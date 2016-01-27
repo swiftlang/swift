@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Fulfillment.h"
+#include "IRGen.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/SIL/TypeLowering.h"
@@ -138,6 +139,69 @@ bool FulfillmentMap::searchTypeMetadata(ModuleDecl &M, CanType type,
   return false;
 }
 
+/// Given that we have a source for a witness table that the given type
+/// conforms to the given protocol, check to see if it fulfills anything.
+bool FulfillmentMap::searchWitnessTable(ModuleDecl &M,
+                                        CanType type, ProtocolDecl *protocol,
+                                        unsigned source, MetadataPath &&path,
+                                        const InterestingKeysCallback &keys) {
+  llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
+  llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
+
+  // If the interesting-keys set is limiting the set of interesting
+  // conformances, collect that filter.
+  if (keys.isInterestingType(type) &&
+      keys.hasLimitedInterestingConformances(type)) {
+    // Bail out immediately if the set is empty.
+    // This only makes sense because we're not trying to fulfill
+    // associated types this way.
+    auto requiredConformances = keys.getInterestingConformances(type);
+    if (requiredConformances.empty()) return false;
+
+    interestingConformancesBuffer.insert(requiredConformances.begin(),
+                                         requiredConformances.end());
+    interestingConformances = &interestingConformancesBuffer;
+  }
+
+  return searchWitnessTable(M, type, protocol, source, std::move(path), keys,
+                            interestingConformances);
+}
+
+bool FulfillmentMap::searchWitnessTable(ModuleDecl &M,
+                                        CanType type, ProtocolDecl *protocol,
+                                        unsigned source, MetadataPath &&path,
+                                        const InterestingKeysCallback &keys,
+                                  const llvm::SmallPtrSetImpl<ProtocolDecl*> *
+                                          interestingConformances) {
+  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+
+  bool hadFulfillment = false;
+
+  auto nextInheritedIndex = 0;
+  for (auto inherited : protocol->getInheritedProtocols(nullptr)) {
+    auto index = nextInheritedIndex++;
+
+    // Ignore protocols that don't have witness tables.
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(inherited))
+      continue;
+
+    MetadataPath inheritedPath = path;
+    inheritedPath.addInheritedProtocolComponent(index);
+    hadFulfillment |= searchWitnessTable(M, type, inherited,
+                                         source, std::move(inheritedPath),
+                                         keys, interestingConformances);
+  }
+
+  // If we're not limited the set of interesting conformances, or if
+  // this is an interesting conformance, record it.
+  if (!interestingConformances || interestingConformances->count(protocol)) {
+    hadFulfillment |= addFulfillment({type, protocol}, source, std::move(path));
+  }
+
+  return hadFulfillment;
+}
+
+
 bool FulfillmentMap::searchParentTypeMetadata(ModuleDecl &M, CanType parent,
                                               unsigned source,
                                               MetadataPath &&path,
@@ -212,45 +276,33 @@ bool FulfillmentMap::searchTypeArgConformances(ModuleDecl &M, CanType arg,
   auto storedConformances = param->getConformsTo();
   if (storedConformances.empty()) return false;
 
-  bool hadFulfillment = false;
+  llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
+  llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
 
-  // If we're not limiting the interesting conformances, just add fulfillments
-  // for all of the stored conformances.
-  if (!keys.hasLimitedInterestingConformances(arg)) {
-    for (size_t confIndex : indices(storedConformances)) {
-      MetadataPath confPath = path;
-      confPath.addNominalTypeArgumentConformanceComponent(argIndex,
-                                                          confIndex);
-      hadFulfillment |=
-        addFulfillment({arg, storedConformances[confIndex]},
-                       source, std::move(confPath));
-    }
+  // If the interesting-keys set is limiting the set of interesting
+  // conformances, collect that filter.
+  if (keys.hasLimitedInterestingConformances(arg)) {
+    // Bail out immediately if the set is empty.
+    auto requiredConformances = keys.getInterestingConformances(arg);
+    if (requiredConformances.empty()) return false;
 
-    return hadFulfillment;
+    interestingConformancesBuffer.insert(requiredConformances.begin(),
+                                         requiredConformances.end());
+    interestingConformances = &interestingConformancesBuffer;
   }
 
-  // Otherwise, our targets are the interesting conformances for the type
-  // argument.
-  auto requiredConformances = keys.getInterestingConformances(arg);
-  if (requiredConformances.empty()) return false;
+  bool hadFulfillment = false;
 
-  for (auto target : requiredConformances) {
-    // Ignore trivial protocols.
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(target))
+  for (size_t confIndex : indices(storedConformances)) {
+    auto storedProtocol = storedConformances[confIndex];
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(storedProtocol))
       continue;
 
-    // Check each of the stored conformances.
-    for (size_t confIndex : indices(storedConformances)) {
-      // TODO: maybe this should consider indirect conformance.
-      // But that should be part of the metadata path.
-      if (target == storedConformances[confIndex]) {
-        MetadataPath confPath = path;
-        confPath.addNominalTypeArgumentConformanceComponent(argIndex,
-                                                            confIndex);
-        hadFulfillment |=
-          addFulfillment({arg, target}, source, std::move(confPath));
-      }
-    }
+    MetadataPath confPath = path;
+    confPath.addNominalTypeArgumentConformanceComponent(argIndex, confIndex);
+    hadFulfillment |=
+      searchWitnessTable(M, arg, storedProtocol, source, std::move(confPath),
+                         keys, interestingConformances);
   }
 
   return hadFulfillment;
@@ -275,4 +327,19 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
     Fulfillments.insert({ key, Fulfillment(source, std::move(path)) });
     return true;
   }
+}
+
+bool FulfillmentMap::Everything::isInterestingType(CanType type) const {
+  return true;
+}
+bool FulfillmentMap::Everything::hasInterestingType(CanType type) const {
+  return true;
+}
+bool FulfillmentMap::Everything
+                   ::hasLimitedInterestingConformances(CanType type) const {
+  return false;
+}
+GenericSignature::ConformsToArray
+FulfillmentMap::Everything::getInterestingConformances(CanType type) const{
+  return {};
 }

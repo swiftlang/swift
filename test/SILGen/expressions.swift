@@ -308,9 +308,9 @@ func archetype_member_ref<T : Runcible>(x: T) {
   x.free_method()
   // CHECK: witness_method $T, #Runcible.free_method!1
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
-  // CHECK-NEXT: copy_addr [[X:%.*]] to [initialization] [[TEMP]]#1
+  // CHECK-NEXT: copy_addr [[X:%.*]] to [initialization] [[TEMP]]
   // CHECK-NEXT: apply
-  // CHECK-NEXT: destroy_addr [[TEMP]]#1
+  // CHECK-NEXT: destroy_addr [[TEMP]]
   var u = x.associated_method()
   // CHECK: witness_method $T, #Runcible.associated_method!1
   // CHECK-NEXT: apply
@@ -401,13 +401,14 @@ func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(x: (Int, Float)) {
   var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box $(Int, Float)
+  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
 
   int(x.0)
-  // CHECK: tuple_element_addr [[XADDR]]#1 : {{.*}}, 0
+  // CHECK: tuple_element_addr [[PB]] : {{.*}}, 0
   // CHECK: apply
 
   float(x.1)
-  // CHECK: tuple_element_addr [[XADDR]]#1 : {{.*}}, 1
+  // CHECK: tuple_element_addr [[PB]] : {{.*}}, 1
   // CHECK: apply
 
   int(tuple().0)
@@ -433,31 +434,36 @@ func if_expr(a: Bool, b: Bool, x: Int, y: Int, z : Int) -> Int {
   var z = z
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box $Bool
+  // CHECK: [[PBA:%.*]] = project_box [[AB]]
   // CHECK: [[BB:%[0-9]+]] = alloc_box $Bool
+  // CHECK: [[PBB:%.*]] = project_box [[BB]]
   // CHECK: [[XB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[PBX:%.*]] = project_box [[XB]]
   // CHECK: [[YB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[PBY:%.*]] = project_box [[YB]]
   // CHECK: [[ZB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[PBZ:%.*]] = project_box [[ZB]]
 
   return a
     ? x
     : b
     ? y
     : z
-  // CHECK:   [[A:%[0-9]+]] = load [[AB]]#1
+  // CHECK:   [[A:%[0-9]+]] = load [[PBA]]
   // CHECK:   [[ACOND:%[0-9]+]] = apply {{.*}}([[A]])
   // CHECK:   cond_br [[ACOND]], [[IF_A:bb[0-9]+]], [[ELSE_A:bb[0-9]+]]
   // CHECK: [[IF_A]]:
-  // CHECK:   [[XVAL:%[0-9]+]] = load [[XB]]
+  // CHECK:   [[XVAL:%[0-9]+]] = load [[PBX]]
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[XVAL]] : $Int)
   // CHECK: [[ELSE_A]]:
-  // CHECK:   [[B:%[0-9]+]] = load [[BB]]#1
+  // CHECK:   [[B:%[0-9]+]] = load [[PBB]]
   // CHECK:   [[BCOND:%[0-9]+]] = apply {{.*}}([[B]])
   // CHECK:   cond_br [[BCOND]], [[IF_B:bb[0-9]+]], [[ELSE_B:bb[0-9]+]]
   // CHECK: [[IF_B]]:
-  // CHECK:   [[YVAL:%[0-9]+]] = load [[YB]]
+  // CHECK:   [[YVAL:%[0-9]+]] = load [[PBY]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[YVAL]] : $Int)
   // CHECK: [[ELSE_B]]:
-  // CHECK:   [[ZVAL:%[0-9]+]] = load [[ZB]]
+  // CHECK:   [[ZVAL:%[0-9]+]] = load [[PBZ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[ZVAL]] : $Int)
   // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : $Int):
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[B_RES]] : $Int)

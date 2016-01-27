@@ -1,10 +1,6 @@
-// RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify
-
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
+// RUN: %target-swift-frontend -emit-sil %s -parse-stdlib -o /dev/null -verify
 
 import Swift
-import gizmo
 
 func markUsed<T>(t: T) {}
 
@@ -145,7 +141,7 @@ func test4() {
   markUsed(t3.2)
 
 
-  // Partially set, wholey read.
+  // Partially set, wholly read.
   var t4 : (Int, Int, Int)   // expected-note 1 {{variable defined here}}
   t4.0 = 1; t4.2 = 42
   _ = t4            // expected-error {{variable 't4.1' used before being initialized}}
@@ -290,7 +286,7 @@ func emptyStructTest() {
 
 func takesTuplePair(inout a : (SomeClass, SomeClass)) {}
 
-// This tests cases where an store might be an init or assign based on control
+// This tests cases where a store might be an init or assign based on control
 // flow path reaching it.
 func conditionalInitOrAssign(c : Bool, x : Int) {
   var t : Int  // Test trivial types.
@@ -578,38 +574,6 @@ enum TrivialEnum : TriviallyConstructible {
     self.init(up: y * y)
   }
 }
-
-@requires_stored_property_inits
-class RequiresInitsDerived : Gizmo {
-  var a = 1
-  var b = 2
-  var c = 3
-
-  override init() {
-    super.init()
-  }
-
-  init(i: Int) {
-    if i > 0 {
-      super.init()
-    }
-  } // expected-error{{super.init isn't called on all paths before returning from initializer}}
-
-  init(d: Double) {
-    f() // expected-error {{use of 'self' in method call 'f' before super.init initializes self}}
-    super.init()
-  }
-
-  init(t: ()) {
-    a = 5 // expected-error {{use of 'self' in property access 'a' before super.init initializes self}}
-    b = 10 // expected-error {{use of 'self' in property access 'b' before super.init initializes self}}
-    super.init()
-    c = 15
-  }
-
-  func f() { }
-}
-
 
 // rdar://16119509 - Dataflow problem where we reject valid code.
 class rdar16119509_Buffer {
@@ -1046,7 +1010,7 @@ struct StructMutatingMethodTest {
   let y : Int
   init() {
     x = 42
-    ++x     // expected-error {{mutating operator '++' may not be used on immutable value 'self.x'}}
+    x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
 
     y = 12
     myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' may not be passed inout}}
@@ -1195,4 +1159,58 @@ func test22436880() {
 let x: String? // expected-note 2 {{constant defined here}}
 print(x?.characters.count) // expected-error {{constant 'x' used before being initialized}}
 print(x!) // expected-error {{constant 'x' used before being initialized}}
+
+
+// <rdar://problem/22723281> QoI: [DI] Misleading error from Swift compiler when using an instance method in init()
+protocol PMI {
+  func getg()
+}
+
+extension PMI {
+  func getg() {}
+}
+
+class WS: PMI {
+  final let x: String  // expected-note {{'self.x' not initialized}}
+  
+  init() {
+    getg()   // expected-error {{use of 'self' in method call 'getg' before all stored properties are initialized}}
+    self.x = "foo"
+  }
+}
+
+// <rdar://problem/23013334> DI QoI: Diagnostic claims that property is being used when it actually isn't
+class r23013334 {
+  var B: Int   // expected-note {{'self.B' not initialized}}
+  var A: String
+  
+  init(A: String) throws {
+    self.A = A
+    self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
+
+      print(self.A)
+      return ()
+    }
+    
+    self.B = 0
+  }
+  
+}
+
+class r23013334Derived : rdar16119509_Base {
+  var B: Int   // expected-note {{'self.B' not initialized}}
+  var A: String
+  
+  init(A: String) throws {
+    self.A = A
+    self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
+      
+      print(self.A)
+      return ()
+    }
+    
+    self.B = 0
+  }
+
+}
 

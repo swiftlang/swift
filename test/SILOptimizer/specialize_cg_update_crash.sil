@@ -23,10 +23,10 @@ bb0:
   %13 = function_ref @_TF7TestMod11genlibfunc2urFq_q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
   %14 = alloc_stack $MyStruct
   %16 = alloc_stack $MyStruct
-  %17 = apply %13<MyStruct>(%16#1, %14#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+  %17 = apply %13<MyStruct>(%16, %14) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
   %18 = struct $MyStruct ()
-  dealloc_stack %16#0 : $*@local_storage MyStruct
-  dealloc_stack %14#0 : $*@local_storage MyStruct
+  dealloc_stack %16 : $*MyStruct
+  dealloc_stack %14 : $*MyStruct
   return %18 : $MyStruct
 }
 

@@ -1,8 +1,8 @@
-//===-------------- ARCAnalysis.cpp - SIL ARC Analysis --------------------===//
+//===--- ARCAnalysis.cpp - SIL ARC Analysis -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -44,7 +44,7 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
   if (auto *BI = dyn_cast<BuiltinInst>(User))
     return AA->canBuiltinDecrementRefCount(BI, Ptr);
 
-  // We can not conservatively prove that this instruction can not decrement the
+  // We cannot conservatively prove that this instruction cannot decrement the
   // ref count of Ptr. So assume that it does.
   return true;
 }
@@ -57,10 +57,10 @@ bool swift::mayCheckRefCount(SILInstruction *User) {
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
 
-/// Returns true if a builtin apply can not use reference counted values.
+/// Returns true if a builtin apply cannot use reference counted values.
 ///
 /// The main case that this handles here are builtins that via read none imply
-/// that they can not read globals and at the same time do not take any
+/// that they cannot read globals and at the same time do not take any
 /// non-trivial types via the arguments. The reason why we care about taking
 /// non-trivial types as arguments is that we want to be careful in the face of
 /// intrinsics that may be equivalent to bitcast and inttoptr operations.
@@ -71,7 +71,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
     if (II.hasAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
-        if (!Op.get().getType().isTrivial(Mod)) {
+        if (!Op.get()->getType().isTrivial(Mod)) {
           return false;
         }
       }
@@ -83,7 +83,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   auto &BI = BInst->getBuiltinInfo();
   if (BI.isReadNone()) {
     for (auto &Op : BInst->getAllOperands()) {
-      if (!Op.get().getType().isTrivial(Mod)) {
+      if (!Op.get()->getType().isTrivial(Mod)) {
         return false;
       }
     }
@@ -108,8 +108,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case ValueKind::WitnessMethodInst:
     return true;
 
-  // DeallocStackInst do not use reference counted values, only local storage
-  // handles.
+  // DeallocStackInst do not use reference counted values.
   case ValueKind::DeallocStackInst:
     return true;
 
@@ -148,7 +147,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   // safe.
   case ValueKind::UncheckedTrivialBitCastInst: {
     SILValue Op = cast<UncheckedTrivialBitCastInst>(Inst)->getOperand();
-    return Op.getType().isTrivial(Inst->getModule());
+    return Op->getType().isTrivial(Inst->getModule());
   }
 
   // Typed GEPs do not use pointers. The user of the typed GEP may but we will
@@ -181,7 +180,11 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
     // Certain builtin function refs we know can never use non-trivial values.
     return canApplyOfBuiltinUseNonTrivialValues(BI);
   }
-
+  // We do not care about branch inst, since if the branch inst's argument is
+  // dead, LLVM will clean it up.
+  case ValueKind::BranchInst:
+  case ValueKind::CondBranchInst:
+    return true;
   default:
     return false;
   }
@@ -237,23 +240,19 @@ bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
   // the object then return true.
   // Notice that we need to check all of the values of the object.
   if (isa<StoreInst>(User)) {
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-      if (AA->mayWriteToMemory(User, SILValue(Ptr.getDef(), i)))
-        return true;
-    }
+    if (AA->mayWriteToMemory(User, Ptr))
+      return true;
     return false;
   }
 
   if (isa<LoadInst>(User) ) {
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-      if (AA->mayReadFromMemory(User, SILValue(Ptr.getDef(), i)))
-        return true;
-    }
+    if (AA->mayReadFromMemory(User, Ptr))
+      return true;
     return false;
   }
 
   // If we have a terminator instruction, see if it can use ptr. This currently
-  // means that we first show that TI can not indirectly use Ptr and then use
+  // means that we first show that TI cannot indirectly use Ptr and then use
   // alias analysis on the arguments.
   if (auto *TI = dyn_cast<TermInst>(User))
     return canTerminatorUseValue(TI, Ptr, AA);
@@ -340,7 +339,7 @@ valueHasARCUsesInInstructionRange(SILValue Op,
     ++Start;
   }
 
-  // If all such instructions can not use Op, return false.
+  // If all such instructions cannot use Op, return false.
   return None;
 }
 
@@ -371,7 +370,7 @@ swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
     --End;
   }
 
-  // If all such instructions can not use Op, return false.
+  // If all such instructions cannot use Op, return false.
   return None;
 }
 
@@ -403,7 +402,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
     ++Start;
   }
 
-  // If all such instructions can not decrement Op, return nothing.
+  // If all such instructions cannot decrement Op, return nothing.
   return None;
 }
 
@@ -424,7 +423,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 
   // Ok, we have an apply site with arguments. Look at the function type and
   // iterate through the function parameters. If any of the parameters are
-  // guaranteed, attempt to prove that the passed in parameter can not alias
+  // guaranteed, attempt to prove that the passed in parameter cannot alias
   // Ptr. If we fail, return true.
   CanSILFunctionType FType = FAS.getSubstCalleeType();
   auto Params = FType->getParameters();
@@ -432,9 +431,8 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
     if (!Params[i].isGuaranteed())
       continue;
     SILValue Op = FAS.getArgument(i);
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++)
-      if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
-        return true;
+    if (!AA->isNoAlias(Op, Ptr))
+      return true;
   }
 
   // Ok, we were able to prove that all arguments to the apply that were
@@ -485,7 +483,7 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
        II != IE; ++II) {
     // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
-      // And the object can not use values in a manner that will keep the object
+      // And the object cannot use values in a manner that will keep the object
       // alive, continue. We may be able to find additional releases.
       if (canNeverUseValues(&*II))
         continue;
@@ -563,7 +561,7 @@ static bool addLastUse(SILValue V, SILBasicBlock *BB,
                        ReleaseTracker &Tracker) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     for (auto &Op : I->getAllOperands())
-      if (Op.get().getDef() == V.getDef()) {
+      if (Op.get() == V) {
         Tracker.trackLastRelease(&*I);
         return true;
       }
@@ -590,7 +588,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
   // We'll treat this like a liveness problem where the value is the def. Each
   // block that has a use of the value has the value live-in unless it is the
   // block with the value.
-  for (auto *UI : V.getUses()) {
+  for (auto *UI : V->getUses()) {
     auto *User = UI->getUser();
     auto *BB = User->getParent();
 
@@ -638,19 +636,15 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 //                            Leaking BB Analysis
 //===----------------------------------------------------------------------===//
 
-static bool ignoreableApplyInstInUnreachableBlock(const ApplyInst *AI) {
-  const char *fatalName = "_TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_";
+static bool ignorableApplyInstInUnreachableBlock(const ApplyInst *AI) {
   const auto *Fn = AI->getCalleeFunction();
-
-  // We use endswith here since if we specialize fatal error we will always
-  // prepend the specialization records to fatalName.
-  if (!Fn || !Fn->getName().endswith(fatalName))
+  if (!Fn)
     return false;
 
-  return true;
+  return Fn->hasSemanticsAttr("arc.programtermination_point");
 }
 
-static bool ignoreableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {
+static bool ignorableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {
   const BuiltinInfo &BInfo = BI->getBuiltinInfo();
   if (BInfo.ID == BuiltinValueKind::CondUnreachable)
     return true;
@@ -687,7 +681,7 @@ bool swift::isARCInertTrapBB(const SILBasicBlock *BB) {
 
     // Check for apply insts that we can ignore.
     if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
-      if (ignoreableApplyInstInUnreachableBlock(AI)) {
+      if (ignorableApplyInstInUnreachableBlock(AI)) {
         ++II;
         continue;
       }
@@ -695,7 +689,7 @@ bool swift::isARCInertTrapBB(const SILBasicBlock *BB) {
 
     // Check for builtins that we can ignore.
     if (auto *BI = dyn_cast<BuiltinInst>(&*II)) {
-      if (ignoreableBuiltinInstInUnreachableBlock(BI)) {
+      if (ignorableBuiltinInstInUnreachableBlock(BI)) {
         ++II;
         continue;
       }

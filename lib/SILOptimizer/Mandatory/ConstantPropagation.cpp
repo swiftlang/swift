@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -366,7 +366,7 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
   }
 }
 
-static std::pair<bool, bool> getTypeSigndness(const BuiltinInfo &Builtin) {
+static std::pair<bool, bool> getTypeSignedness(const BuiltinInfo &Builtin) {
   bool SrcTySigned =
   (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
    Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
@@ -481,7 +481,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     // 2048. Is there a better way to identify conversions from literals?
     bool Literal = (SrcBitWidth == 2048);
 
-    // FIXME: This will prevent hard error in cases the error is comming
+    // FIXME: This will prevent hard error in cases the error is coming
     // from ObjC interoperability code. Currently, we treat NSUInteger as
     // Int.
     if (Loc.getSourceLoc().isInvalid()) {
@@ -503,7 +503,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     // Otherwise report the overflow error.
     if (Literal) {
       bool SrcTySigned, DstTySigned;
-      std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+      std::tie(SrcTySigned, DstTySigned) = getTypeSignedness(Builtin);
       SmallString<10> SrcAsString;
       SrcVal.toString(SrcAsString, /*radix*/10, SrcTySigned);
 
@@ -521,7 +521,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       // Otherwise, print the Builtin Types.
       } else {
         bool SrcTySigned, DstTySigned;
-        std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+        std::tie(SrcTySigned, DstTySigned) = getTypeSignedness(Builtin);
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow_builtin_types,
                  DstTySigned, DstTy, SrcAsString);
@@ -540,10 +540,10 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 
         // Otherwise, print the Builtin Types.
         } else {
-          // Since builtin types are sign-agnostic, print the signdness
+          // Since builtin types are sign-agnostic, print the signedness
           // separately.
           bool SrcTySigned, DstTySigned;
-          std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+          std::tie(SrcTySigned, DstTySigned) = getTypeSignedness(Builtin);
           diagnose(M.getASTContext(), Loc.getSourceLoc(),
                    diag::integer_conversion_overflow_builtin_types,
                    SrcTySigned, SrcTy, DstTySigned, DstTy);
@@ -746,7 +746,7 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
 static bool isApplyOfStringConcat(SILInstruction &I) {
   if (auto *AI = dyn_cast<ApplyInst>(&I))
     if (auto *Fn = AI->getCalleeFunction())
-      if (Fn->hasSemanticsString("string.concat"))
+      if (Fn->hasSemanticsAttr("string.concat"))
         return true;
   return false;
 }
@@ -766,7 +766,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
     return false;
 
   // Replace all uses of the old instruction by a new instruction.
-  SILValue(AI).replaceAllUsesWith(Concatenated);
+  AI->replaceAllUsesWith(Concatenated);
 
   auto RemoveCallback = [&](SILInstruction *DeadI) { WorkList.remove(DeadI); };
   // Remove operands that are not used anymore.
@@ -777,7 +777,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
   for (auto &Op : AI->getAllOperands()) {
     SILValue Val = Op.get();
     Op.drop();
-    if (Val.use_empty()) {
+    if (Val->use_empty()) {
       auto *DeadI = dyn_cast<SILInstruction>(Val);
       recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
                                                  RemoveCallback);
@@ -861,7 +861,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
 
         InvalidateInstructions = true;
-        SILValue(I).replaceAllUsesWith(V);
+        I->replaceAllUsesWith(V);
       },
       [&](SILInstruction *I) { /* EraseAction */
         auto *TI = dyn_cast<TermInst>(I);
@@ -1022,12 +1022,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
           // If the user is a tuple_extract, just substitute the right value in.
           if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
             SILValue NewVal = TI->getOperand(TEI->getFieldNo());
-            assert(TEI->getTypes().size() == 1 &&
-                   "Currently, we only support single result instructions.");
-            SILValue(TEI, 0).replaceAllUsesWith(NewVal);
+            TEI->replaceAllUsesWith(NewVal);
             TEI->dropAllReferences();
             FoldedUsers.insert(TEI);
-            if (auto *Inst = dyn_cast<SILInstruction>(NewVal.getDef()))
+            if (auto *Inst = dyn_cast<SILInstruction>(NewVal))
               WorkList.insert(Inst);
           }
         }
@@ -1038,12 +1036,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
 
       // We were able to fold, so all users should use the new folded value.
-      assert(User->getTypes().size() == 1 &&
-             "Currently, we only support single result instructions");
-      SILValue(User).replaceAllUsesWith(C);
+      User->replaceAllUsesWith(C);
 
       // The new constant could be further folded now, add it to the worklist.
-      if (auto *Inst = dyn_cast<SILInstruction>(C.getDef()))
+      if (auto *Inst = dyn_cast<SILInstruction>(C))
         WorkList.insert(Inst);
     }
 

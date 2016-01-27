@@ -19,10 +19,10 @@ func opaque_archetype_to_opaque_archetype
 func opaque_archetype_is_opaque_archetype
 <T:NotClassBound, U>(t:T, u:U.Type) -> Bool {
   return t is U
-  // CHECK:   checked_cast_addr_br take_always T in [[VAL:%.*]]#1 : $*T to U in [[DEST:%.*]]#1 : $*U, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br take_always T in [[VAL:%.*]] : $*T to U in [[DEST:%.*]] : $*U, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   // CHECK: [[YES]]:
   // CHECK:   [[Y:%.*]] = integer_literal $Builtin.Int1, -1
-  // CHECK:   destroy_addr [[DEST]]#1
+  // CHECK:   destroy_addr [[DEST]]
   // CHECK:   br [[CONT:bb[0-9]+]]([[Y]] : $Builtin.Int1)
   // CHECK: [[NO]]:
   // CHECK:   [[N:%.*]] = integer_literal $Builtin.Int1, 0
@@ -121,9 +121,9 @@ func opaque_existential_to_opaque_archetype
   return p as! T
   // CHECK: bb0([[RET:%.*]] : $*T, [[ARG:%.*]] : $*NotClassBound):
   // CHECK:      [[TEMP:%.*]] = alloc_stack $NotClassBound
-  // CHECK-NEXT: copy_addr [[ARG]] to [initialization] [[TEMP]]#1
-  // CHECK-NEXT: unconditional_checked_cast_addr take_always NotClassBound in [[TEMP]]#1 : $*NotClassBound to T in [[RET]] : $*T
-  // CHECK-NEXT: dealloc_stack [[TEMP]]#0
+  // CHECK-NEXT: copy_addr [[ARG]] to [initialization] [[TEMP]]
+  // CHECK-NEXT: unconditional_checked_cast_addr take_always NotClassBound in [[TEMP]] : $*NotClassBound to T in [[RET]] : $*T
+  // CHECK-NEXT: dealloc_stack [[TEMP]]
   // CHECK-NEXT: destroy_addr [[ARG]]
   // CHECK-NEXT: [[T0:%.*]] = tuple ()
   // CHECK-NEXT: return [[T0]]

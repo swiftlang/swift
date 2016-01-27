@@ -41,7 +41,7 @@ struct Z {
   func getI() -> Int { return i }
   mutating func incI() {}
 
-  func curried(x: Int)(y: Int) -> Int { return x + y } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func curried(x: Int) -> (Int) -> Int { return { y in x + y } }
 
   subscript (k : Int) -> Int {
     get {
@@ -78,7 +78,7 @@ var incI = z.incI // expected-error{{partial application of 'mutating'}}
 var zi = z.getI()
 var zcurried1 = z.curried
 var zcurried2 = z.curried(0)
-var zcurriedFull = z.curried(0)(y: 1)
+var zcurriedFull = z.curried(0)(1)
 
 ////
 // Members of modules
@@ -110,7 +110,7 @@ enum W {
   case Omega
 
   func foo(x: Int) {}
-  func curried(x: Int)(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func curried(x: Int) -> (Int) -> () {}
 }
 
 var w = W.Omega
@@ -118,7 +118,7 @@ var foo = w.foo
 var fooFull : () = w.foo(0)
 var wcurried1 = w.curried
 var wcurried2 = w.curried(0)
-var wcurriedFull : () = w.curried(0)(y: 1)
+var wcurriedFull : () = w.curried(0)(1)
 
 // Member of enum Type
 func enumMetatypeMember(opt: Int?) {
@@ -328,7 +328,7 @@ protocol Functional {
   func apply(v: Vector) -> Scalar
 }
 protocol Coalgebra {
-  func coproduct(f: Functional)(v1: Vector, v2: Vector) -> Scalar // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func coproduct(f: Functional) -> (v1: Vector, v2: Vector) -> Scalar
 }
 
 // Make sure existential is closed early when we partially apply
@@ -533,6 +533,10 @@ func f22490787() {
   }
 }
 
-
+// <rdar://problem/23942743> [QoI] Bad diagnostic when errors inside enum constructor
+enum r23942743 {
+  case Tomato(cloud: String)
+}
+let _ = .Tomato(cloud: .None)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
 
 

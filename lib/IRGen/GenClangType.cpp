@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -205,7 +205,9 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_NAMED_TYPE("COpaquePointer", ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
   CHECK_NAMED_TYPE("DarwinBoolean", ctx.UnsignedCharTy);
-  CHECK_NAMED_TYPE("NSZone", ctx.VoidPtrTy);
+  CHECK_NAMED_TYPE(swiftDecl->getASTContext().getSwiftName(
+                     KnownFoundationEntity::NSZone),
+                   ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("ObjCBool", ctx.ObjCBuiltinBoolTy);
   CHECK_NAMED_TYPE("Selector", getClangSelectorType(ctx));
 #undef CHECK_NAMED_TYPE

@@ -110,8 +110,8 @@ public enum DC_PublicEnum {
 
 // CHECK-LABEL: private{{(\*/)?}} protocol EA_PrivateProtocol {
 private protocol EA_PrivateProtocol {
-  // CHECK: {{^}} typealias Foo
-  typealias Foo
+  // CHECK: {{^}} associatedtype Foo
+  associatedtype Foo
   // CHECK: private var Bar
   var Bar: Int { get }
   // CHECK: private func baz()
@@ -120,8 +120,8 @@ private protocol EA_PrivateProtocol {
 
 // CHECK-LABEL: public{{(\*/)?}} protocol EB_PublicProtocol {
 public protocol EB_PublicProtocol {
-  // CHECK: {{^}} typealias Foo
-  typealias Foo
+  // CHECK: {{^}} associatedtype Foo
+  associatedtype Foo
   // CHECK: public var Bar
   var Bar: Int { get }
   // CHECK: public func baz()
@@ -241,13 +241,13 @@ private struct GC_NestedOuterPrivate {
 
 
 public protocol HA_PublicProtocol {
-  typealias Assoc
+  associatedtype Assoc
 }
 internal protocol HB_InternalProtocol {
-  typealias Assoc
+  associatedtype Assoc
 }
 private protocol HC_PrivateProtocol {
-  typealias Assoc
+  associatedtype Assoc
 }
 public struct HA_PublicStruct {}
 internal struct HB_InternalStruct {}

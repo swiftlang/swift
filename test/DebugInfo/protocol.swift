@@ -9,8 +9,8 @@ class Point : PointUtils {
     var x : Float
     var y : Float
     init (_x : Float, _y : Float) {
-        x = _x;
-        y = _y;
+        x = _x
+        y = _y
     }
 
     func distanceFromOrigin() -> Float {

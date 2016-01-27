@@ -141,7 +141,7 @@ provide patterns for the other kinds of types as well.
 Selection statement
 -------------------
 
-This is the main way we expect users to employ non-obvious pattern- matching. We
+This is the main way we expect users to employ non-obvious pattern-matching. We
 obviously need something with statement children, so this has to be a
 statement. That's also fine because this kind of full pattern match is very
 syntactically heavyweight, and nobody would want to embed it in the middle of an

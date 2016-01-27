@@ -45,10 +45,6 @@ struct Test1 : RawOptionSetType {
   var rawValue: Int { return 0 }
 }
 
-print("", appendNewline: false)
-Swift.print("", appendNewline: false)
-print("", appendNewline: true)
-print("", false, appendNewline: false)
 print("", false)
 
 func ftest1() {

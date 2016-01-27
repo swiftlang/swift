@@ -11,6 +11,7 @@ func markUsed<T>(t: T) {}
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
 
 // -- initialize x
+// CHECK: alloc_global @_Tv8toplevel1xSi
 // CHECK: [[X:%[0-9]+]] = global_addr @_Tv8toplevel1xSi : $*Int
 // CHECK: integer_literal $Builtin.Int2048, 999
 // CHECK: store {{.*}} to [[X]]
@@ -32,6 +33,7 @@ x = 0
 print_x()
 
 // <rdar://problem/19770775> Deferred initialization of let bindings rejected at top level in playground
+// CHECK: alloc_global @_Tv8toplevel5countSi
 // CHECK: [[COUNTADDR:%[0-9]+]] = global_addr @_Tv8toplevel5countSi : $*Int
 // CHECK-NEXT: [[COUNTMUI:%[0-9]+]] = mark_uninitialized [var] [[COUNTADDR]] : $*Int
 let count: Int
@@ -60,6 +62,7 @@ func print_y() {
 
 
 // -- assign y
+// CHECK: alloc_global @_Tv8toplevel1ySi
 // CHECK: [[Y1:%[0-9]+]] = global_addr @_Tv8toplevel1ySi : $*Int
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
 // CHECK: assign {{.*}} to [[Y]]
@@ -73,7 +76,7 @@ print_y()
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
 // CHECK: [[SINK:%.+]] = function_ref @_TF8toplevel8markUsed
 // CHECK-NOT: release
-// CHECK: store [[VALUE]] to [[BOX:%.+]]#1 : $*A
+// CHECK: store [[VALUE]] to [[BOX:%.+]] : $*A
 // CHECK-NOT: release
 // CHECK: apply [[SINK]]<A>({{%.+}})
 class A {}
@@ -81,7 +84,8 @@ guard let a = Optional(A()) else { trap() }
 markUsed(a)
 
 
-// CHECK: [[VARADDR:%[0-9]+]] = global_addr @_Tv8toplevel21NotInitializedIntegerSi
+// CHECK: alloc_global @_Tv8toplevel21NotInitializedIntegerSi
+// CHECK-NEXT: [[VARADDR:%[0-9]+]] = global_addr @_Tv8toplevel21NotInitializedIntegerSi
 // CHECK-NEXT: [[VARMUI:%[0-9]+]] = mark_uninitialized [var] [[VARADDR]] : $*Int
 // CHECK-NEXT: mark_function_escape [[VARMUI]] : $*Int
 

@@ -1,8 +1,8 @@
-//===--------- LoopUnroll.cpp - Loop unrolling ------------*- C++ -*-------===//
+//===--- LoopUnroll.cpp - Loop unrolling ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -56,7 +56,7 @@ public:
 
 protected:
   SILValue remapValue(SILValue V) {
-    if (auto *BB = V.getDef()->getParentBB()) {
+    if (auto *BB = V->getParentBB()) {
       if (!Loop->contains(BB))
         return V;
     }
@@ -140,7 +140,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
-      RecArg->getIncomingValue(Preheader).getDef());
+      RecArg->getIncomingValue(Preheader));
   if (!Start)
     return None;
 
@@ -197,12 +197,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   // We can either have a split backedge as our latch terminator.
   //   HeaderBlock:
   //     ...
-  //     cond_br %cond, ExitBlock, BackegdeBlock
+  //     cond_br %cond, ExitBlock, BackedgeBlock
   //
-  //   BackegdeBlock:
+  //   BackedgeBlock:
   //     br HeaderBlock:
   //
-  // Or a a conditional branch back to the header.
+  // Or a conditional branch back to the header.
   //   HeaderBlock:
   //     ...
   //     cond_br %cond, ExitBlock, HeaderBlock
@@ -290,12 +290,11 @@ static void collectLoopLiveOutValues(
         // Is this use outside the loop.
         if (!Loop->contains(Op->getUser())) {
           auto UsedValue = Op->get();
-          assert(UsedValue.getDef() == &Inst && "Instructions must match");
+          assert(UsedValue == &Inst && "Instructions must match");
           assert(ClonedInstructions.count(&Inst) && "Unmapped instruction!");
 
           if (!LoopLiveOutValues.count(UsedValue))
-            LoopLiveOutValues[UsedValue].push_back(SILValue(
-                ClonedInstructions[&Inst], UsedValue.getResultNumber()));
+            LoopLiveOutValues[UsedValue].push_back(ClonedInstructions[&Inst]);
         }
       }
     }
@@ -310,11 +309,11 @@ updateSSA(SILLoop *Loop,
     // Collect out of loop uses of this value.
     auto OrigValue = MapEntry.first;
     SmallVector<UseWrapper, 16> UseList;
-    for (auto Use : OrigValue.getUses())
+    for (auto Use : OrigValue->getUses())
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.Initialize(OrigValue.getType());
+    SSAUp.Initialize(OrigValue->getType());
     SSAUp.AddAvailableValue(OrigValue->getParentBB(), OrigValue);
     for (auto NewValue : MapEntry.second)
       SSAUp.AddAvailableValue(NewValue->getParentBB(), NewValue);
@@ -390,10 +389,8 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
           MappedValue = Cloner.getValueMap()[MapEntry.first];
         // Otherwise, consult the instruction map.
         else
-          MappedValue = SILValue(
-              Cloner
-                  .getInstMap()[cast<SILInstruction>(MapEntry.first.getDef())],
-              MapEntry.first.getResultNumber());
+          MappedValue = Cloner
+                  .getInstMap()[cast<SILInstruction>(MapEntry.first)];
         MapEntry.second.push_back(MappedValue);
         assert(MapEntry.second.size() == Cnt);
       }

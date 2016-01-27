@@ -1,8 +1,8 @@
-//===------ SideEffectAnalysis.h - SIL Side Effect Analysis -*- C++ -*-----===//
+//===--- SideEffectAnalysis.h - SIL Side Effect Analysis --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -181,8 +181,8 @@ public:
     /// release instructions, e.g. isUnique?
     bool ReadsRC = false;
     
-    /// Returns the effecs for an address or reference. This might be a
-    /// parameter, the LocalEffects or, if the value can not be associated to one
+    /// Returns the effects for an address or reference. This might be a
+    /// parameter, the LocalEffects or, if the value cannot be associated to one
     /// of them, the GlobalEffects.
     Effects *getEffectsOn(SILValue Addr);
     

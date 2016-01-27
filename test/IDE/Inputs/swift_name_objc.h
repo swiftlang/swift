@@ -1,4 +1,4 @@
-@import ObjectiveC;
+@import Foundation;
 
 #define SWIFT_NAME(X) __attribute__((swift_name(#X)))
 
@@ -45,6 +45,12 @@ SWIFT_NAME(SomeProtocol)
 @end
 
 @protocol SNCollision
+@property (readonly,nonnull) id reqSetter;
+- (void)setReqSetter:(nonnull id)bar;
+
+@property (readonly,nonnull) id optSetter;
+@optional
+- (void)setOptSetter:(nonnull id)bar;
 @end
 
 @protocol NSAccessibility

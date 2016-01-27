@@ -25,7 +25,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %12 = function_ref @globalinit_func11 : $@convention(thin) () -> () // users: %26, %13
   %14 = builtin "once"(%11 : $Builtin.RawPointer, %12 : $@convention(thin) () -> ()) : $()
   %15 = alloc_stack $Int32                        // users: %38, %40, %41
-  %16 = struct_element_addr %15#1 : $*Int32, #Int32._value // users: %28, %17
+  %16 = struct_element_addr %15 : $*Int32, #Int32._value // users: %28, %17
   %17 = load %16 : $*Builtin.Int32                // user: %20
   %18 = integer_literal $Builtin.Int32, -1         // user: %20
   %20 = builtin "xor_Int32"(%17 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int32 // user: %22
@@ -53,7 +53,7 @@ bb3(%35 : $()):                                   // Preds: bb2
   strong_retain %1 : $Builtin.NativeObject        // id: %38
   strong_release %1 : $Builtin.NativeObject       // id: %39
   strong_release %1 : $Builtin.NativeObject       // id: %40
-  dealloc_stack %15#0 : $*@local_storage Int32    // id: %41
+  dealloc_stack %15 : $*Int32    // id: %41
 // CHECK: return
   return %0 : $Builtin.RawPointer
 }

@@ -48,7 +48,7 @@ Swift. Given a static type, it is obvious what kind it is from its
 definition. These kinds are:
 
 1. **Immutable Data** - Immutable data (which can have a constructor, but whose
-   value cannot be changed after it completes) is sharable across actors, and it
+   value cannot be changed after it completes) is shareable across actors, and it
    would make sense to unique them where possible.  Immutable data can
    (transitively) point to other immutable data, but it isn't valid (and the
    compiler rejects) immutable data that is pointing to mutable data. For
@@ -322,7 +322,7 @@ covered by this model at all. For example, having multiple threads execute on
 different slices of the same array would require copying the array to temporary
 disjoint memory spaces to do operations, then recopy it back into place. This
 data copying can be awkward and reduce the benefits of parallelism to make it
-non- profitable.
+non-profitable.
 
 There are multiple different ways to tackle this. We can just throw it back into
 the programmer's lap and tell them that the behavior is undefined if they get a

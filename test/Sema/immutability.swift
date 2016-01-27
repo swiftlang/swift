@@ -23,7 +23,7 @@ func foreach_variable() {
   }
 }
 
-func takeClosure(fn : (Int)->Int) {}
+func takeClosure(fn : (Int) -> Int) {}
 
 func passClosure() {
   takeClosure { a in
@@ -221,10 +221,10 @@ func test_mutability() {
 
 
 func test_arguments(a : Int,
-                    var b : Int, // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{21-25=}}
-                    let c : Int) {   // expected-warning {{Use of 'let' binding here is deprecated and will be removed in a future version of Swift}} {{21-25=}}
+                    var b : Int, // expected-error {{Use of 'var' binding here is not allowed}} {{21-25=}}
+                    let c : Int) { // expected-warning {{'let' keyword is unnecessary; function parameters are immutable by default}} {{21-25=}}
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
-  b = 2  // ok.
+  var b = 2  // ok.
   c = 3  // expected-error {{cannot assign to value: 'c' is a 'let' constant}}
 }
 
@@ -317,7 +317,7 @@ func testSubscriptNoGetter(iis: SubscriptNoGetter) {
 func testSelectorStyleArguments1(x: Int, bar y: Int) {
   var x = x
   var y = y
-  ++x; ++y
+  x += 1; y += 1
 }
 
 func testSelectorStyleArguments2(x: Int,

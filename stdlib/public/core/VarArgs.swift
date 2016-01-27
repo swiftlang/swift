@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -333,7 +333,8 @@ final public class VaListBuilder {
     }
 
     for word in words {
-      storage[count++] = word
+      storage[count] = word
+      count += 1
     }
   }
 
@@ -403,7 +404,8 @@ final public class VaListBuilder {
       sseRegistersUsed += 1
     }
     else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
-      storage[gpRegistersUsed++] = encoded[0]
+      storage[gpRegistersUsed] = encoded[0]
+      gpRegistersUsed += 1
     }
     else {
       for w in encoded {

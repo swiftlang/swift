@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,6 @@
 #include <cstring>
 #include <new>
 #include <string>
-#include <regex>
 #include <dlfcn.h>
 
 #if SWIFT_OBJC_INTEROP
@@ -575,7 +574,12 @@ static void getEnumMirrorInfo(const OpaqueValue *value,
 
   unsigned payloadCases = Description.getNumPayloadCases();
 
-  unsigned tag = type->vw_getEnumTag(value);
+  // 'tag' is in the range [-ElementsWithPayload..ElementsWithNoPayload-1].
+  int tag = type->vw_getEnumTag(value);
+
+  // Convert resilient tag index to fragile tag index.
+  tag += payloadCases;
+
   const Metadata *payloadType = nullptr;
   bool indirect = false;
 
@@ -660,18 +664,6 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
 }
   
 // -- Class destructuring.
-static bool classHasSuperclass(const ClassMetadata *c) {
-#if SWIFT_OBJC_INTEROP
-  // A class does not have a superclass if its ObjC superclass is the
-  // "SwiftObject" root class.
-  return c->SuperClass
-    && (Class)c->SuperClass != NSClassFromString(@"SwiftObject");
-#else
-  // In non-objc mode, the test is just if it has a non-null superclass.
-  return c->SuperClass != nullptr;
-#endif
-}
-
 static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      HeapObject *owner,
                                      const OpaqueValue *value,

@@ -9,7 +9,7 @@ struct DoesNotBridgeToObjC {}
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<Int>
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to Array<Int> in [[TARGET]]#1 : $*Array<Int>, bb1, bb2
+// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Array<Int> in [[TARGET]] : $*Array<Int>, bb1, bb2
 @inline(never)
 func testAnyObjectToArrayInt(a: AnyObject) -> Bool {
   return a is [Int]
@@ -19,7 +19,7 @@ func testAnyObjectToArrayInt(a: AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<String>
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to Array<String> in [[TARGET]]#1 : $*Array<String>, bb1, bb2
+// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Array<String> in [[TARGET]] : $*Array<String>, bb1, bb2
 @inline(never)
 func testAnyObjectToArrayString(a: AnyObject) -> Bool {
   return a is [String]
@@ -39,7 +39,7 @@ func testAnyObjectToArrayNotBridged(a: AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Dictionary<Int, String>
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to Dictionary<Int, String> in [[TARGET]]#1 : $*Dictionary<Int, String>, bb1, bb2
+// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Dictionary<Int, String> in [[TARGET]] : $*Dictionary<Int, String>, bb1, bb2
 @inline(never)
 func testAnyObjectToDictionary(a: AnyObject) -> Bool {
   return a is [Int:String]
@@ -49,7 +49,7 @@ func testAnyObjectToDictionary(a: AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $String
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to String in [[TARGET]]#1 : $*String, bb1, bb2
+// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to String in [[TARGET]] : $*String, bb1, bb2
 @inline(never)
 func testAnyObjectToString(a: AnyObject) -> Bool {
   return a is String

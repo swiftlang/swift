@@ -243,7 +243,7 @@ bb4(%a1 : $Int32):
   cond_br undef, bb1, bb5
 
 bb5:
-  dealloc_stack %s1#0 : $*@local_storage Int32
+  dealloc_stack %s1 : $*Int32
   return %a1 : $Int32
 }
 
@@ -267,7 +267,7 @@ bb2:
   %o1 = alloc_ref $XX
   %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
   %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
-  dealloc_stack %s1#0 : $*@local_storage Int32
+  dealloc_stack %s1 : $*Int32
   %l1 = ref_element_addr %n1 : $XX, #XX.x
   %l2 = load %l1 : $*Int32
   strong_release %n1 : $XX

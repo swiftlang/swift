@@ -1,8 +1,8 @@
-//===--- TypeExpansionAnalysis.h ------------------------------*- C++ -*------===//
+//===--- TypeExpansionAnalysis.h --------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -26,7 +26,7 @@ enum class TEKind {
   TENode  // Intermediate and leaf nodes expansion.
 }; 
 
-using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
+using TypeExpansionMap = llvm::DenseMap<SILType, NewProjectionPathList>;
 
 /// This analysis determines memory effects during destruction.
 class TypeExpansionAnalysis : public SILAnalysis {
@@ -45,9 +45,8 @@ public:
   }
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.
-  const ProjectionPathList &getTypeExpansionProjectionPaths(SILType B,
-                                                            SILModule *Mod,
-                                                            TEKind K);
+  const NewProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod,
+                                                TEKind K);
 };
 }
 #endif

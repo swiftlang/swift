@@ -73,13 +73,13 @@ func doSomething<T : P>(b : B<T>, _ t : T) {
 }
 
 func driver() -> () {
-  var b = B<C2>()
-  var b2 = B2<C1>()
-  var b3 = B3<C0>()
+  let b = B<C2>()
+  let b2 = B2<C1>()
+  let b3 = B3<C0>()
 
-  var c0 = C0()
-  var c1 = C1()
-  var c2 = C2()
+  let c0 = C0()
+  let c1 = C1()
+  let c2 = C2()
 
   doSomething(b, c2)
   doSomething(b2, c1)

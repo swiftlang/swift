@@ -83,12 +83,6 @@ class NestedGeneric<U> {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF16generic_closures24generic_curried_function{{.*}} : $@convention(thin) <T, U> (@in U, @in T) -> () {
-// CHECK-LABEL: sil shared @_TF16generic_closures24generic_curried_function{{.*}}
-func generic_curried_function<T, U>(x: T)(y: U) { }
-
-var f: (Int) -> () = generic_curried_function(zero)
-
   // <rdar://problem/15417773>
   // Ensure that nested closures capture the generic parameters of their nested
   // context.

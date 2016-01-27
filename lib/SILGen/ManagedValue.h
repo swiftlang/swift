@@ -1,8 +1,8 @@
-//===--- RValue.h - Exploded RValue Representation --------------*- C++ -*-===//
+//===--- ManagedValue.h - Exploded RValue Representation --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -79,7 +79,7 @@ public:
   /// Create a managed value for an l-value.
   static ManagedValue forLValue(SILValue value) {
     assert(value && "No value specified");
-    assert(value.getType().isAddress() &&
+    assert(value->getType().isAddress() &&
            "lvalues always have isAddress() type");
     return ManagedValue(value, true, CleanupHandle::invalid());
   }
@@ -119,7 +119,7 @@ public:
   }
   SILValue getValue() const { return valueAndFlag.getPointer(); }
   
-  SILType getType() const { return getValue().getType(); }
+  SILType getType() const { return getValue()->getType(); }
   
 
   CanType getSwiftType() const {

@@ -1,8 +1,8 @@
-//===--- AbstractionPattern.h - SIL type abstraction pattersn ---*- C++ -*-===//
+//===--- AbstractionPattern.h - SIL type abstraction patterns ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -248,31 +248,7 @@ class AbstractionPattern {
   };
   CanGenericSignature GenericSig;
 
-  static bool isOpaqueType(CanGenericSignature signature, CanType type) {
-    assert(signature || !type->hasTypeParameter());
-    if (auto arch = dyn_cast<ArchetypeType>(type))
-      return !arch->requiresClass();
-    // FIXME: Check class constraint of dependent types in their originating
-    // context.  Even for direct parameters this requires a more principled
-    // check than this.
-    if (auto paramType = dyn_cast<GenericTypeParamType>(type))
-      return isOpaqueType(signature, paramType);
-    if (isa<DependentMemberType>(type))
-      return true;
-    return false;
-  }
-
-  static bool isOpaqueType(CanGenericSignature signature,
-                           CanGenericTypeParamType type);
-
   Kind getKind() const { return Kind(TheKind); }
-
-  CanGenericSignature getGenericSignature() const {
-    assert(getKind() == Kind::Type ||
-           hasStoredClangType() ||
-           hasStoredObjCMethod());
-    return CanGenericSignature(GenericSig);
-  }
 
   CanGenericSignature getGenericSignatureForFunctionComponent() const {
     if (auto genericFn = dyn_cast<GenericFunctionType>(getType())) {
@@ -304,36 +280,29 @@ class AbstractionPattern {
     return hasStoredObjCMethod();
   }
 
-  void initSwiftType(CanGenericSignature signature, CanType origType) {
+  void initSwiftType(CanGenericSignature signature, CanType origType,
+                     Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
-    if (isOpaqueType(signature, origType)) {
-      TheKind = unsigned(Kind::Opaque);
-    } else {
-      TheKind = unsigned(Kind::Type);
-      OrigType = origType;
+    TheKind = unsigned(kind);
+    OrigType = origType;
+    GenericSig = CanGenericSignature();
+    if (origType->hasTypeParameter())
       GenericSig = signature;
-    }
   }
 
   void initClangType(CanGenericSignature signature,
                      CanType origType, const clang::Type *clangType,
                      Kind kind = Kind::ClangType) {
-    assert(!isOpaqueType(signature, origType));
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ClangType = clangType;
-    GenericSig = signature;
   }
 
   void initObjCMethod(CanGenericSignature signature,
                       CanType origType, const clang::ObjCMethodDecl *method,
                       Kind kind, EncodedForeignErrorInfo errorInfo) {
-    assert(!isOpaqueType(signature, origType));
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ObjCMethod = method;
     OtherData = errorInfo.getOpaqueValue();
-    GenericSig = signature;
   }
 
   AbstractionPattern() {}
@@ -362,6 +331,19 @@ public:
     return AbstractionPattern(Kind::Invalid);
   }
 
+  bool hasGenericSignature() const {
+    return (getKind() == Kind::Type ||
+            hasStoredClangType() ||
+            hasStoredObjCMethod());
+  }
+
+  CanGenericSignature getGenericSignature() const {
+    assert(getKind() == Kind::Type ||
+           hasStoredClangType() ||
+           hasStoredObjCMethod());
+    return CanGenericSignature(GenericSig);
+  }
+  
   /// Return an open-coded abstraction pattern for a tuple.  The
   /// caller is responsible for ensuring that the storage for the
   /// tuple elements is valid for as long as the abstraction pattern is.
@@ -498,10 +480,43 @@ public:
     return getKind() != Kind::Invalid;
   }
 
-  /// Is this abstraction pattern fully opaque?
-  bool isOpaque() const {
-    assert(isValid());
-    return getKind() == Kind::Opaque;
+  bool isTypeParameter() const {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return true;
+    case Kind::Type: {
+      auto type = getType();
+      if (isa<ArchetypeType>(type) ||
+          isa<DependentMemberType>(type) ||
+          isa<AbstractTypeParamType>(type)) {
+        return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
+  }
+
+  bool requiresClass(ModuleDecl &module) {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return false;
+    case Kind::Type: {
+      auto type = getType();
+      if (auto archetype = dyn_cast<ArchetypeType>(type))
+        return archetype->requiresClass();
+      else if (isa<DependentMemberType>(type) ||
+               isa<AbstractTypeParamType>(type)) {
+        assert(GenericSig &&
+               "Dependent type in pattern without generic signature?");
+        return GenericSig->requiresClass(type, module);
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
   }
 
   /// Return the Swift type which provides structure for this

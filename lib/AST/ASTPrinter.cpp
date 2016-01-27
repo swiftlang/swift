@@ -1,8 +1,8 @@
-//===--- ASTPrinter.cpp - Swift Language AST Printer---------------------===//
+//===--- ASTPrinter.cpp - Swift Language AST Printer ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
@@ -31,6 +32,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -120,7 +122,7 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
       Builder.append(Data, Data + Step);
     } else {
 
-      // If malformatted, add replacement characters.
+      // If malformed, add replacement characters.
       Builder.append(Replacement);
     }
     Data += Step;
@@ -135,8 +137,12 @@ bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
   Ty = Ty->getRValueType();
   PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
    if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
+     llvm::SmallPtrSet<const ExtensionDecl*, 4> AllExts;
+     for (auto Ext : ND->getExtensions()) {
+       AllExts.insert(Ext);
+     }
      Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
+       return AllExts.count(ED) == 1 && isExtensionApplied(*ND->getDeclContext(), Ty, ED);
      };
      ND->print(OS, Options);
      return true;
@@ -216,6 +222,14 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   return *this;
 }
 
+ASTPrinter &ASTPrinter::operator<<(DeclName name) {
+  llvm::SmallString<32> str;
+  llvm::raw_svector_ostream os(str);
+  name.print(os);
+  printTextImpl(os.str());
+  return *this;
+}
+
 /// Determine whether to escape the given keyword in the given context.
 static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   switch (context) {
@@ -224,6 +238,9 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
 
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
+
+  case PrintNameContext::FunctionParameter:
+    return !canBeArgumentLabel(keyword);
   }
 }
 
@@ -424,15 +441,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
     // is null.
     if ((Options.PreferTypeRepr && TL.hasLocation()) ||
         TL.getType().isNull()) {
-      TL.getTypeRepr()->print(Printer, Options);
+      if (auto repr = TL.getTypeRepr())
+        repr->print(Printer, Options);
       return;
     }
     TL.getType().print(Printer, Options);
   }
 
   void printAttributes(const Decl *D);
-  void printTypedPattern(const TypedPattern *TP,
-                         bool StripOuterSliceType = false);
+  void printTypedPattern(const TypedPattern *TP);
 
 public:
   void printPattern(const Pattern *pattern);
@@ -466,10 +483,11 @@ private:
   /// \returns true if anything was printed.
   bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
-  void printOneParameter(const Pattern *BodyPattern,
-                         bool ArgNameIsAPIByDefault,
-                         bool StripOuterSliceType,
-                         bool Curried);
+  void printOneParameter(const ParamDecl *param, bool Curried,
+                         bool ArgNameIsAPIByDefault);
+
+  void printParameterList(ParameterList *PL, bool isCurried,
+                          std::function<bool(unsigned)> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -507,8 +525,7 @@ void PrintAST::printAttributes(const Decl *D) {
   D->getAttrs().print(Printer, Options);
 }
 
-void PrintAST::printTypedPattern(const TypedPattern *TP,
-                                 bool StripOuterSliceType) {
+void PrintAST::printTypedPattern(const TypedPattern *TP) {
   auto TheTypeLoc = TP->getTypeLoc();
   if (TheTypeLoc.hasLocation()) {
     // If the outer typeloc is an InOutTypeRepr, print the inout before the
@@ -528,13 +545,6 @@ void PrintAST::printTypedPattern(const TypedPattern *TP,
 
     printPattern(TP->getSubPattern());
     Printer << ": ";
-    if (StripOuterSliceType) {
-      Type T = TP->getType();
-      if (auto *BGT = T->getAs<BoundGenericType>()) {
-        BGT->getGenericArgs()[0].print(Printer, Options);
-        return;
-      }
-    }
     printTypeLoc(TheTypeLoc);
     return;
   }
@@ -547,12 +557,6 @@ void PrintAST::printTypedPattern(const TypedPattern *TP,
 
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  if (StripOuterSliceType) {
-    if (auto *BGT = T->getAs<BoundGenericType>()) {
-      BGT->getGenericArgs()[0].print(Printer, Options);
-      return;
-    }
-  }
   T.print(Printer, Options);
 }
 
@@ -564,9 +568,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
-    recordDeclLoc(named->getDecl(),
-      [&]{
-        Printer.printName(named->getBodyName());
+    recordDeclLoc(named->getDecl(), [&]{
+        Printer.printName(named->getBoundName());
       });
     break;
   }
@@ -585,21 +588,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
       const auto &Elt = Fields[i];
       if (i != 0)
         Printer << ", ";
-
-      if (Elt.hasEllipsis()) {
-        printTypedPattern(cast<TypedPattern>(Elt.getPattern()),
-                          /*StripOuterSliceType=*/true);
-        Printer << "...";
-      } else {
-        printPattern(Elt.getPattern());
-      }
-      if (Elt.getDefaultArgKind() != DefaultArgumentKind::None) {
-        if (Options.PrintDefaultParameterPlaceholder)
-          Printer << " = default";
-        else if (Options.VarInitializers) {
-          // FIXME: Print initializer here.
-        }
-      }
+      
+      printPattern(Elt.getPattern());
     }
     Printer << ")";
     break;
@@ -698,8 +688,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
 
   bool isFirst = true;
   for (auto &req : requirements) {
-    if (req.isInvalid() ||
-        req.getKind() == RequirementKind::WitnessMarker)
+    if (req.isInvalid())
       continue;
 
     if (isFirst) {
@@ -716,18 +705,16 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
     }
 
     switch (req.getKind()) {
-    case RequirementKind::Conformance:
+    case RequirementReprKind::TypeConstraint:
       printTypeLoc(req.getSubjectLoc());
       Printer << " : ";
       printTypeLoc(req.getConstraintLoc());
       break;
-    case RequirementKind::SameType:
+    case RequirementReprKind::SameType:
       printTypeLoc(req.getFirstTypeLoc());
       Printer << " == ";
       printTypeLoc(req.getSecondTypeLoc());
       break;
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("Handled above");
     }
   }
 }
@@ -1290,6 +1277,13 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
           Printer << ".";
         }
       }
+
+      // Respect alias type.
+      if (extendedType->getKind() == TypeKind::NameAlias) {
+        extendedType.print(Printer, Options);
+        return;
+      }
+
       Printer.printTypeRef(nominal, nominal->getName());
     });
   printInherited(decl);
@@ -1399,7 +1393,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   if (!Options.SkipIntroducerKeywords)
-    Printer << "typealias ";
+    Printer << "associatedtype ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -1562,50 +1556,40 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
   return visitVarDecl(decl);
 }
 
-void PrintAST::printOneParameter(const Pattern *BodyPattern,
-                                 bool ArgNameIsAPIByDefault,
-                                 bool StripOuterSliceType,
-                                 bool Curried) {
+void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
+                                 bool ArgNameIsAPIByDefault) {
   auto printArgName = [&]() {
     // Print argument name.
-    auto ArgName = BodyPattern->getBoundName();
-    auto BodyName = BodyPattern->getBodyName();
+    auto ArgName = param->getArgumentName();
+    auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      Printer.printName(ArgName);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
 
       if (!ArgNameIsAPIByDefault && !ArgName.empty())
         Printer << " _";
       break;
     case PrintOptions::ArgAndParamPrintingMode::MatchSource:
       if (ArgName == BodyName && ArgNameIsAPIByDefault) {
-        Printer.printName(ArgName);
+        Printer.printName(ArgName, PrintNameContext::FunctionParameter);
         break;
       }
       if (ArgName.empty() && !ArgNameIsAPIByDefault) {
-        Printer.printName(BodyName);
+        Printer.printName(BodyName, PrintNameContext::FunctionParameter);
         break;
       }
       SWIFT_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::BothAlways:
-      Printer.printName(ArgName);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
       Printer << " ";
-      Printer.printName(BodyName);
+      Printer.printName(BodyName, PrintNameContext::FunctionParameter);
       break;
     }
     Printer << ": ";
   };
 
-  if (auto *VP = dyn_cast<VarPattern>(BodyPattern))
-    BodyPattern = VP->getSubPattern();
-  auto *TypedBodyPattern = dyn_cast<TypedPattern>(BodyPattern);
-  if (!TypedBodyPattern) {
-    // It was a syntax error.
-    printArgName();
-    return;
-  }
-  auto TheTypeLoc = TypedBodyPattern->getTypeLoc();
-  if (TheTypeLoc.hasLocation()) {
+  auto TheTypeLoc = param->getTypeLoc();
+  if (TheTypeLoc.getTypeRepr()) {
     // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
     // subpattern.
     if (auto *IOTR = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
@@ -1619,6 +1603,9 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
       Printer << "inout ";
     }
   } else {
+    if (param->hasType())
+      TheTypeLoc = TypeLoc::withoutLoc(param->getType());
+    
     if (Type T = TheTypeLoc.getType()) {
       if (auto *IOT = T->getAs<InOutType>()) {
         Printer << "inout ";
@@ -1628,9 +1615,9 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
   }
 
   // If the parameter is autoclosure, or noescape, print it.  This is stored
-  // on the type of the pattern, not on the typerepr.
-  if (BodyPattern->hasType()) {
-    auto bodyCanType = BodyPattern->getType()->getCanonicalType();
+  // on the type of the decl, not on the typerepr.
+  if (param->hasType()) {
+    auto bodyCanType = param->getType()->getCanonicalType();
     if (auto patternType = dyn_cast<AnyFunctionType>(bodyCanType)) {
       switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
       case 0: break; // neither.
@@ -1643,12 +1630,6 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
 
   printArgName();
 
-  if (StripOuterSliceType && !TheTypeLoc.hasLocation()) {
-    if (auto *BGT = TypedBodyPattern->getType()->getAs<BoundGenericType>()) {
-      BGT->getGenericArgs()[0].print(Printer, Options);
-      return;
-    }
-  }
   auto ContainsFunc = [&] (DeclAttrKind Kind) {
     return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
       begin(), Options.ExcludeAttrList.end(), Kind);
@@ -1667,66 +1648,64 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
     Options.ExcludeAttrList.push_back(DAK_NoEscape);
   if (!hasAutoClosure)
     Options.ExcludeAttrList.push_back(DAK_AutoClosure);
+  
+  
+  // If the parameter is variadic, we will print the "..." after it, but we have
+  // to strip off the added array type.
+  if (param->isVariadic() && TheTypeLoc.getType()) {
+    if (auto *BGT = TheTypeLoc.getType()->getAs<BoundGenericType>())
+      TheTypeLoc.setType(BGT->getGenericArgs()[0]);
+  }
+  
   printTypeLoc(TheTypeLoc);
+  
+  if (param->isVariadic())
+    Printer << "...";
 
   // After printing the type, we need to restore what the option used to be.
   if (!hasNoEscape)
     RemoveFunc(DAK_NoEscape);
   if (!hasAutoClosure)
     RemoveFunc(DAK_AutoClosure);
+  
+  
+  if (Options.PrintDefaultParameterPlaceholder &&
+      param->isDefaultArgument()) {
+    Printer << " = ";
+    auto defaultArgStr
+      = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
+    if (defaultArgStr.empty())
+      Printer << "default";
+    else
+      Printer << defaultArgStr;
+  }
+}
+
+void PrintAST::printParameterList(ParameterList *PL, bool isCurried,
+                            std::function<bool(unsigned)> isAPINameByDefault) {
+  Printer << "(";
+  for (unsigned i = 0, e = PL->size(); i != e; ++i) {
+    if (i > 0)
+      Printer << ", ";
+    
+    printOneParameter(PL->get(i), isCurried, isAPINameByDefault(i));
+  }
+  Printer << ")";
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
-  ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
+  auto BodyParams = AFD->getParameterLists();
 
   // Skip over the implicit 'self'.
-  if (AFD->getImplicitSelfDecl()) {
-    BodyPatterns = BodyPatterns.slice(1);
-  }
+  if (AFD->getImplicitSelfDecl())
+    BodyParams = BodyParams.slice(1);
 
-  for (unsigned CurrPattern = 0, NumPatterns = BodyPatterns.size();
+  for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
-    if (auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns[CurrPattern])) {
-      Printer << "(";
-      for (unsigned i = 0, e = BodyTuple->getNumElements(); i != e; ++i) {
-        if (i > 0)
-          Printer << ", ";
-
-        // Determine whether the argument name is API by default.
-        bool ArgNameIsAPIByDefault
-          = CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(i);
-
-        printOneParameter(BodyTuple->getElement(i).getPattern(),
-                          ArgNameIsAPIByDefault,
-                          BodyTuple->getElement(i).hasEllipsis(),
-                          /*Curried=*/CurrPattern > 0);
-        auto &CurrElt = BodyTuple->getElement(i);
-        if (CurrElt.hasEllipsis())
-          Printer << "...";
-        if (Options.PrintDefaultParameterPlaceholder &&
-            CurrElt.getDefaultArgKind() != DefaultArgumentKind::None) {
-          if (AFD->getClangDecl() && CurrElt.getPattern()->hasType()) {
-            // For Clang declarations, figure out the default we're using.
-            auto CurrType = CurrElt.getPattern()->getType();
-            Printer << " = " << CurrType->getInferredDefaultArgString();
-          } else {
-            // Use placeholder anywhere else.
-            Printer << " = default";
-          }
-        }
-      }
-      Printer << ")";
-      continue;
-    }
-    bool ArgNameIsAPIByDefault
-      = CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(0);
-    auto *BodyParen = cast<ParenPattern>(BodyPatterns[CurrPattern]);
-    Printer << "(";
-    printOneParameter(BodyParen->getSubPattern(),
-                      ArgNameIsAPIByDefault,
-                      /*StripOuterSliceType=*/false,
-                      /*Curried=*/CurrPattern > 0);
-    Printer << ")";
+    printParameterList(BodyParams[CurrPattern], /*Curried=*/CurrPattern > 0,
+                       [&](unsigned argNo)->bool {
+      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(argNo);
+    });
   }
 
   if (AFD->isBodyThrowing()) {
@@ -1797,18 +1776,13 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
             Printer << "nonmutating ";
           Printer << (decl->isSetter() ? "set" : "willSet");
 
-          auto BodyParams = decl->getBodyParamPatterns();
-          auto ValueParam = BodyParams.back()->getSemanticsProvidingPattern();
-          if (auto *TP = dyn_cast<TuplePattern>(ValueParam)) {
-            if (!TP->isImplicit() && TP->getNumElements() != 0) {
-              auto *P = TP->getElement(0).getPattern()->
-                            getSemanticsProvidingPattern();
-              Identifier Name = P->getBodyName();
-              if (!Name.empty() && !P->isImplicit()) {
-                Printer << "(";
-                Printer.printName(Name);
-                Printer << ")";
-              }
+          auto params = decl->getParameterLists().back();
+          if (params->size() != 0 && !params->get(0)->isImplicit()) {
+            auto Name = params->get(0)->getName();
+            if (!Name.empty()) {
+              Printer << "(";
+              Printer.printName(Name);
+              Printer << ")";
             }
           }
         });
@@ -1926,33 +1900,11 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
-  recordDeclLoc(decl,
-    [&]{
-      Printer << "subscript ";
-      auto *IndicePat = decl->getIndices();
-      if (auto *BodyTuple = dyn_cast<TuplePattern>(IndicePat)) {
-        Printer << "(";
-        for (unsigned i = 0, e = BodyTuple->getNumElements(); i != e; ++i) {
-          if (i > 0)
-            Printer << ", ";
-
-          printOneParameter(BodyTuple->getElement(i).getPattern(),
-                            /*ArgNameIsAPIByDefault=*/false,
-                            BodyTuple->getElement(i).hasEllipsis(),
-                            /*Curried=*/false);
-          if (BodyTuple->getElement(i).hasEllipsis())
-            Printer << "...";
-        }
-      } else {
-        auto *BodyParen = cast<ParenPattern>(IndicePat);
-        Printer << "(";
-        printOneParameter(BodyParen->getSubPattern(),
-                          /*ArgNameIsAPIByDefault=*/false,
-                          /*StripOuterSliceType=*/false,
-                          /*Curried=*/false);
-      }
-      Printer << ")";
-    });
+  recordDeclLoc(decl, [&]{
+    Printer << "subscript ";
+    printParameterList(decl->getIndices(), /*Curried=*/false,
+                       /*isAPINameByDefault*/[](unsigned)->bool{return false;});
+  });
   Printer << " -> ";
   decl->getElementType().print(Printer, Options);
 
@@ -2384,6 +2336,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     case DeclContextKind::AbstractFunctionDecl:
       visit(cast<AbstractFunctionDecl>(DC)->getType());
       return;
+        
+    case DeclContextKind::SubscriptDecl:
+      visit(cast<SubscriptDecl>(DC)->getType());
+      return;
     }
   }
 
@@ -2481,7 +2437,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     else
       D = T->getAnyNominal();
 
-    // If we can not find the declaration, be extra careful and print
+    // If we cannot find the declaration, be extra careful and print
     // the type qualified.
     if (!D)
       return true;
@@ -2627,7 +2583,7 @@ public:
       }
 
       if (TD.hasName()) {
-        Printer.printName(TD.getName());
+        Printer.printName(TD.getName(), PrintNameContext::FunctionParameter);
         Printer << ": ";
       }
 
@@ -2882,6 +2838,7 @@ public:
   unsigned getDepthOfRequirement(const Requirement &req) {
     switch (req.getKind()) {
     case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
     case RequirementKind::WitnessMarker:
       return getDepthOfType(req.getFirstType());
 
@@ -2977,6 +2934,7 @@ public:
       visit(req.getFirstType());
       switch (req.getKind()) {
       case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
         Printer << " : ";
         break;
 
@@ -3219,21 +3177,12 @@ public:
   }
 
   void visitTypeVariableType(TypeVariableType *T) {
-    auto Base = T->getBaseBeingSubstituted();
-    
     if (T->getASTContext().LangOpts.DebugConstraintSolver) {
       Printer << "$T" << T->getID();
       return;
     }
     
-    if (T->isEqual(Base) || T->isPrinting) {
-      Printer << "_";
-      return;
-    }
-    
-    llvm::SaveAndRestore<bool> isPrinting(T->isPrinting, true);
-    
-    visit(Base);
+    Printer << "_";
   }
 };
 } // unnamed namespace
@@ -3420,7 +3369,5 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
 
 void Substitution::print(llvm::raw_ostream &os,
                          const PrintOptions &PO) const {
-  Archetype->print(os, PO);
-  os << " = ";
   Replacement->print(os, PO);
 }

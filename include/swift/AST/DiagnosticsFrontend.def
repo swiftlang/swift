@@ -1,8 +1,8 @@
-//===- DiagnosticsFrontend.def - Diagnostics Text ---------------*- C++ -*-===//
+//===--- DiagnosticsFrontend.def - Diagnostics Text -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,116 +23,114 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
-WARNING(warning_no_such_sdk,frontend,none,
+WARNING(warning_no_such_sdk,none,
   "no such SDK: '%0'", (StringRef))
 
-ERROR(error_no_frontend_args, frontend, none,
+ERROR(error_no_frontend_args, none,
   "no arguments provided to '-frontend'", ())
 
-ERROR(error_no_such_file_or_directory,frontend,none,
+ERROR(error_no_such_file_or_directory,none,
   "no such file or directory: '%0'", (StringRef))
 
-ERROR(error_unsupported_target_os, frontend, none,
+ERROR(error_unsupported_target_os, none,
   "unsupported target OS: '%0'", (StringRef))
 
-ERROR(error_unsupported_target_arch, frontend, none,
+ERROR(error_unsupported_target_arch, none,
   "unsupported target architecture: '%0'", (StringRef))
 
-ERROR(cannot_open_file,frontend,none,
+ERROR(cannot_open_file,none,
   "cannot open file '%0' (%1)", (StringRef, StringRef))
-ERROR(cannot_open_serialized_file,frontend,none,
+ERROR(cannot_open_serialized_file,none,
   "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
-ERROR(error_open_input_file,frontend,none,
+ERROR(error_open_input_file,none,
   "error opening input file '%0' (%1)", (StringRef, StringRef))
-ERROR(error_clang_importer_not_linked_in,frontend,none,
-  "clang importer not available", ())
-ERROR(error_clang_importer_create_fail,frontend,none,
+ERROR(error_clang_importer_create_fail,none,
   "clang importer creation failed", ())
-ERROR(error_missing_arg_value,frontend,none,
+ERROR(error_missing_arg_value,none,
   "missing argument value for '%0', expected %1 argument(s)",
   (StringRef, unsigned))
-ERROR(error_unknown_arg,frontend,none,
+ERROR(error_unknown_arg,none,
   "unknown argument: '%0'", (StringRef))
-ERROR(error_invalid_arg_value,frontend,none,
+ERROR(error_invalid_arg_value,none,
   "invalid value '%1' in '%0'", (StringRef, StringRef))
-ERROR(error_immediate_mode_missing_stdlib,frontend,none,
+ERROR(error_immediate_mode_missing_stdlib,none,
   "could not load the swift standard library", ())
-ERROR(error_immediate_mode_missing_library,frontend,none,
+ERROR(error_immediate_mode_missing_library,none,
   "could not load %select{shared library|framework}0 '%1'",
   (unsigned, StringRef))
-ERROR(error_immediate_mode_primary_file,frontend,none,
+ERROR(error_immediate_mode_primary_file,none,
   "immediate mode is incompatible with -primary-file", ())
-ERROR(error_missing_frontend_action,frontend,none,
+ERROR(error_missing_frontend_action,none,
   "no frontend action was selected", ())
 
-ERROR(error_mode_cannot_emit_dependencies,frontend,none,
+ERROR(error_mode_cannot_emit_dependencies,none,
   "this mode does not support emitting dependency files", ())
-ERROR(error_mode_cannot_emit_header,frontend,none,
+ERROR(error_mode_cannot_emit_header,none,
   "this mode does not support emitting Objective-C headers", ())
-ERROR(error_mode_cannot_emit_module,frontend,none,
+ERROR(error_mode_cannot_emit_module,none,
   "this mode does not support emitting modules", ())
-ERROR(error_mode_cannot_emit_module_doc,frontend,none,
+ERROR(error_mode_cannot_emit_module_doc,none,
   "this mode does not support emitting module documentation files", ())
 
-WARNING(emit_reference_dependencies_without_primary_file,frontend,none,
+WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
-ERROR(error_bad_module_name,frontend,none,
+ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
-ERROR(error_stdlib_module_name,frontend,none,
+ERROR(error_stdlib_module_name,none,
       "module name \"%0\" is reserved for the standard library"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
 
-ERROR(error_stdlib_not_found,frontend,Fatal,
+ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
-ERROR(error_underlying_module_not_found,frontend,none,
+ERROR(error_underlying_module_not_found,none,
       "underlying Objective-C module %0 not found", (Identifier))
 
-ERROR(error_repl_requires_no_input_files,frontend,none,
+ERROR(error_repl_requires_no_input_files,none,
   "REPL mode requires no input files", ())
-ERROR(error_mode_requires_one_input_file,frontend,none,
+ERROR(error_mode_requires_one_input_file,none,
   "this mode requires a single input file", ())
-ERROR(error_mode_requires_an_input_file,frontend,none,
+ERROR(error_mode_requires_an_input_file,none,
   "this mode requires at least one input file", ())
-ERROR(error_mode_requires_one_sil_multi_sib,frontend,none,
+ERROR(error_mode_requires_one_sil_multi_sib,none,
   "this mode requires .sil for primary-file and only .sib for other inputs", ())
 
-ERROR(error_no_output_filename_specified,frontend,none,
+ERROR(error_no_output_filename_specified,none,
   "an output filename was not specified for a mode which requires an output "
   "filename", ())
 
-ERROR(error_implicit_output_file_is_directory,frontend,none,
+ERROR(error_implicit_output_file_is_directory,none,
   "the implicit output file '%0' is a directory; explicitly specify a filename "
   "using -o", (StringRef))
 
-ERROR(repl_must_be_initialized,sema,none,
+ERROR(repl_must_be_initialized,none,
       "variables currently must have an initial value when entered at the "
       "top level of the REPL", ())
 
-ERROR(error_doing_code_completion,frontend,none,
+ERROR(error_doing_code_completion,none,
       "compiler is in code completion mode (benign diagnostic)", ())
 
-ERROR(verify_encountered_fatal,frontend,none,
+ERROR(verify_encountered_fatal,none,
       "fatal error encountered while in -verify mode", ())
 
-ERROR(error_parse_input_file,frontend,none,
+ERROR(error_parse_input_file,none,
   "error parsing input file '%0' (%1)", (StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF

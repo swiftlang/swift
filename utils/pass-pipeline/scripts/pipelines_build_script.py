@@ -9,7 +9,6 @@ import textwrap
 # Append the src dir
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
-import pass_pipeline_library
 import passes
 
 # TODO: This should not be hard coded.
@@ -50,7 +49,7 @@ def build_disable_slice_pipelines(**kwargs):
         return result
 
     for i in pipeline_range:
-        pipeline_args = get_pipeline_args(kwargs['pipeline_script'], pipeline_range[:i+1])
+        pipeline_args = get_pipeline_args(kwargs['pipeline_script'], pipeline_range[:i + 1])
         data_file = os.path.join(kwargs['output_dir'], "pipeline-slice-%.2d-disabled-pipeline.json" % i)
         with open(data_file, 'w') as f:
             f.write(subprocess.check_output(pipeline_args))

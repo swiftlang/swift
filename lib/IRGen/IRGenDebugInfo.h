@@ -1,8 +1,8 @@
-//===--- IRGenDebugInfo.h - Debug Info Support-------------------*- C++ -*-===//
+//===--- IRGenDebugInfo.h - Debug Info Support ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -109,23 +109,6 @@ class IRGenDebugInfo {
 
   /// Used by pushLoc.
   SmallVector<std::pair<Location, const SILDebugScope *>, 8> LocationStack;
-
-  // FIXME: move this to something more local in type generation.
-  CanGenericSignature CurGenerics;
-  class GenericsRAII {
-    IRGenDebugInfo &Self;
-    GenericContextScope Scope;
-    CanGenericSignature OldGenerics;
-  public:
-    GenericsRAII(IRGenDebugInfo &self, CanGenericSignature generics)
-      : Self(self), Scope(self.IGM, generics), OldGenerics(self.CurGenerics) {
-      if (generics) self.CurGenerics = generics;
-    }
-
-    ~GenericsRAII() {
-      Self.CurGenerics = OldGenerics;
-    }
-  };
 
 public:
   IRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
@@ -310,7 +293,7 @@ public:
 /// instructions (e.g., ARC-inserted calls to release()) that have no
 /// source location associated with them. The DWARF specification
 /// allows the compiler to use the special line number 0 to indicate
-/// code that can not be attributed to any source location.
+/// code that cannot be attributed to any source location.
 class ArtificialLocation : public AutoRestoreLocation {
 public:
   /// \brief Set the current location to line 0, but within scope DS.

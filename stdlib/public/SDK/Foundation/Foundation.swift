@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -313,8 +313,7 @@ extension Bool: _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    if number.boolValue { self = true }
-    else { self = false }
+    self = number.boolValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {
@@ -860,7 +859,7 @@ public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
   return result!
 }
 
-// Set<T> is conditionally bridged to NSSet
+// Set<Element> is conditionally bridged to NSSet
 extension Set : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return NSSet.self
@@ -1044,15 +1043,28 @@ extension CGRectEdge {
 
 public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
+// Note: NSErrorPointer becomes ErrorPointer in Swift 3.
+public typealias ErrorPointer = NSErrorPointer
+
+public // COMPILER_INTRINSIC
+let _nilObjCError: ErrorType = _GenericObjCError.NilError
+
 @warn_unused_result
 @_silgen_name("swift_convertNSErrorToErrorType")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorType(error: NSError?) -> ErrorType
+func _convertNSErrorToErrorType(error: NSError?) -> ErrorType {
+  if let error = error {
+    return error
+  }
+  return _nilObjCError
+}
 
 @warn_unused_result
 @_silgen_name("swift_convertErrorTypeToNSError")
 public // COMPILER_INTRINSIC
-func _convertErrorTypeToNSError(error: ErrorType) -> NSError
+func _convertErrorTypeToNSError(error: ErrorType) -> NSError {
+  return unsafeDowncast(_bridgeErrorTypeToNSError(error))
+}
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods
@@ -1161,7 +1173,7 @@ extension NSOrderedSet : ArrayLiteralConvertible {
 
 //===--- "Copy constructors" ----------------------------------------------===//
 // These are needed to make Cocoa feel natural since we eliminated
-// implicit briding conversions from Objective-C to Swift
+// implicit bridging conversions from Objective-C to Swift
 //===----------------------------------------------------------------------===//
 
 extension NSArray {

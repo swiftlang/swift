@@ -25,8 +25,8 @@ func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
 func multipleBlocksAllMissing(x: Int) -> Int {
   var y : Int = x + 1 
   while (y > 0 ) {
-    --y;
-    break;
+    y -= 1
+    break
   }
   var x = 0
   x += 1
@@ -35,7 +35,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
 @noreturn func MYsubscriptNonASCII(idx: Int) -> UnicodeScalar {
 } // no-warning
 
-@noreturn @_silgen_name("exit") func exit ()->()
+@noreturn @_silgen_name("exit") func exit () -> ()
 @noreturn func tryingToReturn (x: Bool) -> () {
   if x {
     return // expected-error {{return from a 'noreturn' function}}
@@ -76,22 +76,22 @@ func diagnose_missing_return_no_error_after_noreturn_method() -> Int {
 } // no error
 
 func whileLoop(flag: Bool) -> Int {
-  var b = 1;
+  var b = 1
   while (flag) {
     if b == 3 {
       return 3
     }
-    b++  
+    b += 1
   }
 } //expected-error {{missing return in a function expected to return 'Int'}}
 
 func whileTrueLoop() -> Int {
-  var b = 1;
+  var b = 1
   while (true) {
     if b == 3 {
       return 3
     }
-    b++  
+    b += 1
   } // no-error
 }
 
@@ -101,7 +101,7 @@ func testUnreachableAfterNoReturn(x: Int) -> Int {
 }
 
 func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
-  let x:Int = 5;
+  let x:Int = 5
   if true {  // expected-note {{condition always evaluates to true}}
     exit(); 
   }
@@ -116,10 +116,10 @@ func testReachableAfterNoReturnInADifferentBlock(x: Int) -> Int {
 }
 
 func testUnreachableAfterNoReturnFollowedByACall() -> Int {
-  let x:Int = 5;
+  let x:Int = 5
   exit(); // expected-note{{a call to a noreturn function}}
   exit(); // expected-warning {{will never be executed}}
-  return x; 
+  return x
 }
 
 func testUnreachableAfterNoReturnMethod() -> Int {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -use-native-super-method -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
 
 struct Bool {}
 var false_ = Bool()
@@ -40,7 +40,7 @@ public class Sub : Base {
   // CHECK: }
 
   // CHECK-LABEL: sil shared [transparent] @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@convention(thin) (@owned Sub) -> Bool {
-  // CHECK: [[SUPER:%[0-9]+]] = super_method %{{[0-9]+}} : $Sub, #Base.x!getter.1 : Base -> () -> Bool , $@convention(method) (@guaranteed Base) -> Bool
+  // CHECK: [[SUPER:%[0-9]+]] = function_ref @_TFC13auto_closures4Baseg1xVS_4Bool : $@convention(method) (@guaranteed Base) -> Bool
   // CHECK: [[RET:%.*]] = apply [[SUPER]]({{%.*}})
   // CHECK: return [[RET]]
   override var x: Bool { return call_auto_closure(super.x) }

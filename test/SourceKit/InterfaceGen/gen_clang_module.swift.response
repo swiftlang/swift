@@ -3802,7 +3802,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "rawValue",
             key.offset: 254,
-            key.length: 10,
+            key.length: 18,
             key.typename: "UInt32",
             key.nameoffset: 0,
             key.namelength: 0
@@ -3822,7 +3822,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "rawValue",
             key.offset: 290,
-            key.length: 8,
+            key.length: 16,
             key.typename: "UInt32",
             key.nameoffset: 290,
             key.namelength: 8
@@ -3897,7 +3897,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "rawValue",
             key.offset: 481,
-            key.length: 10,
+            key.length: 18,
             key.typename: "UInt32",
             key.nameoffset: 0,
             key.namelength: 0
@@ -3917,7 +3917,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "rawValue",
             key.offset: 517,
-            key.length: 8,
+            key.length: 16,
             key.typename: "UInt32",
             key.nameoffset: 517,
             key.namelength: 8
@@ -4003,7 +4003,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "rawValue",
             key.offset: 718,
-            key.length: 10,
+            key.length: 18,
             key.typename: "UInt32",
             key.nameoffset: 0,
             key.namelength: 0
@@ -4023,7 +4023,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "rawValue",
             key.offset: 754,
-            key.length: 8,
+            key.length: 16,
             key.typename: "UInt32",
             key.nameoffset: 754,
             key.namelength: 8
@@ -4180,7 +4180,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "rawValue",
             key.offset: 1195,
-            key.length: 8,
+            key.length: 13,
             key.typename: "Int",
             key.nameoffset: 1195,
             key.namelength: 8
@@ -4266,7 +4266,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "x",
             key.offset: 1498,
-            key.length: 1,
+            key.length: 8,
             key.typename: "Int32",
             key.nameoffset: 1498,
             key.namelength: 1
@@ -4275,7 +4275,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "y",
             key.offset: 1508,
-            key.length: 1,
+            key.length: 9,
             key.typename: "Double",
             key.nameoffset: 1508,
             key.namelength: 1
@@ -4339,7 +4339,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "x",
             key.offset: 1632,
-            key.length: 1,
+            key.length: 8,
             key.typename: "Int32",
             key.nameoffset: 1632,
             key.namelength: 1
@@ -4348,7 +4348,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "y",
             key.offset: 1642,
-            key.length: 1,
+            key.length: 9,
             key.typename: "Double",
             key.nameoffset: 1642,
             key.namelength: 1
@@ -4412,7 +4412,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "x",
             key.offset: 1821,
-            key.length: 1,
+            key.length: 8,
             key.typename: "Int32",
             key.nameoffset: 1821,
             key.namelength: 1
@@ -4421,7 +4421,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "y",
             key.offset: 1831,
-            key.length: 1,
+            key.length: 9,
             key.typename: "Double",
             key.nameoffset: 1831,
             key.namelength: 1
@@ -4454,7 +4454,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "a",
         key.offset: 2015,
-        key.length: 1,
+        key.length: 8,
         key.typename: "Int32",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4473,7 +4473,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.offset: 2070,
-        key.length: 1,
+        key.length: 8,
         key.typename: "Int32",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4493,7 +4493,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "a",
         key.offset: 2110,
-        key.length: 1,
+        key.length: 8,
         key.typename: "Int32",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4502,7 +4502,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "b",
         key.offset: 2120,
-        key.length: 3,
+        key.length: 10,
         key.typename: "Float",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4511,7 +4511,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "c",
         key.offset: 2132,
-        key.length: 3,
+        key.length: 11,
         key.typename: "Double",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4520,7 +4520,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "d",
         key.offset: 2145,
-        key.length: 3,
+        key.length: 32,
         key.typename: "UnsafeMutablePointer<Int32>",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4540,7 +4540,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "blk",
         key.offset: 2265,
-        key.length: 3,
+        key.length: 24,
         key.typename: "((Float) -> Int32)!",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4560,7 +4560,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "fptr",
         key.offset: 2331,
-        key.length: 4,
+        key.length: 40,
         key.typename: "(@convention(c) (Float) -> Int32)!",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4653,7 +4653,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "a",
         key.offset: 3005,
-        key.length: 1,
+        key.length: 8,
         key.typename: "Int32",
         key.nameoffset: 0,
         key.namelength: 0
@@ -4806,7 +4806,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "anObject",
             key.offset: 3794,
-            key.length: 8,
+            key.length: 20,
             key.typename: "AnyObject!",
             key.nameoffset: 0,
             key.namelength: 0
@@ -4840,7 +4840,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "f",
             key.offset: 3881,
-            key.length: 7,
+            key.length: 14,
             key.typename: "Float",
             key.nameoffset: 3881,
             key.namelength: 5
@@ -4954,7 +4954,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "a",
             key.offset: 4354,
-            key.length: 1,
+            key.length: 8,
             key.typename: "Int32",
             key.nameoffset: 0,
             key.namelength: 0
@@ -4974,7 +4974,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "a",
             key.offset: 4397,
-            key.length: 1,
+            key.length: 8,
             key.typename: "Int32",
             key.nameoffset: 0,
             key.namelength: 0
@@ -4983,7 +4983,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "b",
             key.offset: 4407,
-            key.length: 7,
+            key.length: 14,
             key.typename: "Int32",
             key.nameoffset: 4407,
             key.namelength: 5
@@ -5149,7 +5149,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "x",
             key.offset: 5035,
-            key.length: 1,
+            key.length: 8,
             key.typename: "Int32",
             key.nameoffset: 5035,
             key.namelength: 1
@@ -5431,7 +5431,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "i",
             key.offset: 5902,
-            key.length: 5,
+            key.length: 12,
             key.typename: "Int32",
             key.nameoffset: 5902,
             key.namelength: 3
@@ -5494,7 +5494,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.offset: 6245,
-        key.length: 1,
+        key.length: 15,
         key.typename: "FooCFTypeRef",
         key.nameoffset: 0,
         key.namelength: 0

@@ -1,8 +1,8 @@
-//===------- RemovePin.cpp -  StrongPin/Unpin removal -----*- C++ -*-------===//
+//===--- RemovePin.cpp -  StrongPin/Unpin removal -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -101,8 +101,8 @@ public:
         if (auto *Unpin = dyn_cast<StrongUnpinInst>(CurInst)) {
           DEBUG(llvm::dbgs() << "        Found unpin!\n");
           SILValue RCId = RCIA->getRCIdentityRoot(Unpin->getOperand());
-          DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId.getDef());
-          auto *PinDef = dyn_cast<StrongPinInst>(RCId.getDef());
+          DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId);
+          auto *PinDef = dyn_cast<StrongPinInst>(RCId);
           if (PinDef && AvailablePins.count(PinDef)){
             DEBUG(llvm::dbgs() << "        Found matching pin: " << *PinDef);
             SmallVector<MarkDependenceInst *, 8> MarkDependentInsts;
@@ -110,8 +110,8 @@ public:
               DEBUG(llvm::dbgs() << "        Pin users are safe! Removing!\n");
               Changed = true;
               auto *Enum = SILBuilder(PinDef).createOptionalSome(
-                  PinDef->getLoc(), PinDef->getOperand(), PinDef->getType(0));
-              SILValue(PinDef).replaceAllUsesWith(Enum);
+                  PinDef->getLoc(), PinDef->getOperand(), PinDef->getType());
+              PinDef->replaceAllUsesWith(Enum);
               Unpin->eraseFromParent();
               PinDef->eraseFromParent();
               // Remove this pindef from AvailablePins.
@@ -119,7 +119,7 @@ public:
               ++NumPinPairsRemoved;
             } else {
               DEBUG(llvm::dbgs()
-                    << "        Pin users are not safe! Can not remove!\n");
+                    << "        Pin users are not safe! Cannot remove!\n");
             }
 
             continue;
@@ -185,8 +185,8 @@ public:
       // A mark_dependence is safe if it is marking a dependence on a base that
       // is the strong_pinned value.
       if (auto *MD = dyn_cast<MarkDependenceInst>(U))
-        if (Pin == MD->getBase().getDef() ||
-            std::find(Users.begin(), Users.end(), MD->getBase().getDef()) !=
+        if (Pin == MD->getBase() ||
+            std::find(Users.begin(), Users.end(), MD->getBase()) !=
                 Users.end()) {
           MarkDeps.push_back(MD);
           continue;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,8 +15,8 @@
 %TMirrorConformance = gyb.parseTemplate("../../common/MirrorConformance.gyb")
 %TMirrorBoilerplate = gyb.parseTemplate("../../common/MirrorBoilerplate.gyb")
 
-% for Type in [['CGPoint',['x','y'],'Point',['x','y']],\
-%             ['CGSize',['width','height'],'Size',['width','height']],\
+% for Type in [['CGPoint',['x','y'],'Point',['x','y']],
+%             ['CGSize',['width','height'],'Size',['width','height']],
 %             ['CGRect',['origin','size'],'Rectangle',['origin.x','origin.y','size.width','size.height']]]:
 %   Self = Type[0]
 %   Children = Type[1]
@@ -25,11 +25,11 @@
 %   MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,disposition='Struct')
 %   MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,disposition='Struct')
 %   MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,disposition='Struct')
-%   QLArgFirst=True
+%   QLArgFirst = True
 %   QLArgString = ''
 %   SummaryString = ''
 %   for QLArg in QLArgs:
-%     if QLArgFirst == False:
+%     if not QLArgFirst:
 %       QLArgString = QLArgString + ', '
 %       SummaryString = SummaryString + ', '
 %     else:

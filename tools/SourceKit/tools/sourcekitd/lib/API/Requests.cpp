@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -94,6 +94,13 @@ static LazySKDUID RequestBuildSettingsRegister(
 static LazySKDUID KindExpr("source.lang.swift.expr");
 static LazySKDUID KindStmt("source.lang.swift.stmt");
 static LazySKDUID KindType("source.lang.swift.type");
+
+static LazySKDUID KindEverything("source.codecompletion.everything");
+static LazySKDUID KindModule("source.codecompletion.module");
+static LazySKDUID KindKeyword("source.codecompletion.keyword");
+static LazySKDUID KindLiteral("source.codecompletion.literal");
+static LazySKDUID KindCustom("source.codecompletion.custom");
+static LazySKDUID KindIdentifier("source.codecompletion.identifier");
 
 static UIdent DiagKindNote("source.diagnostic.severity.note");
 static UIdent DiagKindWarning("source.diagnostic.severity.warning");
@@ -625,9 +632,9 @@ handleSemanticRequest(RequestDict Req,
   return Rec(createErrorRequestInvalid(ErrBuf.c_str()));
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Index
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKIndexingConsumer : public IndexingConsumer {
@@ -667,6 +674,7 @@ public:
   ~SKIndexingConsumer() {
     assert(Cancelled ||
            (EntitiesStack.size() == 1 && DependenciesStack.size() == 1));
+    (void) Cancelled;
   }
 
   void failed(StringRef ErrDescription) override;
@@ -815,13 +823,14 @@ bool SKIndexingConsumer::recordRelatedEntity(const EntityInfo &Info) {
 bool SKIndexingConsumer::finishSourceEntity(UIdent Kind) {
   Entity &CurrEnt = EntitiesStack.back();
   assert(CurrEnt.Kind == Kind);
+  (void) CurrEnt;
   EntitiesStack.pop_back();
   return true;
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // ReportDocInfo
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -865,6 +874,7 @@ public:
   }
   ~SKDocConsumer() {
     assert(Cancelled || EntitiesStack.size() == 1);
+    (void) Cancelled;
   }
 
   sourcekitd_response_t createResponse() {
@@ -1036,6 +1046,7 @@ bool SKDocConsumer::handleAvailableAttribute(const AvailableAttrInfo &Info) {
 bool SKDocConsumer::finishSourceEntity(UIdent Kind) {
   Entity &CurrEnt = EntitiesStack.back();
   assert(CurrEnt.Kind == Kind);
+  (void) CurrEnt;
   EntitiesStack.pop_back();
   return true;
 }
@@ -1071,9 +1082,9 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
   return true;
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // ReportCursorInfo
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static void reportCursorInfo(StringRef Filename,
                              int64_t Offset,
@@ -1125,16 +1136,16 @@ static void reportCursorInfo(StringRef Filename,
     }
     if (Info.IsSystem)
       Elem.setBool(KeyIsSystem, true);
-    if (!Info.TypeInteface.empty())
-      Elem.set(KeyTypeInterface, Info.TypeInteface);
+    if (!Info.TypeInterface.empty())
+      Elem.set(KeyTypeInterface, Info.TypeInterface);
 
     return Rec(RespBuilder.createResponse());
   });
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // FindRelatedIdents
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -1158,9 +1169,9 @@ static void findRelatedIdents(StringRef Filename,
   });
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // CodeComplete
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKCodeCompletionConsumer : public CodeCompletionConsumer {
@@ -1233,9 +1244,9 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // (New) CodeComplete
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKGroupedCodeCompletionConsumer : public GroupedCodeCompletionConsumer {
@@ -1302,10 +1313,73 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   ResponseBuilder RespBuilder;
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
-  if (optionsDict)
-    options = std::move(llvm::make_unique<SKOptionsDictionary>(*optionsDict));
+  std::vector<FilterRule> filterRules;
+  if (optionsDict) {
+    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
+    bool failed = false;
+    optionsDict->dictionaryArrayApply(KeyFilterRules, [&](RequestDict dict) {
+      FilterRule rule;
+      auto kind = dict.getUID(KeyKind);
+      if (kind == KindEverything) {
+        rule.kind = FilterRule::Everything;
+      } else if (kind == KindModule) {
+        rule.kind = FilterRule::Module;
+      } else if (kind == KindKeyword) {
+        rule.kind = FilterRule::Keyword;
+      } else if (kind == KindLiteral) {
+        rule.kind = FilterRule::Literal;
+      } else if (kind == KindCustom) {
+        rule.kind = FilterRule::CustomCompletion;
+      } else if (kind == KindIdentifier) {
+        rule.kind = FilterRule::Identifier;
+      } else {
+        // Warning: unknown
+      }
+
+      int64_t hide;
+      if (dict.getInt64(KeyHide, hide, false)) {
+        failed = true;
+        CCC.failed("filter rule missing required key 'key.hide'");
+        return true;
+      }
+
+      rule.hide = hide;
+
+      switch (rule.kind) {
+      case FilterRule::Everything:
+        break;
+      case FilterRule::Module:
+      case FilterRule::Identifier: {
+        SmallVector<const char *, 8> names;
+        if (dict.getStringArray(KeyNames, names, false)) {
+          failed = true;
+          CCC.failed("filter rule missing required key 'key.names'");
+          return true;
+        }
+        rule.names.assign(names.begin(), names.end());
+        break;
+      }
+      case FilterRule::Keyword:
+      case FilterRule::Literal:
+      case FilterRule::CustomCompletion: {
+        SmallVector<sourcekitd_uid_t, 8> uids;
+        dict.getUIDArray(KeyUIDs, uids, true);
+        for (auto uid : uids)
+          rule.uids.push_back(UIdentFromSKDUID(uid));
+        break;
+      }
+      }
+
+      filterRules.push_back(std::move(rule));
+      return false; // continue
+    });
+
+    if (failed)
+      return CCC.createResponse();
+  }
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), CCC, Args);
+  Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), filterRules, CCC,
+                        Args);
   return CCC.createResponse();
 }
 
@@ -1324,7 +1398,7 @@ codeCompleteUpdate(StringRef name, int64_t offset,
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
   if (optionsDict)
-    options = std::move(llvm::make_unique<SKOptionsDictionary>(*optionsDict));
+    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteUpdate(name, offset, options.get(), CCC);
   return CCC.createResponse();
@@ -1413,9 +1487,9 @@ void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
   Response.set(KeyNextRequestStart, offset);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // Editor
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 class SKEditorConsumer : public EditorConsumer {
@@ -1750,7 +1824,7 @@ bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
   Node.set(KeyKind, Kind);
   Node.set(KeyOffset, Offset);
   Node.set(KeyLength, Length);
-  return  true;
+  return true;
 }
 
 bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {

@@ -51,7 +51,7 @@ public func differentWrapped<
   return a.getValue() != b.getValue()
 }
 
-@noreturn @_silgen_name("exit") public func exit ()->()
+@noreturn @_silgen_name("exit") public func exit () -> ()
 
 @noreturn public func testNoReturnAttr() -> () { exit() }
 @noreturn public func testNoReturnAttrPoly<T>(x x: T) -> () { exit() }

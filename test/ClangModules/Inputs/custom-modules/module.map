@@ -7,6 +7,11 @@ module AvailabilityExtras {
   export *
 }
 
+module CFAndObjC {
+  header "CFAndObjC.h"
+  export *
+}
+
 module ClangModuleUser {
   header "ClangModuleUser.h"
   export *
@@ -127,4 +132,12 @@ module Requires {
 
 module SwiftName {
   header "SwiftName.h"
+}
+
+module MacrosRedefA {
+  header "MacrosRedefA.h"
+}
+
+module MacrosRedefB {
+  header "MacrosRedefB.h"
 }

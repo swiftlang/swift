@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -158,12 +158,6 @@ def getMinFloat(floatBits, intBits):
     minFloat = negativePrefix(floatBits) + negativeExponent(floatBits, intBits)
     return "0x%0.x" % minFloat
 
-def incIfSigned(bits, signed):
-    if not(signed):
-        return bits + 1
-    else:
-        return bits
-
 }%
 
 % for bits in allFloatBits:
@@ -181,7 +175,7 @@ public struct ${Self} {
   @_transparent public
   init() {
     let zero: Int64 = 0
-    self._value = Builtin.uitofp_Int64_FPIEEE${bits}(zero._value)
+    self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._value)
   }
 
   @_transparent 
@@ -574,12 +568,16 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 
@@ -645,6 +643,7 @@ public func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 %   sign = 's' if signed else 'u'
 %   Self = intName(bits, signed)
 %   BuiltinName = builtinIntName(bits)
+%   intBits = intFormatFix(bits)
 @_transparent
 extension ${Self} {
 %   for srcBits in allFloatBits:
@@ -662,23 +661,28 @@ extension ${Self} {
     // <rdar://problem/17959546> Float80.isFinite is missing
     _precondition(
       other.isFinite,
-      "floating point value can not be converted to ${Self} because it is either infinite or NaN")
+      "floating point value cannot be converted to ${Self} because it is either infinite or NaN")
 %      if signed:
     // FIXME: Float80 doesn't have a _fromBitPattern
     // ${That}(roundTowardsZero: ${Self}.min)
-    // > ${getMinFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
-    _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits,
-      incIfSigned(intFormatFix(bits), signed))}),
-      "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
+    // > ${getMinFloat(srcBits, intBits)}
+    _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits, intBits)}),
+      "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
+    // ${That}(roundTowardsZero: ${Self}.max)
+    // > ${getMaxFloat(srcBits, intBits)}
+    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits, intBits)}),
+      "floating point value cannot be converted to ${Self} because it is greater than ${Self}.max")
 %      else:
     _precondition(other >= (0.0 as ${That}),
-      "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
-%      end
+      "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
+%          # NOTE: Since unsigned ints effectively have one more bit than signed ints
+%          # for storing positive numbers, we use `intBits + 1` when calculating the
+%          # max acceptable float value in the following lines.
     // ${That}(roundTowardsZero: ${Self}.max)
-    // > ${getMaxFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
-    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits,
-      incIfSigned(intFormatFix(bits), signed))}),
-      "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
+    // > ${getMaxFloat(srcBits, intBits + 1)}
+    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits, intBits + 1)}),
+      "floating point value cannot be converted to ${Self} because it is greater than ${Self}.max")
+%      end
 
 %     end
     self._value =

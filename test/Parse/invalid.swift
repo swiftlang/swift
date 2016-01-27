@@ -29,7 +29,7 @@ func foo() {
 
 func test3(a: inout Int) {} // expected-error {{'inout' must appear before the parameter name}}{{12-12=inout }}{{15-21=}}
 
-super.init() // expected-error {{'super' cannot be used outside of class members}} expected-error {{initializers may only be declared within a type}}
+super.init() // expected-error {{'super' cannot be used outside of class members}}
 
 switch state { // expected-error {{use of unresolved identifier 'state'}}
   let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} \
@@ -46,9 +46,8 @@ func test4() {
 // rdar://problem/18507467
 func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}}
 // expected-error @-1 {{expected ',' separator}} {{20-20=,}}
-// expected-error @-2 {{type annotation missing in pattern}}
-// expected-error @-3 {{expected parameter type following ':'}}
-// expected-error @-4 {{expected ',' separator}}
+// expected-error @-2 {{expected parameter type following ':'}}
+// expected-error @-3 {{expected ',' separator}}
 
 
 // <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol
@@ -56,4 +55,12 @@ protocol Animal<Food> {  // expected-error {{protocols do not allow generic para
   func feed(food: Food) // expected-error {{use of undeclared type 'Food'}}
 }
 
+
+
+// SR-573 - Crash with invalid parameter declaration
+class Starfish {}
+struct Salmon {}
+func f573(s Starfish,  // expected-error {{parameter requires an explicit type}}
+          _ ss: Salmon) -> [Int] {}
+func g573() { f573(Starfish(), Salmon()) }
 

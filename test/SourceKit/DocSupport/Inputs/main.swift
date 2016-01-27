@@ -96,10 +96,10 @@ func test1(cp: ComputedProperty, sub: CC2) {
   var x = cp.value
   x = cp.readOnly
   cp.value = x
-  ++cp.value
+  cp.value += 1
   x = sub[0]
   sub[0] = x
-  ++sub[0]
+  sub[0] += 1
 }
 
 struct S2 {
@@ -137,7 +137,7 @@ func test3(c: SB1, s: S2) {
 func test4(inout a: Int) {}
 
 protocol Prot2 {
-  typealias Element
+  associatedtype Element
   var p : Int { get }
   func foo()
 }

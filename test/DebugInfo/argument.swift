@@ -54,15 +54,8 @@ class A {
 
 }
 
-// Curried functions have their arguments backwards.
-// CHECK: !DILocalVariable(name: "b", arg: 1,{{.*}} line: [[@LINE+2]]
-// CHECK: !DILocalVariable(name: "a", arg: 2,{{.*}} line: [[@LINE+1]]
-func uncurry (a: Int64) (b: Int64) -> (Int64, Int64) {
-  return (a, b)
-}
-
 // CHECK: !DILocalVariable(name: "x", arg: 1,{{.*}} line: [[@LINE+2]]
 // CHECK: !DILocalVariable(name: "y", arg: 2,{{.*}} line: [[@LINE+1]]
 func tuple(x: Int64, y: (Int64, Float, String)) -> Int64 {
-  return x+y.0;
+  return x+y.0
 }

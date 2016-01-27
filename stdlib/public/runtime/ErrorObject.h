@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -179,14 +179,6 @@ extern "C" void swift_unexpectedError(SwiftError *object)
 
 /// Initialize an ErrorType box to make it usable as an NSError instance.
 extern "C" id swift_bridgeErrorTypeToNSError(SwiftError *errorObject);
-
-/// Convert an (optional) NSError instance to a (non-optional)
-/// ErrorType box.
-extern "C" SwiftError *swift_convertNSErrorToErrorType(id errorObject);
-
-/// Convert a (non-optional) ErrorType box to a (non-optional)
-/// NSError instance.
-extern "C" id swift_convertErrorTypeToNSError(SwiftError *errorObject);
 
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
 /// implementation using the _ObjectiveCBridgeableErrorType protocol.

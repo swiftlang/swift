@@ -15,6 +15,6 @@ class S<T> {
 // CHECK-NOT: apply
 // CHECK: return
 public func testDevirtMethodWithItsOwnGenericParam() -> Int {
-  var s: S<Int> = S<Int>()
+  let s: S<Int> = S<Int>()
   return s.f(0, 0.0)
 }

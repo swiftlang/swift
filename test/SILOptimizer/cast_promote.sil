@@ -19,10 +19,10 @@ public protocol NativeProto {}
 sil @promote_super : $@convention(thin) <T where T : Base> (@owned AnyObject) -> @owned T {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
-  store %0 to %1#1 : $*AnyObject
-  %3 = unchecked_addr_cast %1#1 : $*AnyObject to $*T
+  store %0 to %1 : $*AnyObject
+  %3 = unchecked_addr_cast %1 : $*AnyObject to $*T
   %4 = load %3 : $*T
-  dealloc_stack %1#0 : $*@local_storage AnyObject
+  dealloc_stack %1 : $*AnyObject
   return %4 : $T
 }
 
@@ -32,10 +32,10 @@ bb0(%0 : $AnyObject):
 sil @promote_anyobject : $@convention(thin) <T where T : AnyObject> (@owned AnyObject) -> @owned T {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
-  store %0 to %1#1 : $*AnyObject
-  %3 = unchecked_addr_cast %1#1 : $*AnyObject to $*T
+  store %0 to %1 : $*AnyObject
+  %3 = unchecked_addr_cast %1 : $*AnyObject to $*T
   %4 = load %3 : $*T
-  dealloc_stack %1#0 : $*@local_storage AnyObject
+  dealloc_stack %1 : $*AnyObject
   return %4 : $T
 }
 
@@ -45,10 +45,10 @@ bb0(%0 : $AnyObject):
 sil @promote_objc : $@convention(thin) <T where T : ObjCProto> (@owned AnyObject) -> @owned T {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
-  store %0 to %1#1 : $*AnyObject
-  %3 = unchecked_addr_cast %1#1 : $*AnyObject to $*T
+  store %0 to %1 : $*AnyObject
+  %3 = unchecked_addr_cast %1 : $*AnyObject to $*T
   %4 = load %3 : $*T
-  dealloc_stack %1#0 : $*@local_storage AnyObject
+  dealloc_stack %1 : $*AnyObject
   return %4 : $T
 }
 
@@ -58,10 +58,10 @@ bb0(%0 : $AnyObject):
 sil @promote_objcproto : $@convention(thin) (@owned AnyObject) -> @owned ObjCProto {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
-  store %0 to %1#1 : $*AnyObject
-  %3 = unchecked_addr_cast %1#1 : $*AnyObject to $*ObjCProto
+  store %0 to %1 : $*AnyObject
+  %3 = unchecked_addr_cast %1 : $*AnyObject to $*ObjCProto
   %4 = load %3 : $*ObjCProto
-  dealloc_stack %1#0 : $*@local_storage AnyObject
+  dealloc_stack %1 : $*AnyObject
   return %4 : $ObjCProto
 }
 
@@ -71,10 +71,10 @@ bb0(%0 : $AnyObject):
 sil @nopromote_nativeproto : $@convention(thin) (@out NativeProto, @owned AnyObject) -> () {
 bb0(%0 : $*NativeProto, %1 : $AnyObject):
   %3 = alloc_stack $AnyObject
-  store %1 to %3#1 : $*AnyObject
-  %5 = unchecked_addr_cast %3#1 : $*AnyObject to $*NativeProto
+  store %1 to %3 : $*AnyObject
+  %5 = unchecked_addr_cast %3 : $*AnyObject to $*NativeProto
   copy_addr %5 to [initialization] %0 : $*NativeProto
-  dealloc_stack %3#0 : $*@local_storage AnyObject
+  dealloc_stack %3 : $*AnyObject
   strong_release %1 : $AnyObject
   %9 = tuple ()
   return %9 : $()
@@ -191,8 +191,8 @@ struct Agg {
 // CHECK: load %2 : $*Agg
 // CHECK: unchecked_trivial_bit_cast %{{.*}} : $Agg to $PtrInt
 // CHECK: [[LOCAL:%.*]] = alloc_stack $Agg
-// CHECK: store %{{.*}} to [[LOCAL]]#1 : $*Agg
-// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[LOCAL]]#1 : $*Agg to $*PtrInt2
+// CHECK: store %{{.*}} to [[LOCAL]] : $*Agg
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[LOCAL]] : $*Agg to $*PtrInt2
 // CHECK: load [[CAST]] : $*PtrInt2
 // CHECK: dealloc_stack
 // CHECK: return
@@ -200,28 +200,28 @@ sil @unchecked_addr_cast_struct_promote : $@convention(thin) (@inout PtrInt, @in
 bb0(%0 : $*PtrInt, %1 : $*PtrInt2, %2 : $*Agg):
   %3 = load %0 : $*PtrInt
   %4 = alloc_stack $PtrInt
-  store %3 to %4#1 : $*PtrInt
-  %6 = unchecked_addr_cast %4#1 : $*PtrInt to $*Builtin.RawPointer
+  store %3 to %4 : $*PtrInt
+  %6 = unchecked_addr_cast %4 : $*PtrInt to $*Builtin.RawPointer
   %7 = load %6 : $*Builtin.RawPointer
   %8 = load %1 : $*PtrInt2
   %9 = alloc_stack $PtrInt2
-  store %8 to %9#1 : $*PtrInt2
-  %11 = unchecked_addr_cast %9#1 : $*PtrInt2 to $*PtrInt
+  store %8 to %9 : $*PtrInt2
+  %11 = unchecked_addr_cast %9 : $*PtrInt2 to $*PtrInt
   %12 = load %11 : $*PtrInt
   %13 = load %2 : $*Agg
   %14 = alloc_stack $Agg
-  store %13 to %14#1 : $*Agg
-  %16 = unchecked_addr_cast %14#1 : $*Agg to $*PtrInt
+  store %13 to %14 : $*Agg
+  %16 = unchecked_addr_cast %14 : $*Agg to $*PtrInt
   %17 = load %16 : $*PtrInt
   %18 = alloc_stack $Agg
-  store %13 to %18#1 : $*Agg
-  %20 = unchecked_addr_cast %18#1 : $*Agg to $*PtrInt2
+  store %13 to %18 : $*Agg
+  %20 = unchecked_addr_cast %18 : $*Agg to $*PtrInt2
   %21 = load %20 : $*PtrInt2
   %22 = tuple (%7 : $Builtin.RawPointer, %12 : $PtrInt, %17 : $PtrInt, %21 : $PtrInt2)
-  dealloc_stack %18#0 : $*@local_storage Agg
-  dealloc_stack %14#0 : $*@local_storage Agg
-  dealloc_stack %9#0 : $*@local_storage PtrInt2
-  dealloc_stack %4#0 : $*@local_storage PtrInt
+  dealloc_stack %18 : $*Agg
+  dealloc_stack %14 : $*Agg
+  dealloc_stack %9 : $*PtrInt2
+  dealloc_stack %4 : $*PtrInt
   return %22 : $(Builtin.RawPointer, PtrInt, PtrInt, PtrInt2)
 }
 
@@ -252,53 +252,53 @@ public enum PX3 {case X(Int), Y, Z}
 // CHECK: unchecked_trivial_bit_cast %{{.*}} : $PB2 to $Int
 // CHECK: unchecked_trivial_bit_cast %{{.*}} : $PB2 to $PX2
 // CHECK: alloc_stack $PB2
-// CHECK: store %{{.*}} to %{{.*}}#1 : $*PB2
-// CHECK: unchecked_addr_cast %{{.*}}#1 : $*PB2 to $*PX3
+// CHECK: store %{{.*}} to %{{.*}} : $*PB2
+// CHECK: unchecked_addr_cast %{{.*}} : $*PB2 to $*PX3
 // CHECK: load %{{.*}} : $*PX3
 // CHECK: load %3 : $*PAB2
 // CHECK: alloc_stack $PAB2
-// CHECK: store %{{.*}} to %{{.*}}#1 : $*PAB2
-// CHECK: unchecked_addr_cast %{{.*}}#1 : $*PAB2 to $*PXY2
+// CHECK: store %{{.*}} to %{{.*}} : $*PAB2
+// CHECK: unchecked_addr_cast %{{.*}} : $*PAB2 to $*PXY2
 // CHECK: load %{{.*}} : $*PXY2
-// CHECK: dealloc_stack %{{.*}}#0 : $*@local_storage PAB2
-// CHECK: dealloc_stack %{{.*}}#0 : $*@local_storage PB2
+// CHECK: dealloc_stack %{{.*}} : $*PAB2
+// CHECK: dealloc_stack %{{.*}} : $*PB2
 // CHECK: return %{{.*}} : $(E0_, E1, Int, PX2, PX3, PXY2)
 sil @unchecked_addr_cast_enum_promote : $@convention(thin) (@inout E0, @inout E2, @inout PB2, @inout PAB2) -> (E0_, E1, Int, PX2, PX3, PXY2) {
 bb0(%0 : $*E0, %1 : $*E2, %2 : $*PB2, %3 : $*PAB2):
   %9 = load %0 : $*E0                             // user: %11
   %10 = alloc_stack $E0                           // users: %11, %12, %43
-  store %9 to %10#1 : $*E0                        // id: %11
-  %12 = unchecked_addr_cast %10#1 : $*E0 to $*E0_ // user: %13
+  store %9 to %10 : $*E0                        // id: %11
+  %12 = unchecked_addr_cast %10 : $*E0 to $*E0_ // user: %13
   %13 = load %12 : $*E0_                          // user: %37
   %14 = load %1 : $*E2                            // user: %16
   %15 = alloc_stack $E2                           // users: %16, %17, %42
-  store %14 to %15#1 : $*E2                       // id: %16
-  %17 = unchecked_addr_cast %15#1 : $*E2 to $*E1  // user: %18
+  store %14 to %15 : $*E2                       // id: %16
+  %17 = unchecked_addr_cast %15 : $*E2 to $*E1  // user: %18
   %18 = load %17 : $*E1                           // user: %37
   %19 = load %2 : $*PB2                           // users: %21, %25, %29
   %20 = alloc_stack $PB2                          // users: %21, %22, %41
-  store %19 to %20#1 : $*PB2                      // id: %21
-  %22 = unchecked_addr_cast %20#1 : $*PB2 to $*Int // user: %23
+  store %19 to %20 : $*PB2                      // id: %21
+  %22 = unchecked_addr_cast %20 : $*PB2 to $*Int // user: %23
   %23 = load %22 : $*Int                          // user: %37
   %24 = alloc_stack $PB2                          // users: %25, %26, %40
-  store %19 to %24#1 : $*PB2                      // id: %25
-  %26 = unchecked_addr_cast %24#1 : $*PB2 to $*PX2 // user: %27
+  store %19 to %24 : $*PB2                      // id: %25
+  %26 = unchecked_addr_cast %24 : $*PB2 to $*PX2 // user: %27
   %27 = load %26 : $*PX2                          // user: %37
   %28 = alloc_stack $PB2                          // users: %29, %30, %39
-  store %19 to %28#1 : $*PB2                      // id: %29
-  %30 = unchecked_addr_cast %28#1 : $*PB2 to $*PX3 // user: %31
+  store %19 to %28 : $*PB2                      // id: %29
+  %30 = unchecked_addr_cast %28 : $*PB2 to $*PX3 // user: %31
   %31 = load %30 : $*PX3                          // user: %37
   %32 = load %3 : $*PAB2                          // user: %34
   %33 = alloc_stack $PAB2                         // users: %34, %35, %38
-  store %32 to %33#1 : $*PAB2                     // id: %34
-  %35 = unchecked_addr_cast %33#1 : $*PAB2 to $*PXY2 // user: %36
+  store %32 to %33 : $*PAB2                     // id: %34
+  %35 = unchecked_addr_cast %33 : $*PAB2 to $*PXY2 // user: %36
   %36 = load %35 : $*PXY2                         // user: %37
   %37 = tuple (%13 : $E0_, %18 : $E1, %23 : $Int, %27 : $PX2, %31 : $PX3, %36 : $PXY2) // user: %44
-  dealloc_stack %33#0 : $*@local_storage PAB2     // id: %38
-  dealloc_stack %28#0 : $*@local_storage PB2      // id: %39
-  dealloc_stack %24#0 : $*@local_storage PB2      // id: %40
-  dealloc_stack %20#0 : $*@local_storage PB2      // id: %41
-  dealloc_stack %15#0 : $*@local_storage E2       // id: %42
-  dealloc_stack %10#0 : $*@local_storage E0       // id: %43
+  dealloc_stack %33 : $*PAB2     // id: %38
+  dealloc_stack %28 : $*PB2      // id: %39
+  dealloc_stack %24 : $*PB2      // id: %40
+  dealloc_stack %20 : $*PB2      // id: %41
+  dealloc_stack %15 : $*E2       // id: %42
+  dealloc_stack %10 : $*E0       // id: %43
   return %37 : $(E0_, E1, Int, PX2, PX3, PXY2)    // id: %44
 }

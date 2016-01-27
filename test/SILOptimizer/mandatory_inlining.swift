@@ -23,7 +23,7 @@ func foo(x: Float) -> Float {
   // CHECK: return
 
 @_transparent func baz(x: Float) -> Float {
-  return x;
+  return x
 }
 
 // CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining3baz
@@ -80,28 +80,6 @@ func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[FALSE:%.*]] = struct $Bool ([[FV:%.*]] : $Builtin.Int1)
   // CHECK: return [[FALSE]]
 
-@_transparent func test_curried(x: Int)(y: Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  return y
-}
-
-func call_uncurried(x: Int, y: Int) -> Int {
-  return test_curried(x)(y: y)
-}
-
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining14call_uncurried
-  // CHECK-NOT: = apply
-  // CHECK: return
-
-func call_curried(x: Int, y: Int) -> Int {
-  let z = test_curried(x)
-  return z(y: y)
-}
-
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining12call_curried
-  // CHECK: = apply
-  // CHECK: = apply
-  // CHECK: return
-
 infix operator &&& {
   associativity left
   precedence 120
@@ -112,7 +90,7 @@ infix operator ||| {
   precedence 110
 }
 
-@_transparent func &&& (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@_transparent func &&& (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
   if lhs {
     return rhs()
   }
@@ -120,7 +98,7 @@ infix operator ||| {
   return false
 }
 
-@_transparent func ||| (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@_transparent func ||| (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
   if lhs {
     return true
   }
@@ -148,7 +126,7 @@ enum X {
 }
 
 func testInlineUnionElement() -> X {
-  return X.onetransp;
+  return X.onetransp
   // CHECK-LABEL: sil hidden @_TF18mandatory_inlining22testInlineUnionElementFT_OS_1X
   // CHECK: enum $X, #X.onetransp!enumelt
   // CHECK-NOT = apply

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -443,6 +443,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
       IGM.emitProtocolConformances();
+      IGM.emitTypeMetadataRecords();
     }
 
     // Okay, emit any definitions that we suddenly need.
@@ -665,7 +666,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
 
-  // Start all the threads an do the LLVM compilation.
+  // Start all the threads and do the LLVM compilation.
   for (int ThreadIdx = 1; ThreadIdx < numThreads; ++ThreadIdx) {
     Threads.push_back(std::thread(ThreadEntryPoint, &dispatcher, &DiagMutex,
                                   ThreadIdx));

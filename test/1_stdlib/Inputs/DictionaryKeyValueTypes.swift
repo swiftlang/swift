@@ -791,7 +791,7 @@ func _checkArrayFastEnumerationImpl(
   expected: [Int],
   _ a: NSArray,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject)->()) -> Void,
+  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject) -> ()) -> Void,
   _ convertValue: (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
@@ -924,7 +924,7 @@ func _checkSetFastEnumerationImpl(
   expected: [Int],
   _ s: NSSet,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> Void,
+  _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject) -> ()) -> Void,
   _ convertMember: (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
@@ -1142,7 +1142,7 @@ func _checkDictionaryFastEnumerationImpl(
   expected: [(Int, Int)],
   _ d: NSDictionary,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2)->()) -> Void,
+  _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2) -> ()) -> Void,
   _ convertKey: (AnyObject) -> Int,
   _ convertValue: (AnyObject) -> Int
 ) {

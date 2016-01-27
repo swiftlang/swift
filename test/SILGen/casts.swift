@@ -65,23 +65,23 @@ struct S : P {}
 // CHECK: sil hidden @_TF5casts32downcast_existential_conditional
 // CHECK: bb0([[IN:%.*]] : $*P):
 // CHECK:   [[COPY:%.*]] = alloc_stack $P
-// CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]#1
+// CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]
 // CHECK:   [[TMP:%.*]] = alloc_stack $S
-// CHECK:   checked_cast_addr_br take_always P in [[COPY]]#1 : $*P to S in [[TMP]]#1 : $*S, bb1, bb2
+// CHECK:   checked_cast_addr_br take_always P in [[COPY]] : $*P to S in [[TMP]] : $*S, bb1, bb2
 //   Success block.
 // CHECK: bb1:
-// CHECK:   [[T0:%.*]] = load [[TMP]]#1 : $*S
+// CHECK:   [[T0:%.*]] = load [[TMP]] : $*S
 // CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, [[T0]] : $S
-// CHECK:   dealloc_stack [[TMP]]#0
+// CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T1]] : $Optional<S>)
 //   Failure block.
 // CHECK: bb2:
 // CHECK:   [[T0:%.*]] = enum $Optional<S>, #Optional.None!enumelt
-// CHECK:   dealloc_stack [[TMP]]#0
+// CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T0]] : $Optional<S>)
 //   Continuation block.
 // CHECK: bb3([[RESULT:%.*]] : $Optional<S>):
-// CHECK:   dealloc_stack [[COPY]]#0
+// CHECK:   dealloc_stack [[COPY]]
 // CHECK:   destroy_addr [[IN]] : $*P
 // CHECK:   return [[RESULT]]
 func downcast_existential_conditional(p: P) -> S? {

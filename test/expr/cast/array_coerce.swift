@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 class C {
-	var x = 0;
+	var x = 0
 }
 class D: C {}
 

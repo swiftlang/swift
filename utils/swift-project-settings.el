@@ -2,7 +2,7 @@
 ;
 ; This source file is part of the Swift.org open source project
 ;
-; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ; Licensed under Apache License v2.0 with Runtime Library Exception
 ;
 ; See http://swift.org/LICENSE.txt for license information
@@ -156,7 +156,7 @@ Swift header should look like.
 "//
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -198,7 +198,7 @@ Swift header should look like.
   ;; is non-empty, v1 all over again
   '(setq v2
          (replace-regexp-in-string "\\` +" ""
-          (if (and comment-end (> (length comment-end) 0)) comment-end  v1)))
+          (if (and comment-end (> (length comment-end) 0)) comment-end v1)))
   
   v1 "===--- "
   str & " " | -1

@@ -25,6 +25,6 @@ TestSuitePasses.test("passes") {
 
 runAllTests()
 runAllTests()
-// CHECK: runAllTests() called twice.  It is not allowed, aborting.
+// CHECK: runAllTests() called twice. Aborting.
 // CHECK: abort()
 

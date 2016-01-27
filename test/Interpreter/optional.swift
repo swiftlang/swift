@@ -9,17 +9,19 @@ class B : A {
 }
 
 func printA(v: A) { v.printA() }
-func printOpt<T>(subprint: T->())(x: T?) {
-  switch (x) {
-  case .Some(let y): print(".Some(", terminator: ""); subprint(y); print(")", terminator: "")
-  case .None: print(".None", terminator: "")
+func printOpt<T>(subprint: T -> ()) -> (T?) -> () {
+  return { x in
+    switch (x) {
+    case .Some(let y): print(".Some(", terminator: ""); subprint(y); print(")", terminator: "")
+    case .None: print(".None", terminator: "")
+    }
   }
 }
 
 func test(v: A????, _ cast: (A????) -> B?) {
-  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
+  printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B: ", terminator: "")
-  printOpt(printA)(x: cast(v))
+  printOpt(printA)(cast(v))
   print("\n", terminator: "")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as? B })
@@ -36,9 +38,9 @@ test(.None, { $0 as? B })
 // CHECK: .None as? B: .None
 
 func test(v: A????, _ cast: (A????) -> B??) {
-  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
+  printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B?: ", terminator: "")
-  printOpt(printOpt(printA))(x: cast(v))
+  printOpt(printOpt(printA))(cast(v))
   print("\n", terminator: "")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as? B? })
@@ -55,9 +57,9 @@ test(.None, { $0 as? B? })
 // CHECK: .None as? B?: .None
 
 func test(v: A????, _ cast: (A????) -> B???) {
-  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
+  printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B??: ", terminator: "")
-  printOpt(printOpt(printOpt(printA)))(x: cast(v))
+  printOpt(printOpt(printOpt(printA)))(cast(v))
   print("\n", terminator: "")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as? B?? })

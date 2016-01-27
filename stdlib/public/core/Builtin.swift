@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -175,8 +175,8 @@ func _conditionallyUnreachable() {
 }
 
 @warn_unused_result
-@_silgen_name("swift_isClassOrObjCExistential")
-func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
+@_silgen_name("swift_isClassOrObjCExistentialType")
+func _swift_isClassOrObjCExistentialType<T>(x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
@@ -194,7 +194,7 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   }
 
   // Maybe a class.
-  return _swift_isClassOrObjCExistential(x)
+  return _swift_isClassOrObjCExistentialType(x)
 }
 
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
@@ -318,7 +318,7 @@ public func _slowPath<C : BooleanType>(x: C) -> Bool {
 @warn_unused_result
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
-  return _swift_usesNativeSwiftReferenceCounting_class(
+  return swift_objc_class_usesNativeSwiftReferenceCounting(
     unsafeAddressOf(theClass)
   )
 #else
@@ -327,24 +327,25 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 }
 
 @warn_unused_result
-@_silgen_name("_swift_class_getInstancePositiveExtentSize_native")
-func _swift_class_getInstancePositiveExtentSize_native(theClass: AnyClass) -> UInt
+@_silgen_name("swift_class_getInstanceExtents")
+func swift_class_getInstanceExtents(theClass: AnyClass)
+  -> (negative: UInt, positive: UInt)
 
-/// - Returns: `class_getInstanceSize(theClass)`.
+@warn_unused_result
+@_silgen_name("swift_objc_class_unknownGetInstanceExtents")
+func swift_objc_class_unknownGetInstanceExtents(theClass: AnyClass)
+  -> (negative: UInt, positive: UInt)
+
+/// - Returns: 
 @inline(__always)
 @warn_unused_result
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
-  return Int(_swift_class_getInstancePositiveExtentSize(
-      unsafeAddressOf(theClass)))
+  return Int(swift_objc_class_unknownGetInstanceExtents(theClass).positive)
 #else
-  return Int(_swift_class_getInstancePositiveExtentSize_native(theClass))
+  return Int(swift_class_getInstanceExtents(theClass).positive)
 #endif
 }
-
-@warn_unused_result
-@_silgen_name("_swift_isClass")
-public func _swift_isClass(x: Any) -> Bool
 
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
@@ -386,6 +387,19 @@ internal var _objectPointerLowSpareBitShift: UInt {
 }
 internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0x8000_0000_0000_0000 }
+}
+#elseif arch(powerpc64) || arch(powerpc64le)
+internal var _objectPointerSpareBits: UInt {
+  @inline(__always) get { return 0x0000_0000_0000_0007 }
+}
+internal var _objectPointerIsObjCBit: UInt {
+  @inline(__always) get { return 0x0000_0000_0000_0002 }
+}
+internal var _objectPointerLowSpareBitShift: UInt {
+    @inline(__always) get { return 0 }
+}
+internal var _objCTaggedPointerBits: UInt {
+    @inline(__always) get { return 0 }
 }
 #endif
 
@@ -481,7 +495,7 @@ internal func _makeBridgeObject(
 public // @testable
 func _getSuperclass(t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
-    _swift_getSuperclass_nonNull(unsafeBitCast(t, COpaquePointer.self)),
+    swift_class_getSuperclass(unsafeBitCast(t, COpaquePointer.self)),
     AnyClass.self)
 }
 
@@ -534,7 +548,7 @@ internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
 public // @testable
 func _isUnique_native<T>(inout object: T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
-  // reference. Any any case it's non pointer bits must be zero, so
+  // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
   _sanityCheck(
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
@@ -551,7 +565,7 @@ func _isUnique_native<T>(inout object: T) -> Bool {
 public // @testable
 func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
-  // reference. Any any case it's non pointer bits must be zero.
+  // reference. Any case it's non pointer bits must be zero.
   _sanityCheck(
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
     == 0)

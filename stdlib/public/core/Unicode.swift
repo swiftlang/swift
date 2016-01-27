@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -44,7 +44,7 @@ public protocol UnicodeCodecType {
 
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
   /// encoding.
-  typealias CodeUnit
+  associatedtype CodeUnit
 
   init()
 
@@ -79,7 +79,7 @@ public struct UTF8 : UnicodeCodecType {
   public init() {}
 
   /// Returns the number of expected trailing bytes for a given first byte: 0,
-  /// 1, 2 or 3.  If the first byte can not start a valid UTF-8 code unit
+  /// 1, 2 or 3.  If the first byte cannot start a valid UTF-8 code unit
   /// sequence, returns 4.
   @warn_unused_result
   public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
@@ -705,9 +705,8 @@ public func transcode<
 
   var inputDecoder = inputEncoding.init()
   var hadError = false
-  for var scalar = inputDecoder.decode(&input);
-          !scalar.isEmptyInput();
-          scalar = inputDecoder.decode(&input) {
+  var scalar = inputDecoder.decode(&input)
+  while !scalar.isEmptyInput() {
     switch scalar {
     case .Result(let us):
       OutputEncoding.encode(us, output: output)
@@ -721,6 +720,7 @@ public func transcode<
         hadError = true
       }
     }
+    scalar = inputDecoder.decode(&input)
   }
   return hadError
 }

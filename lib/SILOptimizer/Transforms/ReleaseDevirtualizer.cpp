@@ -1,8 +1,8 @@
-//===---- ReleaseDevirtualizer.cpp - Devirtualizes release-instructions ---===//
+//===--- ReleaseDevirtualizer.cpp - Devirtualizes release-instructions ----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -164,7 +164,7 @@ devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
   if (!IEMTI)
     return false;
 
-  SILType MType = IEMTI->getOperand().getType();
+  SILType MType = IEMTI->getOperand()->getType();
   auto *MetaType = MType.getSwiftRValueType()->getAs<AnyMetatypeType>();
   if (!MetaType)
     return false;
@@ -213,7 +213,7 @@ bool ReleaseDevirtualizer::createDeinitCall(SILType AllocType,
   SILType DeinitSILType = SILType::getPrimitiveObjectType(DeinitType);
 
   SILBuilder B(ReleaseInst);
-  if (object.getType() != AllocType)
+  if (object->getType() != AllocType)
     object = B.createUncheckedRefCast(ReleaseInst->getLoc(), object, AllocType);
 
   // Create the call to the destructor with the allocated object as self

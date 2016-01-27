@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -200,6 +200,19 @@ public:
     return Address(addr, address.getAlignment());
   }
 
+  /// Cast the given address to be a pointer to the given element type,
+  /// preserving the original address space.
+  Address CreateElementBitCast(Address address, llvm::Type *type,
+                               const llvm::Twine &name = "") {
+    // Do nothing if the type doesn't change.
+    auto origPtrType = address.getType();
+    if (origPtrType->getElementType() == type) return address;
+
+    // Otherwise, cast to a pointer to the correct type.
+    auto ptrType = type->getPointerTo(origPtrType->getAddressSpace());
+    return CreateBitCast(address, ptrType, name);
+  }
+
   /// Insert the given basic block after the IP block and move the
   /// insertion point to it.  Only valid if the IP is valid.
   void emitBlock(llvm::BasicBlock *BB);
@@ -210,6 +223,18 @@ public:
                         size.getValue(),
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
+  }
+  
+  using IRBuilderBase::CreateLifetimeStart;
+  llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
+    return CreateLifetimeStart(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+  
+  using IRBuilderBase::CreateLifetimeEnd;
+  llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
+    return CreateLifetimeEnd(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
   }
 };
 

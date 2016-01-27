@@ -14,7 +14,7 @@ import gizmo
 // CHECK: @_TWPOSC28NeverActuallyMentionedByNames9Equatable5gizmo = linkonce_odr hidden constant
 
 // CHECK-LABEL: define i32 @main
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK:         call %swift.type* @_TMaOSC16NSRuncingOptions()
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_aFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 123
@@ -84,6 +84,9 @@ func test_enum_without_name_Equatable(obj: TestThatEnumType) -> Bool {
 
 func use_metadata<T>(t:T){}
 use_metadata(NSRuncingOptions.Mince)
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaOSC16NSRuncingOptions()
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 @objc enum ExportedToObjC: Int {
   case Foo = -1, Bar, Bas

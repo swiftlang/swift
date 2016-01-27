@@ -1,8 +1,8 @@
-//===--- SILFormat.h - The internals of serialized SILs --------*- C++ -*-===//
+//===--- SILFormat.h - The internals of serialized SILs ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,7 +28,6 @@ using ValueIDField = DeclIDField;
 
 using SILInstOpCodeField = BCFixed<8>;
 using SILTypeCategoryField = BCFixed<2>;
-using SILValueResultField = BCFixed<8>;
 
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
@@ -142,7 +141,7 @@ namespace sil_block {
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
     BOUND_GENERIC_SUBSTITUTION = decls_block::BOUND_GENERIC_SUBSTITUTION,
-    NO_CONFORMANCE = decls_block::NO_CONFORMANCE,
+    ABSTRACT_PROTOCOL_CONFORMANCE = decls_block::ABSTRACT_PROTOCOL_CONFORMANCE,
     NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,
     SPECIALIZED_PROTOCOL_CONFORMANCE
       = decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE,
@@ -216,19 +215,18 @@ namespace sil_block {
     BCFixed<1>           // Is this a let variable.
   >;
 
-  using SILFunctionLayout = BCRecordLayout<
-    SIL_FUNCTION,
-    SILLinkageField,
-    BCFixed<1>,        // transparent
-    BCFixed<1>,        // fragile
-    BCFixed<2>,        // thunk/reabstraction_thunk
-    BCFixed<1>,        // global_init
-    BCFixed<2>,        // inlineStrategy
-    BCFixed<2>,        // side effect info.
-    TypeIDField,
-    IdentifierIDField  // Semantics Attribute
-                       // followed by generic param list, if any
-  >;
+  using SILFunctionLayout =
+      BCRecordLayout<SIL_FUNCTION, SILLinkageField,
+                     BCFixed<1>, // transparent
+                     BCFixed<1>, // fragile
+                     BCFixed<2>, // thunk/reabstraction_thunk
+                     BCFixed<1>, // global_init
+                     BCFixed<2>, // inlineStrategy
+                     BCFixed<2>, // side effect info.
+                     TypeIDField,
+                     BCArray<IdentifierIDField> // Semantics Attribute
+                     // followed by generic param list, if any
+                     >;
 
   // Has an optional argument list where each argument is a typed valueref.
   using SILBasicBlockLayout = BCRecordLayout<
@@ -243,11 +241,9 @@ namespace sil_block {
     SILInstOpCodeField,
     BCFixed<2>,          // Optional attributes
     ValueIDField,
-    SILValueResultField,
     TypeIDField,
     SILTypeCategoryField,
-    ValueIDField,
-    SILValueResultField
+    ValueIDField
   >;
 
   // SIL instructions with one type and one typed valueref.
@@ -259,8 +255,7 @@ namespace sil_block {
     SILTypeCategoryField,
     TypeIDField,
     SILTypeCategoryField,
-    ValueIDField,
-    SILValueResultField
+    ValueIDField
   >;
 
   // SIL instructions that construct existential values.
@@ -272,7 +267,6 @@ namespace sil_block {
     TypeIDField,          // operand type
     SILTypeCategoryField, // operand type category
     ValueIDField,         // operand id
-    SILValueResultField,  // operand result id
     TypeIDField,          // formal concrete type
     BCVBR<5>              // # of protocol conformances
     // Trailed by protocol conformance info (if any)
@@ -287,8 +281,7 @@ namespace sil_block {
     SILTypeCategoryField,
     TypeIDField,
     SILTypeCategoryField,
-    ValueIDField,
-    SILValueResultField
+    ValueIDField
   >;
 
   // SIL instructions with one type and a list of values.
@@ -315,7 +308,6 @@ namespace sil_block {
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
-    SILValueResultField,
     BCArray<ValueIDField> // a list of arguments
   >;
 
@@ -334,8 +326,7 @@ namespace sil_block {
     BCFixed<3>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
-    ValueIDField,
-    SILValueResultField
+    ValueIDField
   >;
 
   // SIL instructions with two typed values.
@@ -346,11 +337,9 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,
-    SILValueResultField,
     TypeIDField,
     SILTypeCategoryField,
-    ValueIDField,
-    SILValueResultField
+    ValueIDField
   >;
 
   using SILGenericOuterParamsLayout = BCRecordLayout<

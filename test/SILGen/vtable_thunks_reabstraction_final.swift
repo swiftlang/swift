@@ -13,18 +13,10 @@ class GenericSuper<T> {
   func foo(x: T) -> T? {
     return nil
   }
-
-  func curried(x: T)(y: T) -> T? {
-    return nil
-  }
 }
 
 class NongenericSub: GenericSuper<Int>, Fooable {
   override func foo(x: Int) -> Int? {
-    return 6502
-  }
-
-  override func curried(x: Int)(y: Int) -> Int? {
     return 6502
   }
 }
@@ -34,10 +26,6 @@ class NongenericSub: GenericSuper<Int>, Fooable {
 
 class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
   override func foo(x: U) -> U? {
-    return x
-  }
-
-  override func curried(x: U)(y: U) -> U? {
     return x
   }
 }

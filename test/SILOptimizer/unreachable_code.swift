@@ -40,7 +40,7 @@ func whileTrueReachable(v: Int) -> () {
     }
     x += 1
   }
-  x--  
+  x -= 1
 }
 
 func whileTrueTwoPredecessorsEliminated() -> () {
@@ -119,9 +119,9 @@ func testSwitchEnum(xi: Int) -> Int {
   case .One:
     userCode() // expected-note {{will never be executed}}
   case .Two:
-    x--  
+    x -= 1
   case .Three:
-    x--  
+    x -= 1
   }
 
   switch cond { // no warning
@@ -160,7 +160,7 @@ func testSwitchEnum(xi: Int) -> Int {
     x -= 1
   }
   
-  return x;
+  return x
 }
 
 
@@ -221,7 +221,7 @@ func testSwitchOptionalBool (b:Bool?, xi: Int) -> Int {
   case .Some(true):
     x += 1
   case .None:
-    x-- 
+    x -= 1 
   } // expected-error{{switch must be exhaustive}}
 
   return xi

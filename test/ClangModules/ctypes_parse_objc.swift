@@ -1,5 +1,4 @@
 // RUN: %target-parse-verify-swift %clang-importer-sdk
-// RUN: %target-parse-verify-swift -enable-swift-name-lookup-tables %clang-importer-sdk
 
 // REQUIRES: objc_interop
 

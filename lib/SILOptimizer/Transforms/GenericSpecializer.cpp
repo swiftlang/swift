@@ -1,8 +1,8 @@
-//===-- GenericSpecializer.cpp - Specialization of generic functions ------===//
+//===--- GenericSpecializer.cpp - Specialization of generic functions -----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-generic-specialize"
+#define DEBUG_TYPE "sil-generic-specializer"
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -25,13 +25,6 @@
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
-
-// STATISTIC(NumEscapingAllocas, "Number of aggregate allocas not chopped up "
-//           "due to uses.");
-// STATISTIC(NumChoppedAllocas, "Number of chopped up aggregate allocas.");
-// STATISTIC(NumUnhandledAllocas, "Number of non struct, tuple allocas.");
-
-namespace {} // end anonymous namespace
 
 namespace {
 
@@ -46,7 +39,7 @@ class GenericSpecializer : public SILFunctionTransform {
                        << " *****\n");
 
     if (specializeAppliesInFunction(F))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
 
   StringRef getName() override { return "Generic Specializer"; }

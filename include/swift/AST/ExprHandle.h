@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -26,7 +26,7 @@ namespace swift {
 
 /// ExprHandle - Provides an indirection for expressions, so both a type and a
 /// pattern can point at the same expression during type-checking.
-class ExprHandle {
+class alignas(8) ExprHandle {
   /// \brief The expression along with a bit saying whether this expression
   /// was already type-checked (or not).
   llvm::PointerIntPair<Expr *, 1, bool> EAndChecked;

@@ -14,7 +14,7 @@ func foo(x : Int32) { // CHECK: [[@LINE]]:21 -> [[END:[0-9]+:2]] : 0
     return
   } // CHECK: [[@LINE]]:4 -> [[END]] : (((0 - 1) - 2) - 4)
 
-  let z = x;
+  let z = x
 }
 
 foo(1);

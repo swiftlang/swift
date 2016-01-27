@@ -3,7 +3,26 @@
 // REQUIRES: asserts
 
 import Builtin
-import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+struct Int32 {
+  var _value : Builtin.Int32
+}
+
+struct Array<T> {
+  var _value : Builtin.NativeObject
+}
+
+struct Bool {
+  var _value: Builtin.Int1
+}
+
+struct UnsafeMutablePointer<T> {
+  var _value: Builtin.RawPointer
+}
 
 class X {
   @sil_stored var a: Int32
@@ -12,7 +31,36 @@ class X {
   init()
 }
 
+sil @exitfunc : $@convention(thin) @noreturn () -> ()
+sil [readnone] @pure_func : $@convention(thin) () -> ()
+sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
+sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
+
 sil @unknown_func : $@convention(thin) () -> ()
+
+
+struct SP {
+  var value: Builtin.BridgeObject
+}
+
+enum EP {
+  case None
+  case Data(SP, Builtin.Int1)
+}
+
+sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
+sil [_semantics "array.check_subscript"] @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (@out Int32, Int32, Bool, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.make_mutable"] @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
+sil [_semantics "array.get_element_address"] @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
+sil [_semantics "array.get_count"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+sil [_semantics "array.get_capacity"] @get_capacity_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+sil [_semantics "array.get_count"] @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+///////////
+// Tests //
+///////////
 
 // CHECK-LABEL: sil @load_store_to_args
 // CHECK: <func=,param0=r,param1=w,param2=w>
@@ -34,9 +82,9 @@ bb0(%0 : $X, %1 : $*Int32, %2 : $*Int32):
   %s = alloc_stack $Int32
 
   %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
-  %ap = apply %f(%1, %s#1, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %f(%1, %s, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
 
-  dealloc_stack %s#0 : $*@local_storage Int32
+  dealloc_stack %s : $*Int32
   %r = tuple ()
   return %r : $()
 }
@@ -57,11 +105,14 @@ bb0(%0 : $X, %1 : $*Int32):
 }
 
 // CHECK-LABEL: sil @partial_apply_load_store_to_args
-// CHECK: <func=w,param0=r,param1=,param2=;alloc>
+// The apply may call deinit of the callee_owned thick function. Therefore the
+// function effects are conservative.
+// CHECK: <func=rw+-,param0=,param1=,param2=;alloc;trap;readrc>
 sil @partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
 bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
   %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
   %c = partial_apply %f(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  // %c is implicitly released which may call deinit of the boxed X.
   %ap = apply %c(%0) : $@callee_owned (@inout Int32) -> ()
 
   %r = tuple ()
@@ -124,13 +175,14 @@ bb0(%0 : $Int32):
   %l1 = load %a : $*Int32
 
   %b = alloc_box $Int32
-  store %0 to %b#1 : $*Int32
-  %l2 = load %b#1 : $*Int32
+  %ba = project_box %b : $@box Int32
+  store %0 to %ba : $*Int32
+  %l2 = load %ba : $*Int32
  
   %s = alloc_stack $Int32
-  store %0 to %s#1 : $*Int32
-  %l3 = load %s#1 : $*Int32
-  dealloc_stack %s#0 : $*@local_storage Int32
+  store %0 to %s : $*Int32
+  %l3 = load %s : $*Int32
+  dealloc_stack %s : $*Int32
 
   %r = tuple ()
   return %r : $()
@@ -221,13 +273,13 @@ bb0(%0 : $Int32):
   return %r : $Int32
 }
 
-struct SP {
-  var value: Builtin.BridgeObject
-}
-
-enum EP {
-  case None
-  case Data(SP, Builtin.Int1)
+// CHECK-LABEL: sil @test_project_box
+// CHECK: <func=,param0=r>
+sil @test_project_box : $@convention(thin) (@box Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $@box Builtin.Int32):
+  %a = project_box %0 : $@box Builtin.Int32
+  %l = load %a : $*Builtin.Int32
+  return %l : $Builtin.Int32
 }
 
 // CHECK-LABEL: sil @projections
@@ -366,16 +418,6 @@ bb0(%0 : $Array<Int32>):
   return %r : $()
 }
 
-sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
-sil [_semantics "array.check_subscript"] @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
-sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
-sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (@out Int32, Int32, Bool, @guaranteed Array<Int32>) -> ()
-sil [_semantics "array.make_mutable"] @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
-sil [_semantics "array.get_element_address"] @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
-sil [_semantics "array.get_count"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
-sil [_semantics "array.get_capacity"] @get_capacity_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
-sil [_semantics "array.get_count"] @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
-
 // CHECK-LABEL: sil @call_noreturn
 // CHECK: <func=;trap>
 sil @call_noreturn : $@convention(thin) () -> () {
@@ -422,8 +464,11 @@ bb0(%0 : $X):
   return %r : $()
 }
 
-sil @exitfunc : $@convention(thin) @noreturn () -> ()
-sil [readnone] @pure_func : $@convention(thin) () -> ()
-sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
-sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
-
+// CHECK-LABEL: sil @fix_lifetime_test
+// CHECK: <func=,param0=r>
+sil @fix_lifetime_test : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  fix_lifetime %0 : $X
+  %3 = tuple()
+  return %3 : $()
+}

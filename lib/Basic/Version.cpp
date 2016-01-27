@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -84,8 +84,8 @@ static void printFullRevisionString(raw_ostream &out) {
 void splitVersionComponents(
   SmallVectorImpl<std::pair<StringRef, SourceRange>> &SplitComponents,
                             StringRef &VersionString, SourceLoc Loc,
-                            DiagnosticEngine *Diags) {
-  SourceLoc Start = Loc.isValid() ? Loc.getAdvancedLoc(1) : Loc;
+                            DiagnosticEngine *Diags, bool skipQuote = false) {
+  SourceLoc Start = (Loc.isValid() && skipQuote) ? Loc.getAdvancedLoc(1) : Loc;
   SourceLoc End = Start;
 
   // Split the version string into tokens separated by the '.' character.
@@ -125,7 +125,8 @@ Version Version::parseCompilerVersionString(
     }
   };
 
-  splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
+  splitVersionComponents(SplitComponents, VersionString, Loc, Diags,
+                         /*skipQuote=*/true);
 
   uint64_t ComponentNumber;
 
@@ -137,7 +138,7 @@ Version Version::parseCompilerVersionString(
     // Version components can't be empty.
     if (SplitComponent.empty()) {
       if (Diags)
-        Diags->diagnose(Range.Start, diag::empty_compiler_version_component);
+        Diags->diagnose(Range.Start, diag::empty_version_component);
       else
         llvm_unreachable("Found empty compiler version component");
       continue;
@@ -165,7 +166,7 @@ Version Version::parseCompilerVersionString(
       continue;
     } else if (Diags) {
       Diags->diagnose(Range.Start,
-                      diag::compiler_version_component_not_number);
+                      diag::version_component_not_number);
     } else {
       llvm_unreachable("Invalid character in _compiler_version build configuration");
     }
@@ -182,18 +183,25 @@ Version Version::parseCompilerVersionString(
   return CV;
 }
 
-Version Version::parseVersionString(StringRef VersionString,
-                                                    SourceLoc Loc,
-                                                    DiagnosticEngine *Diags) {
-  Version CV;
+Optional<Version> Version::parseVersionString(StringRef VersionString,
+                                              SourceLoc Loc,
+                                              DiagnosticEngine *Diags) {
+  Version TheVersion;
   SmallString<16> digits;
   llvm::raw_svector_ostream OS(digits);
   SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
   // Skip over quote character in string literal.
 
+  if (VersionString.empty()) {
+    if (Diags)
+      Diags->diagnose(Loc, diag::empty_version_string);
+    return None;
+  }
+
   splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
 
   uint64_t ComponentNumber;
+  bool isValidVersion = true;
 
   for (size_t i = 0; i < SplitComponents.size(); ++i) {
     StringRef SplitComponent;
@@ -203,35 +211,53 @@ Version Version::parseVersionString(StringRef VersionString,
     // Version components can't be empty.
     if (SplitComponent.empty()) {
       if (Diags)
-        Diags->diagnose(Range.Start, diag::empty_compiler_version_component);
-      else
-        llvm_unreachable("Found empty compiler version component");
+        Diags->diagnose(Range.Start, diag::empty_version_component);
+
+      isValidVersion = false;
       continue;
     }
 
     // All other version components must be numbers.
     if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
-      CV.Components.push_back(ComponentNumber);
+      TheVersion.Components.push_back(ComponentNumber);
       continue;
-    } else if (Diags) {
-      Diags->diagnose(Range.Start,
-                      diag::compiler_version_component_not_number);
     } else {
-      llvm_unreachable("Invalid character in _compiler_version build configuration");
+      if (Diags)
+        Diags->diagnose(Range.Start,
+                        diag::version_component_not_number);
+      isValidVersion = false;
     }
   }
 
-  return CV;
+  return isValidVersion ? Optional<Version>(TheVersion) : None;
 }
 
 
 Version Version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
-  return Version::parseVersionString(
+  auto currentVersion = Version::parseVersionString(
     SWIFT_COMPILER_VERSION, SourceLoc(), nullptr);
+  assert(currentVersion.hasValue() &&
+         "Embedded Swift language version couldn't be parsed: '"
+         SWIFT_COMPILER_VERSION
+         "'");
+  return currentVersion;
 #else
   return Version();
 #endif
+}
+
+Version Version::getCurrentLanguageVersion() {
+#ifndef SWIFT_VERSION_STRING
+#error Swift language version is not set!
+#endif
+  auto currentVersion = Version::parseVersionString(
+    SWIFT_VERSION_STRING, SourceLoc(), nullptr);
+  assert(currentVersion.hasValue() &&
+         "Embedded Swift language version couldn't be parsed: '"
+         SWIFT_VERSION_STRING
+         "'");
+  return currentVersion.getValue();
 }
 
 std::string Version::str() const {

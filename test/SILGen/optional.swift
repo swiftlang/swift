@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func testCall(f: (()->())?) {
+func testCall(f: (() -> ())?) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
@@ -23,23 +23,25 @@ func testCall(f: (()->())?) {
 // CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
 // CHECK-NEXT: br bb2
 
-func testAddrOnlyCallResult<T>(f: (()->T)?) {
+func testAddrOnlyCallResult<T>(f: (() -> T)?) {
   var f = f
   var x = f?()
 }
 // CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<() -> T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> T>):
 // CHECK: [[F:%.*]] = alloc_box $Optional<() -> T>, var, name "f"
+// CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
 // CHECK-NEXT: retain_value [[T0]]
-// CHECK-NEXT: store [[T0]] to [[F]]#1
+// CHECK-NEXT: store [[T0]] to [[PBF]]
 // CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>, var, name "x"
-// CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
+// CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
+// CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[PBX]]
 //   Check whether 'f' holds a value.
-// CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
+// CHECK:      [[T1:%.*]] = select_enum_addr [[PBF]]
 // CHECK-NEXT: cond_br [[T1]], bb1, bb3
 //   If so, pull out the value...
 // CHECK:    bb1:
-// CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[F]]#1
+// CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[PBF]]
 // CHECK-NEXT: [[T0:%.*]] = load [[T1]]
 // CHECK-NEXT: strong_retain
 //   ...evaluate the rest of the suffix...
@@ -48,19 +50,19 @@ func testAddrOnlyCallResult<T>(f: (()->T)?) {
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[THUNK]]<T>([[T0]])
 // CHECK-NEXT: apply [[T1]]([[TEMP]])
 //   ...and coerce to T?
-// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}Some
+// CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}Some
 // CHECK-NEXT: br bb2
 //   Continuation block.
 // CHECK:    bb2
-// CHECK-NEXT: strong_release [[X]]#0
-// CHECK-NEXT: strong_release [[F]]#0
+// CHECK-NEXT: strong_release [[X]]
+// CHECK-NEXT: strong_release [[F]]
 // CHECK-NEXT: release_value
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]] : $()
 
 //   Nothing block.
 // CHECK:    bb3:
-// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
+// CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}None
 // CHECK-NEXT: br bb2
 
 

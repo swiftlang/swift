@@ -5,7 +5,7 @@ func aaa() {}
 func aaa(x: A) {}
 func aaa(x: B) {}
 func aaa(x: B, y: B) {}
-func aaa(#x: B, y: B) {}
+func aaa(x x: B, y: B) {}
 func aab() {}
 
 func test001() {
@@ -25,7 +25,7 @@ struct Foo {
   func aaa(x: A) {}
   func aaa(x: B) {}
   func aaa(x: B, y: B) {}
-  func aaa(#x: B, y: B) {}
+  func aaa(x x: B, y: B) {}
   func aab() {}
 }
 

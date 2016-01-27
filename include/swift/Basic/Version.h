@@ -1,8 +1,8 @@
-//===- Version.h - Swift Version Number -------------------------*- C++ -*-===//
+//===--- Version.h - Swift Version Number -----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 
 #include <string>
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -97,15 +98,20 @@ public:
   /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
   ///
   /// Version components can be any unsigned 64-bit number.
-  static Version parseVersionString(llvm::StringRef VersionString,
-                                            SourceLoc Loc,
-                                            DiagnosticEngine *Diags);
+  static llvm::Optional<Version> parseVersionString(
+    llvm::StringRef VersionString,
+    SourceLoc Loc,
+    DiagnosticEngine *Diags);
 
   /// Returns a version from the currently defined SWIFT_COMPILER_VERSION.
   ///
   /// If SWIFT_COMPILER_VERSION is undefined, this will return the empty
   /// compiler version.
   static Version getCurrentCompilerVersion();
+
+  /// Returns a version from the currently defined SWIFT_VERSION_MAJOR and
+  /// SWIFT_VERSION_MINOR.
+  static Version getCurrentLanguageVersion();
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);

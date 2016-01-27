@@ -5,6 +5,15 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import SceneKit
 
 // SceneKit is only available on iOS 8.0 and above and on OS X 10.8 and above.
@@ -38,8 +47,8 @@ if #available(iOS 8.0, OSX 10.10, *) {
     node.position.z = scn_float_from_cg
     expectTrue(SCNVector3EqualToVector3(node.position, scn_vec3_ref))
 
-    let f1: SCNFloat = scn_vec3_ref.x;
-    let f2: SCNFloat = scn_vec4_ref.y;
+    let f1: SCNFloat = scn_vec3_ref.x
+    let f2: SCNFloat = scn_vec4_ref.y
     expectEqual(f1, 1.0);
     expectEqual(f2, 2.0);
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -200,6 +200,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_check_interface_is_ascii:
       CheckInterfaceIsASCII = true;
+      break;
+
+    case OPT_print_response_as_json:
+      PrintResponseAsJSON = true;
       break;
 
     case OPT_INPUT:

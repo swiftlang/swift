@@ -79,7 +79,7 @@ class UncompressableProperty(UnicodeProperty):
     def get_value(self, cp):
         # Split Unicode codespace into 128-entry "pages".  Start each page with
         # a unique sequence of property values (page number) so that the result
-        # can not be compressed.
+        # cannot be compressed.
         page_number = cp >> 7
         if cp % 0x80 == 1:
             return page_number & 0xff

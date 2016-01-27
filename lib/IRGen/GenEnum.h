@@ -1,8 +1,8 @@
-//===--- GenEnum.h - Swift IR Generation For 'enum' Types -------* C++ *-===//
+//===--- GenEnum.h - Swift IR Generation For 'enum' Types -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -177,8 +177,8 @@ public:
     return cast<llvm::StructType>(getTypeInfo().getStorageType());
   }
   
-  IsPOD_t isPOD(ResilienceScope scope) const {
-    return getTypeInfo().isPOD(scope);
+  IsPOD_t isPOD(ResilienceExpansion expansion) const {
+    return getTypeInfo().isPOD(expansion);
   }
   
   /// \group Query enum layout
@@ -200,7 +200,12 @@ public:
     return ElementsWithNoPayload;
   }
 
+  /// Return a tag index in the range [0..NumElements].
   unsigned getTagIndex(EnumElementDecl *Case) const;
+
+  /// Return a tag index in the range
+  /// [-ElementsWithPayload..ElementsWithNoPayload-1].
+  int getResilientTagIndex(EnumElementDecl *Case) const;
 
   /// Map the given element to the appropriate index in the
   /// discriminator type.

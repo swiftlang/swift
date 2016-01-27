@@ -30,13 +30,13 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   // are @noreturn.
   switch i {
   case 2:
-    preconditionFailure("can not happen")
+    preconditionFailure("cannot happen")
   case 3:
-    _preconditionFailure("can not happen")
+    _preconditionFailure("cannot happen")
   case 4:
-    _debugPreconditionFailure("can not happen")
+    _debugPreconditionFailure("cannot happen")
   case 5:
-    _sanityCheckFailure("can not happen")
+    _sanityCheckFailure("cannot happen")
 
   default:
     return 0

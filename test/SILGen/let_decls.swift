@@ -94,8 +94,8 @@ func testAddressOnlyStructString<T>(a : T) -> String {
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]]#1,
-  // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]]#1 : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
   // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [[STRADDR]]
   // CHECK-NEXT: retain_value [[STRVAL]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
@@ -109,8 +109,8 @@ func testAddressOnlyStructElt<T>(a : T) -> T {
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]]#1,
-  // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]]#1 : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
   // CHECK-NEXT: copy_addr [[ELTADDR]] to [initialization] %0 : $*T
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
 }
@@ -231,17 +231,18 @@ struct WeirdPropertyTest {
 func test_weird_property(v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
-  // CHECK: store %0 to [[VBOX]]#1
+  // CHECK: [[PB:%.*]] = project_box [[VBOX]]
+  // CHECK: store %0 to [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
-  // CHECK: [[VVAL:%[0-9]+]] = load [[VBOX]]#1
+  // CHECK: [[VVAL:%[0-9]+]] = load [[PB]]
   // CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTests1pSi
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
   
   // The getter is mutating, so it takes the box address.
   // CHECK: [[GETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTestg1pSi
-  // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[VBOX]]#1)
+  // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[PB]])
   // CHECK: return [[RES]]
   return v.p
 }
@@ -336,13 +337,13 @@ func testDebugValue(a : Int, b : SimpleProtocol) -> Int {
 func testAddressOnlyTupleArgument(bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
-// CHECK-NEXT:    %3 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 0
+// CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
-// CHECK-NEXT:    %5 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 1
+// CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to %5 : $*Int
 // CHECK-NEXT:    debug_value_addr %2
-// CHECK-NEXT:    destroy_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int)
-// CHECK-NEXT:    dealloc_stack %2#0 : $*@local_storage (start: SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
 }
 
 
@@ -457,10 +458,11 @@ struct LetPropertyStruct {
 // CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box $LetPropertyStruct
-// CHECK:   store %0 to [[ABOX]]#1 : $*LetPropertyStruct
-// CHECK:   [[A:%[0-9]+]] = load [[ABOX]]#1 : $*LetPropertyStruct
+// CHECK:  [[PB:%.*]] = project_box [[ABOX]]
+// CHECK:   store %0 to [[PB]] : $*LetPropertyStruct
+// CHECK:   [[A:%[0-9]+]] = load [[PB]] : $*LetPropertyStruct
 // CHECK:   [[LP:%[0-9]+]] = struct_extract [[A]] : $LetPropertyStruct, #LetPropertyStruct.lp
-// CHECK:   strong_release [[ABOX]]#0 : $@box LetPropertyStruct
+// CHECK:   strong_release [[ABOX]] : $@box LetPropertyStruct
 // CHECK:   return [[LP]] : $Int
 func testLetPropertyAccessOnLValueBase(a : LetPropertyStruct) -> Int {
   var a = a
@@ -498,7 +500,7 @@ func test_unassigned_let_constant() {
   let string : String
 }
 // CHECK: [[S:%[0-9]+]] = alloc_stack $String, let, name "string"
-// CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]]#1 : $*String
+// CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]] : $*String
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
-// CHECK-NEXT:  dealloc_stack [[S]]#0 : $*@local_storage String
+// CHECK-NEXT:  dealloc_stack [[S]] : $*String
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,9 +32,9 @@
 using namespace swift;
 using namespace Lowering;
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // SILGenModule Class implementation
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
@@ -406,10 +406,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
   {
-    auto patterns = AFD->getBodyParamPatterns();
+    auto paramLists = AFD->getParameterLists();
     if (AFD->getDeclContext()->isTypeContext())
-      patterns = patterns.slice(1);
-    emitDefaultArgGenerators(AFD, patterns);
+      paramLists = paramLists.slice(1);
+    emitDefaultArgGenerators(AFD, paramLists);
   }
 
   // If this is a function at global scope, it may close over a global variable.
@@ -424,7 +424,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       // Decls captured by value don't escape.
       auto It = TopLevelSGF->VarLocs.find(capture.getDecl());
       if (It == TopLevelSGF->VarLocs.end() ||
-          !It->getSecond().value.getType().isAddress())
+          !It->getSecond().value->getType().isAddress())
         continue;
 
       Captures.push_back(It->second.value);
@@ -435,21 +435,29 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 }
 
+static bool hasSILBody(FuncDecl *fd) {
+  if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+    return !isa<ProtocolDecl>(fd->getDeclContext());
+
+  return fd->getBody(/*canSynthesize=*/false);
+}
+
 void SILGenModule::emitFunction(FuncDecl *fd) {
   SILDeclRef::Loc decl = fd;
 
   emitAbstractFuncDecl(fd);
 
-  // Emit the actual body of the function to a new SILFunction.  Ignore
-  // prototypes and methods whose bodies weren't synthesized by now.
-  if (fd->getBody(/*canSynthesize=*/false)) {
+  if (hasSILBody(fd)) {
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
 
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
-      SILGenFunction(*this, *f).emitFunction(fd);
+      if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet)
+        SILGenFunction(*this, *f).emitMaterializeForSet(fd);
+      else
+        SILGenFunction(*this, *f).emitFunction(fd);
       postEmitFunction(constant, f);
     });
   }
@@ -769,21 +777,13 @@ void SILGenModule::emitGlobalGetter(VarDecl *global,
 }
 
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                            ArrayRef<Pattern*> patterns) {
+                                        ArrayRef<ParameterList*> paramLists) {
   unsigned index = 0;
-  for (auto pattern : patterns) {
-    pattern = pattern->getSemanticsProvidingPattern();
-    auto tuplePattern = dyn_cast<TuplePattern>(pattern);
-    if (!tuplePattern) {
-      ++index;
-      continue;
-    }
-
-    for (auto &elt : tuplePattern->getElements()) {
-      if (auto handle = elt.getInit()) {
-        emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl,index),
+  for (auto paramList : paramLists) {
+    for (auto param : *paramList) {
+      if (auto handle = param->getDefaultValue())
+        emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
                                 handle->getExpr());
-      }
       ++index;
     }
   }
@@ -907,6 +907,15 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
+
+  if (vd->getStorageKind() == AbstractStorageDecl::StoredWithTrivialAccessors) {
+    // If the global variable has storage, it might also have synthesized
+    // accessors. Emit them here, since they won't appear anywhere else.
+    if (auto getter = vd->getGetter())
+      emitFunction(getter);
+    if (auto setter = vd->getSetter())
+      emitFunction(setter);
+  }
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
@@ -970,11 +979,12 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   }
 }
 
-void SILGenModule::useConformance(ProtocolConformance *conformance) {
+void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // We don't need to emit dependent conformances.
-  if (!conformance)
+  if (conformanceRef.isAbstract())
     return;
 
+  auto conformance = conformanceRef.getConcrete();
   auto root = conformance->getRootNormalConformance();
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
@@ -996,7 +1006,7 @@ void SILGenModule::useConformance(ProtocolConformance *conformance) {
 void
 SILGenModule::useConformancesFromSubstitutions(ArrayRef<Substitution> subs) {
   for (auto &sub : subs) {
-    for (auto *conformance : sub.getConformances())
+    for (auto conformance : sub.getConformances())
       useConformance(conformance);
   }
 }
@@ -1146,9 +1156,9 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
     visit(D);
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // SILModule::constructSIL method implementation
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
 SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,

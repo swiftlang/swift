@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 
@@ -105,7 +105,7 @@ public func _stdlib_pthread_barrier_wait(
   if pthread_mutex_lock(barrier.memory.mutex) != 0 {
     return -1
   }
-  ++barrier.memory.numThreadsWaiting
+  barrier.memory.numThreadsWaiting += 1
   if barrier.memory.numThreadsWaiting < barrier.memory.count {
     // Put the thread to sleep.
     if pthread_cond_wait(barrier.memory.cond, barrier.memory.mutex) != 0 {

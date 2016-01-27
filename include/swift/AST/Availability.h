@@ -1,8 +1,8 @@
-//===--- Availability.h - Swift Availability Structures -----*- C++ -*-===//
+//===--- Availability.h - Swift Availability Structures ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -35,7 +35,7 @@ class VersionRange {
   // The concretization of lattice elements is:
   //    Empty: empty
   //    All: all versions
-  //    x.y.x: all versions greater than or equal to to x.y.z
+  //    x.y.x: all versions greater than or equal to x.y.z
 
   enum class ExtremalRange { Empty, All };
   
@@ -117,7 +117,7 @@ public:
   }
 
   /// Mutates this range to be the union of itself and Other. This is the
-  /// join operator (least upper bound) in the veresion range lattice.
+  /// join operator (least upper bound) in the version range lattice.
   void unionWith(const VersionRange &Other) {
     // With the existing lattice this operation is precise. If the lattice
     // is ever extended it is important that this operation be an

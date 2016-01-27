@@ -11,12 +11,6 @@ func f1(f: () throws -> ()) rethrows { try f() }
 func f2(f: () -> ()) rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}}
 func f3(f: UndeclaredFunctionType) rethrows { f() } // expected-error {{use of undeclared type 'UndeclaredFunctionType'}}
 
-func cf1(f: () throws -> ())() rethrows { try f() } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func cf2(f: () -> ())() rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func cf3(f: UndeclaredFunctionType)() rethrows { f() } // expected-error {{use of undeclared type 'UndeclaredFunctionType'}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func cf4(f: () ->())(g: () throws -> ()) rethrows {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-func cf5() rethrows -> () throws -> () {} // expected-error {{'rethrows' function must take a throwing function argument}}
-
 /** Protocol conformance checking ********************************************/
 
 protocol P {
@@ -342,3 +336,15 @@ func testUnrelatedThrowsInRethrows(fn: () throws -> Void) rethrows {
   try raise() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
   throw SomeError.Badness // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
 }
+
+// <rdar://problem/24221830> Bogus "no calls to throwing functions" warning in derived throwing init
+class B24221830 {}
+class r24221830 : B24221830 {
+  var B: Int
+  
+  init(A: String) throws {
+    self.B = 0
+  }
+  
+}
+

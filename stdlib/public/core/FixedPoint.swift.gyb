@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 
 #
 # Utility code for later in this template
@@ -94,7 +94,7 @@ public protocol _DisallowMixedSignArithmetic : _IntegerType {
   // Int(1), which would otherwise compile due to the arithmetic
   // operators defined for Strideable types (unsigned types are
   // Strideable).
-  typealias _DisallowMixedSignArithmetic : SignedIntegerType = Int
+  associatedtype _DisallowMixedSignArithmetic : SignedIntegerType = Int
 }
 
 /// A set of common requirements for Swift's unsigned integer types.
@@ -244,8 +244,10 @@ public struct ${Self}
   /// byte order if necessary.
   @_transparent public
   init(bigEndian value: ${Self}) {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
+#elseif arch(powerpc64)
+    self = value
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -255,8 +257,10 @@ public struct ${Self}
   /// byte order if necessary.
   @_transparent public
   init(littleEndian value: ${Self}) {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     self = value
+#elseif arch(powerpc64)
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -278,8 +282,10 @@ public struct ${Self}
   /// Returns the big-endian representation of the integer, changing the
   /// byte order if necessary.
   public var bigEndian: ${Self} {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
+#elseif arch(powerpc64)
+    return self
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -287,8 +293,10 @@ public struct ${Self}
   /// Returns the little-endian representation of the integer, changing the
   /// byte order if necessary.
   public var littleEndian: ${Self} {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
     return self
+#elseif arch(powerpc64)
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -353,7 +361,7 @@ extension ${Self} : CustomStringConvertible {
 // restrictive than the full range of ${Self}---against which we're
 // not able to check.  Overflows are not useful indicators of
 // precondition violations in this context.  Therefore, we use masked
-// arithmetic in this conformance, and we need to be be sure that
+// arithmetic in this conformance, and we need to be sure that
 // generic implementations of the arithmetic operators for
 // RandomAccessIndexType's are all shadowed by more-specific
 // implementations that *do* check for overflows.
@@ -606,12 +614,14 @@ public func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
 // FIXME: After <rdar://problem/20226526> is fixed, we should be able
 //        to remove these.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func ++ (inout x: ${Self}) -> ${Self} {
   x = x + 1
   return x
 }
 
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func ++ (inout x: ${Self}) -> ${Self} {
   let ret = x
   x = x + 1
@@ -619,12 +629,14 @@ public postfix func ++ (inout x: ${Self}) -> ${Self} {
 }
 
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func -- (inout x: ${Self}) -> ${Self} {
   x = x - 1
   return x
 }
 
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func -- (inout x: ${Self}) -> ${Self} {
   let ret = x
   x = x - 1

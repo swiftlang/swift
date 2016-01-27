@@ -19,21 +19,23 @@ struct A {
 sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_ : $@convention(method) (A, @owned X) -> @owned X {
 bb0(%0 : $A, %1 : $X):
   %2 = alloc_box $X
+  %2a = project_box %2 : $@box X
   %3 = alloc_box $A
-  store %0 to %3#1 : $*A
+  %3a = project_box %3 : $@box A
+  store %0 to %3a : $*A
   %5 = mark_uninitialized [delegatingself] %1 : $X
-  store %5 to %2#1 : $*X
-  %7 = load %2#1 : $*X
+  store %5 to %2a : $*X
+  %7 = load %2a : $*X
   strong_retain %7 : $X
   // CHECK: class_method [volatile] %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : X.Type -> (a1: A, a2: A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
   %9 = class_method [volatile] %7 : $X, #X.init!initializer.1.foreign : X.Type -> (a1: A, a2: A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
-  %10 = load %3#1 : $*A
-  %11 = load %3#1 : $*A
+  %10 = load %3a : $*A
+  %11 = load %3a : $*A
   %12 = apply %9(%10, %11, %7) : $@convention(objc_method) (A, A, @owned X) -> @owned X
-  assign %12 to %2#1 : $*X
-  strong_release %3#0 : $@box A
-  %15 = load %2#1 : $*X
+  assign %12 to %2a : $*X
+  strong_release %3 : $@box A
+  %15 = load %2a : $*X
   strong_retain %15 : $X
-  strong_release %2#0 : $@box X
+  strong_release %2 : $@box X
   return %15 : $X
 }

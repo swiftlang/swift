@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/ToolChain.h"
-
+#include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "llvm/Option/ArgList.h"
@@ -33,14 +33,46 @@ using namespace llvm::opt;
 
 const char * const ToolChain::SWIFT_EXECUTABLE_NAME;
 
+ToolChain::JobContext::JobContext(Compilation &C,
+                                  ArrayRef<const Job *> Inputs,
+                                  ArrayRef<const Action *> InputActions,
+                                  const CommandOutput &Output,
+                                  const OutputInfo &OI)
+  : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
+    OI(OI), Args(C.getArgs()) {}
+
+ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
+  return C.getInputFiles();
+}
+const char *ToolChain::JobContext::getAllSourcesPath() const {
+  return C.getAllSourcesPath();
+}
+
+const char *
+ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
+                                            StringRef suffix) const {
+  SmallString<128> buffer;
+  std::error_code EC =
+      llvm::sys::fs::createTemporaryFile(name, suffix, buffer);
+  if (EC) {
+    // FIXME: This should not take down the entire process.
+    llvm::report_fatal_error("unable to create temporary file for filelist");
+  }
+
+  C.addTemporaryFile(buffer.str());
+  // We can't just reference the data in the TemporaryFiles vector because
+  // that could theoretically get copied to a new address.
+  return C.getArgs().MakeArgString(buffer.str());
+}
+
 std::unique_ptr<Job>
 ToolChain::constructJob(const JobAction &JA,
+                        Compilation &C,
                         SmallVectorImpl<const Job *> &&inputs,
-                        std::unique_ptr<CommandOutput> output,
                         const ActionList &inputActions,
-                        const llvm::opt::ArgList &args,
+                        std::unique_ptr<CommandOutput> output,
                         const OutputInfo &OI) const {
-  JobContext context{inputs, *output, inputActions, args, OI};
+  JobContext context{C, inputs, inputActions, *output, OI};
 
   auto invocationInfo = [&]() -> InvocationInfo {
     switch (JA.getKind()) {
@@ -69,12 +101,12 @@ ToolChain::constructJob(const JobAction &JA,
     std::string relativePath =
         findProgramRelativeToSwift(invocationInfo.ExecutableName);
     if (!relativePath.empty()) {
-      executablePath = args.MakeArgString(relativePath);
+      executablePath = C.getArgs().MakeArgString(relativePath);
     } else {
       auto systemPath =
           llvm::sys::findProgramByName(invocationInfo.ExecutableName);
       if (systemPath) {
-        executablePath = args.MakeArgString(systemPath.get());
+        executablePath = C.getArgs().MakeArgString(systemPath.get());
       } else {
         // For debugging purposes.
         executablePath = invocationInfo.ExecutableName;
@@ -85,7 +117,8 @@ ToolChain::constructJob(const JobAction &JA,
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
                                 executablePath,
                                 std::move(invocationInfo.Arguments),
-                                std::move(invocationInfo.ExtraEnvironment));
+                                std::move(invocationInfo.ExtraEnvironment),
+                                std::move(invocationInfo.FilelistInfo));
 }
 
 std::string

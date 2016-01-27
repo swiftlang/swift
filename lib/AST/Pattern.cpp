@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "swift/AST/Pattern.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"
@@ -25,7 +26,7 @@ using namespace swift;
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
   switch (kind) {
   case PatternKind::Paren:
-    return OS << "parethesized pattern";
+    return OS << "parenthesized pattern";
   case PatternKind::Tuple:
     return OS << "tuple pattern";
   case PatternKind::Named:
@@ -289,367 +290,8 @@ case PatternKind::ID: foundRefutablePattern = true; break;
   return foundRefutablePattern;
 }
 
-
-
-unsigned Pattern::numTopLevelVariables() const {
-  auto pattern = getSemanticsProvidingPattern();
-  if (auto tuple = dyn_cast<TuplePattern>(pattern))
-    return tuple->getNumElements();
-  return 1;
-}
-
-static Pattern *buildImplicitLetParameter(ASTContext &ctx, Identifier name,
-                                          SourceLoc loc, TypeLoc tyLoc,
-                                          DeclContext *DC) {
-  auto *paramDecl = new (ctx) ParamDecl(/*IsLet*/ true, SourceLoc(), 
-                                        Identifier(), loc, name,
-                                        tyLoc.getType(), DC);
-
-  paramDecl->setImplicit();
-  Pattern *P = new (ctx) NamedPattern(paramDecl, /*Implicit=*/true);
-  P->setType(tyLoc.getType());
-  P = new (ctx) TypedPattern(P, tyLoc, /*Implicit=*/true);
-  P->setType(tyLoc.getType());
-  paramDecl->setParamParentPattern(P);
-  return P;
-}
-
-Pattern *Pattern::buildImplicitSelfParameter(SourceLoc loc, TypeLoc tyLoc,
-                                             DeclContext *DC) {
-  ASTContext &ctx = DC->getASTContext();
-  return ::buildImplicitLetParameter(ctx, ctx.Id_self, loc, tyLoc, DC);
-}
-
-Pattern *Pattern::buildImplicitLetParameter(SourceLoc loc, StringRef name,
-                                            TypeLoc tyLoc, DeclContext *DC) {
-  ASTContext &ctx = DC->getASTContext();
-  Identifier ident = (name.empty() ? Identifier() : ctx.getIdentifier(name));
-  return ::buildImplicitLetParameter(ctx, ident, loc, tyLoc, DC);
-}
-
-Pattern *Pattern::clone(ASTContext &context,
-                        OptionSet<CloneFlags> options) const {
-  Pattern *result;
-  switch (getKind()) {
-  case PatternKind::Any: {
-    result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
-    break;
-  }
-
-  case PatternKind::Named: {
-    auto named = cast<NamedPattern>(this);
-    VarDecl *var;
-    if (auto param = dyn_cast<ParamDecl>(named->getDecl())) {
-
-      auto name = param->getName();
-      // If the argument isn't named, and we're cloning for an inherited
-      // constructor, give the parameter a name so that silgen will produce a
-      // value for it.
-      if (name.empty() && (options & Inherited))
-        name = context.getIdentifier("argument");
-
-      var = new (context) ParamDecl(param->isLet(),
-                                    param->getArgumentNameLoc(),
-                                    param->getArgumentName(),
-                                    param->getLoc(), name,
-                                    param->hasType()
-                                      ? param->getType()
-                                      : Type(),
-                                    param->getDeclContext());
-    } else {
-      var = new (context) VarDecl(!named->getDecl()->isInstanceMember(),
-                                  named->getDecl()->isLet(),
-                                  named->getLoc(),
-                                  named->getBoundName(),
-                                  named->getDecl()->hasType()
-                                    ? named->getDecl()->getType()
-                                    : Type(),
-                                  named->getDecl()->getDeclContext());
-    }
-
-    if ((options & Implicit) || var->isImplicit())
-      var->setImplicit();
-    result = new (context) NamedPattern(var);
-    break;
-  }
-
-  case PatternKind::Paren: {
-    auto paren = cast<ParenPattern>(this);
-    result = new (context) ParenPattern(paren->getLParenLoc(),
-                                        paren->getSubPattern()->clone(context,
-                                                                      options),
-                                        paren->getRParenLoc());
-    break;
-  }
-
-  case PatternKind::Tuple: {
-    auto tuple = cast<TuplePattern>(this);
-    SmallVector<TuplePatternElt, 2> elts;
-    elts.reserve(tuple->getNumElements());
-    for (const auto &elt : tuple->getElements()) {
-      auto eltPattern = elt.getPattern()->clone(context, options);
-
-      // If we're inheriting a default argument, mark it as such.
-      if (elt.getDefaultArgKind() != DefaultArgumentKind::None &&
-          (options & Inherited)) {
-        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, elt.hasEllipsis(),
-                                       elt.getEllipsisLoc(), nullptr,
-                                       DefaultArgumentKind::Inherited));
-      } else {
-        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, elt.hasEllipsis(),
-                                       elt.getEllipsisLoc(), elt.getInit(),
-                                       elt.getDefaultArgKind()));
-      }
-    }
-
-    result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
-                                  tuple->getRParenLoc());
-    break;
-  }
-
-  case PatternKind::Typed: {
-    auto typed = cast<TypedPattern>(this);
-    result = new(context) TypedPattern(typed->getSubPattern()->clone(context,
-                                                                     options),
-                                       typed->getTypeLoc().clone(context));
-    break;
-  }
-      
-  case PatternKind::Is: {
-    auto isa = cast<IsPattern>(this);
-    result = new(context) IsPattern(isa->getLoc(),
-                                     isa->getCastTypeLoc().clone(context),
-                                     isa->getSubPattern()->clone(context,
-                                                                 options),
-                                     isa->getCastKind());
-    break;
-  }
-      
-  case PatternKind::NominalType: {
-    auto nom = cast<NominalTypePattern>(this);
-    SmallVector<NominalTypePattern::Element, 4> elts;
-    for (const auto &elt : nom->getElements()) {
-      elts.push_back(NominalTypePattern::Element(elt.getPropertyLoc(),
-                                         elt.getPropertyName(),
-                                         elt.getProperty(),
-                                         elt.getColonLoc(),
-                                         elt.getSubPattern()->clone(context,
-                                                                    options)));
-    }
-    
-    result = NominalTypePattern::create(nom->getCastTypeLoc().clone(context),
-                                        nom->getLParenLoc(),
-                                        elts,
-                                        nom->getRParenLoc(), context);
-    break;
-  }
-      
-  case PatternKind::EnumElement: {
-    auto oof = cast<EnumElementPattern>(this);
-    Pattern *sub = nullptr;
-    if (oof->hasSubPattern())
-      sub = oof->getSubPattern()->clone(context, options);
-    result = new (context) EnumElementPattern(oof->getParentType()
-                                                .clone(context),
-                                              oof->getLoc(),
-                                              oof->getNameLoc(),
-                                              oof->getName(),
-                                              oof->getElementDecl(),
-                                              sub);
-    break;
-  }
-
-  case PatternKind::OptionalSome: {
-    auto osp = cast<OptionalSomePattern>(this);
-    auto *sub = osp->getSubPattern()->clone(context, options);
-    auto *r = new (context) OptionalSomePattern(sub, osp->getQuestionLoc());
-    r->setElementDecl(osp->getElementDecl());
-    result = r;
-    break;
-  }
-
-  case PatternKind::Bool: {
-    auto bp = cast<BoolPattern>(this);
-    result = new (context) BoolPattern(bp->getNameLoc(), bp->getValue());
-    break;
-  }
-
-  case PatternKind::Expr: {
-    auto expr = cast<ExprPattern>(this);
-    result = new(context) ExprPattern(expr->getSubExpr(),
-                                      expr->isResolved(),
-                                      expr->getMatchExpr(),
-                                      expr->getMatchVar());
-    break;
-  }
-      
-  case PatternKind::Var: {
-    auto var = cast<VarPattern>(this);
-    result = new(context) VarPattern(var->getLoc(), var->isLet(),
-                                     var->getSubPattern()->clone(
-                                       context,
-                                       options|IsVar));
-  }
-  }
-
-  if (hasType())
-    result->setType(getType());
-  if ((options & Implicit) || isImplicit())
-    result->setImplicit();
-
-  return result;
-}
-
-Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
-                                   OptionSet<CloneFlags> options) const {
-  Pattern *result;
-  switch (getKind()) {
-  case PatternKind::Any:
-  case PatternKind::Is:
-  case PatternKind::NominalType:
-  case PatternKind::EnumElement:
-  case PatternKind::OptionalSome:
-  case PatternKind::Bool:
-  case PatternKind::Expr:
-    llvm_unreachable("cannot forward this kind of pattern");
-
-  case PatternKind::Named:
-    return clone(context, options);
-
-  case PatternKind::Paren: {
-    auto paren = cast<ParenPattern>(this);
-    auto sub = paren->getSubPattern()->cloneForwardable(context, DC, options);
-    result = new (context) ParenPattern(paren->getLParenLoc(),
-                                        sub,
-                                        paren->getRParenLoc());
-    break;
-  }
-
-  case PatternKind::Var: {
-    auto var = cast<VarPattern>(this);
-    result = new(context) VarPattern(var->getLoc(), var->isLet(),
-                                     var->getSubPattern()->cloneForwardable(
-                                       context, DC, options|IsVar));
-    break;
-  }
-
-  case PatternKind::Tuple: {
-    auto tuple = cast<TuplePattern>(this);
-    SmallVector<TuplePatternElt, 2> elts;
-    elts.reserve(tuple->getNumElements());
-    for (const auto &elt : tuple->getElements()) {
-      auto eltPattern = elt.getPattern()->cloneForwardable(context, DC, options);
-
-      // If we're inheriting a default argument, mark it as such.
-      if (elt.getDefaultArgKind() != DefaultArgumentKind::None &&
-          (options & Inherited)) {
-        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, elt.hasEllipsis(),
-                                       elt.getEllipsisLoc(), nullptr,
-                                       DefaultArgumentKind::Inherited));
-      } else {
-        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, elt.hasEllipsis(),
-                                       elt.getEllipsisLoc(), elt.getInit(),
-                                       elt.getDefaultArgKind()));
-      }
-    }
-
-    result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
-                                  tuple->getRParenLoc());
-    break;
-  }
-
-  case PatternKind::Typed: {
-    auto typed = cast<TypedPattern>(this);
-    TypeLoc tyLoc = typed->getTypeLoc().clone(context);
-    const Pattern *origSub = typed->getSubPattern();
-
-    // If the original sub-pattern is a single named variable, go
-    // ahead and clone it.
-    if (origSub->getSingleVar()) {
-      Pattern *cloneSub = origSub->cloneForwardable(context, DC, options);
-      result = new (context) TypedPattern(cloneSub, tyLoc);
-
-    // Otherwise, create a new bound variable.
-    } else {
-      result = buildImplicitLetParameter(origSub->getLoc(), "", tyLoc, DC);
-    }
-    break;
-  }
-  }
-
-  if (hasType())
-    result->setType(getType());
-  if ((options & Implicit) || isImplicit())
-    result->setImplicit();
-
-  return result;
-}
-
-Expr *Pattern::buildForwardingRefExpr(ASTContext &context) const {
-  switch (getKind()) {
-  case PatternKind::Any:
-  case PatternKind::Is:
-  case PatternKind::NominalType:
-  case PatternKind::EnumElement:
-  case PatternKind::OptionalSome:
-  case PatternKind::Bool:
-  case PatternKind::Expr:
-    llvm_unreachable("cannot forward this kind of pattern");
-
-  case PatternKind::Named: {
-    auto np = cast<NamedPattern>(this);
-    Expr *ref = new (context) DeclRefExpr(np->getDecl(), SourceLoc(),
-                                         /*implicit*/ true);
-    if (np->getDecl()->getType()->is<InOutType>())
-      ref = new (context) InOutExpr(SourceLoc(), ref, Type(),
-                                    /*implicit=*/true);
-    return ref;
-  }
-
-  case PatternKind::Paren: {
-    auto paren = cast<ParenPattern>(this);
-    return paren->getSubPattern()->buildForwardingRefExpr(context);
-  }
-
-  case PatternKind::Var: {
-    auto var = cast<VarPattern>(this);
-    return var->getSubPattern()->buildForwardingRefExpr(context);
-  }
-
-  case PatternKind::Typed: {
-    auto typed = cast<TypedPattern>(this);
-    return typed->getSubPattern()->buildForwardingRefExpr(context);
-  }
-
-  case PatternKind::Tuple: {
-    auto tuple = cast<TuplePattern>(this);
-    SmallVector<Expr*, 2> elts;
-    SmallVector<Identifier, 2> labels;
-    SmallVector<SourceLoc, 2> labelLocs;
-    elts.reserve(tuple->getNumElements());
-    labels.reserve(tuple->getNumElements());
-    labelLocs.reserve(tuple->getNumElements());
-    for (const auto &elt : tuple->getElements()) {
-      elts.push_back(elt.getPattern()->buildForwardingRefExpr(context));
-      labels.push_back(Identifier()); // FIXME?
-      labelLocs.push_back(SourceLoc());
-    }
-    
-    return TupleExpr::create(context, SourceLoc(), elts, labels, labelLocs,
-                             SourceLoc(), /*trailing closure*/ false,
-                             /*implicit*/ true);
-  }
-
-  }
-  llvm_unreachable("bad pattern kind");
-}
-
 /// Standard allocator for Patterns.
-void *Pattern::operator new(size_t numBytes, ASTContext &C) {
+void *Pattern::operator new(size_t numBytes, const ASTContext &C) {
   return C.Allocate(numBytes, alignof(Pattern));
 }
 
@@ -662,20 +304,7 @@ Identifier Pattern::getBoundName() const {
   return Identifier();
 }
 
-Identifier Pattern::getBodyName() const {
-  if (auto *NP = dyn_cast<NamedPattern>(getSemanticsProvidingPattern()))
-    return NP->getBodyName();
-  return Identifier();
-}
-
 Identifier NamedPattern::getBoundName() const {
-  if (auto param = dyn_cast<ParamDecl>(Var))
-    return param->getArgumentName();
-
-  return Var->getName();
-}
-
-Identifier NamedPattern::getBodyName() const {
   return Var->getName();
 }
 
@@ -703,10 +332,7 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
-      !elements[0].hasEllipsis() &&
-      elements[0].getInit() == nullptr &&
-      elements[0].getPattern()->getBoundName().empty() &&
-      elements[0].getPattern()->getBodyName().empty()) {
+      elements[0].getPattern()->getBoundName().empty()) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
     return new (C) ParenPattern(lp, first.getPattern(), rp, implicit);
   }
@@ -722,24 +348,6 @@ SourceRange TuplePattern::getSourceRange() const {
     return {};
   return { Fields.front().getPattern()->getStartLoc(),
            Fields.back().getPattern()->getEndLoc() };
-}
-
-bool TuplePattern::hasAnyEllipsis() const {
-  for (const auto elt : getElements()) {
-    if (elt.hasEllipsis())
-      return true;
-  }
-
-  return false;
-}
-
-SourceLoc TuplePattern::getAnyEllipsisLoc() const {
-  for (const auto elt : getElements()) {
-    if (elt.hasEllipsis())
-      return elt.getEllipsisLoc();
-  }
-
-  return SourceLoc();
 }
 
 SourceRange TypedPattern::getSourceRange() const {

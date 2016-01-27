@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,6 +20,14 @@
 import Swift
 import SwiftShims
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
 
 #if _runtime(_ObjC)
 import Foundation
@@ -119,8 +127,8 @@ var NoisyDeathCount = 0
 protocol P {}
 
 class Noisy : P {
-  init() { ++NoisyLifeCount }
-  deinit { ++NoisyDeathCount }
+  init() { NoisyLifeCount += 1 }
+  deinit { NoisyDeathCount += 1}
 }
 
 struct Large : P {

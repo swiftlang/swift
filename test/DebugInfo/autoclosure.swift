@@ -17,7 +17,7 @@ infix operator &&&&& {
   precedence 120
 }
 
-func &&&&&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool {
+func &&&&&(lhs: BooleanType, @autoclosure rhs: () -> BooleanType) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 

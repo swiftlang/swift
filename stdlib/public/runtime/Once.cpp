@@ -1,8 +1,8 @@
-//===--- Once.cpp - Runtime support for lazy initialization ----------------==//
+//===--- Once.cpp - Runtime support for lazy initialization ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@ using namespace swift;
 
 #ifdef __APPLE__
 
-// On OS X and and iOS, swift_once is implemented using GCD.
+// On OS X and iOS, swift_once is implemented using GCD.
 
 #include <dispatch/dispatch.h>
 static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,

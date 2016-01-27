@@ -1,15 +1,13 @@
 #!/usr/bin/env python
-#===------------------------------------------------------------------------===#
+# utils/sil-opt-verify-all-modules.py - Verifies Swift modules -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
 
 from __future__ import print_function
 
@@ -17,7 +15,6 @@ import argparse
 import glob
 import multiprocessing
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -55,32 +52,27 @@ def get_verify_build_dir_commands(build_dir, toolchain_name='XcodeDefault'):
 
 
 def get_verify_resource_dir_modules_commands(
-    resource_dir, sil_opt, toolchain_name):
+        resource_dir, sil_opt, toolchain_name):
     print("================================================================")
     print("Resource dir: " + resource_dir)
     print("sil-opt path: " + sil_opt)
 
     known_platforms = [
-      ( 'appletvos', 'arm64', 'arm64-apple-tvos9.0' ),
-      ( 'appletvsimulator', 'x86_64', 'x86_64-apple-tvos9.0' ),
-      ( 'iphoneos', 'armv7', 'armv7-apple-ios7.0' ),
-      ( 'iphoneos', 'armv7s', 'armv7s-apple-ios7.0' ),
-      ( 'iphoneos', 'arm64', 'arm64-apple-ios7.0' ),
-      ( 'iphonesimulator', 'i386', 'i386-apple-ios7.0' ),
-      ( 'iphonesimulator', 'x86_64', 'x86_64-apple-ios7.0' ),
-      ( 'macosx', 'x86_64', 'x86_64-apple-macosx10.9' ),
-      ( 'watchos', 'armv7k', 'armv7k-apple-watchos2.0' ),
-      ( 'watchsimulator', 'i386', 'i386-apple-watchos2.0' ),
+        ('appletvos', 'arm64', 'arm64-apple-tvos9.0'),
+        ('appletvsimulator', 'x86_64', 'x86_64-apple-tvos9.0'),
+        ('iphoneos', 'armv7', 'armv7-apple-ios7.0'),
+        ('iphoneos', 'armv7s', 'armv7s-apple-ios7.0'),
+        ('iphoneos', 'arm64', 'arm64-apple-ios7.0'),
+        ('iphonesimulator', 'i386', 'i386-apple-ios7.0'),
+        ('iphonesimulator', 'x86_64', 'x86_64-apple-ios7.0'),
+        ('macosx', 'x86_64', 'x86_64-apple-macosx10.9'),
+        ('watchos', 'armv7k', 'armv7k-apple-watchos2.0'),
+        ('watchsimulator', 'i386', 'i386-apple-watchos2.0'),
     ]
 
     commands = []
     module_cache_dir = tempfile.mkdtemp(prefix="swift-testsuite-clang-module-cache")
     for (subdir, arch, triple) in known_platforms:
-        platform_frameworks_dir = os.path.join(
-            subprocess.check_output([
-              'xcrun', '--toolchain', toolchain_name, '--show-sdk-platform-path'
-            ]).strip(),
-            'Developer', 'Library', 'Frameworks')
         modules_dir = os.path.join(resource_dir, subdir, arch)
         print(modules_dir)
         modules = glob.glob(os.path.join(modules_dir, '*.swiftmodule'))
@@ -102,7 +94,7 @@ def get_verify_resource_dir_modules_commands(
 
 
 def quote_shell_command(args):
-    return " ".join([ pipes.quote(a) for a in args ])
+    return " ".join([pipes.quote(a) for a in args])
 
 
 def run_commands_in_parallel(commands):
@@ -119,9 +111,8 @@ def run_commands_in_parallel(commands):
     makefile += "all: " + " ".join(targets) + "\n"
 
     temp_dir = tempfile.mkdtemp(prefix="swift-testsuite-main")
-    makefile_file = open(os.path.join(temp_dir, 'Makefile'), 'w')
-    makefile_file.write(makefile)
-    makefile_file.close()
+    with open(os.path.join(temp_dir, 'Makefile'), 'w') as makefile_file:
+        makefile_file.write(makefile)
 
     max_processes = multiprocessing.cpu_count()
     subprocess.check_call([
@@ -151,15 +142,14 @@ def main():
         print("--verify-build-dir and --verify-xcode can't be used together")
         return 1
 
-
     if args.verify_build_dir is not None:
         commands = get_verify_build_dir_commands(args.verify_build_dir)
 
     if args.verify_xcode:
         # Find Xcode.
-        swift_path = subprocess.check_output([ 'xcrun', '--find', 'swift' ])
+        swift_path = subprocess.check_output(['xcrun', '--find', 'swift'])
         xcode_path = swift_path
-        for i in range(0, 7):
+        for _ in range(0, 7):
             xcode_path = os.path.dirname(xcode_path)
 
         toolchains_dir = os.path.join(

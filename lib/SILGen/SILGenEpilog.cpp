@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -95,7 +95,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     if (needsArg) {
       returnValue = predBranch->getArgs()[0];
       // RAUW the old BB argument (if any) with the new value.
-      SILValue(*epilogBB->bbarg_begin(),0).replaceAllUsesWith(returnValue);
+      (*epilogBB->bbarg_begin())->replaceAllUsesWith(returnValue);
     }
 
     // If we are optimizing, we should use the return location from the single,

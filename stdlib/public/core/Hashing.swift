@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -116,7 +116,7 @@ public // @testable
 func _mixUInt(value: UInt) -> UInt {
 #if arch(i386) || arch(arm)
   return UInt(_mixUInt32(UInt32(value)))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return UInt(_mixUInt64(UInt64(value)))
 #endif
 }
@@ -127,7 +127,7 @@ public // @testable
 func _mixInt(value: Int) -> Int {
 #if arch(i386) || arch(arm)
   return Int(_mixInt32(Int32(value)))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return Int(_mixInt64(Int64(value)))
 #endif
 }
@@ -166,7 +166,7 @@ func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // We perform the unchecked arithmetic on `UInt` (instead of doing
   // straightforward computations on `Int`) in order to handle the following
   // tricky case: `startIndex` is negative, and `resultCardinality >= Int.max`.
-  // We can not convert the latter to `Int`.
+  // We cannot convert the latter to `Int`.
   return
     Int(bitPattern:
       UInt(bitPattern: resultRange.startIndex) &+ unsignedResult)

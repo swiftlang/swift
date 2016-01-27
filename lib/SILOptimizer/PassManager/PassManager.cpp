@@ -1,8 +1,8 @@
-//===----- PassManager.cpp - Swift Pass Manager ---------------------------===//
+//===--- PassManager.cpp - Swift Pass Manager -----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -188,7 +188,7 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
     if (isDisabled(SFT))
       continue;
 
-    currentPassHasInvalidated = false;
+    CurrentPassHasInvalidated = false;
 
     if (SILPrintPassName)
       llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
@@ -219,7 +219,7 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
     }
 
     // If this pass invalidated anything, print and verify.
-    if (doPrintAfter(SFT, F, currentPassHasInvalidated && SILPrintAll)) {
+    if (doPrintAfter(SFT, F, CurrentPassHasInvalidated && SILPrintAll)) {
       llvm::dbgs() << "*** SIL function after " << StageName << " "
                    << SFT->getName() << " (" << NumOptimizationIterations
                    << ") ***\n";
@@ -227,11 +227,11 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
     }
 
     // Remember if this pass didn't change anything.
-    if (!currentPassHasInvalidated)
+    if (!CurrentPassHasInvalidated)
       completedPasses.set((size_t)SFT->getPassKind());
 
     if (Options.VerifyAll &&
-        (currentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+        (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
       F->verify();
       verifyAnalyses(F);
     }
@@ -271,7 +271,7 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
 
   // Pop functions off the worklist, and run all function transforms
   // on each of them.
-  while (!FunctionWorklist.empty()) {
+  while (!FunctionWorklist.empty() && continueTransforming()) {
     auto *F = FunctionWorklist.back();
 
     runPassesOnFunction(FuncTransforms, F);
@@ -299,7 +299,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   SMT->injectPassManager(this);
   SMT->injectModule(Mod);
 
-  currentPassHasInvalidated = false;
+  CurrentPassHasInvalidated = false;
 
   if (SILPrintPassName)
     llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
@@ -325,7 +325,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
 
   // If this pass invalidated anything, print and verify.
   if (doPrintAfter(SMT, nullptr,
-                   currentPassHasInvalidated && SILPrintAll)) {
+                   CurrentPassHasInvalidated && SILPrintAll)) {
     llvm::dbgs() << "*** SIL module after " << StageName << " "
                  << SMT->getName() << " (" << NumOptimizationIterations
                  << ") ***\n";
@@ -333,7 +333,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   }
 
   if (Options.VerifyAll &&
-      (currentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
+      (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
     Mod->verify();
     verifyAnalyses();
   }
@@ -433,7 +433,7 @@ SILPassManager::~SILPassManager() {
 }
 
 /// \brief Reset the state of the pass manager and remove all transformation
-/// owned by the pass manager. Anaysis passes will be kept.
+/// owned by the pass manager. Analysis passes will be kept.
 void SILPassManager::resetAndRemoveTransformations() {
   for (auto T : Transformations)
     delete T;

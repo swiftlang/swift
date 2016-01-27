@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -112,7 +112,7 @@ public struct _StringBuffer {
       let hadError = transcode(
         encoding, UTF32.self, input.generate(), sink,
         stopOnError: true)
-      _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
+      _sanityCheck(!hadError, "string cannot be ASCII if there were decoding errors")
       return (result, hadError)
     }
     else {
@@ -186,7 +186,7 @@ public struct _StringBuffer {
   /// Attempt to claim unused capacity in the buffer.
   ///
   /// Operation succeeds if there is sufficient capacity, and either:
-  /// - the buffer is uniquely-refereced, or
+  /// - the buffer is uniquely-referenced, or
   /// - `oldUsedEnd` points to the end of the currently used capacity.
   ///
   /// - parameter subRange: Range of the substring that the caller tries

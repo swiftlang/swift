@@ -21,10 +21,11 @@ entry(%x : $*T):
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   %b = alloc_existential_box $ErrorType, $T
+  %p = project_existential_box $T in %b : $ErrorType
   // CHECK: call %swift.opaque* %initializeWithTake(%swift.opaque* [[ADDR]], %swift.opaque* %0, %swift.type* %T)
-  copy_addr [take] %x to [initialization] %b#1 : $*T
+  copy_addr [take] %x to [initialization] %p : $*T
   // CHECK: ret %swift.error* [[BOX]]
-  return %b#0 : $ErrorType
+  return %b : $ErrorType
 }
 
 struct SomeError: ErrorType {
@@ -40,9 +41,10 @@ entry(%x : $SomeError):
   // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %V17boxed_existential9SomeError*
   %b = alloc_existential_box $ErrorType, $SomeError
-  store %x to %b#1 : $*SomeError
+  %p = project_existential_box $SomeError in %b : $ErrorType
+  store %x to %p : $*SomeError
   // CHECK: ret %swift.error* [[BOX]]
-  return %b#0 : $ErrorType
+  return %b : $ErrorType
 }
 
 // CHECK-LABEL: define void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.ErrorType)
@@ -51,6 +53,26 @@ entry(%b : $ErrorType):
   // CHECK: call void @swift_deallocError(%swift.error* %0, %swift.type* %T)
   dealloc_existential_box %b : $ErrorType, $T
   return undef : $()
+}
+
+// CHECK-LABEL: define {{i[0-9]+}} @project_boxed_existential(%swift.error*)
+sil @project_boxed_existential : $@convention(thin) (@owned ErrorType) -> Int {
+entry(%b : $ErrorType):
+  // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])
+  // CHECK: [[OUT_ADDR:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 0
+  // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
+  // CHECK: [[CADDR:%.*]] = bitcast %swift.opaque* %2 to [[TYPE:%[^*]*]]*
+  %a = project_existential_box $SomeError in %b : $ErrorType
+
+  // CHECK: [[GEP1:%.*]] = getelementptr inbounds [[TYPE]], [[TYPE]]* [[CADDR]], i32 0, i32 1
+  // CHECK: [[GEP2:%.*]] = getelementptr inbounds {{.*}} [[GEP1]], i32 0, i32 0
+  %c = struct_element_addr %a : $*SomeError, #SomeError._code
+
+  // CHECK: [[R:%.*]] = load {{i[0-9]+}}, {{i[0-9]+}}* [[GEP2]]
+  %l = load %c : $*Int
+
+  // CHECK: ret {{i[0-9]+}} [[R]]
+  return %l : $Int
 }
 
 // CHECK-LABEL: define {{i[0-9]+}} @open_boxed_existential(%swift.error*)

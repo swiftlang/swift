@@ -1,12 +1,12 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-func curry<T, U, V>(f: (T, U) -> V)(_ x: T)(_ y: U) -> V {
-  return f(x, y)
+func curry<T, U, V>(f: (T, U) -> V) -> (T) -> (U) -> V {
+  return { x in { y in f(x, y) } }
 }
 
-func curry<T1, T2, T3, T4>(f: (T1, T2, T3) -> T4)(_ x: T1)(_ y: T2)(_ z: T3) -> T4 {
-  return f(x, y, z)
+func curry<T1, T2, T3, T4>(f: (T1, T2, T3) -> T4) -> (T1) -> (T2) -> (T3) -> T4 {
+  return { x in { y in { z in f(x, y, z) } } }
 }
 
 func concat(x: String, _ y: String, _ z: String) -> String {
@@ -91,8 +91,8 @@ print(test_compose_closure(20)) // CHECK-NEXT: 21
 
 // rdar://problem/18988428
 
-func clamp<T: Comparable>(minValue: T, _ maxValue: T)(n: T) -> T {
-    return max(minValue, min(n, maxValue))
+func clamp<T: Comparable>(minValue: T, _ maxValue: T) -> (n: T) -> T {
+    return { n in max(minValue, min(n, maxValue)) }
 }
 
 let clampFoo2 = clamp(10.0, 30.0)
@@ -105,8 +105,8 @@ func pair<T,U> (a: T) -> U -> (T,U) {
 	return { b in (a,b)	}
 }
 
-func pair_<T,U> (a: T)(b: U) -> (T,U) {
-	return (a,b)
+func pair_<T,U> (a: T) -> (b: U) -> (T,U) {
+	return { b in (a,b) }
 }
 
 infix operator <+> { }
@@ -130,20 +130,20 @@ print((b <+> pair_)(a!)) // CHECK-NEXT: (42, 23)
 struct Identity<A> { let value: A }
 struct Const<A, B> { let value: A }
 
-func fmap<A, B>(f: A -> B)(_ identity: Identity<A>) -> Identity<B> {
-	return Identity(value: f(identity.value))
+func fmap<A, B>(f: A -> B) -> (Identity<A>) -> Identity<B> {
+	return { identity in Identity(value: f(identity.value)) }
 }
 
-func fmap<A, B>(f: A -> B)(_ const: Const<A, B>) -> Const<A, B> {
-	return const
+func fmap<A, B>(f: A -> B) -> (Const<A, B>) -> Const<A, B> {
+	return { const in const }
 }
 
 // really Const()
 func _Const<A, B>(a: A) -> Const<A, B> {
 	return Const(value: a)
 }
-func const<A, B>(a: A)(_: B) -> A {
-	return a
+func const<A, B>(a: A) -> (B) -> A {
+	return { _ in a }
 }
 
 // really Identity()
@@ -160,24 +160,24 @@ func runIdentity<A>(i: Identity<A>) -> A {
 }
 
 
-func view<S, A>(lens: (A -> Const<A, S>) -> S -> ((A -> S) -> Const<A, S> -> Const<A, S>) -> Const<A, S>)(_ s: S) -> A {
-	return getConst(lens(_Const)(s)(fmap))
+func view<S, A>(lens: (A -> Const<A, S>) -> S -> ((A -> S) -> Const<A, S> -> Const<A, S>) -> Const<A, S>) -> (S) -> A {
+	return { s in getConst(lens(_Const)(s)(fmap)) }
 }
 
-func over<S, A>(lens: (A -> Identity<A>) -> S -> ((A -> S) -> Identity<A> -> Identity<S>) -> Identity<S>)(_ f: A -> A)(_ s: S) -> S {
-	return runIdentity(lens({ _Identity(f($0)) })(s)(fmap))
+func over<S, A>(lens: (A -> Identity<A>) -> S -> ((A -> S) -> Identity<A> -> Identity<S>) -> Identity<S>) -> (A -> A) -> (S) -> S {
+	return { f in { s in runIdentity(lens({ _Identity(f($0)) })(s)(fmap)) } }
 }
 
-func set<S, A>(lens: (A -> Identity<A>) -> S -> ((A -> S) -> Identity<A> -> Identity<S>) -> Identity<S>)(_ x: A)(_ y: S) -> S {
-	return over(lens)(const(x))(y)
+func set<S, A>(lens: (A -> Identity<A>) -> S -> ((A -> S) -> Identity<A> -> Identity<S>) -> Identity<S>) -> (A) -> (S) -> S {
+	return { x in { y in over(lens)(const(x))(y) } }
 }
 
-func _1<A, B, C, D>(f: A -> C)(_ x: A, _ y: B)(_ fmap: (A -> (A, B)) -> C -> D) -> D {
-	return fmap({ ($0, y) })(f(x))
+func _1<A, B, C, D>(f: A -> C) -> (A, B) -> ((A -> (A, B)) -> C -> D) -> D {
+	return { (x, y) in { fmap in fmap({ ($0, y) })(f(x)) } }
 }
 
-func _2<A, B, C, D>(f: B -> C)(_ x: A, _ y: B)(_ fmap: (B -> (A, B)) -> C -> D) -> D {
-	return fmap({ (x, $0) })(f(y))
+func _2<A, B, C, D>(f: B -> C) -> (A, B) -> ((B -> (A, B)) -> C -> D) -> D {
+    return { (x, y) in { fmap in fmap({ (x, $0) })(f(y)) } }
 }
 
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -188,36 +188,6 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
-/// MarkDependence has type (T, U) -> T
-BUILTIN_SIL_OPERATION(MarkDependence, "markDependence", Special)
-
-/// allocValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
-///                           -> Builtin.RawPointer
-BUILTIN_SIL_OPERATION(AllocValueBuffer, "allocValueBuffer", Special)
-
-/// projectValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
-///                             -> Builtin.RawPointer
-BUILTIN_SIL_OPERATION(ProjectValueBuffer, "projectValueBuffer", Special)
-
-/// deallocValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
-///                           -> ()
-BUILTIN_SIL_OPERATION(DeallocValueBuffer, "deallocValueBuffer", Special)
-
-/// MakeMaterializeForSetCallback has type
-///   ((Builtin.RawPointer,
-///     inout Builtin.UnsafeValueBuffer,
-///     inout T,
-///     T.Type) -> ())
-///     -> Builtin.RawPointer
-///
-/// The first argument is the address returned from materializeForSet.
-/// The second argument is the same Builtin.UnsafeValueBuffer
-/// that was passed to materializeForSet.
-/// The third argument is self.
-/// The last argument is the metatype for self.
-BUILTIN_SIL_OPERATION(MakeMaterializeForSetCallback,
-                      "makeMaterializeForSetCallback", Special)
-
 /// CastToUnknownObject has type (T) -> Builtin.UnknownObject.
 BUILTIN_SIL_OPERATION(CastToUnknownObject, "castToUnknownObject", Special)
 
@@ -291,7 +261,7 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 ///
 /// This builtin takes an inout object reference and returns a boolean. Passing
 /// the reference inout forces the optimizer to preserve a retain distinct from
-/// what’s required to maintain lifetime for any of the reference's source-level
+/// what's required to maintain lifetime for any of the reference's source-level
 /// copies, because the called function is allowed to replace the reference,
 /// thereby releasing the referent.
 ///

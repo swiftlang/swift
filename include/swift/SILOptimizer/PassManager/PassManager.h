@@ -1,8 +1,8 @@
-//===-- PassManager.h  - Swift Pass Manager ---------------------*- C++ -*-===//
+//===--- PassManager.h  - Swift Pass Manager --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -63,8 +63,8 @@ class SILPassManager {
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
 
   /// Set to true when a pass invalidates an analysis.
-  bool currentPassHasInvalidated = false;
-  
+  bool CurrentPassHasInvalidated = false;
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
@@ -108,7 +108,7 @@ public:
       if (!AP->isLocked())
         AP->invalidate(K);
 
-    currentPassHasInvalidated = true;
+    CurrentPassHasInvalidated = true;
 
     // Assume that all functions have changed. Clear all masks of all functions.
     CompletedPassesMap.clear();
@@ -122,13 +122,13 @@ public:
       if (!AP->isLocked())
         AP->invalidate(F, K);
     
-    currentPassHasInvalidated = true;
+    CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();
   }
 
   /// \brief Reset the state of the pass manager and remove all transformation
-  /// owned by the pass manager. Anaysis passes will be kept.
+  /// owned by the pass manager. Analysis passes will be kept.
   void resetAndRemoveTransformations();
 
   // Sets the name of the current optimization stage used for debugging.

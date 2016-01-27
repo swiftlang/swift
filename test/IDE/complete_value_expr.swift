@@ -188,7 +188,7 @@ struct FooStruct {
   mutating
   func instanceFunc6() -> Int! {}
   mutating
-  func instanceFunc7(#a: Int) {}
+  func instanceFunc7(a a: Int) {}
   mutating
   func instanceFunc8(a: (Int, Int)) {}
   mutating
@@ -271,7 +271,7 @@ struct FooStruct {
   struct NestedStruct {}
   class NestedClass {}
   enum NestedEnum {}
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   typealias NestedTypealias = Int
@@ -1683,7 +1683,7 @@ func testTypealias1<S: P4 where S.T == WillConformP1>() {
   S.#^PROTOCOL_EXT_TA_2^#
 }
 // PROTOCOL_EXT_TA: Begin completions
-// PROTOCOL_EXT_TA-DAG: Decl[TypeAlias]/{{Super|CurrNominal}}: T
+// PROTOCOL_EXT_TA_2-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}: T
 // PROTOCOL_EXT_TA: End completions
 
 func testProtExtInit1() {

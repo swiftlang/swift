@@ -226,14 +226,14 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %4 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric9selfTypes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
   // CHECK-NEXT:    %5 = alloc_stack $ConformsWithMoreGeneric
-  // CHECK-NEXT:    store %3 to %5#1 : $*ConformsWithMoreGeneric
+  // CHECK-NEXT:    store %3 to %5 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    %7 = alloc_stack $ConformsWithMoreGeneric
-  // CHECK-NEXT:    %8 = apply %4<ConformsWithMoreGeneric>(%7#1, %5#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %9 = load %7#1 : $*ConformsWithMoreGeneric
+  // CHECK-NEXT:    %8 = apply %4<ConformsWithMoreGeneric>(%7, %5, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    %9 = load %7 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    store %9 to %0 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    %11 = tuple ()
-  // CHECK-NEXT:    dealloc_stack %7#0 : $*@local_storage ConformsWithMoreGeneric
-  // CHECK-NEXT:    dealloc_stack %5#0 : $*@local_storage ConformsWithMoreGeneric
+  // CHECK-NEXT:    dealloc_stack %7 : $*ConformsWithMoreGeneric
+  // CHECK-NEXT:    dealloc_stack %5 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    return %11 : $()
   // CHECK-NEXT:  }
   func loadable<F>(x x: F) -> F { return x }
@@ -264,12 +264,12 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes
   // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
   // CHECK-NEXT:    %3 = alloc_stack $A2
-  // CHECK-NEXT:    store %0 to %3#1 : $*A2
+  // CHECK-NEXT:    store %0 to %3 : $*A2
   // CHECK-NEXT:    %5 = alloc_stack $A2
-  // CHECK-NEXT:    %6 = apply %2<A2>(%5#1, %3#1, %1) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %7 = load %5#1 : $*A2
-  // CHECK-NEXT:    dealloc_stack %5#0 : $*@local_storage A2
-  // CHECK-NEXT:    dealloc_stack %3#0 : $*@local_storage A2
+  // CHECK-NEXT:    %6 = apply %2<A2>(%5, %3, %1) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    %7 = load %5 : $*A2
+  // CHECK-NEXT:    dealloc_stack %5 : $*A2
+  // CHECK-NEXT:    dealloc_stack %3 : $*A2
   // CHECK-NEXT:    return %7 : $A2
   // CHECK-NEXT:  }
 }
@@ -281,17 +281,17 @@ func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    %6 = function_ref @_TZF9witnessesoi3ltg{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
 // CHECK-NEXT:    %7 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    store %4 to %7#1 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    store %4 to %7 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %9 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    store %5 to %9#1 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    store %5 to %9 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %11 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    %12 = apply %6<ConformsWithMoreGeneric, ConformsWithMoreGeneric>(%11#1, %7#1, %9#1) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
-// CHECK-NEXT:    %13 = load %11#1 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    %12 = apply %6<ConformsWithMoreGeneric, ConformsWithMoreGeneric>(%11, %7, %9) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+// CHECK-NEXT:    %13 = load %11 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    store %13 to %0 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %15 = tuple ()
-// CHECK-NEXT:    dealloc_stack %11#0 : $*@local_storage ConformsWithMoreGeneric
-// CHECK-NEXT:    dealloc_stack %9#0 : $*@local_storage ConformsWithMoreGeneric
-// CHECK-NEXT:    dealloc_stack %7#0 : $*@local_storage ConformsWithMoreGeneric
+// CHECK-NEXT:    dealloc_stack %11 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    dealloc_stack %9 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    dealloc_stack %7 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    return %15 : $()
 // CHECK-NEXT:  }
 
@@ -382,15 +382,15 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelC{{.*}} : $@convention(thin) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(thin) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<IUOFailableModel>
-  // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]]#1 : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
   
   // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
   // CHECK:   [[RESULT_TEMP:%[0-9]+]] = alloc_stack $IUOFailableModel
-  // CHECK:   apply [[FORCE_FN]]<IUOFailableModel>([[RESULT_TEMP]]#1, [[IUO_RESULT_TEMP]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = load [[RESULT_TEMP]]#1 : $*IUOFailableModel
+  // CHECK:   apply [[FORCE_FN]]<IUOFailableModel>([[RESULT_TEMP]], [[IUO_RESULT_TEMP]]) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = load [[RESULT_TEMP]] : $*IUOFailableModel
   // CHECK:   store [[RESULT]] to [[SELF]] : $*IUOFailableModel
-  // CHECK:   dealloc_stack [[RESULT_TEMP]]#0 : $*@local_storage IUOFailableModel
-  // CHECK:   dealloc_stack [[IUO_RESULT_TEMP]]#0 : $*@local_storage ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   dealloc_stack [[RESULT_TEMP]] : $*IUOFailableModel
+  // CHECK:   dealloc_stack [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   return
   init!(foo: Int) { return nil }
 }

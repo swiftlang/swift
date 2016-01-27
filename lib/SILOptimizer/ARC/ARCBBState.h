@@ -1,8 +1,8 @@
-//===--- ARCBBState.h --------------------------------------*- C++ -*------===//
+//===--- ARCBBState.h -------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -55,7 +55,7 @@ public:
   ///   builtin "int_trap"() : $()
   ///   unreachable
   ///
-  /// This can not have any uses of reference counted values since the frontend
+  /// This cannot have any uses of reference counted values since the frontend
   /// just leaks at that point.
   bool isTrapBB() const { return IsTrapBB; }
 

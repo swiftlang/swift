@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -140,7 +140,7 @@ enum class DeclVisibilityKind {
   MemberOfOutsideNominal,
 
   /// Declaration is visible at the top level because it is declared in this
-  /// module or in a imported module.
+  /// module or in an imported module.
   VisibleAtTopLevel,
 
   /// Declaration was found via \c AnyObject or \c AnyObject.Type.

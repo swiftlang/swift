@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,21 +32,33 @@ using namespace swift;
 ///
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
-GenericParamList *Parser::parseGenericParameters() {
+ParserResult<GenericParamList> Parser::parseGenericParameters() {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   return parseGenericParameters(consumeStartingLess());
 }
 
-GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
+ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the generic parameter list.
   SmallVector<GenericTypeParamDecl *, 4> GenericParams;
   bool Invalid = false;
   do {
+    // Note that we're parsing a declaration.
+    StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
+                                    StructureMarkerKind::Declaration);
+
+    // Parse attributes.
+    DeclAttributes attributes;
+    if (Tok.hasComment())
+      attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
+    bool foundCCTokenInAttr;
+    parseDeclAttributeList(attributes, foundCCTokenInAttr);
+
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;
-    if (parseIdentifier(Name, NameLoc, diag::expected_generics_parameter_name)) {
+    if (parseIdentifier(Name, NameLoc,
+                        diag::expected_generics_parameter_name)) {
       Invalid = true;
       break;
     }
@@ -56,7 +68,8 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
-      if (Tok.getKind() == tok::identifier) {
+      if (Tok.getKind() == tok::identifier ||
+          Tok.getKind() == tok::code_complete) {
         Ty = parseTypeIdentifier();
       } else if (Tok.getKind() == tok::kw_protocol) {
         Ty = parseTypeComposition();
@@ -65,7 +78,9 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         Invalid = true;
       }
 
-      // FIXME: code completion not handled.
+      if (Ty.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+
       if (Ty.isNonNull())
         Inherited.push_back(Ty.get());
     }
@@ -80,6 +95,9 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
 
+    // Attach attributes.
+    Param->getAttrs() = attributes;
+
     // Add this parameter to the scope.
     addToScope(Param);
 
@@ -89,8 +107,9 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the optional where-clause.
   SourceLoc WhereLoc;
   SmallVector<RequirementRepr, 4> Requirements;
+  bool FirstTypeInComplete;
   if (Tok.is(tok::kw_where) &&
-      parseGenericWhereClause(WhereLoc, Requirements)) {
+      parseGenericWhereClause(WhereLoc, Requirements, FirstTypeInComplete).isError()) {
     Invalid = true;
   }
   
@@ -117,11 +136,12 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   if (GenericParams.empty())
     return nullptr;
 
-  return GenericParamList::create(Context, LAngleLoc, GenericParams,
-                                  WhereLoc, Requirements, RAngleLoc);
+  return makeParserResult(GenericParamList::create(Context, LAngleLoc,
+                                                   GenericParams, WhereLoc,
+                                                   Requirements, RAngleLoc));
 }
 
-GenericParamList *Parser::maybeParseGenericParams() {
+ParserResult<GenericParamList> Parser::maybeParseGenericParams() {
   if (!startsWithLess(Tok))
     return nullptr;
 
@@ -132,7 +152,7 @@ GenericParamList *Parser::maybeParseGenericParams() {
   // first one being the outmost generic parameter list.
   GenericParamList *gpl = nullptr, *outer_gpl = nullptr;
   do {
-    gpl = parseGenericParameters();
+    gpl = parseGenericParameters().getPtrOrNull();
     if (!gpl)
       return nullptr;
 
@@ -140,7 +160,7 @@ GenericParamList *Parser::maybeParseGenericParams() {
       gpl->setOuterParameters(outer_gpl);
     outer_gpl = gpl;
   } while(startsWithLess(Tok));
-  return gpl;
+  return makeParserResult(gpl);
 }
 
 /// parseGenericWhereClause - Parse a 'where' clause, which places additional
@@ -159,17 +179,23 @@ GenericParamList *Parser::maybeParseGenericParams() {
 ///
 ///   same-type-requirement:
 ///     type-identifier '==' type
-bool Parser::parseGenericWhereClause(
+ParserStatus Parser::parseGenericWhereClause(
                SourceLoc &WhereLoc,
-               SmallVectorImpl<RequirementRepr> &Requirements) {
+               SmallVectorImpl<RequirementRepr> &Requirements,
+               bool &FirstTypeInComplete) {
+  ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
-  bool Invalid = false;
+  FirstTypeInComplete = false;
   do {
     // Parse the leading type-identifier.
     ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
-    if (FirstType.isNull() || FirstType.hasCodeCompletion()) {
-      Invalid = true;
+    if (FirstType.isNull()) {
+      Status.setIsParseError();
+      if (FirstType.hasCodeCompletion()) {
+        Status.setHasCodeCompletion();
+        FirstTypeInComplete = true;
+      }
       break;
     }
 
@@ -184,15 +210,16 @@ bool Parser::parseGenericWhereClause(
       } else {
         Protocol = parseTypeIdentifier();
       }
-      if (Protocol.isNull() || Protocol.hasCodeCompletion()) {
-        Invalid = true;
+      if (Protocol.isNull()) {
+        Status.setIsParseError();
+        if (Protocol.hasCodeCompletion())
+          Status.setHasCodeCompletion();
         break;
       }
 
       // Add the requirement.
-      Requirements.push_back(RequirementRepr::getConformance(FirstType.get(),
-                                                         ColonLoc,
-                                                         Protocol.get()));
+      Requirements.push_back(RequirementRepr::getTypeConstraint(FirstType.get(),
+                                                     ColonLoc, Protocol.get()));
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
       // A same-type-requirement
@@ -204,8 +231,10 @@ bool Parser::parseGenericWhereClause(
 
       // Parse the second type.
       ParserResult<TypeRepr> SecondType = parseType();
-      if (SecondType.isNull() || SecondType.hasCodeCompletion()) {
-        Invalid = true;
+      if (SecondType.isNull()) {
+        Status.setIsParseError();
+        if (SecondType.hasCodeCompletion())
+          Status.setHasCodeCompletion();
         break;
       }
 
@@ -215,11 +244,11 @@ bool Parser::parseGenericWhereClause(
                                                       SecondType.get()));
     } else {
       diagnose(Tok, diag::expected_requirement_delim);
-      Invalid = true;
+      Status.setIsParseError();
       break;
     }
     // If there's a comma, keep parsing the list.
   } while (consumeIf(tok::comma));
 
-  return Invalid;
+  return Status;
 }

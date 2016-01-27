@@ -16,27 +16,27 @@ sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin
 bb0(%0 : $*Int, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
-  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $Int
   %6 = load %0 : $*Int
-  store %6 to %5#1 : $*Int
-  unconditional_checked_cast_addr take_always Int in %5#1 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
-  dealloc_stack %5#0 : $*@local_storage Int
+  store %6 to %5 : $*Int
+  unconditional_checked_cast_addr take_always Int in %5 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  dealloc_stack %5 : $*Int
   %11 = integer_literal $Builtin.Int1, -1
   %12 = integer_literal $Builtin.Int1, 0
-  %13 = select_enum_addr %3#1 : $*Optional<CustomStringConvertible>, case #Optional.Some!enumelt.1: %11, case #Optional.None!enumelt: %12 : $Builtin.Int1
+  %13 = select_enum_addr %3 : $*Optional<CustomStringConvertible>, case #Optional.Some!enumelt.1: %11, case #Optional.None!enumelt: %12 : $Builtin.Int1
   cond_br %13, bb2, bb1
 
 bb1:
   %15 = tuple ()
-  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
-  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
+  dealloc_stack %2 : $*CustomStringConvertible
   return %15 : $()
 
 bb2:
-  %19 = unchecked_take_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
-  copy_addr [take] %19 to [initialization] %2#1 : $*CustomStringConvertible
+  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  copy_addr [take] %19 to [initialization] %2 : $*CustomStringConvertible
   br bb1
 }
 
@@ -52,27 +52,27 @@ sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin
 bb0(%0 : $*Int, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
-  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $Int
   %6 = load %0 : $*Int
-  store %6 to %5#1 : $*Int
-  unconditional_checked_cast_addr take_always Int in %5#1 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
-  dealloc_stack %5#0 : $*@local_storage Int
-  %13 = switch_enum_addr %3#1 : $*Optional<CustomStringConvertible>, case #Optional.Some!enumelt.1: bb3, case #Optional.None!enumelt: bb2
+  store %6 to %5 : $*Int
+  unconditional_checked_cast_addr take_always Int in %5 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  dealloc_stack %5 : $*Int
+  %13 = switch_enum_addr %3 : $*Optional<CustomStringConvertible>, case #Optional.Some!enumelt.1: bb3, case #Optional.None!enumelt: bb2
 
 bb1:
   %15 = tuple ()
-  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
-  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
+  dealloc_stack %2 : $*CustomStringConvertible
   return %15 : $()
 
 bb2:
   br bb1
 
 bb3:
-  %19 = unchecked_take_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
-  copy_addr [take] %19 to [initialization] %2#1 : $*CustomStringConvertible
+  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  copy_addr [take] %19 to [initialization] %2 : $*CustomStringConvertible
   br bb1
 }
 
@@ -91,27 +91,27 @@ sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br :
 bb0(%0 : $*Int, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
-  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $Int
   %6 = load %0 : $*Int
-  store %6 to %5#1 : $*Int
-  checked_cast_addr_br take_always Int in %5#1 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
+  store %6 to %5 : $*Int
+  checked_cast_addr_br take_always Int in %5 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
-  dealloc_stack %5#0 : $*@local_storage Int
-  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
+  dealloc_stack %5 : $*Int
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
+  dealloc_stack %2 : $*CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }
 
@@ -147,27 +147,27 @@ sil @convert_checked_cast_addr_br_with_internal_type : $@convention(thin) (@in A
 bb0(%0 : $*A, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
-  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $A
   %6 = load %0 : $*A
-  store %6 to %5#1 : $*A
-  checked_cast_addr_br take_always A in %5#1 : $*A to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
+  store %6 to %5 : $*A
+  checked_cast_addr_br take_always A in %5 : $*A to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
-  dealloc_stack %5#0 : $*@local_storage A
-  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
+  dealloc_stack %5 : $*A
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
+  dealloc_stack %2 : $*CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }
 
@@ -187,27 +187,27 @@ sil @convert_checked_cast_addr_br_with_private_type : $@convention(thin) (@in B,
 bb0(%0 : $*B, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
-  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $B
   %6 = load %0 : $*B
-  store %6 to %5#1 : $*B
-  checked_cast_addr_br take_always B in %5#1 : $*B to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
+  store %6 to %5 : $*B
+  checked_cast_addr_br take_always B in %5 : $*B to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
-  dealloc_stack %5#0 : $*@local_storage B
-  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
+  dealloc_stack %5 : $*B
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
+  dealloc_stack %2 : $*CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }
 
@@ -227,26 +227,26 @@ sil @convert_checked_cast_addr_br_with_non_private_superclass : $@convention(thi
 bb0(%0 : $*D, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
-  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $D
   %6 = load %0 : $*D
-  store %6 to %5#1 : $*D
-  checked_cast_addr_br take_always D in %5#1 : $*D to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
+  store %6 to %5 : $*D
+  checked_cast_addr_br take_always D in %5 : $*D to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
-  dealloc_stack %5#0 : $*@local_storage D
-  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
+  dealloc_stack %5 : $*D
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
+  dealloc_stack %2 : $*CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }

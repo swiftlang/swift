@@ -1,6 +1,8 @@
 Error Handling Rationale and Proposal
 *************************************
 
+.. contents::
+
 This paper surveys the error-handling world, analyzes various ideas
 which have been proposed or are in practice in other languages, and
 ultimately proposes an error-handling scheme for Swift together
@@ -389,7 +391,7 @@ options as a programmer:
   function called by your function.
 
 - You can carefully arrange your function so that there are no
-  critical sections where an universal error can leave things in an
+  critical sections where a universal error can leave things in an
   unwanted state.
 
 There are techniques for making the second more palatable.  Chiefly,
@@ -636,7 +638,7 @@ of the disadvantages and investigate ways to ameliorate them:
 
   - There are many situations where errors are not actually possible
     because the programmer has carefully restricted the input.  For
-    example, matching :code:``/[0-9]{4}/`` and then parsing the result
+    example, matching ``/[0-9]{4}/`` and then parsing the result
     as an integer.  It needs to be convenient to do this in a context
     that cannot actually propagate errors, but the facility to do this
     needs to be carefully designed to discourage use for swallowing
@@ -741,8 +743,8 @@ This approach is therefore relatively even-handed about the error
 vs. the non-error path, although it requires some care in order to
 minimize code-size penalties for parallel error paths.
 
-``setjmp`` / ``longmp``
-~~~~~~~~~~~~~~~~~~~~~~~
+``setjmp`` / ``longjmp``
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another strategy to is to dynamically maintain a thread-local stack of
 interesting frames.  A function with an interesting frame must save
@@ -1043,9 +1045,9 @@ C++ has exceptions.  Exceptions can have almost any type in the
 language.  Propagation typing is tied only to declarations; an
 indirect function pointer is generally assumed to be able to throw.
 Propagation typing used to allow functions to be specific about the
-kinds of exceptions they could throw (:code:``throws
+kinds of exceptions they could throw (``throws
 (std::exception)``), but this is deprecated in favor of just indicating
-whether a function can throw (:code:``noexcept(false)``).
+whether a function can throw (``noexcept(false)``).
 
 C++ aspires to making out-of-memory a recoverable condition, and so
 allocation can throw.  Therefore, it is essentially compulsory for the
@@ -1316,16 +1318,16 @@ generalized ``do`` statement::
   }
 
 Swift should also provide some tools for doing manual propagation.  We
-should have a standard Rust-like :code:``Result<T>`` enum in the
+should have a standard Rust-like ``Result<T>`` enum in the
 library, as well as a rich set of tools, e.g.:
 
 - A function to evaluate an error-producing closure and capture the
-  result as a :code:``Result<T>``.
+  result as a ``Result<T>``.
 
-- A function to unpack a :code:``Result<T>`` by either returning its
+- A function to unpack a ``Result<T>`` by either returning its
   value or propagating the error in the current context.
 
-- A futures library that traffics in :code:``Result<T>`` when
+- A futures library that traffics in ``Result<T>`` when
   applicable.
 
 - An overload of ``dispatch_sync`` which takes an error-producing
@@ -1359,7 +1361,7 @@ declaration or type::
     return try stream.readInt()
   }
 
-  // ‘throws’ is written before the arrow to give a sensible and
+  // 'throws' is written before the arrow to give a sensible and
   // consistent grammar for function types and implicit () result types.
   func baz() throws {
     if let byte = try stream.getOOB() where byte == PROTO_RESET {
@@ -1367,7 +1369,7 @@ declaration or type::
     }
   }
 
-  // ‘throws’ appears in a consistent position in function types.
+  // 'throws' appears in a consistent position in function types.
   func fred(callback: (UInt8) throws -> ()) throws {
      while true {
        let code = try stream.readByte()
@@ -1380,7 +1382,7 @@ declaration or type::
   // this function has type:
   //   (Int) -> (Int) throws -> Int
   func jerry(i: Int)(j: Int) throws -> Int {
-    // It’s not an error to use ‘throws’ on a function that can’t throw.
+    // It's not an error to use 'throws' on a function that can't throw.
     return i + j
   }
 

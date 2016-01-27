@@ -1,8 +1,8 @@
-//===--- DarwinExtras.swift -----------------------------------------------===//
+//===--- Subprocess.swift -------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 
@@ -232,6 +232,8 @@ func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutableP
 internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   return _NSGetEnviron().memory
+#elseif os(FreeBSD)
+  return environ;
 #else
   return __environ
 #endif

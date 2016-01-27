@@ -172,10 +172,10 @@ func redundant(@noescape  // expected-error {{@noescape is implied by @autoclosu
 
 
 protocol P1 {
-  typealias Element
+  associatedtype Element
 }
 protocol P2 : P1 {
-  typealias Element
+  associatedtype Element
 }
 
 func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> (), _: T) {}
@@ -223,9 +223,9 @@ class NoEscapeImmediatelyApplied {
 
 
 // Reduced example from XCTest overlay, involves a TupleShuffleExpr
-public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: StaticString = __FILE__, line: UInt = __LINE__) -> Void {
 }
-public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: StaticString = __FILE__, line: UInt = __LINE__)  -> Void {
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 

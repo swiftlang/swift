@@ -187,3 +187,50 @@ var u = MoreConcreteQuadruple(10, 17, State.CA, "Hella")
 
 // CHECK: 10 17
 printConcretePair(u)
+
+class RootGenericFixedLayout<T> {
+  let a: [T]
+  let b: Int
+
+  init(a: [T], b: Int) {
+    self.a = a
+    self.b = b
+  }
+}
+
+func checkRootGenericFixedLayout<T>(r: RootGenericFixedLayout<T>) {
+  print(r.a)
+  print(r.b)
+}
+
+let rg = RootGenericFixedLayout<Int>(a: [1, 2, 3], b: 4)
+
+// CHECK: [1, 2, 3]
+// CHECK: 4
+checkRootGenericFixedLayout(rg)
+
+class GenericInheritsGenericFixedLayout<T> : RootGenericFixedLayout<T> {
+  let c: Int
+
+  init(a: [T], b: Int, c: Int) {
+    self.c = c
+    super.init(a: a, b: b)
+  }
+}
+
+let gg = GenericInheritsGenericFixedLayout<Int>(a: [1, 2, 3], b: 4, c: 5)
+
+func checkGenericInheritsGenericFixedLayout<T>(g: GenericInheritsGenericFixedLayout<T>) {
+  print(g.a)
+  print(g.b)
+  print(g.c)
+}
+
+// CHECK: [1, 2, 3]
+// CHECK: 4
+checkRootGenericFixedLayout(gg)
+
+// CHECK: [1, 2, 3]
+// CHECK: 4
+// CHECK: 5
+checkGenericInheritsGenericFixedLayout(gg)

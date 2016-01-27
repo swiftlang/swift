@@ -55,6 +55,13 @@ struct IntWrapper: Comparable {
   var value: Int
 
   struct InnerForNoReason {}
+
+  // CHECK-DAG: - "TypeReferencedOnlyBySubscript"
+  subscript(_: TypeReferencedOnlyBySubscript) -> Void { return () }
+
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateSubscript"
+  // FIXME: This should be marked "!private".
+  private subscript(_: TypeReferencedOnlyByPrivateSubscript) -> Void { return () }
 }
 
 // CHECK-DAG: "IntWrapper"
@@ -318,6 +325,11 @@ private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelS
 private struct PrivateTy6 {}
 // CHECK-DAG: !private "PrivateProto3"
 extension PrivateTy6 : PrivateProto3 {}
+
+// CHECK-DAG: - "ProtoReferencedOnlyInGeneric"
+func genericTest<T: ProtoReferencedOnlyInGeneric>(_: T) {}
+// CHECK-DAG: !private "ProtoReferencedOnlyInPrivateGeneric"
+private func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
 
 struct Sentinel1 {}
 

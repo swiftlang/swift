@@ -29,23 +29,23 @@ extern NSUInteger SomeCrazyAppExtensionForbiddenAPI(void)
   __attribute__((availability(macosx_app_extension,unavailable,message="Not available in App Extensions")))
   __attribute__((availability(ios_app_extension,unavailable,message="Not available in App Extensions")));
 
-extern NSString *const globalStringAvailableOn10_10 __attribute__((availability(macosx,introduced=10.10)));
-extern NSString *const globalStringAvailableOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+extern NSString *const globalStringAvailableOn10_51 __attribute__((availability(macosx,introduced=10.51)));
+extern NSString *const globalStringAvailableOn10_52 __attribute__((availability(macosx,introduced=10.52)));
 
-__attribute__((availability(macosx,introduced=10.10)))
-@interface NSAvailableOn10_10 : NSObject
+__attribute__((availability(macosx,introduced=10.51)))
+@interface NSAvailableOn10_51 : NSObject
 - (instancetype)init;
-- (instancetype)initWithStringOn10_11:(NSString *)s __attribute__((availability(macosx,introduced=10.11)));
+- (instancetype)initWithStringOn10_52:(NSString *)s __attribute__((availability(macosx,introduced=10.52)));
 
-@property NSInteger propertyOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+@property NSInteger propertyOn10_52 __attribute__((availability(macosx,introduced=10.52)));
 
-- (void)methodAvailableOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+- (void)methodAvailableOn10_52 __attribute__((availability(macosx,introduced=10.52)));
 @end
 
-extern NSAvailableOn10_10 *const globalClassInstanceAvailableOn10_10 __attribute__((availability(macosx,introduced=10.10)));
+extern NSAvailableOn10_51 *const globalClassInstanceAvailableOn10_51 __attribute__((availability(macosx,introduced=10.51)));
 
-__attribute__((availability(macosx,introduced=10.10)))
-@protocol NSProtocolAvailableOn10_10
+__attribute__((availability(macosx,introduced=10.51)))
+@protocol NSProtocolAvailableOn10_51
 
 @end
 
@@ -55,35 +55,35 @@ __attribute__((availability(macosx,introduced=10.9)))
 @property NSInteger propertyOn10_9;
 
 // Properties with unavailable accessors declared before property.
-- (void)setPropertyOn10_10WithSetterOn10_11Before:(NSInteger)prop __attribute__((availability(macosx,introduced=10.11)));
-@property NSInteger propertyOn10_10WithSetterOn10_11Before __attribute__((availability(macosx,introduced=10.10)));
+- (void)setPropertyOn10_51WithSetterOn10_52Before:(NSInteger)prop __attribute__((availability(macosx,introduced=10.52)));
+@property NSInteger propertyOn10_51WithSetterOn10_52Before __attribute__((availability(macosx,introduced=10.51)));
 
-- (NSInteger)propertyOn10_10WithGetterOn10_11Before __attribute__((availability(macosx,introduced=10.11)));
-@property NSInteger propertyOn10_10WithGetterOn10_11Before __attribute__((availability(macosx,introduced=10.10)));
+- (NSInteger)propertyOn10_51WithGetterOn10_52Before __attribute__((availability(macosx,introduced=10.52)));
+@property NSInteger propertyOn10_51WithGetterOn10_52Before __attribute__((availability(macosx,introduced=10.51)));
 
 // Properties with unavailable accessors declared after property.
-@property NSInteger propertyOn10_10WithSetterOn10_11After __attribute__((availability(macosx,introduced=10.10)));
-- (void)setPropertyOn10_10WithSetterOn10_11After:(NSInteger)prop __attribute__((availability(macosx,introduced=10.11)));
+@property NSInteger propertyOn10_51WithSetterOn10_52After __attribute__((availability(macosx,introduced=10.51)));
+- (void)setPropertyOn10_51WithSetterOn10_52After:(NSInteger)prop __attribute__((availability(macosx,introduced=10.52)));
 
-@property NSInteger propertyOn10_10WithGetterOn10_11After __attribute__((availability(macosx,introduced=10.10)));
-- (NSInteger)propertyOn10_10WithGetterOn10_11After __attribute__((availability(macosx,introduced=10.11)));
+@property NSInteger propertyOn10_51WithGetterOn10_52After __attribute__((availability(macosx,introduced=10.51)));
+- (NSInteger)propertyOn10_51WithGetterOn10_52After __attribute__((availability(macosx,introduced=10.52)));
 
 // Property with redeclared with a setter in a category
-@property(readonly) NSInteger readOnlyRedeclaredWithSetterInCategory __attribute__((availability(macosx,introduced=10.10)));
+@property(readonly) NSInteger readOnlyRedeclaredWithSetterInCategory __attribute__((availability(macosx,introduced=10.51)));
 
-- (void)methodAvailableOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+- (void)methodAvailableOn10_52 __attribute__((availability(macosx,introduced=10.52)));
 @end
 
 @interface NSAvailableOn10_9 (NSWithPropertyReclarationInACategory)
 
-@property(readwrite) NSInteger readOnlyRedeclaredWithSetterInCategory __attribute__((availability(macosx,introduced=10.10)));
-- (void)setReadOnlyRedeclaredWithSetterInCategory:(NSInteger)prop __attribute__((availability(macosx,introduced=10.11)));
+@property(readwrite) NSInteger readOnlyRedeclaredWithSetterInCategory __attribute__((availability(macosx,introduced=10.51)));
+- (void)setReadOnlyRedeclaredWithSetterInCategory:(NSInteger)prop __attribute__((availability(macosx,introduced=10.52)));
 @end
 
-/// Aaa.  NSAvailableOnOSX10_10AndIOS8_0.  Bbb.
-__attribute__((availability(macosx,introduced=10.10)))
+/// Aaa.  NSAvailableOnOSX10_51AndIOS8_0.  Bbb.
+__attribute__((availability(macosx,introduced=10.51)))
 __attribute__((availability(ios,introduced=8.0)))
-@interface NSAvailableOnOSX10_10AndIOS8_0 : NSObject
+@interface NSAvailableOnOSX10_51AndIOS8_0 : NSObject
 
 @end
 
@@ -459,7 +459,7 @@ typedef CF_OPTIONS(unsigned long, CFCalendarUnit) {
   kCFCalendarUnitHour = (1UL << 5),
   kCFCalendarUnitMinute = (1UL << 6),
   kCFCalendarUnitSecond = (1UL << 7),
-  kCFCalendarUnitWeek /*CF_ENUM_DEPRECATED(10_4, 10_10, 2_0, 8_0)*/ = (1UL << 8),
+  kCFCalendarUnitWeek /*CF_ENUM_DEPRECATED(10_4, 10_51, 2_0, 8_0)*/ = (1UL << 8),
   kCFCalendarUnitWeekday = (1UL << 9),
   kCFCalendarUnitWeekdayOrdinal = (1UL << 10),
   kCFCalendarUnitQuarter /*CF_ENUM_AVAILABLE(10_6, 4_0)*/ = (1UL << 11),
@@ -563,17 +563,17 @@ typedef NS_OPTIONS(NSUInteger, NSBitmapFormat) {
   NSAlphaNonpremultipliedBitmapFormat = 1 << 1, // 0 means is premultiplied
   NSFloatingPointSamplesBitmapFormat  = 1 << 2,	// 0 is integer
 
-  NS16BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 8),
-  NS32BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 9),
-  NS16BitBigEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 10),
-  NS32BitBigEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 11)
+  NS16BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 8),
+  NS32BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 9),
+  NS16BitBigEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 10),
+  NS32BitBigEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 11)
 };
 
 typedef NS_OPTIONS(NSUInteger, NSBitmapFormatReversed) {
-  NS16BitLittleEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 8),
-  NS32BitLittleEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 9),
-  NS16BitBigEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 10),
-  NS32BitBigEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 11),
+  NS16BitLittleEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 8),
+  NS32BitLittleEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 9),
+  NS16BitBigEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 10),
+  NS32BitBigEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_51)*/ = (1 << 11),
 
   NSAlphaFirstBitmapFormatR            = 1 << 0, // 0 means is alpha last (RGBA, CMYKA, etc.)
   NSAlphaNonpremultipliedBitmapFormatR = 1 << 1, // 0 means is premultiplied
@@ -607,13 +607,13 @@ typedef NS_OPTIONS(NSUInteger, NSPotentiallyUnavailableOptions) {
   NSPotentiallyUnavailableOptionsFirst   = (1 << 0),
   NSPotentiallyUnavailableOptionsSecond  = (1 << 1),
   NSPotentiallyUnavailableOptionsThird   = (1 << 2),
-}  __attribute__((availability(macosx, introduced=10.10)));
+}  __attribute__((availability(macosx, introduced=10.51)));
 
 /// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
 typedef NS_OPTIONS(NSUInteger, NSOptionsWithUnavailableElement) {
   NSOptionsWithUnavailableElementFirst    = (1 << 0),
   NSOptionsWithUnavailableElementSecond   = (1 << 1),
-  NSOptionsWithUnavailableElementThird __attribute__((availability(macosx, introduced=10.10))) = (1 << 2),
+  NSOptionsWithUnavailableElementThird __attribute__((availability(macosx, introduced=10.51))) = (1 << 2),
 };
 
 /// Aaa.  NSUnavailableEnum.  Bbb.
@@ -621,23 +621,23 @@ typedef NS_ENUM(NSUInteger, NSUnavailableEnum) {
   NSUnavailableEnumFirst,
   NSUnavailableEnumSecond,
   NSUnavailableEnumThird,
-}  __attribute__((availability(macosx, introduced=10.10)));
+}  __attribute__((availability(macosx, introduced=10.51)));
 
 /// Aaa.  NSEnumWithUnavailableElement.  Bbb.
 typedef NS_ENUM(NSUInteger, NSEnumWithUnavailableElement) {
   NSEnumWithUnavailableElementFirst,
   NSEnumWithUnavailableElementSecond,
-  NSEnumWithUnavailableElementThird __attribute__((availability(macosx, introduced=10.10))),
+  NSEnumWithUnavailableElementThird __attribute__((availability(macosx, introduced=10.51))),
 };
 
 typedef NS_OPTIONS(NSUInteger, NSDeprecatedOptions) {
   NSDeprecatedOptionsNone = 0,
   NSDeprecatedOptionsFirst   = (1 << 0)
-}  __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+}  __attribute__((availability(macosx, introduced=10.51, deprecated=10.51, message="Use a different API")));
 
 typedef NS_ENUM(NSUInteger, NSDeprecatedEnum) {
   NSDeprecatedEnumFirst
-} __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+} __attribute__((availability(macosx, introduced=10.51, deprecated=10.51, message="Use a different API")));
 
 typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOptions) {
   NSExplicitlyUnavailableOptionsNone = 0,
@@ -655,7 +655,7 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 @end
 
 @interface NSClassWithDeprecatedOptionsInMethodSignature (ActuallyUseOptions)
-  - (void)someMethodWithDeprecatedOptions:(NSDeprecatedOptions)options __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+  - (void)someMethodWithDeprecatedOptions:(NSDeprecatedOptions)options __attribute__((availability(macosx, introduced=10.51, deprecated=10.51, message="Use a different API")));
 @end
 
 @interface NSClassWithExplicitlyUnavailableOptionsInMethodSignature : NSObject
@@ -670,7 +670,7 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 
 @interface NSClassWithPotentiallyUnavailableOptionsInMethodSignature : NSObject
 + (NSClassWithPotentiallyUnavailableOptionsInMethodSignature *) sharedInstance;
-- (void)someMethodWithPotentiallyUnavailableOptions:(NSPotentiallyUnavailableOptions)options __attribute__((availability(macosx, introduced=10.11)));
+- (void)someMethodWithPotentiallyUnavailableOptions:(NSPotentiallyUnavailableOptions)options __attribute__((availability(macosx, introduced=10.52)));
 @end
 
 @protocol NSWobbling
@@ -820,15 +820,15 @@ typedef struct NonNilableReferences {
 @end
 
 @interface NSClassWithMethodFromNSProtocolWithOptionalRequirement
--(void)optionalRequirement  __attribute__((availability(macosx, introduced=10.10)));
+-(void)optionalRequirement  __attribute__((availability(macosx, introduced=10.51)));
 @end
 
-__attribute__((availability(macosx,introduced=10.10)))
+__attribute__((availability(macosx,introduced=10.51)))
 @interface AnnotatedFrameworkClass : NSObject
 
 @end
 
-__attribute__((availability(macosx,introduced=10.11)))
+__attribute__((availability(macosx,introduced=10.52)))
 @interface AnnotatedLaterFrameworkClass : NSObject
 
 @end
@@ -844,7 +844,7 @@ __attribute__((availability(macosx,introduced=10.11)))
 
 -(void)doSomethingWithClass:(AnnotatedFrameworkClass * __nonnull)k andLaterClass:(AnnotatedLaterFrameworkClass * __nonnull)lk;
 
--(void)someMethodWithAvailability __attribute__((availability(macosx,introduced=10.12)));
+-(void)someMethodWithAvailability __attribute__((availability(macosx,introduced=10.53)));
 
 @property(nonnull) AnnotatedFrameworkClass *someProperty;
 
@@ -861,17 +861,17 @@ __attribute__((availability(macosx,introduced=10.9)))
 @end
 
 /// Aaa.  LaterFrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
-__attribute__((availability(macosx,introduced=10.11)))
+__attribute__((availability(macosx,introduced=10.52)))
 @interface LaterFrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject <UnannotatedFrameworkProtocol>
 @end
 
 /// Aaa.  LaterAnnotatedFrameworkProtocol.  Bbb.
-__attribute__((availability(macosx,introduced=10.11)))
+__attribute__((availability(macosx,introduced=10.52)))
 @protocol LaterAnnotatedFrameworkProtocol
 -(AnnotatedFrameworkClass * __nullable)returnSomething;
 -(void)doSomethingWithClass:(AnnotatedFrameworkClass * __nonnull)k andLaterClass:(AnnotatedLaterFrameworkClass * __nonnull)lk;
 -(void)noUnavailableTypesInSignature;
--(void)someMethodWithAvailability __attribute__((availability(macosx,introduced=10.12)));
+-(void)someMethodWithAvailability __attribute__((availability(macosx,introduced=10.53)));
 @property(nonnull) AnnotatedFrameworkClass *someProperty;
 @end
 
@@ -985,3 +985,10 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 int variadicFunc1(int A, ...);
 
 int variadicFunc2(int A, ...);
+
+@interface NSString (UTF8)
+-(nullable instancetype)initWithUTF8String:(const char *)bytes;
+@end
+
+extern NSString *NSGlobalConstant;
+extern void NSGlobalFunction(void);

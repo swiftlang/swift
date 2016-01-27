@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -117,7 +117,7 @@ bool BottomUpRefCountState::mightRemoveMutators() {
 
 /// Uninitialize the current state.
 void BottomUpRefCountState::clear() {
-  // If we can not conservatively prove that the given RefCountState will not
+  // If we cannot conservatively prove that the given RefCountState will not
   // be removed, be conservative and clear the transition state, so we do not
   // propagate KnownSafety forward.
   if (mightRemoveMutators())
@@ -154,8 +154,7 @@ bool BottomUpRefCountState::valueCanBeDecrementedGivenLatticeState() const {
 
 /// If advance the state's sequence appropriately for a decrement. If we do
 /// advance return true. Otherwise return false.
-bool BottomUpRefCountState::
-handleDecrement(SILInstruction *PotentialDecrement) {
+bool BottomUpRefCountState::handleDecrement() {
   switch (LatState) {
   case LatticeState::MightBeUsed:
     LatState = LatticeState::MightBeDecremented;
@@ -182,18 +181,10 @@ bool BottomUpRefCountState::valueCanBeUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool BottomUpRefCountState::handleUser(SILInstruction *PotentialUser,
-                                       ArrayRef<SILInstruction *> NewInsertPts,
+bool BottomUpRefCountState::handleUser(ArrayRef<SILInstruction *> NewInsertPts,
                                        SILValue RCIdentity, AliasAnalysis *AA) {
   assert(valueCanBeUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
-
-  // Instructions that we do not recognize (and thus will not move) and that
-  // *must* use RCIdentity, implies we are always known safe as long as meet
-  // over all path constraints are satisfied.
-  if (isRCStateTransitionUnknown(PotentialUser))
-    if (mustUseValue(PotentialUser, RCIdentity, AA))
-      FoundNonARCUser = true;
 
   // Advance the sequence...
   switch (LatState) {
@@ -227,18 +218,10 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
 bool BottomUpRefCountState::handleGuaranteedUser(
-    SILInstruction *PotentialGuaranteedUser,
     ArrayRef<SILInstruction *> NewInsertPts, SILValue RCIdentity,
     AliasAnalysis *AA) {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
-
-  // Instructions that we do not recognize (and thus will not move) and that
-  // *must* use RCIdentity, implies we are always known safe as long as meet
-  // over all path constraints are satisfied.
-  if (isRCStateTransitionUnknown(PotentialGuaranteedUser))
-    if (mustUseValue(PotentialGuaranteedUser, RCIdentity, AA))
-      FoundNonARCUser = true;
 
   // Advance the sequence...
   switch (LatState) {
@@ -368,14 +351,20 @@ bool BottomUpRefCountState::handlePotentialGuaranteedUser(
   if (!valueCanBeGuaranteedUsedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
     return false;
 
+  // Instructions that we do not recognize (and thus will not move) and that
+  // *must* use RCIdentity, implies we are always known safe as long as meet
+  // over all path constraints are satisfied.
+  if (isRCStateTransitionUnknown(PotentialGuaranteedUser))
+    if (mustUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
+      FoundNonARCUser = true;
+
   // Otherwise, update the ref count state given the guaranteed user.
-  return handleGuaranteedUser(PotentialGuaranteedUser, InsertPt, getRCRoot(),
-                              AA);
+  return handleGuaranteedUser(InsertPt, getRCRoot(), AA);
 }
 
 /// Check if PotentialDecrement can decrement the reference count associated
@@ -395,14 +384,14 @@ bool BottomUpRefCountState::handlePotentialDecrement(
   if (!valueCanBeDecrementedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayDecrementRefCount(PotentialDecrement, getRCRoot(), AA))
     return false;
 
   // Otherwise, allow the CRTP substruct to update itself given we have a
   // potential decrement.
-  return handleDecrement(PotentialDecrement);
+  return handleDecrement();
 }
 
 // Check if PotentialUser could be a use of the reference counted value that
@@ -427,7 +416,14 @@ bool BottomUpRefCountState::handlePotentialUser(
   if (!mayUseValue(PotentialUser, getRCRoot(), AA))
     return false;
 
-  return handleUser(PotentialUser, InsertPts, getRCRoot(), AA);
+  // Instructions that we do not recognize (and thus will not move) and that
+  // *must* use RCIdentity, implies we are always known safe as long as meet
+  // over all path constraints are satisfied.
+  if (isRCStateTransitionUnknown(PotentialUser))
+    if (mustUseValue(PotentialUser, getRCRoot(), AA))
+      FoundNonARCUser = true;
+
+  return handleUser(InsertPts, getRCRoot(), AA);
 }
 
 void BottomUpRefCountState::updateForSameLoopInst(SILInstruction *I,
@@ -475,7 +471,7 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
         mayDecrementRefCount(I, getRCRoot(), AA)) {
       DEBUG(llvm::dbgs() << "    Found potential guaranteed use:\n        "
                          << getRCRoot());
-      handleGuaranteedUser(I, InsertPts, getRCRoot(), AA);
+      handleGuaranteedUser(InsertPts, getRCRoot(), AA);
       return;
     }
   }
@@ -486,6 +482,40 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
   if (!handlePotentialUser(I, InsertPts, AA))
     return;
   DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+}
+
+void BottomUpRefCountState::updateForPredTerminators(
+    ArrayRef<SILInstruction *> Terms, SILInstruction *InsertPt,
+    AliasAnalysis *AA) {
+  // If this state is not tracking anything, there is nothing to update.
+  if (!isTrackingRefCount())
+    return;
+
+  if (valueCanBeGuaranteedUsedGivenLatticeState() &&
+      std::any_of(Terms.begin(), Terms.end(),
+                  [this, &AA](SILInstruction *I) -> bool {
+                    return mayGuaranteedUseValue(I, getRCRoot(), AA);
+                  })) {
+    handleGuaranteedUser(InsertPt, getRCRoot(), AA);
+    return;
+  }
+
+  if (valueCanBeDecrementedGivenLatticeState() &&
+      std::any_of(Terms.begin(), Terms.end(),
+                  [this, &AA](SILInstruction *I) -> bool {
+                    return mayDecrementRefCount(I, getRCRoot(), AA);
+                  })) {
+    handleDecrement();
+    return;
+  }
+
+  if (!valueCanBeUsedGivenLatticeState() ||
+      std::none_of(Terms.begin(), Terms.end(),
+                   [this, &AA](SILInstruction *I)
+                       -> bool { return mayUseValue(I, getRCRoot(), AA); }))
+    return;
+
+  handleUser(InsertPt, getRCRoot(), AA);
 }
 
 //===----------------------------------------------------------------------===//
@@ -765,7 +795,7 @@ bool TopDownRefCountState::handlePotentialGuaranteedUser(
   if (!valueCanBeGuaranteedUsedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
     return false;
@@ -793,7 +823,7 @@ bool TopDownRefCountState::handlePotentialDecrement(
   if (!valueCanBeDecrementedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayDecrementRefCount(PotentialDecrement, getRCRoot(), AA))
     return false;

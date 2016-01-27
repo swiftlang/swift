@@ -4,7 +4,7 @@
 func test1() {
   print("test1")
   var i : Int
-  for i=0;;++i {
+  for i=0;;i += 1 {
     if i > 2 {
       break
     }
@@ -15,7 +15,7 @@ func test1() {
 func test2() {
   print("test2")
   var i : Int
-  for i=0;i<10;++i {
+  for i=0;i<10;i += 1 {
     if i > 2 {
       continue
     }
@@ -25,7 +25,7 @@ func test2() {
 func test3() {
   print("test3")
   var i : Int
-  for i=0;i<10;++i {
+  for i=0;i<10;i += 1 {
     if i > 2 {
       break
     }
@@ -78,7 +78,7 @@ func test7() {
 func test8() {
   print("test8")
   var i : Int
-  for i=0;;++i {
+  for i=0;;i += 1 {
     for j in 0..<10 {
       if j > 1 {
         break

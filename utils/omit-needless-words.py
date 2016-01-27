@@ -10,13 +10,13 @@ import argparse
 import subprocess
 
 DEFAULT_TARGET_BASED_ON_SDK = {
-    'macosx'              : 'x86_64-apple-macosx10.11',
-    'iphoneos'            : 'arm64-apple-ios9.0',
-    'iphonesimulator'     : 'x86_64-apple-ios9.0',
-    'watchos'             : 'armv7k-apple-watchos2.0',
-    'watchos.simulator'   : 'i386-apple-watchos2.0',
-    'appletvos'           : 'arm64-apple-tvos9',
-    'appletvos.simulator' : 'x86_64-apple-tvos9',
+    'macosx': 'x86_64-apple-macosx10.11',
+    'iphoneos': 'arm64-apple-ios9.0',
+    'iphonesimulator': 'x86_64-apple-ios9.0',
+    'watchos': 'armv7k-apple-watchos2.0',
+    'watchos.simulator': 'i386-apple-watchos2.0',
+    'appletvos': 'arm64-apple-tvos9',
+    'appletvos.simulator': 'x86_64-apple-tvos9',
 }
 
 def create_parser():
@@ -56,7 +56,7 @@ def main():
     omit_needless_words_args = ['-enable-omit-needless-words', '-enable-infer-default-arguments']
 
     # Determine the output files.
-    # No good way with argparse to set default value based on depenency of other arg.
+    # No good way with argparse to set default value based on dependency of other arg.
     if not args.before_file:
         args.before_file = '%s.before.txt' % (args.module)
     if not args.after_file:
@@ -81,8 +81,8 @@ def main():
     subprocess.call(['rm', '-f', source_filename])
 
     # Diff them
-    subprocess.call([args.diff_tool, args.before_file, args.after_file])
+    if args.diff_tool != "":
+        subprocess.call([args.diff_tool, args.before_file, args.after_file])
 
 if __name__ == '__main__':
     main()
-

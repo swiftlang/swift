@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -105,7 +105,7 @@ bool ArrayAllocation::mapInitializationStores() {
   if (!UnsafeMutablePointerExtract)
     return false;
   auto *PointerToAddress = dyn_cast_or_null<PointerToAddressInst>(
-      getSingleNonDebugUser(*UnsafeMutablePointerExtract));
+      getSingleNonDebugUser(UnsafeMutablePointerExtract));
   if (!PointerToAddress)
     return false;
 
@@ -116,7 +116,7 @@ bool ArrayAllocation::mapInitializationStores() {
 
     // Store to the base.
     auto *SI = dyn_cast<StoreInst>(Inst);
-    if (SI && SI->getDest() == SILValue(PointerToAddress, 0)) {
+    if (SI && SI->getDest() == PointerToAddress) {
       // We have already seen an entry for this index bail.
       if (ElementValueMap.count(0))
         return false;
@@ -125,12 +125,12 @@ bool ArrayAllocation::mapInitializationStores() {
     } else if (SI)
       return false;
 
-    // Store a index_addr projection.
+    // Store an index_addr projection.
     auto *IndexAddr = dyn_cast<IndexAddrInst>(Inst);
     if (!IndexAddr)
       return false;
-    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(*IndexAddr));
-    if (!SI || SI->getDest().getDef() != IndexAddr)
+    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(IndexAddr));
+    if (!SI || SI->getDest() != IndexAddr)
       return false;
     auto *Index = dyn_cast<IntegerLiteralInst>(IndexAddr->getIndex());
     if (!Index)
@@ -148,7 +148,7 @@ bool ArrayAllocation::mapInitializationStores() {
   return !ElementValueMap.empty();
 }
 
-/// Check that we have a array initialization call with known elements.
+/// Check that we have an array initialization call with known elements.
 ///
 /// The returned array value is known not to be aliased since it was just
 /// allocated.
@@ -165,7 +165,7 @@ bool ArrayAllocation::isInitializationWithKnownElements() {
 /// Propagate the elements of an array literal to get_element method calls on
 /// the same array.
 ///
-/// We have to prove that the the array value is not changed in between the
+/// We have to prove that the array value is not changed in between the
 /// creation and the method call to get_element.
 bool ArrayAllocation::findValueReplacements() {
   if (!isInitializationWithKnownElements())
@@ -185,7 +185,7 @@ bool ArrayAllocation::findValueReplacements() {
 /// Collect all get_element users and check that there are no escapes or uses
 /// that could change the array value.
 bool ArrayAllocation::analyseArrayValueUses() {
-  return recursivelyCollectUses(ArrayValue.getDef());
+  return recursivelyCollectUses(ArrayValue);
 }
 
 static bool doesNotChangeArray(ArraySemanticsCall &C) {

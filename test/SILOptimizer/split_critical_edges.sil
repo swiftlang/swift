@@ -126,9 +126,10 @@ bb0(%0 : $AnyObject, %10: $Builtin.Int1):
 
 lookup1:
   %1 = alloc_box $AnyObject
-  store %0 to %1#1 : $*AnyObject
+  %1a = project_box %1 : $@box AnyObject
+  store %0 to %1a : $*AnyObject
   %3 = alloc_box $Optional<() -> ()>
-  %4 = load %1#1 : $*AnyObject
+  %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
   %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
@@ -136,9 +137,10 @@ lookup1:
 
 lookup2:
   %21 = alloc_box $AnyObject
-  store %0 to %21#1 : $*AnyObject
+  %21a = project_box %21 : $@box AnyObject
+  store %0 to %21a : $*AnyObject
   %23 = alloc_box $Optional<() -> ()>
-  %24 = load %21#1 : $*AnyObject
+  %24 = load %21a : $*AnyObject
   strong_retain %24 : $AnyObject
   %26 = open_existential_ref %24 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
   %27 = unchecked_ref_cast %26 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject

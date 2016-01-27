@@ -204,7 +204,7 @@ protocol Prot2 : Prot {}
 // CHECK: <kw>class</kw> SubCls : <type>MyCls</type>, <type>Prot</type> {}
 class SubCls : MyCls, Prot {}
 
-// CHECK: <kw>func</kw> genFn<T : <type>Prot</type> <kw>where</kw> <type>T</type>.<type>Blarg</type> : Prot2>(<kw>_</kw>: <type>T</type>) -> <type>Int</type> {}{{$}}
+// CHECK: <kw>func</kw> genFn<T : <type>Prot</type> <kw>where</kw> <type>T</type>.<type>Blarg</type> : <type>Prot2</type>>(<kw>_</kw>: <type>T</type>) -> <type>Int</type> {}{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 
 func f(x: Int) -> Int {
@@ -429,10 +429,21 @@ func emptyDocBlockComment3() {}
 
 
 /**/
-func malformedBlockComment(f : ()throws->()) rethrows {}
+func malformedBlockComment(f : () throws -> ()) rethrows {}
 // CHECK: <doc-comment-block>/**/</doc-comment-block>
-// CHECK: <kw>func</kw> malformedBlockComment(f : ()<kw>throws</kw>->()) <attr-builtin>rethrows</attr-builtin> {}
+// CHECK: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <attr-builtin>rethrows</attr-builtin> {}
 
+//: playground doc comment line
+func playgroundCommentLine(f : () throws -> ()) rethrows {}
+// CHECK: <comment-line>//: playground doc comment line</comment-line>
+
+/*:
+  playground doc comment multi-line
+*/
+func playgroundCommentMultiLine(f : () throws -> ()) rethrows {}
+// CHECK: <comment-block>/*:
+// CHECK: playground doc comment multi-line
+// CHECK: */</comment-block>
 
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>

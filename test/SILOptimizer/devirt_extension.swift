@@ -16,7 +16,7 @@ struct D : DrawingElementType {
   var boundingBox: Int32 = 42
 }
 
-// Check that that boundingBox is devirtualized and inlined.
+// Check that boundingBox is devirtualized and inlined.
 // CHECK: sil @{{.*}}test1111
 // bb0:
 // CHECK-NOT: class_method

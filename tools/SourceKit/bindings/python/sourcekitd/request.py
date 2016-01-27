@@ -1,14 +1,12 @@
-#===- request.py - sourcekitd Python Bindings ----------------*- python -*--===#
+# request.py - sourcekitd Python Bindings -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
 
 import capi
 
@@ -29,10 +27,12 @@ class SourceKitError(Exception):
         return "%s (%s)" % (self.msg, self.kind)
 
 def syntax_annotate_text(text):
-    req = { 'key.request': capi.UIdent('source.request.editor.open'),
-            'key.sourcetext': text,
-            'key.name': "annotate-source-text",
-            'key.enablesyntaxmap': True }
+    req = {
+        'key.request': capi.UIdent('source.request.editor.open'),
+        'key.sourcetext': text,
+        'key.name': "annotate-source-text",
+        'key.enablesyntaxmap': True
+    }
     resp = request_sync(req)
     return resp.get_payload().to_python_object()
 

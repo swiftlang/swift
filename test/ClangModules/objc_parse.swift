@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -enable-swift-name-lookup-tables -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 
@@ -58,7 +57,7 @@ func instanceMethods(b: B) {
   var obj = NSObject()
   var prot = NSObjectProtocol.self
   b.`protocol`(prot, hasThing:obj)
-  b.doThing(obj, `protocol`: prot)
+  b.doThing(obj, protocol: prot)
 }
 
 // Class method invocation
@@ -86,22 +85,21 @@ func instanceMethodsInExtensions(b: B) {
   b.method(1, onExtB:2.5)
   b.method(1, separateExtMethod:3.5)
 
-  let m1 = b.method:onCat1:
+  let m1 = b.method(_:onCat1:)
   m1(1, onCat1: 2.5)
 
-  let m2 = b.method:onExtA:
+  let m2 = b.method(_:onExtA:)
   m2(1, onExtA: 2.5)
 
-  let m3 = b.method:onExtB:
+  let m3 = b.method(_:onExtB:)
   m3(1, onExtB: 2.5)
 
-  let m4 = b.method:separateExtMethod:
+  let m4 = b.method(_:separateExtMethod:)
   m4(1, separateExtMethod: 2.5)
 }
 
 func dynamicLookupMethod(b: AnyObject) {
-  // FIXME: Syntax will be replaced.
-  if let m5 = b.method:separateExtMethod: {
+  if let m5 = b.method(_:separateExtMethod:) {
     m5(1, separateExtMethod: 2.5)
   }
 }

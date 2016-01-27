@@ -35,6 +35,8 @@
 // RUN: cp %s %t
 // RUN: not %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %t/driver-compile.swift 2>&1 | FileCheck -check-prefix DUPLICATE-NAME %s
 
+// RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %S/../Inputs/empty.swift -module-name main -driver-use-filelists 2>&1 | FileCheck -check-prefix=FILELIST %s
+
 // RUN: rm -rf %t && mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
 // RUN: ln %swift_driver_plain %t/DISTINCTIVE-PATH/usr/bin/swiftc
 // RUN: ln -s "swiftc" %t/DISTINCTIVE-PATH/usr/bin/swift-update
@@ -101,6 +103,15 @@
 
 // DUPLICATE-NAME: error: filename "driver-compile.swift" used twice: '{{.*}}test/Driver/driver-compile.swift' and '{{.*}}driver-compile.swift'
 // DUPLICATE-NAME: note: filenames are used to distinguish private declarations with the same name
+
+// FILELIST: bin/swift
+// FILELIST: -filelist [[SOURCES:(["][^"]+|[^ ]+)sources([^"]+["]|[^ ]+)]]
+// FILELIST: -primary-file {{.*/(driver-compile.swift|empty.swift)}}
+// FILELIST: -output-filelist {{[^-]}}
+// FILELIST-NEXT: bin/swift
+// FILELIST: -filelist [[SOURCES]]
+// FILELIST: -primary-file {{.*/(driver-compile.swift|empty.swift)}}
+// FILELIST: -output-filelist {{[^-]}}
 
 // UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift-update
 // UPDATE-CODE: -c{{ }}

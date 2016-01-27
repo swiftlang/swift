@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,6 +16,15 @@
 // XFAIL: linux
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import Foundation
 
 // Check that `NonObjectiveCBase` can be subclassed and the subclass can be
@@ -95,7 +104,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity,T> {
     let count = self.count
     
     withUnsafeMutablePointerToElements {
-      (x: UnsafeMutablePointer<T>)->() in
+      (x: UnsafeMutablePointer<T>) -> () in
       for i in 0.stride(to: count, by: 2) {
         (x + i).destroy()
       }
@@ -107,7 +116,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity,T> {
     precondition(count + 2 <= capacity)
     
     withUnsafeMutablePointerToElements {
-      (p: UnsafeMutablePointer<T>)->() in
+      (p: UnsafeMutablePointer<T>) -> () in
       (p + count).initialize(x)
     }
     self.count = count + 2
@@ -118,7 +127,7 @@ class MyBuffer<T> {
   typealias Manager = ManagedBufferPointer<CountAndCapacity, T>
   deinit {
     Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
-      (pointerToValue, pointerToElements)->Void in
+      (pointerToValue, pointerToElements) -> Void in
       pointerToElements.destroy(self.count)
       pointerToValue.destroy()
     }

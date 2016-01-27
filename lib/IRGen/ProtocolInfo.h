@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -124,6 +124,20 @@ public:
     assert(isAssociatedType());
     return BeginIndex;
   }
+
+  WitnessIndex
+  getAssociatedTypeWitnessTableIndex(ProtocolDecl *target) const {
+    assert(!BeginIndex.isPrefix());
+    auto index = BeginIndex.getValue() + 1;
+    for (auto protocol :
+           cast<AssociatedTypeDecl>(Member)->getConformingProtocols(nullptr)) {
+      if (protocol == target) {
+        return WitnessIndex(index, false);
+      }
+      index++;
+    }
+    llvm_unreachable("protocol not in direct conformance list?");
+  }
 };
 
 /// An abstract description of a protocol.
@@ -164,17 +178,14 @@ public:
                                         ProtocolDecl *protocol,
                                         const ProtocolConformance *conf) const;
 
+  /// The number of witness slots in a conformance to this protocol;
+  /// in other words, the size of the table in words.
   unsigned getNumWitnesses() const {
     return NumWitnesses;
   }
 
-  unsigned getNumTableEntries() const {
-    return NumTableEntries;
-  }
-
   ArrayRef<WitnessTableEntry> getWitnessEntries() const {
-    return ArrayRef<WitnessTableEntry>(getEntriesBuffer(),
-                                       getNumTableEntries());
+    return ArrayRef<WitnessTableEntry>(getEntriesBuffer(), NumTableEntries);
   }
 
   const WitnessTableEntry &getWitnessEntry(Decl *member) const {

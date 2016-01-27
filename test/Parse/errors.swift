@@ -39,6 +39,22 @@ func one() {
     throw opaque_error()
   } catch is ErrorType {  // expected-warning {{'is' test is always true}}
   }
+  
+  func foo() throws {}
+  
+  do {
+#if false
+    try foo()
+#endif
+  } catch {    // don't warn, #if code should be scanned.
+  }
+
+  do {
+#if false
+    throw opaque_error()
+#endif
+  } catch {    // don't warn, #if code should be scanned.
+  }
 }
 
 func takesAutoclosure(@autoclosure fn : () -> Int) {}

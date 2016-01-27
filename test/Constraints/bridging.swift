@@ -186,16 +186,13 @@ func rdar19551164b(s: NSString, _ a: NSArray) {
 }
 
 // rdar://problem/19695671
-func takesSet<T: Hashable>(p: Set<T>) {}
-func takesDictionary<K: Hashable, V>(p: Dictionary<K, V>) {}
-func takesArray<T>(t: Array<T>) {}
+func takesSet<T: Hashable>(p: Set<T>) {}  // expected-note {{in call to function 'takesSet'}}
+func takesDictionary<K: Hashable, V>(p: Dictionary<K, V>) {} // expected-note {{in call to function 'takesDictionary'}}
+func takesArray<T>(t: Array<T>) {} // expected-note {{in call to function 'takesArray'}}
 func rdar19695671() {
-  takesSet(NSSet() as! Set) // expected-error{{cannot invoke 'takesSet' with an argument list of type '(Set<_>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Set<T>)'}}
-  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{cannot invoke 'takesDictionary' with an argument list of type '(Dictionary<_, _>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Dictionary<K, V>)'}}
-  takesArray(NSArray() as! Array) // expected-error{{cannot invoke 'takesArray' with an argument list of type '(Array<_>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Array<T>)'}}
+  takesSet(NSSet() as! Set) // expected-error{{generic parameter 'T' could not be inferred}}
+  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{generic parameter 'K' could not be inferred}}
+  takesArray(NSArray() as! Array) // expected-error{{generic parameter 'T' could not be inferred}}
 }
 
 
@@ -272,7 +269,7 @@ func rdar20029786(ns: NSString?) {
 
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(nsma: NSMutableArray) {
-  var a1 = nsma as! Array // expected-error{{generic parameter 'Element' could not be inferred}}
+  var a1 = nsma as! Array // expected-error{{generic parameter 'Element' could not be inferred in cast to 'Array<_>'}}
   // FIXME: The following diagnostic is misleading and should not happen: expected-warning@-1{{cast from 'NSMutableArray' to unrelated type 'Array<_>' always fails}}
   var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}} {{17-20=as}}
   var a3 = nsma as Array<AnyObject>

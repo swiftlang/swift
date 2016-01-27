@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,9 +32,22 @@ namespace irgen {
   class IRGenFunction;
 
   /// Emit a witness table reference.
-  llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
-                                   CanArchetypeType archetype,
-                                   ProtocolDecl *protocol);
+  llvm::Value *emitArchetypeWitnessTableRef(IRGenFunction &IGF,
+                                            CanArchetypeType archetype,
+                                            ProtocolDecl *protocol);
+
+  /// Emit a metadata reference for an associated type of an archetype.
+  llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
+                                             CanArchetypeType origin,
+                                             AssociatedTypeDecl *associate);
+
+  /// Emit a witness table reference for a specific conformance of an
+  /// associated type of an archetype.
+  llvm::Value *emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
+                                                 CanArchetypeType origin,
+                                                 AssociatedTypeDecl *associate,
+                                                 llvm::Value *associateMetadata,
+                                               ProtocolDecl *associateProtocol);
 
   /// Emit a dynamic metatype lookup for the given archetype.
   llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,

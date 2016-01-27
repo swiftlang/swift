@@ -42,9 +42,8 @@ struct Conformer: Q, QQ {
 // CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1QS_FS1_7qMethod{{.*}} to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER_P_WITNESS_TABLE]] = hidden constant [4 x i8*] [
-// -- FIXME: associated type and witness table
-// CHECK:   i8* null,
-// CHECK:   i8* null,
+// CHECK:   i8* bitcast (%swift.type* ()* @_TMaV18sil_witness_tables14AssocConformer to i8*),
+// CHECK:   i8* bitcast (i8** ()* @_TWaV18sil_witness_tables14AssocConformerS_1AS_ to i8*)
 // CHECK:   i8* bitcast (void (%swift.type*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_ZFS1_12staticMethod{{.*}} to i8*),
 // CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_FS1_14instanceMethod{{.*}} to i8*)
 // CHECK: ]
@@ -71,3 +70,11 @@ func erasure(c c: Conformer) -> QQ {
 func externalErasure(c c: ExternalConformer) -> ExternalP {
   return c
 }
+
+// FIXME: why do these have different linkages?
+
+// CHECK-LABEL: define %swift.type* @_TMaV18sil_witness_tables14AssocConformer()
+// CHECK:         ret %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @_TMfV18sil_witness_tables14AssocConformer, i32 0, i32 1) to %swift.type*)
+
+// CHECK-LABEL: define hidden i8** @_TWaV18sil_witness_tables9ConformerS_1PS_()
+// CHECK:         ret i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @_TWPV18sil_witness_tables9ConformerS_1PS_, i32 0, i32 0)

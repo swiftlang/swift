@@ -1,8 +1,8 @@
-//===--- SILWitnessTable.h - Defines the SILWitnessTable class ------------===//
+//===--- SILWitnessTable.cpp - Defines the SILWitnessTable class ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -26,30 +26,27 @@
 
 using namespace swift;
 
-static void mangleConstant(NormalProtocolConformance *C,
-                           llvm::raw_ostream &buffer) {
+static std::string mangleConstant(NormalProtocolConformance *C) {
   using namespace Mangle;
-  Mangler mangler(buffer);
+  Mangler mangler;
 
   //   mangled-name ::= '_T' global
   //   global ::= 'WP' protocol-conformance
-  buffer << "_TWP";
+  mangler.append("_TWP");
   mangler.mangleProtocolConformance(C);
-  buffer.flush();
+  return mangler.finalize();
+
 }
 
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
                         NormalProtocolConformance *Conformance,
                         ArrayRef<SILWitnessTable::Entry> entries) {
-  assert(Conformance && "Can not create a witness table for a null "
+  assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
   // Create the mangled name of our witness table...
-  llvm::SmallString<32> buffer;
-  llvm::raw_svector_ostream stream(buffer);
-  mangleConstant(Conformance, stream);
-  Identifier Name = M.getASTContext().getIdentifier(buffer);
+  Identifier Name = M.getASTContext().getIdentifier(mangleConstant(Conformance));
 
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
@@ -70,14 +67,12 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                         NormalProtocolConformance *Conformance) {
-  assert(Conformance && "Can not create a witness table for a null "
+  assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
   // Create the mangled name of our witness table...
-  llvm::SmallString<32> buffer;
-  llvm::raw_svector_ostream stream(buffer);
-  mangleConstant(Conformance, stream);
-  Identifier Name = M.getASTContext().getIdentifier(buffer);
+  Identifier Name = M.getASTContext().getIdentifier(mangleConstant(Conformance));
+
 
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));

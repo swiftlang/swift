@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -37,9 +37,6 @@ public:
   SILArgument(SILFunction::iterator ParentBB, SILBasicBlock::bbarg_iterator Pos,
               SILType Ty, const ValueDecl *D = nullptr)
       : SILArgument(&*ParentBB, Pos, Ty, D) {}
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
@@ -90,6 +87,10 @@ public:
   /// of this arguments basic block. The found values are stored in OutArray.
   bool getIncomingValues(
       llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
+
+  /// If this SILArgument's parent block has one predecessor, return the
+  /// incoming value from that predecessor. Returns SILValue() otherwise.
+  SILValue getSingleIncomingValue() const;
 
   /// Returns true if this SILArgument is the self argument of its
   /// function. This means that this will return false always for SILArguments

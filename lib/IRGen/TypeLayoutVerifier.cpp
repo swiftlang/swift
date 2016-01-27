@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -131,10 +131,10 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                              == FixedPacking::OffsetZero),
            "is-inline bit");
     verify(emitLoadOfIsPOD(IGF, layoutType),
-           getBoolConstant(fixedTI->isPOD(ResilienceScope::Component)),
+           getBoolConstant(fixedTI->isPOD(ResilienceExpansion::Maximal)),
            "is-POD bit");
     verify(emitLoadOfIsBitwiseTakable(IGF, layoutType),
-           getBoolConstant(fixedTI->isBitwiseTakable(ResilienceScope::Component)),
+           getBoolConstant(fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal)),
            "is-bitwise-takable bit");
     unsigned xiCount = fixedTI->getFixedExtraInhabitantCount(IGF.IGM);
     verify(emitLoadOfHasExtraInhabitants(IGF, layoutType),
@@ -149,8 +149,8 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
       
       // Verify that the extra inhabitant representations are consistent.
       
-      /* TODO: Update for EnumPayload implementation changes.
-      
+      // TODO: Update for EnumPayload implementation changes.
+#if 0
       auto xiBuf = IGF.createAlloca(fixedTI->getStorageType(),
                                     fixedTI->getFixedAlignment(),
                                     "extra-inhabitant");
@@ -212,7 +212,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                llvm::Twine("extra inhabitant index calculation ")
                  + numberBuf.str());
       }
-       */
+#endif
     }
 
     // TODO: Verify interesting layout properties specific to the kind of type,

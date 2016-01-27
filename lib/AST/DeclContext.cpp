@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -46,6 +46,7 @@ DeclContext::isNominalTypeOrNominalTypeExtensionContext() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:
     return nullptr;
@@ -107,6 +108,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:
     return Type();
@@ -144,6 +146,7 @@ Type DeclContext::getDeclaredTypeInContext() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:
     return Type();
@@ -178,6 +181,7 @@ Type DeclContext::getDeclaredInterfaceType() const {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:
     return Type();
@@ -205,6 +209,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::Initializer:
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SubscriptDecl:
       // Closures and initializers can't themselves be generic, but they
       // can occur in generic contexts.
       continue;
@@ -245,6 +250,7 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
     case DeclContextKind::Initializer:
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SubscriptDecl:
       // Closures and initializers can't themselves be generic, but they
       // can occur in generic contexts.
       continue;
@@ -309,6 +315,7 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
     case DeclContextKind::Module:
     case DeclContextKind::NominalTypeDecl:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::SubscriptDecl:
       // Not in a method context.
       return nullptr;
     }
@@ -323,6 +330,7 @@ DeclContext *DeclContext::getInnermostTypeContext() {
     case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::SubscriptDecl:
     case DeclContextKind::SerializedLocal:
       Result = Result->getParent();
       continue;
@@ -355,6 +363,9 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
     case DeclContextKind::AbstractFunctionDecl:
       return cast<AbstractFunctionDecl>(DC);
 
+    case DeclContextKind::SubscriptDecl:
+      return cast<SubscriptDecl>(DC);
+        
     case DeclContextKind::NominalTypeDecl:
       return cast<NominalTypeDecl>(DC);
 
@@ -408,6 +419,7 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::Initializer:
     case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::SerializedLocal:
+    case DeclContextKind::SubscriptDecl:
       // Check parent context.
       continue;
 
@@ -506,6 +518,13 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
     break;
   }
 
+  case DeclContextKind::SubscriptDecl: {
+    auto *SD = cast<SubscriptDecl>(this);
+    if (SD->hasAccessibility())
+      return SD->getFormalAccess() > Accessibility::Private;
+    break;
+  }
+      
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
     return true;
@@ -553,6 +572,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<TopLevelCodeDecl>(this)->walk(Walker);
   case DeclContextKind::AbstractFunctionDecl:
     return cast<AbstractFunctionDecl>(this)->walk(Walker);
+  case DeclContextKind::SubscriptDecl:
+    return cast<SubscriptDecl>(this)->walk(Walker);
   case DeclContextKind::SerializedLocal:
     llvm_unreachable("walk is unimplemented for deserialized contexts");
   case DeclContextKind::Initializer:
@@ -626,6 +647,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::AbstractFunctionDecl:
     Kind = "AbstractFunctionDecl";
     break;
+    case DeclContextKind::SubscriptDecl:  Kind = "SubscriptDecl"; break;
   }
   OS.indent(Depth*2 + indent) << "0x" << (void*)this << " " << Kind;
 
@@ -669,6 +691,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     OS << " name=" << AFD->getName();
     if (AFD->hasType())
       OS << " : " << AFD->getType();
+    else
+      OS << " : (no type set)";
+    break;
+  }
+  case DeclContextKind::SubscriptDecl: {
+    auto *SD = cast<SubscriptDecl>(this);
+    OS << " name=" << SD->getName();
+    if (SD->hasType())
+      OS << " : " << SD->getType();
     else
       OS << " : (no type set)";
     break;
@@ -803,13 +834,7 @@ void IterableDeclContext::loadAllMembers() const {
     break;
   }
 
-  bool hasMissingRequiredMembers = false;
-  resolver->loadAllMembers(const_cast< Decl *>(container), contextData,
-                           &hasMissingRequiredMembers);
-
-  if (hasMissingRequiredMembers)
-    if (auto proto = dyn_cast<ProtocolDecl>(this))
-      const_cast<ProtocolDecl *>(proto)->setHasMissingRequirements(true);
+  resolver->loadAllMembers(const_cast< Decl *>(container), contextData);
 
   --NumUnloadedLazyIterableDeclContexts;
 }

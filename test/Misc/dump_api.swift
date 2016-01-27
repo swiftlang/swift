@@ -15,7 +15,7 @@ public class _AnyGeneratorBase {}
 ///
 ///     struct AnySequence<S: SequenceType>
 ///     func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
-///     func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
+///     func anyGenerator<T>(nextImplementation: () -> T?) -> AnyGenerator<T>
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.

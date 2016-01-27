@@ -20,7 +20,7 @@ enum Z {
   init(_ x: Int, _ y: Int) { self = .point(x, y) }
 }
 
-enum Optional<T> {
+enum Optional<T> {  // expected-note {{'T' declared as parameter to type 'Optional'}}
   case none
   case value(T)
 
@@ -57,7 +57,7 @@ acceptString("\(hello), \(world) #\(i)!")
 Optional<Int>(1) // expected-warning{{unused}}
 Optional(1) // expected-warning{{unused}}
 _ = .none as Optional<Int>
-Optional(.none) // expected-error{{type of expression is ambiguous without more context}}
+Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}}
 
 // Interpolation
 "\(hello), \(world) #\(i)!"

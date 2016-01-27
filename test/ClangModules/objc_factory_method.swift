@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target x86_64-apple-macosx10.10 -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target x86_64-apple-macosx10.51 -parse %s -verify
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
@@ -38,30 +38,30 @@ func testFactoryWithLaterIntroducedInit() {
 
   // Don't prefer more available convenience factory initializer over less
   // available designated initializer
-  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} 
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.52 or newer}} 
     // expected-note @-1 {{add 'if #available' version check}}
     // expected-note @-2 {{add @available attribute to enclosing global function}}
   
-  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}}
-  // expected-note @-1 {{add 'if #available' version check}}  {{3-63=if #available(OSX 10.11, *) {\n      _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5)\n  \} else {\n      // Fallback on earlier versions\n  \}}}
-  // expected-note @-2 {{add @available attribute to enclosing global function}} {{1-1=@available(OSX 10.11, *)\n}}
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.52 or newer}}
+  // expected-note @-1 {{add 'if #available' version check}}  {{3-63=if #available(OSX 10.52, *) {\n      _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5)\n  \} else {\n      // Fallback on earlier versions\n  \}}}
+  // expected-note @-2 {{add @available attribute to enclosing global function}} {{1-1=@available(OSX 10.52, *)\n}}
 
   
   // Don't prefer more available factory initializer over less
   // available designated initializer
-  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} 
+  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.52 or newer}} 
   // expected-note @-1 {{add 'if #available' version check}}
   // expected-note @-2 {{add @available attribute to enclosing global function}}
 
-  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}} 
+  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.52 or newer}} 
   // expected-note @-1 {{add 'if #available' version check}}
   // expected-note @-2 {{add @available attribute to enclosing global function}}
 
 
   // When both a convenience factory and a convenience initializer have the
   // same availability, choose the convenience initializer.
-  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flim:5) // expected-warning {{'init(flim:)' was deprecated in OS X 10.10: ConvenienceInit}}
-  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flam:5) // expected-warning {{'init(flam:)' was deprecated in OS X 10.10: ConvenienceInit}}
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flim:5) // expected-warning {{'init(flim:)' was deprecated in OS X 10.51: ConvenienceInit}}
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flam:5) // expected-warning {{'init(flam:)' was deprecated in OS X 10.51: ConvenienceInit}}
 
   _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flotsam:5) // expected-warning {{'init(flotsam:)' is deprecated: ConvenienceInit}}
   _ = NSHavingConvenienceFactoryAndSameConvenienceInit(jetsam:5) // expected-warning {{'init(jetsam:)' is deprecated: ConvenienceInit}}

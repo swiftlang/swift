@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -28,6 +28,10 @@ enum class RequirementKind : unsigned int {
   /// A conformance requirement T : P, where T is a type that depends
   /// on a generic parameter and P is a protocol to which T must conform.
   Conformance,
+  /// A superclass requirement T : C, where T is a type that depends
+  /// on a generic parameter and C is a concrete class type which T must
+  /// equal or be a subclass of.
+  Superclass,
   /// A same-type requirement T == U, where T and U are types that shall be
   /// equivalent.
   SameType,

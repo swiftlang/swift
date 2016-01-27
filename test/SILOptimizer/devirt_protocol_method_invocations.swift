@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
 public protocol Foo { 
-  func foo(x:Int)->Int
+  func foo(x:Int) -> Int
 }
 
 public extension Foo {
@@ -25,17 +25,17 @@ public class C : Foo {
 }
 
 @_transparent
-func callfoo(f: Foo)->Int {
+func callfoo(f: Foo) -> Int {
   return f.foo(2) + f.foo(2)
 }
 
 @_transparent
-func callboo(f: Foo)->Int32 {
+func callboo(f: Foo) -> Int32 {
   return f.boo(2) + f.boo(2)
 }
 
 @_transparent
-func callGetSelf(f: Foo)->Foo {
+func callGetSelf(f: Foo) -> Foo {
   return f.getSelf()
 }
 
@@ -64,7 +64,7 @@ func callGetSelf(f: Foo)->Foo {
 // CHECK: apply
 // CHECK: br bb1(
 @inline(never)
-public func test_devirt_protocol_method_invocation(c: C)->Int {
+public func test_devirt_protocol_method_invocation(c: C) -> Int {
   return callfoo(c)
 }
 
@@ -84,7 +84,7 @@ public func test_devirt_protocol_method_invocation(c: C)->Int {
 // CHECK: integer_literal
 // CHECK: return
 @inline(never)
-public func test_devirt_protocol_extension_method_invocation(c: C)->Int32 {
+public func test_devirt_protocol_extension_method_invocation(c: C) -> Int32 {
   return callboo(c)
 }
 
@@ -129,3 +129,40 @@ class PP : CP {
 }
 
 callDynamicSelfClassExistential(PP())
+
+// Make sure we handle indirect conformances.
+// rdar://24114020
+protocol Base {
+  var x: Int { get }
+}
+protocol Derived : Base {
+}
+struct SimpleBase : Derived {
+  var x: Int
+}
+public func test24114020() -> Int {
+  let base: Derived = SimpleBase(x: 1)
+  return base.x
+}
+// It's not obvious why this isn't completely devirtualized.
+// CHECK: sil @_TF34devirt_protocol_method_invocations12test24114020FT_Si
+// CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
+// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
+// CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
+// CHECK:   return [[T2]]
+
+protocol StaticP {
+  static var size: Int { get }
+}
+struct HasStatic<T> : StaticP {
+  static var size: Int { return sizeof(T.self) }
+}
+public func testExMetatype() -> Int {
+  let type: StaticP.Type = HasStatic<Int>.self
+  return type.size
+}
+// CHECK: sil @_TF34devirt_protocol_method_invocations14testExMetatypeFT_Si
+// CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
+// CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
+// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
+// CHECK:   return [[T2]] : $Int

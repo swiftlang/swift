@@ -1,8 +1,8 @@
-//===--- ManagedValue.cpp - Value with cleanup ------------------*- C++ -*-===//
+//===--- ManagedValue.cpp - Value with cleanup ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -92,7 +92,7 @@ void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
                                SILValue address) {
   if (hasCleanup())
     forwardCleanup(gen);
-  auto &addrTL = gen.getTypeLowering(address.getType());
+  auto &addrTL = gen.getTypeLowering(address->getType());
   gen.emitSemanticStore(loc, getValue(), address, addrTL, IsInitialization);
 }
 
@@ -101,7 +101,7 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
   if (hasCleanup())
     forwardCleanup(gen);
   
-  auto &addrTL = gen.getTypeLowering(address.getType());
+  auto &addrTL = gen.getTypeLowering(address->getType());
   gen.emitSemanticStore(loc, getValue(), address, addrTL,
                         IsNotInitialization);
 }

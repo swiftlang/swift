@@ -1123,7 +1123,7 @@ label if it is a named pattern or a type annotation of a named pattern.
 
 A tuple pattern whose body ends in ``'...'`` is a varargs tuple.  The last
 element of such a tuple must be a typed pattern, and the type of that pattern
-is changed from ``T`` to ``T[]``.  The corresponding tuple type for a varargs
+is changed from ``T`` to ``[T]``.  The corresponding tuple type for a varargs
 tuple is a varargs tuple type.
 
 As a special case, a tuple pattern with one element that has no label, has no
@@ -1150,7 +1150,7 @@ appear in declarations.
   class D1 : B {}
   class D2 : B {}
 
-  var bs : B[] = [B(), D1(), D2()]
+  var bs : [B] = [B(), D1(), D2()]
 
   for b in bs {
     switch b {
@@ -1537,8 +1537,8 @@ Short Circuiting Logical Operators
 
 ::
 
-  func && (lhs: Bool, rhs: ()->Bool) -> Bool
-  func || (lhs: Bool, rhs: ()->Bool) -> Bool
+  func && (lhs: Bool, rhs: () -> Bool) -> Bool
+  func || (lhs: Bool, rhs: () -> Bool) -> Bool
 
 Swift has a simplified precedence levels when compared with C.  From highest to
 lowest:

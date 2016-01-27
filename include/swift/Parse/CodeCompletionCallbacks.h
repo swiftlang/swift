@@ -1,8 +1,8 @@
-//===- CodeCompletionCallbacks.h - Parser's interface to code completion --===//
+//===--- CodeCompletionCallbacks.h - Parser's interface to code completion ===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -169,6 +169,8 @@ public:
   virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
 
   virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
+
+  virtual void completeGenericParams(TypeLoc TL) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

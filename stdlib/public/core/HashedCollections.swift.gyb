@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -201,10 +201,10 @@ import SwiftShims
 /// This protocol is only used for compile-time checks that
 /// every storage type implements all required operations.
 internal protocol _HashStorageType {
-  typealias Key
-  typealias Value
-  typealias Index
-  typealias SequenceElement
+  associatedtype Key
+  associatedtype Value
+  associatedtype Index
+  associatedtype SequenceElement
   var startIndex: Index { get }
   var endIndex: Index { get }
 
@@ -561,30 +561,13 @@ public struct Set<Element : Hashable> :
   public func intersect<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Set<Element> {
-
-    // Attempt to iterate the smaller between `self` and `sequence`.
-    // If sequence is not a set, iterate over it because it may be single-pass.
+    let other = sequence as? Set<Element> ?? Set(sequence)
     var newSet = Set<Element>()
-
-    if let other = sequence as? Set<Element> {
-      let smaller: Set<Element>
-      let bigger: Set<Element>
-      if other.count > count {
-        smaller = self
-        bigger = other
-      } else {
-        smaller = other
-        bigger = self
-      }
-      for element in smaller where bigger.contains(element) {
-        newSet.insert(element)
-      }
-    } else {
-      for element in sequence where contains(element) {
-        newSet.insert(element)
+    for member in self {
+      if other.contains(member) {
+        newSet.insert(member)
       }
     }
-
     return newSet
   }
 
@@ -730,15 +713,18 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
     }
 
     let endIndex = lhsNative.endIndex
-    for var i = lhsNative.startIndex; i != endIndex; i = i.successor() {
+    var i = lhsNative.startIndex
+    while i != endIndex {
       let key = lhsNative.assertingGet(i)
       let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
       if let rhsValue = optRhsValue {
         if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
+          i = i.successor()
           continue
         }
       }
+      i = i.successor()
       return false
     }
     return true
@@ -1247,16 +1233,18 @@ public func == <Key : Equatable, Value : Equatable>(
     }
 
     let endIndex = lhsNative.endIndex
-    for var index = lhsNative.startIndex; index != endIndex;
-        index._successorInPlace() {
+    var index = lhsNative.startIndex
+    while index != endIndex {
       let (key, value) = lhsNative.assertingGet(index)
       let optRhsValue: AnyObject? =
         rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
       if let rhsValue = optRhsValue {
         if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
+          index._successorInPlace()
           continue
         }
       }
+      index._successorInPlace()
       return false
     }
     return true
@@ -1330,7 +1318,7 @@ internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionaryType)
 }
 #endif
 
-//===--- Compiler conversion/casting entry points for Dictionary<Key, Value> =//
+//===--- Compiler conversion/casting entry points for Dictionary<K, V> ----===//
 
 #if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
@@ -1437,7 +1425,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   switch source._variantStorage {
   case .Native(let nativeOwner):
     // FIXME(performance): this introduces an indirection through Objective-C
-    // runtime, even though we access native storage.  But we can not
+    // runtime, even though we access native storage.  But we cannot
     // unsafeBitCast the owner object, because that would change the generic
     // arguments.
     //
@@ -2130,7 +2118,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
-    for var i = 0; i != capacity; ++i {
+    for i in 0..<capacity {
       if isInitializedEntry(i) {
         let key = keyAt(i)
         result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
@@ -2248,7 +2236,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
         continue
       }
       nativeStorage.initializeKey(key, at: i.offset)
-      ++count
+      count += 1
     }
     nativeStorage.count = count
 
@@ -2269,7 +2257,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 #if _runtime(_ObjC)
 /// Storage for bridged `${Self}` elements.  We could have used
-/// `${Self}<${AnyTypeParameters}>`, but `AnyObject` can not be a Key because
+/// `${Self}<${AnyTypeParameters}>`, but `AnyObject` cannot be a Key because
 /// it is not `Hashable`.
 internal struct _BridgedNative${Self}Storage {
   internal typealias StorageImpl =
@@ -2618,7 +2606,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     let bridged = _createBridgedNativeStorage(nativeStorage.capacity)
 
     // Bridge everything.
-    for var i = 0; i < nativeStorage.capacity; ++i {
+    for i in 0..<nativeStorage.capacity {
       if nativeStorage.isInitializedEntry(i) {
         let key = _bridgeToObjectiveCUnconditional(nativeStorage.keyAt(i))
 %if Self == 'Set':
@@ -2701,9 +2689,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
         while position < count {
           if bridgedNativeStorage.isInitializedEntry(position) {
             unmanagedObjects[i] = bridgedNativeStorage.valueAt(position)
-            i++
+            i += 1
           }
-          position++
+          position += 1
         }
       }
     } else {
@@ -2712,9 +2700,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
         while position < count {
           if bridgedNativeStorage.isInitializedEntry(position) {
             unmanagedKeys[i] = bridgedNativeStorage.keyAt(position)
-            i++
+            i += 1
           }
-          position++
+          position += 1
         }
       } else {
         // keys nonnull, objects nonnull
@@ -2722,9 +2710,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
           if bridgedNativeStorage.isInitializedEntry(position) {
             unmanagedObjects[i] = bridgedNativeStorage.valueAt(position)
             unmanagedKeys[i] = bridgedNativeStorage.keyAt(position)
-            i++
+            i += 1
           }
-          position++
+          position += 1
         }
       }
     }
@@ -2783,7 +2771,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
       let bridgedKey: AnyObject = _getBridgedKey(currIndex)
       unmanagedObjects[i] = bridgedKey
-      ++stored
+      stored += 1
       currIndex._successorInPlace()
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
@@ -2877,19 +2865,19 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
   }
 
   internal mutating func updateValue(value: Value, forKey: Key) -> Value? {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal mutating func removeAtIndex(index: Index) -> SequenceElement {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal mutating func removeValueForKey(key: Key) -> Value? {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal var count: Int {
@@ -2927,7 +2915,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   @_transparent
   internal var guaranteedNative: Bool {
-    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
 
   @warn_unused_result
@@ -3068,6 +3056,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   internal typealias Index = ${Self}Index<${TypeParameters}>
 
   internal var startIndex: Index {
+    if _fastPath(guaranteedNative) {
+      return ._Native(native.startIndex)
+    }
+
     switch self {
     case .Native:
       return ._Native(native.startIndex)
@@ -3081,6 +3073,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   }
 
   internal var endIndex: Index {
+    if _fastPath(guaranteedNative) {
+      return ._Native(native.endIndex)
+    }
+
     switch self {
     case .Native:
       return ._Native(native.endIndex)
@@ -3095,6 +3091,13 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   @warn_unused_result
   internal func indexForKey(key: Key) -> Index? {
+    if _fastPath(guaranteedNative) {
+      if let nativeIndex = native.indexForKey(key) {
+        return ._Native(nativeIndex)
+      }
+      return nil
+    }
+
     switch self {
     case .Native:
       if let nativeIndex = native.indexForKey(key) {
@@ -3116,6 +3119,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   @warn_unused_result
   internal func assertingGet(i: Index) -> SequenceElement {
+    if _fastPath(guaranteedNative) {
+      return native.assertingGet(i._nativeIndex)
+    }
+
     switch self {
     case .Native:
       return native.assertingGet(i._nativeIndex)
@@ -3140,6 +3147,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   @warn_unused_result
   internal func assertingGet(key: Key) -> Value {
+    if _fastPath(guaranteedNative) {
+      return native.assertingGet(key)
+    }
+
     switch self {
     case .Native:
       return native.assertingGet(key)
@@ -3170,6 +3181,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   @warn_unused_result
   internal func maybeGet(key: Key) -> Value? {
+    if _fastPath(guaranteedNative) {
+      return native.maybeGet(key)
+    }
+
     switch self {
     case .Native:
       return native.maybeGet(key)
@@ -3204,7 +3219,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       native.setKey(key, at: i.offset)
     } else {
       native.initializeKey(key, at: i.offset)
-      ++native.count
+      native.count += 1
     }
 %elif Self == 'Dictionary':
     let oldValue: Value? = found ? native.valueAt(i.offset) : nil
@@ -3212,7 +3227,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       native.setKey(key, value: value, at: i.offset)
     } else {
       native.initializeKey(key, value: value, at: i.offset)
-      ++native.count
+      native.count += 1
     }
 %end
 
@@ -3251,7 +3266,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
     // remove the element
     nativeStorage.destroyEntryAt(offset)
-    --nativeStorage.count
+    nativeStorage.count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
@@ -3265,10 +3280,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole
-    for var b = nativeStorage._next(lastInChain);
-      nativeStorage.isInitializedEntry(b);
-      b = nativeStorage._next(b) {
+    var b = nativeStorage._next(lastInChain)
+    while nativeStorage.isInitializedEntry(b) {
       lastInChain = b
+      b = nativeStorage._next(b)
     }
 
     // Relocate out-of-place elements in the chain, repeating until
@@ -3276,8 +3291,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     while hole != lastInChain {
       // Walk backwards from the end of the chain looking for
       // something out-of-place.
-      var b: Int
-      for b = lastInChain; b != hole; b = nativeStorage._prev(b) {
+      var b = lastInChain
+      while b != hole {
         let idealBucket = nativeStorage._bucket(nativeStorage.keyAt(b))
 
         // Does this element belong between start and hole?  We need
@@ -3288,6 +3303,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
         if start <= hole ? (c0 && c1) : (c0 || c1) {
           break // Found it
         }
+        b = nativeStorage._prev(b)
       }
 
       if b == hole { // No out-of-place elements found; we're done adjusting
@@ -3411,21 +3427,27 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     }
   }
 
-  internal mutating func nativeKeepCapacityRemoveAll() {
+  internal mutating func nativeRemoveAll() {
+    var nativeStorage = native
+
+    // FIXME(performance): if the storage is non-uniquely referenced, we
+    // shouldn't be copying the elements into new storage and then immediately
+    // deleting the elements. We should detect that the storage is not uniquely
+    // referenced and allocate new empty storage of appropriate capacity.
 
     // We have already checked for the empty dictionary case, so we will always
     // mutating the dictionary storage.  Request unique storage.
+    let (reallocated, _) = ensureUniqueNativeStorage(nativeStorage.capacity)
+    if reallocated {
+      nativeStorage = native
+    }
 
-    if !isUniquelyReferenced() {
-      self = .Native(NativeStorageOwner(minimumCapacity: native.capacity))
-    } else {
-      for b in 0..<native.capacity {
-        if native.isInitializedEntry(b) {
-          native.destroyEntryAt(b)
-        }
+    for b in 0..<nativeStorage.capacity {
+      if nativeStorage.isInitializedEntry(b) {
+        nativeStorage.destroyEntryAt(b)
       }
     }
-    native.count = 0
+    nativeStorage.count = 0
   }
 
   internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
@@ -3439,13 +3461,13 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     }
 
     if _fastPath(guaranteedNative) {
-      nativeKeepCapacityRemoveAll()
+      nativeRemoveAll()
       return
     }
 
     switch self {
     case .Native:
-      nativeKeepCapacityRemoveAll()
+      nativeRemoveAll()
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       self = .Native(NativeStorage.Owner(minimumCapacity: cocoaStorage.count))
@@ -3456,6 +3478,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   }
 
   internal var count: Int {
+    if _fastPath(guaranteedNative) {
+      return native.count
+    }
+
     switch self {
     case .Native:
       return native.count
@@ -3521,7 +3547,7 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
         break
       }
       // end workaround
-      ++i
+      i += 1
     }
     return NativeIndex(nativeStorage: nativeStorage, offset: i)
   }
@@ -3595,7 +3621,7 @@ internal struct _Cocoa${Self}Index : ForwardIndexType, Comparable {
   @warn_unused_result
   internal func successor() -> _Cocoa${Self}Index {
     _precondition(
-      currentKeyIndex < allKeys.value, "can not increment endIndex")
+      currentKeyIndex < allKeys.value, "cannot increment endIndex")
     return _Cocoa${Self}Index(cocoa${Self}, allKeys, currentKeyIndex + 1)
   }
 }
@@ -3603,7 +3629,7 @@ internal struct _Cocoa${Self}Index : ForwardIndexType, Comparable {
 @warn_unused_result
 internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
   _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "can not compare indexes pointing to different ${Self}s")
+    "cannot compare indexes pointing to different ${Self}s")
   _precondition(lhs.allKeys.value == rhs.allKeys.value,
     "one or both of the indexes have been invalidated")
 
@@ -3613,7 +3639,7 @@ internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
 @warn_unused_result
 internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
   _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "can not compare indexes pointing to different ${Self}s")
+    "cannot compare indexes pointing to different ${Self}s")
   _precondition(lhs.allKeys.value == rhs.allKeys.value,
     "one or both of the indexes have been invalidated")
 
@@ -3659,7 +3685,7 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
   // not support NSCopying, and fast enumeration does not document that it is
-  // safe to copy the state.  So, we can not implement Index that is a value
+  // safe to copy the state.  So, we cannot implement Index that is a value
   // type for bridged NS${Self} in terms of Cocoa enumeration facilities.
 
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
@@ -3782,7 +3808,7 @@ public func < <${TypeParametersDecl}> (
 final internal class _Cocoa${Self}Generator : GeneratorType {
   internal typealias Element = ${AnySequenceType}
 
-  // Cocoa ${Self} generator has to be a class, otherwise we can not
+  // Cocoa ${Self} generator has to be a class, otherwise we cannot
   // guarantee that the fast enumeration struct is pinned to a certain memory
   // location.
 
@@ -3807,7 +3833,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
     return UnsafeMutablePointer(_fastEnumerationStatePtr + 1)
   }
 
-  // These members have to be word-sized integers, they can not be limited to
+  // These members have to be word-sized integers, they cannot be limited to
   // Int8 just because our buffer holds 16 elements: fast enumeration is
   // allowed to return inner pointers to the container, which can be much
   // larger.
@@ -3843,7 +3869,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
       UnsafeMutablePointer(_fastEnumerationState.itemsPtr)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
-    ++itemIndex
+    itemIndex += 1
 %if Self == 'Set':
     return key
 %elif Self == 'Dictionary':
@@ -3916,7 +3942,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
 %if Self == 'Set':
     return _canBeClass(Element.self) == 0
 %elif Self == 'Dictionary':
-    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
 %end
   }
 
@@ -4105,13 +4131,13 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
   public mutating func add(key newKey: Key, value: Value) {
     _nativeStorage.unsafeAddNew(key: newKey, value: value)
 %end
-    _actualCount++
+    _actualCount += 1
   }
 
   @warn_unused_result
   public mutating func take() -> ${Self}<${TypeParameters}> {
     _precondition(_actualCount >= 0,
-      "can not take the result twice")
+      "cannot take the result twice")
     _precondition(_actualCount == _requestedCount,
       "the number of members added does not match the promised count")
 

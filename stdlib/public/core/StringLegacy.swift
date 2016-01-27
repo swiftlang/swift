@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -163,8 +163,8 @@ extension String {
     return String(rng[startIndex..<rng.endIndex])
   }
 
-  /// Split the given string at the given delimiter character, returning 
-  /// the strings before and after that character (neither includes the character
+  /// Split the given string at the given delimiter character, returning the
+  /// strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
   public func _splitFirst(delim: UnicodeScalar)
     -> (before: String, after: String, wasFound : Bool)
@@ -182,8 +182,8 @@ extension String {
 
   /// Split the given string at the first character for which the given
   /// predicate returns true. Returns the string before that character, the 
-  /// character that matches, the string after that character, and a boolean value
-  /// indicating whether any character was found.
+  /// character that matches, the string after that character,
+  /// and a boolean value indicating whether any character was found.
   public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {

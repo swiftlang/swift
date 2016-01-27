@@ -218,11 +218,11 @@ func != <T>(lhs : T, rhs : NoneType) -> Bool { // expected-error{{invalid redecl
 }
 
 // <rdar://problem/15082356>
-func &&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool { // expected-note{{previously declared}}
+func &&(lhs: BooleanType, @autoclosure rhs: () -> BooleanType) -> Bool { // expected-note{{previously declared}}
   return lhs.boolValue && rhs().boolValue
 }
 
-func &&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
+func &&(lhs: BooleanType, @autoclosure rhs: () -> BooleanType) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
   return lhs.boolValue || rhs().boolValue
 }
 
@@ -296,4 +296,23 @@ enum EnumWithMutating {
   mutating func test1() { } // expected-note {{previously declared}}
   func test1() { } // expected-error{{invalid redeclaration of 'test1()'}}
 }
+
+// <rdar://problem/21783216> Ban members named Type and Protocol without backticks
+// https://twitter.com/jadengeller/status/619989059046240256
+protocol r21783216a {
+  // expected-error @+2 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-note @+1 {{backticks can escape this name if it is important to use}} {{18-22=`Type`}}
+  associatedtype Type
+  
+  // expected-error @+2 {{type member may not be named 'Protocol', since it would conflict with the 'foo.Protocol' expression}}
+  // expected-note @+1 {{backticks can escape this name if it is important to use}} {{18-26=`Protocol`}}
+  associatedtype Protocol
+}
+
+protocol r21783216b {
+  associatedtype `Type`  // ok
+  associatedtype `Protocol` // ok
+}
+
+
 

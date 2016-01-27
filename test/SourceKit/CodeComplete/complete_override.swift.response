@@ -2,6 +2,15 @@
   key.results: [
     {
       key.kind: source.lang.swift.keyword,
+      key.name: "associatedtype",
+      key.sourcetext: "associatedtype",
+      key.description: "associatedtype",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
       key.name: "class",
       key.sourcetext: "class",
       key.description: "class",
@@ -57,9 +66,7 @@
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "f(getMe a: Int, b: Double)",
-      key.sourcetext: "override func f(getMe a: Int, b: Double) {
-<#code#>
-}",
+      key.sourcetext: "override func f(getMe a: Int, b: Double) {\n<#code#>\n}",
       key.description: "f(getMe a: Int, b: Double)",
       key.typename: "",
       key.context: source.codecompletion.context.superclass,
@@ -115,9 +122,7 @@
     {
       key.kind: source.lang.swift.decl.function.constructor,
       key.name: "init()",
-      key.sourcetext: "init() {
-<#code#>
-}",
+      key.sourcetext: "init() {\n<#code#>\n}",
       key.description: "init()",
       key.typename: "",
       key.context: source.codecompletion.context.superclass,

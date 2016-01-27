@@ -17,6 +17,7 @@ add_swift_library(swiftClangImporter
   SwiftLookupTable.cpp
   LINK_LIBRARIES
     swiftAST
+    swiftParse
 )
 
 

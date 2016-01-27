@@ -46,7 +46,7 @@ class GenericClass {
   }
 
   // CHECK: [[@LINE+2]]:3 s:iC14swift_ide_test12GenericClass9subscriptFSiSf{{$}}
-  // CHECK: [[@LINE+1]]:13 s:vC14swift_ide_test12GenericClass1iSi{{$}}
+  // CHECK: [[@LINE+1]]:13 s:vC14swift_ide_test12GenericClassL_1iSi{{$}}
   subscript(i: Int) -> Float {
     // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test12GenericClassg9subscriptFSiSf{{$}}
     get { return 0.0 }
@@ -68,8 +68,8 @@ class GenericClass {
 
 // CHECK: [[@LINE+1]]:10 s:P14swift_ide_test4Prot{{$}}
 protocol Prot {
-  // CHECK: [[@LINE+1]]:13 s:P14swift_ide_test4Prot5Blarg{{$}}
-  typealias Blarg
+  // CHECK: [[@LINE+1]]:18 s:P14swift_ide_test4Prot5Blarg{{$}}
+  associatedtype Blarg
   // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethFwx5BlargwxS1_{{$}}
   func protMeth(x: Blarg) -> Blarg
   // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}

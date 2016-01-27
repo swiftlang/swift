@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -49,74 +49,101 @@ protected:
 public:
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                       SILType T) const override {
-    emitAssignWithCopyCall(IGF, T,
-                           dest.getAddress(), src.getAddress());
+    emitAssignWithCopyCall(IGF, T, dest, src);
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                       SILType T) const override {
-    emitAssignWithTakeCall(IGF, T,
-                           dest.getAddress(), src.getAddress());
+    emitAssignWithTakeCall(IGF, T, dest, src);
+  }
+
+  Address allocateBuffer(IRGenFunction &IGF, Address buffer,
+                         SILType T) const override {
+    auto addr = emitAllocateBufferCall(IGF, T, buffer);
+    return this->getAddressForPointer(addr);
+  }
+
+  Address projectBuffer(IRGenFunction &IGF, Address buffer,
+                        SILType T) const override {
+    auto addr = emitProjectBufferCall(IGF, T, buffer);
+    return this->getAddressForPointer(addr);
+  }
+
+  void destroyBuffer(IRGenFunction &IGF, Address buffer,
+                     SILType T) const override {
+    emitDestroyBufferCall(IGF, T, buffer);
+  }
+
+  void deallocateBuffer(IRGenFunction &IGF, Address buffer,
+                        SILType T) const override {
+    emitDeallocateBufferCall(IGF, T, buffer);
+  }
+
+  Address initializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
+                                   Address dest, Address src,
+                                   SILType T) const override {
+    auto addr = emitInitializeBufferWithCopyOfBufferCall(IGF, T, dest, src);
+    return this->getAddressForPointer(addr);
+  }
+
+  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
+                                   Address dest, Address src,
+                                   SILType T) const override {
+    auto addr = emitInitializeBufferWithTakeOfBufferCall(IGF, T, dest, src);
+    return this->getAddressForPointer(addr);
   }
 
   Address initializeBufferWithCopy(IRGenFunction &IGF,
                                    Address dest, Address src,
                                    SILType T) const override {
-    auto addr = emitInitializeBufferWithCopyCall(IGF, T,
-                                         dest.getAddress(), src.getAddress());
+    auto addr = emitInitializeBufferWithCopyCall(IGF, T, dest, src);
     return this->getAddressForPointer(addr);
   }
 
   Address initializeBufferWithTake(IRGenFunction &IGF,
                                    Address dest, Address src,
                                    SILType T) const override {
-    auto addr = emitInitializeBufferWithTakeCall(IGF, T,
-                                         dest.getAddress(), src.getAddress());
+    auto addr = emitInitializeBufferWithTakeCall(IGF, T, dest, src);
     return this->getAddressForPointer(addr);
   }
 
   void initializeWithCopy(IRGenFunction &IGF,
                         Address dest, Address src, SILType T) const override {
-    emitInitializeWithCopyCall(IGF, T,
-                               dest.getAddress(), src.getAddress());
+    emitInitializeWithCopyCall(IGF, T, dest, src);
   }
 
   void initializeArrayWithCopy(IRGenFunction &IGF,
                                Address dest, Address src, llvm::Value *count,
                                SILType T) const override {
-    emitInitializeArrayWithCopyCall(IGF, T,
-                               dest.getAddress(), src.getAddress(), count);
+    emitInitializeArrayWithCopyCall(IGF, T, dest, src, count);
   }
 
   void initializeWithTake(IRGenFunction &IGF,
                         Address dest, Address src, SILType T) const override {
-    emitInitializeWithTakeCall(IGF, T,
-                               dest.getAddress(), src.getAddress());
+    emitInitializeWithTakeCall(IGF, T, dest, src);
   }
 
   void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                           Address dest, Address src,
                                           llvm::Value *count,
                                           SILType T) const override {
-    emitInitializeArrayWithTakeFrontToBackCall(IGF, T,
-                                  dest.getAddress(), src.getAddress(), count);
+    emitInitializeArrayWithTakeFrontToBackCall(IGF, T, dest, src, count);
   }
 
   void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                           Address dest, Address src,
                                           llvm::Value *count,
                                           SILType T) const override {
-    emitInitializeArrayWithTakeBackToFrontCall(IGF, T,
-                                  dest.getAddress(), src.getAddress(), count);
+    emitInitializeArrayWithTakeBackToFrontCall(IGF, T, dest, src, count);
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-    emitDestroyCall(IGF, T, addr.getAddress());
+    emitDestroyCall(IGF, T, addr);
   }
 
   void destroyArray(IRGenFunction &IGF, Address addr, llvm::Value *count,
                     SILType T) const override {
-    emitDestroyArrayCall(IGF, T, addr.getAddress(), count);
+    emitDestroyArrayCall(IGF, T, addr, count);
   }
 
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -125,13 +152,13 @@ public:
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src,
                                        SILType T) const override {
-    return emitGetExtraInhabitantIndexCall(IGF, T, src.getAddress());
+    return emitGetExtraInhabitantIndexCall(IGF, T, src);
   }
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
                             Address dest,
                             SILType T) const override {
-    emitStoreExtraInhabitantCall(IGF, T, index, dest.getAddress());
+    emitStoreExtraInhabitantCall(IGF, T, index, dest);
   }
 
   void initializeMetadata(IRGenFunction &IGF,

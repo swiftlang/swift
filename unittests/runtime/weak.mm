@@ -1,8 +1,8 @@
-//===- swift/unittests/runtime/weak.mm - Weak-pointer tests ---------------===//
+//===--- weak.mm - Weak-pointer tests -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -40,7 +40,7 @@ static HeapObject *make_objc_object() {
 extern "C" HeapObject *make_swift_object();
 
 static unsigned getUnownedRetainCount(HeapObject *object) {
-  return swift_unownedRetainCount(object) - 1;
+  return object->weakRefCount.getCount() - 1;
 }
 
 static void unknown_release(void *value) {

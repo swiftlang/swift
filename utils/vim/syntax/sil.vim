@@ -9,6 +9,9 @@ syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
+syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
+syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
+
 syn match swiftLineComment   /^#!.*/
 syn match swiftTypeName  /\<[A-Z][a-zA-Z_0-9]*\>/
 syn match swiftDecimal /\<[-]\?[0-9]\+\>/
@@ -24,7 +27,7 @@ syn keyword swiftKeyword public hidden private shared public_external hidden_ext
 syn keyword swiftKeyword getter setter allocator initializer enumelt destroyer globalaccessor objc skipwhite
 syn keyword swiftKeyword alloc_stack alloc_ref alloc_ref_dynamic alloc_box dealloc_stack dealloc_box dealloc_ref skipwhite
 syn keyword swiftKeyword debug_value debug_value_addr skipwhite
-syn keyword swiftKeyword load store assign  mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer to skipwhite
+syn keyword swiftKeyword load store assign mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer to skipwhite
 syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_weak fix_lifetime skipwhite
 syn keyword swiftKeyword function_ref integer_literal float_literal string_literal global_addr skipwhite
 syn keyword swiftKeyword class_method super_method witness_method dynamic_method skipwhite

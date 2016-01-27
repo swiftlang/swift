@@ -2,27 +2,27 @@
 
 func markUsed<T>(t: T) {}
 
-// FIXME: Should be DW_TAG_interface_type
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
-// CHECK-SAME:             identifier: [[PT:"[^"]+"]]
-protocol IGiveOutInts {
+public protocol IGiveOutInts {
   func callMe() -> Int64
 }
 
-class SomeImplementor : IGiveOutInts {
-  init() {} 
-  func callMe() -> Int64 { return 1 }
-}
+// CHECK: define {{.*}}@_TF11protocolarg16printSomeNumbersFPS_12IGiveOutInts_T_
+// CHECK: @llvm.dbg.declare(metadata %P11protocolarg12IGiveOutInts_* %
+// CHECK-SAME:              metadata ![[VAR:.*]], metadata ![[EMPTY:.*]])
+// CHECK: @llvm.dbg.declare(metadata %P11protocolarg12IGiveOutInts_** %
+// CHECK-SAME:              metadata ![[ARG:.*]], metadata ![[DEREF:.*]])
 
-func printSomeNumbers(gen: IGiveOutInts) {
+// FIXME: Should be DW_TAG_interface_type
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
+// CHECK-SAME:             identifier: [[PT:"[^"]+"]]
+
+public func printSomeNumbers(gen: IGiveOutInts) {
   var gen = gen
-  // CHECK: !DILocalVariable(name: "gen", scope{{.*}} line: [[@LINE-1]]
-  // CHECK: !DILocalVariable(name: "gen", arg: 1{{.*}} line: [[@LINE-3]]
-  // CHECK-SAME:             type: ![[PT]]
+  // CHECK: ![[EMPTY]] = !DIExpression()
+  // CHECK: ![[VAR]] = !DILocalVariable(name: "gen", {{.*}} line: [[@LINE-2]]
+  // CHECK: ![[ARG]] = !DILocalVariable(name: "gen", arg: 1,
+  // CHECK-SAME:                        line: [[@LINE-5]], type: ![[PT]]
+  // CHECK: ![[DEREF]] = !DIExpression(DW_OP_deref)
   markUsed(gen.callMe())
 }
-
-var i1 : IGiveOutInts = SomeImplementor()
-
-printSomeNumbers(i1)
 

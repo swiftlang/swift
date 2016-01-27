@@ -11,7 +11,7 @@ class Cat : Panda {
   required init() { }
 
   func getCutenessLevel() -> Int {
-    return 3;
+    return 3
   }
 }
 
@@ -19,7 +19,7 @@ class Veterinarian<T: Panda> {
   func disentangle(t: T) { }
 }
 
-class Anasthesiologist<T: Cat> : Veterinarian<T> { }
+class Anesthesiologist<T: Cat> : Veterinarian<T> { }
 
 func breed<T : Panda>(t: T) { }
 
@@ -41,4 +41,4 @@ func wangle<T : Cat>(t: T.Type) {
 
 feed(Cat())
 wangle(Cat)
-Anasthesiologist<Cat>().disentangle(Cat())
+Anesthesiologist<Cat>().disentangle(Cat())

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,10 +27,7 @@ namespace swift { extern "C" {
 #define bool _Bool
 #endif
 
-bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
-bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
-
-__swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
+bool swift_objc_class_usesNativeSwiftReferenceCounting(const void *);
 
 /// Return an NSString to be used as the Mirror summary of the object
 void *_swift_objCMirrorSummary(const void * nsObject);
@@ -51,7 +48,7 @@ struct Metadata;
   
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
-const struct Metadata *_swift_getSuperclass_nonNull(
+const struct Metadata *swift_class_getSuperclass(
   const struct Metadata *);
   
 void _swift_stdlib_flockfile_stdout(void);

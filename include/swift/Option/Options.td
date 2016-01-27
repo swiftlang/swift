@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -88,6 +88,8 @@ def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
 def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
   InternalDebugOpt,
   HelpText<"With -v, dump information about why files are being rebuilt">;
+def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
+  InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
@@ -215,6 +217,15 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
+
+// Diagnostic control options
+def suppress_warnings : Flag<["-"], "suppress-warnings">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Suppress all warnings">;
+
+def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Treat warnings as errors">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,

@@ -18,8 +18,8 @@ import ObjectiveC
 var NoisyCount = 0
 
 class Noisy {
-  init() { NoisyCount++ }
-  deinit { NoisyCount-- }
+  init() { NoisyCount += 1 }
+  deinit { NoisyCount -= 1 }
 }
 enum SillyError: ErrorType { case JazzHands }
 

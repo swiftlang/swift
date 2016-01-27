@@ -1,8 +1,8 @@
-//===- Utils.h - Misc utilities -------------------------------------------===//
+//===--- Utils.h - Misc utilities -------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -123,6 +123,14 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
+Type getTypeFromMangledTypename(ASTContext &Ctx,
+                                const char *mangled_typename,
+                                std::string &error);
+
+Type getTypeFromMangledSymbolname(ASTContext &Ctx,
+                                  const char *mangled_typename,
+                                  std::string &error);
+
 class XMLEscapingPrinter : public StreamPrinter {
   public:
   XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};
@@ -179,7 +187,6 @@ private:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };
-
 } // namespace ide
 
 class ArchetypeTransformer {

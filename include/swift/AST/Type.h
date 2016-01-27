@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -434,7 +434,7 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
     static swift::CanType getEmptyKey() {
-      return swift::CanType(0);
+      return swift::CanType(nullptr);
     }
     static swift::CanType getTombstoneKey() {
       return swift::CanType(llvm::DenseMapInfo<swift::

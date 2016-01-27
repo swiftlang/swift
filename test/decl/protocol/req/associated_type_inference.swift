@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 protocol P0 {
-  typealias Assoc1 : PSimple // expected-note{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
+  associatedtype Assoc1 : PSimple // expected-note{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
   // expected-note@-1{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
   // expected-note@-2{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
   // expected-note@-3{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
@@ -87,7 +87,7 @@ extension P1 {
 struct X0j : P0, P1 { }
 
 protocol P2 {
-  typealias P2Assoc
+  associatedtype P2Assoc
 
   func h0(x: P2Assoc)
 }
@@ -114,7 +114,7 @@ struct X0m : P0, P2 {
 
 // Inference from properties.
 protocol PropertyP0 {
-  typealias Prop : PSimple // expected-note{{unable to infer associated type 'Prop' for protocol 'PropertyP0'}}
+  associatedtype Prop : PSimple // expected-note{{unable to infer associated type 'Prop' for protocol 'PropertyP0'}}
   var property: Prop { get }
 }
 
@@ -128,8 +128,8 @@ struct XProp0b : PropertyP0 { // expected-error{{type 'XProp0b' does not conform
 
 // Inference from subscripts
 protocol SubscriptP0 {
-  typealias Index
-  typealias Element : PSimple // expected-note{{unable to infer associated type 'Element' for protocol 'SubscriptP0'}}
+  associatedtype Index
+  associatedtype Element : PSimple // expected-note{{unable to infer associated type 'Element' for protocol 'SubscriptP0'}}
 
   subscript (i: Index) -> Element { get }
 }
@@ -144,8 +144,8 @@ struct XSubP0b : SubscriptP0 { // expected-error{{type 'XSubP0b' does not confor
 
 // Inference from properties and subscripts
 protocol CollectionLikeP0 {
-  typealias Index
-  typealias Element
+  associatedtype Index
+  associatedtype Element
 
   var startIndex: Index { get }
   var endIndex: Index { get }
@@ -166,7 +166,7 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 
 // rdar://problem/21304164
 public protocol Thenable {
-    typealias T // expected-note{{protocol requires nested type 'T'}}
+    associatedtype T // expected-note{{protocol requires nested type 'T'}}
     func then(success: (_: T) -> T) -> Self
 }
 
@@ -180,8 +180,8 @@ public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>
 
 // rdar://problem/21559670
 protocol P3 {
-  typealias Assoc = Int
-  typealias Assoc2
+  associatedtype Assoc = Int
+  associatedtype Assoc2
   func foo(x: Assoc2) -> Assoc?
 }
 
@@ -200,7 +200,7 @@ struct X4 : P4 { }
 
 // rdar://problem/21738889
 protocol P5 {
-  typealias A = Int
+  associatedtype A = Int
 }
 
 struct X5<T : P5> : P5 {
@@ -208,15 +208,15 @@ struct X5<T : P5> : P5 {
 }
 
 protocol P6 : P5 {
-  typealias A : P5 = X5<Self>
+  associatedtype A : P5 = X5<Self>
 }
 
 extension P6 where A == X5<Self> { }
 
 // rdar://problem/21774092
 protocol P7 {
-  typealias A
-  typealias B
+  associatedtype A
+  associatedtype B
   func f() -> A
   func g() -> B
 }
@@ -243,12 +243,12 @@ struct MyAnyGenerator<T> : MyGeneratorType {
 }
 
 protocol MyGeneratorType {
-  typealias Element
+  associatedtype Element
 }
 
 protocol MySequenceType {
-  typealias Generator : MyGeneratorType
-  typealias SubSequence
+  associatedtype Generator : MyGeneratorType
+  associatedtype SubSequence
 
   func foo() -> SubSequence
   func generate() -> Generator
@@ -279,7 +279,7 @@ protocol P9 : P8 {
 }
 
 protocol P10 {
-  typealias A
+  associatedtype A
 
   func foo() -> A
 }
@@ -306,8 +306,8 @@ func testZ10() -> Z10.A {
 
 // rdar://problem/21926788
 protocol P11 {
-  typealias A
-  typealias B
+  associatedtype A
+  associatedtype B
   func foo() -> B
 }
 

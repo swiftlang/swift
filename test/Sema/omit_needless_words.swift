@@ -30,3 +30,5 @@ extension String {
 class NSArray {
   func arrayByAddingObject(x: AnyObject) -> NSArray { return NSArray() } // expected-warning{{'arrayByAddingObject' could be named 'adding' [-Womit-needless-words]}}{{8-27=adding}}
 }
+
+func emptyFirstParamName(_: Int) { }

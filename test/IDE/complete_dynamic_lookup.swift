@@ -13,11 +13,6 @@
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// FIXME: Redundant with above, except for -enable-swift-name-lookup-tables
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_DOT_1 -enable-swift-name-lookup-tables > %t.dl.txt
-// RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
-
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_NO_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt

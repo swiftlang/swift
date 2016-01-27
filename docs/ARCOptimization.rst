@@ -137,7 +137,7 @@ lower directly to is_unique instructions in SIL.
 The is_unique instruction takes the address of a reference, and
 although it does not actually change the reference, the reference must
 appear mutable to the optimizer. This forces the optimizer to preserve
-a retain distinct from what’s required to maintain lifetime for any of
+a retain distinct from what's required to maintain lifetime for any of
 the reference's source-level copies, because the called function is
 allowed to replace the reference, thereby releasing the
 referent. Consider the following sequence of rules:
@@ -225,6 +225,493 @@ these cases:
 - isUniqueOrPinned_native : <T> (inout T[?]) -> Int1
 
 These builtins perform an implicit cast to NativeObject before
-checking uniqueness. There’s no way at SIL level to cast the address
+checking uniqueness. There's no way at SIL level to cast the address
 of a reference, so we need to encapsulate this operation as part of
 the builtin.
+
+Semantic Tags
+=============
+
+ARC takes advantage of certain semantic tags. This section documents these
+semantics and their meanings.
+
+arc.programtermination_point
+----------------------------
+
+If this semantic tag is applied to a function, then we know that:
+
+- The function does not touch any reference counted objects.
+- After the function is executed, all reference counted objects are leaked
+  (most likely in preparation for program termination).
+
+This allows one, when performing ARC code motion, to ignore blocks that contain
+an apply to this function as long as the block does not have any other side
+effect having instructions.
+
+ARC Sequence Optimization
+=========================
+
+TODO: Fill this in.
+
+ARC Loop Hoisting
+=================
+
+Abstract
+--------
+
+This section describes the ARCLoopHoisting algorithm that hoists retains and
+releases out of loops. This is a high level description that justifies the
+correction of the algorithm and describes its design. In the following
+discussion we talk about the algorithm conceptually and show its safety and
+considerations necessary for good performance.
+
+*NOTE* In the following when we refer to "hoisting", we are not just talking
+about upward code motion of retains, but also downward code motion of releases.
+
+Loop Canonicalization
+---------------------
+
+In the following we assume that all loops are canonicalized such that:
+
+1. The loop has a pre-header.
+2. The loop has one backedge.
+3. All exiting edges have a unique exit block.
+
+Motiviation
+-----------
+
+Consider the following simple loop::
+
+  bb0:
+    br bb1
+
+  bb1:
+    retain %x                    (1)
+    apply %f(%x)
+    apply %f(%x)
+    release %x                   (2)
+    cond_br ..., bb1, bb2
+
+  bb2:
+    return ...
+
+When it is safe to hoist (1),(2) out of the loop? Imagine if we know the trip
+count of the loop is 3 and completely unroll the loop so the whole function is
+one basic block. In such a case, we know the function looks as follows::
+
+  bb0:
+    # Loop Iteration 0
+    retain %x
+    apply %f(%x)
+    apply %f(%x)
+    release %x                   (4)
+
+    # Loop Iteration 1
+    retain %x                    (5)
+    apply %f(%x)
+    apply %f(%x)
+    release %x                   (6)
+
+    # Loop Iteration 2
+    retain %x                    (7)
+    apply %f(%x)
+    apply %f(%x)
+    release %x
+
+    return ...
+
+Notice how (3) can be paired with (4) and (5) can be paired with (6). Assume
+that we eliminate those. Then the function looks as follows::
+
+  bb0:
+    # Loop Iteration 0
+    retain %x
+    apply %f(%x)
+    apply %f(%x)
+
+    # Loop Iteration 1
+    apply %f(%x)
+    apply %f(%x)
+
+    # Loop Iteration 2
+    apply %f(%x)
+    apply %f(%x)
+    release %x
+
+    return ...
+
+We can then re-roll the loop, yielding the following loop::
+
+  bb0:
+    retain %x                    (8)
+    br bb1
+
+  bb1:
+    apply %f(%x)
+    apply %f(%x)
+    cond_br ..., bb1, bb2
+
+  bb2:
+    release %x                   (9)
+    return ...
+
+Notice that this transformation is equivalent to just hoisting (1) and (2) out
+of the loop in the original example. This form of hoisting is what is termed
+"ARCLoopHoisting". What is key to notice is that even though we are performing
+"hoisting" we are actually pairing releases from one iteration with retains in
+the next iteration and then eliminating the pairs. This realization will guide
+our further analysis.
+
+Correctness
+-----------
+
+In this simple loop case, the proof of correctness is very simple to see
+conceptually. But in a more general case, when is safe to perform this
+optimization? We must consider three areas of concern:
+
+1. Are the retains/releases upon the same reference count? This can be found
+   conservatively by using RCIdentityAnalysis.
+
+2. Can we move retains, releases in the unrolled case as we have specified?
+   This is simple since it is always safe to move a retain earlier and a release
+   later in the dynamic execution of a program. This can only extend the life of
+   a variable which is a legal and generally profitable in terms of allowing for
+   this optimization.
+
+3. How do we pair all necessary retains/releases to ensure we do not unbalance
+   retain/release counts in the loop? Consider a set of retains and a set of
+   releases that we wish to hoist out of a loop. We can only hoist the retain,
+   release sets out of the loop if all paths in the given loop region from the
+   entrance to the backedge.  have exactly one retain or release from this set.
+
+4. Any early exits that we must move a retain past or a release by must be
+   compensated appropriately. This will be discussed in the next section.
+
+Assuming that our optimization does all of these things, we should be able to
+hoist with safety.
+
+Compensating Early Exits for Lost Dynamic Reference Counts
+----------------------------------------------------------
+
+Lets say that we have the following loop canonicalized SIL::
+
+  bb0(%0 : $Builtin.NativeObject):
+    br bb1
+
+  bb1:
+    strong_retain %0 : $Builtin.NativeObject
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject
+    cond_br ..., bb2, bb3
+
+  bb2:
+    cond_br ..., bb1, bb4
+
+  bb3:
+    br bb5
+
+  bb4:
+    br bb5
+
+  bb6:
+    return ...
+
+Can we hoist the retain/release pair here? Lets assume the loop is 3 iterations
+and we completely unroll it. Then we have::
+
+  bb0:
+    strong_retain %0 : $Builtin.NativeObject               (1)
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (2)
+    cond_br ..., bb1, bb4
+
+  bb1: // preds: bb0
+    strong_retain %0 : $Builtin.NativeObject               (3)
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (4)
+    cond_br ..., bb2, bb4
+
+  bb2: // preds: bb1
+    strong_retain %0 : $Builtin.NativeObject               (5)
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (6)
+    cond_br ..., bb3, bb4
+
+  bb3: // preds: bb2
+    br bb5
+
+  bb4: // preds: bb0, bb1, bb2
+    br bb5
+
+  bb5: // preds: bb3, bb4
+    return ...
+
+We want to be able to pair and eliminate (2)/(3) and (4)/(5). In order to do
+that, we need to move (2) from bb0 into bb1 and (4) from bb1 into bb2. In order
+to do this, we need to move a release along all paths into bb4 lest we lose
+dynamic releases along that path. We also sink (6) in order to not have an extra
+release along that path. This then give us::
+
+  bb0:
+    strong_retain %0 : $Builtin.NativeObject               (1)
+
+  bb1:
+    apply %f(%0)
+    apply %f(%0)
+    cond_br ..., bb2, bb3
+
+  bb2:
+    cond_br ..., bb1, bb4
+
+  bb3:
+    strong_release %0 : $Builtin.NativeObject              (6*)
+    br bb5
+
+  bb4:
+    strong_release %0 : $Builtin.NativeObject              (7*)
+    br bb5
+
+  bb5: // preds: bb3, bb4
+    return ...
+
+An easy inductive proof follows.
+
+What if we have the opposite problem, that of moving a retain past an early
+exit. Consider the following::
+
+  bb0(%0 : $Builtin.NativeObject):
+    br bb1
+
+  bb1:
+    cond_br ..., bb2, bb3
+
+  bb2:
+    strong_retain %0 : $Builtin.NativeObject
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject
+    cond_br ..., bb1, bb4
+
+  bb3:
+    br bb5
+
+  bb4:
+    br bb5
+
+  bb6:
+    return ...
+
+Lets unroll this loop::
+
+  bb0(%0 : $Builtin.NativeObject):
+    br bb1
+
+  # Iteration 1
+  bb1: // preds: bb0
+    cond_br ..., bb2, bb8
+
+  bb2: // preds: bb1
+    strong_retain %0 : $Builtin.NativeObject               (1)
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (2)
+    br bb3
+
+  # Iteration 2
+  bb3: // preds: bb2
+    cond_br ..., bb4, bb8
+
+  bb4: // preds: bb3
+    strong_retain %0 : $Builtin.NativeObject               (3)
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (4)
+    br bb5
+
+  # Iteration 3
+  bb5: // preds: bb4
+    cond_br ..., bb6, bb8
+
+  bb6: // preds: bb5
+    strong_retain %0 : $Builtin.NativeObject               (5)
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (6)
+    cond_br ..., bb7, bb8
+
+  bb7: // preds: bb6
+    br bb9
+
+  bb8: // Preds: bb1, bb3, bb5, bb6
+    br bb9
+
+  bb9:
+    return ...
+
+First we want to move the retain into the previous iteration. This means that we
+have to move a retain over the cond_br in bb1, bb3, bb5. If we were to do that
+then bb8 would have an extra dynamic retain along that path. In order to fix
+that issue, we need to balance that release by putting a release in bb8. But we
+cannot move a release into bb8 without considering the terminator of bb6 since
+bb6 is also a predecessor of bb8. Luckily, we have (6). Notice that bb7 has one
+predecessor to bb6 so we can safely move 1 release along that path as well. Thus
+we perform that code motion, yielding the following::
+
+  bb0(%0 : $Builtin.NativeObject):
+    br bb1
+
+  # Iteration 1
+  bb1: // preds: bb0
+    strong_retain %0 : $Builtin.NativeObject               (1)
+    cond_br ..., bb2, bb8
+
+  bb2: // preds: bb1
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (2)
+    br bb3
+
+  # Iteration 2
+  bb3: // preds: bb2
+    strong_retain %0 : $Builtin.NativeObject               (3)
+    cond_br ..., bb4, bb8
+
+  bb4: // preds: bb3
+    apply %f(%0)
+    apply %f(%0)
+    strong_release %0 : $Builtin.NativeObject              (4)
+    br bb5
+
+  # Iteration 3
+  bb5: // preds: bb4
+    strong_retain %0 : $Builtin.NativeObject               (5)
+    cond_br ..., bb6, bb8
+
+  bb6: // preds: bb5
+    apply %f(%0)
+    apply %f(%0)
+    cond_br ..., bb7, bb8
+
+  bb7: // preds: bb6
+    strong_release %0 : $Builtin.NativeObject              (7*)
+    br bb9
+
+  bb8: // Preds: bb1, bb3, bb5, bb6
+    strong_release %0 : $Builtin.NativeObject              (8*)
+    br bb9
+
+  bb9:
+    return ...
+
+Then we move (1), (3), (4) into the single predecessor of their parent block and
+eliminate (3), (5) through a pairing with (2), (4) respectively. This yields
+then::
+
+  bb0(%0 : $Builtin.NativeObject):
+    strong_retain %0 : $Builtin.NativeObject               (1)
+    br bb1
+
+  # Iteration 1
+  bb1: // preds: bb0
+    cond_br ..., bb2, bb8
+
+  bb2: // preds: bb1
+    apply %f(%0)
+    apply %f(%0)
+    br bb3
+
+  # Iteration 2
+  bb3: // preds: bb2
+    cond_br ..., bb4, bb8
+
+  bb4: // preds: bb3
+    apply %f(%0)
+    apply %f(%0)
+    br bb5
+
+  # Iteration 3
+  bb5: // preds: bb4
+    cond_br ..., bb6, bb8
+
+  bb6: // preds: bb5
+    apply %f(%0)
+    apply %f(%0)
+    cond_br ..., bb7, bb8
+
+  bb7: // preds: bb6
+    strong_release %0 : $Builtin.NativeObject              (7*)
+    br bb9
+
+  bb8: // Preds: bb1, bb3, bb5, bb6
+    strong_release %0 : $Builtin.NativeObject              (8*)
+    br bb9
+
+  bb9:
+    return ...
+
+Then we finish by rerolling the loop::
+
+  bb0(%0 : $Builtin.NativeObject):
+    strong_retain %0 : $Builtin.NativeObject               (1)
+    br bb1
+
+  # Iteration 1
+  bb1: // preds: bb0
+    cond_br ..., bb2, bb8
+
+  bb2:
+    apply %f(%0)
+    apply %f(%0)
+    cond_br bb1, bb7
+
+  bb7:
+    strong_release %0 : $Builtin.NativeObject              (7*)
+    br bb9
+
+  bb8: // Preds: bb1, bb3, bb5, bb6
+    strong_release %0 : $Builtin.NativeObject              (8*)
+    br bb9
+
+  bb9:
+    return ...
+
+
+Uniqueness Check Complications
+------------------------------
+
+A final concern that we must consider is if we introduce extra copy on write
+copies through our optimization. To see this, consider the following simple
+IR sequence::
+
+  bb0(%0 : $Builtin.NativeObject):
+    // refcount(%0) == n
+    is_unique %0 : $Builtin.NativeObject
+    // refcount(%0) == n
+    strong_retain %0 : $Builtin.NativeObject
+    // refcount(%0) == n+1
+
+If n is not 1, then trivially is_unique will return false. So assume that n is 1
+for our purposes so no copy is occurring here. Thus we have::
+
+  bb0(%0 : $Builtin.NativeObject):
+    // refcount(%0) == 1
+    is_unique %0 : $Builtin.NativeObject
+    // refcount(%0) == 1
+    strong_retain %0 : $Builtin.NativeObject
+    // refcount(%0) == 2
+
+Now imagine that we move the strong_retain before the is_unique. Then we have::
+
+  bb0(%0 : $Builtin.NativeObject):
+    // refcount(%0) == 1
+    strong_retain %0 : $Builtin.NativeObject
+    // refcount(%0) == 2
+    is_unique %0 : $Builtin.NativeObject
+
+Thus is_unique is guaranteed to return false introducing a copy that was not
+needed. We wish to avoid that if it is at all possible.
+

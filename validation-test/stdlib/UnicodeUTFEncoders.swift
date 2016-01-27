@@ -1,11 +1,18 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 import SwiftPrivate
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import Foundation
 
 @_silgen_name("random") func random() -> UInt32

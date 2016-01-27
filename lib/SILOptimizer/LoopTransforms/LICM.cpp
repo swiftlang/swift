@@ -1,8 +1,8 @@
-//===--------- LICM.cpp - Loop invariant code motion ------*- C++ -*-------===//
+//===--- LICM.cpp - Loop invariant code motion ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,6 +27,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -111,7 +112,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 
   return std::all_of(Opds.begin(), Opds.end(), [=](Operand &Op) {
 
-    auto *Def = Op.get().getDef();
+    ValueBase *Def = Op.get();
 
     // Operand is defined outside the loop.
     if (auto *Inst = dyn_cast<SILInstruction>(Def))
@@ -125,7 +126,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 
 /// Check if an address does not depend on other values in a basic block.
 static SILInstruction *addressIndependent(SILValue Addr) {
-  Addr = Addr.stripCasts();
+  Addr = stripCasts(Addr);
   if (GlobalAddrInst *SGAI = dyn_cast<GlobalAddrInst>(Addr))
     return SGAI;
   if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))
@@ -309,8 +310,8 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
   return Changed;
 }
 
-static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
-                           SILLoopInfo *LI) {
+static bool sinkFixLifetime(SILLoop *Loop, DominanceInfo *DomTree,
+                            SILLoopInfo *LI) {
   DEBUG(llvm::errs() << " Sink fix_lifetime attempt\n");
   auto Preheader = Loop->getLoopPreheader();
   if (!Preheader)
@@ -347,7 +348,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
   // Sink the fix_lifetime instruction.
   bool Changed = false;
   for (auto *FLI : FixLifetimeInsts)
-    if (DomTree->dominates(FLI->getOperand().getDef()->getParentBB(),
+    if (DomTree->dominates(FLI->getOperand()->getParentBB(),
                            Preheader)) {
       auto Succs = ExitingBB->getSuccessors();
       for (unsigned EdgeIdx = 0; EdgeIdx <  Succs.size(); ++EdgeIdx) {
@@ -371,7 +372,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
 }
 
 namespace {
-/// \brief Summmary of may writes occurring in the loop tree rooted at \p
+/// \brief Summary of may writes occurring in the loop tree rooted at \p
 /// Loop. This includes all writes of the sub loops and the loop itself.
 struct LoopNestSummary {
   SILLoop *Loop;
@@ -520,7 +521,7 @@ void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
   Changed |= sinkCondFail(CurrentLoop);
   Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads,
                                RunsOnHighLevelSil);
-  Changed |= sinkFixLiftime(CurrentLoop, DomTree, LoopInfo);
+  Changed |= sinkFixLifetime(CurrentLoop, DomTree, LoopInfo);
 }
 
 namespace {

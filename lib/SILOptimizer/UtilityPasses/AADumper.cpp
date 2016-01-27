@@ -1,19 +1,20 @@
-//===-------- AADumper.cpp - Compare all values in Function with AA -------===//
+//===--- AADumper.cpp - Compare all values in Function with AA ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This pass collects all values in a function and applies alias analysis to
-// them. The purpose of this is to enable unit tests for SIL Alias Analysis
-// implementations independent of any other passes.
-//
+///
+/// \file
+/// This pass collects all values in a function and applies alias analysis to
+/// them. The purpose of this is to enable unit tests for SIL Alias Analysis
+/// implementations independent of any other passes.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-aa-evaluator"
@@ -40,8 +41,8 @@ static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
     for (auto *Arg : BB.getBBArgs())
       Values.push_back(SILValue(Arg));
     for (auto &II : BB)
-      for (unsigned i = 0, e = II.getNumTypes(); i != e; ++i)
-        Values.push_back(SILValue(&II, i));
+      if (II.hasValue())
+        Values.push_back(&II);
   }
   return Values.size() > 1;
 }
@@ -98,61 +99,7 @@ class SILAADumper : public SILModuleTransform {
 
   StringRef getName() override { return "AA Dumper"; }
 };
-
-/// Dumps the memory behavior of instructions in a function.
-class MemBehaviorDumper : public SILModuleTransform {
-  
-  // To reduce the amount of output, we only dump the memory behavior of
-  // selected types of instructions.
-  static bool shouldTestInstruction(SILInstruction *I) {
-    // Only consider function calls.
-    if (FullApplySite::isa(I))
-      return true;
-    
-    return false;
-  }
-  
-  void run() override {
-    for (auto &Fn: *getModule()) {
-      llvm::outs() << "@" << Fn.getName() << "\n";
-      // Gather up all Values in Fn.
-      std::vector<SILValue> Values;
-      if (!gatherValues(Fn, Values))
-        continue;
-
-      AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
-
-      unsigned PairCount = 0;
-      for (auto &BB : Fn) {
-        for (auto &I : BB) {
-          if (shouldTestInstruction(&I)) {
-
-            // Print the memory behavior in relation to all other values in the
-            // function.
-            for (auto &V : Values) {
-              bool Read = AA->mayReadFromMemory(&I, V);
-              bool Write = AA->mayWriteToMemory(&I, V);
-              bool SideEffects = AA->mayHaveSideEffects(&I, V);
-              llvm::outs() <<
-              "PAIR #" << PairCount++ << ".\n" <<
-              "  " << SILValue(&I) <<
-              "  " << V <<
-              "  r=" << Read << ",w=" << Write << ",se=" << SideEffects << "\n";
-            }
-          }
-        }
-      }
-      llvm::outs() << "\n";
-    }
-  }
-  
-  StringRef getName() override { return "Memory Behavior Dumper"; }
-};
         
 } // end anonymous namespace
 
 SILTransform *swift::createAADumper() { return new SILAADumper(); }
-
-SILTransform *swift::createMemBehaviorDumper() {
-  return new MemBehaviorDumper();
-}

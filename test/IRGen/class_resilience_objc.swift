@@ -52,8 +52,7 @@ public class GenericObjCSubclass<T> : NSCoder {
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
 
-// CHECK:      [[T_BOX:%.*]] = alloca %swift.type*
-// CHECK:      store {{.*}}, %swift.type** [[T_BOX]]
+// CHECK:         %T = load
 
 // CHECK-32-NEXT: [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %swift.type**
 // CHECK-32-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
@@ -64,14 +63,13 @@ public class GenericObjCSubclass<T> : NSCoder {
 // CHECK-64-NEXT: [[ISA_VALUE:%.*]] = and [[INT]] [[ISA]], [[ISA_MASK]]
 // CHECK-64-NEXT: [[ISA:%.*]] = inttoptr [[INT]] [[ISA_VALUE]] to %swift.type*
 
-// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to i8***
+// CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
 
-// CHECK-32-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[ISA_ADDR]], [[INT]] 16
+// CHECK-32-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 16
 
-// CHECK-64-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[ISA_ADDR]], [[INT]] 13
+// CHECK-64-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 13
 
-// CHECK-NEXT: [[FIELD_OFFSET_TMP:%.*]] = load i8**, i8*** [[FIELD_OFFSET_ADDR:%.*]]
-// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = ptrtoint i8** [[FIELD_OFFSET_TMP]] to [[INT]]
+// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_ADDR:%.*]]
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[FIELD_OFFSET]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*

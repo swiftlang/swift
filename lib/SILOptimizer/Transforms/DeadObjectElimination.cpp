@@ -1,8 +1,8 @@
-//===-- DeadObjectElimination.cpp - Remove unused objects  ----------------===//
+//===--- DeadObjectElimination.cpp - Remove unused objects  ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -34,6 +34,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
@@ -79,7 +80,7 @@ static SILFunction *getDestructor(AllocRefInst *ARI) {
 
   DEBUG(llvm::dbgs() << "    Found destructor!\n");
 
-  // If the destructor has an objc_method calling convention, we can not
+  // If the destructor has an objc_method calling convention, we cannot
   // analyze it since it could be swapped out from under us at runtime.
   if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     DEBUG(llvm::dbgs() << "        Found objective-c destructor. Can't "
@@ -123,7 +124,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // destructor. RefCountingOperations on other instructions could have side
       // effects though.
       if (auto *RefInst = dyn_cast<RefCountingInst>(&I)) {
-        if (RefInst->getOperand(0).stripCasts().getDef() == Self) {
+        if (stripCasts(RefInst->getOperand(0)) == Self) {
           // For now all ref counting insts have 1 operand. Put in an assert
           // just in case.
           assert(RefInst->getNumOperands() == 1 &&
@@ -146,9 +147,9 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       }
 
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
-      // can not be eliminated.
+      // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
-        if (DeallocRef->getOperand().stripCasts().getDef() == Self) {
+        if (stripCasts(DeallocRef->getOperand()) == Self) {
           DEBUG(llvm::dbgs() << "            SAFE! dealloc_ref on self.\n");
           continue;
         } else {
@@ -160,7 +161,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
 
       // Storing into the object can be ignored.
       if (auto *SI = dyn_cast<StoreInst>(&I))
-        if (SI->getDest().stripAddressProjections().getDef() == Self) {
+        if (stripAddressProjections(SI->getDest()) == Self) {
           DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store into "
                 "self.\n");
           continue;
@@ -179,9 +180,7 @@ void static
 removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
   for (auto *I : UsersToRemove) {
     if (!I->use_empty())
-      for (unsigned i = 0, e = I->getNumTypes(); i != e; ++i)
-        SILValue(I, i).replaceAllUsesWith(SILUndef::get(I->getType(i),
-                                                        I->getModule()));
+      I->replaceAllUsesWith(SILUndef::get(I->getType(), I->getModule()));
     // Now we know that I should not have any uses... erase it from its parent.
     I->eraseFromParent();
   }
@@ -227,7 +226,7 @@ static bool canZapInstruction(SILInstruction *Inst) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremoveableUsers(SILInstruction *AllocRef, UserList &Users) {
+hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
@@ -331,7 +330,7 @@ namespace {
 /// dead arrays. We just need a slightly better destructor analysis to prove
 /// that it only releases elements.
 class DeadObjectAnalysis {
-  // Map a each address projection of this object to a list of stores.
+  // Map each address projection of this object to a list of stores.
   // Do not iterate over this map's entries.
   using AddressToStoreMap =
     llvm::DenseMap<IndexTrieNode*, llvm::SmallVector<StoreInst*, 4> >;
@@ -372,7 +371,7 @@ public:
 
 private:
   void addStore(StoreInst *Store, IndexTrieNode *AddressNode);
-  bool recursivelyCollectInteriorUses(ValueBase *defInst,
+  bool recursivelyCollectInteriorUses(ValueBase *DefInst,
                                       IndexTrieNode *AddressNode,
                                       bool IsInteriorAddress);
 
@@ -384,7 +383,7 @@ private:
 // Record a store into this object.
 void DeadObjectAnalysis::
 addStore(StoreInst *Store, IndexTrieNode *AddressNode) {
-  if (Store->getSrc().getType().isTrivial(Store->getModule()))
+  if (Store->getSrc()->getType().isTrivial(Store->getModule()))
     return;
 
   // SSAUpdater cannot handle multiple defs in the same blocks. Therefore, we
@@ -438,7 +437,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     // Initialization points.
     if (auto *Store = dyn_cast<StoreInst>(User)) {
       // Bail if this address is stored to another object.
-      if (Store->getDest().getDef() != DefInst) {
+      if (Store->getDest() != DefInst) {
         DEBUG(llvm::dbgs() << "        Found an escaping store: " << *User);
         return false;
       }
@@ -506,7 +505,7 @@ bool DeadObjectAnalysis::analyze() {
 
   // Populate AllValues, AddressProjectionTrie, and StoredLocations.
   AddressProjectionTrie = new IndexTrieNode();
-  if (!recursivelyCollectInteriorUses(NewAddrValue.getDef(),
+  if (!recursivelyCollectInteriorUses(NewAddrValue,
                                       AddressProjectionTrie, false)) {
     return false;
   }
@@ -545,7 +544,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   assert(!Stores.empty());
   SILValue StVal = Stores.front()->getSrc();
 
-  SSAUp.Initialize(StVal.getType());
+  SSAUp.Initialize(StVal->getType());
 
   for (auto *Store : Stores)
     SSAUp.AddAvailableValue(Store->getParent(), Store->getSrc());
@@ -557,7 +556,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // per block, and all release points occur after all stores. Therefore we
     // can simply ask SSAUpdater for the reaching store.
     SILValue RelVal = SSAUp.GetValueAtEndOfBlock(RelPoint->getParent());
-    if (StVal.getType().isReferenceCounted(RelPoint->getModule()))
+    if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
       B.createStrongRelease(RelPoint->getLoc(), RelVal)->getOperandRef();
     else
       B.createReleaseValue(RelPoint->getLoc(), RelVal)->getOperandRef();
@@ -740,8 +739,8 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
-  if (hasUnremoveableUsers(ARI, UsersToRemove)) {
-    DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
+  if (hasUnremovableUsers(ARI, UsersToRemove)) {
+    DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
 
@@ -760,8 +759,8 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
 
   UserList UsersToRemove;
-  if (hasUnremoveableUsers(ASI, UsersToRemove)) {
-    DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
+  if (hasUnremovableUsers(ASI, UsersToRemove)) {
+    DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
 
@@ -781,7 +780,7 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
 
   ApplyInst *AllocBufferAI = nullptr;
   SILValue Arg0 = AI->getArgument(0);
-  if (Arg0.getType().isExistentialType()) {
+  if (Arg0->getType().isExistentialType()) {
     // This is a version of the initializer which receives a pre-allocated
     // buffer as first argument. If we want to delete the initializer we also
     // have to delete the allocation.

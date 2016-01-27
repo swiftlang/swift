@@ -12,6 +12,7 @@
 // REQUIRES: optimized_stdlib
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
@@ -33,7 +34,7 @@ var SliceTests = TestSuite("CollectionType")
 %   WrapperType='Slice',
 %   name='WithSuffix',
 %   prefix=[],
-%   suffix=[ -9999, -9998, -9997 ])
+%   suffix=[ -9999, -9998, -9997])
 ${SliceTest}
 
 runAllTests()

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,10 +18,18 @@
 
 public var errno: Int32 {
   get {
+#if os(FreeBSD)
+    return __error().memory
+#else
     return __errno_location().memory
+#endif
   }
   set(val) {
+#if os(FreeBSD)
+    return __error().memory = val
+#else
     return __errno_location().memory = val
+#endif
   }
 }
 
@@ -211,3 +219,15 @@ public func sem_open(
 ) -> UnsafeMutablePointer<sem_t> {
   return _swift_Glibc_sem_open4(name, oflag, mode, value)
 }
+
+// FreeBSD defines extern char **environ differently than Linux.
+#if os(FreeBSD)
+@warn_unused_result
+@_silgen_name("_swift_FreeBSD_getEnv")
+func _swift_FreeBSD_getEnv(
+) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+
+public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+  return _swift_FreeBSD_getEnv().memory
+}
+#endif

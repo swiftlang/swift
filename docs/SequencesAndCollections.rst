@@ -60,8 +60,8 @@ As you can see, sequence does nothing more than deliver a generator.
 To understand the need for generators, it's important to distinguish
 the two kinds of sequences.
 
-* **Volatile** sequences like “stream of network packets,” carry
-  their own traversal state, and are expected to be “consumed” as they
+* **Volatile** sequences like "stream of network packets," carry
+  their own traversal state, and are expected to be "consumed" as they
   are traversed.
 
 * **Stable** sequences, like arrays, should *not* be mutated by `for`\
@@ -215,7 +215,7 @@ that stability in generic code, we'll need another protocol.
 Collections
 ===========
 
-A **collection** is a stable sequence with addressable “positions,”
+A **collection** is a stable sequence with addressable "positions,"
 represented by an associated `Index` type::
  
   protocol CollectionType : SequenceType {

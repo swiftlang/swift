@@ -8,6 +8,6 @@ func non_fully_covered_switch(x: Int) -> Int {
     case 3:
      x -= 1
   } // expected-error{{switch must be exhaustive}}
-  return x;
+  return x
 }
 

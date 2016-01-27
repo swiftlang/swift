@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -591,6 +591,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   bool IsError = sourcekitd_response_is_error(Resp);
   if (IsError) {
     sourcekitd_response_description_dump(Resp);
+
+  } else if (Opts.PrintResponseAsJSON) {
+    sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
+    char *json = sourcekitd_variant_json_description_copy(Info);
+    llvm::outs() << json << '\n';
+    free(json);
+
   } else {
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     switch (Opts.Request) {

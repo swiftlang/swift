@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -222,7 +222,8 @@ extern "C" long double _swift_fmodl(long double lhs, long double rhs) {
 // FIXME: rdar://14883575 Libcompiler_rt omits muloti4
 #if (defined(__APPLE__) && defined(__arm64__)) || \
     (defined(__linux__) && defined(__x86_64__)) || \
-    (defined(__linux__) && defined(__aarch64__))
+    (defined(__linux__) && defined(__aarch64__)) || \
+    (defined(__linux__) && defined(__powerpc64__))
 
 typedef int      ti_int __attribute__ ((mode (TI)));
 extern "C"

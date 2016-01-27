@@ -8,7 +8,7 @@ func markUsed<T>(t: T) {}
 func classifyPoint2(p: (Double, Double)) {
     func return_same (input : Double) -> Double {
         var input = input
-        return input;
+        return input
     }
 
 switch p {

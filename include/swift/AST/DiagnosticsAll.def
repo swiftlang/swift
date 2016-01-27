@@ -1,8 +1,8 @@
-//===- DiagnosticsAll.def - Diagnostics Text Index --------------*- C++ -*-===//
+//===--- DiagnosticsAll.def - Diagnostics Text Index ------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,18 +19,18 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
 #define DIAG_NO_UNDEF

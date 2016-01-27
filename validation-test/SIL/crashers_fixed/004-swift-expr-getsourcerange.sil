@@ -1,0 +1,3 @@
+// RUN: not %target-sil-opt %s
+
+l<@convention()>(

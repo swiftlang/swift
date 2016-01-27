@@ -8,10 +8,9 @@ func foo(inout x: Int) {
 }
 
 // But not partially applied.
-func curriedFoo(inout x: Int)(y: Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  return x + y
+struct C {
+  mutating func f(x: Int) {}
 }
 
-var score: Int = 0
-
-_ = curriedFoo(&score) // expected-error {{partial application of function with 'inout' parameters is not allowed}}
+var c = C()
+let x = c.f // expected-error{{partial application of 'mutating' method is not allowed}}

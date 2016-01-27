@@ -1,8 +1,8 @@
-//===-------------- AliasAnalysis.cpp - SIL Alias Analysis ----------------===//
+//===--- AliasAnalysis.cpp - SIL Alias Analysis ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,6 +23,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -112,25 +113,19 @@ static bool isFunctionArgument(SILValue V) {
   return Arg->isFunctionArg();
 }
 
-/// A no alias argument is an argument that is an address type of the entry
-/// basic block of a function.
-static bool isNoAliasArgument(SILValue V) {
-  return isFunctionArgument(V) && V.getType().isAddress();
-}
-
 /// Return true if V is an object that at compile time can be uniquely
 /// identified.
 static bool isIdentifiableObject(SILValue V) {
   if (isa<AllocationInst>(V) || isa<LiteralInst>(V))
     return true;
-  if (isNoAliasArgument(V))
+  if (isNotAliasingArgument(V))
     return true;
   return false;
 }
 
 /// Return true if V1 and V2 are distinct objects that can be uniquely
 /// identified at compile time.
-static bool areDistinctIdentifyableObjects(SILValue V1, SILValue V2) {
+static bool areDistinctIdentifiableObjects(SILValue V1, SILValue V2) {
   // Do both values refer to the same global variable?
   if (auto *GA1 = dyn_cast<GlobalAddrInst>(V1)) {
     if (auto *GA2 = dyn_cast<GlobalAddrInst>(V2)) {
@@ -156,7 +151,7 @@ static bool isSameValueOrGlobal(SILValue V1, SILValue V2) {
   return false;
 }
 
-/// Is this a literal which we know can not refer to a global object?
+/// Is this a literal which we know cannot refer to a global object?
 ///
 /// FIXME: function_ref?
 static bool isLocalLiteral(SILValue V) {
@@ -173,58 +168,18 @@ static bool isLocalLiteral(SILValue V) {
 /// Is this a value that can be unambiguously identified as being defined at the
 /// function level.
 static bool isIdentifiedFunctionLocal(SILValue V) {
-  return isa<AllocationInst>(*V) || isNoAliasArgument(V) || isLocalLiteral(V);
-}
-
-/// Returns true if V is a function argument that is not an address implying
-/// that we do not have the guarantee that it will not alias anything inside the
-/// function.
-static bool isAliasingFunctionArgument(SILValue V) {
-  return isFunctionArgument(V) && !V.getType().isAddress();
-}
-
-/// Returns true if V is an apply inst that may read or write to memory.
-static bool isReadWriteApplyInst(SILValue V) {
-  // See if this is a normal function application.
-  if (auto *AI = dyn_cast<ApplyInst>(V)) {
-    return AI->mayReadOrWriteMemory();
-  }
-  
-  // Next, see if this is a builtin.
-  if (auto *BI = dyn_cast<BuiltinInst>(V)) {
-    return BI->mayReadOrWriteMemory();
-  }
-
-  // If we fail, bail...
-  return false;
-}
-
-/// Return true if the pointer is one which would have been considered an escape
-/// by isNonEscapingLocalObject.
-static bool isEscapeSource(SILValue V) {
-  if (isReadWriteApplyInst(V))
-    return true;
-
-  if (isAliasingFunctionArgument(V))
-    return true;
-
-  // The LoadInst case works since valueMayBeCaptured always assumes stores are
-  // escapes.
-  if (isa<LoadInst>(*V))
-    return true;
-
-  // We could not prove anything, be conservative and return false.
-  return false;
+  return isa<AllocationInst>(*V) || isNotAliasingArgument(V) ||
+         isLocalLiteral(V);
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
-/// can not alias.
+/// cannot alias.
 static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   assert(O1 != O2 && "This function should only be called on unequal values.");
 
   // If O1 and O2 do not equal and they are both values that can be statically
-  // and uniquely identified, they can not alias.
-  if (areDistinctIdentifyableObjects(O1, O2)) {
+  // and uniquely identified, they cannot alias.
+  if (areDistinctIdentifiableObjects(O1, O2)) {
     DEBUG(llvm::dbgs() << "            Found two unequal identified "
           "objects.\n");
     return true;
@@ -241,16 +196,6 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
       (isFunctionArgument(O2) && isIdentifiedFunctionLocal(O1))) {
     DEBUG(llvm::dbgs() << "            Found unequal function arg and "
           "identified function local!\n");
-    return true;
-  }
-
-  // If one pointer is the result of an apply or load and the other is a
-  // non-escaping local object within the same function, then we know the object
-  // couldn't escape to a point where the call could return it.
-  if ((isEscapeSource(O1) && isNonEscapingLocalObject(O2)) ||
-      (isEscapeSource(O2) && isNonEscapingLocalObject(O1))) {
-    DEBUG(llvm::dbgs() << "            Found unequal escape source and non "
-          "escaping local object!\n");
     return true;
   }
 
@@ -271,20 +216,20 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
   // derived pointers.
-  if (!Projection::isAddrProjection(V2)) {
+  if (!NewProjection::isAddressProjection(V2)) {
     // Ok, V2 is not an address projection. See if V2 after stripping casts
     // aliases O1. If so, then we know that V2 must partially alias V1 via a
     // must alias relation on O1. This ensures that given an alloc_stack and a
     // gep from that alloc_stack, we say that they partially alias.
-    if (isSameValueOrGlobal(O1, V2.stripCasts()))
+    if (isSameValueOrGlobal(O1, stripCasts(V2)))
       return AliasResult::PartialAlias;
 
     return AliasResult::MayAlias;
   }
   
-  assert(!Projection::isAddrProjection(O1) &&
+  assert(!NewProjection::isAddressProjection(O1) &&
          "underlying object may not be a projection");
-  assert(!Projection::isAddrProjection(O2) &&
+  assert(!NewProjection::isAddressProjection(O2) &&
          "underlying object may not be a projection");
 
   // Do the base pointers alias?
@@ -296,8 +241,8 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::NoAlias;
 
   // Let's do alias checking based on projections.
-  auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
-  auto V2Path = ProjectionPath::getAddrProjectionPath(O2, V2, true);
+  auto V1Path = NewProjectionPath::getProjectionPath(O1, V1);
+  auto V2Path = NewProjectionPath::getProjectionPath(O2, V2);
 
   // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
   // what the base pointer of the two values are. Be conservative and return
@@ -329,7 +274,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::NoAlias;
 
   // If one of the GEPs is a super path of the other then they partially
-  // alias. W
+  // alias.
   if (BaseAlias == AliasResult::MustAlias &&
       isStrictSubSeqRelation(R))
     return AliasResult::PartialAlias;
@@ -355,6 +300,7 @@ static bool isTypedAccessOracle(SILInstruction *I) {
   case ValueKind::StoreInst:
   case ValueKind::AllocStackInst:
   case ValueKind::AllocBoxInst:
+  case ValueKind::ProjectBoxInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocBoxInst:
     return true;
@@ -398,13 +344,13 @@ static SILType findTypedAccessType(SILValue V) {
   // typed oracle.
   if (auto *I = dyn_cast<SILInstruction>(V))
     if (isTypedAccessOracle(I))
-      return V.getType();
+      return V->getType();
 
   // Then look at any uses of V that potentially could act as a typed access
   // oracle.
-  for (auto Use : V.getUses())
+  for (auto Use : V->getUses())
     if (isTypedAccessOracle(Use->getUser()))
-      return V.getType();
+      return V->getType();
 
   // Otherwise return an empty SILType
   return SILType();
@@ -436,17 +382,17 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
   // 2. (Pointer, Pointer): If we have two pointers to pointers, since we know
   // that the two values do not equal due to previous AA calculations, one must
   // be a native object and the other is an unknown object type (i.e. an objc
-  // object) which can not alias.
+  // object) which cannot alias.
   //
   // 3. (Scalar, Scalar): If we have two scalar pointers, since we know that the
-  // types are already not equal, we know that they can not alias. For those
+  // types are already not equal, we know that they cannot alias. For those
   // unfamiliar even though BuiltinIntegerType/BuiltinFloatType are single
   // classes, the AST represents each integer/float of different bit widths as
   // different types, so equality of SILTypes allows us to know that they have
   // different bit widths.
   //
   // Thus we can just return false since in none of the aforementioned cases we
-  // can not alias, so return false.
+  // cannot alias, so return false.
   return false;
 }
 
@@ -466,7 +412,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // Typed access based TBAA only occurs on pointers. If we reach this point and
   // do not have a pointer, be conservative and return that the two types may
-  // alias. *NOTE* This ensures we return may alias for local_storage.
+  // alias.
   if(!LTy.isAddress() || !RTy.isAddress())
     return true;
 
@@ -521,7 +467,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // FIXME: All the code following could be made significantly more aggressive
   // by saying that aggregates of the same type that do not contain each other
-  // can not alias.
+  // cannot alias.
 
   // Tuples do not alias non-tuples.
   bool LTyTT = LTy.is<TupleType>();
@@ -590,7 +536,10 @@ AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   // Flush the cache if the size of the cache is too large.
   if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
     AliasCache.clear();
-    ValueBaseToIndex.clear();
+    AliasValueBaseToIndex.clear();
+
+    // Key is no longer valid as we cleared the AliasValueBaseToIndex.
+    Key = toAliasKey(V1, V2, TBAAType1, TBAAType2);
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -614,8 +563,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   if (isSameValueOrGlobal(V1, V2))
     return AliasResult::MustAlias;
 
-  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
-        << "    V2: " << *V2.getDef());
+  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1
+        << "    V2: " << *V2);
 
   // Pass in both the TBAA types so we can perform typed access TBAA and the
   // actual types of V1, V2 so we can perform class based TBAA.
@@ -628,37 +577,50 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 #endif
 
   // Strip off any casts on V1, V2.
-  V1 = V1.stripCasts();
-  V2 = V2.stripCasts();
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1.getDef());
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2.getDef());
+  V1 = stripCasts(V1);
+  V2 = stripCasts(V2);
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1);
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2);
 
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
   SILValue O2 = getUnderlyingObject(V2);
-  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1.getDef());
-  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2.getDef());
+  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1);
+  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2);
 
-  // If O1 and O2 do not equal, see if we can prove that they can not be the
+  // If O1 and O2 do not equal, see if we can prove that they cannot be the
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
     return AliasResult::NoAlias;
 
   // Ok, either O1, O2 are the same or we could not prove anything based off of
-  // their inequality. Now we climb up use-def chains and attempt to do tricks
-  // based off of GEPs.
+  // their inequality.
+  // Next: ask escape analysis. This catches cases where we compare e.g. a
+  // non-escaping pointer with another (maybe escaping) pointer. Escape analysis
+  // uses the connection graph to check if the pointers may point to the same
+  // content.
+  // Note that escape analysis must work with the original pointers and not the
+  // underlying objects because it treats projections differently.
+  if (!EA->canPointToSameMemory(V1, V2)) {
+    DEBUG(llvm::dbgs() << "            Found not-aliased objects based on"
+                                      "escape analysis\n");
+    return AliasResult::NoAlias;
+  }
+
+  // Now we climb up use-def chains and attempt to do tricks based off of GEPs.
 
   // First if one instruction is a gep and the other is not, canonicalize our
   // inputs so that V1 always is the instruction containing the GEP.
-  if (!Projection::isAddrProjection(V1) && Projection::isAddrProjection(V2)) {
+  if (!NewProjection::isAddressProjection(V1) &&
+       NewProjection::isAddressProjection(V2)) {
     std::swap(V1, V2);
     std::swap(O1, O2);
   }
 
   // If V1 is an address projection, attempt to use information from the
   // aggregate type tree to disambiguate it from V2.
-  if (Projection::isAddrProjection(V1)) {
+  if (NewProjection::isAddressProjection(V1)) {
     AliasResult Result = aliasAddressProjection(V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
       return Result;
@@ -672,7 +634,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
   // Treat applications of @noreturn functions as decrementing ref counts. This
   // causes the apply to become a sink barrier for ref count increments.
-  if (FAS.getCallee().getType().getAs<SILFunctionType>()->isNoReturn())
+  if (FAS.getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
     return true;
 
   /// If the pointer cannot escape to the function we are done.
@@ -749,11 +711,13 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 
 AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
                                      SILType Type1, SILType Type2) {
-  size_t idx1 = ValueBaseToIndex.getIndex(V1.getDef());
-  size_t idx2 = ValueBaseToIndex.getIndex(V2.getDef());
-  unsigned R1 = V1.getResultNumber();
-  unsigned R2 = V2.getResultNumber();
+  size_t idx1 = AliasValueBaseToIndex.getIndex(V1);
+  assert(idx1 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
+  size_t idx2 = AliasValueBaseToIndex.getIndex(V2);
+  assert(idx2 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
   void *t1 = Type1.getOpaqueValue();
   void *t2 = Type2.getOpaqueValue();
-  return {idx1, idx2, R1, R2, t1, t2};
+  return {idx1, idx2, t1, t2};
 }

@@ -85,6 +85,8 @@ public struct MySize {
 public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %V17struct_resilience6MySize
+// CHECK: bitcast
+// CHECK: llvm.lifetime.start
 // CHECK: [[COPY:%.*]] = bitcast %V17struct_resilience6MySize* %4 to i8*
 // CHECK: [[ARG:%.*]] = bitcast %V17struct_resilience6MySize* %1 to i8*
 // CHECK: call void @llvm.memcpy{{.*}}(i8* [[COPY]], i8* [[ARG]], {{i32 8|i64 16}}, i32 {{.*}}, i1 false)
@@ -102,6 +104,7 @@ public struct StructWithResilientStorage {
   public let s: Size
   public let ss: (Size, Size)
   public let n: Int
+  public let i: ResilientInt
 }
 
 // Make sure we call a function to access metadata of structs with
@@ -143,27 +146,39 @@ public struct StructWithIndirectResilientEnum {
 // CHECK: ret %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @_TMfV17struct_resilience6MySize, i32 0, i32 1) to %swift.type*)
 
 
-// FIXME: this is bogus
+// FIXME: this should modify the template in-place instead of copying it
 
 // CHECK-LABEL: define private %swift.type* @create_generic_metadata_StructWithResilientStorage(%swift.type_pattern*, i8**)
-// CHECK: [[FIELDS:%.*]] = alloca [3 x i8**]
+// CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
 // CHECK: [[RESULT:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK: [[RESULT_ADDR:%.*]] = bitcast %swift.type* [[RESULT]] to i8**
-// CHECK: [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[RESULT_ADDR]], i32 7
+// CHECK: [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[RESULT_ADDR]], i32 8
 // CHECK: [[VWT_ADDR:%.*]] = bitcast i8** [[VWT]] to i8*
 
 // CHECK: [[RESULT_ADDR2:%.*]] = bitcast %swift.type* %2 to [[INT]]*
 // CHECK: [[FIELD_OFFSETS_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[RESULT_ADDR:%.*]], i32 3
-// CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* [[FIELDS]], i32 0, i32 0
+// CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x i8**], [4 x i8**]* [[FIELDS]], i32 0, i32 0
+
+// public let s: Size
 
 // CHECK: [[FIELD_1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_1]]
 
+// public let ss: (Size, Size)
+
 // CHECK: [[FIELD_2:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 1
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_2]]
 
-// CHECK: [[FIELD_3:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 2
-// CHECK: store i8** [[SIZE_AND_ALIGNMENT:getelementptr inbounds (.*)]], i8*** [[FIELD_3]]
+// Fixed-layout aggregate -- we can reference a static value witness table
+// public let n: Int
 
-// CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 3, i8*** [[FIELDS_ADDR]], [[INT]]* [[FIELD_OFFSETS_ADDR]], i8** [[VWT]])
+// CHECK: [[FIELD_3:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 2
+// CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVBi{{32|64}}_, i32 {{.*}}), i8*** [[FIELD_3]]
+
+// Resilient aggregate with one field -- make sure we don't look inside it
+// public let i: ResilientInt
+// CHECK: [[FIELD_4:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 3
+// CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_4]]
+
+// CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* [[FIELD_OFFSETS_ADDR]], i8** [[VWT]])
 // CHECK: ret %swift.type* [[RESULT]]

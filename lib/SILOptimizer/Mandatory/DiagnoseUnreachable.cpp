@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -66,7 +66,7 @@ struct UnreachableInfo {
 /// it possible.
 class UnreachableUserCodeReportingState {
 public:
-  /// \brief The set of top-level blocks that became immediately unreachbale due
+  /// \brief The set of top-level blocks that became immediately unreachable due
   /// to conditional branch folding, etc.
   ///
   /// This is a SetVector since several blocks may lead to the same error
@@ -171,9 +171,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     SILArgument *Arg = *AI;
 
     // We were able to fold, so all users should use the new folded value.
-    assert(Arg->getTypes().size() == 1 &&
-           "Currently, we only support single result instructions.");
-    SILValue(Arg).replaceAllUsesWith(Args[Idx]);
+    Arg->replaceAllUsesWith(Args[Idx]);
     NumBasicBlockArgsPropagated++;
   }
 
@@ -200,7 +198,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       SILBuilderWithScope B(&BB, CBI);
 
       // Determine which of the successors is unreachable and create a new
-      // terminator that only branches to the reachable sucessor.
+      // terminator that only branches to the reachable successor.
       SILBasicBlock *UnreachableBlock = nullptr;
       bool CondIsTrue = false;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
@@ -267,8 +265,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
           }
         }
 
-      // Not fully covered switches will be diagnosed later. SILGen represnets
-      // them with a Default basic block with an unrechable instruction.
+      // Not fully covered switches will be diagnosed later. SILGen represents
+      // them with a Default basic block with an unreachable instruction.
       // We are going to produce an error on all unreachable instructions not
       // eliminated by DCE.
       if (!TheSuccessorBlock)
@@ -404,7 +402,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
   for (auto *Use : Uses)
     if (auto *User = dyn_cast<SILInstruction>(Use->getUser()))
       if (User->getParent() != BB)
-        Use->set(SILUndef::get(Use->get().getType(), Mod));
+        Use->set(SILUndef::get(Use->get()->getType(), Mod));
 }
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
@@ -645,7 +643,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
         HasReachablePred = true;
     }
 
-    // If all of the predecessors of this sucessor are unreachable, check if
+    // If all of the predecessors of this successor are unreachable, check if
     // it contains user code.
     if (!HasReachablePred && diagnoseUnreachableBlock(*SB, M, Reachable,
                                                     State, TopLevelB, Visited))

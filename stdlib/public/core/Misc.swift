@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -83,6 +83,42 @@ func _typeName(type: Any.Type, qualified: Bool = true) -> String {
     input: UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
+@_silgen_name("swift_getTypeByMangledName")
+func _getTypeByMangledName(
+    name: UnsafePointer<UInt8>,
+    _ nameLength: UInt)
+  -> Any.Type?
+
+/// Lookup a class given a name. Until the demangled encoding of type
+/// names is stabilized, this is limited to top-level class names (Foo.bar).
+@warn_unused_result
+public // SPI(Foundation)
+func _typeByName(name: String) -> Any.Type? {
+  let components = name.characters.split{$0 == "."}.map(String.init)
+  guard components.count == 2 else {
+    return nil
+  }
+
+  // Note: explicitly build a class name to match on, rather than matching
+  // on the result of _typeName(), to ensure the type we are resolving is
+  // actually a class.
+  var name = "C"
+  if components[0] == "Swift" {
+    name += "Ss"
+  } else {
+    name += String(components[0].characters.count) + components[0]
+  }
+  name += String(components[1].characters.count) + components[1]
+
+  let nameUTF8 = Array(name.utf8)
+  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
+    let type = _getTypeByMangledName(nameUTF8.baseAddress,
+                                     UInt(nameUTF8.endIndex))
+
+    return type
+  }
+}
+ 
 @warn_unused_result
 @_silgen_name("swift_stdlib_demangleName")
 func _stdlib_demangleNameImpl(
@@ -124,7 +160,7 @@ func _stdlib_demangleName(mangledName: String) -> String {
 public // @testable
 func _floorLog2(x: Int64) -> Int {
   _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")
-  // Note: use unchecked subtraction because we this expression can not
+  // Note: use unchecked subtraction because we this expression cannot
   // overflow.
   return 63 &- Int(_countLeadingZeros(x))
 }

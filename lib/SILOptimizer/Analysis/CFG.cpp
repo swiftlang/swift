@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,17 +19,20 @@
 using namespace swift;
 
 static bool isSafeNonExitTerminator(TermInst *TI) {
-  switch (TI->getKind()) {
-  case ValueKind::BranchInst:
-  case ValueKind::CondBranchInst:
-  case ValueKind::SwitchValueInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::SwitchEnumAddrInst:
-  case ValueKind::DynamicMethodBranchInst:
-  case ValueKind::CheckedCastBranchInst:
-  case ValueKind::CheckedCastAddrBranchInst:
+  switch (TI->getTermKind()) {
+  case TermKind::BranchInst:
+  case TermKind::CondBranchInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
     return true;
-  default:
+  case TermKind::UnreachableInst:
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::TryApplyInst:
     return false;
   }
 }

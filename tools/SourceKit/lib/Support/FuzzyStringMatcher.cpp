@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -35,7 +35,7 @@ FuzzyStringMatcher::FuzzyStringMatcher(StringRef pattern_)
   assert(pattern.size() == lowercasePattern.size());
 
   // FIXME: pull out the magic constants.
-  // This depends on the inner details of the matching algorithm and  will need
+  // This depends on the inner details of the matching algorithm and will need
   // to be updated if we substantially alter it.
   if (pattern.size() == 1) {
     maxScore = 3.0 +  // uppercase match
@@ -154,7 +154,7 @@ struct CandidateSpecificMatcher {
   /// Calculates the candidate's score, matching the candidate from
   /// \p firstPatternPos or later.
   ///
-  /// This drives drives scoreCandidateTrial by trying the possible matches.
+  /// This drives scoreCandidateTrial by trying the possible matches.
   double scoreCandidate(unsigned firstPatternPos);
 
   /// Calculates the candidate's score, matching the candidate from

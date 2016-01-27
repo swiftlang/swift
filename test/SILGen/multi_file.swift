@@ -18,7 +18,7 @@ func lazyPropertiesAreNotStored(container: LazyContainer) {
 
 // CHECK-LABEL: sil hidden @_TF10multi_file29lazyRefPropertiesAreNotStored
 func lazyRefPropertiesAreNotStored(container: LazyContainerClass) {
-  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : LazyContainerClass -> () -> Int , $@convention(method) (@guaranteed LazyContainerClass) -> Int
+  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int , $@convention(method) (@guaranteed LazyContainerClass) -> Int
   markUsed(container.lazyVar)
 }
 

@@ -5,6 +5,15 @@
 // RUN: %target-run %t/main
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import resilient_struct
 
 var ResilientStructTestSuite = TestSuite("ResilientStruct")
@@ -43,7 +52,13 @@ ResilientStructTestSuite.test("StaticLayout") {
   }
 }
 
-struct MyResilientLayoutRuntimeTest {
+// Make sure structs with dynamic layout are instantiated correctly,
+// and can conform to protocols.
+protocol MyResilientLayoutProtocol {
+  var b1: ResilientBool { get }
+}
+
+struct MyResilientLayoutRuntimeTest : MyResilientLayoutProtocol {
   let b1: ResilientBool
   let i: ResilientInt
   let b2: ResilientBool
@@ -89,6 +104,58 @@ ResilientStructTestSuite.test("DynamicLayout") {
         }
       }
     }
+  }
+}
+
+@inline(never) func getB(p: MyResilientLayoutProtocol) -> Bool {
+  return p.b1.b
+}
+
+ResilientStructTestSuite.test("DynamicLayoutConformance") {
+  do {
+    let r = MyResilientLayoutRuntimeTest(b1: ResilientBool(b: true),
+                                         i: ResilientInt(i: 0),
+                                         b2: ResilientBool(b: false),
+                                         d: ResilientDouble(d: 0.0))
+    expectEqual(getB(r), true)
+  }
+}
+
+protocol ProtocolWithAssociatedType {
+  associatedtype T: MyResilientLayoutProtocol
+
+  func getT() -> T
+}
+
+struct StructWithDependentAssociatedType : ProtocolWithAssociatedType {
+  let r: MyResilientLayoutRuntimeTest
+
+  init(r: MyResilientLayoutRuntimeTest) {
+    self.r = r
+  }
+
+  func getT() -> MyResilientLayoutRuntimeTest {
+    return r
+  }
+}
+
+@inline(never) func getAssociatedType<T : ProtocolWithAssociatedType>(p: T)
+    -> MyResilientLayoutProtocol.Type {
+  return T.T.self
+}
+
+ResilientStructTestSuite.test("DynamicLayoutAssociatedType") {
+  do {
+    let r = MyResilientLayoutRuntimeTest(b1: ResilientBool(b: true),
+                                         i: ResilientInt(i: 0),
+                                         b2: ResilientBool(b: false),
+                                         d: ResilientDouble(d: 0.0))
+    let metatype: MyResilientLayoutProtocol.Type =
+        MyResilientLayoutRuntimeTest.self
+    let associated: MyResilientLayoutProtocol.Type =
+        getAssociatedType(StructWithDependentAssociatedType(r: r));
+    expectEqual(true, metatype == associated)
+    expectEqual(getB(r), true)
   }
 }
 

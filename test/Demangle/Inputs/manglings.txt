@@ -100,8 +100,10 @@ _TWPC3foo3barS_8barrables ---> protocol witness table for foo.bar : foo.barrable
 _TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for foo.bar : foo.barrable in foo
 _TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type foo.bar and conformance foo.bar : foo.barrable in foo
 _TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type foo.bar and conformance foo.bar : foo.barrable in foo
-_TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for foo.bar : foo.barrable in foo
-_TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for foo.bar : foo.barrable in foo
+_TWGC3foo3barS_8barrableS_ ---> generic protocol witness table for foo.bar : foo.barrable in foo
+_TWIC3foo3barS_8barrableS_ ---> instantiation function for generic protocol witness table for foo.bar : foo.barrable in foo
+_TWtC3foo3barS_8barrableS_4fred ---> associated type metadata accessor for fred in foo.bar : foo.barrable in foo
+_TWTC3foo3barS_8barrableS_4fredS_6thomas ---> associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
 _TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
 _TIF1t1fFT1iSi1sSS_T_A_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 1)
@@ -175,7 +177,7 @@ _TF8manglingX27ihqwctvzcJBfGFJdrssDxIboAybFT_T_ ---> mangling.他們爲什麽不
 _TF8manglingX30Proprostnemluvesky_uybCEdmaEBaFT_T_ ---> mangling.Pročprostěnemluvíčesky () -> ()
 _TF8manglingXoi7p_qcaDcFTSiSi_Si ---> mangling.«+» infix (Swift.Int, Swift.Int) -> Swift.Int
 _TF8manglingoi2qqFTSiSi_T_ ---> mangling.?? infix (Swift.Int, Swift.Int) -> ()
-_TFE11ext_structAV11def_structA1A4testfT_T_ ---> ext.ext_structA.def_structA.A.test () -> ()
+_TFE11ext_structAV11def_structA1A4testfT_T_ ---> (extension in ext_structA):def_structA.A.test () -> ()
 _TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> devirt_access.(getPrivateClass in _DISC) () -> devirt_access.(PrivateClass in _DISC)
 _TF4mainP5_mainX3wxaFT_T_ ---> main.(λ in _main) () -> ()
 _TtPMP_ ---> protocol<>.Type
@@ -200,8 +202,8 @@ _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_F
 _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_g31closureInGenericPropertyContextwx3Tee ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericPropertyContext.getter : A.Tee in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
 _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu0_RxS1_rfTqd__1yqd_0__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth <A, B where A: interface_type_mangling.GenericWitnessTest> (A1, y : B1) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
 _TFC3red11BaseClassEHcfzT1aSi_S0_ ---> red.BaseClassEH.init (a : Swift.Int) throws -> red.BaseClassEH
-_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1aSi ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
-_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1bx ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
+_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1aSi ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
+_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1bx ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
 _TTRXFo_iT__iT_zoPs9ErrorType__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.ErrorType) to @callee_owned () -> (@unowned (), @error @owned Swift.ErrorType)
 _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps9ErrorType_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorType

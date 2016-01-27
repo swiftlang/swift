@@ -11,6 +11,15 @@
 //
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import Foundation
 import StdlibUnittestFoundationExtras
 
@@ -259,9 +268,9 @@ NSStringAPIs.test("localizedCapitalizedString") {
 ///   executed in the given localeID
 func expectLocalizedEquality(
   expected: String,
-  _ op: (_: NSLocale?)->String,
+  _ op: (_: NSLocale?) -> String,
   _ localeID: String? = nil,
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__
@@ -679,7 +688,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
 NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   var s = "abc あかさた"
   do {
-    // The largest buffer that can not accommodate the string plus null terminator.
+    // The largest buffer that cannot accommodate the string plus null terminator.
     let bufferLength = 16
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
@@ -1187,7 +1196,7 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
     expectEmpty(s.rangeOfString("す"))
 
     // Note: here `rangeOfString` API produces indexes that don't point between
-    // grapheme cluster boundaries -- these can not be created with public
+    // grapheme cluster boundaries -- these cannot be created with public
     // String interface.
     //
     // FIXME: why does this search succeed and the above queries fail?  There is
@@ -1395,8 +1404,8 @@ NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
 
   func fwo(
     s: String, _ options: NSStringCompareOptions
-  )(loc: NSLocale?) -> String {
-    return s.stringByFoldingWithOptions(options, locale: loc)
+  ) -> (NSLocale?) -> String {
+    return { loc in s.stringByFoldingWithOptions(options, locale: loc) }
   }
   
   expectLocalizedEquality("abcd", fwo("abCD", .CaseInsensitiveSearch), "en")
@@ -2143,7 +2152,7 @@ func getNullCString() -> UnsafeMutablePointer<CChar> {
   return nil
 }
 
-func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<CChar>.alloc(100)
   up[0] = 0x61
   up[1] = 0x62
@@ -2151,7 +2160,7 @@ func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
   return (up, { up.dealloc(100) })
 }
 
-func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0xd0
   up[1] = 0xb0
@@ -2162,7 +2171,7 @@ func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
 }
 
 func getIllFormedUTF8String1(
-) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed
@@ -2174,7 +2183,7 @@ func getIllFormedUTF8String1(
 }
 
 func getIllFormedUTF8String2(
-) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
   let up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed

@@ -54,9 +54,9 @@ bb0:
   %s1 = alloc_stack $TestStruct
 
   %f = function_ref @unknown_func :  $@convention(thin) (@inout TestStruct) -> ()
-  %a = apply %f(%s1#1) : $@convention(thin) (@inout TestStruct) -> ()
+  %a = apply %f(%s1) : $@convention(thin) (@inout TestStruct) -> ()
 
-  dealloc_stack %s1#0 : $*@local_storage TestStruct
+  dealloc_stack %s1 : $*TestStruct
 
   strong_release %o1 : $TestClass
   strong_release %o2 : $TestClass

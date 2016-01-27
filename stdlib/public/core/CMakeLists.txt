@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 #
 #===----------------------------------------------------------------------===#
 
-# The list of sources without which it's impossble to build a core
+# The list of sources without which it's impossible to build a core
 # standard library.  Try to add new standard library sources to
 # SWIFTLIB_SOURCES, below, rather than SWIFTLIB_ESSENTIAL, if
 # possible, to improve layering.  Check that you got it right by
@@ -127,6 +127,7 @@ set(SWIFTLIB_SOURCES
   Mirror.swift
   Process.swift
   SliceBuffer.swift
+  Tuple.swift.gyb
   VarArgs.swift
   Zip.swift
   Prespecialized.swift

@@ -1,8 +1,8 @@
-//===--- IRGenDebugInfo.h - Debug Info Support-----------------------------===//
+//===--- IRGenDebugInfo.cpp - Debug Info Support --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -128,7 +128,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   StringRef Flags = Opts.DWARFDebugFlags;
   unsigned Major, Minor;
   std::tie(Major, Minor) = version::getSwiftNumericVersion();
-  unsigned RuntimeVersion = Major*100 + Minor;
+  unsigned MajorRuntimeVersion = Major;
 
   // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
@@ -136,7 +136,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   // Clang is doing the same thing here.
   TheCU = DBuilder.createCompileUnit(
       Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
-      Flags, RuntimeVersion, SplitName,
+      Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
           ? llvm::DIBuilder::LineTablesOnly
           : llvm::DIBuilder::FullDebug);
@@ -553,15 +553,21 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   if (!DC)
     return TheCU;
 
+  if (isa<FuncDecl>(DC))
+    if (auto *Decl = IGM.SILMod->lookUpFunction(
+          SILDeclRef(cast<AbstractFunctionDecl>(DC), SILDeclRef::Kind::Func)))
+      return getOrCreateScope(Decl->getDebugScope());
+
   switch (DC->getContextKind()) {
-  // TODO: Create a cache for functions.
-  case DeclContextKind::AbstractClosureExpr:
+  // The interesting cases are already handled above.
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::AbstractClosureExpr:
 
   // We don't model these in DWARF.
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Initializer:
   case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::SubscriptDecl:
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::TopLevelCodeDecl:
@@ -619,7 +625,7 @@ IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                      DeclContext *DeclCtx) {
   SmallVector<llvm::Metadata *, 16> Parameters;
 
-  GenericsRAII scope(*this, FnTy->getGenericSignature());
+  GenericContextScope scope(IGM, FnTy->getGenericSignature());
 
   // The function return type is the first element in the list.
   createParameterType(Parameters, FnTy->getSemanticResultSILType(),
@@ -644,7 +650,6 @@ static bool isAllocatingConstructor(SILFunctionTypeRepresentation Rep,
 llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     SILModule &SILMod, const SILDebugScope *DS, llvm::Function *Fn,
     SILFunctionTypeRepresentation Rep, SILType SILTy, DeclContext *DeclCtx) {
-  // Returned a previously cached entry for an abstract (inlined) function.
   auto cached = ScopeCache.find(DS);
   if (cached != ScopeCache.end())
     return cast<llvm::DISubprogram>(cached->second);
@@ -677,9 +682,11 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     ScopeLine = FL.LocForLinetable.Line;
   }
 
-  auto File = getOrCreateFile(L.Filename);
-  auto Scope = MainModule;
   auto Line = L.Line;
+  auto File = getOrCreateFile(L.Filename);
+  llvm::DIScope *Scope = MainModule;
+  if (DS->SILFn && DS->SILFn->getDeclContext())
+    Scope = getOrCreateContext(DS->SILFn->getDeclContext()->getParent());
 
   // We know that main always comes from MainFile.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
@@ -857,7 +864,7 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
                       (Alignment)CI.getTargetInfo().getPointerAlign(0));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           TName, 0,
-                          // swift.type is a already pointer type,
+                          // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
                           DirectValue, ArtificialValue);
@@ -870,12 +877,9 @@ llvm::DIFile *IRGenDebugInfo::getFile(llvm::DIScope *Scope) {
     case llvm::dwarf::DW_TAG_lexical_block:
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
       break;
-    case llvm::dwarf::DW_TAG_subprogram: {
-      // Scopes are not indexed by UID.
-      llvm::DITypeIdentifierMap EmptyMap;
-      Scope = cast<llvm::DISubprogram>(Scope)->getScope().resolve(EmptyMap);
+    case llvm::dwarf::DW_TAG_subprogram:
+      Scope = cast<llvm::DISubprogram>(Scope)->getFile();
       break;
-    }
     default:
       return MainFile;
     }
@@ -961,24 +965,6 @@ getStorageSize(const llvm::DataLayout &DL, ArrayRef<llvm::Value *> Storage) {
   return Size(size);
 }
 
-/// LValues, inout args, and Archetypes are implicitly indirect by
-/// virtue of their DWARF type.
-static bool isImplicitlyIndirect(TypeBase *Ty) {
-  switch (Ty->getKind()) {
-  case TypeKind::Paren:
-    return isImplicitlyIndirect(
-        cast<ParenType>(Ty)->getUnderlyingType().getPointer());
-  case TypeKind::NameAlias:
-    return isImplicitlyIndirect(
-        cast<NameAliasType>(Ty)->getSinglyDesugaredType());
-  case TypeKind::InOut:
-  case TypeKind::Archetype:
-    return true;
-  default:
-    return false;
-  }
-}
-
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
@@ -1017,9 +1003,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
   unsigned Flags = 0;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
-
-  if (isImplicitlyIndirect(DbgTy.getType()))
-    Indirection = DirectValue;
 
   // Create the descriptor for the variable.
   llvm::DILocalVariable *Var = nullptr;
@@ -1154,14 +1137,9 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
 
-  llvm::SmallString<160> Buffer;
-  {
-    llvm::raw_svector_ostream S(Buffer);
-    Mangle::Mangler M(S, /* DWARF */ true);
-    M.mangleTypeForDebugger(DbgTy.getType(), DbgTy.getDeclContext());
-  }
-  assert(!Buffer.empty() && "mangled name came back empty");
-  return BumpAllocatedString(Buffer);
+  Mangle::Mangler M(/* DWARF */ true);
+  M.mangleTypeForDebugger(DbgTy.getType(), DbgTy.getDeclContext());
+  return BumpAllocatedString(M.finalize());
 }
 
 /// Create a member of a struct, class, tuple, or enum.
@@ -1186,9 +1164,10 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
     unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
+  auto genericSig = IGM.SILMod->Types.getCurGenericContext();
   for (auto ElemTy : TupleTy->getElementTypes()) {
     auto &elemTI =
-      IGM.getTypeInfoForUnlowered(AbstractionPattern(CurGenerics,
+      IGM.getTypeInfoForUnlowered(AbstractionPattern(genericSig,
                                                   ElemTy->getCanonicalType()),
                                   ElemTy);
     DebugTypeInfo DbgTy(ElemTy, elemTI, DeclContext);

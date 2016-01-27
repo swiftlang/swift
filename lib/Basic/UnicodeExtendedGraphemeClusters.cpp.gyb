@@ -7,7 +7,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,12 +17,9 @@
 
 %{
 
-import re
+from GYBUnicodeDataUtils import GraphemeClusterBreakPropertyTable, get_extended_grapheme_cluster_rules_matrix
 
-from GYBUnicodeDataUtils import *
-
-grapheme_cluster_break_property_table = \
-    GraphemeClusterBreakPropertyTable(unicodeGraphemeBreakPropertyFile)
+break_table = GraphemeClusterBreakPropertyTable(unicodeGraphemeBreakPropertyFile)
 
 }%
 
@@ -32,8 +29,7 @@ swift::unicode::GraphemeClusterBreakProperty
 swift::unicode::getGraphemeClusterBreakProperty(uint32_t C) {
   // FIXME: replace linear search with a trie lookup.
 
-% for start_code_point,end_code_point,value in \
-%     grapheme_cluster_break_property_table.property_value_ranges:
+% for start_code_point, end_code_point, value in break_table.property_value_ranges:
 %   if start_code_point == 0:
   if (C <= ${end_code_point})
 %   else:
@@ -46,7 +42,7 @@ swift::unicode::getGraphemeClusterBreakProperty(uint32_t C) {
 }
 
 const uint16_t swift::unicode::ExtendedGraphemeClusterNoBoundaryRulesMatrix[] = {
-% for row in get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_table):
+% for row in get_extended_grapheme_cluster_rules_matrix(break_table):
   ${row},
 % end
 };

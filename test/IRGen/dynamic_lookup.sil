@@ -55,15 +55,17 @@ bb0(%0 : $X):
 sil @dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = alloc_box $AnyObject
-  store %0 to %1#1 : $*AnyObject
+  %1a = project_box %1 : $@box AnyObject
+  store %0 to %1a : $*AnyObject
   %3 = alloc_box $Optional<() -> ()>              
-  %4 = load %1#1 : $*AnyObject
+  %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
   %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
 
-  // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(f)", align {{(4|8)}}
-  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]])
+  // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(f)"
+  // CHECK: [[RESPONDS:%[0-9]+]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
+  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
   // CHECK: br i1 [[HAS_SEL]]
   dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 
@@ -82,7 +84,8 @@ bb3:
 sil @dynamic_lookup_static_br : $@convention(thin) (@thick AnyObject.Type) -> () {
 bb0(%0 : $@thick AnyObject.Type):
   // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(g)", align {{(4|8)}}
-  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]])
+  // CHECK: [[RESPONDS:%[0-9]+]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
+  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
   // CHECK: br i1 [[HAS_SEL]]
   %1 = open_existential_metatype %0 : $@thick AnyObject.Type to $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type
   dynamic_method_br %1 : $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type, #X.g!1.foreign, bb1, bb2
@@ -101,8 +104,9 @@ bb3:
 sil @_T1t23dynamic_lookup_propertyFT1xPSo13AnyObject__T_ : $@convention(thin) (AnyObject) -> () {
   bb0(%0 : $AnyObject):
   %1 = alloc_box $AnyObject
-  store %0 to %1#1 : $*AnyObject
-  %6 = load %1#1 : $*AnyObject                // users: %24, %8, %7
+  %1a = project_box %1 : $@box AnyObject
+  store %0 to %1a : $*AnyObject
+  %6 = load %1a : $*AnyObject                // users: %24, %8, %7
   strong_retain %6 : $AnyObject
   %8 = open_existential_ref %6 : $AnyObject to $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject // users: %11, %9
   %9 = unchecked_ref_cast %8 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject to $Builtin.UnknownObject
@@ -123,22 +127,25 @@ bb3:
 sil @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_ : $@convention(thin) (AnyObject, Int) -> () {
 bb0(%0 : $AnyObject, %1 : $Int):
   %2 = alloc_box $AnyObject
+  %2a = project_box %2 : $@box AnyObject
   %3 = alloc_box $Int
-  store %0 to %2#1 : $*AnyObject
-  store %1 to %3#1 : $*Int
-  %8 = load %2#1 : $*AnyObject
+  %3a = project_box %3 : $@box Int
+  store %0 to %2a : $*AnyObject
+  store %1 to %3a : $*Int
+  %8 = load %2a : $*AnyObject
   strong_retain %8 : $AnyObject
   %10 = open_existential_ref %8 : $AnyObject to $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject
   %11 = unchecked_ref_cast %10 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject to $Builtin.UnknownObject
   // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(objectAtIndexedSubscript:)", align {{(4|8)}}
-  // CHECK-NEXT: [[HAS_SEL:%[0-9]+]] = call i1 @swift_objcRespondsToSelector(%objc_object* %0, i8* [[SEL]])
+  // CHECK: [[RESPONDS:%[0-9]+]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
+  // CHECK-NEXT: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
   // CHECK-NEXT: br i1 [[HAS_SEL]], label [[HAS_METHOD:%[0-9]+]], label [[HAS_METHOD:%[0-9]+]]
 
   dynamic_method_br %11 : $Builtin.UnknownObject, #X.subscript!getter.1.foreign, bb1, bb2
 
 bb1(%13 : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int): // Preds: bb0
   %14 = partial_apply %13(%11) : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int
-  %15 = load %3#1 : $*Int             
+  %15 = load %3a : $*Int             
   %16 = apply %14(%15) : $@callee_owned Int -> Int
   br bb3
 

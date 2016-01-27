@@ -54,6 +54,15 @@
 
 import OpenCL
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import Foundation
 import Darwin
 
@@ -132,7 +141,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Create the compute program from the source buffer
   //
   program = KernelSource.withCString {
-    (s: UnsafePointer<CChar>)->cl_program in
+    (s: UnsafePointer<CChar>) -> cl_program in
     var s = s
     return withUnsafeMutablePointer(&s) {
       return clCreateProgramWithSource(context, 1, $0, nil, &err)

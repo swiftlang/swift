@@ -118,10 +118,10 @@ entry(%z : $*Z, %x : $@thick Bar<T, U, V>.Type):
 sil @call_concrete_witness : $(Foo) -> () {
 entry(%x : $Foo):
   %m = alloc_stack $Foo
-  store %x to %m#1 : $*Foo
+  store %x to %m : $*Foo
   %w = function_ref @concrete_type_concrete_method_witness : $@convention(witness_method) (@in Foo) -> @thick Foo.Type
-  %z = apply %w(%m#1) : $@convention(witness_method) (@in Foo) -> @thick Foo.Type
-  dealloc_stack %m#0 : $*@local_storage Foo
+  %z = apply %w(%m) : $@convention(witness_method) (@in Foo) -> @thick Foo.Type
+  dealloc_stack %m : $*Foo
   return undef : $()
 }
 

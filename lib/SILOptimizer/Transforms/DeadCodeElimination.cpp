@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -91,7 +91,7 @@ class DCE : public SILFunctionTransform {
 
   /// Tracks if the pass changed branches.
   bool BranchesChanged;
-  /// Trackes if the pass changed ApplyInsts.
+  /// Tracks if the pass changed ApplyInsts.
   bool CallsChanged;
 
   /// The entry point to the transformation.
@@ -197,7 +197,7 @@ void DCE::markValueLive(ValueBase *V) {
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
-/// are overflow builtints but may be extended to other instructions in the
+/// are overflow builtins but may be extended to other instructions in the
 /// future.
 static SILInstruction *getProducer(CondFailInst *CFI) {
   // Check for the pattern:
@@ -235,7 +235,7 @@ void DCE::markLive(SILFunction &F) {
         // definition is alive.
         SILValue Op = FLI->getOperand();
         auto *OpInst = dyn_cast<SILInstruction>(Op);
-        if (OpInst && !Op.getType().isAddress()) {
+        if (OpInst && !Op->getType().isAddress()) {
           addReverseDependency(OpInst, FLI);
         } else {
           markValueLive(FLI);
@@ -280,18 +280,20 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   // delivers those arguments.
   markValueLive(Term);
 
-  switch (Term->getKind()) {
-  default:
-    llvm_unreachable("Unexpected terminator kind!");
+  switch (Term->getTermKind()) {
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
 
-  case ValueKind::UnreachableInst:
-  case ValueKind::SwitchValueInst:
+  case TermKind::UnreachableInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::CheckedCastAddrBranchInst:
     llvm_unreachable("Unexpected argument for terminator kind!");
     break;
 
-  case ValueKind::DynamicMethodBranchInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::CheckedCastBranchInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::CheckedCastBranchInst:
     assert(ArgIndex == 0 && "Expected a single argument!");
 
     // We do not need to do anything with these. If the resulting
@@ -300,26 +302,26 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
     // single operand of these instructions as live.
     break;
 
-  case ValueKind::BranchInst:
-    markValueLive(cast<BranchInst>(Term)->getArg(ArgIndex).getDef());
+  case TermKind::BranchInst:
+    markValueLive(cast<BranchInst>(Term)->getArg(ArgIndex));
     break;
 
-  case ValueKind::CondBranchInst: {
+  case TermKind::CondBranchInst: {
     auto *CondBr = cast<CondBranchInst>(Term);
 
     if (CondBr->getTrueBB() == Succ) {
       auto TrueArgs = CondBr->getTrueArgs();
-      markValueLive(TrueArgs[ArgIndex].getDef());
+      markValueLive(TrueArgs[ArgIndex]);
     }
 
     if (CondBr->getFalseBB() == Succ) {
       auto FalseArgs = CondBr->getFalseArgs();
-      markValueLive(FalseArgs[ArgIndex].getDef());
+      markValueLive(FalseArgs[ArgIndex]);
     }
 
     break;
   }
-  case ValueKind::TryApplyInst: {
+  case TermKind::TryApplyInst: {
     assert(ArgIndex == 0 && "Expect a single argument!");
     break;
   }
@@ -332,7 +334,7 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   // Conceptually, the dependency from a debug instruction to its definition
   // is in reverse direction: Only if its definition (the Arg) is alive, also
   // the debug_value instruction is alive.
-  for (Operand *DU : getDebugUses(*Arg))
+  for (Operand *DU : getDebugUses(Arg))
     markValueLive(DU->getUser());
 
   if (Arg->isFunctionArg())
@@ -350,12 +352,12 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
 void DCE::propagateLiveness(SILInstruction *I) {
   if (!isa<TermInst>(I)) {
     for (auto &O : I->getAllOperands())
-      markValueLive(O.get().getDef());
+      markValueLive(O.get());
 
     // Conceptually, the dependency from a debug instruction to its definition
     // is in reverse direction: Only if its definition is alive, also the
     // debug_value instruction is alive.
-    for (Operand *DU : getDebugUses(*I))
+    for (Operand *DU : getDebugUses(I))
       markValueLive(DU->getUser());
 
     // Handle all other reverse-dependency instructions, like cond_fail and
@@ -366,35 +368,30 @@ void DCE::propagateLiveness(SILInstruction *I) {
     return;
   }
 
-  switch (I->getKind()) {
-#define TERMINATOR(ID, PARENT, MEM, RELEASE)
-#define VALUE(ID, PARENT) case ValueKind::ID:
-#include "swift/SIL/SILNodes.def"
-    llvm_unreachable("Unexpected terminator instruction!");
-
-  case ValueKind::BranchInst:
-  case ValueKind::UnreachableInst:
+  switch (ValueKindAsTermKind(I->getKind())) {
+  case TermKind::BranchInst:
+  case TermKind::UnreachableInst:
     return;
 
-  case ValueKind::ReturnInst:
-  case ValueKind::ThrowInst:
-  case ValueKind::CondBranchInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::SwitchEnumAddrInst:
-  case ValueKind::DynamicMethodBranchInst:
-  case ValueKind::CheckedCastBranchInst:
-    markValueLive(I->getOperand(0).getDef());
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::CondBranchInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
+    markValueLive(I->getOperand(0));
     return;
 
-  case ValueKind::TryApplyInst:
-  case ValueKind::SwitchValueInst:
+  case TermKind::TryApplyInst:
+  case TermKind::SwitchValueInst:
     for (auto &O : I->getAllOperands())
-      markValueLive(O.get().getDef());
+      markValueLive(O.get());
     return;
 
-  case ValueKind::CheckedCastAddrBranchInst:
-    markValueLive(I->getOperand(0).getDef());
-    markValueLive(I->getOperand(1).getDef());
+  case TermKind::CheckedCastAddrBranchInst:
+    markValueLive(I->getOperand(0));
+    markValueLive(I->getOperand(1));
     return;
   }
   llvm_unreachable("corrupt instruction!");
@@ -455,9 +452,9 @@ bool DCE::removeDead(SILFunction &F) {
       DEBUG(llvm::dbgs() << "Removing dead argument:\n");
       DEBUG(Inst->dump());
 
-      for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-        auto *Undef = SILUndef::get(Inst->getType(i), Inst->getModule());
-        SILValue(Inst, i).replaceAllUsesWith(Undef);
+      if (Inst->hasValue()) {
+        auto *Undef = SILUndef::get(Inst->getType(), Inst->getModule());
+        Inst->replaceAllUsesWith(Undef);
       }
 
       Changed = true;
@@ -485,9 +482,9 @@ bool DCE::removeDead(SILFunction &F) {
       DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
       DEBUG(Inst->dump());
 
-      for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
-        auto *Undef = SILUndef::get(Inst->getType(i), Inst->getModule());
-        SILValue(Inst, i).replaceAllUsesWith(Undef);
+      if (Inst->hasValue()) {
+        auto *Undef = SILUndef::get(Inst->getType(), Inst->getModule());
+        Inst->replaceAllUsesWith(Undef);
       }
 
 

@@ -1,8 +1,8 @@
-//===- PerformanceInliner.cpp - Basic cost based inlining for performance -===//
+//===--- PerformanceInliner.cpp - Basic cost based performance inlining ---===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -310,7 +310,7 @@ SILValue ConstantTracker::scanProjections(SILValue addr,
                                           SmallVectorImpl<Projection> *Result) {
   for (;;) {
     if (Projection::isAddrProjection(addr)) {
-      SILInstruction *I = cast<SILInstruction>(addr.getDef());
+      SILInstruction *I = cast<SILInstruction>(addr);
       if (Result) {
         Optional<Projection> P = Projection::addressProjectionForInstruction(I);
         Result->push_back(P.getValue());
@@ -534,9 +534,11 @@ bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
   StringRef CallerName = Caller->getName();
   StringRef CalleeName = Callee->getName();
 
-  bool InlinedBefore = InlinedFunctions.count(std::make_pair(CallerName, CalleeName));
+  bool InlinedBefore =
+      InlinedFunctions.count(std::make_pair(CallerName, CalleeName));
 
-  // If the Callee was inlined into the Caller in previous inlining iterations then
+  // If the Callee was inlined into the Caller in previous inlining iterations
+  // then
   // we need to reject this inlining request to prevent a cycle.
   return InlinedBefore;
 }
@@ -560,7 +562,7 @@ static bool calleeHasMinimalSelfRecursion(SILFunction *Callee) {
   return false;
 }
 
-// Returns the callee of an apply_inst if it is basically inlinable.
+// Returns the callee of an apply_inst if it is basically inlineable.
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   SILFunction *Callee = AI.getCalleeFunction();
@@ -572,16 +574,16 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   // Don't inline functions that are marked with the @_semantics or @effects
   // attribute if the inliner is asked not to inline them.
-  if (Callee->hasDefinedSemantics() || Callee->hasEffectsKind()) {
+  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       DEBUG(llvm::dbgs() << "        FAIL: Function " << Callee->getName()
             << " has special semantics or effects attribute.\n");
       return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
-    if (Callee->hasDefinedSemantics() &&
+    if (Callee->hasSemanticsAttrs() &&
         WhatToInline != InlineSelection::Everything &&
-        Callee->getSemanticsString().startswith("availability")) {
+        Callee->hasSemanticsAttrThatStartsWith("availability")) {
       return nullptr;
     }
   } else if (Callee->isGlobalInit()) {
@@ -715,7 +717,7 @@ static SILBasicBlock *getTakenBlock(TermInst *term,
   if (CheckedCastBranchInst *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
     if (SILInstruction *def = constTracker.getDefInCaller(CCB->getOperand())) {
       if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
-        SILType castType = UCI->getOperand()->getType(0);
+        SILType castType = UCI->getOperand()->getType();
         if (CCB->getCastType().isSuperclassOf(castType)) {
           return CCB->getSuccessBB();
         }
@@ -776,7 +778,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         SILInstruction *def = constTracker.getDefInCaller(AI->getCallee());
         if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def))) {
 
-          DEBUG(llvm::dbgs() << "        Boost: apply const function at" << *AI);
+          DEBUG(llvm::dbgs() << "        Boost: apply const function at"
+                             << *AI);
           Benefit += ConstCalleeBenefit + loopDepth * LoopBenefitFactor;
           testThreshold *= 2;
         }
@@ -1286,7 +1289,7 @@ void SILPerformanceInliner::visitColdBlocks(
 
 
 //===----------------------------------------------------------------------===//
-//                          Performane Inliner Pass
+//                          Performance Inliner Pass
 //===----------------------------------------------------------------------===//
 
 namespace {

@@ -68,7 +68,7 @@ There are a few aspects of the language that make it challenging to implement th
   extension C { }
   extension B { struct Inner { } }
 
-Here, the name lookup used for the first extension needs to resolve the typealias, which depends on the second extension having already been bound. There is a similar dependency on resolving superclasses beforing binding extensions::
+Here, the name lookup used for the first extension needs to resolve the typealias, which depends on the second extension having already been bound. There is a similar dependency on resolving superclasses before binding extensions::
 
   class X { struct Inner { } }
   class Y : X { }
@@ -154,7 +154,7 @@ The proposed architecture is significantly different from the current type check
 
 **Make name lookup phase-aware**: Name lookup is currently one of the worst offenders when violating phase ordering. Parameterize name lookup based on the phase at which it's operating. For example, asking for name lookup at the "extension binding" phase might not resolve type aliases, look into superclasses, or look into protocols.
 
-**Make type resolution phase-aware**: Type resolution effectively brings a given ``TypeRepr`` up to the "declaration type validation`` phase in one shot. Parameterize type resolution based on the target phase, and start minimizing the among of work that the type checking does. Use extension binding as a testbed for these more-minimal dependencies.
+**Make type resolution phase-aware**: Type resolution effectively brings a given ``TypeRepr`` up to the "declaration type validation`` phase in one shot. Parameterize type resolution based on the target phase, and start minimizing the amount of work that the type checking does. Use extension binding as a testbed for these more-minimal dependencies.
 
 **Dependency graph and priority queue**: Extend the current-phase trait with an operation that enumerates the dependencies that need to be satisfied to bring a given AST node up to a particular phase. Start with ``TypeRepr`` nodes, and use the dependency graph and priority queue to satisfy all dependencies ahead of time, eliminating direct recursion from the type-resolution code path. Build circular-dependency detection within this test-bed.
 
@@ -165,7 +165,7 @@ The proposed architecture is significantly different from the current type check
 How do we test it?
 ~~~~~~~~~~~~~~~~~~
 
-**Existing code continues to work**: As we move various parts of the type checker over to the dependency graph, existing Swift code should continue to work, since we'll have fallbacks to the existing logic and the new type checker should be strictly more lazy than the existing type checker.
+**Existing code continues to work**: As we move various parts of the type checker over to the dependency graph, existing Swift code should continue to work, since we'll have fallbacks to the existing logic and the new type checker should be strictly lazier than the existing type checker.
 
 **Order-independence testing**: One of the intended improvements from this type checker architecture is that we should get more predictable order-independent behavior. To check this, we can randomly scramble the order in which we type-check declarations in the primary source file of a well-formed module and verify that we get the same results.
 
@@ -180,4 +180,4 @@ The proposed change is a major architectural shift, and it's only complete when 
 
 **Accessors that check the current phase**: When we're finished, each of the AST's accessors should assert that the AST node is in the appropriate phase. The number of such assertions that have been enabled is an indication of how well the type checker is respecting the dependencies.
 
-**Phases of AST nodes in non-primary files**: With the current type checker, every AST node in a non-primary file that gets touched when type-checking the primary file will end up being fully validated (currently, the "attribute checking" phase). As the type checker gets more lazy, the AST nodes in non-primary files will trend toward earlier phases. Tracking the number of nodes in non-primary files at each phase over time will help us establish how lazy the type checker is becoming.
+**Phases of AST nodes in non-primary files**: With the current type checker, every AST node in a non-primary file that gets touched when type-checking the primary file will end up being fully validated (currently, the "attribute checking" phase). As the type checker gets lazier, the AST nodes in non-primary files will trend toward earlier phases. Tracking the number of nodes in non-primary files at each phase over time will help us establish how lazy the type checker is becoming.

@@ -1,8 +1,8 @@
-//===--- type_traits.h - Type traits -----------------------------*- C++ -*-==//
+//===--- type_traits.h - Type traits ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@
 
 namespace swift {
 
-/// Same as \c std::is_trivially_copyable, which we can not use directly
+/// Same as \c std::is_trivially_copyable, which we cannot use directly
 /// because it is not implemented yet in all C++11 standard libraries.
 ///
 /// Unlike \c llvm::isPodLike, this trait should produce a precise result and

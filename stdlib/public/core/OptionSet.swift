@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -34,7 +34,7 @@ public protocol OptionSetType : SetAlgebraType, RawRepresentable {
   // constrained extension
   
   /// An `OptionSet`'s `Element` type is normally `Self`.
-  typealias Element = Self
+  associatedtype Element = Self
 
   // FIXME: This initializer should just be the failable init from
   // RawRepresentable. Unfortunately, current language limitations

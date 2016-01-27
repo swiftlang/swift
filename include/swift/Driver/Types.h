@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -44,10 +44,18 @@ namespace types {
   /// Returns true if the type represents textual data.
   bool isTextual(ID Id);
 
-  /// Returns true if the type is produced in the compiler after the LLVM passes.
+  /// Returns true if the type is produced in the compiler after the LLVM 
+  /// passes.
+  ///
   /// For those types the compiler produces multiple output files in multi-
   /// threaded compilation.
   bool isAfterLLVM(ID Id);
+
+  /// Returns true if the type is a file that contributes to the Swift module
+  /// being compiled.
+  ///
+  /// These need to be passed to the Swift frontend 
+  bool isPartOfSwiftCompilation(ID Id);
 
   template <typename Fn>
   void forAllTypes(const Fn &fn);

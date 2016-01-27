@@ -1,0 +1,130 @@
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+
+// CHECK: %swift.type = type { [[INT:i32|i64]] }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import resilient_struct
+
+//
+// Fits inside a buffer's inline storage.
+//
+
+public struct SmallResilientStruct {
+  let x: Int32 = 0
+}
+
+// CHECK: @smallGlobal = global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer
+sil_global [let] @smallGlobal : $SmallResilientStruct
+
+//
+// Requires out-of-line allocation.
+//
+
+public struct LargeResilientStruct {
+  let w: Int64 = 0
+  let x: Int64 = 0
+  let y: Int64 = 0
+  let z: Int64 = 0
+}
+
+// CHECK: @largeGlobal = global [[BUFFER]] zeroinitializer
+sil_global [let] @largeGlobal : $LargeResilientStruct
+
+//
+// Size is known in this resilience domain, and global is hidden,
+// so allocate it directly.
+//
+
+// CHECK: @fixedGlobal = hidden global %V17global_resilience20LargeResilientStruct zeroinitializer
+sil_global hidden @fixedGlobal : $LargeResilientStruct
+
+//
+// Unknown size -- must call value witness functions for buffer
+// management.
+//
+
+// CHECK: @otherGlobal = global [[BUFFER]] zeroinitializer
+sil_global [let] @otherGlobal : $Size
+
+// CHECK-LABEL: define void @testSmallGlobal()
+sil @testSmallGlobal : $@convention(thin) () -> () {
+bb0:
+  // This is just a no-op
+  alloc_global @smallGlobal
+
+  %addr = global_addr @smallGlobal : $*SmallResilientStruct
+
+  // CHECK: [[VALUE:%.*]] = load i32, i32* getelementptr inbounds (%V17global_resilience20SmallResilientStruct, %V17global_resilience20SmallResilientStruct* bitcast ([[BUFFER]]* @smallGlobal to %V17global_resilience20SmallResilientStruct*), i32 0, i32 0, i32 0)
+  %value = load %addr : $*SmallResilientStruct
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
+// CHECK-LABEL: define void @testLargeGlobal()
+sil @testLargeGlobal : $@convention(thin) () -> () {
+bb0:
+  // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_slowAlloc([[INT]] 32, [[INT]] 7)
+  // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
+  alloc_global @largeGlobal
+
+  // CHECK: [[VALUE:%.*]] = load %V17global_resilience20LargeResilientStruct*, %V17global_resilience20LargeResilientStruct** bitcast ([[BUFFER]]* @largeGlobal to %V17global_resilience20LargeResilientStruct**)
+  %addr = global_addr @largeGlobal : $*LargeResilientStruct
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
+// CHECK-LABEL: define void @testFixedGlobal()
+sil @testFixedGlobal : $@convention(thin) () -> () {
+bb0:
+  alloc_global @fixedGlobal
+
+  %addr = global_addr @fixedGlobal : $*LargeResilientStruct
+
+  // CHECK:      load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 0, i32 0)
+  // CHECK-NEXT: load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 1, i32 0)
+  // CHECK-NEXT: load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 2, i32 0)
+  // CHECK-NEXT: load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 3, i32 0)
+  %value = load %addr : $*LargeResilientStruct
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
+sil @testOtherGlobal : $@convention(thin) () -> () {
+bb0:
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
+
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+  // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
+  // CHECK: [[allocateBuffer:%.*]] = bitcast i8* [[WITNESS]] to %swift.opaque* ([[BUFFER]]*, %swift.type*)*
+  // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[allocateBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]])
+  alloc_global @otherGlobal
+
+  // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
+  // CHECK: [[projectBuffer:%.*]] = bitcast i8* [[WITNESS]] to %swift.opaque* ([[BUFFER]]*, %swift.type*)*
+  // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[projectBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]])
+  %addr = global_addr @otherGlobal : $*Size
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}

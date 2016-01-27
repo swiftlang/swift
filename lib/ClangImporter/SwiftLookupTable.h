@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -36,6 +36,7 @@ namespace clang {
 class NamedDecl;
 class DeclContext;
 class MacroInfo;
+class ObjCCategoryDecl;
 }
 
 namespace swift {
@@ -47,10 +48,10 @@ class SwiftLookupTableWriter;
 ///
 const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 
-/// Lookup table major version number.
+/// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 1;
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 2;
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -162,6 +163,9 @@ private:
   /// the C entities that have that name, in all contexts.
   llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>> LookupTable;
 
+  /// The list of Objective-C categories and extensions.
+  llvm::SmallVector<clang::ObjCCategoryDecl *, 4> Categories;
+
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
 
@@ -196,6 +200,9 @@ public:
   void addEntry(DeclName name, SingleEntry newEntry,
                 clang::DeclContext *effectiveContext);
 
+  /// Add an Objective-C category or extension to the table.
+  void addCategory(clang::ObjCCategoryDecl *category);
+
   /// Lookup the set of entities with the given base name.
   ///
   /// \param baseName The base name to search for. All results will
@@ -213,6 +220,9 @@ public:
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
   SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(StringRef baseName);
+
+  /// Retrieve the set of Objective-C categories and extensions.
+  ArrayRef<clang::ObjCCategoryDecl *> categories();
 
   /// Deserialize all entries.
   void deserializeAll();
@@ -245,15 +255,17 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
   std::function<void()> OnRemove;
 
   void *SerializedTable;
+  ArrayRef<clang::serialization::DeclID> Categories;
 
   SwiftLookupTableReader(clang::ModuleFileExtension *extension,
                          clang::ASTReader &reader,
                          clang::serialization::ModuleFile &moduleFile,
                          std::function<void()> onRemove,
-                         void *serializedTable)
+                         void *serializedTable,
+                         ArrayRef<clang::serialization::DeclID> categories)
     : ModuleFileExtensionReader(extension), Reader(reader),
       ModuleFile(moduleFile), OnRemove(onRemove),
-      SerializedTable(serializedTable) { }
+      SerializedTable(serializedTable), Categories(categories) { }
 
 public:
   /// Create a new lookup table reader for the given AST reader and stream
@@ -280,6 +292,11 @@ public:
   /// \returns true if we found anything, false otherwise.
   bool lookup(StringRef baseName,
               SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries);
+
+  /// Retrieve the declaration IDs of the categories.
+  ArrayRef<clang::serialization::DeclID> categories() const {
+    return Categories;
+  }
 };
 
 }

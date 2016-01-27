@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -159,7 +159,6 @@ LoopRegionFunctionInfo::~LoopRegionFunctionInfo() {
 void LoopRegionFunctionInfo::verify() {
 #ifndef NDEBUG
   llvm::SmallVector<unsigned, 8> UniquePredList;
-  llvm::SmallVector<LoopRegion::SuccessorID, 8> UniqueSuccList;
   for (auto *R : IDToRegionMap) {
     // Make sure that our region has a pred list without duplicates. We do not
     // care if the predecessor list is sorted, just that it is unique.
@@ -177,7 +176,7 @@ void LoopRegionFunctionInfo::verify() {
     if (!R->ParentID.hasValue()) {
       auto NLSuccs = R->getNonLocalSuccs();
       assert(NLSuccs.begin() == NLSuccs.end() &&
-             "Can not have non local "
+             "Cannot have non local "
              "successors without a parent node");
       continue;
     }
@@ -915,16 +914,6 @@ struct alledge_iterator
     if (isSubregion())
       return false;
     return SuccIter->getValue().IsNonLocal;
-  }
-
-  Optional<unsigned> getSuccIndex() const {
-    if (isSubregion())
-      return None;
-    // Since we have a bidirectional iterator, this will perform increments
-    // until we get to SuccIter. This is the behavior we want so that we ensure
-    // that we skip over any dead successor edges. We are just performing
-    // graphing, so performance is not a concern.
-    return std::distance(Wrapper->Region->succ_begin(), SuccIter);
   }
 
   LoopRegionWrapper *operator*() const {

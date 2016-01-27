@@ -14,8 +14,8 @@ class C {
 }()
 }
 
-func foo1(a: Int, handler : ()->()) {}
-func foo2(handler : () ->()) {}
+func foo1(a: Int, handler : () -> ()) {}
+func foo2(handler : () -> ()) {}
 
 func foo3() {
   foo1(1)
@@ -35,7 +35,7 @@ func foo3() {
 
 // CHECK: key.sourcetext: "        var abc = 1"
 // CHECK: key.sourcetext: "        let a: String = {"
-// CHECK: key.sourcetext: "            let b = "asdf""
+// CHECK: key.sourcetext: "            let b = \"asdf\""
 // CHECK: key.sourcetext: "            return b"
 // CHECK: key.sourcetext: "        }()"
 // CHECK: key.sourcetext: "    }"

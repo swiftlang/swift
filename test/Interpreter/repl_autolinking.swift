@@ -8,6 +8,8 @@
 
 // REQUIRES: swift_repl
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnueabihf
+// UNSUPPORTED: OS=freebsd
 
 // This test checks that autolinking works in the REPL.
 

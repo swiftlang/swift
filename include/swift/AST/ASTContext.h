@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -34,7 +34,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include <functional>
 #include <memory>
@@ -99,6 +98,26 @@ enum class AllocationArena {
   /// Any type involving a type variable is allocated in this arena.
   ConstraintSolver
 };
+
+/// Lists the set of "known" Foundation entities that are used in the
+/// compiler.
+///
+/// While the names of Foundation types aren't likely to change in
+/// Objective-C, their mapping into Swift can. Therefore, when
+/// referring to names of Foundation entities in Swift, use this enum
+/// and \c ASTContext::getSwiftName or \c ASTContext::getSwiftId.
+enum class KnownFoundationEntity {
+#define FOUNDATION_ENTITY(Name) Name,
+#include "swift/AST/KnownFoundationEntities.def"
+};
+
+/// Retrieve the Foundation entity kind for the given Objective-C
+/// entity name.
+Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+
+/// Determine with the non-prefixed name of the given known Foundation
+/// entity conflicts with the Swift standard library.
+bool nameConflictsWithStandardLibrary(KnownFoundationEntity entity);
 
 /// Callback function used when referring to a type member of a given
 /// type variable.
@@ -281,7 +300,7 @@ public:
   template <typename T>
   typename std::remove_reference<T>::type *AllocateObjectCopy(T &&t,
               AllocationArena arena = AllocationArena::Permanent) const {
-    // This function can not be named AllocateCopy because it would always win
+    // This function cannot be named AllocateCopy because it would always win
     // overload resolution over the AllocateCopy(ArrayRef<T>).
     using TNoRef = typename std::remove_reference<T>::type;
     TNoRef *res = (TNoRef *) Allocate(sizeof(TNoRef), alignof(TNoRef), arena);
@@ -487,7 +506,7 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
   
-  /// \brief Look for the declaration with the given name within the
+  /// Look for the declaration with the given name within the
   /// swift module.
   void lookupInSwiftModule(StringRef name,
                            SmallVectorImpl<ValueDecl *> &results) const;
@@ -500,9 +519,10 @@ public:
                                   Type type,
                                   LazyResolver *resolver) const;
 
-  /// \brief Notify all of the mutation listeners that the given declaration
-  /// was just added.
-  void addedExternalDecl(Decl *decl);
+  /// Add a declaration to a list of declarations that need to be emitted
+  /// as part of the current module or source file, but are otherwise not
+  /// nested within it.
+  void addExternalDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
@@ -590,7 +610,7 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// \brief Load the methods within the given class that that produce
+  /// \brief Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -604,7 +624,7 @@ public:
   ///
   /// \param previousGeneration The previous generation with which this
   /// callback was invoked. The list of methods will already contain all of
-  /// the results from generations up and and including \c previousGeneration.
+  /// the results from generations up and including \c previousGeneration.
   ///
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested. This list will be
@@ -780,6 +800,16 @@ public:
   /// protocols that conflict with methods.
   bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 
+  /// Retrieve the Swift name for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  StringRef getSwiftName(KnownFoundationEntity kind);
+
+  /// Retrieve the Swift identifier for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  Identifier getSwiftId(KnownFoundationEntity kind) {
+    return getIdentifier(getSwiftName(kind));
+  }
+
   /// Try to dump the context of the given archetype.
   void dumpArchetypeContext(ArchetypeType *archetype,
                             unsigned indent = 0) const;
@@ -791,7 +821,7 @@ public:
 
   /// Collect visible clang modules from the ClangModuleLoader. These modules are
   /// not necessarily loaded.
-  void getVisibleTopLevelClangeModules(SmallVectorImpl<clang::Module*> &Modules) const;
+  void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
   /// Retrieve or create the stored archetype builder for the given
   /// canonical generic signature and module.

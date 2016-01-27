@@ -1,5 +1,5 @@
-// RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift
-// RUN: not %swift -parse -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %swift -parse -verify -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift
+// RUN: not %swift -parse -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 
@@ -29,15 +29,15 @@ func useClassThatTriggersImportOfPotentiallyUnavailableOptions() {
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {
-  _ = NSDeprecatedOptions.First // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.10: Use a different API}}
-  _ = NSDeprecatedEnum.First    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.10: Use a different API}}
+  _ = NSDeprecatedOptions.First // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
+  _ = NSDeprecatedEnum.First    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
 }
 
-func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.10: Use a different API}}
+func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
 }
 
 class SuperClassWithDeprecatedInitializer {
-  @available(OSX, introduced=10.9, deprecated=10.10)
+  @available(OSX, introduced=10.9, deprecated=10.51)
   init() { }
 }
 
@@ -49,39 +49,39 @@ class SubClassWithSynthesizedDesignedInitializerOverride : SuperClassWithDepreca
 }
 
 func callImplicitInitializerOnSubClassWithSynthesizedDesignedInitializerOverride() {
-  _ = SubClassWithSynthesizedDesignedInitializerOverride() // expected-warning {{'init()' was deprecated in OS X 10.10}}
+  _ = SubClassWithSynthesizedDesignedInitializerOverride() // expected-warning {{'init()' was deprecated in OS X 10.51}}
 }
 
-@available(OSX, introduced=10.9, deprecated=10.10)
+@available(OSX, introduced=10.9, deprecated=10.51)
 class DeprecatedSuperClass {
   var i : Int = 7 // Causes initializer to be synthesized
 }
 
-class NotDeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass { // expected-warning {{'DeprecatedSuperClass' was deprecated in OS X 10.10}}
+class NotDeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass { // expected-warning {{'DeprecatedSuperClass' was deprecated in OS X 10.51}}
 }
 
-func callImplicitInitalizerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
+func callImplicitInitializerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
   // We do not expect a warning here because the synthesized initializer
   // in NotDeprecatedSubClassOfDeprecatedSuperClass is not itself marked
   // deprecated.
   _ = NotDeprecatedSubClassOfDeprecatedSuperClass()
 }
 
-@available(OSX, introduced=10.9, deprecated=10.10)
+@available(OSX, introduced=10.9, deprecated=10.51)
 class DeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass {
 }
 
 // Tests synthesis of materializeForSet
 class ClassWithLimitedAvailabilityAccessors {
   var limitedGetter: Int {
-    @available(OSX, introduced=10.11)
+    @available(OSX, introduced=10.52)
     get { return 10 }
     set(newVal) {}
   }
 
   var limitedSetter: Int {
     get { return 10 }
-    @available(OSX, introduced=10.11)
+    @available(OSX, introduced=10.52)
     set(newVal) {}
   }
 }
@@ -103,7 +103,7 @@ func unavailableUseInUnavailableFunction() {
 }
 
 
-@available(OSX 10.11, *)
+@available(OSX 10.52, *)
 func foo() {
   let _ =  SubOfOtherWithInit()
 }

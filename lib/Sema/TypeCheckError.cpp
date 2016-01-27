@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -81,9 +81,6 @@ public:
 
   /// Whether the function is marked 'rethrows'.
   bool isBodyRethrows() const { return IsRethrows; }
-
-  /// The uncurry level that 'rethrows' applies to.
-  unsigned getNumBodyParameters() const { return ParamCount; }
 
   unsigned getNumArgumentsForFullApply() const {
     return (ParamCount - unsigned(IsProtocolMethod));
@@ -213,6 +210,8 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
+    } else if (auto ic = dyn_cast<IfConfigStmt>(S)) {
+      recurse = asImpl().checkIfConfig(ic);
     } else {
       assert(!isa<CatchStmt>(S));
     }
@@ -303,7 +302,7 @@ enum class ThrowingKind {
   Throws,
 };
 
-/// A type expressing the result of classifying whether an call or function
+/// A type expressing the result of classifying whether a call or function
 /// throws.
 class Classification {
   ThrowingKind Result;
@@ -572,6 +571,11 @@ private:
       Result = ThrowingKind::Throws;
       return ShouldRecurse;
     }
+
+    ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
+      return ShouldRecurse;
+    }
+    
     void checkExhaustiveDoBody(DoCatchStmt *S) {}
     void checkNonExhaustiveDoBody(DoCatchStmt *S) {
       S->getBody()->walk(*this);
@@ -1328,6 +1332,37 @@ private:
     return ShouldRecurse;
   }
 
+  ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
+    // Check the inactive regions of a #if block to disable warnings that may
+    // be due to platform specific code.
+    struct ConservativeThrowChecker : public ASTWalker {
+      CheckErrorCoverage &CEC;
+      ConservativeThrowChecker(CheckErrorCoverage &CEC) : CEC(CEC) {}
+      
+      Expr *walkToExprPost(Expr *E) override {
+        if (isa<TryExpr>(E))
+          CEC.Flags.set(ContextFlags::HasAnyThrowSite);
+        return E;
+      }
+      
+      Stmt *walkToStmtPost(Stmt *S) override {
+        if (isa<ThrowStmt>(S))
+          CEC.Flags.set(ContextFlags::HasAnyThrowSite);
+
+        return S;
+      }
+    };
+
+    for (auto &clause : S->getClauses()) {
+      // Active clauses are handled by the normal AST walk.
+      if (clause.isActive) continue;
+      
+      for (auto elt : clause.Elements)
+        elt.walk(ConservativeThrowChecker(*this));
+    }
+    return ShouldRecurse;
+  }
+
   ShouldRecurse_t checkThrow(ThrowStmt *S) {
     checkThrowSite(S, /*requiresTry*/ false,
                    Classification::forThrow(PotentialReason::forThrow()));
@@ -1382,7 +1417,8 @@ private:
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
-      TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
+      if (!E->isImplicit())
+        TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
 
     // Diagnose all the call sites within a single unhandled 'try'
     // at the same time.

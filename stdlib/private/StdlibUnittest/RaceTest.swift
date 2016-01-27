@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -40,7 +40,7 @@ import SwiftPrivate
 import SwiftPrivatePthreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD)
 import Glibc
 #endif
 
@@ -68,15 +68,15 @@ public protocol RaceTestWithPerTrialDataType {
   ///
   /// This type should be a class.  (The harness will not pass struct instances
   /// between threads correctly.)
-  typealias RaceData : AnyObject
+  associatedtype RaceData : AnyObject
 
   /// Type of thread-local data.
   ///
   /// Thread-local data is newly created for every trial.
-  typealias ThreadLocalData
+  associatedtype ThreadLocalData
 
   /// Results of the observation made after performing an operation.
-  typealias Observation
+  associatedtype Observation
 
   init()
 
@@ -501,8 +501,8 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())
   let sharedState = _RaceTestSharedState<RT>(racingThreadCount: racingThreadCount)
 
-  let masterThreadBody: (_: ())->() = {
-    (_: ())->() in
+  let masterThreadBody: () -> Void = {
+    () -> Void in
     for _ in 0..<trials {
       autoreleasepool {
         _masterThreadOneTrial(sharedState)
@@ -510,8 +510,8 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
     }
   }
 
-  let racingThreadBody: (Int)->() = {
-    (tid: Int)->() in
+  let racingThreadBody: (Int) -> Void = {
+    (tid: Int) -> Void in
     for _ in 0..<trials {
       _workerThreadOneTrial(tid, sharedState)
     }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -76,16 +76,16 @@ public:
     return MemorySILType.getSwiftRValueType();
   }
 
-  SILValue getAddress() const {
-    if (isa<MarkUninitializedInst>(MemoryInst))
-      return SILValue(MemoryInst, 0);
-    return SILValue(MemoryInst, 1);
+  SILInstruction *getAddress() const {
+    if (isa<MarkUninitializedInst>(MemoryInst) ||
+        isa<AllocStackInst>(MemoryInst))
+      return MemoryInst;
+    assert(false);
+    return nullptr;
   }
 
-  SILValue getContainer() const {
-    if (isa<MarkUninitializedInst>(MemoryInst))
-      return SILValue();
-    return SILValue(MemoryInst, 0);
+  AllocBoxInst *getContainer() const {
+    return dyn_cast<AllocBoxInst>(MemoryInst);
   }
 
   /// getNumMemoryElements - Return the number of elements, without the extra
@@ -110,7 +110,7 @@ public:
     return false;
   }
 
-  /// True if the memory object is the 'self' argument of a enum initializer.
+  /// True if the memory object is the 'self' argument of an enum initializer.
   bool isEnumInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       if (MUI->isRootSelf())

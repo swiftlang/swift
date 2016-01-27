@@ -1,8 +1,8 @@
-//===- CSE.cpp - Simple and fast CSE pass ---------------------------------===//
+//===--- CSE.cpp - Simple and fast CSE pass -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -127,6 +127,10 @@ public:
 
   hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getField());
+  }
+
+  hash_code visitProjectBoxInst(ProjectBoxInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
   }
 
   hash_code visitRefToRawPointerInst(RefToRawPointerInst *X) {
@@ -537,7 +541,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      SILValue(Inst, 0).replaceAllUsesWith(V);
+      Inst->replaceAllUsesWith(V);
       Inst->eraseFromParent();
       Changed = true;
       ++NumSimplify;
@@ -619,7 +623,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return !WMI->isVolatile();
   }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
-    return !EMI->getOperand().getType().isAddress();
+    return !EMI->getOperand()->getType().isAddress();
   }
   switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:
@@ -637,6 +641,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     case ValueKind::ValueMetatypeInst:
     case ValueKind::ObjCProtocolInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::IndexAddrInst:
     case ValueKind::PointerToAddressInst:

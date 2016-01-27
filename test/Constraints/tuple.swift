@@ -24,9 +24,9 @@ func f5(x: (Int, Int)) {}
 
 func f6(_: (i: Int, j: Int), k: Int = 15) {}
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Conversions and shuffles
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 // Variadic functions.
 f4()
@@ -72,11 +72,13 @@ extension Int : PosixErrorReturn {
 }
 
 func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
-  (f:(A) -> T)(args:A) -> T // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  (f:(A) -> T) -> (args:A) -> T
 {
-  let result = f(args)
-  assert(result != T.errorReturnValue())
-  return result
+  return { args in
+    let result = f(args)
+    assert(result != T.errorReturnValue())
+    return result
+  }
 }
 
 func open(name: String, oflag: Int) -> Int { }
@@ -149,6 +151,32 @@ func gcd_23700031<T>(a: T, b: T) {
   var b = b
   (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
   // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (UInt8, UInt8), (Int8, Int8), (UInt16, UInt16), (Int16, Int16), (UInt32, UInt32), (Int32, Int32), (UInt64, UInt64), (Int64, Int64), (UInt, UInt), (Int, Int), (Float, Float)}}
+}
+
+// <rdar://problem/24210190>
+//   Don't ignore tuple labels in same-type constraints or stronger.
+protocol Kingdom {
+  associatedtype King
+}
+struct Victory<General> {
+  init<K: Kingdom where K.King == General>(_ king: K) {}
+}
+struct MagicKingdom<K> : Kingdom {
+  typealias King = K
+}
+func magify<T>(t: T) -> MagicKingdom<T> { return MagicKingdom() }
+func foo(pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
+  return Victory(magify(pair)) // expected-error {{cannot convert return expression of type 'Victory<(Int, Int)>' to return type 'Victory<(x: Int, y: Int)>'}}
+}
+
+
+// https://bugs.swift.org/browse/SR-596
+// Compiler crashes when accessing a non-existent property of a closure parameter
+func call(f: C -> Void) {}
+func makeRequest() {
+  call { obj in
+    print(obj.invalidProperty)  // expected-error {{value of type 'C' has no member 'invalidProperty'}}
+  }
 }
 
 
