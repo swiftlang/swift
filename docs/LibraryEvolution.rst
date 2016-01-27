@@ -134,6 +134,11 @@ version of the library where the entity may be used.
   a declaration in Swift, because a client may depend on them
   See `New Conformances`_, below.
 
+In a versioned library, any top-level public entity from the list above may not
+be made ``public`` without an appropriate version. A public entity declared
+within a versioned type (or an extension of a versioned type) will default to
+having the same version as the type.
+
 Code within a library may generally use all other entities declared within the
 library (barring their own availability checks), since the entire library is
 shipped as a unit. That is, even if a particular API was introduced in v1.0,
@@ -144,10 +149,9 @@ is not enforced by the language.
 
 .. _semantic versioning: http://semver.org
 
-In a versioned library, an entity from the list above may not be made
-``public`` without an appropriate version. However, in some cases it may be
-useful to version an ``internal`` entity as well. See `Versioning Internal
-Declarations`_ below.
+Certain uses of ``internal`` entities require them to be part of a library's
+binary interface, which means they need to be versioned as well. See
+`Versioning Internal Declarations`_ below.
 
 The syntax for marking an entity as versioned has not yet been decided, but the
 rest of this document will use syntax #1 described below.
