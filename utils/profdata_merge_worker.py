@@ -1,46 +1,52 @@
 #!/usr/bin/env python
 
-from contextlib import closing
 import os
+import shutil
+import pipes
 import sys
-import atexit
 import socket
-import select
-import time
 import SocketServer
 from multiprocessing import Lock, Process, Queue, JoinableQueue
 import thread
 import subprocess
+import tempfile
+import argparse
 
-PID_FILE_PATH = os.path.join("/tmp", "profdata_merge_worker.pid")
-
-FINAL_PROFDATA_PATH = os.path.join("/tmp", "swift.profdata")
 SERVER_ADDRESS = ('localhost', 12400)
-
 TESTS_FINISHED_SENTINEL = "PROFDATA_MERGE_WORKER_TESTS_FINISHED_SENTINEL"
-
 FILE_QUEUE = JoinableQueue()
 FILES_MERGED = set()
+CONFIG = None
 
-DEBUG = len(sys.argv) > 1 and sys.argv[1] == "--debug"
+class Config():
+    def __init__(self, debug, out_dir):
+        self.debug = debug
+        self.out_dir = out_dir
+        self.tmp_dir = tempfile.mkdtemp()
+        self.pid_file_path = os.path.join(self.out_dir, "profdata_merge_worker.pid")
+        self.final_profdata_path = os.path.join(self.out_dir, "swift.profdata")
 
 printlock = Lock()
 def printsync(msg):
-    if DEBUG:
+    if CONFIG and CONFIG.debug:
         with printlock:
             print >>sys.stderr, msg
 
 class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
+    def report(self, msg):
+        """Convenience method for reporting status from the workers."""
+        printsync("\n===== ProfdataTCPHandler =====\n%s\n" % msg)
+
     def handle(self):
         """Receive a newline-separated list of filenames from a TCP connection
         and add them to the shared merge queue, where the workers will
         execute llvm-profdata merge commands."""
         data = self.rfile.read()
-        printsync(data)
+        self.report("received data (length %d): %s" % (len(data), data))
 
         # Stop once we receive the sentinel
         if data.startswith(TESTS_FINISHED_SENTINEL):
-            printsync("received sentinel; killing server...")
+            self.report("received sentinel; killing server...")
             self.finish()
             self.connection.close()
             def kill_server(server):
@@ -60,8 +66,8 @@ class ProfdataMergerProcess(Process):
     def __init__(self):
         Process.__init__(self)
         self.filename_buffer = []
-        self.profdata_path = os.path.join("/tmp", "%s.profdata" % self.name)
-        self.profdata_tmp_path = self.profdata_path + ".tmp"
+        self.profdata_path = os.path.join(CONFIG.tmp_dir, "%s.profdata" % self.name)
+        self.profdata_tmp_path = self.profdata_path + ".copy"
 
     def report(self, msg):
         """Convenience method for reporting status from the workers."""
@@ -78,10 +84,14 @@ class ProfdataMergerProcess(Process):
         if os.path.exists(self.profdata_path):
             os.rename(self.profdata_path, self.profdata_tmp_path)
             self.filename_buffer.append(self.profdata_tmp_path)
-        llvm_cmd = ("xcrun llvm-profdata merge %s -o %s" %
-                    (" ".join(self.filename_buffer), self.profdata_path))
+        cleaned_files = ' '.join(pipes.quote(f) for f in self.filename_buffer)
+        llvm_cmd = ("xcrun llvm-profdata merge -o %s %s"
+            % (self.profdata_path, cleaned_files))
         self.report(llvm_cmd)
-        subprocess.call(llvm_cmd, shell=True)
+        ret = subprocess.call(llvm_cmd, shell=True)
+        if ret != 0:
+            self.report("llvm profdata command failed -- Exited with code %d"
+                % ret)
         for f in self.filename_buffer:
             if os.path.exists(f):
                 os.remove(f)
@@ -105,26 +115,16 @@ class ProfdataMergerProcess(Process):
                 self.merge_file_buffer()
                 FILE_QUEUE.task_done()
 
-@atexit.register
-def remove_pidfile():
-    """Always remove the pid file when we exit."""
-    if os.path.exists(PID_FILE_PATH):
-        os.remove(PID_FILE_PATH)
-
 def main():
-    pid = os.getpid()
-    if not DEBUG:
-        pid = os.fork()
-        if pid != 0:
-            sys.exit(0) # kill the parent process we forked from.
 
-    if os.path.exists(PID_FILE_PATH):
-        with open(PID_FILE_PATH) as pidfile:
+    pid = os.getpid()
+    if os.path.exists(CONFIG.pid_file_path):
+        with open(CONFIG.pid_file_path) as pidfile:
             pid = pidfile.read()
             printsync('existing process found with pid %s' % pid)
         return
 
-    with open(PID_FILE_PATH, "w") as pidfile:
+    with open(CONFIG.pid_file_path, "w") as pidfile:
         pidfile.write(str(pid))
 
     processes = [ProfdataMergerProcess() for _ in range(10)]
@@ -144,7 +144,7 @@ def main():
 
     # now that all workers have completed, merge all their files
     merge_final = ProfdataMergerProcess()
-    merge_final.profdata_path = FINAL_PROFDATA_PATH
+    merge_final.profdata_path = CONFIG.final_profdata_path
     for p in processes:
         if os.path.exists(p.profdata_path):
             printsync("merging " + p.profdata_path + "...")
@@ -152,4 +152,24 @@ def main():
     merge_final.merge_file_buffer()
 
 if __name__ == "__main__":
-    exit(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--debug",
+        help="Run in foreground and report status.",
+        action="store_true")
+    parser.add_argument("-o", "--output-dir",
+        help="The directory to write the PID file and final profdata file.",
+        default="/tmp")
+    args = parser.parse_args()
+    CONFIG = Config(args.debug, args.output_dir)
+    if not CONFIG.debug:
+        pid = os.fork()
+        if pid != 0:
+            sys.exit(0) # kill the parent process we forked from.
+    try:
+        main()
+    finally:
+        if os.path.exists(CONFIG.pid_file_path):
+            os.remove(CONFIG.pid_file_path)
+        if os.path.exists(CONFIG.tmp_dir):
+            shutil.rmtree(CONFIG.tmp_dir, ignore_errors=True)
+
