@@ -437,7 +437,6 @@ class SignatureOptimizer {
   llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
 
 public:
-  ArrayRef<ArgumentDescriptor> getArgList() const { return ArgDescList; }
   SignatureOptimizer() = delete;
   SignatureOptimizer(const SignatureOptimizer &) = delete;
   SignatureOptimizer(SignatureOptimizer &&) = delete;
