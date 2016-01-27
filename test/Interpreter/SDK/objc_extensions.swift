@@ -40,6 +40,10 @@ print(o.respondsToSelector("blackHoleWithHawkingRadiation"))
 // CHECK: true
 print(o.respondsToSelector("setBlackHoleWithHawkingRadiation:"))
 
+// Test #selector for referring to methods.
+// CHECK: true
+print(o.respondsToSelector(#selector(NSObject.frob)))
+
 // CHECK: I've been frobbed!
 o.frob()
 // CHECK: true
