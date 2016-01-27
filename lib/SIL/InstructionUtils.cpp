@@ -141,6 +141,18 @@ SILValue swift::stripAddressProjections(SILValue V) {
   }
 }
 
+SILValue swift::stripUnaryAddressProjections(SILValue V) {
+  while (true) {
+    V = stripSinglePredecessorArgs(V);
+    if (!NewProjection::isAddressProjection(V))
+      return V;
+    auto *Inst = cast<SILInstruction>(V);
+    if (Inst->getNumOperands() > 1)
+      return V;
+    V = Inst->getOperand(0);
+  }
+}
+
 SILValue swift::stripValueProjections(SILValue V) {
   while (true) {
     V = stripSinglePredecessorArgs(V);
