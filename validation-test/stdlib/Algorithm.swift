@@ -82,6 +82,7 @@ Algorithm.test("min,max") {
 
 Algorithm.test("sorted/strings")
   .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
+  .xfail(.FreeBSDAny(reason: "String comparison: ICU vs. Foundation"))
   .code {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
