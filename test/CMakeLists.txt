@@ -207,8 +207,6 @@ if(PYTHONINTERP_FOUND)
             set(command_profdata_merge_stop)
         endif()
 
-        message(STATUS ${command_profdata_merge_start})
-        message(STATUS ${command_profdata_merge_stop})
         add_custom_target("check-swift${test_mode_target_suffix}${VARIANT_SUFFIX}"
             ${command_upload_stdlib}
             ${command_clean_test_results_dir}
