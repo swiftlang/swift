@@ -414,55 +414,47 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
 
 namespace {
 
-/// A class that contains all analysis information we gather about our
-/// function. Also provides utility methods for creating the new empty function.
-class SignatureOptimizer {
-  llvm::BumpPtrAllocator &Allocator;
-
-  RCIdentityFunctionInfo *RCIA;
-
+// Helper class that analyzes the parameters of a function to
+// determine how we can modify the function signature to improve the
+// quality of the code that we generate.
+class ParameterAnalyzer {
   /// The function that we are analyzing.
   SILFunction *F;
+
+  RCIdentityFunctionInfo *RCIA;
 
   /// Does any call inside the given function may bind dynamic 'Self' to a
   /// generic argument of the callee.
   bool MayBindDynamicSelf;
 
-  /// Did we change the self argument. If so we need to change the calling
-  /// convention 'method' to 'freestanding'.
-  bool HaveModifiedSelfArgument;
+  /// Did we decide to change the self argument? If so we need to
+  /// change the calling convention 'method' to 'freestanding'.
+  bool ShouldModifySelfArgument = false;
 
   /// A list of structures which present a "view" of precompiled information on
   /// an argument that we will use during our optimization.
   llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
 
+  llvm::BumpPtrAllocator &Allocator;
+
 public:
-  SignatureOptimizer() = delete;
-  SignatureOptimizer(const SignatureOptimizer &) = delete;
-  SignatureOptimizer(SignatureOptimizer &&) = delete;
+  ParameterAnalyzer(SILFunction *F, RCIdentityFunctionInfo *RCIA,
+                    llvm::BumpPtrAllocator &Allocator)
+      : F(F), RCIA(RCIA), MayBindDynamicSelf(computeMayBindDynamicSelf(F)),
+        Allocator(Allocator) {}
 
-  SignatureOptimizer(llvm::BumpPtrAllocator &Allocator,
-                     RCIdentityFunctionInfo *RCIA, SILFunction *F)
-      : Allocator(Allocator), RCIA(RCIA), F(F),
-        MayBindDynamicSelf(computeMayBindDynamicSelf(F)),
-        HaveModifiedSelfArgument(false), ArgDescList() {}
-
-  /// Analyze the given function.
   bool analyze();
 
   /// Returns the mangled name of the function that should be generated from
   /// this function analyzer.
-  std::string getOptimizedName();
+  std::string getOptimizedName() const;
 
-  /// Create a new empty function with the optimized signature found by this
-  /// analysis.
-  ///
-  /// *NOTE* This occurs in the same module as F.
-  SILFunction *createEmptyFunctionWithOptimizedSig(const std::string &Name);
-
+  bool shouldModifySelfArgument() const { return ShouldModifySelfArgument; }
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
   MutableArrayRef<ArgumentDescriptor> getArgDescList() { return ArgDescList; }
+  SILFunction *getAnalyzedFunction() const { return F; }
 
+private:
   /// Is the given argument required by the ABI?
   ///
   /// Metadata arguments may be required if dynamic Self is bound to any generic
@@ -472,6 +464,33 @@ public:
     // metadata argument or object from which self metadata can be obtained.
     return MayBindDynamicSelf && (F->getSelfMetadataArgument() == Arg);
   }
+};
+
+/// A class that contains all analysis information we gather about our
+/// function. Also provides utility methods for creating the new empty function.
+class SignatureOptimizer {
+  ParameterAnalyzer &Analyzer;
+
+public:
+  SignatureOptimizer() = delete;
+  SignatureOptimizer(const SignatureOptimizer &) = delete;
+  SignatureOptimizer(SignatureOptimizer &&) = delete;
+
+  SignatureOptimizer(ParameterAnalyzer &Analyzer) : Analyzer(Analyzer) {}
+
+  ArrayRef<ArgumentDescriptor> getArgDescList() const {
+    return Analyzer.getArgDescList();
+  }
+
+  MutableArrayRef<ArgumentDescriptor> getArgDescList() {
+    return Analyzer.getArgDescList();
+  }
+
+  /// Create a new empty function with the optimized signature found by this
+  /// analysis.
+  ///
+  /// *NOTE* This occurs in the same module as F.
+  SILFunction *createEmptyFunctionWithOptimizedSig(const std::string &Name);
 
 private:
   /// Compute the CanSILFunctionType for the optimized function.
@@ -483,7 +502,7 @@ private:
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
-bool SignatureOptimizer::analyze() {
+bool ParameterAnalyzer::analyze() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
@@ -548,7 +567,7 @@ bool SignatureOptimizer::analyze() {
       // Store that we have modified the self argument. We need to change the
       // calling convention later.
       if (Args[i]->isSelf())
-        HaveModifiedSelfArgument = true;
+        ShouldModifySelfArgument = true;
     }
 
     // Add the argument to our list.
@@ -559,65 +578,10 @@ bool SignatureOptimizer::analyze() {
 }
 
 //===----------------------------------------------------------------------===//
-//                         Creating the New Function
-//===----------------------------------------------------------------------===//
-
-CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
-  const ASTContext &Ctx = F->getModule().getASTContext();
-  CanSILFunctionType FTy = F->getLoweredFunctionType();
-
-  // The only way that we modify the arity of function parameters is here for
-  // dead arguments. Doing anything else is unsafe since by definition non-dead
-  // arguments will have SSA uses in the function. We would need to be smarter
-  // in our moving to handle such cases.
-  llvm::SmallVector<SILParameterInfo, 8> InterfaceParams;
-  for (auto &ArgDesc : ArgDescList) {
-    ArgDesc.computeOptimizedInterfaceParams(InterfaceParams);
-  }
-
-  SILResultInfo InterfaceResult = FTy->getResult();
-  auto InterfaceErrorResult = FTy->getOptionalErrorResult();
-  auto ExtInfo = FTy->getExtInfo();
-
-  // Don't use a method representation if we modified self.
-  if (HaveModifiedSelfArgument)
-    ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-
-  return SILFunctionType::get(FTy->getGenericSignature(), ExtInfo,
-                              FTy->getCalleeConvention(), InterfaceParams,
-                              InterfaceResult, InterfaceErrorResult, Ctx);
-}
-
-SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
-    const std::string &NewFName) {
-  SILModule &M = F->getModule();
-
-  // Create the new optimized function type.
-  CanSILFunctionType NewFTy = createOptimizedSILFunctionType();
-
-  // Create the new function.
-  auto *NewF = M.getOrCreateFunction(
-      F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
-      F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
-      F->getDeclContext());
-
-  NewF->setDeclCtx(F->getDeclContext());
-
-  // Array semantic clients rely on the signature being as in the original
-  // version.
-  for (auto &Attr : F->getSemanticsAttrs())
-    if (!StringRef(Attr).startswith("array."))
-      NewF->addSemanticsAttr(Attr);
-
-  return NewF;
-}
-
-//===----------------------------------------------------------------------===//
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
-std::string SignatureOptimizer::getOptimizedName() {
+std::string ParameterAnalyzer::getOptimizedName() const {
   Mangle::Mangler M;
   auto P = SpecializationPass::FunctionSignatureOpts;
   FunctionSignatureSpecializationMangler FSSM(P, M, F);
@@ -644,6 +608,65 @@ std::string SignatureOptimizer::getOptimizedName() {
   FSSM.mangle();
 
   return M.finalize();
+}
+
+//===----------------------------------------------------------------------===//
+//                         Creating the New Function
+//===----------------------------------------------------------------------===//
+
+CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
+  auto *F = Analyzer.getAnalyzedFunction();
+
+  const ASTContext &Ctx = F->getModule().getASTContext();
+  CanSILFunctionType FTy = F->getLoweredFunctionType();
+
+  // The only way that we modify the arity of function parameters is here for
+  // dead arguments. Doing anything else is unsafe since by definition non-dead
+  // arguments will have SSA uses in the function. We would need to be smarter
+  // in our moving to handle such cases.
+  llvm::SmallVector<SILParameterInfo, 8> InterfaceParams;
+  for (auto &ArgDesc : getArgDescList()) {
+    ArgDesc.computeOptimizedInterfaceParams(InterfaceParams);
+  }
+
+  SILResultInfo InterfaceResult = FTy->getResult();
+  auto InterfaceErrorResult = FTy->getOptionalErrorResult();
+  auto ExtInfo = FTy->getExtInfo();
+
+  // Don't use a method representation if we modified self.
+  if (Analyzer.shouldModifySelfArgument())
+    ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  return SILFunctionType::get(FTy->getGenericSignature(), ExtInfo,
+                              FTy->getCalleeConvention(), InterfaceParams,
+                              InterfaceResult, InterfaceErrorResult, Ctx);
+}
+
+SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
+    const std::string &NewFName) {
+
+  auto *F = Analyzer.getAnalyzedFunction();
+  SILModule &M = F->getModule();
+
+  // Create the new optimized function type.
+  CanSILFunctionType NewFTy = createOptimizedSILFunctionType();
+
+  // Create the new function.
+  auto *NewF = M.getOrCreateFunction(
+      F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(), F->isBare(),
+      F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
+      F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
+      F->getDeclContext());
+
+  NewF->setDeclCtx(F->getDeclContext());
+
+  // Array semantic clients rely on the signature being as in the original
+  // version.
+  for (auto &Attr : F->getSemanticsAttrs())
+    if (!StringRef(Attr).startswith("array."))
+      NewF->addSemanticsAttr(Attr);
+
+  return NewF;
 }
 
 //===----------------------------------------------------------------------===//
@@ -847,8 +870,8 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   assert(!CallSites.empty() && "Unexpected empty set of call sites!");
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  SignatureOptimizer Optimizer(BPA, RCIA, F);
-  if (!Optimizer.analyze()) {
+  ParameterAnalyzer Analyzer(F, RCIA, BPA);
+  if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
     return false;
@@ -859,7 +882,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   ++NumFunctionSignaturesOptimized;
 
-  auto NewFName = Optimizer.getOptimizedName();
+  auto NewFName = Analyzer.getOptimizedName();
 
   // If we already have a specialized version of this function, do not
   // respecialize. For now just bail.
@@ -870,6 +893,8 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   // just a fear.
   if (F->getModule().lookUpFunction(NewFName))
     return false;
+
+  SignatureOptimizer Optimizer(Analyzer);
 
   // Otherwise, move F over to NewF.
   SILFunction *NewF =
