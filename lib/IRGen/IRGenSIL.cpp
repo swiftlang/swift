@@ -329,7 +329,7 @@ public:
   /// All alloc_ref instructions which allocate the object on the stack.
   llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
   /// With closure captures it is actually possible to have two function
-  /// arguments that both have the same name. Until this is is fixed, we need to
+  /// arguments that both have the same name. Until this is fixed, we need to
   /// also hash the ArgNo here.
   typedef std::pair<unsigned, std::pair<const SILDebugScope *, StringRef>>
       StackSlotKey;

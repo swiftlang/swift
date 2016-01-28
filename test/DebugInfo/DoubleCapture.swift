@@ -4,7 +4,7 @@ class C {
     func bar() {
       self.foo()
     }
-    // Yes, there are really two arguments calles self in this example!
+    // Yes, there are really two arguments called self in this example!
     // CHECK: (name: "self", arg: 1, scope: ![[SCOPE:[0-9]+]], {{.*}}line: 10,
     // CHECK: (name: "self", arg: 2, scope: ![[SCOPE]], {{.*}}line: 3,
     {[weak self] in _ = self!; bar() }()
