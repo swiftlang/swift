@@ -27,11 +27,11 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
   @noescape _ body: () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
-    NSLocale.self, Selector("currentLocale"))
+    NSLocale.self, #selector(NSLocale.currentLocale))
   precondition(oldMethod != nil, "could not find +[NSLocale currentLocale]")
 
   let newMethod = class_getClassMethod(
-    NSLocale.self, Selector("_swiftUnittest_currentLocale"))
+    NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale))
   precondition(newMethod != nil, "could not find +[NSLocale _swiftUnittest_currentLocale]")
 
   precondition(_temporaryNSLocaleCurrentLocale == nil,
