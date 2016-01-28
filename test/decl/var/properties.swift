@@ -449,11 +449,11 @@ extension StructWithExtension1 {
 
 class ClassWithExtension1 {
   var foo: Int = 0
-  class var fooStatic = 4 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class var fooStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 extension ClassWithExtension1 {
   var fooExt: Int // expected-error {{extensions may not contain stored properties}}
-  class var fooExtStatic = 4 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class var fooExtStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 
 enum EnumWithExtension1 {
@@ -471,7 +471,7 @@ protocol ProtocolWithExtension1 {
 }
 extension ProtocolWithExtension1 {
   final var fooExt: Int // expected-error{{extensions may not contain stored properties}}
-  final static var fooExtStatic = 4 // expected-error{{static stored properties not yet supported in generic types}}
+  final static var fooExtStatic = 4 // expected-error{{static stored properties not supported in generic types}}
 }
 
 func getS() -> S {
@@ -584,11 +584,11 @@ enum MonoEnum {
 }
 
 struct GenStruct<T> {
-  static var foo: Int = 0 // expected-error{{static stored properties not yet supported in generic types}}
+  static var foo: Int = 0 // expected-error{{static stored properties not supported in generic types}}
 }
 
 class MonoClass {
-  class var foo: Int = 0 // expected-error{{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class var foo: Int = 0 // expected-error{{class stored properties not supported in classes; did you mean 'static'?}}
 }
 
 protocol Proto {

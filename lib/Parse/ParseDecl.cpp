@@ -3781,6 +3781,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
 
+  bool HasBehavior = false;
+  SourceLoc BehaviorLBracket, BehaviorRBracket;
+  TypeRepr *BehaviorType;
+
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
   defer {
@@ -3824,6 +3828,26 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // want.
     Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
   };
+  
+  // Check for a behavior declaration.
+  if (Tok.is(tok::l_square)) {
+    BehaviorLBracket = consumeToken(tok::l_square);
+    // TODO: parse visibility (public/private/internal)
+    auto type = parseType(diag::expected_behavior_name,
+                          /*handle completion*/ true);
+    // TODO: recovery. could scan to next closing bracket
+    if (type.isParseError())
+      return makeParserError();
+    if (type.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+    BehaviorType = type.get();
+    if (!Tok.is(tok::r_square)) {
+      diagnose(Tok.getLoc(), diag::expected_rsquare_after_behavior_name);
+      return makeParserError();
+    }
+    BehaviorRBracket = consumeToken(tok::r_square);
+    HasBehavior = true;
+  }
 
   do {
     Pattern *pattern;
@@ -3844,6 +3868,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
+      if (HasBehavior)
+        VD->addBehavior(BehaviorLBracket, BehaviorType, BehaviorRBracket);
       VD->getAttrs() = Attributes;
       Decls.push_back(VD);
     });

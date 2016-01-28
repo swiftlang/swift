@@ -90,7 +90,7 @@ class subject_getterSetter1 {
 
 class subject_staticVar1 {
   @objc
-  class var staticVar1: Int = 42 // expected-error {{class stored properties not yet supported}}
+  class var staticVar1: Int = 42 // expected-error {{class stored properties not supported}}
 
   @objc
   class var staticVar2: Int { return 42 }
@@ -1506,7 +1506,7 @@ class infer_instanceVar5 {
 class infer_staticVar1 {
 // CHECK-LABEL: @objc class infer_staticVar1 {
 
-  class var staticVar1: Int = 42 // expected-error {{class stored properties not yet supported}}
+  class var staticVar1: Int = 42 // expected-error {{class stored properties not supported}}
   // CHECK: @objc class var staticVar1: Int
 }
 

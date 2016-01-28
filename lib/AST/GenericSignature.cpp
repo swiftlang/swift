@@ -403,10 +403,10 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
     args = args.slice(1);
     
     if (auto subTy = depTy->getAs<SubstitutableType>()) {
-      subs[subTy] = replacement;
+      subs[subTy->getCanonicalType().getPointer()] = replacement;
     }
     else if (auto dTy = depTy->getAs<DependentMemberType>()) {
-      subs[dTy] = replacement;
+      subs[dTy->getCanonicalType().getPointer()] = replacement;
     }
   }
   

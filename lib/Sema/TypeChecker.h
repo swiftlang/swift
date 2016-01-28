@@ -37,6 +37,7 @@ namespace swift {
 class ArchetypeBuilder;
 class GenericTypeResolver;
 class NominalTypeDecl;
+class NormalProtocolConformance;
 class TopLevelContext;
 class TypeChecker;
 
@@ -1019,6 +1020,23 @@ public:
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
   void completeLazyVarImplementation(VarDecl *lazyVar);
+  
+  /// Instantiate the storage implementation for a behavior-backed property.
+  void completePropertyBehaviorStorage(VarDecl *VD,
+                               VarDecl *BehaviorStorage,
+                               FuncDecl *BehaviorInitStorage,
+                               Type SelfTy,
+                               Type StorageTy,
+                               NormalProtocolConformance *BehaviorConformance,
+                               ArrayRef<Substitution> SelfInterfaceSubs,
+                               ArrayRef<Substitution> SelfContextSubs);
+  
+  /// Instantiate the accessor implementations for a behavior-backed
+  /// property.
+  void completePropertyBehaviorAccessors(VarDecl *VD,
+                                     VarDecl *ValueImpl,
+                                     ArrayRef<Substitution> SelfInterfaceSubs,
+                                     ArrayRef<Substitution> SelfContextSubs);
 
   /// Sets up and solves the constraint system \p cs to type check the given
   /// expression.

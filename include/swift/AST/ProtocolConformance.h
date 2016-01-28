@@ -262,6 +262,13 @@ public:
   void printName(raw_ostream &os,
                  const PrintOptions &PO = PrintOptions()) const;
   
+  /// True if the conformance is for a property behavior instantiation.
+  ///
+  /// FIXME: When protocol conformances gain proper support for visibility,
+  /// there shouldn't be anything special about behavior conformances aside from
+  /// having private visibility.
+  bool isBehaviorConformance() const;
+  
   void dump() const;
 
 private:
@@ -291,7 +298,8 @@ private:
 /// providing the witnesses \c A.foo and \c B<T>.foo, respectively, for the
 /// requirement \c foo.
 class NormalProtocolConformance : public ProtocolConformance,
-                                  public llvm::FoldingSetNode {
+                                  public llvm::FoldingSetNode
+{
   /// \brief The protocol being conformed to and its current state.
   llvm::PointerIntPair<ProtocolDecl *, 2, ProtocolConformanceState>
     ProtocolAndState;
@@ -299,11 +307,16 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
+  enum {
+    IsInvalid = 1,
+    IsBehaviorConformance = 2,
+  };
+
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
   ///
-  /// Also stores the "invalid" bit.
-  llvm::PointerIntPair<DeclContext *, 1, bool> DCAndInvalid;
+  /// Also stores the "invalid" and "is behavior" bits.
+  llvm::PointerIntPair<DeclContext *, 2, unsigned> DCAndFlags;
 
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -330,7 +343,7 @@ class NormalProtocolConformance : public ProtocolConformance,
                             SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state)
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      ProtocolAndState(protocol, state), Loc(loc), DCAndInvalid(dc, false)
+      ProtocolAndState(protocol, state), Loc(loc), DCAndFlags(dc, 0)
   {
   }
 
@@ -345,7 +358,7 @@ public:
 
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
-  DeclContext *getDeclContext() const { return DCAndInvalid.getPointer(); }
+  DeclContext *getDeclContext() const { return DCAndFlags.getPointer(); }
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
@@ -358,10 +371,26 @@ public:
   }
 
   /// Determine whether this conformance is invalid.
-  bool isInvalid() const { return DCAndInvalid.getInt(); }
+  bool isInvalid() const {
+    return DCAndFlags.getInt() & IsInvalid;
+  }
+  
+  bool isBehaviorConformance() const {
+    return DCAndFlags.getInt() & IsBehaviorConformance;
+  }
 
   /// Mark this conformance as invalid.
-  void setInvalid() { DCAndInvalid.setInt(true); }
+  void setInvalid() {
+    unsigned flags = DCAndFlags.getInt();
+    flags |= IsInvalid;
+    DCAndFlags.setInt(flags);
+  }
+
+  void setBehaviorConformance() {
+    unsigned flags = DCAndFlags.getInt();
+    flags |= IsBehaviorConformance;
+    DCAndFlags.setInt(flags);
+  }
 
   /// Retrieve the type witness substitution and type decl (if one exists)
   /// for the given associated type.
