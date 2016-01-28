@@ -2855,9 +2855,6 @@ public:
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
       validatePatternBindingDecl(TC, PBD, i);
 
-    // Note: The Else body is type checked when the enclosing BraceStmt is
-    // checked.
-    
     if (PBD->isInvalid() || PBD->isBeingTypeChecked())
       return;
 
@@ -3292,10 +3289,9 @@ public:
 
     if (!IsFirstPass) {
       checkAccessibility(TC, SD);
-    }
 
-    if (!(IsFirstPass || SD->isInvalid())) {
-      checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
+      if (!SD->isInvalid())
+        checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
     }
 
     // Visit each of the members.
@@ -3449,9 +3445,8 @@ public:
 
     TC.addImplicitDestructor(CD);
 
-    if (!(IsFirstPass || CD->isInvalid())) {
+    if (!IsFirstPass && !CD->isInvalid())
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
-    }
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
