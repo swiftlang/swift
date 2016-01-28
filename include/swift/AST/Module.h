@@ -930,7 +930,8 @@ public:
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
-  llvm::DenseMap<ObjCSelector, std::vector<AbstractFunctionDecl *>> ObjCMethods;
+  llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<AbstractFunctionDecl *>>
+    ObjCMethods;
 
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;

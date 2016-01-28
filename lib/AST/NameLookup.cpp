@@ -1372,7 +1372,7 @@ bool DeclContext::lookupQualified(Type type,
   return !decls.empty();
 }
 
-void DeclContext::lookupObjCMethods(
+void DeclContext::lookupAllObjCMethods(
        ObjCSelector selector,
        SmallVectorImpl<AbstractFunctionDecl *> &results) const {
   // Collect all of the methods with this selector.

@@ -2743,7 +2743,7 @@ namespace {
 
     Type visitObjCSelectorExpr(ObjCSelectorExpr *E) {
       // #selector only makes sense when we have the Objective-C
-      // #runtime.
+      // runtime.
       auto &tc = CS.getTypeChecker();
       if (!tc.Context.LangOpts.EnableObjCInterop) {
         tc.diagnose(E->getLoc(), diag::expr_selector_no_objc_runtime);
