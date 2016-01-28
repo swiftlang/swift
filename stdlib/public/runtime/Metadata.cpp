@@ -1504,7 +1504,6 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                          GenericMetadata *pattern,
                                           size_t numFields,
                                           const ClassFieldLayout *fieldLayouts,
                                           size_t *fieldOffsets) {
@@ -1597,7 +1596,9 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   // even if Swift doesn't, because of SwiftObject.)
   rodata->InstanceStart = size;
 
-  auto &allocator = unsafeGetInitializedCache(pattern).getAllocator();
+  auto &allocator = unsafeGetInitializedCache(
+                           self->getDescription()->getGenericMetadataPattern())
+    .getAllocator();
 
   // Always clone the ivar descriptors.
   if (numFields) {
@@ -2382,6 +2383,14 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::ErrorObject:
     return nullptr;
   }
+}
+
+const GenericMetadata *
+Metadata::getGenericPattern() const {
+  auto ntd = getNominalTypeDescriptor();
+  if (!ntd)
+    return nullptr;
+  return ntd->getGenericMetadataPattern();
 }
 
 const ClassMetadata *

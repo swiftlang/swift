@@ -389,8 +389,6 @@ public:
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::StructType *ProtocolConformanceRecordTy;
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
-  llvm::StructType *NominalTypeDescriptorTy;
-  llvm::PointerType *NominalTypeDescriptorPtrTy;
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;

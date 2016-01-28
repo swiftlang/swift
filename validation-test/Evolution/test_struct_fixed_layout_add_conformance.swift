@@ -65,14 +65,6 @@ protocol MyPoint3DLike {
 extension AddConformance : MyPointLike {}
 extension AddConformance : MyPoint3DLike {}
 
-@inline(never) func workWithMyPointLike<T>(t: T) {
-  var p = t as! MyPointLike
-  p.x = 50
-  p.y = 60
-  expectEqual(p.x, 50)
-  expectEqual(p.y, 60)
-}
-
 StructFixedLayoutAddConformanceTest.test("MyPointLike") {
   var p: MyPointLike = AddConformance()
 
@@ -82,8 +74,6 @@ StructFixedLayoutAddConformanceTest.test("MyPointLike") {
     expectEqual(p.x, 50)
     expectEqual(p.y, 60)
   }
-
-  workWithMyPointLike(p)
 }
 #endif
 

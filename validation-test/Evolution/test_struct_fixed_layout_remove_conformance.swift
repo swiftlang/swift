@@ -48,14 +48,6 @@ protocol MyPoint3DLike {
 extension RemoveConformance : MyPointLike {}
 extension RemoveConformance : MyPoint3DLike {}
 
-@inline(never) func workWithMyPointLike<T>(t: T) {
-  var p = t as! MyPointLike
-  p.x = 50
-  p.y = 60
-  expectEqual(p.x, 50)
-  expectEqual(p.y, 60)
-}
-
 StructFixedLayoutRemoveConformanceTest.test("MyPointLike") {
   var p: MyPointLike = RemoveConformance()
 
@@ -65,8 +57,6 @@ StructFixedLayoutRemoveConformanceTest.test("MyPointLike") {
     expectEqual(p.x, 50)
     expectEqual(p.y, 60)
   }
-
-  workWithMyPointLike(p)
 }
 #endif
 

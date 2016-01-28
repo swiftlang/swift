@@ -1861,11 +1861,19 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
   if (IGM.hasMetadataPattern(nom)) {
     // Conformances for generics, concrete subclasses of generics, and
     // resiliently-sized types are represented by referencing the
-    // nominal type descriptor.
-    typeKind = TypeMetadataRecordKind::UniqueNominalTypeDescriptor;
-    entity = LinkEntity::forNominalTypeDescriptor(nom);
-    defaultTy = IGM.NominalTypeDescriptorTy;
-    defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
+    // metadata pattern.
+    //
+    // FIXME: this is wrong if the conforming type is a resilient type from
+    // another module. In that case, we don't know if we require runtime
+    // metadata instantiation or not, and instead, we need a way to reference
+    // the metadata accessor function from the conformance table.
+    typeKind = TypeMetadataRecordKind::UniqueGenericPattern;
+    entity = LinkEntity::forTypeMetadata(
+                         nom->getDeclaredType()->getCanonicalType(),
+                         TypeMetadataAddress::AddressPoint,
+                         /*isPattern*/ true);
+    defaultTy = IGM.TypeMetadataPatternStructTy;
+    defaultPtrTy = IGM.TypeMetadataPatternPtrTy;
   } else if (auto ct = dyn_cast<ClassType>(conformingType)) {
     auto clas = ct->getDecl();
     if (clas->isForeign()) {

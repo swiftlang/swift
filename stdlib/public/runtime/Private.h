@@ -114,7 +114,7 @@ namespace swift {
   const Metadata *
   _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
                                   const Metadata *metadata,
-                                  const NominalTypeDescriptor *ntd);
+                                  const GenericMetadata *pattern);
 
   const Metadata *
   _searchConformancesByMangledTypeName(const llvm::StringRef typeName);

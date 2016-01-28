@@ -75,8 +75,8 @@ void ProtocolConformanceRecord::dump() const {
              class_getName(*getIndirectClass()));
       break;
       
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-      printf("unique nominal type descriptor %s", symbolName(getNominalTypeDescriptor()));
+    case TypeMetadataRecordKind::UniqueGenericPattern:
+      printf("unique generic type %s", symbolName(getGenericPattern()));
       break;
   }
   
@@ -121,7 +121,7 @@ const {
       return swift_getObjCClassMetadata(ClassMetadata);
     return nullptr;
       
-  case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
+  case TypeMetadataRecordKind::UniqueGenericPattern:
   case TypeMetadataRecordKind::Universal:
     // The record does not apply to a single type.
     return nullptr;
@@ -386,44 +386,39 @@ recur_inside_cache_lock:
 
   // See if we have a cached conformance. Try the specific type first.
 
-  {
-    // Hash and lookup the type-protocol pair in the cache.
-    size_t hash = hashTypeProtocolPair(type, protocol);
-    ConcurrentList<ConformanceCacheEntry> &Bucket =
-      C.Cache.findOrAllocateNode(hash);
+  // Hash and lookup the type-protocol pair in the cache.
+  size_t hash = hashTypeProtocolPair(type, protocol);
+  ConcurrentList<ConformanceCacheEntry> &Bucket =
+    C.Cache.findOrAllocateNode(hash);
 
-    // Check if the type-protocol entry exists in the cache entry that we found.
-    for (auto &Entry : Bucket) {
-      if (!Entry.matches(type, protocol)) continue;
+  // Check if the type-protocol entry exists in the cache entry that we found.
+  for (auto &Entry : Bucket) {
+    if (!Entry.matches(type, protocol)) continue;
 
-      if (Entry.isSuccessful()) {
-        return std::make_pair(Entry.getWitnessTable(), true);
-      }
+    if (Entry.isSuccessful()) {
+      return std::make_pair(Entry.getWitnessTable(), true);
+    }
 
-      if (type == origType)
-        foundEntry = &Entry;
+    if (type == origType)
+      foundEntry = &Entry;
 
-      // If we got a cached negative response, check the generation number.
-      if (Entry.getFailureGeneration() == C.SectionsToScan.size()) {
-        // We found an entry with a negative value.
-        return std::make_pair(nullptr, true);
-      }
+    // If we got a cached negative response, check the generation number.
+    if (Entry.getFailureGeneration() == C.SectionsToScan.size()) {
+      // We found an entry with a negative value.
+      return std::make_pair(nullptr, true);
     }
   }
 
-  {
-    // For generic and resilient types, nondependent conformances
-    // are keyed by the nominal type descriptor rather than the
-    // metadata, so try that.
-    auto *description = type->getNominalTypeDescriptor();
-
+  // If the type is generic, see if there's a shared nondependent witness table
+  // for its instances.
+  if (auto generic = type->getGenericPattern()) {
     // Hash and lookup the type-protocol pair in the cache.
-    size_t hash = hashTypeProtocolPair(description, protocol);
+    size_t hash = hashTypeProtocolPair(generic, protocol);
     ConcurrentList<ConformanceCacheEntry> &Bucket =
       C.Cache.findOrAllocateNode(hash);
 
     for (auto &Entry : Bucket) {
-      if (!Entry.matches(description, protocol)) continue;
+      if (!Entry.matches(generic, protocol)) continue;
       if (Entry.isSuccessful()) {
         return std::make_pair(Entry.getWitnessTable(), true);
       }
@@ -446,30 +441,28 @@ recur_inside_cache_lock:
 
 /// Checks if a given candidate is a type itself, one of its
 /// superclasses or a related generic type.
-///
 /// This check is supposed to use the same logic that is used
 /// by searchInConformanceCache.
-///
-/// \param candidate Pointer to a Metadata or a NominalTypeDescriptor.
-///
 static
-bool isRelatedType(const Metadata *type, const void *candidate,
-                   bool candidateIsMetadata) {
+bool isRelatedType(const Metadata *type, const void *candidate) {
 
   while (true) {
-    if (type == candidate && candidateIsMetadata)
+    if (type == candidate)
       return true;
 
-    // If the type is resilient or generic, see if there's a witness table
-    // keyed off the nominal type descriptor.
-    auto *description = type->getNominalTypeDescriptor();
-    if (description == candidate && !candidateIsMetadata)
-      return true;
+    // If the type is generic, see if there's a shared nondependent witness table
+    // for its instances.
+    if (auto generic = type->getGenericPattern()) {
+      if (generic == candidate)
+        return true;
+    }
 
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
       if (classHasSuperclass(classType)) {
         type = swift_getObjCClassMetadata(classType->SuperClass);
+        if (type == candidate)
+          return true;
         continue;
       }
     }
@@ -549,7 +542,7 @@ recur:
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, metadata, /*isMetadata=*/true))
+        if (!isRelatedType(type, metadata))
           continue;
 
         // Hash and lookup the type-protocol pair in the cache.
@@ -571,18 +564,18 @@ recur:
       // An accessor function might still be necessary even if the witness table
       // can be shared.
       } else if (record.getTypeKind()
-                   == TypeMetadataRecordKind::UniqueNominalTypeDescriptor
+                   == TypeMetadataRecordKind::UniqueGenericPattern
                  && record.getConformanceKind()
                    == ProtocolConformanceReferenceKind::WitnessTable) {
 
-        auto R = record.getNominalTypeDescriptor();
+        auto R = record.getGenericPattern();
         auto P = record.getProtocol();
 
         // Look for an exact match.
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, R, /*isMetadata=*/false))
+        if (!isRelatedType(type, R))
           continue;
 
         // Hash and lookup the type-protocol pair in the cache.
@@ -617,8 +610,8 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
     for (const auto &record : section) {
       if (auto metadata = record.getCanonicalTypeMetadata())
         foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
-      else if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
+      else if (auto pattern = record.getGenericPattern())
+        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, pattern);
 
       if (foundMetadata != nullptr)
         break;

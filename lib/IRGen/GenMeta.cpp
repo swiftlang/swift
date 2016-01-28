@@ -2031,8 +2031,7 @@ namespace {
     void layout() {
       asImpl().addName();
       asImpl().addKindDependentFields();
-      asImpl().addMetadataAccessorFn();
-      asImpl().addNominalTypeKind();
+      asImpl().addGenericMetadataPatternAndKind();
       asImpl().addGenericParams();
     }
 
@@ -2042,32 +2041,20 @@ namespace {
                                  ntd->getDeclaredType()->getCanonicalType(),
                                  /*willBeRelativelyAddressed*/ true));
     }
-
-    void addMetadataAccessorFn() {
+    
+    void addGenericMetadataPatternAndKind() {
       NominalTypeDecl *ntd = asImpl().getTarget();
-
-      // If the type has constant metadata and this is known to be the case
-      // from all resilience domains that can access it, don't link the
-      // accessor.
-      if (!IGM.isResilient(ntd, IGM.getResilienceExpansionForAccess(ntd)) &&
-          !IGM.hasMetadataPattern(ntd)) {
-        addConstantInt32(asImpl().getKind());
+      auto kind = asImpl().getKind();
+      if (!IGM.hasMetadataPattern(ntd)) {
+        // There's no pattern to link.
+        addConstantInt32(kind);
         return;
       }
 
-      llvm::Function *fn;
-      if (ntd->isGenericContext()) {
-        fn = getGenericTypeMetadataAccessFunction(IGM, ntd, NotForDefinition);
-      } else {
-        CanType declaredType = ntd->getDeclaredType()->getCanonicalType();
-        fn = getTypeMetadataAccessFunction(IGM, declaredType, NotForDefinition);
-      }
-
-      addRelativeAddress(fn);
-    }
-
-    void addNominalTypeKind() {
-      addConstantInt32(asImpl().getKind());
+      addRelativeAddressWithTag(
+        IGM.getAddrOfTypeMetadata(ntd->getDeclaredType()->getCanonicalType(),
+                                  /*pattern*/ true),
+        kind);
     }
     
     void addGenericParams() {
@@ -2907,8 +2894,7 @@ namespace {
       }
 
       if (HasDependentMetadata) {
-        asImpl().emitInitializeMetadata(IGF, metadataValue, metadataPattern,
-                                        vwtableValue);
+        asImpl().emitInitializeMetadata(IGF, metadataValue, vwtableValue);
       }
       
       // The metadata is now complete.
@@ -3579,7 +3565,6 @@ namespace {
 
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
-                                llvm::Value *pattern,
                                 llvm::Value *vwtable) {
       assert(!HasDependentVWT && "class should never have dependent VWT");
 
@@ -3722,7 +3707,7 @@ namespace {
         // Ask the runtime to lay out the class.
         auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
         IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
-                               {metadata, pattern, numFields,
+                               {metadata, numFields,
                                 firstField.getAddress(), fieldVector});
         IGF.Builder.CreateLifetimeEnd(fields,
                         IGF.IGM.getPointerSize() * storedProperties.size() * 2);
@@ -4628,11 +4613,10 @@ namespace {
                         
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
-                                llvm::Value *pattern,
                                 llvm::Value *vwtable) {
       // Nominal types are always preserved through SIL lowering.
       auto structTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-      IGM.getTypeInfoForLowered(structTy)
+      IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
         .initializeMetadata(IGF, metadata, vwtable,
                             SILType::getPrimitiveAddressType(structTy));
     }
@@ -4777,7 +4761,6 @@ public:
   
   void emitInitializeMetadata(IRGenFunction &IGF,
                               llvm::Value *metadata,
-                              llvm::Value *pattern,
                               llvm::Value *vwtable) {
     // Nominal types are always preserved through SIL lowering.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
