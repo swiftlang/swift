@@ -24,7 +24,7 @@ class ThisBase1 {
     }
   }
 
-  class var baseStaticVar: Int = 42 // expected-error {{class stored properties not yet supported}}
+  class var baseStaticVar: Int = 42 // expected-error {{class stored properties not supported}}
 
   class var baseStaticProp: Int {
     get {
@@ -70,7 +70,7 @@ class ThisDerived1 : ThisBase1 {
     }
   }
 
-  class var derivedStaticVar: Int = 42// expected-error {{class stored properties not yet supported}}
+  class var derivedStaticVar: Int = 42// expected-error {{class stored properties not supported}}
 
   class var derivedStaticProp: Int {
     get {

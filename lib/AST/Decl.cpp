@@ -2732,6 +2732,16 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   }
 }
 
+void AbstractStorageDecl::addBehavior(SourceLoc LBracketLoc,
+                                      TypeRepr *Type,
+                                      SourceLoc RBracketLoc) {
+  assert(BehaviorInfo.getPointer() == nullptr && "already set behavior!");
+  auto mem = getASTContext().Allocate(sizeof(BehaviorRecord),
+                                      alignof(BehaviorRecord));
+  auto behavior = new (mem) BehaviorRecord{LBracketLoc, Type, RBracketLoc};
+  BehaviorInfo.setPointer(behavior);
+}
+
 void AbstractStorageDecl::makeComputedWithMutableAddress(SourceLoc lbraceLoc,
                                                 FuncDecl *get, FuncDecl *set,
                                                 FuncDecl *materializeForSet,
@@ -3294,6 +3304,20 @@ ParamDecl::ParamDecl(ParamDecl *PD)
 
 
 /// \brief Retrieve the type of 'self' for the given context.
+Type DeclContext::getSelfTypeInContext() const {
+  // For a protocol or extension thereof, the type is 'Self'.
+  if (getAsProtocolOrProtocolExtensionContext()) {
+    // In the parser, generic parameters won't be wired up yet, just give up on
+    // producing a type.
+    if (getGenericParamsOfContext() == nullptr)
+      return Type();
+    return getProtocolSelf()->getArchetype();
+  }
+  return getDeclaredTypeInContext();
+}
+
+/// \brief Retrieve the type of 'self' for the given context.
+/// FIXME: Can this be integrated with getSelfTypeInContext above?
 static Type getSelfTypeForContext(DeclContext *dc) {
   // For a protocol or extension thereof, the type is 'Self'.
   // FIXME: Weird that we're producing an archetype for protocol Self,
@@ -3307,7 +3331,6 @@ static Type getSelfTypeForContext(DeclContext *dc) {
   }
   return dc->getDeclaredTypeOfContext();
 }
-
 
 /// Create an implicit 'self' decl for a method in the specified decl context.
 /// If 'static' is true, then this is self for a static method in the type.

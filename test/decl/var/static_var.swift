@@ -143,31 +143,31 @@ extension E {
 
 class C {
   static var v1: Int = 0
-  class final var v3: Int = 0 // expected-error {{class stored properties not yet supported}}
-  class var v4: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final var v3: Int = 0 // expected-error {{class stored properties not supported}}
+  class var v4: Int = 0 // expected-error {{class stored properties not supported}}
 
   static var v5: Int { return 0 }
   class var v6: Int { return 0 }
   static final var v7: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 
   static let l1: Int = 0
-  class let l2: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
-  class final let l3: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class let l2: Int = 0 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  class final let l3: Int = 0 // expected-error {{class stored properties not supported}}
   static final let l4 = 2 // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
 extension C {
   static var ev1: Int = 0
-  class final var ev2: Int = 0 // expected-error {{class stored properties not yet supported}}
-  class var ev3: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final var ev2: Int = 0 // expected-error {{class stored properties not supported}}
+  class var ev3: Int = 0 // expected-error {{class stored properties not supported}}
 
   static var ev4: Int { return 0 }
   class var ev5: Int { return 0 }
   static final var ev6: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 
   static let el1: Int = 0
-  class let el2: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
-  class final let el3: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class let el2: Int = 0 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  class final let el3: Int = 0 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
   static final let el4: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
@@ -177,8 +177,8 @@ protocol P {
   class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
   static final var v3: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
 
-  static let l1: Int // expected-error {{static stored properties not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
-  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}} expected-error {{class stored properties not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  static let l1: Int // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
 }
 
 struct S1 {
@@ -201,12 +201,12 @@ enum E1 {
 }
 
 class C1 {
-  class var x: Int // expected-error {{class stored properties not yet supported}} expected-error {{'class var' declaration requires an initializer expression or getter/setter specifier}}
+  class var x: Int // expected-error {{class stored properties not supported}} expected-error {{'class var' declaration requires an initializer expression or getter/setter specifier}}
 }
 
 class C2 {
   var x: Int = 19
-  class var x: Int = 17 // expected-error{{class stored properties not yet supported}}
+  class var x: Int = 17 // expected-error{{class stored properties not supported}}
 
   func xx() -> Int { return self.x + C2.x }
 }

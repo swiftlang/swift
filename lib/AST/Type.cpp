@@ -2350,6 +2350,15 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
+      // Check whether we have a direct substitution for the dependent type.
+      // FIXME: This arguably should be getMemberForBaseType's responsibility.
+      auto known =
+        substitutions.find(depMemTy->getCanonicalType().getPointer());
+      if (known != substitutions.end() && known->second) {
+        return SubstitutedType::get(type, known->second,
+                                    module->getASTContext());
+      }
+    
       auto newBase = depMemTy->getBase().subst(module, substitutions, options);
       if (!newBase)
         return failed(type);

@@ -685,6 +685,14 @@ public:
                  DeclContext *dc,
                  ProtocolConformanceState state);
 
+  /// Produce a new normal conformance for a property behavior.
+  NormalProtocolConformance *
+  getBehaviorConformance(Type conformingType,
+                         ProtocolDecl *protocol,
+                         SourceLoc loc,
+                         DeclContext *dc,
+                         ProtocolConformanceState state);
+
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the
   /// conformance itself, along with a bit indicating whether this diagnostic

@@ -939,8 +939,8 @@ ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 
 // Variables (var and let).
-ERROR(unimplemented_type_var,none,
-      "%select{ERROR|static|class}1 stored properties not yet supported"
+ERROR(unimplemented_static_var,none,
+      "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes}0"
       "%select{|; did you mean 'static'?}2",
       (unsigned, StaticSpellingKind, unsigned))
@@ -1525,6 +1525,45 @@ ERROR(dynamic_self_struct_enum,none,
 // Duplicate declarations
 ERROR(duplicate_enum_element,none,
       "duplicate definition of enum element",())
+
+// Property behaviors
+ERROR(property_behavior_not_protocol,none,
+      "property behavior name must refer to a protocol", ())
+ERROR(property_behavior_protocol_reqt_ambiguous,none,
+      "property behavior protocol has ambiguous %0 member", (Identifier))
+NOTE(property_behavior_protocol_reqt_here,none,
+     "%0 declared here", (Identifier))
+ERROR(property_behavior_protocol_no_value,none,
+      "property behavior protocol does not have a 'value' property", ())
+ERROR(property_behavior_protocol_no_initStorage,none,
+      "property behavior protocol has a 'storage' requirement but does not "
+      "have a static 'initStorage' method with the expected type %0", (Type))
+ERROR(property_behavior_unknown_requirement,none,
+      "property behavior protocol %0 has non-behavior requirement %1",
+      (Identifier, Identifier))
+NOTE(property_behavior_unknown_requirement_here,none,
+     "declared here", ())
+NOTE(self_conformance_required_by_property_behavior,none,
+     "conformance to %0 required to contain an instance property with "
+     "behavior %1",
+     (Identifier, Identifier))
+NOTE(value_conformance_required_by_property_behavior,none,
+     "behavior %1 requires property type to conform to protocol %0",
+     (Identifier, Identifier))
+ERROR(property_behavior_with_self_requirement_not_in_type,none,
+      "property behavior %0 can only be used on instance properties "
+      "because it has 'Self' requirements",
+      (Identifier))
+ERROR(property_behavior_with_storage_not_supported,none,
+      "property behavior %0 with storage is not supported outside of "
+      "type contexts",
+      (Identifier))
+ERROR(property_behavior_value_type_doesnt_match,none,
+      "property behavior %0 provides 'value' property implementation with "
+      "type %1 that doesn't match type %2 of declared property %3",
+      (Identifier, Type, Identifier, Type))
+NOTE(property_behavior_value_decl_here,none,
+     "'value' property declared here", ())
 
 //------------------------------------------------------------------------------
 // Type Check Attributes

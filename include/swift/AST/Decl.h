@@ -3538,6 +3538,27 @@ enum class AccessStrategy : unsigned char {
   DispatchToAccessor,
 };
 
+/// Information about a behavior instantiated by a storage declaration.
+///
+/// TODO: Accessors, composed behaviors
+struct BehaviorRecord {
+  SourceLoc LBracketLoc, RBracketLoc;
+  TypeRepr *ProtocolName;
+  
+  Optional<NormalProtocolConformance *> Conformance = None;
+  // The 'value' property from the behavior protocol that provides the property
+  // implementation.
+  VarDecl *ValueDecl = nullptr;
+  
+  BehaviorRecord(SourceLoc LBracket,
+                 TypeRepr *ProtocolName,
+                 SourceLoc RBracket)
+  : LBracketLoc(LBracket), RBracketLoc(RBracket), ProtocolName(ProtocolName)
+  {}
+  
+  SourceLoc getLoc() const { return ProtocolName->getLoc(); }
+};
+
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
@@ -3614,7 +3635,7 @@ private:
   AbstractStorageDecl *OverriddenDecl;
 
   struct GetSetRecord;
-
+  
   /// This is stored immediately before the GetSetRecord.
   struct AddressorRecord {
     FuncDecl *Address = nullptr;        // User-defined address accessor
@@ -3626,7 +3647,7 @@ private:
     }
   };
   void configureAddressorRecord(AddressorRecord *record,
-                                FuncDecl *addressor, FuncDecl *mutableAddressor);
+                               FuncDecl *addressor, FuncDecl *mutableAddressor);
 
   struct GetSetRecord {
     SourceRange Braces;
@@ -3654,6 +3675,8 @@ private:
                                 FuncDecl *willSet, FuncDecl *didSet);
 
   llvm::PointerIntPair<GetSetRecord*, 2, OptionalEnum<Accessibility>> GetSetInfo;
+  llvm::PointerIntPair<BehaviorRecord*, 2, OptionalEnum<Accessibility>>
+    BehaviorInfo;
 
   ObservingRecord &getDidSetInfo() const {
     assert(hasObservers());
@@ -3828,6 +3851,10 @@ public:
   /// This should only be used by the ClangImporter.
   void setComputedSetter(FuncDecl *Set);
 
+  /// \brief Add a behavior to a property.
+  void addBehavior(SourceLoc LBracketLoc, TypeRepr *Type,
+                   SourceLoc RBracketLoc);
+
   /// \brief Set a materializeForSet accessor for this declaration.
   ///
   /// This should only be used by Sema.
@@ -3965,6 +3992,19 @@ public:
   /// \brief Does this declaration expose a fixed layout to the given
   /// module?
   bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
+
+  /// Does the storage use a behavior?
+  bool hasBehavior() const {
+    return BehaviorInfo.getPointer() != nullptr;
+  }
+  
+  /// Get the behavior info.
+  const BehaviorRecord *getBehavior() const {
+    return BehaviorInfo.getPointer();
+  }
+  BehaviorRecord *getMutableBehavior() {
+    return BehaviorInfo.getPointer();
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

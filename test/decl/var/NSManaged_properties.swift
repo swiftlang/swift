@@ -38,9 +38,7 @@ class SwiftGizmo : A {
   // expected-error@+1{{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   @NSManaged var nonobjc_var: SwiftProto?
 
-  @NSManaged class var d: Int = 4  // expected-error {{@NSManaged only allowed on an instance property or method}} \
-            // expected-error {{class stored properties not yet supported}}
-
+  @NSManaged class var d: Int = 4  // expected-error {{@NSManaged only allowed on an instance property or method}}
 
   @NSManaged var e: Int { return 4 } // expected-error {{@NSManaged not allowed on computed properties}}
 
