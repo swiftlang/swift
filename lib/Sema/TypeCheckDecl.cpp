@@ -6350,7 +6350,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
         return std::string(String); \
     }
     CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")
-    CHECK_LITERAL_PROTOCOL(DictionaryLiteralConvertible, "[]")
+    CHECK_LITERAL_PROTOCOL(DictionaryLiteralConvertible, "[:]")
     CHECK_LITERAL_PROTOCOL(UnicodeScalarLiteralConvertible, "\"\"")
     CHECK_LITERAL_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible, "\"\"")
     CHECK_LITERAL_PROTOCOL(FloatLiteralConvertible, "0.0")

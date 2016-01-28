@@ -241,8 +241,8 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::NoAlias;
 
   // Let's do alias checking based on projections.
-  auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
-  auto V2Path = ProjectionPath::getAddrProjectionPath(O2, V2, true);
+  auto V1Path = NewProjectionPath::getProjectionPath(O1, V1);
+  auto V2Path = NewProjectionPath::getProjectionPath(O2, V2);
 
   // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
   // what the base pointer of the two values are. Be conservative and return

@@ -47,8 +47,7 @@ f0(i, i,
 
 
 // Position mismatch
-f5(f4)  // expected-error {{cannot invoke 'f5' with an argument list of type '((Int) -> Int)'}}
-// expected-note @-1 {{expected an argument list of type '(T)'}}
+f5(f4)  // expected-error {{argument type '(Int) -> Int' does not conform to expected type 'P2'}}
 
 // Tuple element not convertible.
 f0(i,
@@ -75,8 +74,7 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 "awfawf".doesntExist(0)   // expected-error {{value of type 'String' has no member 'doesntExist'}}
 
 // Does not conform to protocol.
-f5(i)  // expected-error {{cannot invoke 'f5' with an argument list of type '(Int)'}}
-// expected-note @-1 {{expected an argument list of type '(T)'}}
+f5(i)  // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 
 // Make sure we don't leave open existentials when diagnosing.
 // <rdar://problem/20598568>

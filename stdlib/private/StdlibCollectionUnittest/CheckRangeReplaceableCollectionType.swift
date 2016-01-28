@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import StdlibUnittest
+
 internal enum RangeSelection {
   case EmptyRange
   case LeftEdge

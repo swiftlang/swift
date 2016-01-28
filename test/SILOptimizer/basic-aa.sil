@@ -17,6 +17,60 @@ case None
 case Some(T)
 }
 
+// CHECK-LABEL: @index_addr_inst_with_unknown_index
+// CHECK: PAIR #16.
+// CHECK-NEXT: %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: %4 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: MayAlias
+sil @index_addr_inst_with_unknown_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %214 = index_addr %212 : $*Int, %1 : $Builtin.Word
+  %2114 = index_addr %212 : $*Int, %1 : $Builtin.Word
+  br bb1
+
+bb1:
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @index_addr_inst_with_same_constant_index
+// CHECK: PAIR #16.
+// CHECK-NEXT: %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: %4 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: MustAlias
+sil @index_addr_inst_with_same_constant_index : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %6 = integer_literal $Builtin.Word, 2
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %214 = index_addr %212 : $*Int, %6 : $Builtin.Word
+  %2114 = index_addr %212 : $*Int, %6 : $Builtin.Word
+  br bb1
+
+bb1:
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @index_addr_inst_with_different_constant_index
+// CHECK: PAIR #23.
+// CHECK-NEXT: %4 = index_addr %3 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT: %5 = index_addr %3 : $*Int, %2 : $Builtin.Word
+// CHECK-NEXT: NoAlias
+sil @index_addr_inst_with_different_constant_index : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %6 = integer_literal $Builtin.Word, 2
+  %7 = integer_literal $Builtin.Word, 3 
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %214 = index_addr %212 : $*Int, %6 : $Builtin.Word
+  %2114 = index_addr %212 : $*Int, %7 : $Builtin.Word
+  br bb1
+
+bb1:
+  %3 = tuple()
+  return %3 : $()
+}
+
 // Address Arguments don't alias if they are arguments to the first BB.
 //
 // CHECK-LABEL: @address_args_dont_alias_in_first_bb

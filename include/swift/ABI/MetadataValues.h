@@ -19,6 +19,8 @@
 #ifndef SWIFT_ABI_METADATAVALUES_H
 #define SWIFT_ABI_METADATAVALUES_H
 
+#include "swift/AST/Ownership.h"
+
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -93,13 +95,6 @@ enum : unsigned {
   NumGenericMetadataPrivateDataWords = 16,
 };
 
-enum class FieldRecordOwnership : unsigned {
-  Strong,
-  Weak,
-  Unowned,
-  Unmanaged,
-};
-
 /// Records information about a type's fields.
 struct FieldRecordFlags {
 protected:
@@ -114,6 +109,8 @@ protected:
   };
 
 public:
+  FieldRecordFlags() : Data(0) {}
+
   /// True if this field has a type defined in the same image
   /// as the type that contains it.
   constexpr bool isInternal() const {
@@ -127,8 +124,20 @@ public:
   }
 
   /// Get the ownership semantics if the field has a reference type.
-  constexpr FieldRecordOwnership getOwnership() const {
-    return FieldRecordOwnership((Data >> OwnershipShift) & OwnershipMask);
+  constexpr Ownership getOwnership() const {
+    return Ownership((Data >> OwnershipShift) & OwnershipMask);
+  }
+
+  void setInternal(bool internal) {
+    if (internal)
+      Data &= ~InternalExternalMask;
+    else
+      Data |= InternalExternalMask;
+  }
+
+  void setOwnership(Ownership ownership) {
+    Data &= ~OwnershipMask;
+    Data |= int_type(ownership) << OwnershipShift;
   }
 
   int_type getValue() const { return Data; }

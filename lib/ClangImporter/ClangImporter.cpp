@@ -803,6 +803,7 @@ bool ClangImporter::Implementation::importHeader(
   // Force the import to occur.
   pp.LookAhead(0);
 
+  SmallVector<clang::NamedDecl *, 16> parsedNamedDecls;
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Parser->ParseTopLevelDecl(parsed)) {
     if (!parsed) continue;
@@ -810,13 +811,16 @@ bool ClangImporter::Implementation::importHeader(
     for (auto *D : parsed.get()) {
       if (trackParsedSymbols)
         addBridgeHeaderTopLevelDecls(D);
-
-      if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-        addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable,
-                              named);
-      }
+      if (auto named = dyn_cast<clang::NamedDecl>(D))
+        parsedNamedDecls.push_back(named);
     }
   }
+
+  // We can't do this as we're parsing because we may want to resolve naming
+  // conflicts between the things we've parsed.
+  for (auto *named : parsedNamedDecls)
+    addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable, named);
+
   pp.EndSourceFile();
   bumpGeneration();
 

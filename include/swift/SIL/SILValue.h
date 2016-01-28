@@ -163,10 +163,6 @@ public:
   bool operator==(ValueBase *RHS) const { return Value == RHS; }
   bool operator!=(SILValue RHS) const { return !(*this == RHS); }
   bool operator!=(ValueBase *RHS) const { return Value != RHS; }
-  // Ordering (for std::map).
-  bool operator<(SILValue RHS) const {
-    return Value < RHS.Value;
-  }
 
   /// Return true if underlying ValueBase of this SILValue is non-null. Return
   /// false otherwise.
@@ -183,9 +179,6 @@ public:
   static SILValue getFromOpaqueValue(void *p) {
     return SILValue((ValueBase *)p);
   }
-
-  /// Get the SILLocation associated with the value, if it has any.
-  Optional<SILLocation> getLoc() const;
 
   enum {
     NumLowBitsAvailable =

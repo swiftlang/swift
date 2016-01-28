@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 import SwiftPrivate
 
 // Also import modules which are used by StdlibUnittest internally. This
@@ -81,6 +82,7 @@ Algorithm.test("min,max") {
 
 Algorithm.test("sorted/strings")
   .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
+  .xfail(.FreeBSDAny(reason: "String comparison: ICU vs. Foundation"))
   .code {
   expectEqual(
     [ "Banana", "apple", "cherry" ],

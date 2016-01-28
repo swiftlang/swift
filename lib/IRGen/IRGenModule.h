@@ -391,6 +391,8 @@ public:
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
+  llvm::StructType *FieldDescriptorTy;
+  llvm::PointerType *FieldDescriptorPtrTy;
   llvm::StructType *FieldRecordTy;
   llvm::PointerType *FieldRecordPtrTy;
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
@@ -555,6 +557,7 @@ public:
   llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                            ForDefinition_t forDefinition);
   void addUsedGlobal(llvm::GlobalValue *global);
+  void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addProtocolConformanceRecord(NormalProtocolConformance *conformance);
 
@@ -563,6 +566,9 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
+  llvm::Constant *getAddrOfFieldName(StringRef Name);
+  StringRef getFieldMetadataSectionName();
+  StringRef getFieldNamesSectionName();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -577,6 +583,7 @@ private:
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>> FieldNames;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
 
@@ -585,6 +592,14 @@ private:
   /// forcing visibility of symbols which may otherwise be optimized
   /// out.
   SmallVector<llvm::WeakVH, 4> LLVMUsed;
+
+  /// LLVMCompilerUsed - List of global values which are required to be
+  /// present in the object file; bitcast to i8*. This is used for
+  /// forcing visibility of symbols which may otherwise be optimized
+  /// out.
+  ///
+  /// Similar to LLVMUsed, but emitted as llvm.compiler.used.
+  SmallVector<llvm::WeakVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
   ///
@@ -749,6 +764,10 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfGenericTypeMetadataAccessFunction(
+                                             NominalTypeDecl *nominal,
+                                             ArrayRef<llvm::Type *> genericArgs,
+                                             ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);

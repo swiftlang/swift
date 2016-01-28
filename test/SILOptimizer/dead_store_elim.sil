@@ -84,6 +84,7 @@ struct S7 {
   init()
 }
 
+
 class SelfLoop {
   var a: SelfLoop
   init()
@@ -122,6 +123,12 @@ enum Example {
   case D
 }
 
+struct S9 {
+  var x : S3
+  init(x : S3)
+  init()
+}
+
 sil @foo_user : $@convention(thin) (@guaranteed foo) -> ()
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
@@ -130,6 +137,7 @@ sil @S5_init : $@convention(thin) (@thin S5.Type) -> S5
 sil @S6_init : $@convention(thin) (@thin S6.Type) -> S6
 sil @S7_init : $@convention(thin) (@thin S7.Type) -> S7
 sil @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8
+sil @S9_init : $@convention(thin) (@thin S9.Type) -> S9
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil hidden @dead_store_across_fixlifetime_inst
@@ -184,6 +192,7 @@ bb0:
 
 // CHECK-LABEL: sil @store_after_store
 // CHECK: bb0 
+// CHECK: store
 // CHECK-NOT: store
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
@@ -1436,3 +1445,29 @@ bb0(%0 : $Optional<protocol<>.Type>):
   dealloc_stack %2 : $*Optional<protocol<>.Type> // id: %26
   return %18 : $Int                               // id: %27
 }
+
+/// Make sure we do perform partial dead store for the first store.
+/// we have a case which partial dead store miscompiles a program,
+/// in that case the bitvector is not tracked correctly and we end
+/// up deleting the entire larger store, store %3 to %0#1 : $*S3 in
+/// this case. 
+///
+/// CHECK-LABEL: partial_dead_store_in_nested_struct
+/// CHECK: apply 
+/// CHECK-NEXT: struct_extract
+sil hidden @partial_dead_store_in_nested_struct : $@convention(thin) (@inout S9) -> () {
+bb0(%0 : $*S9):
+  %1 = function_ref @S9_init : $@convention(thin) (@thin S9.Type) -> S9 // user: %3
+  %2 = metatype $@thin S9.Type                    // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin S9.Type) -> S9 // user: %4
+  store %3 to %0 : $*S9                         // id: %4
+  %5 = integer_literal $Builtin.Int64, 10         // user: %6
+  %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
+  %7 = struct_element_addr %0 : $*S9, #S9.x     // user: %8
+  %8 = struct_element_addr %7 : $*S3, #S3.a     // user: %8
+  store %6 to %8 : $*Int                          // id: %8
+  %9 = tuple ()                                   // user: %11
+  return %9 : $()                                 // id: %11
+}
+
+

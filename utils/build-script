@@ -290,7 +290,7 @@ environments and easily reproducible by engineers who are not familiar with the
 details of the setups of other systems or automated environments.""")
 
     targets_group = parser.add_argument_group(
-        title="Host and cross-compilation targets.")
+        title="Host and cross-compilation targets")
     targets_group.add_argument(
         "--host-target",
         help="The host target. LLVM, Clang, and Swift will be built for this "
@@ -503,7 +503,7 @@ also build for iOS, but disallow tests that require an iOS device""",
 
     parser.add_argument("--tvos",
         help="""
-also build for tvOS, but disallow tests that require an tvos device""",
+also build for tvOS, but disallow tests that require a tvos device""",
         action="store_true")
 
     parser.add_argument("--watchos",

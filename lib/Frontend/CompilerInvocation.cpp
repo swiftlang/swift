@@ -1204,6 +1204,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  if (Args.hasArg(OPT_strip_field_names)) {
+    Opts.StripFieldNames = true;
+  }
+
+  if (Args.hasArg(OPT_strip_field_metadata)) {
+    Opts.StripFieldMetadata = true;
+    Opts.StripFieldNames = true;
+  }
+
   return false;
 }
 

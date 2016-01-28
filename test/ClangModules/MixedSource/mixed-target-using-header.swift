@@ -57,3 +57,15 @@ func testFoundationOverlay() {
   _ = NSUTF8StringEncoding // no ambiguity
   _ = NSUTF8StringEncoding as UInt // and we should get the overlay version
 }
+
+func testProtocolNamingConflict() {
+  let a: ConflictingName1? = nil
+  var b: ConflictingName1Protocol?
+  b = a // expected-error {{cannot assign value of type 'ConflictingName1?' to type 'ConflictingName1Protocol?'}}
+  _ = b
+
+  let c: ConflictingName2? = nil
+  var d: ConflictingName2Protocol?
+  d = c // expected-error {{cannot assign value of type 'ConflictingName2?' to type 'ConflictingName2Protocol?'}}
+  _ = d
+}

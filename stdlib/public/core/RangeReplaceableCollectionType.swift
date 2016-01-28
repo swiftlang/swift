@@ -448,6 +448,7 @@ public func +<
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.reserveCapacity(lhs.count + numericCast(rhs.underestimateCount()))
   lhs.appendContentsOf(rhs)
   return lhs
 }
@@ -463,19 +464,6 @@ public func +<
   result.appendContentsOf(lhs)
   result.appendContentsOf(rhs)
   return result
-}
-
-@warn_unused_result
-public func +<
-    C : RangeReplaceableCollectionType,
-    S : CollectionType
-    where S.Generator.Element == C.Generator.Element
->(lhs: C, rhs: S) -> C {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
-  return lhs
 }
 
 @warn_unused_result

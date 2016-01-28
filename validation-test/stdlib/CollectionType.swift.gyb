@@ -5,7 +5,11 @@
 // RUN: %S/../../utils/line-directive %t/CollectionType.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
+// <rdar://problem/24357067> The compiler never finishes compiling validation-test/stdlib/CollectionType.swift.gyb in -O
+// REQUIRES: swift_test_mode_optimize_none
+
 import StdlibUnittest
+import StdlibCollectionUnittest
 import SwiftPrivate
 
 // Also import modules which are used by StdlibUnittest internally. This

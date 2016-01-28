@@ -943,6 +943,9 @@ namespace {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        if (Implicit) {
+          apply->setImplicit();
+        }
       }
       return finishApply(apply, openedType, nullptr);
     }
@@ -1425,6 +1428,7 @@ namespace {
                            object->getLoc(), object->getLoc(),
                            MetatypeType::get(valueType))
       };
+      args[1]->setImplicit();
 
       // Form the argument tuple.
       Expr *argTuple = TupleExpr::createImplicit(tc.Context, args, {});
@@ -3025,12 +3029,13 @@ namespace {
           tc.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
             .fixItRemove(SourceRange(expr->getLoc(),
                                  expr->getCastTypeLoc().getSourceRange().End));
-          return sub;
+
+        } else {
+          tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
+                      sub->getType(), toType)
+            .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
+                          "as");
         }
-        tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
-                    sub->getType(), toType)
-          .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
-                        "as");
 
         // Convert the subexpression.
         bool failed = tc.convertToType(sub, toType, cs.DC);
@@ -3239,6 +3244,151 @@ namespace {
       (void) invalid;
       assert(!invalid && "conversion cannot fail");
       E->setSemanticExpr(callExpr);
+      return E;
+    }
+
+    Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+      // Dig out the reference to a declaration.
+      Expr *subExpr = E->getSubExpr();
+      ValueDecl *foundDecl = nullptr;
+      while (subExpr) {
+        // Declaration reference.
+        if (auto declRef = dyn_cast<DeclRefExpr>(subExpr)) {
+          foundDecl = declRef->getDecl();
+          break;
+        }
+
+        // Constructor reference.
+        if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(subExpr)) {
+          foundDecl = ctorRef->getDecl();
+          break;
+        }
+
+        // Member reference.
+        if (auto memberRef = dyn_cast<MemberRefExpr>(subExpr)) {
+          foundDecl = memberRef->getMember().getDecl();
+          break;
+        }
+
+        // Dynamic member reference.
+        if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(subExpr)) {
+          foundDecl = dynMemberRef->getMember().getDecl();
+          break;
+        }
+
+        // Look through parentheses.
+        if (auto paren = dyn_cast<ParenExpr>(subExpr)) {
+          subExpr = paren->getSubExpr();
+          continue;
+        }
+
+        // Look through "a.b" to "b".
+        if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(subExpr)) {
+          subExpr = dotSyntax->getRHS();
+          continue;
+        }
+
+        // Look through self-rebind expression.
+        if (auto rebindSelf = dyn_cast<RebindSelfInConstructorExpr>(subExpr)) {
+          subExpr = rebindSelf->getSubExpr();
+          continue;
+        }
+
+        // Look through optional binding within the monadic "?".
+        if (auto bind = dyn_cast<BindOptionalExpr>(subExpr)) {
+          subExpr = bind->getSubExpr();
+          continue;
+        }
+
+        // Look through optional evaluation of the monadic "?".
+        if (auto optEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+          subExpr = optEval->getSubExpr();
+          continue;
+        }
+
+        // Look through an implicit force-value.
+        if (auto force = dyn_cast<ForceValueExpr>(subExpr)) {
+          if (force->isImplicit()) {
+            subExpr = force->getSubExpr();
+            continue;
+          }
+
+          break;
+        }
+
+        // Look through implicit open-existential operations.
+        if (auto open = dyn_cast<OpenExistentialExpr>(subExpr)) {
+          if (open->isImplicit()) {
+            subExpr = open->getSubExpr();
+            continue;
+          }
+          break;
+        }
+
+        // Look to the referenced member in a self-application.
+        if (auto selfApply = dyn_cast<SelfApplyExpr>(subExpr)) {
+          subExpr = selfApply->getFn();
+          continue;
+        }
+
+        // Look through implicit conversions.
+        if (auto conversion = dyn_cast<ImplicitConversionExpr>(subExpr)) {
+          subExpr = conversion->getSubExpr();
+          continue;
+        }
+
+        // Look through explicit coercions.
+        if (auto coercion = dyn_cast<CoerceExpr>(subExpr)) {
+          subExpr = coercion->getSubExpr();
+          continue;
+        }
+
+        break;
+      }
+
+      if (!subExpr) return nullptr;
+
+      // If we didn't find any declaration at all, we're stuck.
+      auto &tc = cs.getTypeChecker();
+      if (!foundDecl) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
+          .highlight(subExpr->getSourceRange());
+        return E;
+      }
+
+      // If the declaration we found was not a method or initializer,
+      // complain.
+      auto func = dyn_cast<AbstractFunctionDecl>(foundDecl);
+      if (!func) {
+        tc.diagnose(E->getLoc(),
+                    isa<VarDecl>(foundDecl)
+                      ? diag::expr_selector_property
+                      : diag::expr_selector_not_method_or_init)
+          .highlight(subExpr->getSourceRange());
+        tc.diagnose(foundDecl, diag::decl_declared_here,
+                    foundDecl->getFullName());
+        return E;
+      }
+
+      // The declaration we found must be exposed to Objective-C.
+      if (!func->isObjC()) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
+                    isa<ConstructorDecl>(func))
+          .highlight(subExpr->getSourceRange());
+        if (foundDecl->getLoc().isValid()) {
+          tc.diagnose(foundDecl,
+                      diag::expr_selector_make_objc,
+                      isa<ConstructorDecl>(func))
+            .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+                         "@objc ");
+        } else {
+          tc.diagnose(foundDecl, diag::decl_declared_here,
+                      foundDecl->getFullName());
+        }
+        return E;
+      }
+
+      E->setMethod(func);
       return E;
     }
 
@@ -4353,11 +4503,15 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     // If the element changed, rebuild a new ParenExpr.
     assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
     if (fromTupleExpr[0] != argParen->getSubExpr()) {
+      bool argParenImplicit = argParen->isImplicit();
       argParen = new (tc.Context) ParenExpr(argParen->getLParenLoc(),
                                             fromTupleExpr[0],
                                             argParen->getRParenLoc(),
                                             argParen->hasTrailingClosure(),
                                             fromTupleExpr[0]->getType());
+      if (argParenImplicit) {
+        argParen->setImplicit();
+      }
       arg = argParen;
     } else {
       // coerceToType may have updated the element type of the ParenExpr in
@@ -5179,7 +5333,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     // If there is no argument to the constructor function, then just pass in
     // the empty tuple.
     literal = TupleExpr::createEmpty(tc.Context, literal->getLoc(),
-                                     literal->getLoc(), /*implicit*/true);
+                                     literal->getLoc(),
+                                     /*implicit*/!literal->getLoc().isValid());
   } else {
     // Otherwise, figure out the type of the constructor function and coerce to
     // it.
@@ -6385,12 +6540,25 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
       ++i;
     }
 
+    // The tuple should have the source range enclosing its arguments unless
+    // they are invalid or there are no arguments.
+    SourceLoc TupleStartLoc = base->getStartLoc();
+    SourceLoc TupleEndLoc = base->getEndLoc();
+    if (arguments.size() > 0) {
+      SourceLoc AltStartLoc = arguments.front()->getStartLoc();
+      SourceLoc AltEndLoc = arguments.back()->getEndLoc();
+      if (AltStartLoc.isValid() && AltEndLoc.isValid()) {
+        TupleStartLoc = AltStartLoc;
+        TupleEndLoc = AltEndLoc;
+      }
+    }
+
     arg = TupleExpr::create(Context,
-                            base->getStartLoc(),
+                            TupleStartLoc,
                             arguments,
                             names,
                             { },
-                            base->getEndLoc(),
+                            TupleEndLoc,
                             /*hasTrailingClosure=*/false,
                             /*Implicit=*/true,
                             TupleType::get(elementTypes, Context));

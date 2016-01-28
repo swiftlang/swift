@@ -456,6 +456,30 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
 }
 
+/// Collect elements of an already-existing global list with the given
+/// \c name into \c list.
+///
+/// We use this when Clang code generation might populate the list.
+static void collectGlobalList(IRGenModule &IGM,
+                              SmallVectorImpl<llvm::WeakVH> &list,
+                              StringRef name) {
+  if (auto *existing = IGM.Module.getGlobalVariable(name)) {
+    auto *globals = cast<llvm::ConstantArray>(existing->getInitializer());
+    for (auto &use : globals->operands()) {
+      auto *global = use.get();
+      list.push_back(global);
+    }
+    existing->eraseFromParent();
+  }
+
+  std::for_each(list.begin(), list.end(),
+                [](const llvm::WeakVH &global) {
+    assert(!isa<llvm::GlobalValue>(global) ||
+           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
+           "all globals in the 'used' list must be definitions");
+  });
+}
+
 /// Emit a global list, i.e. a global constant array holding all of a
 /// list of values.  Generally these lists are for various LLVM
 /// metadata or runtime purposes.
@@ -651,6 +675,13 @@ void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
   LLVMUsed.push_back(global);
 }
 
+/// Add the given global value to @llvm.compiler.used.
+///
+/// This value must have a definition by the time the module is finalized.
+void IRGenModule::addCompilerUsedGlobal(llvm::GlobalValue *global) {
+  LLVMCompilerUsed.push_back(global);
+}
+
 /// Add the given global value to the Objective-C class list.
 void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
   ObjCClasses.push_back(classPtr);
@@ -731,24 +762,16 @@ void IRGenModule::emitGlobalLists() {
   // @llvm.used
 
   // Collect llvm.used globals already in the module (coming from ClangCodeGen).
-  auto *ExistingLLVMUsed = Module.getGlobalVariable("llvm.used");
-  if (ExistingLLVMUsed) {
-    auto *Globals =
-        cast<llvm::ConstantArray>(ExistingLLVMUsed->getInitializer());
-    for (auto &Use : Globals->operands()) {
-      auto *Global = Use.get();
-      LLVMUsed.push_back(Global);
-    }
-    ExistingLLVMUsed->eraseFromParent();
-  }
-
-  std::for_each(LLVMUsed.begin(), LLVMUsed.end(),
-                [](const llvm::WeakVH &global) {
-    assert(!isa<llvm::GlobalValue>(global) ||
-           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
-           "all globals in the 'used' list must be definitions");
-  });
+  collectGlobalList(*this, LLVMUsed, "llvm.used");
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
+                 llvm::GlobalValue::AppendingLinkage,
+                 Int8PtrTy,
+                 false);
+
+  // Collect llvm.compiler.used globals already in the module (coming
+  // from ClangCodeGen).
+  collectGlobalList(*this, LLVMCompilerUsed, "llvm.compiler.used");
+  emitGlobalList(*this, LLVMCompilerUsed, "llvm.compiler.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
                  false);
@@ -1051,8 +1074,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
 
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-    switch (getTypeMetadataAccessStrategy(IGM, getType(),
-                                          /*preferDirectAccess=*/false)) {
+    switch (getTypeMetadataAccessStrategy(IGM, getType())) {
     case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
     case MetadataAccessStrategy::HiddenUniqueAccessor:
@@ -1060,7 +1082,6 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     case MetadataAccessStrategy::PrivateAccessor:
       return getSILLinkage(FormalLinkage::Private, forDefinition);
     case MetadataAccessStrategy::NonUniqueAccessor:
-    case MetadataAccessStrategy::Direct:
       return SILLinkage::Shared;
     }
     llvm_unreachable("bad metadata access kind");
@@ -2167,12 +2188,37 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
   return entry;
 }
 
+/// Fetch the type metadata access function for the given generic type.
+llvm::Function *
+IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
+                                           NominalTypeDecl *nominal,
+                                           ArrayRef<llvm::Type *> genericArgs,
+                                           ForDefinition_t forDefinition) {
+  assert(!genericArgs.empty());
+  assert(nominal->isGenericContext());
+
+  auto type = nominal->getDeclaredType()->getCanonicalType();
+  assert(isa<UnboundGenericType>(type));
+  LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  return entry;
+}
+
 /// Get or create a type metadata cache variable.  These are an
 /// implementation detail of type metadata access functions.
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
+  assert(!type->hasUnboundGenericType());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
                                TypeMetadataPtrTy, DebugTypeInfo());
@@ -2738,6 +2784,26 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
 
   // Cache and return.
   entry = {global, address};
+  return address;
+}
+
+llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
+  auto &entry = FieldNames[Name];
+  if (entry.second)
+    return entry.second;
+
+  auto init = llvm::ConstantDataArray::getString(LLVMContext, Name);
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::LinkOnceODRLinkage,
+                                         init);
+  global->setSection(getFieldNamesSectionName());
+
+  auto zero = llvm::ConstantInt::get(SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      global->getValueType(), global, indices);
+
+  entry = { global, address };
   return address;
 }
 

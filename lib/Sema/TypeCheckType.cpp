@@ -111,11 +111,11 @@ Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
   return Type();
 }
 
-static Type getObjectiveCClassType(TypeChecker &TC,
-                                   Type &cache,
-                                   Identifier ModuleName,
-                                   Identifier TypeName,
-                                   DeclContext *dc) {
+static Type getObjectiveCNominalType(TypeChecker &TC,
+                                     Type &cache,
+                                     Identifier ModuleName,
+                                     Identifier TypeName,
+                                     DeclContext *dc) {
   if (cache)
     return cache;
 
@@ -142,17 +142,24 @@ static Type getObjectiveCClassType(TypeChecker &TC,
 }
 
 Type TypeChecker::getNSObjectType(DeclContext *dc) {
-  return getObjectiveCClassType(*this, NSObjectType, Context.Id_ObjectiveC,
+  return getObjectiveCNominalType(*this, NSObjectType, Context.Id_ObjectiveC,
                                 Context.getSwiftId(
                                   KnownFoundationEntity::NSObject),
                                 dc);
 }
 
 Type TypeChecker::getNSErrorType(DeclContext *dc) {
-  return getObjectiveCClassType(*this, NSObjectType, Context.Id_Foundation,
-                                Context.getSwiftId(
-                                  KnownFoundationEntity::NSError),
-                                dc);
+  return getObjectiveCNominalType(*this, NSObjectType, Context.Id_Foundation,
+                                  Context.getSwiftId(
+                                    KnownFoundationEntity::NSError),
+                                  dc);
+}
+
+Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
+  return getObjectiveCNominalType(*this, ObjCSelectorType,
+                                  Context.Id_ObjectiveC,
+                                  Context.Id_Selector,
+                                  dc);
 }
 
 Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {

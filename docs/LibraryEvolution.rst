@@ -134,6 +134,11 @@ version of the library where the entity may be used.
   a declaration in Swift, because a client may depend on them
   See `New Conformances`_, below.
 
+In a versioned library, any top-level public entity from the list above may not
+be made ``public`` without an appropriate version. A public entity declared
+within a versioned type (or an extension of a versioned type) will default to
+having the same version as the type.
+
 Code within a library may generally use all other entities declared within the
 library (barring their own availability checks), since the entire library is
 shipped as a unit. That is, even if a particular API was introduced in v1.0,
@@ -144,10 +149,9 @@ is not enforced by the language.
 
 .. _semantic versioning: http://semver.org
 
-In a versioned library, an entity from the list above may not be made
-``public`` without an appropriate version. However, in some cases it may be
-useful to version an ``internal`` entity as well. See `Versioning Internal
-Declarations`_ below.
+Certain uses of ``internal`` entities require them to be part of a library's
+binary interface, which means they need to be versioned as well. See
+`Versioning Internal Declarations`_ below.
 
 The syntax for marking an entity as versioned has not yet been decided, but the
 rest of this document will use syntax #1 described below.
@@ -739,8 +743,9 @@ Finally, classes allow the following changes that do not apply to structs:
   is a subclass of ``A`` *and* class ``B``, along with any superclasses between
   it and class ``A``, were introduced in the latest version of the library.
 - A non-final override of a method, subscript, property, or initializer may be
-  removed; any existing callers should automatically use the superclass
-  implementation.
+  removed as long as the generic parameters, formal parameters, and return type
+  *exactly* match the overridden declaration. Any existing callers should 
+  automatically use the superclass implementation.
 
 .. admonition:: TODO
 
@@ -768,9 +773,9 @@ are permitted. In particular:
   be subclasses/overrides that would be broken by the change.
 - ``dynamic`` may not be added to *or* removed from any members. Existing
   clients would not know to invoke the member dynamically.
-- A ``final`` override of a member may *not* be removed; existing clients may
-  be performing a direct call to the implementation instead of using dynamic
-  dispatch.
+- A ``final`` override of a member may *not* be removed, even if the type
+  matches exactly; existing clients may be performing a direct call to the
+  implementation instead of using dynamic dispatch.
 
 .. note:: These restrictions tie in with the ongoing discussions about
   "``final``-by-default" and "non-publicly-subclassable-by-default".

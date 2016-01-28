@@ -27,11 +27,6 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   # filename.
   StdlibUnittest.swift.gyb
 
-  CheckCollectionType.swift
-  CheckMutableCollectionType.swift.gyb
-  CheckRangeReplaceableCollectionType.swift
-  CheckRangeReplaceableSliceType.swift
-  CheckSequenceType.swift
   InterceptTraps.cpp
   LoggingWrappers.swift.gyb
   OpaqueIdentityFunctions.cpp

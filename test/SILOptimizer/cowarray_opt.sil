@@ -1051,6 +1051,33 @@ bb2:
   return %7 : $()
 }
 
+// We don't support hoisting non-unary projections yet.
+
+// CHECK-LABEL: sil @dont_hoist_non_unary_projections
+// CHECK-NOT: index_addr
+// CHECK: bb2({{.*}}):
+// CHECK: index_addr
+sil @dont_hoist_non_unary_projections : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
+bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
+  br bb2(%2 : $*Container)
+
+bb2(%3: $*Container):
+  %i = integer_literal $Builtin.Int32, 0
+  %3i = index_addr %3 : $*Container, %i : $Builtin.Int32
+  %4 = struct_element_addr %3i : $*Container, #Container.array
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1, bb3
+
+bb3:
+  %7 = tuple()
+  return %7 : $()
+}
+
 // CHECK-LABEL: sil @hoist_projections2
 // CHECK: bb0([[CONTAINER:%[0-9]+]]
 // CHECK: [[CONTAINER2:%.*]] = struct_element_addr [[CONTAINER]] : $*ContainerContainer

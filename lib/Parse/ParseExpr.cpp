@@ -40,8 +40,10 @@ static Expr *createArgWithTrailingClosure(ASTContext &context,
   // If there are no elements, just build a parenthesized expression around
   // the closure.
   if (elementsIn.empty()) {
-    return new (context) ParenExpr(leftParen, closure, rightParen,
-                                   /*hasTrailingClosure=*/true);
+    auto PE = new (context) ParenExpr(leftParen, closure, rightParen,
+                                      /*hasTrailingClosure=*/true);
+    PE->setImplicit();
+    return PE;
   }
 
   // Create the list of elements, and add the trailing closure to the end.
@@ -434,6 +436,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ///     expr-postfix(Mode)
 ///     operator-prefix expr-unary(Mode)
 ///     '&' expr-unary(Mode)
+///     expr-selector
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   UnresolvedDeclRefExpr *Operator;
@@ -453,6 +456,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     return makeParserResult(
         new (Context) InOutExpr(Loc, SubExpr.get(), Type()));
   }
+
+  case tok::pound_selector:
+    return parseExprSelector();
 
   case tok::oper_postfix:
     // Postfix operators cannot start a subexpression, but can happen
@@ -497,6 +503,50 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   return makeParserResult(
       new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
+}
+
+/// parseExprSelector
+///
+///   expr-selector:
+///     '#selector' '(' expr ')'
+///
+ParserResult<Expr> Parser::parseExprSelector() {
+  // Consume '#selector'.
+  SourceLoc keywordLoc = consumeToken(tok::pound_selector);
+
+  // Parse the leading '('.
+  if (!Tok.is(tok::l_paren)) {
+    diagnose(Tok, diag::expr_selector_expected_lparen);
+    return makeParserError();
+  }
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+
+  // Parse the subexpression.
+  ParserResult<Expr> subExpr = parseExpr(diag::expr_selector_expected_expr);
+  if (subExpr.hasCodeCompletion())
+    return subExpr;
+
+  // Parse the closing ')'
+  SourceLoc rParenLoc;
+  if (subExpr.isParseError()) {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      rParenLoc = consumeToken();
+    else
+      rParenLoc = Tok.getLoc();
+  } else {
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expr_selector_expected_rparen, lParenLoc);
+  }
+
+  // If the subexpression was in error, just propagate the error.
+  if (subExpr.isParseError())
+    return makeParserResult<Expr>(
+             new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+
+  return makeParserResult<Expr>(
+    new (Context) ObjCSelectorExpr(keywordLoc, lParenLoc, subExpr.get(),
+                                   rParenLoc));
 }
 
 static DeclRefKind getDeclRefKindForOperator(tok kind) {
@@ -1194,9 +1244,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
                                                  { }, { }, SourceLoc(), 
                                                  closure.get());
+        // The call node should still be marked as explicit
         Result = makeParserResult(
             ParserStatus(closure),
-            new (Context) CallExpr(Result.get(), arg, /*Implicit=*/true));
+            new (Context) CallExpr(Result.get(), arg, /*Implicit=*/false));
       }
 
       if (Result.hasCodeCompletion())
@@ -1791,8 +1842,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         Identifier name = Tok.is(tok::identifier) ?
             Context.getIdentifier(Tok.getText()) : Identifier();
         auto var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
-                                           Identifier(), Tok.getLoc(), name,
-                                           Type(), nullptr);
+                                           SourceLoc(), Identifier(),
+                                           Tok.getLoc(), name, Type(), nullptr);
         elements.push_back(var);
         consumeToken();
  
@@ -2034,9 +2085,10 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
-    auto *var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),
+    auto *var = new (Context) ParamDecl(/*IsLet*/ true, SourceLoc(),SourceLoc(),
                                         Identifier(), varLoc, ident, Type(),
                                         closure);
+    var->setImplicit();
     decls.push_back(var);
   }
 

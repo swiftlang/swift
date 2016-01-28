@@ -35,12 +35,13 @@ SILValue stripUpCasts(SILValue V);
 /// upcasts and downcasts.
 SILValue stripClassCasts(SILValue V);
 
-/// Return the underlying SILValue after stripping off all casts and
-/// address projection instructions.
-///
-/// An address projection instruction is one of one of ref_element_addr,
-/// struct_element_addr, tuple_element_addr.
+/// Return the underlying SILValue after stripping off all address projection
+/// instructions.
 SILValue stripAddressProjections(SILValue V);
+
+/// Return the underlying SILValue after stripping off all address projection
+/// instructions which have a single operand.
+SILValue stripUnaryAddressProjections(SILValue V);
 
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.

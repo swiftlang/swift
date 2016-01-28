@@ -44,6 +44,7 @@ enum class tok {
   pound_endif,
   pound_line,
   pound_available,
+  pound_selector,
   comment,
   
 #define KEYWORD(X) kw_ ## X,
@@ -261,6 +262,9 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
   }
 
+  StringRef getRawText() const {
+    return Text;
+  }
 
   StringRef getText() const {
     if (EscapedIdentifier) {

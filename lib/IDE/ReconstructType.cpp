@@ -119,12 +119,12 @@ GetTemplateArgument (swift::TypeBase* type,
             }
             case swift::TypeKind::PolymorphicFunction:
             {
-                swift::PolymorphicFunctionType *polymorhpic_func_type = swift_can_type->getAs<swift::PolymorphicFunctionType>();
-                if (!polymorhpic_func_type)
+                swift::PolymorphicFunctionType *polymorphic_func_type = swift_can_type->getAs<swift::PolymorphicFunctionType>();
+                if (!polymorphic_func_type)
                     break;
-                if (arg_idx >= polymorhpic_func_type->getGenericParameters().size())
+                if (arg_idx >= polymorphic_func_type->getGenericParameters().size())
                     break;
-                return polymorhpic_func_type->getGenericParameters()[arg_idx]->getArchetype();
+                return polymorphic_func_type->getGenericParameters()[arg_idx]->getArchetype();
             }
                 break;
             default:

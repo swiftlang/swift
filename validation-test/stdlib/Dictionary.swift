@@ -12,6 +12,7 @@
 
 import Darwin
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile

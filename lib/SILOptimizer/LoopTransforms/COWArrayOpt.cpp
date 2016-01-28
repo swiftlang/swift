@@ -1433,7 +1433,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
 
   // We can hoist address projections (even if they are only conditionally
   // executed).
-  auto ArrayAddrBase = stripAddressProjections(CurrentArrayAddr);
+  auto ArrayAddrBase = stripUnaryAddressProjections(CurrentArrayAddr);
   SILBasicBlock *ArrayAddrBaseBB = ArrayAddrBase->getParentBB();
 
   if (ArrayAddrBaseBB && !DomTree->dominates(ArrayAddrBaseBB, Preheader)) {

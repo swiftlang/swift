@@ -1022,6 +1022,17 @@ PatternBindingDecl *
 PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc VarLoc,
+                           Pattern *Pat, Expr *E,
+                           DeclContext *Parent) {
+  return create(Ctx, StaticLoc, StaticSpelling, VarLoc,
+                PatternBindingEntry(Pat, E),
+                Parent);
+}
+
+PatternBindingDecl *
+PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
+                           StaticSpellingKind StaticSpelling,
+                           SourceLoc VarLoc,
                            ArrayRef<PatternBindingEntry> PatternList,
                            DeclContext *Parent) {
   size_t Size = sizeof(PatternBindingDecl) +
@@ -1037,7 +1048,7 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
   for (auto pe : PatternList) {
     ++elt;
     auto &newEntry = entries[elt];
-    newEntry = { nullptr, pe.getInit() };
+    newEntry = pe; // This should take care of initializer with flags
     PBD->setPattern(elt, pe.getPattern());
   }
   return PBD;
@@ -1072,6 +1083,20 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   return ~0U;
 }
 
+SourceRange PatternBindingEntry::getOrigInitRange() const {
+  auto Init = InitCheckedAndRemoved.getPointer();
+  return Init ? Init->getSourceRange() : SourceRange();
+}
+
+void PatternBindingEntry::setInit(Expr *E) {
+  auto F = InitCheckedAndRemoved.getInt();
+  if (E) {
+    InitCheckedAndRemoved.setInt(F - Flags::Removed);
+    InitCheckedAndRemoved.setPointer(E);
+  } else {
+    InitCheckedAndRemoved.setInt(F | Flags::Removed);
+  }
+}
 
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
@@ -3392,12 +3417,14 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-ParamDecl::ParamDecl(bool isLet, SourceLoc argumentNameLoc,
+ParamDecl::ParamDecl(bool isLet,
+                     SourceLoc letVarInOutLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,
                      Identifier parameterName, Type ty, DeclContext *dc)
   : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc,
             parameterName, ty, dc),
-  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) {
+  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
+  LetVarInOutLoc(letVarInOutLoc) {
 }
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
@@ -3408,6 +3435,7 @@ ParamDecl::ParamDecl(ParamDecl *PD)
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
+    LetVarInOutLoc(PD->getLetVarInOutLoc()),
     typeLoc(PD->getTypeLoc()),
     DefaultValueAndIsVariadic(PD->DefaultValueAndIsVariadic),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
@@ -3453,7 +3481,7 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
       selfType = InOutType::get(selfType);
   }
     
-  auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),
+  auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
                                      Identifier(), loc, C.Id_self, selfType,DC);
   selfDecl->setImplicit();
   return selfDecl;
@@ -3487,7 +3515,7 @@ SourceRange ParamDecl::getSourceRange() const {
   // If the typeloc has a valid location, use it to end the range.
   if (auto typeRepr = getTypeLoc().getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
-    if (endLoc.isValid())
+    if (endLoc.isValid() && !isTypeLocImplicit())
       return SourceRange(range.Start, endLoc);
   }
   

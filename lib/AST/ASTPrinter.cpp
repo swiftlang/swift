@@ -698,9 +698,19 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       Printer << ", ";
     }
 
-    auto asWrittenStr = req.getAsWrittenString();
-    if (!asWrittenStr.empty()) {
-      Printer << asWrittenStr;
+    auto TupleOp = req.getAsAnalyzedWrittenString();
+    if (TupleOp.hasValue()) {
+      auto Tuple = TupleOp.getValue();
+      Printer << std::get<0>(Tuple);
+      switch(std::get<2>(Tuple)) {
+      case RequirementReprKind::TypeConstraint:
+        Printer << " : ";
+        break;
+      case RequirementReprKind::SameType:
+        Printer << " == ";
+        break;
+      }
+      Printer << std::get<1>(Tuple);
       continue;
     }
 

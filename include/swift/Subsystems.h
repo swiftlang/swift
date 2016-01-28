@@ -123,7 +123,8 @@ namespace swift {
                               const SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
                               bool KeepComments = true,
-                              bool TokenizeInterpolatedString = true);
+                              bool TokenizeInterpolatedString = true,
+                              ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.

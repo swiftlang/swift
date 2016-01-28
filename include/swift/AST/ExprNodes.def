@@ -155,6 +155,7 @@ EXPR(DefaultValue, Expr)
 EXPR(CodeCompletion, Expr)
 UNCHECKED_EXPR(UnresolvedPattern, Expr)
 EXPR(EditorPlaceholder, Expr)
+EXPR(ObjCSelector, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

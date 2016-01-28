@@ -515,6 +515,7 @@ private:
   Type UInt8Type;
   Type NSObjectType;
   Type NSErrorType;
+  Type ObjCSelectorType;
   Type ExceptionType;
 
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
@@ -589,6 +590,7 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getNSErrorType(DeclContext *dc);
+  Type getObjCSelectorType(DeclContext *dc);
   Type getExceptionType(DeclContext *dc, SourceLoc loc);
 
   /// \brief Try to resolve an IdentTypeRepr, returning either the referenced

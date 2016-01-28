@@ -197,6 +197,7 @@ namespace {
                                               SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
+    RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
@@ -830,6 +831,9 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
   case StringLiteralInst::Encoding::UTF8:
     Elts = EltsArray;
     break;
+
+  case StringLiteralInst::Encoding::ObjCSelector:
+    llvm_unreachable("Objective-C selectors cannot be formed here");
   }
 
   return RValue(Elts, ty);
@@ -1940,6 +1944,46 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 RValue RValueEmitter::
 visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
+}
+
+RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
+  SILType loweredSelectorTy = SGF.getLoweredType(e->getType());
+
+  // Dig out the declaration of the Selector type.
+  auto selectorDecl = e->getType()->getAs<StructType>()->getDecl();
+
+  // Dig out the type of its pointer.
+  Type selectorMemberTy;
+  for (auto member : selectorDecl->getMembers()) {
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      if (!var->isStatic() && var->hasStorage()) {
+        selectorMemberTy = var->getInterfaceType()->getRValueType();
+        break;
+      }
+    }
+  }
+  if (!selectorMemberTy) {
+    SGF.SGM.diagnose(e, diag::objc_selector_malformed);
+    return RValue(SGF, e, SGF.emitUndef(e, loweredSelectorTy));
+  }
+
+  // Form the selector string.
+  llvm::SmallString<64> selectorScratch;
+  auto selectorString =
+    e->getMethod()->getObjCSelector().getString(selectorScratch);
+
+  // Create an Objective-C selector string literal.
+  auto selectorLiteral =
+    SGF.B.createStringLiteral(e, selectorString,
+                              StringLiteralInst::Encoding::ObjCSelector);
+
+  // Create the pointer struct from the raw pointer.
+  SILType loweredPtrTy = SGF.getLoweredType(selectorMemberTy);
+  auto ptrValue = SGF.B.createStruct(e, loweredPtrTy, { selectorLiteral });
+
+  // Wrap that up in a Selector and return it.
+  auto selectorValue = SGF.B.createStruct(e, loweredSelectorTy, { ptrValue });
+  return RValue(SGF, e, ManagedValue::forUnmanaged(selectorValue));
 }
 
 static StringRef

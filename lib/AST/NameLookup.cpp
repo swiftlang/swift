@@ -1091,9 +1091,6 @@ bool DeclContext::lookupQualified(Type type,
 
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
-    assert(!(options & NL_IgnoreAccessibility) &&
-           "accessibility always enforced for module-level lookup");
-
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {

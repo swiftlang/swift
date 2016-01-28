@@ -17,6 +17,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
@@ -370,7 +371,7 @@ var tests = TestSuite("NewLazy")
 tests.test("LazySequence/SequenceType") {
   let expected = (0..<100).map(OpaqueValue.init)
   var actual = MinimalSequence(elements: expected).lazy
-  
+
   expectType(
     LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &actual)
 
@@ -378,7 +379,7 @@ tests.test("LazySequence/SequenceType") {
   var again = actual.lazy
   expectType(
     LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &again)
-  
+
   var elements = actual.elements
 
   // Expect .elements to strip a lazy wrapper
@@ -406,10 +407,10 @@ func expectSequencePassthrough<
   SequenceLog._copyToNativeArrayBuffer.expectIncrement(baseType) {
     _ = s._copyToNativeArrayBuffer()
   }
-  
+
   SequenceLog._initializeTo.expectIncrement(baseType) { () -> Void in
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
-  
+
     let end = s._initializeTo(buf)
     expectTrue(end <= buf + count)
     buf.destroy(end - buf)
@@ -422,7 +423,7 @@ tests.test("LazySequence/Passthrough") {
   // through to the underlying sequence.
   let a = (0..<100).map(OpaqueValue.init)
   let base = LoggingSequence(a)
-  
+
   expectSequencePassthrough(
     base.lazy,
     base: base, arbitraryElement: OpaqueValue(0), count: a.count)
@@ -433,7 +434,7 @@ tests.test("LazyCollection/CollectionType/${traversal}") {
   let expected = (0..<100).map(OpaqueValue.init)
   let base = Minimal${traversal}Collection(elements: expected)
   var actual = base.lazy
-  
+
   expectType(
     LazyCollection<Minimal${traversal}Collection<OpaqueValue<Int>>>.self,
     &actual)
@@ -443,7 +444,7 @@ tests.test("LazyCollection/CollectionType/${traversal}") {
   expectType(
     LazyCollection<Minimal${traversal}Collection<OpaqueValue<Int>>>.self,
     &again)
-  
+
   check${traversal}Collection(
     expected, base.lazy, resiliencyChecks: .none
   ) { $0.value == $1.value }
@@ -456,7 +457,7 @@ tests.test("LazyCollection/CollectionType/${traversal}") {
 tests.test("LazyCollection/Passthrough") {
   let expected = (0..<100).map(OpaqueValue.init)
   let base = LoggingCollection(expected)
-  
+
   expectSequencePassthrough(
     base.lazy,
     base: base.lazy._base,
@@ -468,11 +469,11 @@ tests.test("LazyCollection/Passthrough") {
   let startIndex = CollectionLog.startIndex.expectIncrement(baseType) {
     s.startIndex
   }
-  
+
   let endIndex = CollectionLog.endIndex.expectIncrement(baseType) {
     s.endIndex
   }
-  
+
   CollectionLog.subscriptIndex.expectIncrement(baseType) { _ = s[startIndex] }
   CollectionLog.subscriptRange.expectUnchanged(baseType) {
     _ = s[startIndex..<endIndex]
@@ -499,19 +500,19 @@ tests.test("LazyMapSequence") {
   }
 
   expectEqual(0, calls)
-  
+
   expectType(
     LazyMapSequence<
-      MinimalSequence<OpaqueValue<Int>>, 
+      MinimalSequence<OpaqueValue<Int>>,
       OpaqueValue<Double>>.self,
     &mapped)
-  
+
   let expected = [ 1.0, 1.5, 2.5, 3.5, 5.5 ].map(OpaqueValue.init)
-  
+
   checkSequence(expected, mapped, resiliencyChecks: .none) {
     $0.value == $1.value
   }
-  
+
   expectEqual(expected.count, calls)
 }
 
@@ -540,15 +541,15 @@ tests.test("LazyMapCollection/${traversal}") {
     return OpaqueValue(Double(x.value) / 2.0)
   }
   expectEqual(0, calls)
-  
+
   expectType(
     LazyMapCollection<
-      Minimal${traversal}Collection<OpaqueValue<Int>>, 
+      Minimal${traversal}Collection<OpaqueValue<Int>>,
       OpaqueValue<Double>>.self,
     &mapped)
-  
+
   let expected = [ 1.0, 1.5, 2.5, 3.5, 5.5 ].map(OpaqueValue.init)
-  
+
   check${traversal}Collection(expected, mapped, resiliencyChecks: .none) {
     $0.value == $1.value
   }
@@ -563,7 +564,7 @@ tests.test("LazyMapCollection/Passthrough") {
   let expected = (0..<100).map(OpaqueValue.init)
   let base = LoggingCollection(expected)
   let mapped = base.lazy.map { OpaqueValue(Double($0.value) / 2.0) }
-  
+
   let startIndex = CollectionLog.startIndex.expectIncrement(base.dynamicType) {
     mapped.startIndex
   }
@@ -605,7 +606,7 @@ tests.test("ReverseCollection") {
     _ = r.reverse().map { _ in calls += 1 }
     expectEqual(r.count, calls)
   }
-  
+
   checkBidirectionalCollection(
     "raboof".characters,
     "foobar".characters.reverse())
@@ -629,18 +630,18 @@ tests.test("ReverseCollection/Lazy") {
   // Check that reversing a lazy collection, or lazy-ing a reverse
   // collection, produces the same lazy reverse collection.
   do {
-    
+
     let base = Array(11.stride(through: 0, by: -1)).lazy.map { $0 }
-    
+
     typealias Base = LazyMapCollection<[Int], Int>
     ExpectType<Base>.test(base)
-    
+
     typealias LazyReversedBase = LazyCollection<
       ReverseRandomAccessCollection<Base>>
 
     let reversed = base.reverse()
     ExpectType<LazyReversedBase>.test(reversed)
-    
+
     var calls = 0
     let reversedAndMapped = reversed.map { (x) -> Int in calls += 1; return x }
     expectEqual(0, calls)
@@ -652,17 +653,17 @@ tests.test("ReverseCollection/Lazy") {
     typealias Expected = LazyCollection<
       ReverseCollection<String.CharacterView>
     >
-    
+
     let base = "foobar".characters.lazy.map { $0 }
     typealias Base = LazyMapCollection<String.CharacterView, Character>
     ExpectType<Base>.test(base)
-    
+
     typealias LazyReversedBase = LazyCollection<
       ReverseCollection<Base>>
 
     let reversed = base.reverse()
     ExpectType<LazyReversedBase>.test(reversed)
-    
+
     var calls = 0
     let reversedAndMapped = reversed.map { (x) -> Character in calls += 1; return x }
     expectEqual(0, calls)
@@ -675,7 +676,7 @@ tests.test("ReverseCollection/Lazy") {
 // the first selects even numbers and the second selects odd numbers,
 // both from an underlying sequence of whole numbers.
 func checkFilterGeneratorBase<
-  S : SequenceType, T : GeneratorType 
+  S : SequenceType, T : GeneratorType
     where S.Generator == LazyFilterGenerator<T>, T.Element == OpaqueValue<Int>
 >(s1: S, _ s2: S) {
   var g1 = s1.generate()
@@ -706,14 +707,14 @@ tests.test("LazyFilterSequence") {
     return x.value % 2 == 0
   }
   expectEqual(calls, 0, "filtering was eager!")
-  
+
   ExpectType<
     LazyFilterSequence<MinimalSequence<OpaqueValue<Int>>>
   >.test(filtered)
 
   let evens = 0.stride(to: 100, by: 2).map(OpaqueValue.init)
   checkSequence(evens, filtered, resiliencyChecks: .none) {
-    $0.value == $1.value 
+    $0.value == $1.value
   }
   expectEqual(100, calls)
 
@@ -724,19 +725,19 @@ tests.test("LazyFilterSequence") {
   checkSequence(odds, filtered, resiliencyChecks: .none) {
     $0.value == $1.value
   }
-  
+
   // Try again using explicit construction
   filtered = LazyFilterSequence(
     MinimalSequence(elements: base),
     whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
-  
+
   expectEqual(100, calls)
 
   // Check that it constructs the same sequence
   checkSequence(evens, filtered, resiliencyChecks: .none) {
-    $0.value == $1.value 
+    $0.value == $1.value
   }
-  
+
   expectEqual(200, calls)
 
   checkFilterGeneratorBase(
@@ -748,14 +749,14 @@ tests.test("LazyFilterIndex/base") {
   let base = MinimalForwardCollection(elements: (0..<100).map(OpaqueValue.init))
   let evens = base.lazy.filter { $0.value % 2 == 0 }
   let odds = base.lazy.filter { $0.value % 2 != 0 }
-  
+
   expectEqual(base.startIndex, evens.startIndex.base)
   expectEqual(base.startIndex.successor(), odds.startIndex.base)
 
   expectEqual(
     base.startIndex.successor().successor(),
     evens.startIndex.successor().base)
-  
+
   expectEqual(
     base.startIndex.successor().successor().successor(),
     odds.startIndex.successor().base)
@@ -770,11 +771,11 @@ tests.test("LazyFilterCollection") {
     return x.value % 2 == 0
   }
   expectEqual(calls, 0, "filtering was eager!")
-  
+
   ExpectType<
     LazyFilterCollection<MinimalForwardCollection<OpaqueValue<Int>>>
   >.test(filtered)
-  
+
   checkForwardCollection(
     0.stride(to: 100, by: 2).map(OpaqueValue.init), filtered,
     resiliencyChecks: .none
@@ -798,7 +799,7 @@ do {
     var expected: Range<Int>
     var data: [Range<Int>]
   }
-  
+
   let flattenSamples: [Sample] = [
     Sample(
       expected: 0..<8, data: [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8 ]),
@@ -815,14 +816,14 @@ do {
   for sample in flattenSamples {
     let expected = sample.expected
     let data = sample.data
-    
+
     tests.test("FlattenSequence/\(data)") {
       var base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
       checkSequence(expected, base.flatten(), resiliencyChecks: .none)
 
       // Checking that flatten doesn't introduce laziness
-      
+
       // checkSequence consumed base, so reassign
       base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
@@ -845,7 +846,7 @@ do {
       _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
-    
+
   % for traversal in 'Forward', 'Bidirectional':
   %   t = '' if traversal == 'Forward' else traversal
     tests.test("Flatten${t}Collection/\(data)") {
@@ -862,7 +863,7 @@ do {
         expected.count, calls,
         "unexpected laziness in \(flattened.dynamicType)")
     }
-    
+
     tests.test("Flatten${t}Collection/Lazy\(data)") {
       // Checking that flatten doesn't remove laziness
       let base = Minimal${traversal}Collection(
@@ -870,7 +871,7 @@ do {
       ).lazy.map { $0 }
 
       let flattened = base.flatten()
-    
+
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")

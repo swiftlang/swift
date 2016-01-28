@@ -286,6 +286,12 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   TypeMetadataRecordPtrTy
     = TypeMetadataRecordTy->getPointerTo(DefaultAS);
 
+  FieldDescriptorTy = createStructType(*this, "swift.field_descriptor", {
+    Int32Ty, // Number of fields that follow
+    Int32Ty, // Size of fields that follow
+    // Tail-allocated FieldRecordTy elements
+  });
+
   FieldRecordTy = createStructType(*this, "swift.field_record", {
     Int32Ty,           // Flags
     RelativeAddressTy, // Offset to metadata or mangled name for external type
@@ -856,4 +862,32 @@ IRGenModule *IRGenModuleDispatcher::getGenModule(SILFunction *f) {
     return IGM;
 
   return getPrimaryIGM();
+}
+
+StringRef IRGenModule::getFieldMetadataSectionName() {
+  switch (TargetInfo.OutputObjectFormat) {
+    case llvm::Triple::MachO:
+      return "__DATA, __swift2_field_names, regular, no_dead_strip";
+      break;
+    case llvm::Triple::ELF:
+      return ".swift2_field_names";
+      break;
+    default:
+      llvm_unreachable("Don't know how to emit field name table for "
+                       "the selected object format.");
+  }
+}
+
+StringRef IRGenModule::getFieldNamesSectionName() {
+  switch (TargetInfo.OutputObjectFormat) {
+    case llvm::Triple::MachO:
+      return "__DATA, __swift2_field_metadata, regular, no_dead_strip";
+      break;
+    case llvm::Triple::ELF:
+      return ".swift2_field_metadata";
+      break;
+    default:
+      llvm_unreachable("Don't know how to emit field metadata table for "
+                       "the selected object format.");
+  }
 }

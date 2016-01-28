@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import StdlibUnittest
+
 // These tests are shared between partition() and sort().
 public struct PartitionExhaustiveTest {
   public let sequence: [Int]

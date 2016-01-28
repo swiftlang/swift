@@ -5,4 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-for in.f=Swift.dynamicType.e.n
+class n{func f{func b<class A{var _=f=b
