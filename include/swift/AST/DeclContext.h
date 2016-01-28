@@ -405,6 +405,11 @@ public:
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
+  /// Look up Objective-C methods with the given selector.
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const;
+
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
   ASTContext &getASTContext() const;

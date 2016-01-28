@@ -520,10 +520,22 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   }
 }
 
+void Module::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  FORWARD(lookupObjCMethods, (selector, results));
+}
+
 void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseName(), lookupKind, *this, result);
+}
+
+void BuiltinUnit::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  // No @objc methods in the Builtin module.
 }
 
 DerivedFileUnit::DerivedFileUnit(Module &M)
@@ -559,6 +571,17 @@ void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
   for (auto D : DerivedDecls) {
     if (Id.empty() || D->getName() == Id)
       consumer.foundDecl(D, DeclVisibilityKind::VisibleAtTopLevel);
+  }
+}
+
+void DerivedFileUnit::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  for (auto D : DerivedDecls) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (func->isObjC() && func->getObjCSelector() == selector)
+        results.push_back(func);
+    }
   }
 }
 
@@ -605,6 +628,15 @@ void SourceFile::lookupClassMember(Module::AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   getCache().lookupClassMember(accessPath, name, results, *this);
+}
+
+void SourceFile::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  // FIXME: Make sure this table is complete, somehow.
+  auto known = ObjCMethods.find(selector);
+  if (known == ObjCMethods.end()) return;
+  results.append(known->second.begin(), known->second.end());
 }
 
 void Module::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
