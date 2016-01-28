@@ -306,9 +306,13 @@ public:
 
   /// All alloc_ref instructions which allocate the object on the stack.
   llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
+  /// With closure captures it is actually possible to have two function
+  /// arguments that both have the same name. Until this is is fixed, we need to
+  /// also hash the ArgNo here.
+  typedef std::pair<unsigned, std::pair<const SILDebugScope *, StringRef>>
+      StackSlotKey;
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
-  llvm::SmallDenseMap<std::pair<const SILDebugScope *, StringRef>, Address, 8>
-      ShadowStackSlots;
+  llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   unsigned NumAnonVars = 0;
 
@@ -537,7 +541,7 @@ public:
   /// shadow copies, we lose the precise lifetime.
   llvm::Value *emitShadowCopy(llvm::Value *Storage,
                               const SILDebugScope *Scope,
-                              StringRef Name,
+                              StringRef Name, unsigned ArgNo,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
     if (IGM.Opts.Optimize ||
@@ -549,7 +553,7 @@ public:
     if (Align.isZero())
       Align = IGM.getPointerAlignment();
 
-    auto &Alloca = ShadowStackSlots[{Scope, Name}];
+    auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
     if (!Alloca.isValid())
       Alloca = createAlloca(Ty, Align, Name+".addr");
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
@@ -557,13 +561,13 @@ public:
   }
 
   llvm::Value *emitShadowCopy(Address Storage, const SILDebugScope *Scope,
-                              StringRef Name) {
-    return emitShadowCopy(Storage.getAddress(), Scope, Name,
+                              StringRef Name, unsigned ArgNo) {
+    return emitShadowCopy(Storage.getAddress(), Scope, Name, ArgNo,
                           Storage.getAlignment());
   }
 
-  void emitShadowCopy(ArrayRef<llvm::Value *> vals, const SILDebugScope *scope,
-                      StringRef name,
+  void emitShadowCopy(ArrayRef<llvm::Value *> vals, const SILDebugScope *Scope,
+                      StringRef Name, unsigned ArgNo,
                       llvm::SmallVectorImpl<llvm::Value *> &copy) {
     // Only do this at -O0.
     if (IGM.Opts.Optimize) {
@@ -574,7 +578,7 @@ public:
     // Single or empty values.
     if (vals.size() <= 1) {
       for (auto val : vals)
-        copy.push_back(emitShadowCopy(val, scope, name));
+        copy.push_back(emitShadowCopy(val, Scope, Name, ArgNo));
       return;
     }
 
@@ -590,7 +594,7 @@ public:
     auto layout = IGM.DataLayout.getStructLayout(aggregateType);
     Alignment align(layout->getAlignment());
 
-    auto alloca = createAlloca(aggregateType, align, name + ".debug");
+    auto alloca = createAlloca(aggregateType, align, Name + ".debug");
     size_t i = 0;
     for (auto val : vals) {
       auto addr = Builder.CreateStructGEP(alloca, i,
@@ -1475,10 +1479,11 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // other argument. It is only used for sorting.
     unsigned ArgNo =
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
-    IGM.DebugInfo->emitVariableDeclaration(
-        Builder,
-        emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(), Name),
-        DTI, getDebugScope(), Name, ArgNo, IndirectValue, ArtificialValue);
+    auto Storage = emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(),
+                                  Name, ArgNo);
+    IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI,
+                                           getDebugScope(), Name, ArgNo,
+                                           IndirectValue, ArtificialValue);
   }
 }
 
@@ -3099,9 +3104,9 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy; 
   Explosion e = getLoweredExplosion(SILVal);
-  emitShadowCopy(e.claimAll(), i->getDebugScope(), Name, Copy);
-  emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
-                               i->getVarInfo().ArgNo);
+  unsigned ArgNo = i->getVarInfo().ArgNo;
+  emitShadowCopy(e.claimAll(), i->getDebugScope(), Name, ArgNo, Copy);
+  emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name, ArgNo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -3125,9 +3130,10 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
     DbgTy.unwrapLValueOrInOutType();
   // Put the value's address into a stack slot at -Onone and emit a debug
   // intrinsic.
+  unsigned ArgNo = i->getVarInfo().ArgNo;
   emitDebugVariableDeclaration(
-      emitShadowCopy(Addr, i->getDebugScope(), Name), DbgTy, i->getDebugScope(),
-      Name, i->getVarInfo().ArgNo,
+      emitShadowCopy(Addr, i->getDebugScope(), Name, ArgNo), DbgTy,
+      i->getDebugScope(), Name, ArgNo,
       DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
 }
 
@@ -3540,7 +3546,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
     DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type);
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, emitShadowCopy(addr.getAddress(), i->getDebugScope(), Name),
+        Builder, emitShadowCopy(addr.getAddress(), i->getDebugScope(), Name, 0),
         DbgTy, i->getDebugScope(), Name, 0,
         DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
   }
