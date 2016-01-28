@@ -614,7 +614,7 @@ SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/dispatc
   let end = 10
   let range = Range(start: MinimalComparableIndexValue(start), end: MinimalComparableIndexValue(end))
   let count = 20
-  for test in 0...count {
+  for test in 0..<count {
     expectEqual(
       test >= start && test < end,
       range.contains(MinimalComparableIndexValue(test)))

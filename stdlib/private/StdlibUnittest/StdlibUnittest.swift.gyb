@@ -2612,13 +2612,8 @@ public func < (
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
 public struct MinimalComparableIndexValue : Comparable, ForwardIndexType {
-  public static var timesEqualEqualWasCalled = ResettableValue(0)
-  public static var timesLessWasCalled = ResettableValue(0)
-
-  public static var equalImpl =
-    ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
-  public static var lessImpl =
-    ResettableValue<(Int, Int) -> Bool>({ $0 < $1 })
+  public static var timesEqualEqualWasCalled = 0
+  public static var timesLessWasCalled = 0
 
   public func successor() -> MinimalComparableIndexValue {
     return MinimalComparableIndexValue(value.successor())
@@ -2642,16 +2637,16 @@ public func == (
   lhs: MinimalComparableIndexValue,
   rhs: MinimalComparableIndexValue
 ) -> Bool {
-  MinimalComparableIndexValue.timesEqualEqualWasCalled.value += 1
-  return MinimalComparableIndexValue.equalImpl.value(lhs.value, rhs.value)
+  MinimalComparableIndexValue.timesEqualEqualWasCalled += 1
+  return lhs.value == rhs.value
 }
 
 public func < (
   lhs: MinimalComparableIndexValue,
   rhs: MinimalComparableIndexValue
 ) -> Bool {
-  MinimalComparableIndexValue.timesLessWasCalled.value += 1
-  return MinimalComparableIndexValue.lessImpl.value(lhs.value, rhs.value)
+  MinimalComparableIndexValue.timesLessWasCalled += 1
+  return lhs.value < rhs.value
 }
 
 // ${'Local Variables'}:
