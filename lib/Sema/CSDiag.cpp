@@ -1066,6 +1066,8 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
       // FIXME: Use TC.isConvertibleTo?
       if (rArgType->isEqual(paramType))
         continue;
+      if (auto genericParam = paramType->getAs<GenericTypeParamType>())
+        paramType = genericParam->getDecl()->getArchetype();
       if (paramType->is<ArchetypeType>() && !rArgType->hasTypeVariable()) {
         if (singleArchetype) {
           if (!paramType->isEqual(singleArchetype))
@@ -1662,6 +1664,10 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
   bool foundFailure = false;
   Type paramType = failedArgument.parameterType;
   Type argType = badArgExpr->getType();
+
+  if (auto genericParam = paramType->getAs<GenericTypeParamType>())
+    paramType = genericParam->getDecl()->getArchetype();
+  
   if (paramType->is<ArchetypeType>() && !argType->hasTypeVariable() &&
       // FIXME: For protocol argument types, could add specific error
       // similar to could_not_use_member_on_existential.
