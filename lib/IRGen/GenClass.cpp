@@ -1715,8 +1715,7 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls) {
 llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
                                         ExtensionDecl *ext) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
-  ClassDecl *cls = ext->getDeclaredTypeInContext()
-    ->getClassOrBoundGenericClass();
+  ClassDecl *cls = ext->getAsClassOrClassExtensionContext();
   assert(cls && "generating category metadata for a non-class extension");
   
   ClassDataBuilder builder(IGM, cls, ext);

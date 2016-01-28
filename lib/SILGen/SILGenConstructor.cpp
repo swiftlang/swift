@@ -250,8 +250,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
-    auto nominal = ctor->getDeclContext()->getDeclaredTypeInContext()
-                     ->getNominalOrBoundGenericNominal();
+    auto nominal = ctor->getDeclContext()
+        ->getAsNominalTypeOrNominalTypeExtensionContext();
     emitMemberInitializers(selfDecl, nominal);
   }
 
@@ -436,9 +436,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Use alloc_ref to allocate the object.
   // TODO: allow custom allocation?
   // FIXME: should have a cleanup in case of exception
-  auto selfTypeContext = ctor->getDeclContext()->getDeclaredTypeInContext();
-  auto selfClassDecl =
-    cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
+  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
 
   SILValue selfValue;
 
@@ -524,9 +522,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // TODO: If we could require Objective-C classes to have an attribute to get
   // this behavior, we could avoid runtime overhead here.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto selfTypeContext = ctor->getDeclContext()->getDeclaredTypeInContext();
-  auto selfClassDecl =
-    cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
+  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
   bool NeedsBoxForSelf = isDelegating ||
     (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
