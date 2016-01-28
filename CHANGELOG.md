@@ -164,8 +164,8 @@ Swift 2.2
       let sel: Selector = "insertSubview:aboveSubview:"
 
   Generally, such string literals should be replaced with uses of
-  #selector, and the compiler will provide Fix-Its that use
-  #selector. In cases where they is not possible (e.g., when referring
+  `#selector`, and the compiler will provide Fix-Its that use
+  `#selector`. In cases where they is not possible (e.g., when referring
   to the getter of a property), one can still directly construct
   selectors, e.g.,:
 
