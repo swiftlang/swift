@@ -943,6 +943,9 @@ namespace {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        if (Implicit) {
+          apply->setImplicit();
+        }
       }
       return finishApply(apply, openedType, nullptr);
     }
@@ -1425,6 +1428,7 @@ namespace {
                            object->getLoc(), object->getLoc(),
                            MetatypeType::get(valueType))
       };
+      args[1]->setImplicit();
 
       // Form the argument tuple.
       Expr *argTuple = TupleExpr::createImplicit(tc.Context, args, {});
@@ -3025,12 +3029,13 @@ namespace {
           tc.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
             .fixItRemove(SourceRange(expr->getLoc(),
                                  expr->getCastTypeLoc().getSourceRange().End));
-          return sub;
+
+        } else {
+          tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
+                      sub->getType(), toType)
+            .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
+                          "as");
         }
-        tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
-                    sub->getType(), toType)
-          .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
-                        "as");
 
         // Convert the subexpression.
         bool failed = tc.convertToType(sub, toType, cs.DC);
@@ -4498,11 +4503,15 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     // If the element changed, rebuild a new ParenExpr.
     assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
     if (fromTupleExpr[0] != argParen->getSubExpr()) {
+      bool argParenImplicit = argParen->isImplicit();
       argParen = new (tc.Context) ParenExpr(argParen->getLParenLoc(),
                                             fromTupleExpr[0],
                                             argParen->getRParenLoc(),
                                             argParen->hasTrailingClosure(),
                                             fromTupleExpr[0]->getType());
+      if (argParenImplicit) {
+        argParen->setImplicit();
+      }
       arg = argParen;
     } else {
       // coerceToType may have updated the element type of the ParenExpr in
@@ -5324,7 +5333,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     // If there is no argument to the constructor function, then just pass in
     // the empty tuple.
     literal = TupleExpr::createEmpty(tc.Context, literal->getLoc(),
-                                     literal->getLoc(), /*implicit*/true);
+                                     literal->getLoc(),
+                                     /*implicit*/!literal->getLoc().isValid());
   } else {
     // Otherwise, figure out the type of the constructor function and coerce to
     // it.
@@ -6530,12 +6540,25 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
       ++i;
     }
 
+    // The tuple should have the source range enclosing its arguments unless
+    // they are invalid or there are no arguments.
+    SourceLoc TupleStartLoc = base->getStartLoc();
+    SourceLoc TupleEndLoc = base->getEndLoc();
+    if (arguments.size() > 0) {
+      SourceLoc AltStartLoc = arguments.front()->getStartLoc();
+      SourceLoc AltEndLoc = arguments.back()->getEndLoc();
+      if (AltStartLoc.isValid() && AltEndLoc.isValid()) {
+        TupleStartLoc = AltStartLoc;
+        TupleEndLoc = AltEndLoc;
+      }
+    }
+
     arg = TupleExpr::create(Context,
-                            base->getStartLoc(),
+                            TupleStartLoc,
                             arguments,
                             names,
                             { },
-                            base->getEndLoc(),
+                            TupleEndLoc,
                             /*hasTrailingClosure=*/false,
                             /*Implicit=*/true,
                             TupleType::get(elementTypes, Context));

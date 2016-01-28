@@ -436,7 +436,7 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList*> paramLists,
   const TypeLowering &returnTI = getTypeLowering(resultType);
   if (returnTI.isReturnedIndirectly()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(),
+    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"), SourceLoc(),
                                  AC.getIdentifier("$return_value"), resultType,
                                  DeclCtx);

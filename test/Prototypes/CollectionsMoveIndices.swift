@@ -30,12 +30,12 @@
 // and avoid keeping a reference to the whole collection.
 
 public protocol MyGeneratorType {
-  typealias Element
+  associatedtype Element
   mutating func next() -> Element?
 }
 public protocol MySequenceType {
-  typealias Generator : MyGeneratorType
-  typealias SubSequence /* : MySequenceType */
+  associatedtype Generator : MyGeneratorType
+  associatedtype SubSequence /* : MySequenceType */
   func generate() -> Generator
   @warn_unused_result
   func map<T>(
@@ -82,9 +82,9 @@ struct OldGenerator<G : MyGeneratorType> : GeneratorType {
 //------------------------------------------------------------------------
 
 public protocol MyIndexableType {
-  typealias Index : MyIndexType
-  typealias _Element
-  typealias UnownedHandle
+  associatedtype Index : MyIndexType
+  associatedtype _Element
+  associatedtype UnownedHandle
   var startIndex: Index { get }
   var endIndex: Index { get }
   subscript(i: Index) -> _Element { get }
@@ -110,12 +110,12 @@ extension MyIndexableType {
 }
 
 public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
-  typealias Generator = DefaultGenerator<Self>
-  typealias Index : MyIndexType
-  typealias SubSequence : MySequenceType /* : MyForwardCollectionType */
+  associatedtype Generator = DefaultGenerator<Self>
+  associatedtype Index : MyIndexType
+  associatedtype SubSequence : MySequenceType /* : MyForwardCollectionType */
     = MySlice<Self>
-  typealias UnownedHandle = Self // DefaultUnownedForwardCollection<Self>
-  typealias IndexRange : MyIndexRangeType, MySequenceType, MyIndexableType /* : MyForwardCollectionType */
+  associatedtype UnownedHandle = Self // DefaultUnownedForwardCollection<Self>
+  associatedtype IndexRange : MyIndexRangeType, MySequenceType, MyIndexableType /* : MyForwardCollectionType */
     // FIXME: where IndexRange.Generator.Element == Index
     // FIXME: where IndexRange.Index == Index
     = DefaultForwardIndexRange<Self>
@@ -419,7 +419,7 @@ extension MyBidirectionalCollectionType
 }
 
 public protocol MyRandomAccessCollectionType : MyBidirectionalCollectionType {
-  typealias Index : MyRandomAccessIndex
+  associatedtype Index : MyRandomAccessIndex
 }
 
 public struct DefaultUnownedForwardCollection<Collection : MyForwardCollectionType> {
@@ -700,16 +700,16 @@ public struct DefaultGenerator<Collection : MyIndexableType>
   }
 }
 public protocol MyMutableCollectionType : MyForwardCollectionType {
-  typealias SubSequence : MyForwardCollectionType = MyMutableSlice<Self>
+  associatedtype SubSequence : MyForwardCollectionType = MyMutableSlice<Self>
   subscript(i: Index) -> Generator.Element { get set }
 }
 
 public protocol MyIndexType : Equatable {
   // Move to CollectionType?
-  typealias Distance : SignedIntegerType = Int
+  associatedtype Distance : SignedIntegerType = Int
 }
 public protocol MyIndexRangeType : Equatable {
-  typealias Index : MyIndexType
+  associatedtype Index : MyIndexType
   var startIndex: Index { get }
   var endIndex: Index { get }
 }
@@ -778,7 +778,7 @@ extension MyRandomAccessIndexType {
 //------------
 
 public protocol MyStrideable : Comparable {
-  typealias Distance : SignedNumberType
+  associatedtype Distance : SignedNumberType
 
   @warn_unused_result
   func distanceTo(other: Self) -> Distance

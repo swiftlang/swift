@@ -87,3 +87,8 @@ public struct CollectionOfOne<Element> : CollectionType {
   let element: Element
 }
 
+extension CollectionOfOne : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["element": element])
+  }
+}

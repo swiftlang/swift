@@ -72,7 +72,7 @@ extension String.CharacterView : CollectionType {
   }
   
   /// A character position.
-  public struct Index : BidirectionalIndexType, Comparable, _Reflectable {
+  public struct Index : BidirectionalIndexType, Comparable, CustomPlaygroundQuickLookable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base
@@ -203,9 +203,8 @@ extension String.CharacterView : CollectionType {
       return endIndexUTF16 - graphemeClusterStartUTF16
     }
 
-    /// Returns a mirror that reflects `self`.
-    public func _getMirror() -> _MirrorType {
-      return _IndexMirror(self)
+    public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+      return .Int(Int64(_utf16Index))
     }
   }
 
@@ -230,34 +229,6 @@ extension String.CharacterView : CollectionType {
   ///   `position != endIndex`.
   public subscript(i: Index) -> Character {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
-  }
-
-  internal struct _IndexMirror : _MirrorType {
-    var _value: Index
-
-    init(_ x: Index) {
-      _value = x
-    }
-
-    var value: Any { return _value }
-
-    var valueType: Any.Type { return (_value as Any).dynamicType }
-
-    var objectIdentifier: ObjectIdentifier? { return nil }
-
-    var disposition: _MirrorDisposition { return .Aggregate }
-
-    var count: Int { return 0 }
-
-    subscript(i: Int) -> (String, _MirrorType) {
-      _preconditionFailure("_MirrorType access out of bounds")
-    }
-
-    var summary: String { return "\(_value._utf16Index)" }
-
-    var quickLookObject: PlaygroundQuickLook? {
-      return .Int(Int64(_value._utf16Index))
-    }
   }
 }
 

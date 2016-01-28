@@ -747,6 +747,11 @@ static StringRef omitNeedlessWords(StringRef name,
   return name;
 }
 
+/// Whether the given word is a plural s
+static bool isPluralSuffix(StringRef word) {
+  return word == "s" || word == "es" || word == "ies";
+}
+
 /// A form of toLowercaseWord that also lowercases acronyms.
 static StringRef toLowercaseWordAndAcronym(StringRef string,
                                            StringScratchSpace &scratch) {
@@ -763,9 +768,11 @@ static StringRef toLowercaseWordAndAcronym(StringRef string,
   for (unsigned i = 0, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
-      // If the next non-uppercase character was alphanumeric, we should
-      // still lowercase the character we're on.
-      if (!clang::isLetter(string[i+1])) {
+      // If the next non-uppercase character was not a letter, we seem
+      // to have a plural, we should still lowercase the character
+      // we're on.
+      if (!clang::isLetter(string[i+1]) ||
+          isPluralSuffix(camel_case::getFirstWord(string.substr(i+1)))) {
         scratchStr.push_back(clang::toLowercase(string[i]));
         ++i;
       }

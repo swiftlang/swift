@@ -58,9 +58,9 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
 static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
                                StringRef name, Type type, bool isLet) {
   auto &context = DC->getASTContext();
-  auto *param = new (context) ParamDecl(isLet, SourceLoc(), Identifier(),
-                                        loc, context.getIdentifier(name),
-                                        Type(), DC);
+  auto *param = new (context) ParamDecl(isLet, SourceLoc(), SourceLoc(),
+                                        Identifier(), loc,
+                                        context.getIdentifier(name),Type(), DC);
   param->setImplicit();
   param->getTypeLoc().setType(type);
   return param;
@@ -1263,12 +1263,9 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   if (storage->isInvalid()) return;
 
   // We only need materializeForSet in polymorphic contexts:
-  auto containerTy =
-    storage->getDeclContext()->getDeclaredTypeOfContext();
-  if (!containerTy) return;
-
-  NominalTypeDecl *container = containerTy->getAnyNominal();
-  assert(container && "extension of non-nominal type?");
+  NominalTypeDecl *container = storage->getDeclContext()
+      ->isNominalTypeOrNominalTypeExtensionContext();
+  if (!container) return;
 
   //   - in non-ObjC protocols, but not protocol extensions.
   if (auto protocol = dyn_cast<ProtocolDecl>(container)) {
@@ -1422,7 +1419,8 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
         varType = OptionalType::get(varType);
 
       // Create the parameter.
-      auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
+      auto *arg = new (context) ParamDecl(/*IsLet*/true, SourceLoc(), 
+                                          Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
       arg->setImplicit();
       params.push_back(arg);
@@ -1487,8 +1485,10 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
                                "." +
                                classDecl->getName().str()).toStringRef(buffer));
 
-  Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc);
+  Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc,
+                                                       /*Implicit=*/true);
   className = new (tc.Context) ParenExpr(loc, className, loc, false);
+  className->setImplicit();
   Expr *call = new (tc.Context) CallExpr(fn, className, /*Implicit=*/true);
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(call),

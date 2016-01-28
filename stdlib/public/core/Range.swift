@@ -147,6 +147,12 @@ public struct Range<
   }
 }
 
+extension Range : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["startIndex": startIndex, "endIndex": endIndex])
+  }
+}
+
 /// O(1) implementation of `contains()` for ranges of comparable elements.
 extension Range where Element: Comparable {
   @warn_unused_result

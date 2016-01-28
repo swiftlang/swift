@@ -1054,7 +1054,8 @@ static bool isReachable(SILBasicBlock *Block) {
       return true;
 
     for (auto &Succ : CurBB->getSuccessors())
-      if (!Visited.insert(Succ).second)
+      // Second is true if the insertion took place.
+      if (Visited.insert(Succ).second)
         Worklist.push_back(Succ);
   }
 

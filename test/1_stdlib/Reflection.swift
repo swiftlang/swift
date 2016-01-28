@@ -29,8 +29,8 @@ dump(Complex<Double>(real: -1.5, imag: -0.75))
 // CHECK-NEXT:      imag: 44
 dump(Complex<Int>(real: 22, imag: 44))
 // CHECK-NEXT:    Reflection.Complex<Swift.String>
-// CHECK-NEXT:      real: is this the real life?
-// CHECK-NEXT:      imag: is it just fantasy?
+// CHECK-NEXT:      real: "is this the real life?"
+// CHECK-NEXT:      imag: "is it just fantasy?"
 dump(Complex<String>(real: "is this the real life?", 
                      imag: "is it just fantasy?"))
 
@@ -52,7 +52,7 @@ class Best : Better {
 // CHECK-LABEL: Root class:
 // CHECK-NEXT:    Reflection.Good #0
 // CHECK-NEXT:      x: 11
-// CHECK-NEXT:      y: 222
+// CHECK-NEXT:      y: "222"
 print("Root class:")
 dump(Good())
 
@@ -61,9 +61,9 @@ dump(Good())
 // CHECK-NEXT:      super: Reflection.Better
 // CHECK-NEXT:        super: Reflection.Good
 // CHECK-NEXT:          x: 11
-// CHECK-NEXT:          y: 222
+// CHECK-NEXT:          y: "222"
 // CHECK-NEXT:        z: 333.5
-// CHECK-NEXT:      w: 4444
+// CHECK-NEXT:      w: "4444"
 print("Subclass:")
 dump(Best())
 
@@ -79,9 +79,9 @@ dump(any)
 // CHECK-NEXT:      super: Reflection.Better
 // CHECK-NEXT:        super: Reflection.Good
 // CHECK-NEXT:          x: 11
-// CHECK-NEXT:          y: 222
+// CHECK-NEXT:          y: "222"
 // CHECK-NEXT:        z: 333.5
-// CHECK-NEXT:      w: 4444
+// CHECK-NEXT:      w: "4444"
 print("Any class:")
 any = Best()
 dump(any)
@@ -97,15 +97,15 @@ any = 2.5
 dump(any)
 
 // CHECK-LABEL: Character:
-// CHECK-NEXT: a
+// CHECK-NEXT:   "a"
 print("Character:")
-print(_reflect(Character("a")).summary)
+dump(Character("a"))
 
 let range = 3...9
-// CHECK-NEXT: 3..<10
-print(_reflect(range).summary)
-// CHECK-NEXT: startIndex=3
-print("startIndex=\(_reflect(range)[0].1.summary)")
+// CHECK-NEXT: Range(3..<10)
+// CHECK-NEXT:  startIndex: 3
+// CHECK-NEXT:  endIndex: 10
+dump(range)
 
 protocol Fooable {}
 extension Int : Fooable {}
@@ -131,65 +131,61 @@ extension Best: Barrable {}
 // CHECK-NEXT:      super: Reflection.Better
 // CHECK-NEXT:        super: Reflection.Good
 // CHECK-NEXT:          x: 11
-// CHECK-NEXT:          y: 222
+// CHECK-NEXT:          y: "222"
 // CHECK-NEXT:        z: 333.5
-// CHECK-NEXT:      w: 4444
+// CHECK-NEXT:      w: "4444"
 print("Barrable class:")
 var barrable: Barrable = Best()
 dump(barrable)
 // CHECK-LABEL: second verse
 // CHECK-NEXT:    Reflection.Best #0
+// CHECK-NEXT:      super: Reflection.Better
+// CHECK-NEXT:        super: Reflection.Good
+// CHECK-NEXT:          x: 11
+// CHECK-NEXT:          y: "222"
+// CHECK-NEXT:        z: 333.5
+// CHECK-NEXT:      w: "4444"
 print("second verse same as the first:")
 dump(barrable)
 
-// With _Reflectable protocols we extract the witness table from the container.
-// CHECK-LABEL: _Reflectable int:
-// CHECK-NEXT:   1
-print("_Reflectable int:")
-var reflectable: _Reflectable = 1
-dump(reflectable)
-
 // CHECK-NEXT: Logical: true
-switch _reflect(true).quickLookObject {
-  case .None: print("no quicklook")
-  case .Some(let ql):
-    switch ql {
-      case .Logical(let x): print("Logical: \(x)")
-      default: print("wrong quicklook type")
-    }
+switch true.customPlaygroundQuickLook() {
+  case .Logical(let x): print("Logical: \(x)")
+  default: print("wrong quicklook type")
 }
 
-// CHECK-NEXT: Hello world
-print( _reflect(Optional<String>("Hello world")).summary )
-// CHECK-NEXT: nil
-print( _reflect(Optional<String>()).summary  )
+// CHECK-NEXT: Optional("Hello world")
+// CHECK-NEXT:   Some: "Hello world"
+dump(Optional<String>("Hello world"))
+// CHECK-NEXT: - nil
+dump(Optional<String>())
 
 let intArray = [1,2,3,4,5]
-let intArrayMirror = _reflect(intArray)
 // CHECK-NEXT: 5 elements
-print(intArrayMirror.summary)
-// CHECK-NEXT: [0]: 1
-print("\(intArrayMirror[0].0): \(intArrayMirror[0].1.summary)")
-// CHECK-NEXT: [4]: 5
-print("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
+// CHECK-NEXT: 1
+// CHECK-NEXT: 2
+// CHECK-NEXT: 3
+// CHECK-NEXT: 4
+// CHECK-NEXT: 5
+dump(intArray)
 
 var justSomeFunction = { (x:Int) -> Int in return x + 1 }
 // CHECK-NEXT: (Function)
-print(_reflect(justSomeFunction).summary)
+dump(justSomeFunction as Any)
 
 // CHECK-NEXT: Swift.String
-print(_reflect(String.self).summary)
+dump(String.self)
 
-// CHECK-NEXT: CollectionOfOne(Howdy Swift!)
-// CHECK-NEXT:  - element: Howdy Swift!
+// CHECK-NEXT: Swift.CollectionOfOne<Swift.String>
+// CHECK-NEXT:   element: "Howdy Swift!"
 dump(CollectionOfOne("Howdy Swift!"))
 
 // CHECK-NEXT: EmptyCollection
 var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
-print(_reflect(emptyCollectionOfInt).summary)
+dump(emptyCollectionOfInt)
 
 // CHECK-NEXT: .One
-print(_reflect(Bit.One).summary)
+dump(Bit.One)
 
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0
@@ -197,26 +193,28 @@ print(_reflect(Bit.One).summary)
 // CHECK-NEXT: by: 3.14
 dump(1.0.stride(through: 12.15, by: 3.14))
 
-// CHECK-NEXT: UnsafeMutablePointer(nil)
+// CHECK-NEXT: 0x0000
+// CHECK-NEXT: - pointerValue: 0
 var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
-print(_reflect(nilUnsafeMutablePointerString).summary)
+dump(nilUnsafeMutablePointerString)
 
-// CHECK-NEXT: UnsafeMutablePointer(0x123456)
+// CHECK-NEXT: 123456
+// CHECK-NEXT: - pointerValue: 1193046
 var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
   bitPattern: 0x123456)
-print(_reflect(randomUnsafeMutablePointerString).summary)
+dump(randomUnsafeMutablePointerString)
 
-// CHECK-NEXT: Hello panda
+// CHECK-NEXT: "Hello panda"
 var sanePointerString = UnsafeMutablePointer<String>.alloc(1)
 sanePointerString.initialize("Hello panda")
-print(_reflect(sanePointerString.memory).summary)
+dump(sanePointerString.memory)
 sanePointerString.destroy()
 sanePointerString.dealloc(1)
 
 // Don't crash on types with opaque metadata. rdar://problem/19791252
+// CHECK-NEXT: (Opaque Value)
 var rawPointer = unsafeBitCast(0 as Int, Builtin.RawPointer.self)
 dump(rawPointer)
-// CHECK: - (Opaque Value)
 
 // CHECK-LABEL: and now our song is done
 print("and now our song is done")

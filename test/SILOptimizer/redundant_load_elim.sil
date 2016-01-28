@@ -1047,3 +1047,51 @@ bb3:
   %44 = tuple ()
   return %44 : $()
 }
+
+// Make sure the first load in bb1 is not eliminated as we have
+// this unreachable block which will have a liveout of nil.
+// we make this in the context of a loop, because we want to run an
+// optimistic data flow.
+// 
+// CHECK-LABEL: sil @load_to_load_loop_with_unreachable_block
+// CHECK: bb1:
+// CHECK: load
+// CHECK: cond_br
+sil @load_to_load_loop_with_unreachable_block : $@convention(thin) () -> () {
+bb0:
+  %101 = alloc_stack $Int32
+  %102 = alloc_stack $Int32
+  %0 = struct_element_addr %101 : $*Int32, #Int32.value
+  %1 = struct_element_addr %102 : $*Int32, #Int32.value
+  %2 = load %0 : $*Builtin.Int32
+  %99 = load %1 : $*Builtin.Int32
+  %125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %126 = apply %125(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  %127 = apply %125(%99) : $@convention(thin) (Builtin.Int32) -> ()
+  br bb1
+
+bb20:
+  %44 = load %0 : $*Builtin.Int32
+  br bb1
+
+bb1:
+  %4 = load %0 : $*Builtin.Int32
+  %5 = integer_literal $Builtin.Int32, 2
+  %1125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %1126 = apply %1125(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  store %5 to %0 : $*Builtin.Int32
+  builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  %6 = load %0 : $*Builtin.Int32
+  %11125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %11126 = apply %11125(%6) : $@convention(thin) (Builtin.Int32) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %7 = load %0 : $*Builtin.Int32
+  %111125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %111126 = apply %111125(%7) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %102 : $*Int32
+  dealloc_stack %101 : $*Int32
+  %9999 = tuple()
+  return %9999 : $()
+}

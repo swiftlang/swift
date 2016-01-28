@@ -31,7 +31,8 @@ using SILTypeCategoryField = BCFixed<2>;
 
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
-  SIL_UTF16
+  SIL_UTF16,
+  SIL_OBJC_SELECTOR,
 };
 
 enum SILLinkageEncoding : uint8_t {

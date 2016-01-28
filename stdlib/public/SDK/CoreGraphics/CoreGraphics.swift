@@ -39,6 +39,22 @@ public extension CGPoint {
   }
 }
 
+extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["x": x, "y": y], displayStyle: .Struct)
+  }
+
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Point(Double(x), Double(y))
+  }
+}
+
+extension CGPoint : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return "(\(x), \(y))"
+  }
+}
+
 extension CGPoint : Equatable {}
 @_transparent // @fragile
 @warn_unused_result
@@ -65,6 +81,22 @@ public extension CGSize {
   @available(*, unavailable, renamed="zero")
   static var zeroSize: CGSize {
     fatalError("can't retrieve unavailable property")
+  }
+}
+
+extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["width": width, "height": height], displayStyle: .Struct)
+  }
+
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Size(Double(width), Double(height))
+  }
+}
+
+extension CGSize : CustomDebugStringConvertible {
+  public var debugDescription : String {
+    return "(\(width), \(height))"
   }
 }
 
@@ -354,6 +386,22 @@ public extension CGRect {
   func rectsByDividing(atDistance: CGFloat, fromEdge: CGRectEdge)
     -> (slice: CGRect, remainder: CGRect) {
     fatalError("can't call unavailable function")
+  }
+}
+
+extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["origin": origin, "size": size], displayStyle: .Struct)
+  }
+
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Rectangle(Double(origin.x), Double(origin.y), Double(size.width), Double(size.height))
+  }
+}
+
+extension CGRect : CustomDebugStringConvertible {
+  public var debugDescription : String {
+    return "(\(origin.x), \(origin.y), \(size.width), \(size.height))"
   }
 }
 

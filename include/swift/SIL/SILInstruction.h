@@ -1203,7 +1203,9 @@ class StringLiteralInst : public LiteralInst {
 public:
   enum class Encoding {
     UTF8,
-    UTF16
+    UTF16,
+    /// UTF-8 encoding of an Objective-C selector.
+    ObjCSelector,
   };
 
 private:
