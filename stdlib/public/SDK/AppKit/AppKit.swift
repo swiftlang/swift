@@ -13,94 +13,39 @@
 import Foundation
 @_exported import AppKit
 
-struct _NSCursorMirror : _MirrorType {
-  var _value: NSCursor
-
-  init(_ v: NSCursor) { _value = v }
-
-  var value: Any { return _value }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return .None }
-
-  var count: Int { return 0 }
-
-  subscript(_: Int) -> (String, _MirrorType) {
-    _preconditionFailure("_MirrorType access out of bounds")
-  }
-
-  var summary: String { return "" }
-
-  var quickLookObject: PlaygroundQuickLook? {
-    return .Some(.Image(_value.image))
-  }
-  
-  var disposition : _MirrorDisposition { return .Aggregate }
-}
-
-extension NSCursor : _Reflectable {
-  public func _getMirror() -> _MirrorType {
-    return _NSCursorMirror(self)
+extension NSCursor : CustomPlaygroundQuickLookable {
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Image(image)
   }
 }
 
-struct _NSViewMirror : _MirrorType {
-  static var _views = Set<NSView>()
+internal struct _NSViewQuickLookState {
+  static var views = Set<NSView>()
+}
 
-  var _v : NSView
-  
-  init(_ v : NSView) { _v = v }
-  
-  var value: Any { return _v }
-  
-  var valueType: Any.Type { return (_v as Any).dynamicType }
-  
-  var objectIdentifier: ObjectIdentifier? { return .None }
-  
-  var count: Int { return 0 }
-  
-  subscript(_: Int) -> (String, _MirrorType) {
-    _preconditionFailure("_MirrorType access out of bounds")
-  }
-  
-  var summary: String { return "" }
-  
-  var quickLookObject: PlaygroundQuickLook? {
-    // adapted from the Xcode QuickLooks implementation
-    
-    var result: PlaygroundQuickLook? = nil
-    
+extension NSView : CustomPlaygroundQuickLookable {
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
     // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
     // could need to draw itself in order to get a QLObject for itself, which in turn if your code was
     // instrumented to log on-draw, would cause yourself to get back here and so on and so forth
     // until you run out of stack and crash
     // This code checks that we aren't trying to log the same view recursively - and if so just returns
-    // nil, which is probably a safer option than crashing
+    // an empty view, which is probably a safer option than crashing
     // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
-    if !_NSViewMirror._views.contains(_v) {
-      _NSViewMirror._views.insert(_v)
-      
-      let bounds = _v.bounds
-      if let b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
-        _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
-        result = .Some(.View(b))
+    if _NSViewQuickLookState.views.contains(self) {
+      return .View(NSImage())
+    } else {
+      _NSViewQuickLookState.views.insert(self)
+      let result: PlaygroundQuickLook
+      if let b = bitmapImageRepForCachingDisplayInRect(bounds) {
+        cacheDisplayInRect(bounds, toBitmapImageRep: b)
+        result = .View(b)
+      } else {
+        result = .View(NSImage())
       }
-      
-      _NSViewMirror._views.remove(_v)
+      _NSViewQuickLookState.views.remove(self)
+      return result
     }
-    
-    return result
-    
-  }
-  
-  var disposition : _MirrorDisposition { return .Aggregate }
-}
-
-extension NSView : _Reflectable {
-  /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
-    return _NSViewMirror(self)
   }
 }
 

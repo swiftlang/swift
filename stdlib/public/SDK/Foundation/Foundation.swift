@@ -1376,6 +1376,10 @@ extension NSKeyedUnarchiver {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// NSURL
+//===----------------------------------------------------------------------===//
+
 extension NSURL : _FileReferenceLiteralConvertible {
   private convenience init(failableFileReferenceLiteral path: String) {
     let fullPath = NSBundle.mainBundle().pathForResource(path, ofType: nil)!
@@ -1388,3 +1392,62 @@ extension NSURL : _FileReferenceLiteralConvertible {
 }
 
 public typealias _FileReferenceLiteralType = NSURL
+
+//===----------------------------------------------------------------------===//
+// Mirror/Quick Look Conformance
+//===----------------------------------------------------------------------===//
+
+extension NSURL : CustomPlaygroundQuickLookable {
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .URL(absoluteString)
+  }
+}
+
+extension NSRange : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: ["location": location, "length": length])
+  }
+}
+
+extension NSRange : CustomPlaygroundQuickLookable {
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Range(Int64(location), Int64(length))
+  }
+}
+
+extension NSDate : CustomPlaygroundQuickLookable {
+  var summary: String {
+    let df = NSDateFormatter()
+    df.dateStyle = .MediumStyle
+    df.timeStyle = .ShortStyle
+    return df.stringFromDate(self)
+  }
+
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Text(summary)
+  }
+}
+
+extension NSSet : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(reflecting: self as Set<NSObject>)
+  }
+}
+
+extension NSString : CustomPlaygroundQuickLookable {
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Text(self as String)
+  }
+}
+
+extension NSArray : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(reflecting: self as [AnyObject])
+  }
+}
+
+extension NSDictionary : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(reflecting: self as [NSObject : AnyObject])
+  }
+}

@@ -79,33 +79,3 @@ protocol _ArrayType
   // For testing.
   var _buffer: _Buffer { get }
 }
-
-internal struct _ArrayTypeMirror<
-  T : _ArrayType where T.Index == Int
-> : _MirrorType {
-  let _value : T
-
-  init(_ v : T) { _value = v }
-
-  var value: Any { return (_value as Any) }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return nil }
-
-  var count: Int { return _value.count }
-
-  subscript(i: Int) -> (String, _MirrorType) {
-    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
-    return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
-  }
-
-  var summary: String {
-    if count == 1 { return "1 element" }
-    return "\(count) elements"
-  }
-
-  var quickLookObject: PlaygroundQuickLook? { return nil }
-
-  var disposition: _MirrorDisposition { return .IndexContainer }
-}
