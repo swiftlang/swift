@@ -11,16 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 %import gyb
-%TMirrorDecl = gyb.parseTemplate("../common/MirrorDecl.gyb")
-%TMirrorConformance = gyb.parseTemplate("../common/MirrorConformance.gyb")
-%TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
 % for mutable in (True, False):
 %  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
 %  a_Self = 'an `UnsafeMutablePointer`' if mutable else 'an `UnsafePointer`'
-%  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
-%  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
-%  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
 
 /// A pointer to an object of type `Memory`.  This type provides no automated
 /// memory management, and therefore the user must take care to allocate
@@ -423,33 +417,24 @@ extension ${Self} : CustomDebugStringConvertible {
   }
 }
 
-${MirrorDecl} {
-  ${MirrorBoilerplate}
-
-  var count: Int { return 1 }
-
-  func _getPointerValue() -> UInt64 {
-    return UInt64(Int(Builtin.ptrtoint_Word(_value._rawValue)))
+extension ${Self} : CustomReflectable {
+  public func customMirror() -> Mirror {
+    let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
+    return Mirror(self, children: ["pointerValue": ptrValue])
   }
-
-  subscript(i: Int) -> (String, _MirrorType) {
-    switch i {
-    case 0: return ("pointerValue",_reflect(_getPointerValue()))
-    default: _preconditionFailure("cannot extract this child index")
-    }
-  }
-
-  var summary: String {
-    let selfType = "${Self}"
-    let ptrValue = _getPointerValue()
-    if ptrValue == 0 { return "\(selfType)(nil)" }
-    return "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
-  }
-
-  var quickLookObject: PlaygroundQuickLook? { return .Text(summary) }
 }
 
-${MirrorConformance}
+extension ${Self} : CustomPlaygroundQuickLookable {
+  var summary: String {
+    let selfType = "${Self}"
+    let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
+    return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
+  }
+
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return .Text(summary)
+  }
+}
 
 @_transparent
 @warn_unused_result

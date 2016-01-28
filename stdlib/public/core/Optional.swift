@@ -12,7 +12,7 @@
 
 // The compiler has special knowledge of Optional<Wrapped>, including the fact
 // that it is an enum with cases named 'None' and 'Some'.
-public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
+public enum Optional<Wrapped> : NilLiteralConvertible {
   case None
   case Some(Wrapped)
 
@@ -47,12 +47,6 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
     case .None:
       return .None
     }
-  }
-
-  /// Returns a mirror that reflects `self`.
-  @warn_unused_result
-  public func _getMirror() -> _MirrorType {
-    return _OptionalMirror(self)
   }
 
   /// Create an instance initialized with `nil`.
@@ -213,41 +207,6 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
     return false
   }
 }
-
-internal struct _OptionalMirror<Wrapped> : _MirrorType {
-  let _value : Optional<Wrapped>
-
-  init(_ x : Optional<Wrapped>) {
-    _value = x
-  }
-
-  var value: Any { return _value }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return .None }
-
-  var count: Int { return (_value != nil) ? 1 : 0 }
-
-  subscript(i: Int) -> (String, _MirrorType) {
-    switch (_value, i) {
-    case (.Some(let contents), 0) : return ("Some", _reflect(contents))
-    default: _preconditionFailure("cannot extract this child index")
-    }
-  }
-
-  var summary: String {
-    switch _value {
-      case let contents?: return _reflect(contents).summary
-      default: return "nil"
-    }
-  }
-
-  var quickLookObject: PlaygroundQuickLook? { return .None }
-
-  var disposition: _MirrorDisposition { return .Optional }
-}
-
 
 @warn_unused_result
 public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {

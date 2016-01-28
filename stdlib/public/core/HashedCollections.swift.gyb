@@ -4033,69 +4033,16 @@ internal func < <${TypeParametersDecl}> (
   return lhs._intPos < rhs
 }
 
-internal class ${Self}Mirror<${TypeParametersDecl}> : _MirrorType {
-  typealias MirroredType = ${Self}<${TypeParameters}>
-  internal let _mirror : MirroredType
-  internal var _pos : ${Self}MirrorPosition<${TypeParameters}>
-
-  internal init(_ m : MirroredType) {
-    _mirror = m
-    _pos = ${Self}MirrorPosition(m)
-  }
-
-  internal var value: Any { return (_mirror as Any) }
-
-  internal var valueType: Any.Type { return (_mirror as Any).dynamicType }
-
-  internal var objectIdentifier: ObjectIdentifier? { return nil }
-
-  internal var count: Int { return _mirror.count }
-
-  internal subscript(i: Int) -> (String, _MirrorType) {
-    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
-
-    if _pos > i {
-      _pos._intPos = 0
-    }
-
-    while _pos < i && !(_pos == i) {
-      _pos.successor()
-    }
-%if Self == 'Set':
-    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
-%elif Self == 'Dictionary':
-    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
-%end
-  }
-
-  internal var summary: String {
-%if Self == 'Set':
-    if count == 1 {
-      return "1 member"
-    }
-    return "\(count) members"
-%elif Self == 'Dictionary':
-    if count == 1 {
-      return "1 key/value pair"
-    }
-    return "\(count) key/value pairs"
-%end
-  }
-
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
-
-%if Self == 'Set':
-  internal var disposition: _MirrorDisposition { return .MembershipContainer }
-%elif Self == 'Dictionary':
-  internal var disposition: _MirrorDisposition { return .KeyContainer }
-%end
-}
-
-extension ${Self} : _Reflectable {
+extension ${Self} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func _getMirror() -> _MirrorType {
-    return ${Self}Mirror(self)
+  public func customMirror() -> Mirror {
+%if Self == 'Set':
+    let style = Mirror.DisplayStyle.Set
+%elif Self == 'Dictionary':
+    let style = Mirror.DisplayStyle.Dictionary
+%end
+    return Mirror(self, unlabeledChildren: self, displayStyle: style)
   }
 }
 
