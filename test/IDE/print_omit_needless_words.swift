@@ -160,6 +160,9 @@
 // CHECK-FOUNDATION: let globalConstant: String
 // CHECK-FOUNDATION: func globalFunction()
 
+// Lowercasing initialisms with plurals.
+// CHECK-FOUNDATION: var urlsInText: [URL] { get }
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
