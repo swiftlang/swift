@@ -2387,6 +2387,14 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       method->setForeignErrorConvention(*errorConvention);
     }
   }
+
+  // Record this method in the source-file-specific Objective-C method
+  // table.
+  if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (auto sourceFile = method->getParentSourceFile()) {
+      sourceFile->ObjCMethods[method->getObjCSelector()].push_back(method);
+    }
+  }
 }
 
 namespace {

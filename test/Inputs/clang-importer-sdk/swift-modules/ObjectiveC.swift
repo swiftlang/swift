@@ -46,6 +46,10 @@ extension ObjCBool : BooleanLiteralConvertible {
 public struct Selector : StringLiteralConvertible {
   private var ptr : COpaquePointer
 
+  public init(_ value: String) {
+    self.init(stringLiteral: value)
+  }
+
   public init(unicodeScalarLiteral value: String) {
     self.init(stringLiteral: value)
   }

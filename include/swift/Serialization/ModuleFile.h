@@ -553,6 +553,11 @@ public:
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
+  /// Find all Objective-C methods with the given selector.
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results);
+
   /// Reports all link-time dependencies.
   void collectLinkLibraries(Module::LinkLibraryCallback callback) const;
 
