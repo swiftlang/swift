@@ -61,15 +61,13 @@ static bool isDelayedOperatorDecl(ValueDecl *vd) {
   return vd && (vd->getName().str() == "==");
 }
 
-static bool isPotentiallySymmetricOperatorDecl(ValueDecl *vd) {
+static bool isArithmeticOperatorDecl(ValueDecl *vd) {
   return vd && 
   ( vd->getName().str() == "+" ||
     vd->getName().str() == "-" ||
     vd->getName().str() == "*" ||
     vd->getName().str() == "/" ||
-    vd->getName().str() == "%" ||
-    vd->getName().str() == "|" ||
-    vd->getName().str() == "&" );
+    vd->getName().str() == "%" );
 }
 
 namespace {
@@ -404,7 +402,7 @@ namespace {
               // TODO: We currently limit this optimization to known arithmetic
               // operators, but we should be able to broaden this out to
               // logical operators as well.
-              if (!isPotentiallySymmetricOperatorDecl(ODR1->getDecls()[0]))
+              if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
                 return;
 
               if (ODR1->getDecls()[0]->getName().str() != 
@@ -979,7 +977,7 @@ namespace {
       
       auto favoredExprTy = CS.getFavoredType(expr);
       
-      if (isPotentiallySymmetricOperatorDecl(value)) {
+      if (isArithmeticOperatorDecl(value)) {
         // If the parent has been favored on the way down, propagate that
         // information to its children.
         // TODO: This is only valid for arithmetic expressions.
