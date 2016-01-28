@@ -71,7 +71,7 @@ KNOWN_SETTINGS=(
     llvm-enable-assertions      "1"              "enable assertions in LLVM and Clang"
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
-    swift-analyze-code-coverage "default"        "enable code coverage analysis in Swift (set to \`merged\` to merge profdata files and remove intermediaries)"
+    swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (none, not-merged, merged). Defaults to none if the argument is not present, and not-merged if the argument is present without a modifier."
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"

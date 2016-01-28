@@ -58,6 +58,10 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+option(SWIFT_ANALYZE_CODE_COVERAGE
+    "Build Swift with code coverage instrumenting enabled."
+    "NONE")
+
 set(SWIFT_VERSION "3.0" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
