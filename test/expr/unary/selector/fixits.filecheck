@@ -1,7 +1,0 @@
-// Note: This file is used to check the output of the transformed
-// fixits.swift.
-
-// CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
-// CHECK: warning: string literal is not a valid Objective-C selector
-// CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
-// CHECK: warning: string literal is not a valid Objective-C selector

@@ -1,3 +1,5 @@
+// REQUIRES: objc_interop
+
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: rm -rf %t.overlays
@@ -21,8 +23,13 @@
 // RUN: %S/../../../../utils/apply-fixit-edits.py %t.remapping
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %t.sources/fixits.swift 2> %t.result
 
-// RUN: FileCheck %S/fixits.filecheck < %t.result
+// RUN: FileCheck %s < %t.result
 // RUN: grep -c "warning:" %t.result | grep 4
+
+// CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
+// CHECK: warning: string literal is not a valid Objective-C selector
+// CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
+// CHECK: warning: string literal is not a valid Objective-C selector
 
 import Foundation
 

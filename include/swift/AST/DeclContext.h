@@ -405,8 +405,9 @@ public:
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
-  /// Look up Objective-C methods with the given selector.
-  void lookupObjCMethods(
+  /// Look up all Objective-C methods with the given selector visible
+  /// in the enclosing module.
+  void lookupAllObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 

@@ -2025,7 +2025,7 @@ public:
 
     // Look for methods with this selector.
     SmallVector<AbstractFunctionDecl *, 8> allMethods;
-    DC->lookupObjCMethods(*selector, allMethods);
+    DC->lookupAllObjCMethods(*selector, allMethods);
 
     // If we didn't find any methods, complain.
     if (allMethods.empty()) {
