@@ -695,9 +695,9 @@ struct _ParentProcess {
           testPassed = false
           print("expecting a crash, but the test did not crash")
 
-        case (.Some(_), false):
+        case (.Some(let status), false):
           testPassed = false
-          print("the test crashed unexpectedly")
+          print("the test crashed unexpectedly with a termination status of '\(status.description)'")
 
         case (.Some(_), true):
           testPassed = !_anyExpectFailed
