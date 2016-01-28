@@ -59,7 +59,7 @@ option(SWIFT_INCLUDE_DOCS
     TRUE)
 
 option(SWIFT_ANALYZE_CODE_COVERAGE
-    "Build Swift with code coverage instrumenting enabled."
+    "Build Swift with code coverage instrumenting enabled (modes are NONE, NOT-MERGED, and MERGED)"
     "NONE")
 
 set(SWIFT_VERSION "3.0" CACHE STRING

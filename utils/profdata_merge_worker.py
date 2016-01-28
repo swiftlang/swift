@@ -101,6 +101,8 @@ class ProfdataMergerProcess(Process):
             os.rename(self.profdata_path, self.profdata_tmp_path)
             self.filename_buffer.append(self.profdata_tmp_path)
         cleaned_files = ' '.join(pipes.quote(f) for f in self.filename_buffer)
+        # FIXME: This doesn't necessarily always line up with the version
+        #        of clang++ used to build the binaries.
         llvm_cmd = ("xcrun llvm-profdata merge -o %s %s"
             % (self.profdata_path, cleaned_files))
         self.report(llvm_cmd)
