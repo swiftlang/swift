@@ -556,8 +556,6 @@ the number of parallel build jobs to use""",
         '--host-target',
     ]))
 
-    print(args.swift_analyze_code_coverage)
-
     if args.host_target is None:
         print_with_argv0("Unknown operating system.")
         return 1
