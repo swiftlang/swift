@@ -239,7 +239,7 @@ macro(add_sourcekit_executable name)
         PROPERTIES
         LINK_FLAGS "-Wl,-exported_symbol,_main")
 
-      if(NOT SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "NONE")
+    if(NOT SWIFT_ANALYZE_CODE_COVERAGE STREQUAL FALSE)
           set_property(TARGET "${name}" APPEND_STRING PROPERTY
             LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
       endif()

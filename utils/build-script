@@ -515,8 +515,9 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
         help="""enable code coverage analysis in Swift (set to `merged` to merge
 and remove intermediary profdata files)""",
         const="not-merged",
-        choices=["none", "not-merged", "merged"],
+        choices=["false", "not-merged", "merged"],
         nargs='?',
+        default="false", # so CMake can see the inert mode as a false value
         dest="swift_analyze_code_coverage")
 
     parser.add_argument("--build-subdir",
@@ -554,6 +555,8 @@ the number of parallel build jobs to use""",
         '--cmake',
         '--host-target',
     ]))
+
+    print(args.swift_analyze_code_coverage)
 
     if args.host_target is None:
         print_with_argv0("Unknown operating system.")
