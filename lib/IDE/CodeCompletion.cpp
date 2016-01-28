@@ -1985,6 +1985,21 @@ public:
     Builder.addRightParen();
   }
 
+  void addPoundSelector() {
+    // #selector is only available when the Objective-C runtime is.
+    if (!Ctx.LangOpts.EnableObjCInterop) return;
+
+    CodeCompletionResultBuilder Builder(
+                                  Sink,
+                                  CodeCompletionResult::ResultKind::Keyword,
+                                  SemanticContextKind::ExpressionSpecific,
+                                  ExpectedTypes);
+    Builder.addTextChunk("selector");
+    Builder.addLeftParen();
+    Builder.addSimpleTypedParameter("@objc method", /*isVarArg=*/false);
+    Builder.addRightParen();
+  }
+
   void addFunctionCallPattern(const AnyFunctionType *AFT,
                               const AbstractFunctionDecl *AFD = nullptr) {
     foundFunction(AFT);
@@ -4569,6 +4584,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::AfterPound: {
     Lookup.addPoundAvailable(ParentStmtKind);
+    Lookup.addPoundSelector();
     break;
   }
   }
