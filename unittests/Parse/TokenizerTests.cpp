@@ -84,7 +84,7 @@ public:
       << "---- Actual: \n" << Actual << "\n";
   }
   
-  std::vector<Token> parseAndGetSplitTOkens(unsigned BufID) {
+  std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
     swift::ParserUnit PU(SM, BufID, LangOpts, "unknown");
 
     bool Done = false;
@@ -144,7 +144,7 @@ TEST_F(TokenizerTest, ProperlySplitTokens) {
   );
 
   // Parse the input and get split tokens info
-  auto SplitTokens = parseAndGetSplitTOkens(BufID);
+  auto SplitTokens = parseAndGetSplitTokens(BufID);
 
   // Tokenize with fixing split tokens
   Tokens = tokenize(BufID, SplitTokens);
