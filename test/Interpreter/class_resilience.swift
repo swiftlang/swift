@@ -58,8 +58,6 @@ ResilientClassTestSuite.test("ClassWithResilientProperty") {
   expectEqual(c.s.w, 30)
   expectEqual(c.s.h, 40)
   expectEqual(c.color, 50)
-  expectTrue(_typeByName("main.ClassWithResilientProperty")
-             == ClassWithResilientProperty.self)
 
   // Make sure the conformance works
   expectEqual(getS(c).w, 30)
@@ -121,8 +119,6 @@ ResilientClassTestSuite.test("ClassWithResilientlySizedProperty") {
   expectEqual(c.r.s.h, 40)
   expectEqual(c.r.color, 50)
   expectEqual(c.color, 60)
-  expectTrue(_typeByName("main.ClassWithResilientlySizedProperty")
-    == ClassWithResilientlySizedProperty.self)
 }
 
 
@@ -150,8 +146,6 @@ ResilientClassTestSuite.test("ChildOfParentWithResilientStoredProperty") {
   expectEqual(c.s.h, 40)
   expectEqual(c.color, 50)
   expectEqual(c.enabled, 60)
-  expectTrue(_typeByName("main.ChildOfParentWithResilientStoredProperty")
-    == ChildOfParentWithResilientStoredProperty.self)
 }
 
 
@@ -179,8 +173,6 @@ ResilientClassTestSuite.test("ChildOfOutsideParentWithResilientStoredProperty") 
   expectEqual(c.s.h, 40)
   expectEqual(c.color, 50)
   expectEqual(c.enabled, 60)
-  expectTrue(_typeByName("main.ChildOfOutsideParentWithResilientStoredProperty")
-    == ChildOfOutsideParentWithResilientStoredProperty.self)
 }
 
 
@@ -248,6 +240,18 @@ ResilientClassTestSuite.test("ChildOfResilientOutsideParentWithResilientStoredPr
   expectEqual(c.color, 50)
 }
 #endif
+
+
+ResilientClassTestSuite.test("TypeByName") {
+  expectTrue(_typeByName("main.ClassWithResilientProperty")
+             == ClassWithResilientProperty.self)
+  expectTrue(_typeByName("main.ClassWithResilientlySizedProperty")
+             == ClassWithResilientlySizedProperty.self)
+  expectTrue(_typeByName("main.ChildOfParentWithResilientStoredProperty")
+             == ChildOfParentWithResilientStoredProperty.self)
+  expectTrue(_typeByName("main.ChildOfOutsideParentWithResilientStoredProperty")
+             == ChildOfOutsideParentWithResilientStoredProperty.self)
+}
 
 
 runAllTests()
