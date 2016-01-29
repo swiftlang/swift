@@ -128,9 +128,9 @@ public struct JoinSequence<
     let separatorSize: Int = numericCast(_separator.count)
 
     let reservation = _base._preprocessingPass {
-      (s: Base) -> Int in
+      () -> Int in
       var r = 0
-      for chunk in s {
+      for chunk in _base {
         r += separatorSize + chunk.underestimateCount()
       }
       return r - separatorSize

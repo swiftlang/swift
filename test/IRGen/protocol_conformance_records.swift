@@ -45,7 +45,7 @@ class NativeClassType: Runcible {
 // CHECK:           @_TMnV28protocol_conformance_records17NativeGenericType
 // -- witness table
 // CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypex_S_8RuncibleS_
-// -- flags 0x04: unique nominal type descruptor
+// -- flags 0x04: unique nominal type descriptor
 // CHECK:           i32 4
 // CHECK:         },
 struct NativeGenericType<T>: Runcible {
@@ -75,7 +75,7 @@ extension Int: Runcible {
 // CHECK:           @got._TMnV16resilient_struct4Size
 // -- witness table
 // CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypex_S_8RuncibleS_
-// -- flags 0x04: unique nominal type descruptor
+// -- flags 0x04: unique nominal type descriptor
 // CHECK:           i32 4
 // CHECK:         }
 // CHECK:       ]

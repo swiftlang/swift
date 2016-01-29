@@ -1474,9 +1474,9 @@ extension TestSuite {
     testNamePrefix += String(Sequence.Type)
 
     let isMultiPass = makeSequence([])
-      ._preprocessingPass { _ in true } ?? false
+      ._preprocessingPass { true } ?? false
     let isEquatableMultiPass = makeSequenceOfEquatable([])
-      ._preprocessingPass { _ in true } ?? false
+      ._preprocessingPass { true } ?? false
     expectEqual(
       isMultiPass, isEquatableMultiPass,
       "Two sequence types are of different kinds?")
