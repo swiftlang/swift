@@ -1138,13 +1138,14 @@ bool DSEContext::run() {
 
   // Finally, delete the dead stores and create the live stores.
   bool Changed = false;
-  for (SILBasicBlock &BB : *F) {
+ for (SILBasicBlock &BB : *F) {
     // Create the stores that are alive due to partial dead stores.
     for (auto &I : getBlockState(&BB)->LiveStores) {
       Changed = true;
-      SILInstruction *IT = cast<SILInstruction>(I.first)->getNextNode();
+      SILInstruction *Inst = cast<SILInstruction>(I.first);
+      auto *IT = &*std::next(Inst->getIterator());
       SILBuilderWithScope Builder(IT);
-      Builder.createStore(I.first.getLoc().getValue(), I.second, I.first);
+      Builder.createStore(Inst->getLoc(), I.second, Inst);
     }
     // Delete the dead stores.
     for (auto &I : getBlockState(&BB)->DeadStores) {
