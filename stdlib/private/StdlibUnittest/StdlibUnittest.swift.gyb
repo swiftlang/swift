@@ -1124,6 +1124,9 @@ func _getRunningOSVersion() -> OSVersion {
 public enum TestRunPredicate : CustomStringConvertible {
   case Custom(() -> Bool, reason: String)
 
+  case Always(/*reason:*/ String)
+  case Never
+
   case OSXAny(/*reason:*/ String)
   case OSXMajor(Int, reason: String)
   case OSXMinor(Int, Int, reason: String)
@@ -1166,6 +1169,12 @@ public enum TestRunPredicate : CustomStringConvertible {
     switch self {
     case Custom(_, let reason):
       return "Custom(reason: \(reason))"
+
+    case Always(let reason):
+      return "Always(reason: \(reason))"
+    case Never:
+      return ""
+
     case OSXAny(let reason):
       return "OSX(*, reason: \(reason))"
     case OSXMajor(let major, let reason):
@@ -1239,6 +1248,11 @@ public enum TestRunPredicate : CustomStringConvertible {
     switch self {
     case Custom(let predicate, _):
       return predicate()
+
+    case Always:
+      return true
+    case Never:
+      return false
 
     case OSXAny:
       switch _getRunningOSVersion() {
