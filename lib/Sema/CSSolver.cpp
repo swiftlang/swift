@@ -1029,6 +1029,7 @@ static bool tryTypeVariableBindings(
               FreeTypeVariableBinding allowFreeTypeVariables) {
   bool anySolved = false;
   llvm::SmallPtrSet<CanType, 4> exploredTypes;
+  llvm::SmallPtrSet<TypeBase *, 4> boundTypes;
 
   SmallVector<PotentialBinding, 4> storedBindings;
   auto &tc = cs.getTypeChecker();
@@ -1070,6 +1071,33 @@ static bool tryTypeVariableBindings(
 
       // Remove parentheses. They're insignificant here.
       type = type->getWithoutParens();
+
+      // If we've already tried this binding, move on.
+      if (!boundTypes.insert(type.getPointer()).second)
+        continue;
+
+      // Prevent against checking against the same bound generic type
+      // over and over again. Doing so means redundant work in the best
+      // case. In the worst case, we'll produce lots of duplicate solutions
+      // for this constraint system, which is problematic for overload
+      // resolution.
+      if (type->hasTypeVariable()) {
+        auto triedBinding = false;
+        if (auto BGT = type->getAs<BoundGenericType>()) {
+          for (auto bt : boundTypes) {
+            if (auto BBGT = bt->getAs<BoundGenericType>()) {
+              if (BGT != BBGT &&
+                  BGT->getDecl() == BBGT->getDecl()) {
+                triedBinding = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (triedBinding)
+          continue;
+      }
 
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = cs.getASTContext().TypeCheckerDebug->getStream();

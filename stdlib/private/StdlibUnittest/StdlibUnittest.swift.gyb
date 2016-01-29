@@ -1124,6 +1124,9 @@ func _getRunningOSVersion() -> OSVersion {
 public enum TestRunPredicate : CustomStringConvertible {
   case Custom(() -> Bool, reason: String)
 
+  case Always(/*reason:*/ String)
+  case Never
+
   case OSXAny(/*reason:*/ String)
   case OSXMajor(Int, reason: String)
   case OSXMinor(Int, Int, reason: String)
@@ -1166,6 +1169,12 @@ public enum TestRunPredicate : CustomStringConvertible {
     switch self {
     case Custom(_, let reason):
       return "Custom(reason: \(reason))"
+
+    case Always(let reason):
+      return "Always(reason: \(reason))"
+    case Never:
+      return ""
+
     case OSXAny(let reason):
       return "OSX(*, reason: \(reason))"
     case OSXMajor(let major, let reason):
@@ -1239,6 +1248,11 @@ public enum TestRunPredicate : CustomStringConvertible {
     switch self {
     case Custom(let predicate, _):
       return predicate()
+
+    case Always:
+      return true
+    case Never:
+      return false
 
     case OSXAny:
       switch _getRunningOSVersion() {
@@ -2605,6 +2619,48 @@ public func < (
 ) -> Bool {
   MinimalComparableValue.timesLessWasCalled.value += 1
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
+}
+
+/// A type that conforms only to `Comparable` and `ForwardIndexType`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public struct MinimalComparableIndexValue : Comparable, ForwardIndexType {
+  public static var timesEqualEqualWasCalled = 0
+  public static var timesLessWasCalled = 0
+
+  public func successor() -> MinimalComparableIndexValue {
+    return MinimalComparableIndexValue(value.successor())
+  }
+
+  public var value: Int
+  public var identity: Int
+
+  public init(_ value: Int) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Int, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+}
+
+public func == (
+  lhs: MinimalComparableIndexValue,
+  rhs: MinimalComparableIndexValue
+) -> Bool {
+  MinimalComparableIndexValue.timesEqualEqualWasCalled += 1
+  return lhs.value == rhs.value
+}
+
+public func < (
+  lhs: MinimalComparableIndexValue,
+  rhs: MinimalComparableIndexValue
+) -> Bool {
+  MinimalComparableIndexValue.timesLessWasCalled += 1
+  return lhs.value < rhs.value
 }
 
 // ${'Local Variables'}:

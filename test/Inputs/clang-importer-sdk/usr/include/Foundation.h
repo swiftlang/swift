@@ -992,3 +992,7 @@ int variadicFunc2(int A, ...);
 
 extern NSString *NSGlobalConstant;
 extern void NSGlobalFunction(void);
+
+@interface NSString (URLExtraction)
+@property (nonnull,copy,readonly) NSArray<NSURL *> *URLsInText;
+@end

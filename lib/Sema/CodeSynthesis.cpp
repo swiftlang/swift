@@ -1263,12 +1263,9 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   if (storage->isInvalid()) return;
 
   // We only need materializeForSet in polymorphic contexts:
-  auto containerTy =
-    storage->getDeclContext()->getDeclaredTypeOfContext();
-  if (!containerTy) return;
-
-  NominalTypeDecl *container = containerTy->getAnyNominal();
-  assert(container && "extension of non-nominal type?");
+  NominalTypeDecl *container = storage->getDeclContext()
+      ->isNominalTypeOrNominalTypeExtensionContext();
+  if (!container) return;
 
   //   - in non-ObjC protocols, but not protocol extensions.
   if (auto protocol = dyn_cast<ProtocolDecl>(container)) {

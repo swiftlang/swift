@@ -153,6 +153,29 @@ Swift 2.2
 
   For more information, see [SE-0020](https://github.com/apple/swift-evolution/blob/master/proposals/0020-if-swift-version.md).
 
+* The Objective-C selector of a Swift method can now be determined
+  directly with the #selector expression, e.g.,:
+
+      let sel = #selector(insertSubview(_:aboveSubview:)) // sel has type Selector
+
+  Along with this change, the use of string literals as selectors has
+  been deprecated, e.g.,
+
+      let sel: Selector = "insertSubview:aboveSubview:"
+
+  Generally, such string literals should be replaced with uses of
+  `#selector`, and the compiler will provide Fix-Its that use
+  `#selector`. In cases where they is not possible (e.g., when referring
+  to the getter of a property), one can still directly construct
+  selectors, e.g.,:
+
+      let sel = Selector("propertyName")
+
+  Note that the compiler is now checking the string literals used to
+  construct Selectors to ensure that they are well-formed Objective-C
+  selectors and that there is an '@objc' method with that selector.
+
+
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
 

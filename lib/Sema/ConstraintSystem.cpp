@@ -1108,8 +1108,8 @@ ConstraintSystem::getTypeOfMemberReference(
                             minOpeningDepth);
 
       // Determine the object type of 'self'.
-      auto nominal = value->getDeclContext()->getDeclaredTypeOfContext()
-                       ->getAnyNominal();
+      auto nominal = value->getDeclContext()
+          ->isNominalTypeOrNominalTypeExtensionContext();
       
       // We want to track if the generic context is represented by a
       // class-bound existential so we won't inappropriately wrap the

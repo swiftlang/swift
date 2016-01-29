@@ -68,6 +68,20 @@ f4(i, d) // expected-error {{extra argument in call}}
 // Missing member.
 i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 
+// Generic member does not conform.
+extension Int {
+  func wibble<T: P2>(x: T, _ y: T) -> T { return x }
+}
+i.wibble(3, 4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
+
+// Generic member args correct, but return type doesn't match.
+struct A : P2 {
+  func wonka() {}
+}
+let a = A()
+for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'SequenceType'}}
+}
+
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
 [1, 2, 3].doesntExist(0)  // expected-error {{value of type '[Int]' has no member 'doesntExist'}}
@@ -596,7 +610,7 @@ func r22470302(c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message="calling this is unwise")
-  func unavail<T : SequenceType where T.Generator.Element == String> // expected-note {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : SequenceType where T.Generator.Element == String> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
     (a : T) -> String {}
 }
 extension Array {
@@ -605,8 +619,7 @@ extension Array {
   }
   
   func h() -> String {
-    return "foo".unavail([0])  // expected-error {{cannot invoke 'unavail' with an argument list of type '([Int])'}}
-    // expected-note @-1 {{expected an argument list of type '(T)'}}
+    return "foo".unavail([0])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
   }
 }
 
@@ -650,7 +663,7 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 struct UnaryOp {}
 
 _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
-// expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double),}}
+// expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double)}}
 
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis

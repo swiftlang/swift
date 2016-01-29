@@ -3431,28 +3431,66 @@ class UnsupportedProtocolVisitor
   : public TypeReprVisitor<UnsupportedProtocolVisitor>, public ASTWalker
 {
   TypeChecker &TC;
-  SmallPtrSet<ProtocolDecl *, 4> Diagnosed;
-
+  bool recurseIntoSubstatements;
+  bool hitTopStmt;
+    
 public:
-  UnsupportedProtocolVisitor(TypeChecker &tc) : TC(tc) { }
+  UnsupportedProtocolVisitor(TypeChecker &tc) : TC(tc) {
+    recurseIntoSubstatements = true;
+    hitTopStmt = false;
+  }
 
-  SmallPtrSet<ProtocolDecl *, 4> &getDiagnosedProtocols() { return Diagnosed; }
+  void setRecurseIntoSubstatements(bool recurse) {
+    recurseIntoSubstatements = recurse;
+  }
 
   bool walkToTypeReprPre(TypeRepr *T) {
     visit(T);
     return true;
   }
+    
+  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
+    if (recurseIntoSubstatements) {
+      return { true, S };
+    } else if (hitTopStmt) {
+      return { false, S };
+    } else {
+      hitTopStmt = true;
+      return { true, S };
+    }
+  }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
+    if (T->isInvalid())
+      return;
+    
     auto comp = T->getComponentRange().back();
     if (auto proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (!proto->existentialTypeSupported(&TC)) {
         TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
                     proto->getName());
-        Diagnosed.insert(proto);
+        T->setInvalid();
       }
-
-      return;
+    } else if (auto alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
+      if (!alias->hasUnderlyingType())
+        return;
+      auto type = alias->getUnderlyingType();
+      type.findIf([&](Type type) -> bool {
+        if (T->isInvalid())
+          return false;
+        SmallVector<ProtocolDecl*, 2> protocols;
+        if (type->isExistentialType(protocols)) {
+          for (auto *proto : protocols) {
+            if (proto->existentialTypeSupported(&TC))
+              continue;
+            
+            TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+                        proto->getName());
+            T->setInvalid();
+          }
+        }
+        return false;
+      });
     }
   }
 };
@@ -3478,27 +3516,6 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
 
   UnsupportedProtocolVisitor visitor(*this);
   decl->walk(visitor);
-  if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
-    if (auto type = valueDecl->getType()) {
-      type.findIf([&](Type type) -> bool {
-        SmallVector<ProtocolDecl*, 2> protocols;
-        if (type->isExistentialType(protocols)) {
-          for (auto *proto : protocols) {
-            if (proto->existentialTypeSupported(this))
-              continue;
-
-            if (visitor.getDiagnosedProtocols().insert(proto).second) {
-              diagnose(valueDecl->getLoc(),
-                       diag::unsupported_existential_type,
-                       proto->getName());
-            }
-          }
-        }
-
-        return false;
-      });
-    }
-  }
 }
 
 void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
@@ -3506,5 +3523,9 @@ void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
     return;
 
   UnsupportedProtocolVisitor visitor(*this);
+    
+  // This method will already be called for all individual statements, so don't repeat
+  // that checking by walking into any statement inside this one.
+  visitor.setRecurseIntoSubstatements(false);
   stmt->walk(visitor);
 }

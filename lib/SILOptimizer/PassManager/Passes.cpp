@@ -200,6 +200,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addDeadStoreElimination();
   PM.addCSE();
   PM.addEarlyCodeMotion();
+  PM.addARCSequenceOpts();
 
   PM.addSILLinker();
 

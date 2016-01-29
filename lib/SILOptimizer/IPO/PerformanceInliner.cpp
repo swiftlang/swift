@@ -74,6 +74,9 @@ namespace {
   // increasing the code size.
   const unsigned TrivialFunctionThreshold = 20;
 
+  // Configuration for the caller block limit.
+  const unsigned BlockLimitDenominator = 10000;
+
   // Represents a value in integer constant evaluation.
   struct IntConst {
     IntConst() : isValid(false), isFromCaller(false) { }
@@ -234,7 +237,8 @@ namespace {
     bool isProfitableToInline(FullApplySite AI, unsigned loopDepthOfAI,
                               DominanceAnalysis *DA,
                               SILLoopAnalysis *LA,
-                              ConstantTracker &constTracker);
+                              ConstantTracker &constTracker,
+                              unsigned &NumCallerBlocks);
 
     void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
                          SILBasicBlock *root, DominanceInfo *DT);
@@ -735,7 +739,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               unsigned loopDepthOfAI,
                                               DominanceAnalysis *DA,
                                               SILLoopAnalysis *LA,
-                                              ConstantTracker &callerTracker) {
+                                              ConstantTracker &callerTracker,
+                                              unsigned &NumCallerBlocks) {
   SILFunction *Callee = AI.getCalleeFunction();
   
   if (Callee->getInlineStrategy() == AlwaysInline)
@@ -808,6 +813,18 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
     Threshold = TrivialFunctionThreshold;
+  } else {
+    // The default case.
+    // We reduce the benefit if the caller is too large. For this we use a
+    // cubic function on the number of caller blocks. This starts to prevent
+    // inlining at about 800 - 1000 caller blocks.
+    unsigned blockMinus =
+      (NumCallerBlocks * NumCallerBlocks) / BlockLimitDenominator *
+                          NumCallerBlocks / BlockLimitDenominator;
+    if (Threshold > blockMinus + TrivialFunctionThreshold)
+      Threshold -= blockMinus;
+    else
+      Threshold = TrivialFunctionThreshold;
   }
 
   if (CalleeCost > Threshold) {
@@ -817,6 +834,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   }
   DEBUG(llvm::dbgs() << "        YES: ready to inline, "
         "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
+  NumCallerBlocks += Callee->size();
   return true;
 }
 
@@ -1014,6 +1032,8 @@ void SILPerformanceInliner::collectAppliesToInline(
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
 
+  unsigned NumCallerBlocks = Caller->size();
+
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
   SmallVector<FullApplySite, 8> InitialCandidates;
@@ -1032,7 +1052,8 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       auto *Callee = getEligibleFunction(AI);
       if (Callee) {
-        if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker))
+        if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker,
+                                 NumCallerBlocks))
           InitialCandidates.push_back(AI);
       }
     }

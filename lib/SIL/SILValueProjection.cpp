@@ -49,6 +49,7 @@ SILValue SILValueProjection::createExtract(SILValue Base,
   // from our list of address projections.
   SILValue LastExtract = Base;
   SILBuilder Builder(Inst);
+  Builder.setCurrentDebugScope(Inst->getFunction()->getDebugScope());
 
   // We use an auto-generated SILLocation for now.
   // TODO: make the sil location more precise.
@@ -165,6 +166,7 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
       Vals.push_back(Values[X].materialize(InsertPt));
     }
     SILBuilder Builder(InsertPt);
+    Builder.setCurrentDebugScope(InsertPt->getFunction()->getDebugScope());
     
     // We use an auto-generated SILLocation for now.
     // TODO: make the sil location more precise.

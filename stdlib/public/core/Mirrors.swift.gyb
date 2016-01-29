@@ -18,20 +18,20 @@ from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 Types = [
-    ('Float', '.Float', '$0'),
-    ('Double', '.Double', '$0'),
-    ('Bool', '.Logical', '$0'),
-    ('String', '.Text', '$0'),
-    ('Character', '.Text', 'String($0)'),
-    ('UnicodeScalar', '.UInt', 'UInt64($0)'),
+    ('Float', '.Float', 'self'),
+    ('Double', '.Double', 'self'),
+    ('Bool', '.Logical', 'self'),
+    ('String', '.Text', 'self'),
+    ('Character', '.Text', 'String(self)'),
+    ('UnicodeScalar', '.UInt', 'UInt64(self)'),
 ]
 
 for self_ty in all_integer_types(word_bits):
   Self = self_ty.stdlib_name
   if self_ty.is_signed:
-    Types.append( (Self, '.Int', 'Int64($0)') )
+    Types.append( (Self, '.Int', 'Int64(self)') )
   else:
-    Types.append( (Self, '.UInt', 'UInt64($0)') )
+    Types.append( (Self, '.UInt', 'UInt64(self)') )
 
 }%
 
@@ -39,11 +39,18 @@ internal func _toString<T>(x: T) -> String {
   return String(x)
 }
 
-% for Type in Types:
-extension ${Type[0]} : _Reflectable {
+%for Type in Types:
+
+extension ${Type[0]} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
-    return _LeafMirror(self, _toString, { ${Type[1]}(${Type[2]}) })
+  public func customMirror() -> Mirror {
+    return Mirror(self, unlabeledChildren: [Any]())
+  }
+}
+
+extension ${Type[0]} : CustomPlaygroundQuickLookable {
+  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    return ${Type[1]}(${Type[2]})
   }
 }
 % end

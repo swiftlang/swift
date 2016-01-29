@@ -13,7 +13,7 @@ def execute_cmd(cmd):
     os.system(cmd)
 
 # The regular expression we use to match compiler-crasher lines.
-regex = re.compile('.*Swift :: compiler_crashers(|_2)/(.*\.swift).*')
+regex = re.compile('.*Swift :: (compiler_crashers|compiler_crashers_2|IDE/crashers)/(.*\.swift).*')
 
 # Take the output of lit as standard input.
 for line in sys.stdin:
@@ -23,8 +23,8 @@ for line in sys.stdin:
         filename = match.group(2)
 
         # Move the test over to the fixed suite.
-        from_filename = 'validation-test/compiler_crashers%s/%s' % (suffix, filename)
-        to_filename = 'validation-test/compiler_crashers%s_fixed/%s' % (suffix, filename)
+        from_filename = 'validation-test/%s/%s' % (suffix, filename)
+        to_filename = 'validation-test/%s_fixed/%s' % (suffix, filename)
         git_mv_cmd = 'git mv %s %s' % (from_filename, to_filename)
         execute_cmd(git_mv_cmd)
 

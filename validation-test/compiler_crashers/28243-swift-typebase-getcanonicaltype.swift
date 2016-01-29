@@ -5,6 +5,13 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func b{for c:a
-protocol a{typealias d:d
-var T:d
+extension String{
+func b{
+{
+a<
+}}
+class A
+extension{
+struct B{
+struct B<T where T:A{
+protocol a{func<

@@ -3308,12 +3308,8 @@ namespace {
 
         // Look through an implicit force-value.
         if (auto force = dyn_cast<ForceValueExpr>(subExpr)) {
-          if (force->isImplicit()) {
-            subExpr = force->getSubExpr();
-            continue;
-          }
-
-          break;
+          subExpr = force->getSubExpr();
+          continue;
         }
 
         // Look through implicit open-existential operations.

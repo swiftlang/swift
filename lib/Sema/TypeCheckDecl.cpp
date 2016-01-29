@@ -1040,7 +1040,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   ArrayRef<ValueDecl *> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
-    if (auto nominal = currentDC->getDeclaredTypeOfContext()->getAnyNominal()) {
+    if (auto nominal = currentDC->isNominalTypeOrNominalTypeExtensionContext()) {
       otherDefinitions = nominal->lookupDirect(current->getBaseName());
       if (tracker)
         tracker->addUsedMember({nominal, current->getName()}, isCascading);
@@ -2386,6 +2386,14 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       method->setForeignErrorConvention(*errorConvention);
     }
   }
+
+  // Record this method in the source-file-specific Objective-C method
+  // table.
+  if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (auto sourceFile = method->getParentSourceFile()) {
+      sourceFile->ObjCMethods[method->getObjCSelector()].push_back(method);
+    }
+  }
 }
 
 namespace {
@@ -2826,8 +2834,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-      Type containerTy = VD->getDeclContext()->getDeclaredTypeOfContext();
-      if (!containerTy || !containerTy->is<ProtocolType>()) {
+      if (!VD->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
         synthesizeMaterializeForSet(materializeForSet, VD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -2848,9 +2855,6 @@ public:
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
       validatePatternBindingDecl(TC, PBD, i);
 
-    // Note: The Else body is type checked when the enclosing BraceStmt is
-    // checked.
-    
     if (PBD->isInvalid() || PBD->isBeingTypeChecked())
       return;
 
@@ -3061,8 +3065,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      Type containerTy = SD->getDeclContext()->getDeclaredTypeOfContext();
-      if (!containerTy || !containerTy->is<ProtocolType>()) {
+      if (!SD->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
         synthesizeMaterializeForSet(materializeForSet, SD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3286,10 +3289,9 @@ public:
 
     if (!IsFirstPass) {
       checkAccessibility(TC, SD);
-    }
 
-    if (!(IsFirstPass || SD->isInvalid())) {
-      checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
+      if (!SD->isInvalid())
+        checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
     }
 
     // Visit each of the members.
@@ -3443,9 +3445,8 @@ public:
 
     TC.addImplicitDestructor(CD);
 
-    if (!(IsFirstPass || CD->isInvalid())) {
+    if (!IsFirstPass && !CD->isInvalid())
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
-    }
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
@@ -3817,12 +3818,8 @@ public:
       return false;
     }
 
-    auto containerTy = dc->getDeclaredTypeOfContext();
-    if (containerTy->is<ErrorType>())
-      return true;
-
     // 'Self' is only a dynamic self on class methods.
-    auto nominal = containerTy->getAnyNominal();
+    auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
     assert(nominal && "Non-nominal container for method type?");
     if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
       int which;

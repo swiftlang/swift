@@ -35,12 +35,13 @@ CONFIG = None
 class Config():
     """A class to store configuration information specified by command-line arguments.
     Used to encapsulate what would normally be global variables."""
-    def __init__(self, debug, out_dir):
+    def __init__(self, debug, out_dir, no_remove_files):
         self.debug = debug
         self.out_dir = out_dir
         self.tmp_dir = tempfile.mkdtemp()
         self.pid_file_path = os.path.join(self.out_dir, "profdata_merge_worker.pid")
         self.final_profdata_path = os.path.join(self.out_dir, "swift.profdata")
+        self.remove_files = not no_remove_files
 
 printlock = Lock()
 def printsync(msg):
@@ -110,9 +111,10 @@ class ProfdataMergerProcess(Process):
         if ret != 0:
             self.report("llvm profdata command failed -- Exited with code %d"
                 % ret)
-        for f in self.filename_buffer:
-            if os.path.exists(f):
-                os.remove(f)
+        if CONFIG.remove_files:
+            for f in self.filename_buffer:
+                if os.path.exists(f):
+                    os.remove(f)
         self.filename_buffer = []
 
     def run(self):
@@ -179,7 +181,7 @@ def stop_server(args):
 
 def start_server(args):
     global CONFIG
-    CONFIG = Config(args.debug, args.output_dir)
+    CONFIG = Config(args.debug, args.output_dir, args.no_remove)
     if not CONFIG.debug:
         pid = os.fork()
         if pid != 0:
@@ -204,6 +206,9 @@ if __name__ == "__main__":
     start.add_argument("-o", "--output-dir",
         help="The directory to write the PID file and final profdata file.",
         default="/tmp")
+    start.add_argument("--no-remove",
+        action="store_true",
+        help="Don't remove profraw files after merging them.")
     start.set_defaults(func=start_server)
 
     stop = subparsers.add_parser("stop")

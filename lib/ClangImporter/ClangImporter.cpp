@@ -3809,6 +3809,59 @@ void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
   }
 }
 
+void ClangModuleUnit::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  // FIXME: Ignore submodules, which are empty for now.
+  if (clangModule && clangModule->isSubModule())
+    return;
+
+  // Map the selector into a Clang selector.
+  auto clangSelector = owner.Impl.exportSelector(selector);
+  if (clangSelector.isNull()) return;
+
+  // Collect all of the Objective-C methods with this selector.
+  SmallVector<clang::ObjCMethodDecl *, 8> objcMethods;
+  auto &clangSema = owner.Impl.getClangSema();
+  clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
+                                               objcMethods,
+                                               /*instance=*/true);
+  clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
+                                               objcMethods,
+                                               /*instance=*/false);
+
+  // Import the methods.
+  auto &clangCtx = clangSema.getASTContext();
+  for (auto objcMethod : objcMethods) {
+    // Verify that this method came from this module.
+    auto owningClangModule = getClangOwningModule(objcMethod, clangCtx);
+    if (owningClangModule)
+      owningClangModule = owningClangModule->getTopLevelModule();
+
+    if (owningClangModule != clangModule) continue;
+
+    // If we found a property accessor, import the property.
+    if (objcMethod->isPropertyAccessor())
+      (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true));
+
+    // Import it.
+    // FIXME: Retrying a failed import works around recursion bugs in the Clang
+    // importer.
+    auto imported = owner.Impl.importDecl(objcMethod);
+    if (!imported) imported = owner.Impl.importDecl(objcMethod);
+    if (!imported) continue;
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
+      results.push_back(func);
+
+    // If there is an alternate declaration, also look at it.
+    if (auto alternate = owner.Impl.getAlternateDecl(imported)) {
+      if (auto func = dyn_cast<AbstractFunctionDecl>(alternate))
+        results.push_back(func);
+    }
+  }
+}
+
 void ClangModuleUnit::collectLinkLibraries(
     Module::LinkLibraryCallback callback) const {
   if (!clangModule)

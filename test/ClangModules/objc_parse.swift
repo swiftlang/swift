@@ -37,8 +37,8 @@ func instanceMethods(b: B) {
   b.setEnabled(true)
 
   // SEL
-  b.performSelector("isEqual:", withObject:b)
-  if let result = b.performSelector("getAsProto", withObject:nil) {
+  b.performSelector(#selector(NSObject.isEqual(_:)), withObject:b)
+  if let result = b.performSelector(#selector(B.getAsProto), withObject:nil) {
     _ = result.takeUnretainedValue()
   }
 
@@ -208,7 +208,7 @@ func testProtocolMethods(b: B, p2m: P2.Type) {
 }
 
 func testId(x: AnyObject) {
-  x.performSelector!("foo:", withObject: x)
+  x.performSelector!("foo:", withObject: x) // expected-warning{{no method declared with Objective-C selector 'foo:'}}
 
   x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
@@ -377,10 +377,10 @@ func testPreferClassMethodToCurriedInstanceMethod(obj: NSObject) {
 func testPropertyAndMethodCollision(obj: PropertyAndMethodCollision,
                                     rev: PropertyAndMethodReverseCollision) {
   obj.object = nil
-  obj.object(obj, doSomething:"action")
+  obj.object(obj, doSomething:Selector("action"))
 
   rev.object = nil
-  rev.object(rev, doSomething:"action")
+  rev.object(rev, doSomething:Selector("action"))
 
   var value: AnyObject = obj.protoProp()
   value = obj.protoPropRO()

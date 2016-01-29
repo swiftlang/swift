@@ -317,7 +317,7 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
   if (!dc->isTypeContext())
     return type;
 
-  auto nominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
+  auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
   auto selfTy = nominal->getInterfaceType()->castTo<MetatypeType>()
                   ->getInstanceType();
   if (auto sig = nominal->getGenericSignatureOfContext())

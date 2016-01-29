@@ -1627,7 +1627,8 @@ namespace {
 
     // If the type isn't actually dependent, we're okay.
     bool visit(CanType type) {
-      if (!type->hasArchetype()) return false;
+      if (!type->hasArchetype() && !type->hasTypeParameter())
+        return false;
       return CanTypeVisitor::visit(type);
     }
 
@@ -1644,7 +1645,7 @@ namespace {
         return true;
 
       for (auto field : decl->getStoredProperties()) {
-        if (visit(field->getType()->getCanonicalType()))
+        if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
       }
       return false;
@@ -1667,7 +1668,7 @@ namespace {
       for (auto elt : decl->getAllElements()) {
         if (elt->hasArgumentType() &&
             !elt->isIndirect() &&
-            visit(elt->getArgumentType()->getCanonicalType()))
+            visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
       }
       return false;
@@ -1686,7 +1687,9 @@ namespace {
 
     // The IR-generation for function types is specifically not
     // type-dependent.
-    bool visitAnyFunctionType(CanAnyFunctionType type) { return false; }
+    bool visitAnyFunctionType(CanAnyFunctionType type) {
+      return false;
+    }
 
     // The safe default for a dependent type is to assume that it
     // needs its own implementation.
@@ -1700,11 +1703,11 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   assert(!isa<ProtocolDecl>(decl));
   if (isa<ClassDecl>(decl)) {
     return false;
-  } else if (auto sd = dyn_cast<StructDecl>(decl)) {
-    return IsIRTypeDependent(IGM).visitStructDecl(sd);
+  } else if (auto structDecl = dyn_cast<StructDecl>(decl)) {
+    return IsIRTypeDependent(IGM).visitStructDecl(structDecl);
   } else {
-    auto ed = cast<EnumDecl>(decl);
-    return IsIRTypeDependent(IGM).visitEnumDecl(ed);
+    auto enumDecl = cast<EnumDecl>(decl);
+    return IsIRTypeDependent(IGM).visitEnumDecl(enumDecl);
   }
 }
 
