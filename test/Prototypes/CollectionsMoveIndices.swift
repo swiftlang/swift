@@ -246,20 +246,6 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
 
   var count: Index.Distance { get }
 }
-/*
-extension MyForwardCollectionType
-  // FIXME: this constraint shouldn't be necessary.
-  where IndexRange.Index == Index
-  {
-
-  // FIXME: do we want this overload?  Would we provide such an overload
-  // for every method that accepts ranges of indices?
-  // FIXME: can we have a generic subscript on MyIndexRangeType instead?
-  public subscript(bounds: IndexRange) -> SubSequence {
-    return self[MyRange(start: bounds.startIndex, end: bounds.endIndex)]
-  }
-}
-*/
 
 extension MyForwardCollectionType {
   /// Do not use this method directly; call advancedBy(n) instead.
@@ -560,13 +546,6 @@ public struct DefaultForwardIndexRange<Collection : MyIndexableType /* MyForward
   internal let _unownedCollection: Collection.UnownedHandle
   public let startIndex: Collection.Index
   public let endIndex: Collection.Index
-  public subscript(from start: Index, to end: Index)
-    -> DefaultForwardIndexRange<Collection> {
-    return DefaultForwardIndexRange(
-      _unownedCollection: _unownedCollection,
-      startIndex: start,
-      endIndex: end)
-  }
 
   // FIXME: remove explicit typealiases.
   public typealias _Element = Collection.Index
@@ -665,10 +644,6 @@ public struct MyRange<Index : MyIndexType> : MyIndexRangeType {
   public subscript(i: Index) -> Index {
     return i
   }
-
-  public subscript(from start: Index, to end: Index) -> MyRange<Index> {
-    return MyRange(start: start, end: end)
-  }
 }
 
 public func ..<*
@@ -754,13 +729,6 @@ public struct MySliceIndexRange<Collection : MyIndexableType /* MyForwardCollect
   internal let _unownedCollection: Collection.UnownedHandle
   public let startIndex: Collection.Index
   public let endIndex: Collection.Index
-  public subscript(from start: Index, to end: Index)
-    -> MySliceIndexRange<Collection> {
-    return MySliceIndexRange(
-      _unownedCollection: _unownedCollection,
-      startIndex: start,
-      endIndex: end)
-  }
 
   // FIXME: remove explicit typealiases.
   public typealias _Element = Collection.Index
@@ -880,7 +848,6 @@ public protocol MyIndexRangeType : Equatable {
   associatedtype Index : MyIndexType
   var startIndex: Index { get }
   var endIndex: Index { get }
-  subscript(from start: Index, to end: Index) -> Self { get }
 }
 
 public func == <IR : MyIndexRangeType> (lhs: IR, rhs: IR) -> Bool {
