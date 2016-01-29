@@ -728,7 +728,7 @@ the number of parallel build jobs to use""",
         swift_build_dir_label = args.swift_build_variant
         if args.swift_assertions:
             swift_build_dir_label += "Assert"
-        if args.swift_analyze_code_coverage:
+        if args.swift_analyze_code_coverage != "false":
             swift_build_dir_label += "Coverage"
 
         swift_stdlib_build_dir_label = args.swift_stdlib_build_variant
