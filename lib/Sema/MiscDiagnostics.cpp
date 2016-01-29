@@ -2096,7 +2096,7 @@ public:
 
         if (classDecl == superclassDecl) {
           bestMethod = method;
-          continue;          
+          break;
         }
 
         bestClassDecl = superclassDecl;
