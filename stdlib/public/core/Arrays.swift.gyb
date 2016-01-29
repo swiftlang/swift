@@ -1270,6 +1270,8 @@ public func == <Element : Equatable>(
     return true
   }
 
+%if Self == 'ArraySlice':
+
   var streamLHS = lhs.generate()
   var streamRHS = rhs.generate()
 
@@ -1281,6 +1283,19 @@ public func == <Element : Equatable>(
     }
     nextLHS = streamLHS.next()
   }
+
+%else:
+
+  _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
+  _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+
+  // We know that lhs.count == rhs.count, compare element wise.
+  for idx in 0..<lhsCount {
+    if lhs[idx] != rhs[idx] {
+      return false
+    }
+  }
+%end
 
   return true
 }
