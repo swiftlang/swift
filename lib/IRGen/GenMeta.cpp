@@ -4616,7 +4616,7 @@ namespace {
                                 llvm::Value *vwtable) {
       // Nominal types are always preserved through SIL lowering.
       auto structTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-      IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
+      IGM.getTypeInfoForLowered(structTy)
         .initializeMetadata(IGF, metadata, vwtable,
                             SILType::getPrimitiveAddressType(structTy));
     }

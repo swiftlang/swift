@@ -278,6 +278,11 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   ProtocolConformanceRecordPtrTy
     = ProtocolConformanceRecordTy->getPointerTo(DefaultAS);
 
+  NominalTypeDescriptorTy
+    = llvm::StructType::create(LLVMContext, "swift.type_descriptor");
+  NominalTypeDescriptorPtrTy
+    = NominalTypeDescriptorTy->getPointerTo(DefaultAS);
+
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
       RelativeAddressTy,
