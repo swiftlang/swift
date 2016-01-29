@@ -3387,7 +3387,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   if (isSelfParameter() && UseDC) {
     // If the problematic decl is 'self', then we might be trying to mutate
     // a property in a non-mutating method.
-    auto FD = dyn_cast<FuncDecl>(UseDC->getInnermostMethodContext());
+    auto FD = dyn_cast_or_null<FuncDecl>(UseDC->getInnermostMethodContext());
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredTypeInContext()
                  ->hasReferenceSemantics()) {
