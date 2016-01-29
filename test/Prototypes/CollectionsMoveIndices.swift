@@ -172,7 +172,7 @@ struct OldGenerator<G : MyGeneratorType> : GeneratorType {
 //------------------------------------------------------------------------
 
 public protocol MyIndexableType {
-  associatedtype Index : MyIndexType
+  associatedtype Index : Equatable
   associatedtype _Element
   associatedtype UnownedHandle
   var startIndex: Index { get }
@@ -201,7 +201,7 @@ extension MyIndexableType {
 
 public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   associatedtype Generator = DefaultGenerator<Self>
-  associatedtype Index : MyIndexType
+  associatedtype Index : Equatable
   associatedtype SubSequence : MySequenceType /* : MyForwardCollectionType */
     = MySlice<Self>
   associatedtype UnownedHandle = Self // DefaultUnownedForwardCollection<Self>
@@ -400,7 +400,7 @@ extension MyForwardCollectionType
 }
 extension MyForwardCollectionType
   where
-  Index : MyRandomAccessIndex,
+  Index : MyStrideable,
   Index.Distance == IndexDistance {
 
   @warn_unused_result
@@ -511,7 +511,7 @@ extension MyBidirectionalCollectionType {
 }
 extension MyBidirectionalCollectionType
   where
-  Index : MyRandomAccessIndex,
+  Index : MyStrideable,
   Index.Distance == IndexDistance {
 
   @warn_unused_result
@@ -535,7 +535,7 @@ extension MyBidirectionalCollectionType
 }
 
 public protocol MyRandomAccessCollectionType : MyBidirectionalCollectionType {
-  associatedtype Index : MyRandomAccessIndex
+  associatedtype Index : MyStrideable
     // FIXME: where Index.Distance == IndexDistance
 }
 
@@ -638,7 +638,7 @@ public struct DefaultForwardIndexRangeGenerator<Collection : MyIndexableType /* 
   }
 }
 
-public struct MyRange<Index : MyIndexType> : MyIndexRangeType {
+public struct MyRange<Index : Equatable> : MyIndexRangeType {
   public let startIndex: Index
   public let endIndex: Index
 
@@ -653,7 +653,7 @@ public struct MyRange<Index : MyIndexType> : MyIndexRangeType {
 }
 
 public func ..<*
-  <Index : MyIndexType>(lhs: Index, rhs: Index) -> MyRange<Index> {
+  <Index : Equatable>(lhs: Index, rhs: Index) -> MyRange<Index> {
   return MyRange(start: lhs, end: rhs)
 }
 
@@ -846,10 +846,8 @@ public protocol MyMutableCollectionType : MyForwardCollectionType {
   subscript(i: Index) -> Generator.Element { get set }
 }
 
-public protocol MyIndexType : Equatable {}
-
 public protocol MyIndexRangeType : Equatable {
-  associatedtype Index : MyIndexType
+  associatedtype Index : Equatable
   var startIndex: Index { get }
   var endIndex: Index { get }
 }
@@ -1010,11 +1008,7 @@ public protocol MyStrideable : Comparable {
   func advancedBy(n: Distance) -> Self
 }
 
-public protocol MyRandomAccessIndex : MyIndexType, MyStrideable {}
-
-extension Int : MyIndexType {}
 extension Int : MyStrideable {}
-extension Int : MyRandomAccessIndex {}
 
 //------------------------------------------------------------------------
 // Array
@@ -1075,7 +1069,7 @@ public struct MySimplestForwardCollection<Element> : MyForwardCollectionType {
   }
 }
 
-public struct MySimplestForwardCollectionIndex : MyIndexType {
+public struct MySimplestForwardCollectionIndex : Equatable {
   internal let _index: Int
   internal init(_ index: Int) {
     self._index = index
@@ -1122,7 +1116,7 @@ public struct MySimplestBidirectionalCollection<Element> : MyBidirectionalCollec
   }
 }
 
-public struct MySimplestBidirectionalCollectionIndex : MyIndexType {
+public struct MySimplestBidirectionalCollectionIndex : Equatable {
   internal let _index: Int
   internal init(_ index: Int) {
     self._index = index
@@ -1162,7 +1156,7 @@ public struct MySimplestRandomAccessCollection<Element> : MyRandomAccessCollecti
   }
 }
 
-public struct MySimplestRandomAccessCollectionIndex : MyRandomAccessIndex {
+public struct MySimplestRandomAccessCollectionIndex : MyStrideable {
   internal let _index: Int
   internal init(_ index: Int) {
     self._index = index
