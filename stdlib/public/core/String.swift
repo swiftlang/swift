@@ -630,9 +630,9 @@ extension SequenceType where Generator.Element == String {
     let separatorSize = separator.utf16.count
 
     let reservation = self._preprocessingPass {
-      (s: Self) -> Int in
+      () -> Int in
       var r = 0
-      for chunk in s {
+      for chunk in self {
         // FIXME(performance): this code assumes UTF-16 in-memory representation.
         // It should be switched to low-level APIs.
         r += separatorSize + chunk.utf16.count

@@ -2011,7 +2011,7 @@ public func checkSequence<
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { (sequence) -> Void in 
+  sequence._preprocessingPass { () -> Void in 
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)

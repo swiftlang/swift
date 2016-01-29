@@ -85,8 +85,8 @@ sequenceWrapperTests.test("Dispatch/_customContainsEquatableElement") {
 
 sequenceWrapperTests.test("Dispatch/_preprocessingPass") {
   expectWrapperDispatch(
-    direct._preprocessingPass { _ in 1 },
-    indirect._preprocessingPass { _ in 1 },
+    direct._preprocessingPass { 1 },
+    indirect._preprocessingPass { 1 },
     dispatchLog._preprocessingPass)
 }
 
