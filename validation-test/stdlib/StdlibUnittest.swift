@@ -452,7 +452,7 @@ AssertionsTestSuite.test("UnexpectedCrash/RuntimeTrap") {
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/RuntimeTrap
 // CHECK: err>>> CRASHED: SIG{{.*}}
-// CHECK: the test crashed unexpectedly
+// CHECK: the test crashed unexpectedly with a termination status of 'Exit(0)'
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/RuntimeTrap
 
 AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
@@ -461,7 +461,7 @@ AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/NullPointerDereference
 // CHECK: err>>> CRASHED: SIG{{.*}}
-// CHECK: the test crashed unexpectedly
+// CHECK: the test crashed unexpectedly with a termination status of 'Exit(0)'
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference
 
 var TestSuiteLifetimeTracked = TestSuite("TestSuiteLifetimeTracked")
