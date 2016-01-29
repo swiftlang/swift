@@ -13,21 +13,50 @@
 // Problem
 // =======
 //
-// In practice it has turned out that every one of our concrete
-// collection's non random-access indices holds a reference to the
-// collection it traverses.  This introduces complexity in
-// implementations (especially as we try to avoid multiple-reference
-// effects that can cause unnecessary COW copies -- see `Dictionary`
-// and `Set`) and presumably translates into less-efficient codegen.
-// We should consider other schemes.
+// Swift standard library defines three kinds of collection indices:
+// forward, bidirectional and random access.  A collection uses one of
+// these indices based on the capabilities of the backing data
+// structure.  For example, a singly-linked list can only have forward
+// indices, a tree with parent pointers has bidirectional indices, and
+// Array and Deque has random access indices.
 //
-// Solution
-// ========
+// It turned out that in practice, every one of the non-random-access
+// indices holds a reference to the collection it traverses, or to
+// some part of it, to implement `.successor()` and `.predecessor()`.
+// This introduces extra complexity in implementations and presumably
+// translates into less-efficient code that does reference counting on
+// indices.  Indices referencing collections also conflicts with COW
+// -- a live index makes a collection non-uniquely referenced, causing
+// unnecessary copies (see `Dictionary` and `Set`, that have to use a
+// double-indirection trick to avoid these extra copies).  We should
+// consider other schemes that don't require these tricks.
+//
+// Proposed Solution
+// =================
 //
 // Change indices so that they can't be moved forward or backward by
-// themselves (`i.successor()`).  Then indices can store the minimal
-// amount of information about the element position in the collection,
-// and avoid keeping a reference to the whole collection.
+// themselves (`i.successor()` is not allowed).  Then indices can
+// store the minimal amount of information only about the element
+// position in the collection.  Usually index can be represented as
+// one or a couple of integers that encode the "path" in the
+// data structure from the root to the element.  In this
+// representation, only a collection can move indices (e.g.,
+// `c.next(i)`).
+//
+// Advantages:
+// * indices don't need to keep a reference to the collection.
+//   - indices are simpler to implement.
+//   - indices are not reference-countable, and thus cheaper to
+//     handle.
+// * the hierarchy of index protocols is removed, and instead we add
+//   protocols for forward, bidirectional and random-access
+//   collections.  This is closer to how people generally talk about
+//   collections.  Writing a generic constraint for bidirectional and
+//   random-access collections becomes simpler.
+//
+// Disadvantages:
+// * a value-typed linked list can't conform to CollectionType.  A
+//   reference-typed one can.
 
 // Issues
 // ======
