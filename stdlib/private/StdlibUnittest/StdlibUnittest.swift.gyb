@@ -1165,6 +1165,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case FreeBSDAny(reason: String)
 
+  case ObjCRuntime(/*reason:*/ String)
+  case NativeRuntime(/*reason:*/ String)
+
   public var description: String {
     switch self {
     case Custom(_, let reason):
@@ -1241,6 +1244,11 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case FreeBSDAny(reason: let reason):
       return "FreeBSDAny(*, reason: \(reason))"
+
+    case ObjCRuntime(let reason):
+      return "Objective-C runtime, reason: \(reason))"
+    case NativeRuntime(let reason):
+      return "Native runtime (no ObjC), reason: \(reason))"
     }
   }
 
@@ -1485,6 +1493,20 @@ public enum TestRunPredicate : CustomStringConvertible {
       default:
         return false
       }
+
+    case ObjCRuntime:
+#if _runtime(_ObjC)
+      return true
+#else
+      return false
+#endif
+
+    case NativeRuntime:
+#if _runtime(_ObjC)
+      return false
+#else
+      return true
+#endif
     }
   }
 }
