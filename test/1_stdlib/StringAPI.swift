@@ -248,11 +248,7 @@ func checkHasPrefixHasSuffix(
     .starts(with: rhsNFDGraphemeClusters.lazy.reversed(), by: (==))
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
-  expectEqual(
-    expectHasPrefix, (lhs + "abc").hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
-  expectEqual(
-    expectHasSuffix, ("abc" + lhs).hasSuffix(rhs), stackTrace: stackTrace)
 #endif
 }
 
@@ -268,6 +264,14 @@ StringTests.test("hasPrefix,hasSuffix")
   for test in comparisonTests {
     checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
     checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
+
+    let fragment = "abc"
+    let combiner = "\u{0301}" // combining acute accent
+
+    checkHasPrefixHasSuffix(test.lhs + fragment, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(fragment + test.lhs, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(test.lhs + combiner, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(combiner + test.lhs, test.rhs, test.loc.withCurrentLoc())
   }
 }
 
