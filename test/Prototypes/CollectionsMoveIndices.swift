@@ -209,6 +209,7 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
     // FIXME: where IndexRange.Generator.Element == Index
     // FIXME: where IndexRange.Index == Index
     = DefaultForwardIndexRange<Self>
+  associatedtype IndexDistance : SignedIntegerType = Int
 
   var startIndex: Index { get }
   var endIndex: Index { get }
@@ -222,13 +223,13 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   func next(i: Index) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by: Index.Distance) -> Index
+  func advance(i: Index, by: IndexDistance) -> Index
 
   @warn_unused_result
-  func advance(i: Index, by: Index.Distance, limit: Index) -> Index
+  func advance(i: Index, by: IndexDistance, limit: Index) -> Index
 
   @warn_unused_result
-  func distanceFrom(start: Index, to: Index) -> Index.Distance
+  func distanceFrom(start: Index, to: Index) -> IndexDistance
 
   func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
 
@@ -244,19 +245,19 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
 
   var isEmpty: Bool { get }
 
-  var count: Index.Distance { get }
+  var count: IndexDistance { get }
 }
 
 extension MyForwardCollectionType {
   /// Do not use this method directly; call advancedBy(n) instead.
   @inline(__always)
   @warn_unused_result
-  internal func _advanceForward(i: Index, by n: Index.Distance) -> Index {
+  internal func _advanceForward(i: Index, by n: IndexDistance) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
 
     var i = i
-    for var offset: Index.Distance = 0; offset != n; offset = offset + 1 {
+    for var offset: IndexDistance = 0; offset != n; offset = offset + 1 {
       _nextInPlace(&i)
     }
     return i
@@ -266,32 +267,32 @@ extension MyForwardCollectionType {
   @inline(__always)
   @warn_unused_result
   internal func _advanceForward(
-    i: Index, by n: Index.Distance, limit: Index
+    i: Index, by n: IndexDistance, limit: Index
   ) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
 
     var i = i
-    for var offset: Index.Distance = 0; offset != n && i != limit; offset = offset + 1 {
+    for var offset: IndexDistance = 0; offset != n && i != limit; offset = offset + 1 {
       _nextInPlace(&i)
     }
     return i
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance) -> Index {
+  public func advance(i: Index, by n: IndexDistance) -> Index {
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     return self._advanceForward(i, by: n, limit: limit)
   }
 
   @warn_unused_result
-  public func distanceFrom(start: Index, to end: Index) -> Index.Distance {
+  public func distanceFrom(start: Index, to end: Index) -> IndexDistance {
     var start = start
-    var count: Index.Distance = 0
+    var count: IndexDistance = 0
     while start != end {
       count = count + 1
       _nextInPlace(&start)
@@ -325,7 +326,7 @@ extension MyForwardCollectionType {
     return startIndex == endIndex
   }
 
-  public var count: Index.Distance {
+  public var count: IndexDistance {
     return distanceFrom(startIndex, to: endIndex)
   }
 
@@ -398,7 +399,9 @@ extension MyForwardCollectionType
   }
 }
 extension MyForwardCollectionType
-  where Index : MyRandomAccessIndex {
+  where
+  Index : MyRandomAccessIndex,
+  Index.Distance == IndexDistance {
 
   @warn_unused_result
   public func next(i: Index) -> Index {
@@ -406,14 +409,14 @@ extension MyForwardCollectionType
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance) -> Index {
+  public func advance(i: Index, by n: IndexDistance) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     let d = i.distanceTo(limit)
@@ -482,24 +485,24 @@ extension MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance) -> Index {
+  public func advance(i: Index, by n: IndexDistance) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
     var i = i
-    for var offset: Index.Distance = n; offset != 0; offset = offset + 1 {
+    for var offset: IndexDistance = n; offset != 0; offset = offset + 1 {
       _previousInPlace(&i)
     }
     return i
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limit: limit)
     }
     var i = i
-    for var offset: Index.Distance = n; offset != 0 && i != limit;
+    for var offset: IndexDistance = n; offset != 0 && i != limit;
         offset = offset + 1 {
       _previousInPlace(&i)
     }
@@ -507,7 +510,9 @@ extension MyBidirectionalCollectionType {
   }
 }
 extension MyBidirectionalCollectionType
-  where Index : MyRandomAccessIndex {
+  where
+  Index : MyRandomAccessIndex,
+  Index.Distance == IndexDistance {
 
   @warn_unused_result
   public func previous(i: Index) -> Index {
@@ -515,12 +520,12 @@ extension MyBidirectionalCollectionType
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance) -> Index {
+  public func advance(i: Index, by n: IndexDistance) -> Index {
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     let d = i.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
@@ -531,6 +536,7 @@ extension MyBidirectionalCollectionType
 
 public protocol MyRandomAccessCollectionType : MyBidirectionalCollectionType {
   associatedtype Index : MyRandomAccessIndex
+    // FIXME: where Index.Distance == IndexDistance
 }
 
 public struct DefaultUnownedForwardCollection<Collection : MyForwardCollectionType> {
@@ -840,10 +846,8 @@ public protocol MyMutableCollectionType : MyForwardCollectionType {
   subscript(i: Index) -> Generator.Element { get set }
 }
 
-public protocol MyIndexType : Equatable {
-  // Move to CollectionType?
-  associatedtype Distance : SignedIntegerType = Int
-}
+public protocol MyIndexType : Equatable {}
+
 public protocol MyIndexRangeType : Equatable {
   associatedtype Index : MyIndexType
   var startIndex: Index { get }
