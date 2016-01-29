@@ -1629,6 +1629,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   if (pattern->hasType()) {
     contextualType = pattern->getType();
     contextualPurpose = CTP_Initialization;
+
+    // If we already had an error, don't repeat the problem.
+    if (contextualType->is<ErrorType>())
+      return true;
   }
     
   // Type-check the initializer.
