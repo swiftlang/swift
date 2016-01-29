@@ -2400,10 +2400,37 @@ namespace {
                                          cs.getConstraintLocator(base));
         }
 
+        Type toType = simplifyType(expr->getType());
+        
+        // Don't allow lvalues when indexing into a tuple expr.
+        // If we get any lvalues, add load exprs to convert the tuple to be all rvalues.
+        if (auto *tupleExpr = dyn_cast<TupleExpr>(base)) {
+          unsigned count = tupleExpr->getNumElements();
+          unsigned lvalues = 0;
+          auto &tc = cs.getTypeChecker();
+          SmallVector<TupleTypeElt, 4> tupleElts;
+          for (unsigned i = 0; i < count; i++) {
+            Expr *elementExpr = tupleExpr->getElement(i);
+            Type elementType = elementExpr->getType();
+            if (elementType->isLValueType()) {
+              lvalues++;
+              elementExpr->propagateLValueAccessKind(AccessKind::Read, true);
+              elementExpr = new (tc.Context) LoadExpr(elementExpr, elementType->getRValueType());
+              tupleExpr->setElement(i, elementExpr);
+            }
+            tupleElts.push_back(elementExpr->getType());
+          }
+          
+          if (lvalues > 0) {
+            auto &Context = tupleExpr->getType()->getASTContext();
+            tupleExpr->setType(TupleType::get(tupleElts, Context));
+            toType = toType->getRValueType();
+          }
+        }
+
         return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
                                           selected.choice.getTupleIndex(),
-                                          nameLoc.getBaseNameLoc(),
-                                          simplifyType(expr->getType()));
+                                          nameLoc.getBaseNameLoc(), toType);
       }
 
       case OverloadChoiceKind::BaseType: {
