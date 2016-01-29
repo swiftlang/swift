@@ -1803,6 +1803,8 @@ static bool isSelf(Type type) {
 static bool isSelfOrOptionalSelf(Type type) {
   if (auto optType = type->getAnyOptionalObjectType())
     type = optType;
+  if (auto selfType = type->getAs<DynamicSelfType>())
+    type = selfType->getSelfType();
   return isSelf(type);
 }
 
@@ -1862,21 +1864,8 @@ static bool isNonContravariantSelfParamType(Type type) {
   return containsSelf(type);
 }
 
-namespace {
-  /// Describes how we should check for Self in the result type of a function.
-  enum class SelfInResultType {
-    /// Check for the Self type normally.
-    Check,
-    /// Ignore Self in the result type.
-    Ignore,
-    /// The result type is known to be a dynamic Self.
-    DynamicSelf,
-  };
-
-}
 /// Find references to Self within the given function type.
-static SelfReferenceKind findSelfReferences(const AnyFunctionType *fnType,
-                                            SelfInResultType inResultType) {
+static SelfReferenceKind findSelfReferences(const AnyFunctionType *fnType) {
   // Check whether the input type contains Self in any position where it would
   // make an override not have contravariant parameter types.
   if (isNonContravariantSelfParamType(fnType->getInput()))
@@ -1884,19 +1873,10 @@ static SelfReferenceKind findSelfReferences(const AnyFunctionType *fnType,
 
   // Consider the result type.
   auto type = fnType->getResult();
-  switch (inResultType) {
-  case SelfInResultType::DynamicSelf:
-    return SelfReferenceKind::Result;
-
-  case SelfInResultType::Check:
-    return isSelfOrOptionalSelf(type)
-             ? SelfReferenceKind::Result
-             : containsSelf(type) ? SelfReferenceKind::Yes
-                                  : SelfReferenceKind::No;
-
-  case SelfInResultType::Ignore:
-    return SelfReferenceKind::No;
-  }
+  return isSelfOrOptionalSelf(type)
+           ? SelfReferenceKind::Result
+           : containsSelf(type) ? SelfReferenceKind::Yes
+                                : SelfReferenceKind::No;
 }
 
 /// Find the bare Self references within the given requirement.
@@ -1910,35 +1890,16 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
   if (auto afd = dyn_cast<AbstractFunctionDecl>(value)) {
     auto type = afd->getInterfaceType();
 
-    // Skip the 'self' type.
+    // Skip the 'self' parameter.
     type = type->castTo<AnyFunctionType>()->getResult();
-
-    // Check first input types. Any further input types are treated as part of
-    // the result type.
-    auto fnType = type->castTo<AnyFunctionType>();
-    return findSelfReferences(fnType,
-                              isa<ConstructorDecl>(afd)
-                                ? SelfInResultType::Ignore
-                                : (isa<FuncDecl>(afd) &&
-                                   cast<FuncDecl>(afd)->hasDynamicSelf())
-                                  ? SelfInResultType::DynamicSelf
-                                  : SelfInResultType::Check);
+    return findSelfReferences(type->castTo<AnyFunctionType>());
   }
 
   auto type = value->getInterfaceType();
 
   if (isa<SubscriptDecl>(value)) {
     auto fnType = type->castTo<AnyFunctionType>();
-    return findSelfReferences(fnType, SelfInResultType::Check);
-  }
-
-  if (isa<VarDecl>(value)) {
-    type = type->getRValueType();
-    return isSelfOrOptionalSelf(type)
-             ? SelfReferenceKind::Result
-             : containsSelf(type) ? SelfReferenceKind::Yes
-                                  : SelfReferenceKind::No;
-
+    return findSelfReferences(fnType);
   }
 
   return containsSelf(type) ? SelfReferenceKind::Yes
@@ -2288,6 +2249,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                             requirement->getFullName(), conformance->getType(),
                             proto->getDeclaredType());
               });
+            break;
+          }
+
+          if (isa<ConstructorDecl>(best.Witness)) {
+            // Constructors conceptually also have a dynamic Self
+            // return type, so they're okay.
             break;
           }
 
