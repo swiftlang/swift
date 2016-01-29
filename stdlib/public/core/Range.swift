@@ -154,15 +154,16 @@ extension Range : CustomReflectable {
 }
 
 /// O(1) implementation of `contains()` for ranges of comparable elements.
-extension Range where Element: Comparable {
+extension Range where Element : Comparable {
   @warn_unused_result
-  func _customContainsEquatableElement(element: Generator.Element) -> Bool? {
+  public func _customContainsEquatableElement(element: Element) -> Bool? {
     return element >= self.startIndex && element < self.endIndex
   }
-    
-  // FIXME: copied from SequenceAlgorithms as a workaround for https://bugs.swift.org/browse/SR-435
+
+  // FIXME: copied from SequenceAlgorithms as a workaround for
+  // https://bugs.swift.org/browse/SR-435
   @warn_unused_result
-  public func contains(element: Generator.Element) -> Bool {
+  public func contains(element: Element) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
     }
