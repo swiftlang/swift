@@ -53,6 +53,7 @@ STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
 
 using namespace swift;
+using namespace importer;
 
 namespace swift {
 namespace inferred_attributes {
@@ -1171,8 +1172,6 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
 }
 
 namespace {
-  typedef ClangImporter::Implementation::EnumKind EnumKind;
-
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
@@ -1898,7 +1897,7 @@ namespace {
       
       // Create the enum declaration and record it.
       NominalTypeDecl *result;
-      auto enumKind = Impl.classifyEnum(Impl.getClangPreprocessor(), decl);
+      auto enumKind = Impl.getEnumKind(decl);
       switch (enumKind) {
       case EnumKind::Constants: {
         // There is no declaration. Rather, the type is mapped to the
@@ -2339,7 +2338,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      switch (Impl.classifyEnum(Impl.getClangPreprocessor(), clangEnum)) {
+      switch (Impl.getEnumKind(clangEnum)) {
       case EnumKind::Constants: {
         // The enumeration was simply mapped to an integral type. Create a
         // constant with that integral type.
@@ -4925,37 +4924,6 @@ namespace {
       return nullptr;
     }
   };
-}
-
-/// \brief Classify the given Clang enumeration to describe how to import it.
-EnumKind ClangImporter::Implementation::
-classifyEnum(clang::Preprocessor &pp, const clang::EnumDecl *decl) {
-  // Anonymous enumerations simply get mapped to constants of the
-  // underlying type of the enum, because there is no way to conjure up a
-  // name for the Swift type.
-  if (!decl->hasNameForLinkage())
-    return EnumKind::Constants;
-
-  // Was the enum declared using *_ENUM or *_OPTIONS?
-  // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
-  auto loc = decl->getLocStart();
-  if (loc.isMacroID()) {
-    StringRef MacroName = pp.getImmediateMacroName(loc);
-    if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||
-        MacroName == "OBJC_ENUM" ||
-        MacroName == "SWIFT_ENUM" || MacroName == "SWIFT_ENUM_NAMED")
-      return EnumKind::Enum;
-    if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS"
-        || MacroName == "SWIFT_OPTIONS")
-      return EnumKind::Options;
-  }
-
-  // Hardcode a particular annoying case in the OS X headers.
-  if (decl->getName() == "DYLD_BOOL")
-    return EnumKind::Enum;
-
-  // Fall back to the 'Unknown' path.
-  return EnumKind::Unknown;
 }
 
 Decl *ClangImporter::Implementation::importDeclCached(

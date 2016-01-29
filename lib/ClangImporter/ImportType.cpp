@@ -39,6 +39,7 @@
 #include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
+using namespace importer;
 
 /// Given that a type is the result of a special typedef import, was
 /// it originally a CF pointer?
@@ -658,8 +659,8 @@ namespace {
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
       auto clangDecl = type->getDecl();
-      switch (Impl.classifyEnum(Impl.getClangPreprocessor(), clangDecl)) {
-      case ClangImporter::Implementation::EnumKind::Constants: {
+      switch (Impl.getEnumKind(clangDecl)) {
+      case EnumKind::Constants: {
         auto clangDef = clangDecl->getDefinition();
         // Map anonymous enums with no fixed underlying type to Int /if/
         // they fit in an Int32. If not, this mapping isn't guaranteed to be
@@ -672,9 +673,9 @@ namespace {
         // Import the underlying integer type.
         return Visit(clangDecl->getIntegerType());
       }
-      case ClangImporter::Implementation::EnumKind::Enum:
-      case ClangImporter::Implementation::EnumKind::Unknown:
-      case ClangImporter::Implementation::EnumKind::Options: {
+      case EnumKind::Enum:
+      case EnumKind::Unknown:
+      case EnumKind::Options: {
         auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(clangDecl));
         if (!decl)
           return nullptr;
@@ -1875,7 +1876,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
-    if (classifyEnum(pp, enumTy->getDecl()) == EnumKind::Options) {
+    if (getEnumKind(enumTy->getDecl(), &pp) == EnumKind::Options) {
       auto enumName = enumTy->getDecl()->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))

@@ -17,6 +17,7 @@
 #ifndef SWIFT_CLANG_IMPORTER_IMPL_H
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
+#include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/ASTContext.h"
@@ -253,25 +254,6 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   friend class SwiftNameLookupExtension;
 
 public:
-  /// \brief Describes how a particular C enumeration type will be imported
-  /// into Swift. All of the possibilities have the same storage
-  /// representation, but can be used in different ways.
-  enum class EnumKind {
-    /// \brief The enumeration type should map to an enum, which means that
-    /// all of the cases are independent.
-    Enum,
-    /// \brief The enumeration type should map to an option set, which means that
-    /// the constants represent combinations of independent flags.
-    Options,
-    /// \brief The enumeration type should map to a distinct type, but we don't
-    /// know the intended semantics of the enum constants, so conservatively
-    /// map them to independent constants.
-    Unknown,
-    /// \brief The enumeration constants should simply map to the appropriate
-    /// integer values.
-    Constants
-  };
-
   Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
   ~Implementation();
 
@@ -497,7 +479,7 @@ public:
                           : decl->getTypedefNameForAnonDecl()->getName();
 
     if (moduleName.empty()) return enumName;
-
+    
     scratch.append(moduleName.begin(), moduleName.end());
     scratch.push_back('.');
     scratch.append(enumName.begin(), enumName.end());
@@ -509,7 +491,7 @@ public:
     // Due to the semaOverride present in importFullName(), we might be using a
     // decl from a different context.
     auto &preprocessor = ppOverride ? *ppOverride : getClangPreprocessor();
-
+ 
     // If there is no name for linkage, the computation is trivial and we
     // wouldn't be able to perfom name-based caching anyway.
     if (!decl->hasNameForLinkage())
@@ -520,11 +502,12 @@ public:
     auto known = enumInfos.find(key);
     if (known != enumInfos.end())
       return known->second;
-
+    
     importer::EnumInfo enumInfo(decl, preprocessor);
     enumInfos[key] = enumInfo;
     return enumInfo;
   }
+
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl,
                                  clang::Preprocessor *ppOverride = nullptr) {
     return getEnumInfo(decl, ppOverride).getKind();
@@ -537,7 +520,6 @@ public:
                             clang::Preprocessor *ppOverride = nullptr) {
     return getEnumInfo(decl, ppOverride).getConstantNamePrefix();
   }
->>>>>>> 8aaf014... [Clang importer] Cache enum information based on modulename.enumname.
 
 private:
   class EnumConstantDenseMapInfo {
@@ -558,11 +540,6 @@ private:
       return lhs == rhs;
     }
   };
-
-  /// Retrieve the prefix to be stripped from the names of the enum constants
-  /// within the given enum.
-  StringRef getEnumConstantNamePrefix(clang::Sema &sema,
-                                      const clang::EnumDecl *enumDecl);
 
 public:
   /// \brief Keep track of enum constant values that have been imported.
@@ -936,11 +913,6 @@ public:
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
-
-  /// \brief Classify the given Clang enumeration type to describe how it
-  /// should be imported 
-  static EnumKind classifyEnum(clang::Preprocessor &pp,
-                               const clang::EnumDecl *decl);
 
   /// Determine whether we should attempt to add the swift3_migration
   /// attribute.
