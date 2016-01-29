@@ -323,6 +323,10 @@ public:
   /// signatures of Objective-C methods and C functions.
   CodeGenABITypes *ABITypes;
 
+  /// A global variable which stores the hash of the module. Used for
+  /// incremental compilation.
+  llvm::GlobalVariable *ModuleHash;
+
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 

@@ -38,6 +38,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MD5.h"
 
 #include "GenEnum.h"
 #include "GenType.h"
@@ -127,7 +128,8 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Triple(Triple), TargetMachine(TargetMachine),
     SILMod(SILMod), OutputFilename(OutputFilename), dispatcher(dispatcher),
     TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+    DebugInfo(0), ModuleHash(nullptr),
+    ObjCInterop(Context.LangOpts.EnableObjCInterop),
     Types(*new TypeConverter(*this))
 {
   dispatcher.addGenModule(SF, this);
@@ -797,6 +799,34 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 }
 
 void IRGenModule::finalize() {
+  const char *ModuleHashVarName = "llvm.swift_module_hash";
+  if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
+      !Module.getGlobalVariable(ModuleHashVarName)) {
+    // Create a global variable into which we will store the hash of the
+    // module (used for incremental compilation).
+    // We have to create the variable now (before we emit the global lists).
+    // But we want to calculate the hash later because later we can do it
+    // multi-threaded.
+    llvm::MD5::MD5Result zero = { 0 };
+    ArrayRef<uint8_t> ZeroArr(zero, sizeof(llvm::MD5::MD5Result));
+    auto *ZeroConst = llvm::ConstantDataArray::get(Module.getContext(), ZeroArr);
+    ModuleHash = new llvm::GlobalVariable(Module, ZeroConst->getType(), true,
+                                          llvm::GlobalValue::PrivateLinkage,
+                                          ZeroConst, ModuleHashVarName);
+    switch (TargetInfo.OutputObjectFormat) {
+    case llvm::Triple::MachO:
+      // On Darwin the linker ignores the __LLVM segment.
+      ModuleHash->setSection("__LLVM,__swift_modhash");
+      break;
+    case llvm::Triple::ELF:
+      ModuleHash->setSection(".swift_modhash");
+      break;
+    default:
+      llvm_unreachable("Don't know how to emit the module hash for the selected"
+                       "object format.");
+    }
+    addUsedGlobal(ModuleHash);
+  }
   emitLazyPrivateDefinitions();
   emitAutolinkInfo();
   emitGlobalLists();
