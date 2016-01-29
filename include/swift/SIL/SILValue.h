@@ -626,7 +626,4 @@ namespace llvm {
 
 }  // end namespace llvm
 
-// FIXME: SILTypeList is going away, but for now just note it's 4-byte-aligned.
-LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILTypeList, 2);
-
 #endif
