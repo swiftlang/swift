@@ -70,6 +70,18 @@ XFailsAndSkips.test("fails") {
   expectEqual(1, 2)
 }
 
+// CHECK: [    XFAIL ] XFailsAndSkips.fails-always{{$}}
+XFailsAndSkips.test("fails-always")
+  .xfail(.Always("must always fail")).code {
+  expectEqual(1, 2)
+}
+
+// CHECK: [      OK ] XFailsAndSkips.fails-never{{$}}
+XFailsAndSkips.test("fails-never")
+  .xfail(.Never).code {
+  expectEqual(1, 1)
+}
+
 // CHECK: [    XFAIL ] XFailsAndSkips.xfail 10.9.3 passes{{$}}
 XFailsAndSkips.test("xfail 10.9.3 passes")
   .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
@@ -80,6 +92,18 @@ XFailsAndSkips.test("xfail 10.9.3 passes")
 XFailsAndSkips.test("xfail 10.9.3 fails")
   .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
   expectEqual(1, 2)
+}
+
+// CHECK: [     SKIP ] XFailsAndSkips.skipAlways (skip: [Always(reason: skip)]){{$}}
+XFailsAndSkips.test("skipAlways")
+  .skip(.Always("skip")).code {
+    fatalError("should not happen")
+}
+
+// CHECK: [       OK ] XFailsAndSkips.skipNever{{$}}
+XFailsAndSkips.test("skipNever")
+  .skip(.Never).code {
+    expectEqual(1, 1)
 }
 
 // CHECK: [     FAIL ] XFailsAndSkips.skip 10.9.2 passes{{$}}
