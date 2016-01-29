@@ -16,6 +16,8 @@ struct D : DrawingElementType {
   var boundingBox: Int32 = 42
 }
 
+// CHECK: sil @main
+
 // Check that boundingBox is devirtualized and inlined.
 // CHECK: sil @{{.*}}test1111
 // bb0:
@@ -25,7 +27,7 @@ struct D : DrawingElementType {
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
 // CHECK-NOT: bb1:
-// return
+// CHECK: return
 public func test1111() -> Int32 {
   return (D() as DrawingElementType).boundingBox
 }

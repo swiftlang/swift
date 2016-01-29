@@ -6,7 +6,6 @@ import c_layout
 func blackHole<T>(t: T) { }
 
 // CHECK: @staticFloat = internal global float 1.700000e+01, align 4
-// CHECK: define internal void @doubleTrouble() [[CLANG_FUNC_ATTR:#[0-9]+]] {
 
 public func testStaticGlobal() {
   blackHole(c_layout.staticFloat)
@@ -30,6 +29,8 @@ public func testCaptureGlobal() {
     s = c_layout.staticString
   }) // CHECK: {{^}$}}
 }
+
+// CHECK: define internal void @doubleTrouble() [[CLANG_FUNC_ATTR:#[0-9]+]] {
 
 // CHECK: attributes [[SWIFT_FUNC_ATTR]] = { "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
 // CHECK: attributes [[CLANG_FUNC_ATTR]] = { inlinehint nounwind {{(ssp )?}}{{(uwtable )?}}"no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"

@@ -200,6 +200,13 @@ public func resilientEnumPartialApply(f: Medium -> Int) {
 // CHECK:     ret void
 }
 
+// Make sure we call a function to access metadata of enums with
+// resilient layout.
+
+// CHECK-LABEL: define %swift.type* @_TF15enum_resilience20getResilientEnumTypeFT_PMP_()
+// CHECK:      [[METADATA:%.*]] = call %swift.type* @_TMaO15enum_resilience24EnumWithResilientPayload()
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
+
 // CHECK-LABEL: define internal void @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_(%Si* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted*)
 
 
@@ -210,13 +217,6 @@ public enum EnumWithResilientPayload {
   case OneSize(Size)
   case TwoSizes(Size, Size)
 }
-
-// Make sure we call a function to access metadata of enums with
-// resilient layout.
-
-// CHECK-LABEL: define %swift.type* @_TF15enum_resilience20getResilientEnumTypeFT_PMP_()
-// CHECK:      [[METADATA:%.*]] = call %swift.type* @_TMaO15enum_resilience24EnumWithResilientPayload()
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 public func getResilientEnumType() -> Any.Type {
   return EnumWithResilientPayload.self

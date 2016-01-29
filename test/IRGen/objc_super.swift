@@ -7,12 +7,12 @@
 
 import gizmo
 
-// CHECK: [[CLASS:%objc_class]] = type
 // CHECK: [[TYPE:%swift.type]] = type
+// CHECK: [[CLASS:%objc_class]] = type
 // CHECK: [[HOOZIT:%C10objc_super6Hoozit]] = type
 // CHECK: [[NSRECT:%VSC6NSRect]] = type
-// CHECK: [[SUPER:%objc_super]] = type
 // CHECK: [[OBJC:%objc_object]] = type
+// CHECK: [[SUPER:%objc_super]] = type
 // CHECK: [[GIZMO:%CSo5Gizmo]] = type
 
 class Hoozit : Gizmo {

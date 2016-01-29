@@ -1,14 +1,14 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  | FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
+// CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OBJC_CLASS:%objc_class]] = type {
 // CHECK: [[OPAQUE:%swift.opaque]] = type
 // CHECK: [[A:%C8subclass1A]] = type <{ [[REF:%swift.refcounted]], %Si, %Si }>
 // CHECK: [[REF]] = type {
-// CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[B:%C8subclass1B]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 
 // CHECK: @_DATA__TtC8subclass1A = private constant {{.*\* } }}{

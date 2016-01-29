@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -parse-as-library -enable-resilience %s | FileCheck %s
 // RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
 import resilient_struct
@@ -140,10 +140,12 @@ public struct StructWithIndirectResilientEnum {
 // CHECK-NEXT: ret [[INT]] [[FIELD_PAYLOAD]]
 
 
-// Public metadata accessor for our resilient struct
-
 // CHECK-LABEL: define %swift.type* @_TMaV17struct_resilience6MySize()
 // CHECK: ret %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @_TMfV17struct_resilience6MySize, i32 0, i32 1) to %swift.type*)
+
+
+
+// Public metadata accessor for our resilient struct
 
 
 // FIXME: this should modify the template in-place instead of copying it
@@ -182,3 +184,6 @@ public struct StructWithIndirectResilientEnum {
 
 // CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* [[FIELD_OFFSETS_ADDR]], i8** [[VWT]])
 // CHECK: ret %swift.type* [[RESULT]]
+
+
+

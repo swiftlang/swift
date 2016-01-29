@@ -11,20 +11,26 @@
 //===----------------------------------------------------------------------===//
 
 public enum Process {
-  /// The list of command-line arguments with which the current
-  /// process was invoked.
-  public static let arguments: [String] = {
-    // Use lazy initialization of static properties to safely initialize the
-    // public 'arguments' property on first use.
-    (0..<Int(argc)).map { i in
-      String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? ""
+  /// Initialize the swift argument with the list of command-line arguments
+  /// with which the current process was invoked.
+  public static func initArguments() {
+    for i in 0..<Int(argc) {
+      _arguments.append(
+          String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? "")
     }
-  }()
+  }
 
   internal static var _argc: CInt = CInt()
   internal static var _unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
     = nil
+
+  internal static var _arguments : [String] = [String]() 
+
+  /// Access to the swift arguments.
+  public static var arguments : [String] {
+    return _arguments;
+  } 
 
   /// Access to the raw argc value from C.
   public static var argc: CInt {
@@ -49,5 +55,8 @@ func _didEnterMain(
   // values that were passed in to main.
   Process._argc = CInt(argc)
   Process._unsafeArgv = UnsafeMutablePointer(argv)
+
+  // Initialize the swift arguments.
+  Process.initArguments();
 }
 

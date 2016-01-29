@@ -5,10 +5,10 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
+// CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[HOOZIT:%C17objc_class_export6Hoozit]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[REF]] = type
 // CHECK: [[FOO:%C17objc_class_export3Foo]] = type <{ [[REF]], %Si }>
-// CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[NSRECT:%VSC6NSRect]] = type <{ %VSC7NSPoint, %VSC6NSSize }>
 // CHECK: [[NSPOINT:%VSC7NSPoint]] = type <{ %Sd, %Sd }>
 // CHECK: [[DOUBLE:%Sd]] = type <{ double }>

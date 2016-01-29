@@ -21,12 +21,23 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
   return { i in i + seq.ord() }
 }
 
+// -- Closure entry point
+// CHECK: define linkonce_odr hidden i64 @[[CLOSURE2:_TFF7closure1buRxS_9OrdinablerFT3seqx_FSiSiU_FSiSi]](i64, %swift.refcounted*, %swift.type* %T, i8** %T.Ordinable) {{.*}} {
+
+// -- <rdar://problem/14443343> Boxing of tuples with generic elements
+// CHECK: define hidden { i8*, %swift.refcounted* } @_TF7closure14captures_tupleu0_rFT1xTxq___FT_Txq__(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U)
+func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
+  // CHECK-NOT: @swift_getTupleTypeMetadata2
+  // CHECK: [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
+  // CHECK: [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1
+  // CHECK: bitcast %swift.opaque* [[ADDR]] to <{}>*
+  return {x}
+}
+
 // -- partial_apply stub
 // CHECK: define internal i64 @_TPA_[[CLOSURE1]](i64, %swift.refcounted*) {{.*}} {
 // CHECK: }
-
-// -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @[[CLOSURE2:_TFF7closure1buRxS_9OrdinablerFT3seqx_FSiSiU_FSiSi]](i64, %swift.refcounted*, %swift.type* %T, i8** %T.Ordinable) {{.*}} {
 
 // -- partial_apply stub
 // CHECK: define internal i64 @_TPA_[[CLOSURE2]](i64, %swift.refcounted*) {{.*}} {
@@ -46,13 +57,4 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // CHECK:   ret i64 [[RES]]
 // CHECK: }
 
-// -- <rdar://problem/14443343> Boxing of tuples with generic elements
-// CHECK: define hidden { i8*, %swift.refcounted* } @_TF7closure14captures_tupleu0_rFT1xTxq___FT_Txq__(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U)
-func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
-  // CHECK-NOT: @swift_getTupleTypeMetadata2
-  // CHECK: [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
-  // CHECK: [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1
-  // CHECK: bitcast %swift.opaque* [[ADDR]] to <{}>*
-  return {x}
-}
+
