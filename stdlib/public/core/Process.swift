@@ -13,7 +13,7 @@
 public enum Process {
   /// Initialize the swift argument with the list of command-line arguments
   /// with which the current process was invoked.
-  public static func initArguments() {
+  internal static func _initArguments() {
     for i in 0..<Int(argc) {
       _arguments.append(
           String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? "")
@@ -25,11 +25,12 @@ public enum Process {
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
     = nil
 
-  internal static var _arguments : [String] = [String]() 
+  internal static var _arguments: [String] = [] 
 
-  /// Access to the swift arguments.
-  public static var arguments : [String] {
-    return _arguments;
+  /// The list of command-line arguments with which the current
+  /// process was invoked.
+  public static var arguments: [String] {
+    return _arguments
   } 
 
   /// Access to the raw argc value from C.
@@ -55,8 +56,8 @@ func _didEnterMain(
   // values that were passed in to main.
   Process._argc = CInt(argc)
   Process._unsafeArgv = UnsafeMutablePointer(argv)
-
-  // Initialize the swift arguments.
-  Process.initArguments();
+  // Arguments can only be initialized after _argc and _unsafeArgv are
+  // initialized.
+  Process._initArguments();
 }
 
