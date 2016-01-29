@@ -84,6 +84,10 @@ public func testTopLevel() {
 #endif
 }
 
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaCSo12__PrivFooSub{{.*}} {
+// CHECK: %objc_class* @"OBJC_CLASS_$_PrivFooSub"
+// CHECK: }
+
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT2__Vs5Int32_GSQS__
 // CHECK: @"\01L_selector(init:)"
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT9__twoArgsVs5Int325otherS0__GSQS__
@@ -92,13 +96,6 @@ public func testTopLevel() {
 // CHECK: @"\01L_selector(initWithOneArg:)"
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT8__noArgsT__GSQS__
 // CHECK: @"\01L_selector(initWithNoArgs)"
-
-
-
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaCSo12__PrivFooSub{{.*}} {
-// CHECK: %objc_class* @"OBJC_CLASS_$_PrivFooSub"
-// CHECK: }
-
 
 _ = __PrivAnonymousA
 _ = __E0PrivA

@@ -21,16 +21,24 @@ class CallStaticInline {
   func ReturnZero() -> Int64 { return Int64(zero()) }
 }
 
+// CHECK-LABEL: define internal i32 @zero()
+// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
+
 // CHECK-LABEL: define hidden i64 @_TFC12clang_inline17CallStaticInline210ReturnZerofT_Vs5Int64(%C12clang_inline17CallStaticInline2*) {{.*}} {
 class CallStaticInline2 {
   func ReturnZero() -> Int64 { return Int64(wrappedZero()) }
 }
 
+// CHECK-LABEL: define internal i32 @wrappedZero()
+// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
 // CHECK-LABEL: define hidden i32 @_TF12clang_inline10testExternFT_Vs5Int32() {{.*}} {
 func testExtern() -> CInt {
   return wrappedGetInt()
 }
+
+// CHECK-LABEL: define internal i32 @wrappedGetInt()
+// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
 // CHECK-LABEL: define hidden i32 @_TF12clang_inline16testAlwaysInlineFT_Vs5Int32()
 // CHECK:       [[SSP:#[0-9]+]] {
@@ -45,28 +53,19 @@ func testInlineRedeclared() -> CInt {
   return zeroRedeclared()
 }
 
+// CHECK-LABEL: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
+
 // CHECK-LABEL: define hidden i32 @_TF12clang_inline27testInlineRedeclaredWrappedFT_Vs5Int32() {{.*}} {
 func testInlineRedeclaredWrapped() -> CInt {
   return wrappedZeroRedeclared()
 }
 
+// CHECK-LABEL: define internal i32 @wrappedZeroRedeclared() #{{[0-9]+}} {
+
 // CHECK-LABEL: define hidden i32 @_TF12clang_inline22testStaticButNotInlineFT_Vs5Int32() {{.*}} {
 func testStaticButNotInline() -> CInt {
   return staticButNotInline()
 }
-
-// CHECK-LABEL: define internal i32 @zero()
-// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
-
-// CHECK-LABEL: define internal i32 @wrappedZero()
-// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
-
-// CHECK-LABEL: define internal i32 @wrappedGetInt()
-// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
-
-// CHECK-LABEL: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
-
-// CHECK-LABEL: define internal i32 @wrappedZeroRedeclared() #{{[0-9]+}} {
 
 // CHECK-LABEL: define internal i32 @staticButNotInline() #{{[0-9]+}} {
 
@@ -75,7 +74,7 @@ func testStaticButNotInline() -> CInt {
 // CHECK-LABEL: declare i32 @getInt()
 // CHECK:         [[GET_INT_ATTR:#[0-9]+]]
 
-// CHECK: attributes [[SSP]] = { ssp {{.*}} }
 // CHECK: attributes [[INLINEHINT_SSP_UWTABLE]] = { inlinehint ssp {{.*}}}
+// CHECK: attributes [[SSP]] = { ssp {{.*}} }
 // CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 
 // CHECK: attributes [[GET_INT_ATTR]] = {

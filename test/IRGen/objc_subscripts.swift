@@ -3,7 +3,6 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
-// CHECK: @[[const1:[0-9]+]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
 // CHECK:   private constant { i32, i32, [5 x { i8*, i8*, i8* }] } 
 // CHECK:   { i32 24, i32 5, [5 x { i8*, i8*, i8* }] 
@@ -33,7 +32,7 @@
 // CHECK:           i8* bitcast (void ([[OPAQUE6:%.*]]*, i8*, i64, [[OPAQUE7:%.*]]*)* @_TToFC15objc_subscripts10SomeObjects9subscriptFS0_Si to i8*)
 // CHECK:         },
 // CHECK:       { i8*, i8*, i8* } 
-// CHECK:         { i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @[[const1]], i64 0, i64 0), i8* bitcast ([[OPAQUE8:%.*]]* ([[OPAQUE9:%.*]]*, i8*)* @_TToFC15objc_subscripts10SomeObjectcfT_S0_ to i8*) }
+// CHECK:         { i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @0, i64 0, i64 0), i8* bitcast ([[OPAQUE8:%.*]]* ([[OPAQUE9:%.*]]*, i8*)* @_TToFC15objc_subscripts10SomeObjectcfT_S0_ to i8*) }
 // CHECK:    ]
 // CHECK:  }, section "__DATA, __objc_const", align 8
 

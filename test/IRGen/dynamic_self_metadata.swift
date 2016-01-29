@@ -6,7 +6,6 @@
 // <rdar://problem/16931299>
 
 // CHECK: [[TYPE:%.+]] = type <{ [8 x i8] }>
-// CHECK: [[TYPE:%.+]] = type <{ [8 x i8] }>
 
 @inline(never) func id<T>(t: T) -> T {
   return t

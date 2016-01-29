@@ -110,6 +110,24 @@ public class MyResilientChild : MyResilientParent {
   public let field: Int32 = 0
 }
 
+
+// ClassWithResilientProperty metadata accessor
+
+// CHECK-LABEL: define %swift.type* @_TMaC16class_resilience26ClassWithResilientProperty()
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK:    cacheIsNull:
+// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
+// CHECK-NEXT: store %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty
+// CHECK-NEXT: br label %cont
+
+// CHECK:    cont:
+// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: ret %swift.type* [[RESULT]]
+
+
 // ClassWithResilientProperty.color getter
 
 // CHECK-LABEL: define i32 @_TFC16class_resilience26ClassWithResilientPropertyg5colorVs5Int32(%C16class_resilience26ClassWithResilientProperty*)
@@ -120,6 +138,24 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
+
+
+// ClassWithResilientlySizedProperty metadata accessor
+
+// CHECK-LABEL: define %swift.type* @_TMaC16class_resilience33ClassWithResilientlySizedProperty()
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK:    cacheIsNull:
+// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
+// CHECK-NEXT: store %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty
+// CHECK-NEXT: br label %cont
+
+// CHECK:    cont:
+// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: ret %swift.type* [[RESULT]]
+
 
 // ClassWithResilientlySizedProperty.color getter
 
@@ -132,6 +168,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
 
+
 // ClassWithIndirectResilientEnum.color getter
 
 // CHECK-LABEL: define i32 @_TFC16class_resilience30ClassWithIndirectResilientEnumg5colorVs5Int32(%C16class_resilience30ClassWithIndirectResilientEnum*)
@@ -139,6 +176,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
+
 
 // ResilientChild.field getter
 
@@ -150,6 +188,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
+
 
 // ResilientGenericChild.field getter
 
@@ -175,6 +214,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, i32* [[PAYLOAD_ADDR]]
 // CHECK-NEXT: ret i32 [[RESULT]]
 
+
 // MyResilientChild.field getter
 
 // CHECK-LABEL: define i32 @_TFC16class_resilience16MyResilientChildg5fieldVs5Int32(%C16class_resilience16MyResilientChild*)
@@ -183,37 +223,6 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, i32* [[PAYLOAD_ADDR]]
 // CHECK-NEXT: ret i32 [[RESULT]]
 
-// ClassWithResilientProperty metadata accessor
-
-// CHECK-LABEL: define %swift.type* @_TMaC16class_resilience26ClassWithResilientProperty()
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
-// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
-
-// CHECK:    cacheIsNull:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
-// CHECK-NEXT: store %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience26ClassWithResilientProperty
-// CHECK-NEXT: br label %cont
-
-// CHECK:    cont:
-// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT: ret %swift.type* [[RESULT]]
-
-// ClassWithResilientlySizedProperty metadata accessor
-
-// CHECK-LABEL: define %swift.type* @_TMaC16class_resilience33ClassWithResilientlySizedProperty()
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
-// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
-
-// CHECK:    cacheIsNull:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_getResilientMetadata(
-// CHECK-NEXT: store %swift.type* [[METADATA]], %swift.type** @_TMLC16class_resilience33ClassWithResilientlySizedProperty
-// CHECK-NEXT: br label %cont
-
-// CHECK:    cont:
-// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT: ret %swift.type* [[RESULT]]
 
 // ClassWithResilientProperty metadata instantiation function
 
@@ -231,6 +240,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @_TWvdvC16class_resilience26ClassWithResilientProperty5colorVs5Int32
 // CHECK:             ret %swift.type* [[METADATA]]
+
 
 // ClassWithResilientlySizedProperty metadata instantiation function
 

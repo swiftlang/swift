@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend %s -emit-ir  | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
 import Swift
 
-// CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[A:%C13generic_types1A]] = type <{ [[REF:%swift.refcounted]], [[INT:%Si]] }>
+// CHECK: [[INT]] = type <{ i64 }>
 // CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%Sp]] }>
 // CHECK: [[C:%C13generic_types1C]] = type
 // CHECK: [[D:%C13generic_types1D]] = type

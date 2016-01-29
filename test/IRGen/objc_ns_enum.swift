@@ -54,6 +54,39 @@ func imported_enum_inject_radixed_b() -> NSRadixedOptions {
   return .Hex
 }
 
+// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_aFT_OSC17NSNegativeOptions() {{.*}} {
+// CHECK:   ret i32 -1
+func imported_enum_inject_negative_a() -> NSNegativeOptions {
+  return .Foo
+}
+
+// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_bFT_OSC17NSNegativeOptions() {{.*}} {
+// CHECK:   ret i32 -2147483648
+func imported_enum_inject_negative_b() -> NSNegativeOptions {
+  return .Bar
+}
+
+// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_aFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
+// CHECK:   ret i32 -1
+func imported_enum_inject_negative_unsigned_a() -> NSNegativeUnsignedOptions {
+  return .Foo
+}
+
+// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_bFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
+// CHECK:   ret i32 -2147483648
+func imported_enum_inject_negative_unsigned_b() -> NSNegativeUnsignedOptions {
+  return .Bar
+}
+
+func test_enum_without_name_Equatable(obj: TestThatEnumType) -> Bool {
+  return obj.getValue() != .ValueOfThatEnumType
+}
+
+func use_metadata<T>(t:T){}
+use_metadata(NSRuncingOptions.Mince)
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaOSC16NSRuncingOptions()
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 @objc enum ExportedToObjC: Int {
   case Foo = -1, Bar, Bas
@@ -105,41 +138,6 @@ func objc_enum_method_calls(x: ObjCEnumMethods) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJC_ENUM_METHODS]]*, i8*, i64)*)
   x.prop = x.enumOut()
 }
-
-// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_aFT_OSC17NSNegativeOptions() {{.*}} {
-// CHECK:   ret i32 -1
-func imported_enum_inject_negative_a() -> NSNegativeOptions {
-  return .Foo
-}
-
-// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_bFT_OSC17NSNegativeOptions() {{.*}} {
-// CHECK:   ret i32 -2147483648
-func imported_enum_inject_negative_b() -> NSNegativeOptions {
-  return .Bar
-}
-
-// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_aFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
-// CHECK:   ret i32 -1
-func imported_enum_inject_negative_unsigned_a() -> NSNegativeUnsignedOptions {
-  return .Foo
-}
-
-// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_bFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
-// CHECK:   ret i32 -2147483648
-func imported_enum_inject_negative_unsigned_b() -> NSNegativeUnsignedOptions {
-  return .Bar
-}
-
-func test_enum_without_name_Equatable(obj: TestThatEnumType) -> Bool {
-  return obj.getValue() != .ValueOfThatEnumType
-}
-
-func use_metadata<T>(t:T){}
-use_metadata(NSRuncingOptions.Mince)
-
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaOSC16NSRuncingOptions()
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
-
 
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
 
