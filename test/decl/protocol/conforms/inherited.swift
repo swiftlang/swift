@@ -56,6 +56,28 @@ protocol P11 {
   func f11() -> (x: Self) -> Int
 }
 
+// Inheritable: parameter is a function returning 'Self'.
+protocol P12 {
+  func f12(s: () -> (Self, Self))
+}
+
+// Never inheritable: parameter is a function accepting 'Self'.
+protocol P13 {
+  func f13(s: Self -> ())
+}
+
+// Inheritable: parameter is a function accepting a function
+// accepting 'Self'.
+protocol P14 {
+  func f14(s: (Self -> ()) -> ())
+}
+
+// Never inheritable: parameter is a function accepting a function
+// returning 'Self'.
+protocol P15 {
+  func f15(s: (() -> Self) -> ())
+}
+
 // Class A conforms to everything that can be conformed to by a
 // non-final class.
 class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
@@ -189,3 +211,20 @@ final class A9 : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
 
 // P9
 func ==(x: A9, y: A9) -> Bool { return true }
+
+class A12 : P12 {
+  func f12(s: () -> (A12, A12)) {}
+}
+
+class A13 : P13 {
+  func f13(s: A13 -> ()) {} // expected-error{{protocol 'P13' requirement 'f13' cannot be satisfied by a non-final class ('A13') because it uses 'Self' in a non-parameter, non-result type position}}
+}
+
+class A14 : P14 {
+  func f14(s: (A14 -> ()) -> ()) {}
+}
+
+class A15 : P15 {
+  func f15(s: (() -> A15) -> ()) {} // expected-error{{protocol 'P15' requirement 'f15' cannot be satisfied by a non-final class ('A15') because it uses 'Self' in a non-parameter, non-result type position}}
+}
+

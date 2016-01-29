@@ -1779,12 +1779,13 @@ namespace {
   /// is-inheritable check.
   enum class SelfReferenceKind {
     /// The type does not refer to 'Self' at all.
-    No,
+    None,
     /// The type refers to 'Self', but only as the result type of a method.
     Result,
-    /// The type refers to 'Self' in some position that is not the result type
-    /// of a method.
-    Yes
+    /// The type refers to 'Self', but only as the parameter type of a method.
+    Parameter,
+    /// The type refers to 'Self', and none of the above conditions hold.
+    Other
   };
 }
 
@@ -1835,75 +1836,98 @@ static bool containsSelf(Type type) {
   return selfWalker.FoundSelf;
 }
 
-/// Determine whether the given parameter type involves Self in a manner that
-/// is not contravariant.
-static bool isNonContravariantSelfParamType(Type type) {
-  // 'Self' or an optional thereof will be contravariant in overrides.
+/// Classify usages of Self in the given type.
+static SelfReferenceKind
+findSelfReferences(Type type, SelfReferenceKind selfKind) {
   if (isSelfOrOptionalSelf(type))
-    return false;
+    return selfKind;
 
   // Decompose tuples.
   if (auto tuple = type->getAs<TupleType>()) {
+    auto kind = SelfReferenceKind::None;
     for (auto &elt: tuple->getElements()) {
-      if (isNonContravariantSelfParamType(elt.getType()))
-        return true;
+      auto eltKind = findSelfReferences(elt.getType(), selfKind);
+      // If all non-'No' kinds are equal, return one,
+      // otherwise we have a problematic usage.
+      if (kind == SelfReferenceKind::None)
+        kind = eltKind;
+      else if (eltKind == SelfReferenceKind::None)
+        continue;
+      else if (eltKind != kind)
+        return SelfReferenceKind::Other;
     }
 
-    return false;
+    return kind;
   } 
 
-  // Look into the input type of parameters.
+  // Decompose functions.
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
-    if (isNonContravariantSelfParamType(funcTy->getInput()))
-      return true;
+    // Flip the input type around.
+    auto inputKind = findSelfReferences(funcTy->getInput(),
+                                        (selfKind == SelfReferenceKind::Parameter
+                                         ? SelfReferenceKind::Result
+                                         : SelfReferenceKind::Parameter));
+    auto resultKind = findSelfReferences(funcTy->getResult(), selfKind);
 
-    return containsSelf(funcTy->getResult());
+    // Return a non-'No' value if one of them is 'No' or they're
+    // both equal.
+    if (inputKind == SelfReferenceKind::None)
+      return resultKind;
+    else if (resultKind == SelfReferenceKind::None)
+      return inputKind;
+    else if (inputKind == resultKind)
+      return inputKind;
+
+    // We have a problematic usage.
+    return SelfReferenceKind::Other;
   }
 
-  // If the parameter contains Self, it is not contravariant.
-  return containsSelf(type);
+  // Any other usage is problematic.
+  return (containsSelf(type)
+          ? SelfReferenceKind::Other
+          : SelfReferenceKind::None);
 }
 
 /// Find references to Self within the given function type.
 static SelfReferenceKind findSelfReferences(const AnyFunctionType *fnType) {
-  // Check whether the input type contains Self in any position where it would
-  // make an override not have contravariant parameter types.
-  if (isNonContravariantSelfParamType(fnType->getInput()))
-    return SelfReferenceKind::Yes;
+  // Contravariant 'Self' in the parameter list is always allowed,
+  // because a witness in a non-final class then has a more general
+  // function type than the requirement.
+  auto inputKind = findSelfReferences(fnType->getInput(),
+                                      SelfReferenceKind::Parameter);
+  if (inputKind == SelfReferenceKind::Result ||
+      inputKind == SelfReferenceKind::Other) {
+    return SelfReferenceKind::Other;
+  }
 
   // Consider the result type.
-  auto type = fnType->getResult();
-  return isSelfOrOptionalSelf(type)
-           ? SelfReferenceKind::Result
-           : containsSelf(type) ? SelfReferenceKind::Yes
-                                : SelfReferenceKind::No;
+  return findSelfReferences(fnType->getResult(),
+                            SelfReferenceKind::Result);
 }
 
 /// Find the bare Self references within the given requirement.
 static SelfReferenceKind findSelfReferences(ValueDecl *value) {
   // Types never refer to 'Self'.
   if (isa<TypeDecl>(value))
-    return SelfReferenceKind::No;
+    return SelfReferenceKind::None;
+
+  auto type = value->getInterfaceType();
 
   // If the function requirement returns Self and has no other
   // reference to Self, note that.
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(value)) {
-    auto type = afd->getInterfaceType();
-
+  if (isa<AbstractFunctionDecl>(value)) {
     // Skip the 'self' parameter.
     type = type->castTo<AnyFunctionType>()->getResult();
     return findSelfReferences(type->castTo<AnyFunctionType>());
   }
-
-  auto type = value->getInterfaceType();
 
   if (isa<SubscriptDecl>(value)) {
     auto fnType = type->castTo<AnyFunctionType>();
     return findSelfReferences(fnType);
   }
 
-  return containsSelf(type) ? SelfReferenceKind::Yes
-                            : SelfReferenceKind::No;
+  return containsSelf(type) ? SelfReferenceKind::Other
+                            : SelfReferenceKind::None;
 }
 
 SmallVector<ValueDecl *, 4> 
@@ -2206,11 +2230,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       // Check whether this requirement uses Self in a way that might
       // prevent conformance from succeeding.
       switch (findSelfReferences(requirement)) {
-      case SelfReferenceKind::No:
+      case SelfReferenceKind::None:
         // No references to Self: nothing more to do.
         break;
 
-      case SelfReferenceKind::Yes: {
+      case SelfReferenceKind::Other: {
         // References to Self in a position where subclasses cannot do
         // the right thing. Complain if the adoptee is a non-final
         // class.
@@ -2269,9 +2293,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             });
           break;
         }
-        
         break;
       }
+      case SelfReferenceKind::Parameter:
+        llvm_unreachable("Should not see this here");
+        
       }
 
       // Record the match.
