@@ -224,7 +224,8 @@ func generic_member_ref<T>(x: Generic<T>) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions24bound_generic_member_ref
-func bound_generic_member_ref(var x: Generic<UnicodeScalar>) -> Int {
+func bound_generic_member_ref(x: Generic<UnicodeScalar>) -> Int {
+  var x = x
   // CHECK: bb0([[XADDR:%[0-9]+]] : $Generic<UnicodeScalar>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
@@ -302,7 +303,8 @@ protocol Bendable { }
 protocol Wibbleable { }
 
 // CHECK-LABEL: sil hidden @_TF11expressions20archetype_member_ref
-func archetype_member_ref<T : Runcible>(var x: T) {
+func archetype_member_ref<T : Runcible>(x: T) {
+  var x = x
   x.free_method()
   // CHECK: witness_method $T, #Runcible.free_method!1
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
@@ -396,7 +398,8 @@ func float(x: Float) {}
 func tuple() -> (Int, Float) { return (1, 1.0) }
 
 // CHECK-LABEL: sil hidden @_TF11expressions13tuple_element
-func tuple_element(var x: (Int, Float)) {
+func tuple_element(x: (Int, Float)) {
+  var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box $(Int, Float)
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
 
@@ -423,7 +426,12 @@ func containers() -> ([Int], Dictionary<String, Int>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions7if_expr
-func if_expr(var a: Bool, var b: Bool, var x: Int, var y: Int, var z: Int) -> Int {
+func if_expr(a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
+  var a = a
+  var b = b
+  var x = x
+  var y = y
+  var z = z
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box $Bool
   // CHECK: [[PBA:%.*]] = project_box [[AB]]

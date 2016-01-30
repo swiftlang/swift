@@ -9,11 +9,12 @@
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}optionalMethodGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
-func optionalMethodGeneric<T : P1>(var t t : T) {
+func optionalMethodGeneric<T : P1>(t t : T) {
+  var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
+  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK-NEXT: store [[T]] to [[PT]] : $*T
+  // CHECK: store [[T]] to [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int -> ()>
   // CHECK-NEXT: project_box [[OPT_BOX]]
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T
@@ -24,11 +25,12 @@ func optionalMethodGeneric<T : P1>(var t t : T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF17protocol_optional23optionalPropertyGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
-func optionalPropertyGeneric<T : P1>(var t t : T) {
+func optionalPropertyGeneric<T : P1>(t t : T) {
+  var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
+  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK-NEXT: store [[T]] to [[PT]] : $*T
+  // CHECK: store [[T]] to [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: project_box [[OPT_BOX]]
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T
@@ -39,11 +41,12 @@ func optionalPropertyGeneric<T : P1>(var t t : T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF17protocol_optional24optionalSubscriptGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
-func optionalSubscriptGeneric<T : P1>(var t t : T) {
+func optionalSubscriptGeneric<T : P1>(t t : T) {
+  var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
-  // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
+  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK-NEXT: store [[T]] to [[PT]] : $*T
+  // CHECK: store [[T]] to [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: project_box [[OPT_BOX]]
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T

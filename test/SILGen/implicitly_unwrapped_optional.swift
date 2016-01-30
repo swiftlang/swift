@@ -1,13 +1,14 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo(var f f: (()->())!) {
+func foo(f f: (()->())!) {
+  var f = f
   f?()
 }
 // CHECK:    sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> () {
 // CHECK:    bb0([[T0:%.*]] : $ImplicitlyUnwrappedOptional<() -> ()>):
-// CHECK-NEXT: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
+// CHECK: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
 // CHECK-NEXT: [[PF:%.*]] = project_box [[F]]
-// CHECK-NEXT: store [[T0]] to [[PF]]
+// CHECK: store [[T0]] to [[PF]]
 // CHECK:      [[T1:%.*]] = select_enum_addr [[PF]]
 // CHECK-NEXT: cond_br [[T1]], bb1, bb3
 //   If it does, project and load the value out of the implicitly unwrapped

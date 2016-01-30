@@ -5,9 +5,9 @@ import Swift
 var zero: Int
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures28generic_nondependent_context{{.*}}
-func generic_nondependent_context<T>(x: T, var y: Int) -> Int {
+func generic_nondependent_context<T>(x: T, y: Int) -> Int {
   func foo() -> Int { return y }
-  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) (@owned @box Int) -> Int
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) (Int) -> Int
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
   return foo()
 }

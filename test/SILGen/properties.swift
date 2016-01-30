@@ -325,7 +325,8 @@ func logical_local_captured_get(x: Int) -> Int {
 func inout_arg(inout x: Int) {}
 
 // CHECK-LABEL: sil hidden  @_TF10properties14physical_inout
-func physical_inout(var x: Int) {
+func physical_inout(x: Int) {
+  var x = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
@@ -348,7 +349,8 @@ func val_subscript_get(v: Val, i: Int) -> Float {
 
 // CHECK-LABEL: sil hidden  @_TF10properties17val_subscript_set
 // CHECK: bb0(%0 : $Val, [[I:%[0-9]+]] : $Int, [[X:%[0-9]+]] : $Float):
-func val_subscript_set(var v: Val, i: Int, x: Float) {
+func val_subscript_set(v: Val, i: Int, x: Float) {
+  var v = v
   v[i] = x
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
   // CHECK: [[PB:%.*]] = project_box [[VADDR]]
@@ -386,7 +388,8 @@ func generic_mono_log_get<T>(g: Generic<T>) -> Int {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties20generic_mono_log_set
-func generic_mono_log_set<T>(var g: Generic<T>, x: Int) {
+func generic_mono_log_set<T>(g: Generic<T>, x: Int) {
+  var g = g
   g.mono_log = x
   // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Generics8mono_log
   // CHECK: apply [[GENERIC_SET_METHOD]]<
@@ -420,7 +423,8 @@ func bound_generic_mono_log_get(g: Generic<UnicodeScalar>, x: Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties22generic_subscript_type
-func generic_subscript_type<T>(var g: Generic<T>, i: T, x: T) -> T {
+func generic_subscript_type<T>(g: Generic<T>, i: T, x: T) -> T {
+  var g = g
   g[i] = x
   return g[i]
 }

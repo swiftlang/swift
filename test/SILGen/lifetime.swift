@@ -22,7 +22,8 @@ func local_valtype() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime20local_valtype_branch
-func local_valtype_branch(var a: Bool) {
+func local_valtype_branch(a: Bool) {
+    var a = a
     // CHECK: [[A:%[0-9]+]] = alloc_box $Bool
 
     if a { return }
@@ -108,7 +109,6 @@ func local_valtype_branch(var a: Bool) {
     }
     // CHECK: release [[X]]
     // CHECK: [[EPILOG]]:
-    // CHECK: release [[A]]
     // CHECK: return
 }
 
@@ -126,11 +126,11 @@ func reftype_return() -> Ref {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime11reftype_arg
-func reftype_arg(var a: Ref) {
+func reftype_arg(a: Ref) {
+    var a = a
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
     // CHECK: [[PA:%[0-9]+]] = project_box [[AADDR]]
-    // CHECK-NOT: retain [[A]]
     // CHECK: store [[A]] to [[PA]]
     // CHECK: release [[AADDR]]
     // CHECK: return
@@ -185,7 +185,8 @@ func reftype_call_arg() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime21reftype_call_with_arg
-func reftype_call_with_arg(var a: Ref) {
+func reftype_call_with_arg(a: Ref) {
+    var a = a
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
     // CHECK: [[PB:%.*]] = project_box [[AADDR]]
@@ -201,7 +202,8 @@ func reftype_call_with_arg(var a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime16reftype_reassign
-func reftype_reassign(inout a: Ref, var b: Ref) {
+func reftype_reassign(inout a: Ref, b: Ref) {
+    var b = b
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
     // CHECK: [[A_LOCAL:%[0-9]+]] = alloc_box $Ref
     // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
@@ -346,7 +348,10 @@ class RefWithProp {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
-func logical_lvalue_lifetime(var r: RefWithProp, var _ i: Int, var _ v: Val) {
+func logical_lvalue_lifetime(r: RefWithProp, _ i: Int, _ v: Val) {
+  var r = r
+  var i = i
+  var v = v
   // CHECK: [[RADDR:%[0-9]+]] = alloc_box $RefWithProp
   // CHECK: [[PR:%[0-9]+]] = project_box [[RADDR]]
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
@@ -426,16 +431,17 @@ class Foo<T> {
 
   }
 
-  init(var chi:Int) {
+  init(chi:Int) {
+    var chi = chi
     z = Foo<T>.makeT()
 
   // -- initializing entry point
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3Fooc{{.*}} :
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocfT3chiSi_GS0_x_
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[THISIN:%[0-9]+]] : $Foo<T>):
+    // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
     // CHECK: [[CHIADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: [[PCHI:%[0-9]+]] = project_box [[CHIADDR]]
     // CHECK: store [[CHI]] to [[PCHI]]
-    // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // CHECK: ref_element_addr {{.*}}, #Foo.z
 
@@ -617,19 +623,21 @@ struct Bas<T> {
 
 class B { init(y:Int) {} }
 class D : B {
-  // CHECK-LABEL: sil hidden @_TFC8lifetime1Dc{{.*}} : $@convention(method) (Int, Int, @owned D) -> @owned D
+  // CHECK-LABEL: sil hidden @_TFC8lifetime1DcfT1xSi1ySi_S0_
   // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $D):
-  init(var x:Int, var y:Int) {
+  init(x: Int, y: Int) {
+    var x = x
+    var y = y
     // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $D
     // CHECK: [[PTHIS:%[0-9]+]] = project_box [[THISADDR1]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [derivedself] [[PTHIS]]
+    // CHECK: store [[THIS]] to [[THISADDR]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: [[PX:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: store [[X]] to [[PX]]
     // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: [[PY:%[0-9]+]] = project_box [[YADDR]]
     // CHECK: store [[Y]] to [[PY]]
-    // CHECK: store [[THIS]] to [[THISADDR]]
 
     super.init(y: y)
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
@@ -646,7 +654,8 @@ class D : B {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime8downcast
-func downcast(var b: B) {
+func downcast(b: B) {
+  var b = b
   // CHECK: [[BADDR:%[0-9]+]] = alloc_box $B
   // CHECK: [[PB:%[0-9]+]] = project_box [[BADDR]]
   (b as! D).foo()

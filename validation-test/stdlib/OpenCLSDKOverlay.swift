@@ -141,8 +141,9 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Create the compute program from the source buffer
   //
   program = KernelSource.withCString {
-    (var s: UnsafePointer<CChar>)->cl_program in
-    withUnsafeMutablePointer(&s) {
+    (s: UnsafePointer<CChar>)->cl_program in
+    var s = s
+    return withUnsafeMutablePointer(&s) {
       return clCreateProgramWithSource(context, 1, $0, nil, &err)
     }
   }

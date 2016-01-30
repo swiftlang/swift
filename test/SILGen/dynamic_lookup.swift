@@ -38,11 +38,12 @@ func direct_to_protocol(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup23direct_to_static_method
-func direct_to_static_method(var obj: AnyObject) {
+func direct_to_static_method(obj: AnyObject) {
+  var obj = obj
   // CHECK: [[START:[A-Za-z0-9_]+]]([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK-NEXT: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
-  // CHECK-NEXT: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
+  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
@@ -52,11 +53,12 @@ func direct_to_static_method(var obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup12opt_to_class
-func opt_to_class(var obj: AnyObject) {
+func opt_to_class(obj: AnyObject) {
+  var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[PARAM:%[0-9]+]] : $AnyObject)
-  // CHECK-NEXT: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
+  // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
-  // CHECK-NEXT: store [[PARAM]] to [[PBOBJ]]
+  // CHECK: store [[PARAM]] to [[PBOBJ]]
   // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: [[PBOPT:%.*]] = project_box [[OPTBOX]]
   // CHECK-NEXT: [[EXISTVAL:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
@@ -92,6 +94,7 @@ func opt_to_class(var obj: AnyObject) {
   // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
   // CHECK-NEXT: strong_release [[OPTBOX]] : $@box ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: strong_release [[EXISTBOX]] : $@box AnyObject
+  // CHECK-NEXT: strong_release %0
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[RESULT]] : $()
 }
@@ -103,11 +106,12 @@ func forced_without_outer(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup20opt_to_static_method
-func opt_to_static_method(var obj: AnyObject) {
+func opt_to_static_method(obj: AnyObject) {
+  var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK-NEXT: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
-  // CHECK-NEXT: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
+  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: [[PBO:%.*]] = project_box [[OPTBOX]]
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
@@ -120,11 +124,12 @@ func opt_to_static_method(var obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property
-func opt_to_property(var obj: AnyObject) {
+func opt_to_property(obj: AnyObject) {
+  var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK-NEXT: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
+  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: project_box [[INT_BOX]]
   // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
@@ -145,11 +150,13 @@ func opt_to_property(var obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup19direct_to_subscript
-func direct_to_subscript(var obj: AnyObject, var i: Int) {
+func direct_to_subscript(obj: AnyObject, i: Int) {
+  var obj = obj
+  var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK-NEXT: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
+  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK-NEXT: store [[I]] to [[PBI]] : $*Int
@@ -175,11 +182,13 @@ func direct_to_subscript(var obj: AnyObject, var i: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup16opt_to_subscript
-func opt_to_subscript(var obj: AnyObject, var i: Int) {
+func opt_to_subscript(obj: AnyObject, i: Int) {
+  var obj = obj
+  var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK-NEXT: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
+  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK-NEXT: store [[I]] to [[PBI]] : $*Int
@@ -202,15 +211,17 @@ func opt_to_subscript(var obj: AnyObject, var i: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup8downcast
-func downcast(var obj: AnyObject) -> X {
+func downcast(obj: AnyObject) -> X {
+  var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK-NEXT: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
+  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
   // CHECK-NEXT: strong_release [[OBJ_BOX]] : $@box AnyObject
+  // CHECK-NEXT: strong_release %0
   // CHECK-NEXT: return [[X]] : $X
   return obj as! X
 }

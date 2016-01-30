@@ -657,8 +657,8 @@ ERROR(parameter_inout_var_let,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
 
-WARNING(var_parameter_not_allowed,none,
-        "'var' parameters are deprecated and will be removed in Swift 3", ())
+ERROR(var_parameter_not_allowed,none,
+        "parameters may not have the 'var' specifier", ())
 WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))

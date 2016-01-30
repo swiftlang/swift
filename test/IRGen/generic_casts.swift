@@ -88,7 +88,8 @@ func protoCast(x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
 // <rdar://problem/15313840>
 // Class existential to opaque archetype cast
 // CHECK: define hidden void @_TF13generic_casts33classExistentialToOpaqueArchetype{{.*}}(%swift.opaque* noalias nocapture sret, %objc_object*, %swift.type* %T)
-func classExistentialToOpaqueArchetype<T>(var x: ObjCProto1) -> T {
+func classExistentialToOpaqueArchetype<T>(x: ObjCProto1) -> T {
+  var x = x
   // CHECK: [[X:%.*]] = alloca %P13generic_casts10ObjCProto1_
   // CHECK: [[LOCAL:%.*]] = alloca %P13generic_casts10ObjCProto1_
   // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %P13generic_casts10ObjCProto1_* [[LOCAL]] to %swift.opaque*

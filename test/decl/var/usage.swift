@@ -12,7 +12,7 @@ func basicTests() -> Int {
   return y
 }
 
-func mutableParameter(a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-warning {{'var' parameters are deprecated and will be removed in Swift 3}}
+func mutableParameter(a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{parameters may not have the 'var' specifier}}
   i += 1
   var j = j
   swap(&i, &j)

@@ -46,7 +46,8 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK: }
 
 // @interface Foo -(void) setFoo: (NSString*)s; @end
-func setFoo(f: Foo, var s: String) {
+func setFoo(f: Foo, s: String) {
+  var s = s
   f.setFoo(s)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging6setFoo
@@ -166,7 +167,8 @@ func callBar() -> String {
 // CHECK: }
 
 // void setBar(NSString *s);
-func callSetBar(var s: String) {
+func callSetBar(s: String) {
+  var s = s
   setBar(s)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging10callSetBar

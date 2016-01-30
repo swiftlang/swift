@@ -10,7 +10,7 @@
 // CHECK: [[TUPLE_TYPE:%swift.tuple_type]] = type { [[TYPE]], i64, i8*, [0 x %swift.tuple_element_type] }
 // CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i64 }
 
-func dup<T>(var x: T) -> (T, T) { return (x,x) }
+func dup<T>(x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(<{}>* noalias nocapture sret
 // CHECK:    entry:
 //   Allocate a local variable for 'x'.
@@ -20,7 +20,7 @@ func dup<T>(var x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK-NEXT: [[T_VALUE:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]]
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT: [[INITIALIZE_BUFFER_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[BUFFER]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_BUFFER_FN]]([[BUFFER]]* [[XBUF]], [[OPAQUE]]* {{.*}}, [[TYPE]]* %T)

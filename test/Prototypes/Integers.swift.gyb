@@ -154,7 +154,8 @@ public protocol ArithmeticType {
 % for x in binaryArithmetic:
 @_transparent
 @warn_unused_result
-public func ${x.operator} <T: ArithmeticType>(var lhs: T, rhs: T) -> T {
+public func ${x.operator} <T: ArithmeticType>(lhs: T, rhs: T) -> T {
+  var lhs = lhs
   lhs.${x.name}InPlace(rhs)
   return lhs
 }

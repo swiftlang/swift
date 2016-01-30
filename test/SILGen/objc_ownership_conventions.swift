@@ -30,7 +30,8 @@ func test3() -> NSObject {
 
 // Normal message send with argument, no transfers.
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test5
-func test5(var g: Gizmo) {
+func test5(g: Gizmo) {
+  var g = g
   Gizmo.inspect(g)
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
@@ -43,7 +44,8 @@ func test5(var g: Gizmo) {
 }
 // The argument to consume is __attribute__((ns_consumed)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test6
-func test6(var g: Gizmo) {
+func test6(g: Gizmo) {
+  var g = g
   Gizmo.consume(g)
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
@@ -56,7 +58,8 @@ func test6(var g: Gizmo) {
 }
 // fork is __attribute__((ns_consumes_self)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test7
-func test7(var g: Gizmo) {
+func test7(g: Gizmo) {
+  var g = g
   g.fork()
   // CHECK:      [[G:%.*]] = load
   // CHECK-NEXT: retain [[G]]

@@ -1,16 +1,16 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-// CHECK: @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
-// CHECK: %[[Y:.*]] = call %swift.opaque* %initializeBufferWithTake{{.*}}([{{(24|12)}} x i8]* %{{.*}}, %swift.opaque* %{{.*}}, %swift.type* %U)
+// CHECK: define hidden void @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
+// CHECK: [[Y:%.*]] = getelementptr inbounds %C12generic_arg25Class, %C12generic_arg25Class* %2, i32 0, i32 0, i32 0
 // store %swift.opaque* %[[Y]], %swift.opaque** %[[Y_SHADOW:.*]], align
-// CHECK: call void @llvm.dbg.value(metadata %swift.opaque* %[[Y]], {{.*}}metadata ![[U:.*]], metadata !{{[0-9]+}}), !dbg
+// CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %y.addr, metadata ![[U:.*]], metadata !{{[0-9]+}})
 // Make sure there is no conflicting dbg.value for this variable.x
 // CHECK-NOT: dbg.value{{.*}}metadata ![[U]]
 class Class <T> {
 // CHECK: ![[U]] = !DILocalVariable(name: "y", arg: 2{{.*}} line: [[@LINE+1]],
-  func foo<U>(var x: T, var y: U) {}
+  func foo<U>(x: T, y: U) {}
 
-  func bar(var x: String, var y: Int64) {}
+  func bar(x: String, y: Int64) {}
 
   init() {}
 }

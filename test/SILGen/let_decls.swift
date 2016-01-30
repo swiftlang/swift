@@ -168,17 +168,6 @@ func callThroughLet(predicate: (Int, Int) -> Bool) {
 }
 
 
-// Verify that the mangling of a symbol doesn't depend on whether an argument
-// is var or let.
-func var_argument_mangling(var a : Int) {}
-func let_argument_mangling(let a : Int) {}
-func def_argument_mangling(a : Int) {}
-// CHECK: sil hidden @[[MANPREFIX:[^ :]*]]var_argument_mangling[[MANSUFFIX:[^ :]*]] : $
-// CHECK: sil hidden @[[MANPREFIX]]let_argument_mangling[[MANSUFFIX]] : $
-// CHECK: sil hidden @[[MANPREFIX]]def_argument_mangling[[MANSUFFIX]] : $
-
-
-
 // Verify that we can emit address-only rvalues directly into the result slot in
 // chained calls.
 struct GenericTestStruct<T> {
@@ -240,7 +229,8 @@ struct WeirdPropertyTest {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}test_weird_property
-func test_weird_property(var v : WeirdPropertyTest, let i : Int) -> Int {
+func test_weird_property(v : WeirdPropertyTest, let i : Int) -> Int {
+  var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
   // CHECK: [[PB:%.*]] = project_box [[VBOX]]
   // CHECK: store %0 to [[PB]]
@@ -468,14 +458,15 @@ struct LetPropertyStruct {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
-// CHECK:  %1 = alloc_box $LetPropertyStruct
-// CHECK:  %2 = project_box %1
-// CHECK:   store %0 to %2 : $*LetPropertyStruct
-// CHECK:   %4 = load %2 : $*LetPropertyStruct
-// CHECK:   %5 = struct_extract %4 : $LetPropertyStruct, #LetPropertyStruct.lp
-// CHECK:   strong_release %1 : $@box LetPropertyStruct
-// CHECK:   return %5 : $Int
-func testLetPropertyAccessOnLValueBase(var a : LetPropertyStruct) -> Int {
+// CHECK:  [[ABOX:%[0-9]+]] = alloc_box $LetPropertyStruct
+// CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
+// CHECK:   store %0 to [[A]] : $*LetPropertyStruct
+// CHECK:   [[STRUCT:%[0-9]+]] = load [[A]] : $*LetPropertyStruct
+// CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
+// CHECK:   strong_release [[ABOX]] : $@box LetPropertyStruct
+// CHECK:   return [[PROP]] : $Int
+func testLetPropertyAccessOnLValueBase(a : LetPropertyStruct) -> Int {
+  var a = a
   return a.lp
 }
 

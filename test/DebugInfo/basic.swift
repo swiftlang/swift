@@ -24,16 +24,18 @@
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
 // CHECK-DAG: ![[FOO:[0-9]+]] = distinct !DISubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
 public
-func foo(var a: Int64, var _ b: Int64) -> Int64 {
-     // CHECK-DAG: !DILexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-1]], column: 49)
-     // CHECK-DAG: ![[ASCOPE:.*]] = !DILocation(line: [[@LINE-2]], column: 14, scope: ![[FOO]])
+func foo(a: Int64, _ b: Int64) -> Int64 {
+     var a = a
+     var b = b
+     // CHECK-DAG: !DILexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-3]], column: 41)
+     // CHECK-DAG: ![[ASCOPE:.*]] = !DILocation(line: [[@LINE-4]], column: 10, scope: ![[FOO]])
      // Check that a is the first and b is the second argument.
-     // CHECK-DAG: store i64 %0, i64* [[AVAL:.*]], align 8
-     // CHECK-DAG: store i64 %1, i64* [[BVAL:.*]], align 8
-     // CHECK-DAG: [[AVAL]] = getelementptr inbounds {{.*}}, [[AMEM:.*]], i32 0, i32 0
-     // CHECK-DAG: [[BVAL]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata [[AMEM]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata [[BMEM]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
+     // CHECK-DAG: store i64 %0, i64* [[AADDR:.*]], align 8
+     // CHECK-DAG: store i64 %1, i64* [[BADDR:.*]], align 8
+     // CHECK-DAG: [[AVAL:%.*]] = getelementptr inbounds {{.*}}, [[AMEM:.*]], i32 0, i32 0
+     // CHECK-DAG: [[BVAL:%.*]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[AADDR]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[BADDR]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
      // CHECK-DAG: ![[AARG]] = !DILocalVariable(name: "a", arg: 1
      // CHECK-DAG: ![[BARG]] = !DILocalVariable(name: "b", arg: 2
      if b != 0 {

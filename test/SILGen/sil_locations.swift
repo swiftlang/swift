@@ -63,7 +63,8 @@ func ifexpr_rval() -> Int {
 }
 
 // TODO: missing info on the first branch.
-func forstmt_empty_cond(var i: Int) -> Int {
+func forstmt_empty_cond(i: Int) -> Int {
+  var i = i
   for i=0;;++i {}
     // CHECK-LABEL: sil hidden  @{{.*}}forstmt_empty_cond{{.*}}
     // CHECK: apply {{.*}} line:[[@LINE-2]]:9
@@ -87,7 +88,7 @@ func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden  @_TF13sil_locations15useTemplateTestFT_Si
 
-  // CHECK: function_ref @_TFSiC{{.*}} line:87
+  // CHECK: function_ref @_TFSiC{{.*}}
 }
 
 func foo(x: Int) -> Int {
