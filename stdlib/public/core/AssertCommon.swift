@@ -60,29 +60,45 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 #endif
 }
 
+@_transparent
+@warn_unused_result
+internal
+func _fatalErrorFlags() -> UInt32 {
+  // The current flags are:
+  // (1 << 0): Report backtrace on fatal error
+#if os(iOS) || os(tvOS) || os(watchOS)
+  return 0
+#else
+  return _isDebugAssertConfiguration() ? 1 : 0
+#endif
+}
+
 @_silgen_name("_swift_stdlib_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
-  _ line: UInt)
+  _ line: UInt, flags: UInt32)
 
 @_silgen_name("_swift_stdlib_reportFatalError")
 func _reportFatalError(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
-  _ message: UnsafePointer<UInt8>, _ messageLength: UInt)
+  _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
+  flags: UInt32)
 
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
-  _ line: UInt, _ column: UInt)
+  _ line: UInt, _ column: UInt,
+  flags: UInt32)
 
 @_silgen_name("_swift_stdlib_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
-  _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt)
+  _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
+  flags: UInt32)
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
@@ -93,7 +109,8 @@ func _reportUnimplementedInitializer(
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
   prefix: StaticString, _ message: StaticString,
-  _ file: StaticString, _ line: UInt
+  _ file: StaticString, _ line: UInt,
+  flags: UInt32
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
@@ -104,7 +121,8 @@ func _assertionFailed(
         _reportFatalErrorInFile(
           prefix.baseAddress, UInt(prefix.count),
           message.baseAddress, UInt(message.count),
-          file.baseAddress, UInt(file.count), line)
+          file.baseAddress, UInt(file.count), line,
+          flags: flags)
         Builtin.int_trap()
       }
     }
@@ -121,7 +139,8 @@ func _assertionFailed(
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
   prefix: StaticString, _ message: String,
-  _ file: StaticString, _ line: UInt
+  _ file: StaticString, _ line: UInt,
+  flags: UInt32
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
@@ -133,7 +152,8 @@ func _assertionFailed(
         _reportFatalErrorInFile(
           prefix.baseAddress, UInt(prefix.count),
           messageUTF8.baseAddress, UInt(messageUTF8.count),
-          file.baseAddress, UInt(file.count), line)
+          file.baseAddress, UInt(file.count), line,
+          flags: flags)
       }
     }
   }
@@ -149,8 +169,11 @@ func _assertionFailed(
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
-func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
-                        _ file: StaticString, _ line: UInt) {
+func _fatalErrorMessage(
+  prefix: StaticString, _ message: StaticString,
+  _ file: StaticString, _ line: UInt,
+  flags: UInt32
+) {
 #if INTERNAL_CHECKS_ENABLED
   prefix.withUTF8Buffer {
     (prefix) in
@@ -161,7 +184,8 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
         _reportFatalErrorInFile(
           prefix.baseAddress, UInt(prefix.count),
           message.baseAddress, UInt(message.count),
-          file.baseAddress, UInt(file.count), line)
+          file.baseAddress, UInt(file.count), line,
+          flags: flags)
       }
     }
   }
@@ -172,7 +196,8 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
       (message) in
       _reportFatalError(
         prefix.baseAddress, UInt(prefix.count),
-        message.baseAddress, UInt(message.count))
+        message.baseAddress, UInt(message.count),
+        flags: flags)
     }
   }
 #endif
@@ -204,7 +229,8 @@ func _unimplemented_initializer(className: StaticString,
           _reportUnimplementedInitializerInFile(
             className.baseAddress, UInt(className.count),
             initName.baseAddress, UInt(initName.count),
-            file.baseAddress, UInt(file.count), line, column)
+            file.baseAddress, UInt(file.count), line, column,
+            flags: 0)
         }
       }
     }
@@ -215,7 +241,8 @@ func _unimplemented_initializer(className: StaticString,
         (initName) in
         _reportUnimplementedInitializer(
           className.baseAddress, UInt(className.count),
-          initName.baseAddress, UInt(initName.count))
+          initName.baseAddress, UInt(initName.count),
+          flags: 0)
       }
     }
   }
@@ -229,5 +256,6 @@ func _undefined<T>(
   @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) -> T {
-  _assertionFailed("fatal error", message(), file, line)
+  _assertionFailed("fatal error", message(), file, line,
+    flags: 0)
 }

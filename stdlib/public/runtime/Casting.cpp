@@ -395,7 +395,8 @@ swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                                 const char *message) {
   asm("");
 
-  swift::fatalError("Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
+  swift::fatalError(/* flags = */ 0,
+                    "Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
                     sourceName, sourceType, 
                     targetName, targetType, 
                     message ? ": " : ".", 
