@@ -10,7 +10,7 @@
 **Abstract:** This paper discusses the general concept of weak
 references, including various designs in other languages, and proposes
 several new core language features and a more sophisticated runtime
-support feature which can be exploited in the standard library.
+support feature that can be exploited in the standard library.
 
 .. warning:: This document was used in planning Swift 1.0; it has not been kept
   up to date and does not describe the current or planned behavior of Swift.
@@ -160,7 +160,7 @@ subclassing it.
 The references are presented in order of decreasing strength.
 
 :code:`SoftReference` is a sort of quasi-strong reference
-which holds onto the object until the VM begins to run out
+that holds onto the object until the VM begins to run out
 of memory.  Soft references to softly-referenced objects are
 guaranteed to have been cleared before the VM can throw an
 :code:`OutOfMemoryError`.  The reference will be cleared
@@ -246,7 +246,7 @@ that cannot be cloned (copying the pointer actually copies the
 underlying data).
 
 A *borrowed pointer* (:code:`&int`) is essentially a dangling
-weak reference that is subject to static restrictions which
+weak reference that is subject to static restrictions that
 ensure that it doesn't actually dangle.  It is thus primarily
 a performance optimization.
 
@@ -262,7 +262,7 @@ and a visible value of type :code:`t`.
 :code:`doRefWeak theRef` is an :code:`IO (Maybe t)`.
 
 A weak reference may be constructed with an optional
-:code:`IO ()` which will be run when the referent is
+:code:`IO (),` which will be run when the referent is
 collected.  This finalizer may (somehow) refer to the key
 and value without itself keeping them alive;  it is also
 explicitly permitted to resurrect them.
@@ -323,13 +323,13 @@ Generally, a data structure using weak references extensively
 also needs some way to receive notification that the weak
 reference was collected.  This is because entries in the data
 structure are likely to have significant overhead even if the
-value is collected.  A weak data structure which receives no
-notification that a reference has been invalidated must either
+value is collected.  A weak data structure, which receives no
+notification that a reference has been invalidated, must either
 allow these entries to accumulate indefinitely or must
 periodically scan the entire structure looking for stale entries.
 
-A weak reference which permits immediate deallocation of its
-referent when the last strong reference is dropped is
+A weak reference, which permits immediate deallocation of its
+referent when the last strong reference is dropped, is
 substantially less useful for the implementation of a weak
 cache.  It is a common access pattern (for, say, a memoizing
 cache) for a value to be looked up many times in rapid
@@ -406,7 +406,7 @@ Looking at these use-cases, there are two main thrusts:
   These references must be designed for convenient use by non-expert
   users.
 
-- There are a number of more sophisticated use cases which require
+- There are a number of more sophisticated use cases, which require
   notification or interruption of deallocation; these can be used in
   the implementation of higher-level abstractions like weak caches.
   Here it is reasonable to expect more user expertise, such that
@@ -418,7 +418,7 @@ on top of basic runtime support.
 The first set of use cases will require more direct language support.
 To that end, I propose adding two new variable attributes,
 :code:`@weak` and :code:`@unowned`.  I also propose a small slate of
-new features which directly address the problem of capturing a value
+new features, which directly address the problem of capturing a value
 in a closure with a different strength of reference than it had in the
 enclosing context.
 
@@ -426,7 +426,7 @@ Proposed Variable Attributes
 ============================
 
 In the following discussion, a "variable-like" declaration is any
-declaration which binds a name to a (possibly mutable) value of
+declaration, which binds a name to a (possibly mutable) value of
 arbitrary type.  Currently this is just :code:`var`, but this proposal
 also adds :code:`capture`, and we may later add more variants, such as
 :code:`const` or :code:`val` or the like.
@@ -855,7 +855,7 @@ put this near the variable reference; in larger closures, this can
 become laborious and redundant, and a different mechanism is called for.
 
 In the following discussion, a *var-or-member expression* is an
-expression which is semantically constrained to be one of:
+expression, which is semantically constrained to be one of:
 
 - A reference to a local variable-like declaration from an
   enclosing context.
@@ -864,7 +864,7 @@ expression which is semantically constrained to be one of:
 
 Such expressions have two useful traits:
 
-- They always end in an identifier which on some level meaningfully
+- They always end in an identifier, which on some level meaningfully
   identifies the object.
 
 - Evaluating them is relatively likely (but not guaranteed) to not
@@ -1049,7 +1049,7 @@ there were a reason to prefer using a single statement there).  I
 don't think it does any harm, but I wouldn't mourn it, either.  I do
 think that generalizing the initializer to an arbitrary expression
 would be a serious mistake, because readers are naturally going to
-overlook code which occurs inside the closure, and promoting side
+overlook code, which occurs inside the closure, and promoting side
 effects there would be awful.
 
 It would be nice to have a way to declare that a closure should not
