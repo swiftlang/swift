@@ -4023,7 +4023,7 @@ public:
 
   /// Whether the declaration is later overridden in the module
   ///
-  /// Overriddes are resolved during type checking; only query this field after
+  /// Overrides are resolved during type checking; only query this field after
   /// the whole module has been checked
   bool isOverridden() const { return AbstractStorageDeclBits.Overridden; }
 

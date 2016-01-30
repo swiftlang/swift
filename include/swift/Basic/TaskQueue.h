@@ -29,7 +29,7 @@ class Task; // forward declared to allow for platform-specific implementations
 
 typedef llvm::sys::ProcessInfo::ProcessId ProcessId;
 
-/// \brief Indiciates how a TaskQueue should respond to the task finished event.
+/// \brief Indicates how a TaskQueue should respond to the task finished event.
 enum class TaskFinishedResponse {
   /// Indicates that execution should continue.
   ContinueExecution,

@@ -820,7 +820,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     // but still allow SILGen'ing the first function ?
     // Or try to keep track of SIL diagnostics emitted previously ?
 
-    // FIXME: We should run SIL diagnostis asynchronously after typechecking
+    // FIXME: We should run SIL diagnostics asynchronously after typechecking
     // so that they don't delay reporting of typechecking diagnostics and they
     // don't block any other AST processing for the same SwiftInvocation.
 
