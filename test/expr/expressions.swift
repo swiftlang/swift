@@ -829,5 +829,11 @@ func swift22_deprecation_increment_decrement() {
   _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
 }
 
-
-
+// SR-628 mixing lvalues and rvalues in tuple expression
+var x = 0
+var y = 1
+let _ = (x, x.successor()).0
+let _ = (x, 3).1
+(x,y) = (2,3)
+(x,4) = (1,2) // expected-error {{cannot assign to value: function call returns immutable value}}
+(x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
