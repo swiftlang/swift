@@ -131,7 +131,7 @@ ${orderingRequirementForPredicate}
     range: Range<Index>,
     isOrderedBefore: (${GElement}, ${GElement}) -> Bool
   ) -> Index {
-  var isOrderedBefore = isOrderedBefore
+    var isOrderedBefore = isOrderedBefore
 
 %   else:
 

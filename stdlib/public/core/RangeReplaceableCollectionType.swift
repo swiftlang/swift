@@ -468,19 +468,6 @@ public func +<
 
 @warn_unused_result
 public func +<
-    C : RangeReplaceableCollectionType,
-    S : CollectionType
-    where S.Generator.Element == C.Generator.Element
->(lhs: C, rhs: S) -> C {
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  var lhs = lhs
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
-  return lhs
-}
-
-@warn_unused_result
-public func +<
     RRC1 : RangeReplaceableCollectionType,
     RRC2 : RangeReplaceableCollectionType 
     where RRC1.Generator.Element == RRC2.Generator.Element
