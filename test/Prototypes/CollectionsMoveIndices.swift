@@ -31,6 +31,28 @@
 // double-indirection trick to avoid these extra copies).  We should
 // consider other schemes that don't require these tricks.
 //
+// Eliminating all reference-countable members from indices implies that
+// indices need to essentially encode the path to the element within the data
+// structure.  Since one is free to choose the encoding, we think that it
+// should be possible to choose it in such a way that indices are cheaply
+// comparable.
+//
+// In this new model, indices don't have any method or property
+// requirements (these APIs were moved to Collection), so index
+// protocols were eliminated.  Instead, we are introducing
+// `CollectionType`, `BidirectionalCollectionType` and
+// `RandomAccessCollectionType`.  These protocols naturally compose
+// with `MutableCollectionType` and `RangeReplaceableCollectionType`:
+//
+//     protocol SequenceType {}
+//     protocol CollectionType : SequenceType {}
+//
+//       protocol MutableCollectionType : CollectionType {}
+//       protocol RangeReplaceableCollectionType : CollectionType {}
+//
+//       protocol BidirectionalCollectionType : CollectionType {}
+//         protocol RandomAccessCollectionType : BidirectionalCollectionType {}
+//
 // Proposed Solution
 // =================
 //
@@ -172,7 +194,7 @@ struct OldGenerator<G : MyGeneratorType> : GeneratorType {
 //------------------------------------------------------------------------
 
 public protocol MyIndexableType {
-  associatedtype Index : Equatable
+  associatedtype Index : Comparable
   associatedtype _Element
   associatedtype UnownedHandle
   var startIndex: Index { get }
@@ -201,7 +223,7 @@ extension MyIndexableType {
 
 public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   associatedtype Generator = DefaultGenerator<Self>
-  associatedtype Index : Equatable
+  associatedtype Index : Comparable
   associatedtype SubSequence : MySequenceType /* : MyForwardCollectionType */
     = MySlice<Self>
   associatedtype UnownedHandle = Self // DefaultUnownedForwardCollection<Self>
@@ -638,11 +660,12 @@ public struct DefaultForwardIndexRangeGenerator<Collection : MyIndexableType /* 
   }
 }
 
-public struct MyRange<Index : Equatable> : MyIndexRangeType {
+public struct MyRange<Index : Comparable> : MyIndexRangeType {
   public let startIndex: Index
   public let endIndex: Index
 
   public init(start: Index, end: Index) {
+    _precondition(start <= end, "Can't form a backwards MyRange")
     self.startIndex = start
     self.endIndex = end
   }
@@ -653,7 +676,7 @@ public struct MyRange<Index : Equatable> : MyIndexRangeType {
 }
 
 public func ..<*
-  <Index : Equatable>(lhs: Index, rhs: Index) -> MyRange<Index> {
+  <Index : Comparable>(lhs: Index, rhs: Index) -> MyRange<Index> {
   return MyRange(start: lhs, end: rhs)
 }
 
@@ -1069,7 +1092,7 @@ public struct MySimplestForwardCollection<Element> : MyForwardCollectionType {
   }
 }
 
-public struct MySimplestForwardCollectionIndex : Equatable {
+public struct MySimplestForwardCollectionIndex : Comparable {
   internal let _index: Int
   internal init(_ index: Int) {
     self._index = index
@@ -1081,6 +1104,13 @@ public func == (
   rhs: MySimplestForwardCollectionIndex
 ) -> Bool {
   return lhs._index == rhs._index
+}
+
+public func < (
+  lhs: MySimplestForwardCollectionIndex,
+  rhs: MySimplestForwardCollectionIndex
+) -> Bool {
+  return lhs._index < rhs._index
 }
 
 //------------------------------------------------------------------------
@@ -1116,7 +1146,7 @@ public struct MySimplestBidirectionalCollection<Element> : MyBidirectionalCollec
   }
 }
 
-public struct MySimplestBidirectionalCollectionIndex : Equatable {
+public struct MySimplestBidirectionalCollectionIndex : Comparable {
   internal let _index: Int
   internal init(_ index: Int) {
     self._index = index
@@ -1128,6 +1158,13 @@ public func == (
   rhs: MySimplestBidirectionalCollectionIndex
 ) -> Bool {
   return lhs._index == rhs._index
+}
+
+public func < (
+  lhs: MySimplestBidirectionalCollectionIndex,
+  rhs: MySimplestBidirectionalCollectionIndex
+) -> Bool {
+  return lhs._index < rhs._index
 }
 
 //------------------------------------------------------------------------
