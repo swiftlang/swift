@@ -40,7 +40,8 @@ static const StringRef SupportedConditionalCompilationArches[] = {
   "i386",
   "x86_64",
   "powerpc64",
-  "powerpc64le"
+  "powerpc64le",
+  "s390x"
 };
 
 static const StringRef SupportedConditionalCompilationEndianness[] = {
@@ -154,6 +155,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::x86_64:
     addPlatformConditionValue("arch", "x86_64");
     break;
+  case llvm::Triple::ArchType::systemz:
+    addPlatformConditionValue("arch", "s390x");
+    break;
   default:
     UnsupportedArch = true;
   }
@@ -181,6 +185,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::ArchType::x86_64:
     addPlatformConditionValue("_endian", "little");
+    break;
+  case llvm::Triple::ArchType::systemz:
+    addPlatformConditionValue("_endian", "big");
     break;
   default:
     llvm_unreachable("undefined architecture endianness");

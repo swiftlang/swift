@@ -33,7 +33,11 @@
 /// Does the current Swift platform use LLVM's intrinsic "swiftcall"
 /// calling convention for Swift functions?
 #ifndef SWIFT_USE_SWIFTCALL
+#ifdef __s390x__
+#define SWIFT_USE_SWIFTCALL 1
+#else
 #define SWIFT_USE_SWIFTCALL 0
+#endif
 #endif
 
 /// Does the current Swift platform allow information other than the

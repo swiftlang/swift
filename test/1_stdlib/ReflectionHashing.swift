@@ -49,7 +49,7 @@ Reflection.test("Dictionary") {
   expected += "  ▿ (2 elements)\n"
   expected += "    - .0: \"Three\"\n"
   expected += "    - .1: 3\n"
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   var expected = ""
   expected += "▿ 5 key/value pairs\n"
   expected += "  ▿ (2 elements)\n"
@@ -88,7 +88,7 @@ Reflection.test("Set") {
   expected += "  - 5\n"
   expected += "  - 2\n"
   expected += "  - 4\n"
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   var expected = ""
   expected += "▿ 5 members\n"
   expected += "  - 5\n"

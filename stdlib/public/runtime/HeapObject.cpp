@@ -176,13 +176,13 @@ public:
 
 static Lazy<MetadataCache<BoxCacheEntry>> Boxes;
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 BoxPair::Return
 swift::swift_allocBox(const Metadata *type) {
   return SWIFT_RT_ENTRY_REF(swift_allocBox)(type);
 }
 
-SWIFT_RT_ENTRY_IMPL_VISIBILITY
+SWIFT_CC(swift) SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
   // Get the heap metadata for the box.

@@ -53,3 +53,6 @@ func testConstantFoldFloatLiterals() {
 
 // powerpc64le: call void @{{.*}}_TF15FloatingPointIR13acceptFloat32FSfT_(float 1.000000e+00)
 // powerpc64le: call void @{{.*}}_TF15FloatingPointIR13acceptFloat64FSdT_(double 1.000000e+00)
+
+// s390x: call void @{{.*}}_TF15FloatingPointIR13acceptFloat32FSfT_(float 1.000000e+00)
+// s390x: call void @{{.*}}_TF15FloatingPointIR13acceptFloat64FSdT_(double 1.000000e+00)
