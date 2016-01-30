@@ -2808,6 +2808,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
       if (FT->isAutoClosure())
         convertType = FT->getResult();
 
+    // Replace archetypes and type parameters with UnresolvedType.
     if (convertType->hasTypeVariable() || convertType->hasArchetype() ||
         convertType->isTypeParameter())
       convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
@@ -4045,8 +4046,6 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
           return true;
         }
       }
-      
-      
     } else if (contextualType->is<InOutType>()) {
       contextualType = contextualType->getInOutObjectType();
     } else {

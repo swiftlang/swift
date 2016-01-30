@@ -1695,7 +1695,6 @@ namespace {
 
       // FIXME: If the base type is a type variable, constrain it to a metatype
       // of a bound generic type.
-      
       tc.diagnose(expr->getSubExpr()->getLoc(),
                   diag::not_a_generic_definition);
       tc.diagnose(expr->getLAngleLoc(),

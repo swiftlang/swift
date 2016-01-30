@@ -1695,8 +1695,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   if (concrete && kind >= TypeMatchKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
-    // T1 is convertible to T2 (by loading the value).
-    if (type1->is<LValueType>())
+    // T1 is convertible to T2 (by loading the value).  Note that we cannot get
+    // a value of inout type as an lvalue though.
+    if (type1->is<LValueType>() && !type2->is<InOutType>())
       conversionsOrFixes.push_back(
         ConversionRestrictionKind::LValueToRValue);
 
