@@ -79,7 +79,7 @@ struct TwoWordPair {
   TwoWordPair() = default;
   TwoWordPair(A first, B second);
 
-  // FIXME: rdar://16257592 arm codegen does't call swift_allocBox correctly.
+  // FIXME: rdar://16257592 arm codegen doesn't call swift_allocBox correctly.
   // Structs are returned indirectly on these platforms, but we want to return
   // in registers, so cram the result into an unsigned long long.
   // Use an enum class with implicit conversions so we don't dirty C callers

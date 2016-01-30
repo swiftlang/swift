@@ -74,7 +74,7 @@ class SILGlobalOpt {
 
   // Whether we see a "once" call to callees that we currently don't handle.
   bool UnhandledOnceCallee = false;
-  // Recored number of times a globalinit_func is called by "once".
+  // Record number of times a globalinit_func is called by "once".
   llvm::DenseMap<SILFunction*, unsigned> InitializerCount;
 public:
   SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA),
