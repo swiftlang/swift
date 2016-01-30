@@ -814,7 +814,7 @@ struct MemberLookupResult {
   
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
-    /// Argment labels don't match.
+    /// Argument labels don't match.
     UR_LabelMismatch,
     
     /// This uses a type like Self it its signature that cannot be used on an
