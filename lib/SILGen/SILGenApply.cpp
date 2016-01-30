@@ -2209,7 +2209,7 @@ namespace {
                                  &init, destTL);
     }
 
-    /// Deactive this special destination.  Must always be called
+    /// Deactivate this special destination.  Must always be called
     /// before destruction.
     void deactivate(SILGenFunction &gen) {
       assert(isValid() && "deactivating an invalid destination");

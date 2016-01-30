@@ -262,7 +262,7 @@ static bool isRelease(SILInstruction *Inst, SILValue RetainedValue,
   // We don't want to match the release with both retains in the example below.
   //
   //   retain %a  <--|
-  //   retain %a     | Match.   <-| Dont't match.
+  //   retain %a     | Match.   <-| Don't match.
   //   release %a <--|          <-|
   //
   if (auto *R = dyn_cast<ReleaseValueInst>(Inst))

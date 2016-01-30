@@ -350,7 +350,7 @@ markMultipleLoopLatchLoopBackEdges(RegionTy *LoopHeaderRegion, LoopTy *Loop,
 
 void LoopRegionFunctionInfo::initializeBlockRegions(PostOrderFunctionInfo *PI,
                                                     LoopInfoTy *LI) {
-  DEBUG(llvm::dbgs() << "Visting BB Regions:\n");
+  DEBUG(llvm::dbgs() << "Visiting BB Regions:\n");
 
   // Initialize regions for each BB and associate RPO numbers with each BB.
   //
