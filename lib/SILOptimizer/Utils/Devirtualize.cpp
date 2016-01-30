@@ -61,7 +61,7 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
   Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
   if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
-    // Filter out any subclassses that do not inherit from this
+    // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto RemovedIt = std::remove_if(Subs.begin(), Subs.end(),
         [&ClassType, &M](ClassDecl *Sub){
