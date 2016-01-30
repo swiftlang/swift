@@ -680,6 +680,43 @@ public func ..<*
   return MyRange(start: lhs, end: rhs)
 }
 
+// FIXME: replace this type with a conditional conformance on MyRange.
+public struct MyIterableRange<Index : MyStrideable> :
+  MyBidirectionalCollectionType {
+
+  public let startIndex: Index
+  public let endIndex: Index
+
+  public init(start: Index, end: Index) {
+    _precondition(start <= end, "Can't form a backwards MyIterableRange")
+    self.startIndex = start
+    self.endIndex = end
+  }
+
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    let result = i.advancedBy(1)
+    _precondition(startIndex <= result, "can't advance past endIndex")
+    return i.advancedBy(1)
+  }
+
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    let result = i.advancedBy(-1)
+    _precondition(result <= endIndex, "can't advance before startIndex")
+    return result
+  }
+
+  public subscript(i: Index) -> Index {
+    return i
+  }
+}
+
+public func ..<*
+  <Index : MyStrideable>(lhs: Index, rhs: Index) -> MyIterableRange<Index> {
+  return MyIterableRange(start: lhs, end: rhs)
+}
+
 // FIXME: in order for all this to be usable, we need to unify MyRange and
 // MyHalfOpenInterval.  We can do that by constraining the Bound to comparable,
 // and providing a conditional conformance to collection when the Bound is
@@ -1225,6 +1262,40 @@ public func < (
 }
 
 //------------------------------------------------------------------------
+// Simplest Strideable
+
+public struct MySimplestStrideable : MyStrideable {
+  internal let _value: Int
+  internal init(_ value: Int) {
+    self._value = value
+  }
+
+  @warn_unused_result
+  public func distanceTo(other: MySimplestStrideable) -> Int {
+    return _value.distanceTo(other._value)
+  }
+
+  @warn_unused_result
+  public func advancedBy(n: Int) -> MySimplestStrideable {
+    return MySimplestStrideable(_value.advancedBy(n))
+  }
+}
+
+public func == (
+  lhs: MySimplestStrideable,
+  rhs: MySimplestStrideable
+) -> Bool {
+  return lhs._value == rhs._value
+}
+
+public func < (
+  lhs: MySimplestStrideable,
+  rhs: MySimplestStrideable
+) -> Bool {
+  return lhs._value < rhs._value
+}
+
+//------------------------------------------------------------------------
 
 // FIXME: how does AnyCollection look like in the new scheme?
 
@@ -1291,6 +1362,19 @@ NewCollection.test("popFirst") {
   expectOptionalEqual(2, s.popFirst())
   expectOptionalEqual(3, s.popFirst())
   expectEmpty(s.popFirst())
+}
+
+NewCollection.test("RangeLiterals") {
+  let comparable = MinimalComparableValue(0)
+  let strideable = MySimplestStrideable(0)
+
+  var comparableRange = comparable..<*comparable
+  expectType(MyRange<MinimalComparableValue>.self, &comparableRange)
+
+  var strideableRange = strideable..<*strideable
+  expectType(MyIterableRange<MySimplestStrideable>.self, &strideableRange)
+
+  for _ in OldSequence(0..<*10) {}
 }
 
 runAllTests()
