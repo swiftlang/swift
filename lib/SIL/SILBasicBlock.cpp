@@ -212,8 +212,10 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
     ClonedScope->InlinedCallSite =
         getOrCreateClonedScope(OrigScope->InlinedCallSite);
   } else {
-    ClonedScope->SILFn = &NewFn;
-    ClonedScope->Parent = getOrCreateClonedScope(OrigScope->Parent);
+    if (auto *ParentScope = OrigScope->Parent.dyn_cast<const SILDebugScope *>())
+      ClonedScope->Parent = getOrCreateClonedScope(ParentScope);
+    else
+      ClonedScope->Parent = &NewFn;
   }
   // Create an inline scope for the cloned instruction.
   assert(ClonedScopeCache.find(OrigScope) == ClonedScopeCache.end());

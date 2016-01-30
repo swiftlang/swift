@@ -27,41 +27,55 @@ namespace swift {
 class SILDebugLocation;
 class SILDebugScope;
 
-/// SILDebugScope - This class stores a lexical scope as it is
-/// represented in the debug info.
+/// This class stores a lexical scope as it is represented in the
+/// debug info. In contrast to LLVM IR, SILDebugScope also holds all
+/// the inlining information. In LLVM IR the inline info is part of
+/// DILocation.
 class SILDebugScope : public SILAllocated<SILDebugScope> {
 public:
+  /// The AST node this lexical scope represents.
   SILLocation Loc;
   /// Always points to the parent lexical scope.
-  const SILDebugScope *Parent;
+  /// For top-level scopes, this is the SILFunction.
+  PointerUnion<const SILDebugScope *, SILFunction *> Parent;
   /// If this scope is inlined, this points to a special "scope" that
   /// holds only the location of the call site. The parent scope will be
   /// the scope of the inlined call site.
   const SILDebugScope *InlinedCallSite;
-  /// The SILFunction that the scope belongs to. Inlined functions may
-  /// be elided, so keep track of their type here.
-  /// FIXME: Storing this for every scope is wasteful.  We only need
-  /// this once per function.
-  SILFunction *SILFn;
 
   SILDebugScope(SILLocation Loc, SILFunction &SILFn,
-                const SILDebugScope *Parent = nullptr,
+                const SILDebugScope *ParentScope = nullptr,
                 const SILDebugScope *InlinedCallSite = nullptr)
-      : Loc(Loc), Parent(Parent), InlinedCallSite(InlinedCallSite),
-        SILFn(&SILFn) {}
+      : Loc(Loc), InlinedCallSite(InlinedCallSite) {
+    if (ParentScope)
+      Parent = ParentScope;
+    else
+      Parent = &SILFn;
+  }
 
   /// Create a scope for an artificial function.
   SILDebugScope(SILLocation Loc)
-      : Loc(Loc), Parent(nullptr), InlinedCallSite(nullptr), SILFn(nullptr) {}
+      : Loc(Loc), InlinedCallSite(nullptr) {}
 
   /// Create an inlined version of CalleeScope.
   SILDebugScope(const SILDebugScope *CallSiteScope,
-                const SILDebugScope *CalleeScope, SILFunction *InlinedFn)
+                const SILDebugScope *CalleeScope)
       : Loc(CalleeScope->Loc), Parent(CalleeScope->Parent),
-        InlinedCallSite(CallSiteScope), SILFn(InlinedFn) {
+        InlinedCallSite(CallSiteScope) {
     assert(CallSiteScope && CalleeScope);
-    assert(InlinedFn->isInlined() &&
+    assert(CalleeScope->getFunction()->isInlined() &&
            "function of inlined debug scope is not inlined");
+  }
+
+  SILFunction *getFunction() const {
+    if (Parent.isNull())
+      return nullptr;
+
+    const SILDebugScope *Scope = this;
+    while (Scope->Parent.is<const SILDebugScope *>())
+      Scope = Scope->Parent.get<const SILDebugScope *>();
+    assert(Scope->Parent.is<SILFunction *>() && "orphaned scope");
+    return Scope->Parent.get<SILFunction *>();
   }
 };
 
@@ -84,8 +98,9 @@ public:
     // debug scope. Create a new one here.
     // FIXME: Audit all call sites and make them create the function
     // debug scope.
-    if (NewFn.getDebugScope()->SILFn != &NewFn) {
-      NewFn.getDebugScope()->SILFn->setInlined();
+    auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
+    if (SILFn != &NewFn) {
+      SILFn->setInlined();
       NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));
     }
   }

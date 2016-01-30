@@ -43,7 +43,7 @@ public:
                 CloneCollector::CallbackType Callback)
   : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
                     ApplySubs), Callback(Callback) {
-    assert(F->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
+    assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.

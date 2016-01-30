@@ -244,7 +244,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
 
   CapturePropagationCloner cloner(OrigF, NewF);
   cloner.cloneBlocks(PAI->getArguments());
-  assert(OrigF->getDebugScope()->SILFn != NewF->getDebugScope()->SILFn);
+  assert(OrigF->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
   return NewF;
 }
 

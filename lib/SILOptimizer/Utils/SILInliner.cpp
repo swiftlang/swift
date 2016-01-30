@@ -204,7 +204,7 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
     return it->second;
 
   auto InlineScope = new (getBuilder().getFunction().getModule())
-    SILDebugScope(CallSiteScope, CalleeScope, CalleeScope->SILFn);
+      SILDebugScope(CallSiteScope, CalleeScope);
   assert(CallSiteScope->Parent == InlineScope->InlinedCallSite->Parent);
 
   InlinedScopeCache.insert({CalleeScope, InlineScope});

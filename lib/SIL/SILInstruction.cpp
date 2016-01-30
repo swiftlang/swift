@@ -45,7 +45,7 @@ void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
   if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
 
-  assert(DS->InlinedCallSite || DS->SILFn == getFunction() &&
+  assert(DS->InlinedCallSite || DS->getFunction() == getFunction() &&
          "scope of a non-inlined instruction points to different function");
 
   Location = *B.getOrCreateDebugLocation(getLoc(), DS);
