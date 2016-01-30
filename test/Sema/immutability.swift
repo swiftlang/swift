@@ -13,7 +13,7 @@ let bad_property_2: Int = 0 {
   }
 }
 
-let no_initializer : Int
+let no_initializer: Int
 
 
 
@@ -23,7 +23,7 @@ func foreach_variable() {
   }
 }
 
-func takeClosure(fn : (Int) -> Int) {}
+func takeClosure(fn: (Int) -> Int) {}
 
 func passClosure() {
   takeClosure { a in
@@ -36,7 +36,7 @@ func passClosure() {
     return 42
   }
   
-  takeClosure { (a : Int) -> Int in
+  takeClosure { (a: Int) -> Int in
     a = 42     // expected-error{{cannot assign to value: 'a' is a 'let' constant}}
     return 42
   }
@@ -56,12 +56,12 @@ class FooClass {
     self = FooClass()  // expected-error {{cannot assign to value: 'self' is immutable}}
   }
   
-  mutating init(a : Bool) {}     // expected-error {{'mutating' may only be used on 'func' declarations}} {{3-12=}}
+  mutating init(a: Bool) {}     // expected-error {{'mutating' may only be used on 'func' declarations}} {{3-12=}}
   
   mutating            // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} {{3-12=}}
   func baz() {}
 
-  var x : Int {
+  var x: Int {
     get {
       return 32
     }
@@ -70,7 +70,7 @@ class FooClass {
     }
   }
   
-  subscript(i : Int) -> Int {
+  subscript(i: Int) -> Int {
     get {
       i = 42             // expected-error {{cannot assign to value: 'i' is immutable}}
       return 1
@@ -143,7 +143,7 @@ struct SomeStruct {
   }
 
   // Defaults can be changed.
-  var q : Int {
+  var q: Int {
     mutating
     get {
       iv = 37
@@ -155,7 +155,7 @@ struct SomeStruct {
     }
   }
 
-  var r : Int {
+  var r: Int {
     get {        // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-5=mutating }}
       iv = 37 // expected-error {{cannot assign to property: 'self' is immutable}}
       return 42
@@ -178,20 +178,20 @@ struct TestMutableStruct {
   func g() {}
   
   
-  var mutating_property : Int {
+  var mutating_property: Int {
     mutating
     get {}
     set {}
   }
   
-  var nonmutating_property : Int {
+  var nonmutating_property: Int {
     get {}
     nonmutating
     set {}
   }
   
   // This property has a mutating getter and !mutating setter.
-  var weird_property : Int {
+  var weird_property: Int {
     mutating get {}
     nonmutating set {}
   }
@@ -220,9 +220,9 @@ func test_mutability() {
 }
 
 
-func test_arguments(a : Int,
-                    b : Int,
-                    let c : Int) {
+func test_arguments(a: Int,
+                    b: Int,
+                    let c: Int) {
   var b = b
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
   b = 2  // ok.
@@ -231,7 +231,7 @@ func test_arguments(a : Int,
 }
 
 
-protocol ClassBoundProtocolMutating : class {
+protocol ClassBoundProtocolMutating: class {
   mutating       // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} {{3-12=}}
   func f()
 }
@@ -243,23 +243,23 @@ protocol MutatingTestProto {
   func nonmutatingfunc()  // expected-note {{protocol requires}}
 }
 
-class TestClass : MutatingTestProto {
+class TestClass: MutatingTestProto {
   func mutatingfunc() {}  // Ok, doesn't need to be mutating.
   func nonmutatingfunc() {}
 }
 
-struct TestStruct1 : MutatingTestProto {
+struct TestStruct1: MutatingTestProto {
   func mutatingfunc() {}  // Ok, doesn't need to be mutating.
   func nonmutatingfunc() {}
 }
 
-struct TestStruct2 : MutatingTestProto {
+struct TestStruct2: MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   func nonmutatingfunc() {}
 }
 
-struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct3: MutatingTestProto {   // expected-error {{type 'TestStruct3' does not conform to protocol 'MutatingTestProto'}}
   func mutatingfunc() {}
 
   // This is not ok, "nonmutatingfunc" doesn't allow mutating functions.
@@ -272,7 +272,7 @@ struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3
 protocol NonMutatingSubscriptable {
   subscript(i: Int) -> Int {get nonmutating set} // expected-note {{protocol requires subscript with type '(Int) -> Int'}}
 }
-struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{type 'MutatingSubscriptor' does not conform to protocol 'NonMutatingSubscriptable'}}
+struct MutatingSubscriptor: NonMutatingSubscriptable {  // expected-error {{type 'MutatingSubscriptor' does not conform to protocol 'NonMutatingSubscriptable'}}
   subscript(i: Int) -> Int {
     get { return 42 }
     mutating set {}   // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
@@ -282,7 +282,7 @@ struct MutatingSubscriptor : NonMutatingSubscriptable {  // expected-error {{typ
 protocol NonMutatingGet {
   var a: Int { get } // expected-note {{protocol requires property 'a' with type 'Int'}}
 }
-struct MutatingGet : NonMutatingGet { // expected-error {{type 'MutatingGet' does not conform to protocol 'NonMutatingGet'}}
+struct MutatingGet: NonMutatingGet { // expected-error {{type 'MutatingGet' does not conform to protocol 'NonMutatingGet'}}
   var a: Int { mutating get { return 0 } } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
 }
 
@@ -331,19 +331,19 @@ func testSelectorStyleArguments2(let x: Int,
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
-func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
+func invalid_inout(inout var x: Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
 }
 
 
 
-func updateInt(inout x : Int) {}
+func updateInt(inout x: Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
-  let a : Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
-  let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  let a: Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  let b: Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
 
-  init(arg : Int) {
+  init(arg: Int) {
     a = arg             // ok, a is mutable in init()
     updateInt(&a)       // ok, a is mutable in init() and has been initialized
     b = 17              // ok, b is mutable in init()
@@ -356,10 +356,10 @@ class LetClassMembers {
   }
 }
 struct LetStructMembers {
-  let a : Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
-  let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  let a: Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  let b: Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
 
-  init(arg : Int) {
+  init(arg: Int) {
     a = arg             // ok, a is mutable in init()
     updateInt(&a)       // ok, a is mutable in init() and has been initialized
     b = 17              // ok, b is mutable in init()
@@ -386,7 +386,7 @@ func QoI() {
 
 // <rdar://problem/17051675> Structure initializers in an extension cannot assign to constant properties
 struct rdar17051675_S {
-  let x : Int
+  let x: Int
   init(newX: Int) {
     x = 42
   }
@@ -399,7 +399,7 @@ extension rdar17051675_S {
 }
 
 struct rdar17051675_S2<T> {
-  let x : Int
+  let x: Int
   init(newX: Int) {
     x = 42
   }
@@ -414,7 +414,7 @@ extension rdar17051675_S2 {
 
 // <rdar://problem/17400366> let properties should not be mutable in convenience initializers
 class ClassWithConvenienceInit {
-  let x : Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  let x: Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   init(newX: Int) {
     x = 42
   }
@@ -447,7 +447,7 @@ protocol SingleIntProperty {
   var i: Int { get }
 }
 
-struct SingleIntStruct : SingleIntProperty {
+struct SingleIntStruct: SingleIntProperty {
   let i: Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
 }
 
@@ -476,7 +476,7 @@ struct TestSubscriptMutability {
     self = TestSubscriptMutability() // expected-error {{cannot assign to value: 'self' is immutable}}
   }
 
-  subscript(a : Int) -> TestSubscriptMutability {
+  subscript(a: Int) -> TestSubscriptMutability {
     return TestSubscriptMutability()
   }
 
@@ -487,12 +487,12 @@ struct TestSubscriptMutability {
   }
 }
 
-func f(a : TestSubscriptMutability) {
+func f(a: TestSubscriptMutability) {
   a.var_arr = []  // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
 }
 
 struct TestSubscriptMutability2 {
-  subscript(a : Int) -> Int {
+  subscript(a: Int) -> Int {
     get { return 42 }
     set {}
   }
@@ -524,7 +524,7 @@ struct TestBangMutability {
 
 // <rdar://problem/21176945> mutation through ? not considered a mutation
 func testBindOptional() {
-  var a : TestStruct2? = nil  // Mutated through optional chaining.
+  var a: TestStruct2? = nil  // Mutated through optional chaining.
   a?.mutatingfunc()
 }
 
