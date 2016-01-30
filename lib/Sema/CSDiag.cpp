@@ -2553,6 +2553,7 @@ namespace {
     llvm::DenseMap<TypeLoc*, std::pair<Type, bool>> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
+    llvm::DenseMap<CollectionExpr*, Expr*> CollectionSemanticExprs;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
     void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
@@ -2570,8 +2571,8 @@ namespace {
             if (isa<ModuleDecl>(declRef->getDecl()))
               return { false, expr };
           
-          // Don't strip type info off OtherConstructorDeclRefExpr, because CSGen
-          // doesn't know how to reconstruct it.
+          // Don't strip type info off OtherConstructorDeclRefExpr, because
+          // CSGen doesn't know how to reconstruct it.
           if (isa<OtherConstructorDeclRefExpr>(expr))
             return { false, expr };
           
@@ -2598,6 +2599,15 @@ namespace {
                 TS->ParamDeclTypes[P] = P->getType();
                 P->overwriteType(Type());
               }
+          
+          // If we have a CollectionExpr with a type checked SemanticExpr,
+          // remove it so we can recalculate a new semantic form.
+          if (auto *CE = dyn_cast<CollectionExpr>(expr)) {
+            if (auto SE = CE->getSemanticExpr()) {
+              TS->CollectionSemanticExprs[CE] = SE;
+              CE->setSemanticExpr(nullptr);
+            }
+          }
           
           expr->setType(nullptr);
           expr->clearLValueAccessKind();
@@ -2646,6 +2656,9 @@ namespace {
       for (auto paramDeclElt : ParamDeclTypes)
         paramDeclElt.first->overwriteType(paramDeclElt.second);
       
+      for (auto CSE : CollectionSemanticExprs)
+        CSE.first->setSemanticExpr(CSE.second);
+      
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
       TypeLocTypes.clear();
@@ -2660,6 +2673,10 @@ namespace {
     // we go digging through failed constraints, and expect their locators to
     // still be meaningful.
     ~ExprTypeSaverAndEraser() {
+      for (auto CSE : CollectionSemanticExprs)
+        if (!CSE.first->getType())
+          CSE.first->setSemanticExpr(CSE.second);
+
       for (auto exprElt : ExprTypes)
         if (!exprElt.first->getType())
           exprElt.first->setType(exprElt.second);
@@ -2676,7 +2693,6 @@ namespace {
       for (auto paramDeclElt : ParamDeclTypes)
         if (!paramDeclElt.first->hasType())
           paramDeclElt.first->setType(paramDeclElt.second);
-
     }
   };
 }
