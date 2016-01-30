@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import StdlibUnittest
+
 public protocol WrapperType {
   associatedtype Base
   init(_: Base)

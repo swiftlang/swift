@@ -28,7 +28,6 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   StdlibUnittest.swift.gyb
 
   InterceptTraps.cpp
-  LoggingWrappers.swift.gyb
   OpaqueIdentityFunctions.cpp
   OpaqueIdentityFunctions.swift
   RaceTest.swift

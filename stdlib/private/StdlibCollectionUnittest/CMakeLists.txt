@@ -19,6 +19,7 @@ add_swift_library(swiftStdlibCollectionUnittest SHARED IS_STDLIB
   CheckRangeReplaceableCollectionType.swift
   CheckRangeReplaceableSliceType.swift
   CheckSequenceType.swift
+  LoggingWrappers.swift.gyb
   MinimalCollections.swift.gyb
 
   PRIVATE_LINK_LIBRARIES ${swift_stdlib_unittest_private_link_libraries}
