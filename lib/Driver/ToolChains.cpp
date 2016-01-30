@@ -1109,6 +1109,12 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     break;
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
+    if (getTriple().getOS() == llvm::Triple::Linux) {
+      if (getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7 ||
+          getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v6) {
+        Arguments.push_back("-Wl,-Bsymbolic");
+      }
+    }
     break;
   }
 
@@ -1143,6 +1149,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
                           getPlatformNameForTriple(getTriple()));
   Arguments.push_back("-L");
   Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+
+  Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(RuntimeLibPath);
