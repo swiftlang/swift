@@ -204,7 +204,7 @@ private:
   llvm::SmallBitVector ForwardSetOut;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
-  /// LocationVault. If we ignore all unknown write, whats the maximum set
+  /// LocationVault. If we ignore all unknown write, what's the maximum set
   /// of available locations at the current position in the basic block.
   llvm::SmallBitVector ForwardSetMax;
 
