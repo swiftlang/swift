@@ -17,9 +17,10 @@
 //===----------------------------------------------------------------------===//
 extension ALAssetsLibrary { 
   @nonobjc
-  public func enumerateGroupsWithTypes(var types: UInt32, 
+  public func enumerateGroupsWithTypes(types: UInt32, 
       usingBlock enumerationBlock: ALAssetsLibraryGroupsEnumerationResultsBlock!,
       failureBlock: ALAssetsLibraryAccessFailureBlock!) {
+    var types = types
     if (types == ALAssetsGroupAll) {
       types = ALAssetsGroupLibrary | ALAssetsGroupAlbum | ALAssetsGroupEvent | 
               ALAssetsGroupFaces | ALAssetsGroupSavedPhotos | 
