@@ -168,7 +168,7 @@ func callThroughLet(predicate: (Int, Int) -> Bool) {
 }
 
 
-// Verify that the mangling of a symbol doesn't depent on whether an argument
+// Verify that the mangling of a symbol doesn't depend on whether an argument
 // is var or let.
 func var_argument_mangling(var a : Int) {}
 func let_argument_mangling(let a : Int) {}

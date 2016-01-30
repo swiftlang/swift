@@ -244,7 +244,7 @@ static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
   HashStream.Hash.final(Result);
 }
 
-/// Reeturns false if the hash of the current module \p HashData matches the
+/// Returns false if the hash of the current module \p HashData matches the
 // hash which is stored in an existing output object file.
 static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
                            llvm::GlobalVariable *HashGlobal,
