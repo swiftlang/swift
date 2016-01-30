@@ -741,7 +741,7 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
-  TypeSubstitutionMap getMemberSubstitutions(DeclContext *dc);
+  TypeSubstitutionMap getMemberSubstitutions(const DeclContext *dc);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
@@ -779,7 +779,7 @@ public:
   /// substitute in the types from the given base type (this) to produce
   /// the resulting member type.
   Type getTypeOfMember(ModuleDecl *module, Type memberType,
-                       DeclContext *memberDC);
+                       const DeclContext *memberDC);
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();

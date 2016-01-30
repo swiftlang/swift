@@ -246,7 +246,8 @@ struct PrintOptions {
     return result;
   }
 
-  static PrintOptions printTypeInterface(Type T, DeclContext *DC);
+  static PrintOptions printTypeInterface(Type T, const DeclContext *DC);
+  void setArchetypeTransform(Type T, const DeclContext *DC);
 
   /// Retrieve the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {
