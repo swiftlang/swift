@@ -263,7 +263,7 @@ ${orderingRequirementForComparable}
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       let endAddress = baseAddress + count
-      _stableSort(baseAddress, endAddress)
+      _stableSort(start: baseAddress, end: endAddress)
       return ()
     }
     if didSortUnsafeBuffer == nil {
@@ -290,7 +290,7 @@ ${orderingRequirementForPredicate}
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       let endAddress = baseAddress + count
-      _stableSort(baseAddress, endAddress, escapableIsOrderedBefore)
+      _stableSort(start: baseAddress, end: endAddress, escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {
