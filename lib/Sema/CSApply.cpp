@@ -2416,35 +2416,16 @@ namespace {
 
         Type toType = simplifyType(expr->getType());
         
-        // Don't allow lvalues when indexing into a tuple expr.
-        // If we get any lvalues, add load exprs to convert the tuple to be all rvalues.
-        if (auto *tupleExpr = dyn_cast<TupleExpr>(base)) {
-          unsigned count = tupleExpr->getNumElements();
-          unsigned lvalues = 0;
-          auto &tc = cs.getTypeChecker();
-          SmallVector<TupleTypeElt, 4> tupleElts;
-          for (unsigned i = 0; i < count; i++) {
-            Expr *elementExpr = tupleExpr->getElement(i);
-            Type elementType = elementExpr->getType();
-            if (elementType->isLValueType()) {
-              lvalues++;
-              elementExpr->propagateLValueAccessKind(AccessKind::Read, true);
-              elementExpr = new (tc.Context) LoadExpr(elementExpr, elementType->getRValueType());
-              tupleExpr->setElement(i, elementExpr);
-            }
-            tupleElts.push_back(elementExpr->getType());
-          }
-          
-          if (lvalues > 0) {
-            auto &Context = tupleExpr->getType()->getASTContext();
-            tupleExpr->setType(TupleType::get(tupleElts, Context));
-            toType = toType->getRValueType();
-          }
-        }
+        // If the result type is an rvalue and the base contains lvalues, need a full
+        // tuple coercion to properly load & set access kind on all underlying elements
+        // before taking a single element.
+        baseTy = base->getType();
+        if (!toType->isLValueType() && baseTy->isLValueType())
+          base = coerceToType(base, baseTy->getRValueType(), cs.getConstraintLocator(base));
 
         return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
-                                          selected.choice.getTupleIndex(),
-                                          nameLoc.getBaseNameLoc(), toType);
+                                                         selected.choice.getTupleIndex(),
+                                                         nameLoc.getBaseNameLoc(), toType);
       }
 
       case OverloadChoiceKind::BaseType: {
@@ -4834,6 +4815,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::LValueToRValue: {
+      if (toType->is<TupleType>() || fromType->is<TupleType>())
+        break;
+      
       // Load from the lvalue.
       expr->propagateLValueAccessKind(AccessKind::Read);
       expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());

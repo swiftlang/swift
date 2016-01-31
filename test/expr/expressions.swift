@@ -842,3 +842,5 @@ let _ = (x, 3).1
 (x,y) = (2,3)
 (x,4) = (1,2) // expected-error {{cannot assign to value: function call returns immutable value}}
 (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
+x = (x,(3,y)).1.1
+
