@@ -25,6 +25,9 @@ def host_target():
         elif machine.startswith('armv7'):
             # linux-armv7* is canonicalized to 'linux-armv7'
             return 'linux-armv7'
+        elif machine.startswith('armv6'):
+            # linux-armv6* is canonicalized to 'linux-armv6'
+            return 'linux-armv6'
         elif machine == 'aarch64':
             return 'linux-aarch64'
         elif machine == 'ppc64':
