@@ -3415,6 +3415,24 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     assert(contextPtr->getType() == IGM.RefCountedPtrTy);
   }
 
+  Explosion polyArgs;
+
+  // Emit the polymorphic arguments.
+  assert((subs.empty() != hasPolymorphicParameters(origType) ||
+         (subs.empty() && origType->getRepresentation() ==
+             SILFunctionTypeRepresentation::WitnessMethod))
+         && "should have substitutions iff original function is generic");
+  WitnessMetadata witnessMetadata;
+  if (hasPolymorphicParameters(origType)) {
+    emitPolymorphicArguments(subIGF, origType, substType, subs,
+                             &witnessMetadata, polyArgs);
+  }
+
+  auto haveContextArgument =
+      calleeHasContext ||
+      (origType->hasSelfParam() &&
+       isSelfContextParameter(origType->getSelfParameter()));
+
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
   if (!layout) {
@@ -3453,8 +3471,21 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       llvm_unreachable("should never happen!");
     }
 
+    // FIXME: The naming and documentation here isn't ideal. This
+    // parameter is always present which is evident since we always
+    // grab a type to cast to, but sometimes after the polymorphic
+    // arguments. This is just following the lead of existing (and not
+    // terribly easy to follow) code.
+
+    // If there is a context argument, it comes after the polymorphic
+    // arguments.
+    auto argIndex = args.size();
+    if (haveContextArgument)
+      argIndex += polyArgs.size();
+
     llvm::Type *expectedArgTy =
-      fnTy->getPointerElementType()->getFunctionParamType(args.size());
+        fnTy->getPointerElementType()->getFunctionParamType(argIndex);
+
     llvm::Value *argValue;
     if (isIndirectParameter(argConvention)) {
       expectedArgTy = expectedArgTy->getPointerElementType();
@@ -3593,22 +3624,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   //   - 'self', in which case it was the last formal argument.
   // In either case, it's the last thing in 'args'.
   llvm::Value *fnContext = nullptr;
-  if (calleeHasContext ||
-      (origType->hasSelfParam() &&
-       isSelfContextParameter(origType->getSelfParameter()))) {
+  if (haveContextArgument)
     fnContext = args.takeLast();
-  }
 
-  // Emit the polymorphic arguments.
-  assert((subs.empty() != hasPolymorphicParameters(origType) ||
-         (subs.empty() && origType->getRepresentation() ==
-             SILFunctionTypeRepresentation::WitnessMethod))
-         && "should have substitutions iff original function is generic");
-  WitnessMetadata witnessMetadata;
-  if (hasPolymorphicParameters(origType)) {
-    emitPolymorphicArguments(subIGF, origType, substType, subs,
-                             &witnessMetadata, args);
-  }
+  polyArgs.transferInto(args, polyArgs.size());
 
   // Okay, this is where the callee context goes.
   if (fnContext) {
