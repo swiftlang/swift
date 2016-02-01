@@ -713,13 +713,13 @@ Finally, classes allow the following changes that do not apply to structs:
   declaration of the original member must remain along with its original
   availability, but its body may consist of simply calling the new superclass
   implementation.
-- Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
-  is a subclass of ``A`` *and* class ``B``, along with any superclasses between
-  it and class ``A``, were introduced in the latest version of the library.
 - A non-final override of a method, subscript, property, or initializer may be
   removed as long as the generic parameters, formal parameters, and return type
   *exactly* match the overridden declaration. Any existing callers should 
   automatically use the superclass implementation.
+- Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
+  is a subclass of ``A`` *and* class ``B``, along with any superclasses between
+  it and class ``A``, were introduced in the latest version of the library.
 
 .. admonition:: TODO
 
