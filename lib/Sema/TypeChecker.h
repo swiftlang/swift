@@ -976,17 +976,6 @@ public:
                              GenericSignature *genericSig,
                              ArrayRef<Type> genericArgs);
 
-  /// Given a type that was produced within the given generic declaration
-  /// context, produce the corresponding interface type.
-  ///
-  /// \param dc The declaration context in which the type was produced.
-  ///
-  /// \param type The type, which involves archetypes but not dependent types.
-  ///
-  /// \returns the type after mapping all archetypes to their corresponding
-  /// dependent types.
-  Type getInterfaceTypeFromInternalType(DeclContext *dc, Type type);
-
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;
 

@@ -372,7 +372,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
     // Retrieve the interface type for this inherited type.
     if (DC->isGenericContext() && DC->isTypeContext()) {
-      inheritedTy = getInterfaceTypeFromInternalType(DC, inheritedTy);
+      inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
     }
 
     // Check whether we inherited from the same type twice.
@@ -1243,7 +1243,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     if (dc->isGenericContext() && dc->isTypeContext()) {
       binding->getPattern(entryNumber)->forEachVariable([&](VarDecl *var) {
         var->setInterfaceType(
-          tc.getInterfaceTypeFromInternalType(dc, var->getType()));
+          ArchetypeBuilder::mapTypeOutOfContext(dc, var->getType()));
       });
     }
 
@@ -2998,9 +2998,9 @@ public:
 
       // If we're in a generic context, set the interface type.
       if (dc->isGenericContext()) {
-        auto indicesTy = TC.getInterfaceTypeFromInternalType(
+        auto indicesTy = ArchetypeBuilder::mapTypeOutOfContext(
                            dc, indicesType);
-        auto elementTy = TC.getInterfaceTypeFromInternalType(
+        auto elementTy = ArchetypeBuilder::mapTypeOutOfContext(
                            dc, SD->getElementType());
         SD->setInterfaceType(FunctionType::get(indicesTy, elementTy));
       }
@@ -3114,8 +3114,8 @@ public:
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
       } else if (TAD->getDeclContext()->isGenericContext()) {
         TAD->setInterfaceType(
-          TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
-                                              TAD->getType()));
+          ArchetypeBuilder::mapTypeOutOfContext(TAD->getDeclContext(),
+                                                TAD->getType()));
       }
 
       // We create TypeAliasTypes with invalid underlying types, so we
@@ -5067,10 +5067,10 @@ public:
 
     // Build the generic function type.
     auto funcTy = elt->getType()->castTo<AnyFunctionType>();
-    auto inputTy = TC.getInterfaceTypeFromInternalType(enumDecl,
-                                                       funcTy->getInput());
-    auto resultTy = TC.getInterfaceTypeFromInternalType(enumDecl,
-                                                        funcTy->getResult());
+    auto inputTy = ArchetypeBuilder::mapTypeOutOfContext(enumDecl,
+                                                         funcTy->getInput());
+    auto resultTy = ArchetypeBuilder::mapTypeOutOfContext(enumDecl,
+                                                          funcTy->getResult());
     auto interfaceTy
       = GenericFunctionType::get(enumDecl->getGenericSignatureOfContext(),
                                  inputTy, resultTy, funcTy->getExtInfo());

@@ -449,7 +449,7 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
     // in the TypeRepr.  Because of this, Sema isn't able to rebuild it in
     // terms of interface types.  When interface types prevail, this should be
     // removed.  Until then, we hack the mapping here.
-    return TC.getInterfaceTypeFromInternalType(fn, resultType);
+    return ArchetypeBuilder::mapTypeOutOfContext(fn, resultType);
   }
 
   return resultType;
@@ -583,7 +583,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       // archetypes rather than dependent types. Replace the
       // archetypes with their corresponding dependent types.
       if (func->isImplicit()) {
-        argTy = getInterfaceTypeFromInternalType(func, argTy); 
+        argTy = ArchetypeBuilder::mapTypeOutOfContext(func, argTy); 
       }
 
       if (initFuncTy)
@@ -906,21 +906,6 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
   }
 
   return false;
-}
-
-Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
-  assert(dc->isGenericContext() && "Not a generic context?");
-
-  // Capture the archetype -> generic parameter type mapping.
-  TypeSubstitutionMap substitutions;
-  for (auto params = dc->getGenericParamsOfContext(); params;
-       params = params->getOuterParameters()) {
-    for (auto param : *params) {
-      substitutions[param->getArchetype()] = param->getDeclaredType();
-    }
-  }
-
-  return type.subst(dc->getParentModule(), substitutions, None);
 }
 
 Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
