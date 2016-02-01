@@ -588,8 +588,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       auto *VD = capture.getDecl();
       auto type = VD->getType()->getCanonicalType();
       
-      type = Types.getInterfaceTypeOutOfContext(type,
-                                                function->getAsDeclContext());
+      type = ArchetypeBuilder::mapTypeOutOfContext(
+          function->getAsDeclContext(), type)->getCanonicalType();
       
       auto &loweredTL = Types.getTypeLowering(
                                     AbstractionPattern(genericSig, type), type);

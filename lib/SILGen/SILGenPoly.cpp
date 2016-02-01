@@ -1433,21 +1433,28 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
-  auto &Types = SGM.M.Types;
+  auto *moduleDecl = SGM.M.getSwiftModule();
   for (auto &param : params) {
     interfaceParams.push_back(
-      SILParameterInfo(Types.getInterfaceTypeOutOfContext(param.getType(), generics),
-                       param.getConvention()));
+      SILParameterInfo(
+          ArchetypeBuilder::mapTypeOutOfContext(
+              moduleDecl, generics, param.getType())
+                ->getCanonicalType(),
+          param.getConvention()));
   }
   
   auto interfaceResult = SILResultInfo(
-    Types.getInterfaceTypeOutOfContext(expectedType->getResult().getType(), generics),
-    expectedType->getResult().getConvention());
+      ArchetypeBuilder::mapTypeOutOfContext(
+          moduleDecl, generics, expectedType->getResult().getType())
+              ->getCanonicalType(),
+      expectedType->getResult().getConvention());
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     interfaceErrorResult = SILResultInfo(
-      Types.getInterfaceTypeOutOfContext(expectedType->getErrorResult().getType(), generics),
+      ArchetypeBuilder::mapTypeOutOfContext(
+        moduleDecl, generics, expectedType->getErrorResult().getType())
+            ->getCanonicalType(),
       expectedType->getErrorResult().getConvention());
   }
   
