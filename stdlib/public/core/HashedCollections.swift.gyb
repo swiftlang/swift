@@ -4002,45 +4002,6 @@ extension ${Self}Generator : CustomReflectable {
   }
 }
 
-internal struct ${Self}MirrorPosition<${TypeParametersDecl}> {
-  internal typealias MirroredType = ${Self}<${TypeParameters}>
-
-  internal var _intPos: Int
-  internal var ${Self}Pos: MirroredType.Index
-
-  internal init(_ m: MirroredType) {
-    _intPos = 0
-    ${Self}Pos = m.startIndex
-  }
-
-  internal mutating func successor() {
-    _intPos = _intPos + 1
-    ${Self}Pos._successorInPlace()
-  }
-
-}
-
-@warn_unused_result
-internal func == <${TypeParametersDecl}> (
-  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
-) -> Bool {
-  return lhs._intPos == rhs
-}
-
-@warn_unused_result
-internal func > <${TypeParametersDecl}> (
-  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
-) -> Bool {
-  return lhs._intPos > rhs
-}
-
-@warn_unused_result
-internal func < <${TypeParametersDecl}> (
-  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
-) -> Bool {
-  return lhs._intPos < rhs
-}
-
 extension ${Self} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
