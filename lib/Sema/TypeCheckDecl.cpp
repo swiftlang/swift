@@ -3945,7 +3945,8 @@ public:
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(FD->getModuleContext());
-        TC.checkGenericParamList(&builder, gp, FD->getDeclContext());
+        auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig);
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getParameterLists()) {
@@ -5310,7 +5311,8 @@ public:
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
-        TC.checkGenericParamList(&builder, gp, CD->getDeclContext());
+        auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig);
 
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getParameterList(1), gp);
@@ -5763,7 +5765,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
         ArchetypeBuilder builder =
           createArchetypeBuilder(nominal->getModuleContext());
-        checkGenericParamList(&builder, gp, nominal->getDeclContext());
+        auto *parentSig = nominal->getDeclContext()->getGenericSignatureOfContext();
+        checkGenericParamList(&builder, gp, parentSig);
         finalizeGenericParamList(builder, gp, nominal, *this);
       }
     }
@@ -5822,7 +5825,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     ArchetypeBuilder builder =
       createArchetypeBuilder(proto->getModuleContext());
-    checkGenericParamList(&builder, gp, proto->getDeclContext());
+    auto *parentSig = proto->getDeclContext()->getGenericSignatureOfContext();
+    checkGenericParamList(&builder, gp, parentSig);
     finalizeGenericParamList(builder, gp, proto, *this);
 
     // Record inherited protocols.
@@ -6189,7 +6193,8 @@ static Type checkExtensionGenericParams(
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  tc.checkGenericParamList(&builder, genericParams, ext->getDeclContext());
+  auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
+  tc.checkGenericParamList(&builder, genericParams, parentSig);
   inferExtendedTypeReqs(builder);
   finalizeGenericParamList(builder, genericParams, ext, tc);
 

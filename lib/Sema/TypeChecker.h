@@ -955,7 +955,7 @@ public:
   /// parent generic parameter lists) according to the given resolver.
   bool checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
-                             DeclContext *parentDC,
+                             GenericSignature *parentSig,
                              bool adoptArchetypes = true,
                              GenericTypeResolver *resolver = nullptr);
 
