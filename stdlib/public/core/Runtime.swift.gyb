@@ -325,24 +325,24 @@ public final class _stdlib_AtomicInt {
 //===----------------------------------------------------------------------===//
 
 /// A 32 byte buffer.
-struct _Buffer32 {
-  var x0: UInt64 = 0
-  var x1: UInt64 = 0
-  var x2: UInt64 = 0
-  var x3: UInt64 = 0
+internal struct _Buffer32 {
+  internal var _x0: UInt64 = 0
+  internal var _x1: UInt64 = 0
+  internal var _x2: UInt64 = 0
+  internal var _x3: UInt64 = 0
 }
 
 /// A 72 byte buffer.
-struct _Buffer72 {
-  var x0: UInt64 = 0
-  var x1: UInt64 = 0
-  var x2: UInt64 = 0
-  var x3: UInt64 = 0
-  var x4: UInt64 = 0
-  var x5: UInt64 = 0
-  var x6: UInt64 = 0
-  var x7: UInt64 = 0
-  var x8: UInt64 = 0
+internal struct _Buffer72 {
+  internal var _x0: UInt64 = 0
+  internal var _x1: UInt64 = 0
+  internal var _x2: UInt64 = 0
+  internal var _x3: UInt64 = 0
+  internal var _x4: UInt64 = 0
+  internal var _x5: UInt64 = 0
+  internal var _x6: UInt64 = 0
+  internal var _x7: UInt64 = 0
+  internal var _x8: UInt64 = 0
 }
 
 % for bits in [ 32, 64, 80 ]:

@@ -450,45 +450,45 @@ public func == <Memory> (
 
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  var item0: Builtin.RawPointer
-  var item1: Builtin.RawPointer
-  var item2: Builtin.RawPointer
-  var item3: Builtin.RawPointer
-  var item4: Builtin.RawPointer
-  var item5: Builtin.RawPointer
-  var item6: Builtin.RawPointer
-  var item7: Builtin.RawPointer
-  var item8: Builtin.RawPointer
-  var item9: Builtin.RawPointer
-  var item10: Builtin.RawPointer
-  var item11: Builtin.RawPointer
-  var item12: Builtin.RawPointer
-  var item13: Builtin.RawPointer
-  var item14: Builtin.RawPointer
-  var item15: Builtin.RawPointer
+  internal var _item0: Builtin.RawPointer
+  internal var _item1: Builtin.RawPointer
+  internal var _item2: Builtin.RawPointer
+  internal var _item3: Builtin.RawPointer
+  internal var _item4: Builtin.RawPointer
+  internal var _item5: Builtin.RawPointer
+  internal var _item6: Builtin.RawPointer
+  internal var _item7: Builtin.RawPointer
+  internal var _item8: Builtin.RawPointer
+  internal var _item9: Builtin.RawPointer
+  internal var _item10: Builtin.RawPointer
+  internal var _item11: Builtin.RawPointer
+  internal var _item12: Builtin.RawPointer
+  internal var _item13: Builtin.RawPointer
+  internal var _item14: Builtin.RawPointer
+  internal var _item15: Builtin.RawPointer
 
   @_transparent
-  var length: Int {
+  internal var length: Int {
     return 16
   }
 
-  init() {
-    item0 = _nilRawPointer
-    item1 = item0
-    item2 = item0
-    item3 = item0
-    item4 = item0
-    item5 = item0
-    item6 = item0
-    item7 = item0
-    item8 = item0
-    item9 = item0
-    item10 = item0
-    item11 = item0
-    item12 = item0
-    item13 = item0
-    item14 = item0
-    item15 = item0
+  internal init() {
+    _item0 = _nilRawPointer
+    _item1 = _item0
+    _item2 = _item0
+    _item3 = _item0
+    _item4 = _item0
+    _item5 = _item0
+    _item6 = _item0
+    _item7 = _item0
+    _item8 = _item0
+    _item9 = _item0
+    _item10 = _item0
+    _item11 = _item0
+    _item12 = _item0
+    _item13 = _item0
+    _item14 = _item0
+    _item15 = _item0
 
     _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * length)
   }
