@@ -1592,9 +1592,32 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     auto decl = cand.getDecl();
     candidates.push_back({ decl, uncurryLevel });
 
+    // If we have a base type for this member, try to perform substitions into
+    // it to get a simpler and more concrete type.
+    //
     if (baseType) {
-      auto substType = baseType->getTypeOfMember(CS->DC->getParentModule(),
-                                                 decl, nullptr);
+      auto substType = baseType;
+      // If this is a DeclViaUnwrappingOptional, then we're actually looking
+      // through an optional to get the member, and baseType is an Optional or
+      // Metatype<Optional>.
+      if (cand.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) {
+        bool isMeta = false;
+        if (auto MTT = substType->getAs<MetatypeType>()) {
+          isMeta = true;
+          substType = MTT->getInstanceType();
+        }
+
+        // Look through optional or IUO to get the underlying type the decl was
+        // found in.
+        substType = substType->getAnyOptionalObjectType();
+        if (isMeta && substType)
+          substType = MetatypeType::get(substType);
+      }
+
+
+      if (substType)
+        substType = substType->getTypeOfMember(CS->DC->getParentModule(),
+                                               decl, nullptr);
       if (substType)
         candidates.back().declType = substType;
     }
