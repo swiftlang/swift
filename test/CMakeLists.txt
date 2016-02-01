@@ -198,7 +198,7 @@ if(PYTHONINTERP_FOUND)
             "${validation_test_bin_dir}/lit.site.cfg"
             "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
         set(profdata_merge_worker
-            "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge_worker.py")
+            "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
 
         if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
           set(command_profdata_merge_start
