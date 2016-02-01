@@ -29,7 +29,7 @@ function(add_swift_unittest test_dirname)
 
     if(SWIFT_ANALYZE_CODE_COVERAGE)
       set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-          LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
+        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
     endif()
   endif()
 endfunction()

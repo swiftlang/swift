@@ -23,9 +23,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     PROPERTIES
     LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib")
 
-if(SWIFT_ANALYZE_CODE_COVERAGE)
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
     set_property(TARGET sourcekitd-test APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
+      LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
 endif()
 
