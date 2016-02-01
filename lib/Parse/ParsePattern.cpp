@@ -48,15 +48,6 @@ static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
   }
 }
 
-static void recoverFromBadSelectorArgument(Parser &P) {
-  while (P.Tok.isNot(tok::eof) && P.Tok.isNot(tok::r_paren) &&
-         P.Tok.isNot(tok::l_brace) && P.Tok.isNot(tok::r_brace) &&
-         !P.isStartOfStmt() && !P.isStartOfDecl()) {
-    P.skipSingle();
-  }
-  P.consumeIf(tok::r_paren);
-}
-
 void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
   assert(DC->isLocalContext());
   for (auto context : ParsedContexts) {
@@ -122,14 +113,11 @@ static ParserStatus parseDefaultArgument(Parser &P,
   
   defaultArgs->HasDefaultArgument = true;
 
-  if (initR.hasCodeCompletion()) {
-    recoverFromBadSelectorArgument(P);
+  if (initR.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
-  }
-  if (initR.isNull()) {
-    recoverFromBadSelectorArgument(P);
+
+  if (initR.isNull())
     return makeParserError();
-  }
 
   init = ExprHandle::get(P.Context, initR.get());
   return ParserStatus();
