@@ -2659,7 +2659,8 @@ namespace {
       // to do this unconditionally here and then overwrite in the exception
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
-      expr->getSubExpr()->propagateLValueAccessKind(AccessKind::ReadWrite);
+      if (!expr->getSubExpr()->getType()->is<UnresolvedType>())
+        expr->getSubExpr()->propagateLValueAccessKind(AccessKind::ReadWrite);
       auto objectTy = expr->getSubExpr()->getType()->getRValueType();
 
       // The type is simply inout of whatever the lvalue's object type was.
