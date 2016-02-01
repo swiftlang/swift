@@ -102,6 +102,10 @@ namespace swift {
       PM->addFunctionToWorklist(F);
     }
 
+    /// \brief Reoptimize the current function by restarting the pass
+    /// pipeline on it.
+    void restartPassPipeline() { PM->restartWithCurrentFunction(this); }
+
   protected:
     SILFunction *getFunction() { return F; }
 
