@@ -3373,19 +3373,22 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
                                                   llvm::Value *addr) {
   VarDecl *Decl = i->getDecl();
   if (IGM.DebugInfo && Decl) {
-    auto *Pattern = Decl->getParentPattern();
-    if (!Pattern || !Pattern->isImplicit()) {
-      auto DbgTy = DebugTypeInfo(Decl, type);
-      // Discard any inout or lvalue qualifiers. Since the object itself
-      // is stored in the alloca, emitting it as a reference type would
-      // be wrong.
-      DbgTy.unwrapLValueOrInOutType();
-      StringRef Name = getVarName(i);
-      if (auto DS = i->getDebugScope()) {
-        assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
-        emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
-                                     i->getVarInfo().ArgNo);
-      }
+    // Ignore compiler-generated patterns but not optional bindings.
+    if (auto *Pattern = Decl->getParentPattern())
+      if (Pattern->isImplicit() &&
+          Pattern->getKind() != PatternKind::OptionalSome)
+        return;
+
+    auto DbgTy = DebugTypeInfo(Decl, type);
+    // Discard any inout or lvalue qualifiers. Since the object itself
+    // is stored in the alloca, emitting it as a reference type would
+    // be wrong.
+    DbgTy.unwrapLValueOrInOutType();
+    StringRef Name = getVarName(i);
+    if (auto DS = i->getDebugScope()) {
+      assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
+      emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
+                                   i->getVarInfo().ArgNo);
     }
   }
 }
