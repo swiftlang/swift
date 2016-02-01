@@ -14,6 +14,7 @@
 # by listening for profile data and merging them into a universal profdata
 # file while tests are executing.
 
+from __future__ import print_function
 import os
 import shutil
 import pipes
@@ -45,7 +46,7 @@ def printsync(msg, config=None):
     if not config.debug:
         return
     with printlock:
-        print >>sys.stderr, msg
+        print(msg, file=sys.stderr)
 
 class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
     def report(self, msg):
