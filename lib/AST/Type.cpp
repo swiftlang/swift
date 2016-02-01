@@ -2360,7 +2360,8 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
   };
   
   return transform([&](Type type) -> Type {
-    assert(!isa<SILFunctionType>(type.getPointer()) &&
+    assert((options.contains(SubstFlags::AllowLoweredTypes) ||
+            !isa<SILFunctionType>(type.getPointer())) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
 
