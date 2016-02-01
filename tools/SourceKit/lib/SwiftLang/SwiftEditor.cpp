@@ -1642,7 +1642,8 @@ public:
         // }
         if (auto VD = dyn_cast_or_null<VarDecl>(Cursor->getAsDecl())) {
           if (auto Getter = VD->getGetter()) {
-            if (Getter->getAccessorKeywordLoc().isInvalid()) {
+            if (!Getter->isImplicit() &&
+                Getter->getAccessorKeywordLoc().isInvalid()) {
               LineAndColumn = ParentLineAndColumn;
               continue;
             }
