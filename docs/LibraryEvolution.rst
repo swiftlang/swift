@@ -233,21 +233,14 @@ The following changes are permitted:
   body, not the labels that are part of the function's full name).
 - Reordering generic requirements (but not the generic parameters themselves).
 - Adding a default value to a parameter.
-- Changing a default value is permitted but discouraged; it changes the meaning
-  of existing source code.
+- Changing or removing a default value is permitted but discouraged; it may
+  break or change the meaning of existing source code.
 
 .. note::
 
     Today's implementation of default values puts the evaluation of the default
     value expression in the library, rather than in the client like C++ or C#.
     This is problematic if we want to allow adding new default values.
-
-.. admonition:: TODO
-
-    Is *removing* a default value something we want to allow? It breaks source
-    compatibility, but not binary compatibility under the inlining model. That
-    said, changing a default value is discouraged, and removing + adding is the
-    same thing.
 
 No other changes are permitted; the following are particularly of note:
 
@@ -256,11 +249,7 @@ No other changes are permitted; the following are particularly of note:
 - A versioned function may not change its external parameter names (labels).
 - A versioned function may not add, remove, or reorder parameters, whether or
   not they have default values.
-
-.. admonition:: TODO
-
-    Can a throwing function become non-throwing? It's a "safe" change but
-    it's hard to document how it used to behave for backwards-deployers.
+- A versioned function that throws may not become non-throwing.
 
 
 Inlineable Functions
@@ -535,8 +524,7 @@ struct, even ``private`` or ``internal`` ones. Additionally, all versioned
 stored properties in a ``@fixed_contents`` struct are implicitly declared
 ``@inlineable`` (as described above for top-level variables). In effect:
 
-- Reordering stored instance properties relative to one another is not
-  permitted. Reordering all other members is still permitted.
+- Reordering all members, including stored properties, is still permitted.
 - Adding new stored instance properties (public or non-public) is not permitted.
   Adding any other new members is still permitted.
 - Existing instance properties may not be changed from stored to computed or
@@ -596,10 +584,6 @@ the library, which may have a different layout for the struct. (In this case
 the client must manipulate the struct as if the ``@fixed_contents`` attribute
 were absent.)
 
-.. admonition:: TODO
-
-    We really shouldn't care about the *order* of the stored properties.
-
 
 Enums
 ~~~~~
@@ -632,11 +616,6 @@ accommodate new values. More specifically, the following changes are permitted:
     Non-public cases in public enums don't exist at the moment, but they *can*
     be useful, and they require essentially the same implementation work as
     cases added in future versions of a library.
-
-.. admonition:: TODO
-
-    This states that adding/removing ``indirect`` (on either a case or the
-    entire enum) is considered a breaking change. Is that what we want?
 
 
 Closed Enums
@@ -693,11 +672,6 @@ There are very few safe changes to make to protocols:
 
 However, any members may be added to protocol extensions, and non-public,
 non-versioned members may always be removed from protocol extensions.
-
-.. admonition:: TODO
-
-    We don't have an implementation model hammered out for adding new
-    defaulted requirements, but it is desirable.
 
 .. admonition:: TODO
 
