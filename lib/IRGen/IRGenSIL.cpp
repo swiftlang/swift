@@ -1562,8 +1562,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
       // Ignore scope-less instructions and have IRBuilder reuse the
       // previous location and scope.
-      if (DS && !KeepCurrentLocation &&
-          !(ILoc.isInPrologue() && ILoc.getKind() == SILLocation::CleanupKind))
+      if (DS && !KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
 
       // Function argument handling.
@@ -1577,16 +1576,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           // after the initialization.
           if (!DS)
             DS = CurSILFn->getDebugScope();
-          IGM.DebugInfo->clearLoc(Builder);
+          PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
           emitFunctionArgDebugInfo(BB);
-          IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
           ArgsEmitted = true;
-        } else {
-          // There may be instructions without a valid location
-          // following the prologue. We need to associate them at
-          // least with the function scope or LLVM won't know were
-          // the prologue ends.
-          IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope());
         }
       }
     }
