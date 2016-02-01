@@ -835,13 +835,14 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-/// We pass in a vector of nested GenericParamLists and a vector of
-/// ArchetypeBuilders with the innermost GenericParamList in the beginning
-/// of the vector.
-bool TypeChecker::handleSILGenericParams(
-                    SmallVectorImpl<ArchetypeBuilder *> &builders,
-                    SmallVectorImpl<GenericParamList *> &gps,
+GenericSignature *TypeChecker::handleSILGenericParams(
+                    GenericParamList *genericParams,
                     DeclContext *DC) {
+  SmallVector<GenericParamList *, 2> nestedList;
+  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
+    nestedList.push_back(genericParams);
+  }
+
   // We call checkGenericParamList() on all lists, then call
   // finalizeGenericParamList() on all lists. After finalizeGenericParamList(),
   // the generic parameters will be assigned to archetypes. That will cause
@@ -849,23 +850,24 @@ bool TypeChecker::handleSILGenericParams(
 
   // Since the innermost GenericParamList is in the beginning of the vector,
   // we process in reverse order to handle the outermost list first.
-  GenericSignature *outerSignature = nullptr;
-  for (unsigned i = 0, e = gps.size(); i < e; i++) {
-    auto &builder = *builders.rbegin()[i];
-    builder.addGenericSignature(outerSignature, true);
-
-    auto genericParams = gps.rbegin()[i];
+  GenericSignature *parentSig = nullptr;
+  for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
+    auto genericParams = nestedList.rbegin()[i];
     bool invalid = false;
-    outerSignature = validateGenericSignature(genericParams, DC, outerSignature,
-                                              nullptr, invalid);
+    auto *genericSig = validateGenericSignature(genericParams, DC, parentSig,
+                                                nullptr, invalid);
     if (invalid)
-      return true;
+      return nullptr;
 
     revertGenericParamList(genericParams);
-    checkGenericParamList(&builder, genericParams, DC);
+
+    ArchetypeBuilder builder(*DC->getParentModule(), Diags);
+    checkGenericParamList(&builder, genericParams, parentSig);
     finalizeGenericParamList(builder, genericParams, DC, *this);
+
+    parentSig = genericSig;
   }
-  return false;
+  return parentSig;
 }
 
 void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {

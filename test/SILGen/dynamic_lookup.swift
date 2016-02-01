@@ -32,7 +32,7 @@ func direct_to_class(obj: AnyObject) {
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup18direct_to_protocol
 func direct_to_protocol(obj: AnyObject) {
   // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <`Self` : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> Self -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   obj.g!()
 }
