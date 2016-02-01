@@ -201,13 +201,13 @@ if(PYTHONINTERP_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge_worker.py")
 
         if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
-            set(command_profdata_merge_start
-                COMMAND ${PYTHON_EXECUTABLE} ${profdata_merge_worker} start -o ${swift_test_results_dir})
-            set(command_profdata_merge_stop
-                COMMAND ${PYTHON_EXECUTABLE} ${profdata_merge_worker} stop)
+          set(command_profdata_merge_start
+            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" start -o ${swift_test_results_dir})
+          set(command_profdata_merge_stop
+            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
         else()
-            set(command_profdata_merge_start)
-            set(command_profdata_merge_stop)
+          set(command_profdata_merge_start)
+          set(command_profdata_merge_stop)
         endif()
 
         add_custom_target("check-swift${test_mode_target_suffix}${VARIANT_SUFFIX}"
