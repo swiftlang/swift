@@ -185,7 +185,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     ParserStatus status;
     SourceLoc StartLoc = Tok.getLoc();
 
-    unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
+    unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
     bool FoundCCToken;
@@ -310,8 +310,12 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     }
 
     // If we haven't made progress, don't add the param.
-    if (Tok.getLoc() == StartLoc)
+    if (Tok.getLoc() == StartLoc) {
+      // If we took a default argument index for this parameter, but didn't add
+      // one, then give it back.
+      if (defaultArgs) defaultArgs->NextIndex--;
       return status;
+    }
 
     params.push_back(param);
     return status;
