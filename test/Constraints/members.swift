@@ -540,3 +540,16 @@ enum r23942743 {
 let _ = .Tomato(cloud: .None)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
 
 
+
+// SR-650: REGRESSION: Assertion failed: (baseTy && "Couldn't find appropriate context"), function getMemberSubstitutions
+enum SomeErrorType {
+  case StandaloneError
+  case UnderlyingError(String)
+
+  static func someErrorFromString(str: String) -> SomeErrorType? {
+    if str == "standalone" { return .StandaloneError }
+    if str == "underlying" { return .UnderlyingError }  // expected-error {{contextual member 'UnderlyingError' expects argument of type 'String'}}
+    return nil
+  }
+}
+
