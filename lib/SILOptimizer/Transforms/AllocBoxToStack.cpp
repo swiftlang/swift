@@ -34,7 +34,7 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 //===----------------------------------------------------------------------===//
 
 /// This is a list we use to store a set of indices. We create the set by
-/// sorting, uniqueing at the appropriate time. The reason why it makes sense to
+/// sorting, uniquing at the appropriate time. The reason why it makes sense to
 /// just use a sorted vector with std::count is because generally functions do
 /// not have that many arguments and even fewer promoted arguments.
 using ParamIndexList = llvm::SmallVector<unsigned, 8>;
