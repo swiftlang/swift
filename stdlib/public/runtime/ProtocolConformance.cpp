@@ -251,7 +251,14 @@ struct ConformanceState {
   
   ConformanceState() {
     SectionsToScan.reserve(16);
-    pthread_mutex_init(&SectionsToScanLock, nullptr);
+    // FIXME: using a recursive mutex is not ideal, but we need to be able to
+    // reentrantly call _iterateConformances() and swift_conformsToProtocol()
+    // whilst resolving a name. Once the rest of this pull request is approved,
+    // I can refactor remove the recursive mutex requirement.
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&SectionsToScanLock, &attr);
     _initializeCallbacksToInspectDylib();
   }
 };
@@ -603,10 +610,18 @@ recur:
 }
 
 const Metadata *
-swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
+swift::_iterateConformances(
+  const llvm::StringRef nameRef,
+  const Demangle::NodePointer node,
+  llvm::function_ref<const Metadata *(const llvm::StringRef,
+                                      const Demangle::NodePointer node,
+                                      const Metadata *,
+                                      const NominalTypeDescriptor *)> match) {
   auto &C = Conformances.get();
   const Metadata *foundMetadata = nullptr;
 
+  // this lock needs to be recursive as _iterateConformances() may be
+  // called re-entrantly from findMetadataForNode()
   pthread_mutex_lock(&C.SectionsToScanLock);
 
   unsigned sectionIdx = 0;
@@ -616,9 +631,9 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
     auto &section = C.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
       if (auto metadata = record.getCanonicalTypeMetadata())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
+        foundMetadata = match(nameRef, node, metadata, nullptr);
       else if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
+        foundMetadata = match(nameRef, node, nullptr, ntd);
 
       if (foundMetadata != nullptr)
         break;

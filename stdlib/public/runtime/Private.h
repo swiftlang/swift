@@ -20,6 +20,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
@@ -112,12 +113,14 @@ namespace swift {
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 
   const Metadata *
-  _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
-                                  const Metadata *metadata,
-                                  const NominalTypeDescriptor *ntd);
-
-  const Metadata *
-  _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
+  _iterateConformances(
+    const llvm::StringRef name,
+    const Demangle::NodePointer node,
+    llvm::function_ref<const Metadata *(const llvm::StringRef,
+                                        const Demangle::NodePointer,
+                                        const Metadata *,
+                                        const NominalTypeDescriptor *
+                                        )> match);
 
 #if SWIFT_OBJC_INTEROP
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);

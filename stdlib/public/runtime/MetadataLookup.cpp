@@ -220,17 +220,21 @@ const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
   }
 }
 
-// returns the type metadata for the type named by typeNode
-const Metadata *
-swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
-                                       const Metadata *metadata,
-                                       const NominalTypeDescriptor *ntd) {
+static const Metadata *
+findMetadataForNode(const NodePointer node);
+
+// returns the type metadata if typeNodeName matches the metadata's name
+static const Metadata *
+matchMetadataTypeNode(const llvm::StringRef typeNodeName,
+                      const NodePointer typeNode,
+                      const Metadata *metadata,
+                      const NominalTypeDescriptor *ntd) {
   if (metadata != nullptr) {
     assert(ntd == nullptr);
     ntd = metadata->getNominalTypeDescriptor();
   }
 
-  if (ntd == nullptr || ntd->Name.get() != typeName)
+  if (ntd->Name.get() != typeNodeName)
     return nullptr;
 
   // Instantiate resilient types.
@@ -243,10 +247,112 @@ swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
   return metadata;
 }
 
-// returns the type metadata for the type named by typeName
+// returns the generic type metadata for type named by boundGenericNode
 static const Metadata *
-_searchTypeMetadataRecords(const TypeMetadataState &T,
-                           const llvm::StringRef typeName) {
+matchMetadataGenericNode(const llvm::StringRef typeNodeName,
+                         const NodePointer boundGenericNode,
+                         const Metadata *unused __attribute__((unused)),
+                         const NominalTypeDescriptor *ntd) {
+  if (boundGenericNode->getNumChildren() != 2)
+    return nullptr;
+
+  auto templateTypeNode = boundGenericNode->getChild(0);
+  auto typeListNode = boundGenericNode->getChild(1);
+
+  if (templateTypeNode->getKind() != Node::Kind::Type ||
+      typeListNode->getKind() != Node::Kind::TypeList)
+    return nullptr;
+
+  // Validate that we have one or more generic parameters (the zero parameter
+  // case is handled by matchMetadataTypeNode) and that the number of primary
+  // archetypes matches the number of child nodes in the demangled type.
+  //
+  // TODO: support secondary archetypes, where NumParams != NumPrimaryParams;
+  // not sure if there is enough information available at runtime to do this.
+  auto &genericParams = ntd->GenericParams;
+  if (!genericParams.hasGenericParams() ||
+      genericParams.NumPrimaryParams != typeListNode->getNumChildren() ||
+      genericParams.NumParams != genericParams.NumPrimaryParams)
+    return nullptr;
+
+  auto templateName = mangleNode(templateTypeNode); // XXX cache this
+  if (ntd->Name.get() != templateName)
+    return nullptr;
+
+  auto pattern = ntd->getGenericMetadataPattern();
+  void **arguments = new void *[pattern->NumKeyArguments];
+
+  for (size_t i = 0, witnessIndex = 0;
+       i < genericParams.NumPrimaryParams; i++) {
+    auto param = genericParams.getParameterAt(i);
+    auto metadata = findMetadataForNode(typeListNode->getChild(i));
+    if (metadata == nullptr) {
+      // unknown type
+      delete arguments;
+      return nullptr;
+    }
+
+    for (size_t j = 0; j < param->NumWitnessTables; j++, witnessIndex++) {
+      auto &protocol = param->Protocols[j];
+      auto wt = swift_conformsToProtocol(metadata, protocol);
+      if (wt == nullptr) {
+        // does not conform to associated type requirement, bail
+        delete arguments;
+        return nullptr;
+      }
+
+      arguments[genericParams.NumPrimaryParams + witnessIndex] =
+        const_cast<void *>(reinterpret_cast<const void *>(wt));
+    }
+
+    arguments[i] = const_cast<void *>(reinterpret_cast<const void *>(metadata));
+  }
+
+  auto metadata = swift_getGenericMetadata(pattern, arguments);
+
+  delete arguments;
+  return metadata;
+}
+
+static const Metadata *
+matchMetadataNode(const llvm::StringRef typeNodeName,
+                  const NodePointer typeNode,
+                  const Metadata *metadata,
+                  const NominalTypeDescriptor *ntd) {
+  if (typeNode->getKind() != Node::Kind::Type || !typeNode->hasChildren())
+    return nullptr;
+
+  auto childNode = typeNode->getChild(0);
+  const Metadata *foundMetadata = nullptr;
+
+  switch (childNode->getKind()) {
+  case Node::Kind::BoundGenericClass:
+  case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericStructure:
+    if (ntd != nullptr)
+      foundMetadata = matchMetadataGenericNode(typeNodeName, childNode,
+                                               metadata, ntd);
+    break;
+  default:
+    foundMetadata = matchMetadataTypeNode(typeNodeName, childNode,
+                                          metadata, ntd);
+    break;
+  }
+
+  return foundMetadata;
+}
+
+// caller must acquire lock
+static const Metadata *
+iterateTypeMetadata(
+  const llvm::StringRef nameRef,
+  const NodePointer node,
+  llvm::function_ref<const Metadata *(llvm::StringRef,
+                                      const NodePointer,
+                                      const Metadata *,
+                                      const NominalTypeDescriptor *)> match) {
+  auto &T = TypeMetadataRecords.get();
+
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = T.SectionsToScan.size();
   const Metadata *foundMetadata = nullptr;
@@ -255,9 +361,9 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
     auto &section = T.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
       if (auto metadata = record.getCanonicalTypeMetadata())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
+        foundMetadata = match(nameRef, node, metadata, nullptr);
       else if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
+        foundMetadata = match(nameRef, node, nullptr, ntd);
 
       if (foundMetadata != nullptr)
         return foundMetadata;
@@ -265,6 +371,20 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
   }
 
   return nullptr;
+}
+
+static const Metadata *
+findMetadataForNode(const NodePointer node) {
+  const Metadata *foundMetadata;
+
+  auto name = mangleNode(node);
+  auto nameRef = llvm::StringRef(name);
+
+  foundMetadata = iterateTypeMetadata(nameRef, node, matchMetadataNode);
+  if (foundMetadata == nullptr)
+    foundMetadata = _iterateConformances(nameRef, node, matchMetadataNode);
+
+  return foundMetadata;
 }
 
 static const Metadata *
@@ -281,15 +401,13 @@ _typeByMangledName(const llvm::StringRef typeName) {
       return Entry.getMetadata();
   }
 
-  // Check type metadata records
-  pthread_mutex_lock(&T.SectionsToScanLock);
-  foundMetadata = _searchTypeMetadataRecords(T, typeName);
-  pthread_mutex_unlock(&T.SectionsToScanLock);
+  auto root = demangleTypeAsNode(typeName.data(), typeName.size());
+  if (root == nullptr)
+    return nullptr;
 
-  // Check protocol conformances table. Note that this has no support for
-  // resolving generic types yet.
-  if (foundMetadata == nullptr)
-    foundMetadata = _searchConformancesByMangledTypeName(typeName);
+  pthread_mutex_lock(&T.SectionsToScanLock);
+  foundMetadata = findMetadataForNode(root);
+  pthread_mutex_unlock(&T.SectionsToScanLock);
 
   if (foundMetadata != nullptr)
     Bucket.push_front(TypeMetadataCacheEntry(typeName, foundMetadata));

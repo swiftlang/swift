@@ -647,8 +647,14 @@ layout is as follows:
   * For each type parameter **n**, the following fields are stored:
 
     + The **number of witnesses** for the type parameter is stored at
-      **offset 10+n**. This is the number of witness table pointers that are
-      stored for the type parameter in the generic parameter vector.
+      **offset 10+p**. This is the number of witness table pointers that are
+      stored for the type parameter in the generic parameter vector. The
+      inner offset **p** is advanced by **1+w** for each parameter, where
+      **w** is the number of witness tables for the type. This accounts for
+      the variable length protocol descriptor references below.
+    + For each type parameter with protocol contraints that require a witness
+      table, **n** references to the **protocol descriptors**. References are
+      stored as an offset relative to the start of the nominal type descriptor.
 
 Note that there is no nominal type descriptor for protocols or protocol types.
 See the `protocol descriptor`_ description below.

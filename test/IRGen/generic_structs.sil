@@ -64,8 +64,12 @@ import Builtin
 // CHECK:   i32 add ({{.*}}@_TMPV15generic_structs23DynamicWithRequirements{{.*}}, i32 1)
 // --       generic parameter vector offset
 // CHECK:   i32 5,
-// --       generic parameter count; primary count; generic parameter witness counts
-// CHECK:   i32 3, i32 2, i32 1, i32 1, i32 0
+// --       generic parameter count; primary count;
+// CHECK:   i32 3, i32 2,
+//          generic parameter witness counts and protocols
+// CHECK:   i32 1, i32 trunc (i64 sub (i64 ptrtoint (%swift.protocol* @_TMp15generic_structs4Req1 to i64), i64 add (i64 ptrtoint ({{.*}}* @_TMnV15generic_structs23DynamicWithRequirements to i64), i64 40)) to i32),
+// CHECK:   i32 1, i32 trunc (i64 sub (i64 ptrtoint (%swift.protocol* @_TMp15generic_structs4Req2 to i64), i64 add (i64 ptrtoint ({{.*}}* @_TMnV15generic_structs23DynamicWithRequirements to i64), i64 48)) to i32),
+// CHECK:   i32 0
 // CHECK: }
 
 // CHECK: @_TMPV15generic_structs23DynamicWithRequirements = global { {{.*}}* } {

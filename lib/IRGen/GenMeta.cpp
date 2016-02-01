@@ -2025,6 +2025,31 @@ namespace {
   class NominalTypeDescriptorBuilderBase : public ConstantBuilder<> {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
+    llvm::Constant *getBaseAddress() {
+      return IGM.getAddrOfNominalTypeDescriptor(asImpl().getTarget(), nullptr);
+    }
+
+    llvm::Constant *
+    emitRelativeReference(std::pair<llvm::Constant *,
+                                    IRGenModule::DirectOrGOT> target) {
+      auto targetAddr = llvm::ConstantExpr::getPtrToInt(target.first, IGM.SizeTy);
+      auto offset = llvm::ConstantInt::get(IGM.SizeTy, getNextOffset().getValue());
+      // This seems incredibly baroque, we should be creating an LLVM struct?
+      // not sure how to define one with nested tail-emplaced values
+      auto baseAddr = llvm::ConstantExpr::getPtrToInt(getBaseAddress(), IGM.SizeTy);
+      auto currentAddr = llvm::ConstantExpr::getAdd(baseAddr, offset);
+      auto relativeAddr = llvm::ConstantExpr::getSub(targetAddr, currentAddr);
+
+      if (IGM.SizeTy != IGM.RelativeAddressTy)
+        relativeAddr = llvm::ConstantExpr::getTrunc(relativeAddr,
+                                                    IGM.RelativeAddressTy);
+      if (target.second == IRGenModule::DirectOrGOT::GOT)
+        relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
+                                llvm::ConstantInt::get(IGM.RelativeAddressTy, 1));
+
+      return relativeAddr;
+    }
+
   public:
     NominalTypeDescriptorBuilderBase(IRGenModule &IGM) : ConstantBuilder(IGM) {}
     
@@ -2098,6 +2123,17 @@ namespace {
                 archetype->getConformsTo().end(),
                 Lowering::TypeConverter::protocolRequiresWitnessTable);
         addConstantInt32(count);
+
+        //   ProtocolDescriptor *Protocols[NumWitnessTables];
+        for (auto *protocol : archetype->getConformsTo()) {
+          if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+            continue;
+          assert(!protocol->isObjC());
+          auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+              LinkEntity::forProtocolDescriptor(protocol),
+              IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
+          addInt32(emitRelativeReference(descriptorRef));
+        }
       }
       // };
     }

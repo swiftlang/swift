@@ -27,7 +27,6 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_runtime_objc_sources
       ErrorObject.mm
       SwiftObject.mm
-      Remangle.cpp
       Reflection.mm)
 else()
 endif()
@@ -46,6 +45,7 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Once.cpp
   ProtocolConformance.cpp
   Reflection.cpp
+  Remangle.cpp
   SwiftObject.cpp
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
