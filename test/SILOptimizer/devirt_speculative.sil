@@ -1,0 +1,53 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt  | FileCheck %s
+
+sil_stage canonical
+
+@objc class MyNSObject {}
+private class Base : MyNSObject {
+   override init()
+  @inline(never) func foo()
+}
+
+private class Sub : Base {
+  override init()
+  @inline(never) override func foo()
+}
+
+sil private [noinline] @_TBaseFooFun : $@convention(method) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil private [noinline] @_TSubFooFun : $@convention(method) (@guaranteed Sub) -> () {
+bb0(%0 : $Sub):
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil_vtable Base {
+  #Base.foo!1: _TBaseFooFun
+}
+
+sil_vtable Sub {
+  #Base.foo!1: _TSubFooFun
+}
+
+sil @test_objc_ancestry : $@convention(thin) (@guaranteed Base) -> () {
+bb0(%0: $Base):
+  %1 = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Base) -> ()
+  %3 = tuple()
+  return %3 : $()
+}
+
+// Make sure we leave the generic method call because an objc derived class can be extended at runtime.
+
+// CHECK-LABEL: sil @test_objc_ancestry
+// CHECK: bb0
+// CHECK:  [[METH:%.*]] = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+// CHECK:  checked_cast_br [exact] %0 : $Base to $Base, bb{{.*}}, bb[[CHECK2:[0-9]+]]
+// CHECK: bb[[CHECK2]]{{.*}}:
+// CHECK:  checked_cast_br [exact] %0 : $Base to $Sub, bb{{.*}}, bb[[GENCALL:[0-9]+]]
+// CHECK: bb[[GENCALL]]{{.*}}:
+// CHECK:  apply [[METH]]
