@@ -157,6 +157,16 @@ public:
       return OutputFilenames.back();
     return StringRef();
   }
+
+  // Get a hash of all options which influence the llvm compilation but are not
+  // reflected in the llvm module itself.
+  unsigned getLLVMCodeGenOptionsHash() {
+    unsigned Hash = 0;
+    Hash = (Hash << 1) | Optimize;
+    Hash = (Hash << 1) | DisableLLVMOptzns;
+    Hash = (Hash << 1) | DisableLLVMARCOpts;
+    return Hash;
+  }
 };
 
 } // end namespace swift

@@ -225,22 +225,16 @@ static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
   // Calculate the hash of the whole llvm module.
   MD5Stream HashStream;
   llvm::WriteBitcodeToFile(Module, HashStream);
-  HashStream.flush();
 
   // Update the hash with the compiler version. We want to recompile if the
   // llvm pipeline of the compiler changed.
-  std::string VersionString = version::getSwiftFullVersion();
-  HashStream.Hash.update(VersionString);
+  HashStream << version::getSwiftFullVersion();
 
   // Add all options which influence the llvm compilation but are not yet
   // reflected in the llvm module itself.
-  HashStream.Hash.update(TargetMachine->getTargetTriple().str());
-  SmallVector<uint8_t, 8> OptionBytes;
-  OptionBytes.push_back(Opts.Optimize);
-  OptionBytes.push_back(Opts.DisableLLVMOptzns);
-  OptionBytes.push_back(Opts.DisableLLVMARCOpts);
-  HashStream.Hash.update(OptionBytes);
+  HashStream << Opts.getLLVMCodeGenOptionsHash();
 
+  HashStream.flush();
   HashStream.Hash.final(Result);
 }
 
