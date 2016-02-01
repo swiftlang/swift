@@ -19,6 +19,15 @@ struct S {
 class C1 {
   var total: Int = 0 {
 didSet {
+print()
+    }
+  }
+}
+
+class C2 {
+  var total: Int = 0 {
+    didSet {
+print()
     }
   }
 }
@@ -37,6 +46,7 @@ didSet {
 // RUN: %sourcekitd-test -req=format -line=15 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=16 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=21 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=30 -length=1 %s >>%t.response
 // RUN: FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "class Foo {"
@@ -54,3 +64,5 @@ didSet {
 // CHECK: key.sourcetext: "        return 0"
 // CHECK: key.sourcetext: "    }"
 // CHECK: key.sourcetext: "    didSet {"
+                          "    didSet {"
+// CHECK: key.sourcetext: "        print()"
