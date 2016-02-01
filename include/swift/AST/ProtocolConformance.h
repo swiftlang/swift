@@ -455,7 +455,7 @@ public:
   }
 };
 
-/// Specalized protocol conformance, which projects a generic protocol
+/// Specialized protocol conformance, which projects a generic protocol
 /// conformance to one of the specializations of the generic type.
 ///
 /// For example:
