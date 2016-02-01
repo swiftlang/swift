@@ -15,6 +15,7 @@ from multiprocessing import Process
 from main import printsync
 import pipes
 import os
+import subprocess
 
 class ProfdataMergerProcess(Process):
     def __init__(self, config, file_queue):
