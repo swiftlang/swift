@@ -197,7 +197,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.addRedundantLoadElimination();
-  PM.addDeadStoreElimination();
   PM.addCSE();
   PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();
