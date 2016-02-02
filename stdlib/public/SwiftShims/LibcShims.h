@@ -54,6 +54,7 @@ __swift_ssize_t _swift_stdlib_write(int fd, const void *buf,
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
+__attribute__((const))
 __swift_size_t _swift_stdlib_malloc_size(const void *ptr);
 __swift_uint32_t _swift_stdlib_arc4random(void);
 __swift_uint32_t _swift_stdlib_arc4random_uniform(__swift_uint32_t upper_bound);
