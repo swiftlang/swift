@@ -2304,7 +2304,8 @@ auto ClangImporter::Implementation::importFullName(
       baseName = baseName.substr(removePrefix.size());
   }
 
-  auto hasConflict = [&](const clang::IdentifierInfo *proposedName) -> bool {
+  auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
+                         const clang::TypedefNameDecl *cfTypedef) -> bool {
     // Test to see if there is a value with the same name as 'proposedName'
     // in the same module as the decl
     // FIXME: This will miss macros.
@@ -2312,10 +2313,27 @@ auto ClangImporter::Implementation::importFullName(
     if (clangModule.hasValue() && clangModule.getValue())
       clangModule = clangModule.getValue()->getTopLevelModule();
 
-    auto isInSameModule = [&](const clang::Decl *D) -> bool {
-      auto declModule = getClangSubmoduleForDecl(D);
+    auto conflicts = [&](const clang::Decl *OtherD) -> bool {
+      // If these are simply redeclarations, they do not conflict.
+      if (D->getCanonicalDecl() == OtherD->getCanonicalDecl()) return false;
+
+      // If we have a CF typedef, check whether the "other"
+      // declaration we found is just the opaque type behind it. If
+      // so, it does not conflict.
+      if (cfTypedef) {
+        if (auto cfPointerTy =
+              cfTypedef->getUnderlyingType()->getAs<clang::PointerType>()) {
+          if (auto tagDecl = cfPointerTy->getPointeeType()->getAsTagDecl()) {
+            if (tagDecl->getCanonicalDecl() == OtherD)
+              return false;
+          }
+        }
+      }
+
+      auto declModule = getClangSubmoduleForDecl(OtherD);
       if (!declModule.hasValue())
         return false;
+
       // Handle the bridging header case. This is pretty nasty since things
       // can get added to it *later*, but there's not much we can do.
       if (!declModule.getValue())
@@ -2340,13 +2358,13 @@ auto ClangImporter::Implementation::importFullName(
     lookupResult.suppressDiagnostics();
 
     if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), isInSameModule))
+      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
         return true;
     }
 
     lookupResult.clear(clang::Sema::LookupTagName);
     if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), isInSameModule))
+      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
         return true;
     }
 
@@ -2359,7 +2377,7 @@ auto ClangImporter::Implementation::importFullName(
   SmallString<16> baseNameWithProtocolSuffix;
   if (auto objcProto = dyn_cast<clang::ObjCProtocolDecl>(D)) {
     if (objcProto->hasDefinition()) {
-      if (hasConflict(objcProto->getIdentifier())) {
+      if (hasConflict(objcProto->getIdentifier(), nullptr)) {
         baseNameWithProtocolSuffix = baseName;
         baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
         baseName = baseNameWithProtocolSuffix;
@@ -2377,15 +2395,14 @@ auto ClangImporter::Implementation::importFullName(
   if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(D)) {
     auto swiftName = getCFTypeName(typedefNameDecl, &aliasBaseName);
     if (!swiftName.empty()) {
-      if (swiftName != baseName) {
-        assert(aliasBaseName == baseName);
-        if (!hasConflict(&clangCtx.Idents.get(swiftName)))
-          baseName = swiftName;
-        else
-          aliasBaseName = "";
-      } else if (!aliasBaseName.empty()) {
-        if (hasConflict(&clangCtx.Idents.get(aliasBaseName)))
-          aliasBaseName = "";
+      if (!aliasBaseName.empty() &&
+          hasConflict(&clangCtx.Idents.get(swiftName), typedefNameDecl)) {
+        // Use the alias name (the "Ref" name), only.
+        baseName = aliasBaseName;
+        aliasBaseName = StringRef();
+      } else {
+        // Adopt the requested name.
+        baseName = swiftName;
       }
     }
   }

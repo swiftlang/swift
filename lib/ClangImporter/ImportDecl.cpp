@@ -1275,8 +1275,8 @@ namespace {
       if (!importedSuperclassDecl) return Type();
 
       auto importedSuperclass =
-        cast<TypeAliasDecl>(importedSuperclassDecl)->getDeclaredType();
-      assert(importedSuperclass->is<ClassType>());
+        cast<TypeDecl>(importedSuperclassDecl)->getDeclaredType();
+      assert(importedSuperclass->is<ClassType>() && "must have class type");
       return importedSuperclass;
     }
 
@@ -1354,7 +1354,6 @@ namespace {
       if (Name.empty())
         return nullptr;
 
-      ValueDecl *alternateDecl = nullptr;
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
         bool IsError;
@@ -1370,74 +1369,90 @@ namespace {
         // 'typedef const void *FooRef;' as CF types if they have the
         // right attributes or match our name whitelist.
         if (!SwiftType) {
+          auto DC = Impl.importDeclContextOf(Decl);
+          if (!DC)
+            return nullptr;
+
+          // Local function to create the alias, if needed.
+          auto createAlias = [&](TypeDecl *primary) {
+            if (!importedName.Alias) return;
+
+            auto aliasRef = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                              Decl,
+                              Impl.importSourceLoc(Decl->getLocStart()),
+                              importedName.Alias.getBaseName(),
+                              Impl.importSourceLoc(Decl->getLocation()),
+                              TypeLoc::withoutLoc(
+                                primary->getDeclaredInterfaceType()),
+                              DC);
+            aliasRef->computeType();
+
+            // Record this as the alternate declaration.
+            Impl.AlternateDecls[primary] = aliasRef;
+          };
+
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
-              auto SwiftClass = importCFClassType(Decl, Name, pointee);
-              if (!SwiftClass) return nullptr;
+              auto swiftClass = importCFClassType(Decl, Name, pointee);
+              if (!swiftClass) return nullptr;
 
-              SwiftType = SwiftClass->getDeclaredInterfaceType();
-              NameMapping = MappedTypeNameKind::DefineOnly;
-
-              // If there is an alias (i.e., that doesn't have "Ref"),
-              // use that as the name of the typedef later.
-              if (importedName.Alias)
-                Name = importedName.Alias.getBaseName();
-
-              // Record the class as the alternate decl.
-              alternateDecl = SwiftClass;
+              Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
+                MappedTypeNameKind::DefineAndUse;
+              createAlias(swiftClass);
+              return swiftClass;
+            }
 
             // If the pointee is another CF typedef, create an extra typealias
             // for the name without "Ref", but not a separate type.
-            } else if (pointee.isTypedef()) {
+            if (pointee.isTypedef()) {
               auto underlying =
                 cast_or_null<TypeDecl>(Impl.importDecl(pointee.getTypedef()));
               if (!underlying)
                 return nullptr;
 
-              if (auto typealias = dyn_cast<TypeAliasDecl>(underlying)) {
-                Type doublyUnderlyingTy = typealias->getUnderlyingType();
-                if (isa<NameAliasType>(doublyUnderlyingTy.getPointer()))
-                  SwiftType = doublyUnderlyingTy;
-              }
-              if (!SwiftType)
-                SwiftType = underlying->getDeclaredType();
+              // Create a typealias for this CF typedef.
+              TypeAliasDecl *typealias = nullptr;
+              typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                            Decl,
+                            Impl.importSourceLoc(Decl->getLocStart()),
+                            Name,
+                            Impl.importSourceLoc(Decl->getLocation()),
+                            TypeLoc::withoutLoc(
+                              underlying->getDeclaredInterfaceType()),
+                            DC);
+              typealias->computeType();
 
-              auto DC = Impl.importDeclContextOf(Decl);
-              if (!DC)
-                return nullptr;
+              Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
+                MappedTypeNameKind::DefineAndUse;
+              createAlias(typealias);
+              return typealias;
+            }
 
-              // If there is an alias (i.e., that doesn't have "Ref"),
-              // create that separate typedef.
-              if (importedName.Alias) {
-                auto aliasWithoutRef =
-                  Impl.createDeclWithClangNode<TypeAliasDecl>(
-                    Decl,
-                    Impl.importSourceLoc(Decl->getLocStart()),
-                    importedName.Alias.getBaseName(),
-                    Impl.importSourceLoc(Decl->getLocation()),
-                    TypeLoc::withoutLoc(SwiftType),
-                    DC);
-
-                aliasWithoutRef->computeType();
-                SwiftType = aliasWithoutRef->getDeclaredType();
-                NameMapping = MappedTypeNameKind::DefineOnly;
-
-                // Store this alternative declaration.
-                alternateDecl = aliasWithoutRef;
-              } else {
-                NameMapping = MappedTypeNameKind::DefineAndUse;
-              }
-
-            // If the pointee is 'const void', 
-            // 'CFTypeRef', bring it in specifically as AnyObject.
-            } else if (pointee.isConstVoid()) {
+            // If the pointee is 'const void', 'CFTypeRef', bring it
+            // in specifically as AnyObject.
+            if (pointee.isConstVoid()) {
               auto proto = Impl.SwiftContext.getProtocol(
                                                KnownProtocolKind::AnyObject);
               if (!proto)
                 return nullptr;
-              SwiftType = proto->getDeclaredType();
-              NameMapping = MappedTypeNameKind::DefineOnly;
+
+              // Create a typealias for this CF typedef.
+              TypeAliasDecl *typealias = nullptr;
+              typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                            Decl,
+                            Impl.importSourceLoc(Decl->getLocStart()),
+                            Name,
+                            Impl.importSourceLoc(Decl->getLocation()),
+                            TypeLoc::withoutLoc(
+                              proto->getDeclaredInterfaceType()),
+                            DC);
+              typealias->computeType();
+
+              Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
+                MappedTypeNameKind::DefineAndUse;
+              createAlias(typealias);
+              return typealias;
             }
           }
         }
@@ -1494,9 +1509,6 @@ namespace {
                                       TypeLoc::withoutLoc(SwiftType),
                                       DC);
       Result->computeType();
-
-      if (alternateDecl)
-        Impl.AlternateDecls[Result] = alternateDecl;
       return Result;
     }
 

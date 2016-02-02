@@ -567,7 +567,8 @@ namespace {
         case MappedTypeNameKind::DefineAndUse:
           break;
         case MappedTypeNameKind::DefineOnly:
-          mappedType = cast<TypeAliasDecl>(decl)->getUnderlyingType();
+          if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
+            mappedType = typealias->getUnderlyingType();
           break;
         }
 
