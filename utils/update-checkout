@@ -41,7 +41,6 @@ def update_working_copy(repo_path, branch):
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        status = check_output(['git', 'status', '--porcelain'])
         check_call(["git", "fetch"])
         check_call(["git", "rebase", "FETCH_HEAD"])
 
@@ -64,7 +63,7 @@ def obtain_additional_swift_sources(with_ssh, branch):
                 check_call(['git', 'clone', remote, dir_name])
                 if branch:
                     src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + ".git"
-                    check_call(['git', '--git-dir', src_path, '--work-tree', SWIFT_SOURCE_ROOT, 'checkout', branch])
+                    check_call(['git', '--git-dir', src_path, '--work-tree', os.path.join(SWIFT_SOURCE_ROOT, dir_name), 'checkout', branch])
 
 def main():
     parser = argparse.ArgumentParser(
