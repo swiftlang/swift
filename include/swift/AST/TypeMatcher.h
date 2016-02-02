@@ -230,6 +230,12 @@ class TypeMatcher {
     /// FIXME: Split this out into cases?
     bool visitAnyFunctionType(CanAnyFunctionType firstFunc, Type secondType) {
       if (auto secondFunc = secondType->getAs<AnyFunctionType>()) {
+        // FIXME: Compare throws()? Both existing subclasses would prefer
+        // to mismatch on (!firstFunc->throws() && secondFunc->throws()), but
+        // embedding that non-commutativity in this general matcher is icky.
+        if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
+          return mismatch(firstFunc.getPointer(), secondFunc);
+        
         return this->visit(firstFunc.getInput(), secondFunc->getInput()) &&
                this->visit(firstFunc.getResult(), secondFunc->getResult());
       }
