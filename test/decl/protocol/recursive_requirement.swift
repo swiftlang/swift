@@ -20,7 +20,7 @@ struct X<T: P> {
 }
 
 func f<T : P>(z: T) {
- _ = X<T.A>() // expected-error{{expression type 'X3<T.A>' is ambiguous without more context}}
+ _ = X<T.A>() // expected-error{{expression type 'X<T.A>' is ambiguous without more context}}
 }
 
 // -----
@@ -60,7 +60,7 @@ struct Y3 : DeclaredP {
 struct X3<T:P4> {}
 
 func f2<T:P4>(a: T) {
- _ = X3<T.A>() // expected-error{{expression type 'X<T.A>' is ambiguous without more context}}
+ _ = X3<T.A>() // expected-error{{expression type 'X3<T.A>' is ambiguous without more context}}
 }
 
 f2(Y3())
