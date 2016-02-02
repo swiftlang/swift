@@ -16,7 +16,7 @@ import socket
 import sys
 import logging
 
-from multiprocessing import Lock, Process, Queue, JoinableQueue
+from multiprocessing import JoinableQueue
 from process import ProfdataMergerProcess
 from server import ProfdataServer
 from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL

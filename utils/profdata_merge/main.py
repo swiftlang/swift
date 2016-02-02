@@ -20,7 +20,6 @@ import sys
 import argparse
 import tempfile
 import logging
-from multiprocessing import Lock
 
 import runner
 
