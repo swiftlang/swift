@@ -68,7 +68,8 @@ def stop_server(args):
     sock.close()
 
 def start_server(args):
-    config = Config(args.debug, args.output_dir, args.no_remove)
+    log_file = open(args.log_file, 'w') if args.log_file else sys.stderr
+    config = Config(args.debug, args.output_dir, args.no_remove, log_file)
     if not config.debug:
         pid = os.fork()
         if pid != 0:
@@ -80,4 +81,5 @@ def start_server(args):
             os.remove(config.pid_file_path)
         if os.path.exists(config.tmp_dir):
             shutil.rmtree(config.tmp_dir, ignore_errors=True)
-
+        if log_file != sys.stderr:
+            log_file.close()

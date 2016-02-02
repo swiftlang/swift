@@ -31,7 +31,7 @@ def printsync(msg, config):
     if not config.debug:
         return
     with printlock:
-        print(msg, file=sys.stderr)
+        print(msg, file=config.log_file)
 
 if __name__ == "__main__":
     if sys.platform != "darwin":
@@ -48,6 +48,8 @@ if __name__ == "__main__":
     start.add_argument("-o", "--output-dir",
         help="The directory to write the PID file and final profdata file.",
         default=tempfile.gettempdir())
+    start.add_argument("-l", "--log-file",
+        help="The file to write logs in debug mode.")
     start.add_argument("--no-remove",
         action="store_true",
         help="Don't remove profraw files after merging them.")
