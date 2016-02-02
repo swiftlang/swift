@@ -683,11 +683,8 @@ namespace {
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         for (TypeLoc &type : us->getUnresolvedParams()) {
-          if (TC.validateType(type, DC)) {
-            TC.diagnose(us->getLAngleLoc(),
-                        diag::while_parsing_as_left_angle_bracket);
+          if (TC.validateType(type, DC))
             return nullptr;
-          }
         }
         
         // If this is a reference type a specialized type, form a TypeExpr.

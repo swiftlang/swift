@@ -1065,14 +1065,18 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
       Diags.diagnose(assocType->getLoc(),
                      diag::recursive_requirement_reference);
         
-      // Mark all associatedtypes in this protocol as recursive (and error-type) to avoid later
-      // crashes dealing with this invalid protocol in other contexts.
+      // Mark all associatedtypes in this protocol as recursive (and error-type)
+      // to avoid later crashes dealing with this invalid protocol in other
+      // contexts.
       auto containingProto = assocType->getDeclContext()->isProtocolOrProtocolExtensionContext();
       for (auto member : containingProto->getMembers())
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
           assocType->setIsRecursive();
     }
     pa->setIsRecursive();
+
+    // Silence downstream errors referencing this associated type.
+    assocType->setInvalid();
 
     // FIXME: Drop this protocol.
     pa->addConformance(proto, RequirementSource(kind, loc), *this);
