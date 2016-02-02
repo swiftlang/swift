@@ -1826,7 +1826,9 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                    Flags.toRaw(),
                    CurDeclContext, {BeginLoc, EndLoc},
                    BeginParserPosition.PreviousLoc);
-  skipUntil(tok::eof);
+
+  while (Tok.isNot(tok::eof))
+    consumeToken();
 }
 
 /// \brief Parse a single syntactic declaration and return a list of decl
