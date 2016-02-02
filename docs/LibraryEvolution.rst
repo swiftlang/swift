@@ -807,6 +807,17 @@ changed at all except for the following:
 
 - Making a non-associative operator left- or right-associative.
 
+Operator declarations are not versioned.
+
+
+Typealiases
+~~~~~~~~~~~
+
+Like operators, typealiases only exist at compile-time, so changing them
+affects source compatibility but not binary compatibility. Since a typealias
+is only made up of its name and its type, it is recommended that it is never
+changed at all after being published. Typealiases are not versioned.
+
 
 A Unifying Theme
 ~~~~~~~~~~~~~~~~
