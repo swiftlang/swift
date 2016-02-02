@@ -286,19 +286,9 @@ static bool isAbstractClosure(const SILLocation &Loc) {
 
 /// Construct an inlined-at location from a SILScope.
 llvm::MDNode *
-IRGenDebugInfo::createInlinedAt(const SILDebugScope *InlinedScope) {
-  assert(InlinedScope);
-  assert(InlinedScope->InlinedCallSite && "not an inlined scope");
-  const SILDebugScope *CallSite = InlinedScope->InlinedCallSite;
-
-#ifndef NDEBUG
-  auto *S = getOrCreateScope(InlinedScope);
-  while (!isa<llvm::DISubprogram>(S)) {
-    auto *LB = dyn_cast<llvm::DILexicalBlockBase>(S);
-    S = LB->getScope();
-    assert(S && "Lexical block parent chain must contain a subprogram");
-  }
-#endif
+IRGenDebugInfo::createInlinedAt(const SILDebugScope *CallSite) {
+  if (!CallSite)
+    return nullptr;
 
   // In SIL the inlined-at information is part of the scopes, in LLVM
   // IR it is part of the location. Transforming the inlined-at SIL scope
@@ -313,8 +303,7 @@ IRGenDebugInfo::createInlinedAt(const SILDebugScope *InlinedScope) {
 
   // If this is itself an inlined location, recursively create the
   // inlined-at location for it.
-  if (CallSite->InlinedCallSite)
-    InlinedAt = createInlinedAt(CallSite);
+  InlinedAt = createInlinedAt(CallSite->InlinedCallSite);
 
   auto InlineLoc = getLoc(SM, CallSite->Loc.getDebugSourceLoc());
   return llvm::DebugLoc::get(InlineLoc.Line, InlineLoc.Col, ParentScope,
@@ -394,12 +383,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   LastDebugLoc = L;
   LastScope = DS;
 
-  llvm::MDNode *InlinedAt = nullptr;
-  if (DS->InlinedCallSite) {
-    assert(Scope && "Inlined location without a lexical scope");
-    InlinedAt = createInlinedAt(DS);
-  }
-
+  auto *InlinedAt = createInlinedAt(DS->InlinedCallSite);
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
   auto DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
@@ -1099,11 +1083,7 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
                                       unsigned Col, llvm::DILocalScope *Scope,
                                       const SILDebugScope *DS) {
   // Set the location/scope of the intrinsic.
-  llvm::MDNode *InlinedAt = nullptr;
-  if (DS && DS->InlinedCallSite) {
-    assert(Scope && "Inlined location without a lexical scope");
-    InlinedAt = createInlinedAt(DS);
-  }
+  auto *InlinedAt = createInlinedAt(DS->InlinedCallSite);
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) && llvm::FindAllocaDbgDeclare(Storage))

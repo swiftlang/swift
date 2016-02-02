@@ -216,7 +216,7 @@ private:
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
   llvm::DIScope *getOrCreateContext(DeclContext *DC);
-  llvm::MDNode *createInlinedAt(const SILDebugScope *Scope);
+  llvm::MDNode *createInlinedAt(const SILDebugScope *CallSite);
 
   llvm::DIFile *getOrCreateFile(const char *Filename);
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
