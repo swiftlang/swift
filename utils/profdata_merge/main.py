@@ -18,6 +18,7 @@
 from __future__ import print_function
 import sys
 import argparse
+import tempfile
 from multiprocessing import Lock
 
 import runner
@@ -43,11 +44,12 @@ if __name__ == "__main__":
         action="store_true")
     start.add_argument("-o", "--output-dir",
         help="The directory to write the PID file and final profdata file.",
-        default="/tmp")
+        default=tempfile.gettempdir())
     start.add_argument("--no-remove",
         action="store_true",
         help="Don't remove profraw files after merging them.")
     start.set_defaults(func=runner.start_server)
+
 
     stop = subparsers.add_parser("stop")
     stop.set_defaults(func=runner.stop_server)
