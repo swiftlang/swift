@@ -14,11 +14,12 @@ import shutil
 import os
 import socket
 import sys
+import logging
 
 from multiprocessing import Lock, Process, Queue, JoinableQueue
 from process import ProfdataMergerProcess
 from server import ProfdataServer
-from main import printsync, TESTS_FINISHED_SENTINEL
+from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
 from config import Config
 
 def run_server(config):
@@ -26,10 +27,10 @@ def run_server(config):
     if os.path.exists(config.pid_file_path):
         with open(config.pid_file_path) as pidfile:
             pid = pidfile.read()
-            printsync(("existing process found with pid %s." +
-                       "Ensure there are no other test runners running," +
-                       "and delete the file at %s")
-                       % (pid, config.pid_file_path), config)
+            logging.error(("existing process found with pid %s." +
+                "Ensure there are no other test runners running," +
+                "and delete the file at %s")
+                % (pid, config.pid_file_path))
         return
 
     with open(config.pid_file_path, "w") as pidfile:
@@ -41,7 +42,7 @@ def run_server(config):
     for p in processes:
         p.start()
 
-    server = ProfdataServer(config, file_queue)
+    server = ProfdataServer(file_queue)
     server.serve_forever()
 
     for p in processes:
@@ -49,7 +50,7 @@ def run_server(config):
         file_queue.put(None)
 
     for p in processes:
-        printsync("waiting for %s to finish..." % p.name, config)
+        logging.info("waiting for %s to finish..." % p.name)
         p.join()
 
     # now that all workers have completed, merge all their files
@@ -57,7 +58,7 @@ def run_server(config):
     merge_final.profdata_path = config.final_profdata_path
     for p in processes:
         if os.path.exists(p.profdata_path):
-            printsync("merging " + p.profdata_path + "...", config)
+            logging.info("merging " + p.profdata_path + "...")
             merge_final.filename_buffer.append(p.profdata_path)
     merge_final.merge_file_buffer()
 
@@ -68,9 +69,8 @@ def stop_server(args):
     sock.close()
 
 def start_server(args):
-    log_file = open(args.log_file, 'w') if args.log_file else sys.stderr
-    config = Config(args.debug, args.output_dir, args.no_remove, log_file)
-    if not config.debug:
+    config = Config(args.output_dir, args.no_remove)
+    if not args.debug:
         pid = os.fork()
         if pid != 0:
             sys.exit(0) # kill the parent process we forked from.
@@ -81,5 +81,3 @@ def start_server(args):
             os.remove(config.pid_file_path)
         if os.path.exists(config.tmp_dir):
             shutil.rmtree(config.tmp_dir, ignore_errors=True)
-        if log_file != sys.stderr:
-            log_file.close()

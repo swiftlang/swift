@@ -13,21 +13,21 @@
 
 import SocketServer
 import thread
+import logging
 
-from main import printsync, SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
+from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
 
 class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
     def report(self, msg):
         """Convenience method for reporting status from the workers."""
-        printsync("\n===== ProfdataTCPHandler =====\n%s\n" % msg,
-                self.server.config)
+        logging.info("[ProfdataTCPHandler]: %s" % msg)
 
     def handle(self):
         """Receive a newline-separated list of filenames from a TCP connection
         and add them to the shared merge queue, where the workers will
         execute llvm-profdata merge commands."""
         data = self.rfile.read()
-        self.report("received data (length %d): %s" % (len(data), data))
+        self.report("received data (length %d): %s" % (len(data), repr(data)))
 
         # Stop once we receive the sentinel
         if data.startswith(TESTS_FINISHED_SENTINEL):
@@ -48,8 +48,7 @@ class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
                 self.server.file_queue.put(f)
 
 class ProfdataServer(SocketServer.TCPServer, object):
-    def __init__(self, config, file_queue):
+    def __init__(self, file_queue):
         super(ProfdataServer, self).__init__(SERVER_ADDRESS, ProfdataTCPHandler)
-        self.config = config
         self.file_queue = file_queue
         self.files_merged = set()

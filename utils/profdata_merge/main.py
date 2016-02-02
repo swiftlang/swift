@@ -19,6 +19,7 @@ from __future__ import print_function
 import sys
 import argparse
 import tempfile
+import logging
 from multiprocessing import Lock
 
 import runner
@@ -26,18 +27,13 @@ import runner
 SERVER_ADDRESS = ('localhost', 12400)
 TESTS_FINISHED_SENTINEL = "PROFDATA_MERGE_WORKER_TESTS_FINISHED_SENTINEL"
 
-printlock = Lock()
-def printsync(msg, config):
-    if not config.debug:
-        return
-    with printlock:
-        print(msg, file=config.log_file)
-
 if __name__ == "__main__":
     if sys.platform != "darwin":
         sys.exit("Error: The profile data merge worker requires OS X.")
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("-l", "--log-file",
+        help="The file to write logs in debug mode.")
 
     subparsers = parser.add_subparsers()
 
@@ -48,16 +44,20 @@ if __name__ == "__main__":
     start.add_argument("-o", "--output-dir",
         help="The directory to write the PID file and final profdata file.",
         default=tempfile.gettempdir())
-    start.add_argument("-l", "--log-file",
-        help="The file to write logs in debug mode.")
     start.add_argument("--no-remove",
         action="store_true",
         help="Don't remove profraw files after merging them.")
     start.set_defaults(func=runner.start_server)
 
-
     stop = subparsers.add_parser("stop")
     stop.set_defaults(func=runner.stop_server)
 
     args = parser.parse_args()
+
+    log_args = {'level': logging.DEBUG}
+    if args.log_file:
+        log_args['filename'] = args.log_file
+
+    logging.basicConfig(**log_args)
+
     args.func(args)

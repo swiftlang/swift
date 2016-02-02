@@ -12,10 +12,10 @@
 # merge profile data in parallel.
 
 from multiprocessing import Process
-from main import printsync
 import pipes
 import os
 import subprocess
+import logging
 
 class ProfdataMergerProcess(Process):
     def __init__(self, config, file_queue):
@@ -26,9 +26,9 @@ class ProfdataMergerProcess(Process):
         self.profdata_path = os.path.join(config.tmp_dir, "%s.profdata" % self.name)
         self.profdata_tmp_path = self.profdata_path + ".copy"
 
-    def report(self, msg):
+    def report(self, msg, level=logging.INFO):
         """Convenience method for reporting status from the workers."""
-        printsync("\n===== %s =====\n%s\n" % (self.name, msg), self.config)
+        logging.log(level, "[%s]: %s" % (self.name, msg))
 
     def merge_file_buffer(self):
         """Merge all files in this worker's buffer and clear them.
@@ -50,7 +50,7 @@ class ProfdataMergerProcess(Process):
         ret = subprocess.call(llvm_cmd, shell=True)
         if ret != 0:
             self.report("llvm profdata command failed -- Exited with code %d"
-                % ret)
+                % ret, level=logging.ERROR)
         if self.config.remove_files:
             for f in self.filename_buffer:
                 if os.path.exists(f):
