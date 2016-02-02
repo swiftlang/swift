@@ -292,7 +292,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // Otherwise, we're not sure what is going on, but this doesn't smell
         // like a parameter.
         diagnose(Tok, diag::expected_parameter_name);
-        //skipUntil(tok::comma, tok::r_paren);
         param.isInvalid = true;
       }
     }
