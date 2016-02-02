@@ -35,9 +35,7 @@ def update_working_copy(repo_path):
         check_call(["git", "fetch"])
         check_call(["git", "rebase", "FETCH_HEAD"])
 
-def obtain_additional_swift_sources(opts={'with_ssh': False}):
-    branch = opts['branch']
-    with_ssh = opts['with_ssh']
+def obtain_additional_swift_sources(with_ssh,branch):
     additional_repos = {
         'llvm': 'apple/swift-llvm',
         'clang': 'apple/swift-clang',
@@ -83,17 +81,13 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="Obtain Sources for specific branch")
     args = parser.parse_args()
 
-    if args.branch:
-        branch = args.branch
-    else:
-        branch = None
+    clone = args.clone
+    clone_with_ssh = args.clone_with_ssh
+    branch = args.branch
 
-    if args.clone:
-        obtain_additional_swift_sources({'with_ssh': False, "branch": branch})
-        return 0
 
-    if args.clone_with_ssh:
-        obtain_additional_swift_sources({'with_ssh': True, "branch": branch})
+    if clone or clone_with_ssh:
+        obtain_additional_swift_sources(clone_with_ssh, branch)
         return 0
 
     if args.all:
