@@ -44,7 +44,7 @@ int _swift_stdlib_putchar(int c);
 // String handling <string.h>
 __attribute__((pure))
 __swift_size_t _swift_stdlib_strlen(const char *s);
- __attribute__((pure))
+__attribute__((pure))
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
 // <unistd.h>
