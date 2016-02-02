@@ -21,9 +21,10 @@ from SwiftBuildSupport import (
     SWIFT_SOURCE_ROOT,
     WorkingDirectory,
     check_call,
+    check_output,
 )
 
-def update_working_copy(repo_path,branch):
+def update_working_copy(repo_path, branch):
     if not os.path.isdir(repo_path):
         return
 
@@ -32,12 +33,17 @@ def update_working_copy(repo_path,branch):
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
+        status = check_output(['git', 'status', '--porcelain'])
+        if status:
+            print("Please, commit your changes.")
+            print(status)
+            exit(1)
         if branch:
             check_call(['git','checkout',branch])
         check_call(["git", "fetch"])
         check_call(["git", "rebase", "FETCH_HEAD"])
 
-def obtain_additional_swift_sources(with_ssh,branch):
+def obtain_additional_swift_sources(with_ssh, branch):
     additional_repos = {
         'llvm': 'apple/swift-llvm',
         'clang': 'apple/swift-clang',
@@ -91,21 +97,21 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         return 0
 
     if args.all:
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"),branch)
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"),branch)
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"),branch)
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"), branch)
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"), branch)
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"), branch)
 
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"),branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"), branch)
     update_working_copy(
-        os.path.join(SWIFT_SOURCE_ROOT, "swift", "benchmark", "PerfTestSuite"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "SourceKit"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "cmark"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swiftpm"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-libdispatch"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-foundation"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-xctest"),branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-integration-tests"),branch)
+        os.path.join(SWIFT_SOURCE_ROOT, "swift", "benchmark", "PerfTestSuite"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "SourceKit"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "cmark"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swiftpm"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-libdispatch"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-foundation"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-xctest"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-integration-tests"), branch)
 
     return 0
 
