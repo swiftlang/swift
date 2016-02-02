@@ -49,60 +49,70 @@
 using namespace swift;
 namespace swift {
 class PrinterArchetypeTransformer {
-  Type BaseTy;
-  DeclContext *DC;
+  const DeclContext *DC;
   llvm::DenseMap<TypeBase *, Type> Cache;
   llvm::DenseMap<StringRef, Type> IdMap;
 
 public:
-  PrinterArchetypeTransformer(Type Ty, DeclContext *DC) :
-    BaseTy(Ty->getRValueType()), DC(DC){
+  PrinterArchetypeTransformer(Type Ty, const DeclContext *DC) :
+    DC(DC) {
     (void) this->DC;
-    auto D = BaseTy->getNominalOrBoundGenericNominal();
-    if (!D || !D->getGenericParams())
-      return;
-    SmallVector<Type, 3> Scrach;
-    auto Args = BaseTy->getAllGenericArgs(Scrach);
-    const auto ParamDecls = D->getGenericParams()->getParams();
-    assert(ParamDecls.size() == Args.size());
-
-    // Map type parameter names with their instantiating arguments.
-    for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
-      IdMap[ParamDecls[I]->getName().str()] = Args[I];
+      
+      Type BaseTy = Ty->getRValueType();
+      
+      do {
+        auto D = BaseTy->getNominalOrBoundGenericNominal();
+        if (!D || !D->getGenericParams())
+          continue;
+        SmallVector<Type, 3> Scrach;
+        auto Args = BaseTy->getAllGenericArgs(Scrach);
+        const auto ParamDecls = D->getGenericParams()->getParams();
+        assert(ParamDecls.size() == Args.size());
+        
+        // Map type parameter names with their instantiating arguments.
+        for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+          IdMap[ParamDecls[I]->getName().str()] = Args[I];
+        }
+      } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
     }
-  }
 
   Type transformByName(Type Ty) {
-    if (Ty->getKind() != TypeKind::Archetype)
-      return Ty;
-
-    // First, we try to find the map from cache.
-    if (Cache.count(Ty.getPointer()) > 0) {
-      return Cache[Ty.getPointer()];
-    }
-    auto Id = cast<ArchetypeType>(Ty.getPointer())->getName().str();
-    auto Result = Ty;
-
-    // Iterate the IdMap to find the argument type of the given param name.
-    for (auto It = IdMap.begin(); It != IdMap.end(); ++ It) {
-      if (Id == It->getFirst()) {
-        Result = It->getSecond();
-        break;
+    return Ty.transform([&](Type Ty) -> Type {
+      if (Ty->getKind() != TypeKind::Archetype)
+        return Ty;
+      
+      // First, we try to find the map from cache.
+      if (Cache.count(Ty.getPointer()) > 0) {
+        return Cache[Ty.getPointer()];
       }
-    }
-
-    // Put the result into cache.
-    Cache[Ty.getPointer()] = Result;
-    return Result;
+      auto Id = cast<ArchetypeType>(Ty.getPointer())->getName().str();
+      auto Result = Ty;
+      
+      // Iterate the IdMap to find the argument type of the given param name.
+      for (auto It = IdMap.begin(); It != IdMap.end(); ++ It) {
+        if (Id == It->getFirst()) {
+          Result = It->getSecond();
+          break;
+        }
+      }
+      
+      // Put the result into cache.
+      Cache[Ty.getPointer()] = Result;
+      return Result;
+    });
   }
 };
 }
 
-PrintOptions PrintOptions::printTypeInterface(Type T, DeclContext *DC) {
+PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
   PrintOptions result = printInterface();
-  result.pTransformer = std::make_shared<PrinterArchetypeTransformer>(T, DC);
+  result.setArchetypeTransform(T, DC);
   result.TypeToPrint = T.getPointer();
   return result;
+}
+
+void PrintOptions::setArchetypeTransform(Type T, const DeclContext *DC) {
+  pTransformer = std::make_shared<PrinterArchetypeTransformer>(T, DC);
 }
 
 std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
@@ -655,7 +665,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
   Printer << "<";
   bool IsFirst = true;
   SmallVector<Type, 4> Scrach;
-  if (Options.pTransformer) {
+  if (Options.TypeToPrint) {
     auto ArgArr = Options.TypeToPrint->getAllGenericArgs(Scrach);
     for (auto Arg : ArgArr) {
       if (IsFirst) {

@@ -2422,7 +2422,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
   });
 }
 
-TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
+TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
 
   // Ignore lvalues in the base type.
   Type baseTy(getRValueType());
@@ -2513,7 +2513,7 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
 }
 
 Type TypeBase::getTypeOfMember(Module *module, Type memberType,
-                               DeclContext *memberDC) {
+                               const DeclContext *memberDC) {
   // If the member is not part of a type, there's nothing to substitute.
   if (!memberDC->isTypeContext())
     return memberType;
