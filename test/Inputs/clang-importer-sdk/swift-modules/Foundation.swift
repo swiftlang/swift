@@ -221,6 +221,10 @@ extension NSError : ErrorType {
   public var _code: Int { return code }
 }
 
+extension NSArray {
+  @objc(methodIntroducedInOverlay) public func introducedInOverlay() { }
+}
+
 @_silgen_name("swift_convertNSErrorToErrorType")
 func _convertNSErrorToErrorType(string: NSError?) -> ErrorType
 

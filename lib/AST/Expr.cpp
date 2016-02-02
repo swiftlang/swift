@@ -314,6 +314,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(Assign)
     NON_LVALUE_EXPR(DefaultValue)
     NON_LVALUE_EXPR(CodeCompletion)
+    NON_LVALUE_EXPR(ObjCSelector)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -487,6 +488,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::StringLiteral:
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
+  case ExprKind::ObjCSelector:
     return true;
 
   case ExprKind::ObjectLiteral:

@@ -1097,6 +1097,7 @@ public:
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
   Expr *parseExprStringLiteral();

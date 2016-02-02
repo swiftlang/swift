@@ -3262,6 +3262,147 @@ namespace {
       return E;
     }
 
+    Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+      // Dig out the reference to a declaration.
+      Expr *subExpr = E->getSubExpr();
+      ValueDecl *foundDecl = nullptr;
+      while (subExpr) {
+        // Declaration reference.
+        if (auto declRef = dyn_cast<DeclRefExpr>(subExpr)) {
+          foundDecl = declRef->getDecl();
+          break;
+        }
+
+        // Constructor reference.
+        if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(subExpr)) {
+          foundDecl = ctorRef->getDecl();
+          break;
+        }
+
+        // Member reference.
+        if (auto memberRef = dyn_cast<MemberRefExpr>(subExpr)) {
+          foundDecl = memberRef->getMember().getDecl();
+          break;
+        }
+
+        // Dynamic member reference.
+        if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(subExpr)) {
+          foundDecl = dynMemberRef->getMember().getDecl();
+          break;
+        }
+
+        // Look through parentheses.
+        if (auto paren = dyn_cast<ParenExpr>(subExpr)) {
+          subExpr = paren->getSubExpr();
+          continue;
+        }
+
+        // Look through "a.b" to "b".
+        if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(subExpr)) {
+          subExpr = dotSyntax->getRHS();
+          continue;
+        }
+
+        // Look through self-rebind expression.
+        if (auto rebindSelf = dyn_cast<RebindSelfInConstructorExpr>(subExpr)) {
+          subExpr = rebindSelf->getSubExpr();
+          continue;
+        }
+
+        // Look through optional binding within the monadic "?".
+        if (auto bind = dyn_cast<BindOptionalExpr>(subExpr)) {
+          subExpr = bind->getSubExpr();
+          continue;
+        }
+
+        // Look through optional evaluation of the monadic "?".
+        if (auto optEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+          subExpr = optEval->getSubExpr();
+          continue;
+        }
+
+        // Look through an implicit force-value.
+        if (auto force = dyn_cast<ForceValueExpr>(subExpr)) {
+          subExpr = force->getSubExpr();
+          continue;
+        }
+
+        // Look through implicit open-existential operations.
+        if (auto open = dyn_cast<OpenExistentialExpr>(subExpr)) {
+          if (open->isImplicit()) {
+            subExpr = open->getSubExpr();
+            continue;
+          }
+          break;
+        }
+
+        // Look to the referenced member in a self-application.
+        if (auto selfApply = dyn_cast<SelfApplyExpr>(subExpr)) {
+          subExpr = selfApply->getFn();
+          continue;
+        }
+
+        // Look through implicit conversions.
+        if (auto conversion = dyn_cast<ImplicitConversionExpr>(subExpr)) {
+          subExpr = conversion->getSubExpr();
+          continue;
+        }
+
+        // Look through explicit coercions.
+        if (auto coercion = dyn_cast<CoerceExpr>(subExpr)) {
+          subExpr = coercion->getSubExpr();
+          continue;
+        }
+
+        break;
+      }
+
+      if (!subExpr) return nullptr;
+
+      // If we didn't find any declaration at all, we're stuck.
+      auto &tc = cs.getTypeChecker();
+      if (!foundDecl) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
+          .highlight(subExpr->getSourceRange());
+        return E;
+      }
+
+      // If the declaration we found was not a method or initializer,
+      // complain.
+      auto func = dyn_cast<AbstractFunctionDecl>(foundDecl);
+      if (!func) {
+        tc.diagnose(E->getLoc(),
+                    isa<VarDecl>(foundDecl)
+                      ? diag::expr_selector_property
+                      : diag::expr_selector_not_method_or_init)
+          .highlight(subExpr->getSourceRange());
+        tc.diagnose(foundDecl, diag::decl_declared_here,
+                    foundDecl->getFullName());
+        return E;
+      }
+
+      // The declaration we found must be exposed to Objective-C.
+      if (!func->isObjC()) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
+                    isa<ConstructorDecl>(func))
+          .highlight(subExpr->getSourceRange());
+        if (foundDecl->getLoc().isValid()) {
+          tc.diagnose(foundDecl,
+                      diag::expr_selector_make_objc,
+                      isa<ConstructorDecl>(func))
+            .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+                         "@objc ");
+        } else {
+          tc.diagnose(foundDecl, diag::decl_declared_here,
+                      foundDecl->getFullName());
+        }
+        return E;
+      }
+
+      E->setMethod(func);
+      return E;
+    }
+
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
       ExprStack.push_back(expr);

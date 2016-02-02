@@ -409,6 +409,11 @@ public:
                     DeclContext *container, DeclName name,
                     Identifier privateDiscriminator) const;
 
+  /// Find all Objective-C methods with the given selector.
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const;
+
   /// \sa getImportedModules
   enum class ImportFilter {
     All,
@@ -639,6 +644,11 @@ public:
                                  DeclName name,
                                  SmallVectorImpl<ValueDecl*> &results) const {}
 
+  /// Find all Objective-C methods with the given selector.
+  virtual void lookupObjCMethods(
+                 ObjCSelector selector,
+                 SmallVectorImpl<AbstractFunctionDecl *> &results) const = 0;
+
   /// Returns the comment attached to the given declaration.
   ///
   /// This function is an implementation detail for comment serialization.
@@ -804,6 +814,10 @@ public:
   
   void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
+
   Identifier
   getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
     llvm_unreachable("no private decls in the derived file unit");
@@ -903,6 +917,11 @@ public:
   /// complete, we diagnose.
   std::map<DeclAttrKind, const DeclAttribute *> AttrsRequiringFoundation;
 
+  /// A mapping from Objective-C selectors to the methods that have
+  /// those selectors.
+  llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<AbstractFunctionDecl *>>
+    ObjCMethods;
+
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
 
@@ -958,6 +977,10 @@ public:
   virtual void
   lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &results) const override;
+
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
@@ -1119,6 +1142,11 @@ public:
   virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
+
+  /// Find all Objective-C methods with the given selector.
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   Identifier
   getDiscriminatorForPrivateValue(const ValueDecl *D) const override {

@@ -456,6 +456,30 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
 }
 
+/// Collect elements of an already-existing global list with the given
+/// \c name into \c list.
+///
+/// We use this when Clang code generation might populate the list.
+static void collectGlobalList(IRGenModule &IGM,
+                              SmallVectorImpl<llvm::WeakVH> &list,
+                              StringRef name) {
+  if (auto *existing = IGM.Module.getGlobalVariable(name)) {
+    auto *globals = cast<llvm::ConstantArray>(existing->getInitializer());
+    for (auto &use : globals->operands()) {
+      auto *global = use.get();
+      list.push_back(global);
+    }
+    existing->eraseFromParent();
+  }
+
+  std::for_each(list.begin(), list.end(),
+                [](const llvm::WeakVH &global) {
+    assert(!isa<llvm::GlobalValue>(global) ||
+           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
+           "all globals in the 'used' list must be definitions");
+  });
+}
+
 /// Emit a global list, i.e. a global constant array holding all of a
 /// list of values.  Generally these lists are for various LLVM
 /// metadata or runtime purposes.
@@ -630,6 +654,13 @@ void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
   LLVMUsed.push_back(global);
 }
 
+/// Add the given global value to @llvm.compiler.used.
+///
+/// This value must have a definition by the time the module is finalized.
+void IRGenModule::addCompilerUsedGlobal(llvm::GlobalValue *global) {
+  LLVMCompilerUsed.push_back(global);
+}
+
 /// Add the given global value to the Objective-C class list.
 void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
   ObjCClasses.push_back(classPtr);
@@ -674,24 +705,16 @@ void IRGenModule::emitGlobalLists() {
   // @llvm.used
 
   // Collect llvm.used globals already in the module (coming from ClangCodeGen).
-  auto *ExistingLLVMUsed = Module.getGlobalVariable("llvm.used");
-  if (ExistingLLVMUsed) {
-    auto *Globals =
-        cast<llvm::ConstantArray>(ExistingLLVMUsed->getInitializer());
-    for (auto &Use : Globals->operands()) {
-      auto *Global = Use.get();
-      LLVMUsed.push_back(Global);
-    }
-    ExistingLLVMUsed->eraseFromParent();
-  }
-
-  std::for_each(LLVMUsed.begin(), LLVMUsed.end(),
-                [](const llvm::WeakVH &global) {
-    assert(!isa<llvm::GlobalValue>(global) ||
-           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
-           "all globals in the 'used' list must be definitions");
-  });
+  collectGlobalList(*this, LLVMUsed, "llvm.used");
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
+                 llvm::GlobalValue::AppendingLinkage,
+                 Int8PtrTy,
+                 false);
+
+  // Collect llvm.compiler.used globals already in the module (coming
+  // from ClangCodeGen).
+  collectGlobalList(*this, LLVMCompilerUsed, "llvm.compiler.used");
+  emitGlobalList(*this, LLVMCompilerUsed, "llvm.compiler.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
                  false);

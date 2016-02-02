@@ -336,8 +336,38 @@ ERROR(noescape_functiontype_mismatch,none,
       "invalid conversion from non-escaping function of type %0 to "
       "potentially escaping function type %1", (Type, Type))
 
+// Selector expressions.
+ERROR(expr_selector_no_objc_runtime,none,
+      "'#selector' can only be used with the Objective-C runtime", ())
+ERROR(expr_selector_module_missing,none,
+      "import the 'ObjectiveC' module to use '#selector'", ())
+ERROR(expr_selector_no_declaration,none,
+      "argument of '#selector' does not refer to an initializer or method", ())
+ERROR(expr_selector_property,none,
+      "argument of '#selector' cannot refer to a property", ())
+ERROR(expr_selector_not_method_or_init,none,
+      "argument of '#selector' does not refer to a method or initializer", ())
+ERROR(expr_selector_not_objc,none,
+      "argument of '#selector' refers to %select{a method|an initializer}0 "
+      "that is not exposed to Objective-C",
+      (bool))
+NOTE(expr_selector_make_objc,none,
+     "add '@objc' to expose this %select{method|initializer}0 to Objective-C",
+     (bool))
 
-
+// Selectors-as-string-literals.
+WARNING(selector_literal_invalid,none,
+        "string literal is not a valid Objective-C selector", ())
+WARNING(selector_literal_undeclared,none,
+        "no method declared with Objective-C selector %0", (ObjCSelector))
+WARNING(selector_literal_deprecated,none,
+        "use of string literal for Objective-C selectors is deprecated; "
+        "use '#selector' or explicitly construct a 'Selector'", ())
+WARNING(selector_literal_deprecated_suggest,none,
+        "use of string literal for Objective-C selectors is deprecated; "
+        "use '#selector' instead", ())
+WARNING(selector_construction_suggest,none,
+        "use '#selector' instead of explicitly constructing a 'Selector'", ())
 
 ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())

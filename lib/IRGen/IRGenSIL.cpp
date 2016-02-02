@@ -2236,18 +2236,28 @@ static llvm::Constant *getAddrOfString(IRGenModule &IGM, StringRef string,
   case swift::StringLiteralInst::Encoding::UTF8:
     return IGM.getAddrOfGlobalString(string);
 
-  case swift::StringLiteralInst::Encoding::UTF16:
+  case swift::StringLiteralInst::Encoding::UTF16: {
     // This is always a GEP of a GlobalVariable with a nul terminator.
     auto addr = IGM.getAddrOfGlobalUTF16String(string);
 
     // Cast to Builtin.RawPointer.
     return llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
   }
+
+  case swift::StringLiteralInst::Encoding::ObjCSelector:
+    llvm_unreachable("cannot get the address of an Objective-C selector");
+  }
   llvm_unreachable("bad string encoding");
 }
 
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
-  auto addr = getAddrOfString(IGM, i->getValue(), i->getEncoding());
+  llvm::Value *addr;
+
+  // Emit a load of a selector.
+  if (i->getEncoding() == swift::StringLiteralInst::Encoding::ObjCSelector)
+    addr = emitObjCSelectorRefLoad(i->getValue());
+  else
+    addr = getAddrOfString(IGM, i->getValue(), i->getEncoding());
 
   Explosion e;
   e.add(addr);
