@@ -107,6 +107,10 @@ _ = NSOptions.B
 
 func makeSureAnyObject(_: AnyObject) {}
 func testCF(a: __PrivCFTypeRef, b: __PrivCFSubRef, c: __PrivInt) {
+  // expected-warning@-1{{'__PrivCFTypeRef' is deprecated: renamed to '__PrivCFType'}}
+  // expected-note@-2{{use '__PrivCFType' instead}}
+  // expected-warning@-3{{__PrivCFSubRef' is deprecated: renamed to '__PrivCFSub'}}
+  // expected-note@-4{{use '__PrivCFSub' instead}}
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN

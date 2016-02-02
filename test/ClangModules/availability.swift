@@ -52,7 +52,7 @@ func test_swift_unavailable() {
   let x: NSSwiftUnavailableStruct? = nil // expected-error {{'NSSwiftUnavailableStruct' is unavailable in Swift}}
 }
 
-func test_CFReleaseRetainAutorelease(x : CFTypeRef, color : CGColorRef ) {
+func test_CFReleaseRetainAutorelease(x : CFTypeRef, color : CGColor ) {
   CFRelease(x)              // expected-error {{'CFRelease' is unavailable: Core Foundation objects are automatically memory managed}}
   CGColorRelease(color)     // expected-error {{'CGColorRelease' is unavailable: Core Foundation objects are automatically memory managed}}
   CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}}
