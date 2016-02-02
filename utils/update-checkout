@@ -39,7 +39,7 @@ def update_working_copy(repo_path, branch):
             print(status)
             exit(1)
         if branch:
-            check_call(['git','checkout',branch])
+            check_call(['git', 'checkout', branch])
         check_call(["git", "fetch"])
         check_call(["git", "rebase", "FETCH_HEAD"])
 
