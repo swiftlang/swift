@@ -1987,7 +1987,7 @@ public:
     Builder.addRightParen();
   }
 
-  void addPoundSelector() {
+  void addPoundSelector(bool needPound) {
     // #selector is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
@@ -1996,7 +1996,10 @@ public:
                                   CodeCompletionResult::ResultKind::Keyword,
                                   SemanticContextKind::ExpressionSpecific,
                                   ExpectedTypes);
-    Builder.addTextChunk("selector");
+    if (needPound)
+      Builder.addTextChunk("#selector");
+    else
+      Builder.addTextChunk("selector");
     Builder.addLeftParen();
     Builder.addSimpleTypedParameter("@objc method", /*isVarArg=*/false);
     Builder.addRightParen();
@@ -3156,6 +3159,19 @@ public:
     }
 
     addValueLiteralCompletions();
+
+    // If the expected type is ObjectiveC.Selector, add #selector.
+    if (Ctx.LangOpts.EnableObjCInterop) {
+      for (auto T : ExpectedTypes) {
+        if (auto structDecl = T->getStructOrBoundGenericStruct()) {
+          if (structDecl->getName() == Ctx.Id_Selector &&
+              structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
+            addPoundSelector(/*needPound=*/true);
+            break;
+          }
+        }
+      }
+    }
   }
 
   struct LookupByName : public swift::VisibleDeclConsumer {
@@ -4597,7 +4613,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::AfterPound: {
     Lookup.addPoundAvailable(ParentStmtKind);
-    Lookup.addPoundSelector();
+    Lookup.addPoundSelector(/*needPound=*/false);
     break;
   }
 
