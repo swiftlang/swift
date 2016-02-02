@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -devirtualizer -redundant-load-elim -inline  | FileCheck %s --check-prefix=CHECK-DEVIRT
-// RUN: %target-sil-opt -enable-sil-verify-all %s -early-inline  | FileCheck %s --check-prefix=CHECK-EARLY-INLINE
 // RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt  | FileCheck %s --check-prefix=CHECK-SPECDEVIRT
 // RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining  | FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING
 
@@ -620,11 +619,6 @@ bb0:
 // CHECK-DEVIRT-NOT: class_method
 // CHECK-DEVIRT: }
 
-// CHECK-EARLY-INLINE-LABEL: sil @_TF16devirt_try_apply5test4FT_Vs5Int32
-// CHECK-EARLY-INLINE-NOT: checked_cast_br [exact]
-// CHECK-EARLY-INLINE-NOT: class_method
-// CHECK-EARLY-INLINE: }
-
 sil @_TF16devirt_try_apply5test4FT_Vs5Int32 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Int32
@@ -709,10 +703,6 @@ bb4(%23 : $ErrorType):
 // CHECK-DEVIRT-NOT: class_method
 // CHECK-DEVIRT: }
 
-// CHECK-EARLY-INLINE-LABEL: sil @_TF16devirt_try_apply5test6FT_GSqVs5Int32_
-// CHECK-EARLY-INLINE-NOT: class_method
-// CHECK-EARLY-INLINE: }
-
 sil @_TF16devirt_try_apply5test6FT_GSqVs5Int32_ : $@convention(thin) () -> Optional<Int32> {
 bb0:
   %0 = alloc_stack $Optional<Int32>
@@ -755,11 +745,6 @@ bb4(%20 : $ErrorType):
 // CHECK-DEVIRT-NOT: checked_cast_br [exact]
 // CHECK-DEVIRT-NOT: class_method
 // CHECK-DEVIRT: }
-
-// CHECK-EARLY-INLINE-LABEL: sil @_TF16devirt_try_apply5test7FT_Vs5Int32
-// CHECK-EARLY-INLINE-NOT: checked_cast_br [exact]
-// CHECK-EARLY-INLINE-NOT: class_method
-// CHECK-EARLY-INLINE: }
 
 // CHECK-MANDATORY-INLINING-LABEL: sil @_TF16devirt_try_apply5test7FT_Vs5Int32
 // CHECK-MANDATORY-INLINING-NOT: checked_cast_br [exact]
