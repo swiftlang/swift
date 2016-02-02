@@ -134,14 +134,6 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   AdjustedOptions.PrintDefaultParameterPlaceholder = true;
 }
 
-bool isConditionalExtension(ExtensionDecl *ED) {
-  if (auto *GPs = ED->getGenericParams()) {
-    if (!GPs->getRequirements().empty())
-      return true;
-  }
-  return false;
-}
-
 void findExtensionsFromConformingProtocols(Decl *D,
                                            llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
   NominalTypeDecl* NTD = dyn_cast<NominalTypeDecl>(D);
@@ -162,7 +154,7 @@ void findExtensionsFromConformingProtocols(Decl *D,
     NominalTypeDecl* Back = Unhandled.back();
     Unhandled.pop_back();
     for (ExtensionDecl *E : Back->getExtensions()) {
-      if(isConditionalExtension(E))
+      if(E->isConstrainedExtension())
         Results.insert(E);
       for (auto TL : Back->getInherited()) {
         addTypeLocNominal(TL);
