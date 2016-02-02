@@ -19,7 +19,7 @@ import subprocess
 
 class ProfdataMergerProcess(Process):
     def __init__(self, config, file_queue):
-        Process.__init__(self)
+        super(ProfdataMergerProcess, self).__init__()
         self.config = config
         self.file_queue = file_queue
         self.filename_buffer = []
