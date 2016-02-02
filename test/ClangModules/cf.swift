@@ -137,4 +137,10 @@ func nameCollisions() {
 
   func isOptionalFloat(inout _: Optional<Float>) {}
   isOptionalFloat(&otherAlias) // okay
+
+  var np: NotAProblem?
+  var np2: NotAProblemRef?
+
+  np = np2
+  np2 = np
 }

@@ -98,5 +98,5 @@ typealias __PrivCFTypeRef = __PrivCFType
 class __PrivCFType {
 }
 typealias __PrivCFSubRef = __PrivCFSub
-typealias __PrivCFSub = __PrivCFTypeRef
+typealias __PrivCFSub = __PrivCFType
 typealias __PrivInt = Int32
