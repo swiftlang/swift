@@ -378,6 +378,7 @@ function set_deployment_target_based_options() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
+                -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
             swift_cmake_options=(
                 "${swift_cmake_options[@]}"
@@ -385,6 +386,7 @@ function set_deployment_target_based_options() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
 
             if [[ "${llvm_target_arch}" ]] ; then
