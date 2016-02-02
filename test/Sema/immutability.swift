@@ -432,7 +432,7 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
 }
 
-func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} {{38-38=,}} expected-error 2{{expected parameter type following ':'}}
+func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} expected-error 2 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
 struct F {

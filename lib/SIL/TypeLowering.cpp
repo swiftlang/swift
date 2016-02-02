@@ -1685,72 +1685,6 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   return *theInfo;
 }
 
-namespace {
-  using PrimaryArchetypeMap
-    = llvm::DenseMap<ArchetypeType *, std::pair<unsigned, unsigned>>;
-}
-
-static CanType
-mapArchetypeToInterfaceType(const PrimaryArchetypeMap &primaryArchetypes,
-                            ArchetypeType *arch) {
-  auto &C = arch->getASTContext();
-
-  // If the archetype is primary, try to map it to a generic type parameter.
-  if (arch->isPrimary()) {
-    auto foundArchetype = primaryArchetypes.find(arch);
-    if (foundArchetype == primaryArchetypes.end()) return CanType(arch);
-
-    return CanGenericTypeParamType::get(foundArchetype->second.first,
-                                        foundArchetype->second.second, C);
-  }
-  
-  // Otherwise, map it to a dependent member type of the parent archetype.
-  assert(arch->getAssocType());
-  auto base = mapArchetypeToInterfaceType(primaryArchetypes, arch->getParent());
-  if (base->isTypeParameter())
-    return CanDependentMemberType::get(base, arch->getAssocType(), C);
-  assert(base == CanType(arch->getParent())
-         && "substituted to non-dependent type?!");
-  return CanType(arch);
-}
-
-/// Map a contextual type out of its context into a dependent generic type.
-CanType
-TypeConverter::getInterfaceTypeOutOfContext(CanType contextTy,
-                                         DeclContext *context) const {
-  GenericParamList *genericParams = context->getGenericParamsOfContext();
-  return getInterfaceTypeOutOfContext(contextTy, genericParams);
-}
-
-CanType
-TypeConverter::getInterfaceTypeOutOfContext(CanType contextTy,
-                                        GenericParamList *contextParams) const {
-  // If the context is non-generic, we're done.
-  if (!contextParams)
-    return contextTy;
-
-  // Collect the depths and indices of the primary archetypes of our generic
-  // context.
-  llvm::DenseMap<ArchetypeType *, std::pair<unsigned, unsigned>>
-    primaryArchetypes;
-  unsigned depth = contextParams->getDepth();
-  do {
-    for (unsigned index : indices(contextParams->getParams())) {
-      ArchetypeType *archetype  = contextParams->getPrimaryArchetypes()[index];
-      primaryArchetypes[archetype] = {depth, index};
-    }
-    contextParams = contextParams->getOuterParameters();
-  } while (depth-- > 0);
-
-  // Substitute archetypes from the context with dependent types.
-  return contextTy.transform([&](Type t) -> Type {
-    CanType ct(t);
-    ArchetypeType *arch = dyn_cast<ArchetypeType>(ct);
-    if (!arch) return t;
-    return mapArchetypeToInterfaceType(primaryArchetypes, arch);
-  })->getCanonicalType();
-}
-
 /// Get the type of a global variable accessor function, () -> RawPointer.
 static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
@@ -1777,8 +1711,10 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   CanGenericSignature sig;
   if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>()) {
     sig = genTy->getGenericSignature()->getCanonicalSignature();
-    resultTy = TC.getInterfaceTypeOutOfContext(resultTy,
-                                            funcInfo.ContextGenericParams);
+    resultTy = ArchetypeBuilder::mapTypeOutOfContext(
+        TC.M.getSwiftModule(),
+        funcInfo.ContextGenericParams,
+        resultTy)->getCanonicalType();
   }
   
   if (sig)
@@ -1947,7 +1883,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       // parameters.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
-                        getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
+          ArchetypeBuilder::mapTypeOutOfContext(ACE->getParent(), funcTy)
+              ->getCanonicalType());
       return getFunctionInterfaceTypeWithCaptures(funcTy, ACE);
     }
 
@@ -1956,7 +1893,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
                                   func->getInterfaceType()->getCanonicalType());
     if (func->getParent() && func->getParent()->isLocalContext())
       funcTy = cast<AnyFunctionType>(
-                       getInterfaceTypeOutOfContext(funcTy, func->getParent()));
+          ArchetypeBuilder::mapTypeOutOfContext(func->getParent(), funcTy)
+              ->getCanonicalType());
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }

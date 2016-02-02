@@ -1803,6 +1803,31 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
   });
 }
 
+Type
+ArchetypeBuilder::mapTypeOutOfContext(DeclContext *dc, Type type) {
+  GenericParamList *genericParams = dc->getGenericParamsOfContext();
+  return mapTypeOutOfContext(dc->getParentModule(), genericParams, type);
+}
+
+Type ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
+                                           GenericParamList *genericParams,
+                                           Type type) {
+  // If the context is non-generic, we're done.
+  if (!genericParams)
+    return type;
+
+  // Capture the archetype -> interface type mapping.
+  TypeSubstitutionMap subs;
+  for (auto params = genericParams; params != nullptr;
+       params = params->getOuterParameters()) {
+    for (auto param : *params) {
+      subs[param->getArchetype()] = param->getDeclaredType();
+    }
+  }
+
+  return type.subst(M, subs, SubstFlags::AllowLoweredTypes);
+}
+
 bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
                                            bool adoptArchetypes,
                                            bool treatRequirementsAsExplicit) {

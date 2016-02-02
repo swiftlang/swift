@@ -1689,9 +1689,13 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
 
     // Substitute context parameters out of the "from" and "to" types.
     auto fromInterfaceType
-      = Types.getInterfaceTypeOutOfContext(fromType, thunkContextParams);
+        = ArchetypeBuilder::mapTypeOutOfContext(
+            M.getSwiftModule(), thunkContextParams, fromType)
+                ->getCanonicalType();
     auto toInterfaceType
-      = Types.getInterfaceTypeOutOfContext(toType, thunkContextParams);
+        = ArchetypeBuilder::mapTypeOutOfContext(
+            M.getSwiftModule(), thunkContextParams, toType)
+                ->getCanonicalType();
 
     mangler.mangleType(fromInterfaceType, /*uncurry*/ 0);
     mangler.mangleType(toInterfaceType, /*uncurry*/ 0);

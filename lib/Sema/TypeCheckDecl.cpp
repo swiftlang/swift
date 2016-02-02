@@ -372,7 +372,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
     // Retrieve the interface type for this inherited type.
     if (DC->isGenericContext() && DC->isTypeContext()) {
-      inheritedTy = getInterfaceTypeFromInternalType(DC, inheritedTy);
+      inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
     }
 
     // Check whether we inherited from the same type twice.
@@ -835,13 +835,14 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-/// We pass in a vector of nested GenericParamLists and a vector of
-/// ArchetypeBuilders with the innermost GenericParamList in the beginning
-/// of the vector.
-bool TypeChecker::handleSILGenericParams(
-                    SmallVectorImpl<ArchetypeBuilder *> &builders,
-                    SmallVectorImpl<GenericParamList *> &gps,
+GenericSignature *TypeChecker::handleSILGenericParams(
+                    GenericParamList *genericParams,
                     DeclContext *DC) {
+  SmallVector<GenericParamList *, 2> nestedList;
+  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
+    nestedList.push_back(genericParams);
+  }
+
   // We call checkGenericParamList() on all lists, then call
   // finalizeGenericParamList() on all lists. After finalizeGenericParamList(),
   // the generic parameters will be assigned to archetypes. That will cause
@@ -849,23 +850,24 @@ bool TypeChecker::handleSILGenericParams(
 
   // Since the innermost GenericParamList is in the beginning of the vector,
   // we process in reverse order to handle the outermost list first.
-  GenericSignature *outerSignature = nullptr;
-  for (unsigned i = 0, e = gps.size(); i < e; i++) {
-    auto &builder = *builders.rbegin()[i];
-    builder.addGenericSignature(outerSignature, true);
-
-    auto genericParams = gps.rbegin()[i];
+  GenericSignature *parentSig = nullptr;
+  for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
+    auto genericParams = nestedList.rbegin()[i];
     bool invalid = false;
-    outerSignature = validateGenericSignature(genericParams, DC, outerSignature,
-                                              nullptr, invalid);
+    auto *genericSig = validateGenericSignature(genericParams, DC, parentSig,
+                                                nullptr, invalid);
     if (invalid)
-      return true;
+      return nullptr;
 
     revertGenericParamList(genericParams);
-    checkGenericParamList(&builder, genericParams, DC);
+
+    ArchetypeBuilder builder(*DC->getParentModule(), Diags);
+    checkGenericParamList(&builder, genericParams, parentSig);
     finalizeGenericParamList(builder, genericParams, DC, *this);
+
+    parentSig = genericSig;
   }
-  return false;
+  return parentSig;
 }
 
 void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
@@ -1243,7 +1245,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     if (dc->isGenericContext() && dc->isTypeContext()) {
       binding->getPattern(entryNumber)->forEachVariable([&](VarDecl *var) {
         var->setInterfaceType(
-          tc.getInterfaceTypeFromInternalType(dc, var->getType()));
+          ArchetypeBuilder::mapTypeOutOfContext(dc, var->getType()));
       });
     }
 
@@ -2998,9 +3000,9 @@ public:
 
       // If we're in a generic context, set the interface type.
       if (dc->isGenericContext()) {
-        auto indicesTy = TC.getInterfaceTypeFromInternalType(
+        auto indicesTy = ArchetypeBuilder::mapTypeOutOfContext(
                            dc, indicesType);
-        auto elementTy = TC.getInterfaceTypeFromInternalType(
+        auto elementTy = ArchetypeBuilder::mapTypeOutOfContext(
                            dc, SD->getElementType());
         SD->setInterfaceType(FunctionType::get(indicesTy, elementTy));
       }
@@ -3114,8 +3116,8 @@ public:
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
       } else if (TAD->getDeclContext()->isGenericContext()) {
         TAD->setInterfaceType(
-          TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
-                                              TAD->getType()));
+          ArchetypeBuilder::mapTypeOutOfContext(TAD->getDeclContext(),
+                                                TAD->getType()));
       }
 
       // We create TypeAliasTypes with invalid underlying types, so we
@@ -3945,7 +3947,8 @@ public:
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(FD->getModuleContext());
-        TC.checkGenericParamList(&builder, gp, FD->getDeclContext());
+        auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig);
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getParameterLists()) {
@@ -5067,10 +5070,10 @@ public:
 
     // Build the generic function type.
     auto funcTy = elt->getType()->castTo<AnyFunctionType>();
-    auto inputTy = TC.getInterfaceTypeFromInternalType(enumDecl,
-                                                       funcTy->getInput());
-    auto resultTy = TC.getInterfaceTypeFromInternalType(enumDecl,
-                                                        funcTy->getResult());
+    auto inputTy = ArchetypeBuilder::mapTypeOutOfContext(enumDecl,
+                                                         funcTy->getInput());
+    auto resultTy = ArchetypeBuilder::mapTypeOutOfContext(enumDecl,
+                                                          funcTy->getResult());
     auto interfaceTy
       = GenericFunctionType::get(enumDecl->getGenericSignatureOfContext(),
                                  inputTy, resultTy, funcTy->getExtInfo());
@@ -5310,7 +5313,8 @@ public:
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
-        TC.checkGenericParamList(&builder, gp, CD->getDeclContext());
+        auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig);
 
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getParameterList(1), gp);
@@ -5763,7 +5767,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
         ArchetypeBuilder builder =
           createArchetypeBuilder(nominal->getModuleContext());
-        checkGenericParamList(&builder, gp, nominal->getDeclContext());
+        auto *parentSig = nominal->getDeclContext()->getGenericSignatureOfContext();
+        checkGenericParamList(&builder, gp, parentSig);
         finalizeGenericParamList(builder, gp, nominal, *this);
       }
     }
@@ -5822,7 +5827,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     ArchetypeBuilder builder =
       createArchetypeBuilder(proto->getModuleContext());
-    checkGenericParamList(&builder, gp, proto->getDeclContext());
+    auto *parentSig = proto->getDeclContext()->getGenericSignatureOfContext();
+    checkGenericParamList(&builder, gp, parentSig);
     finalizeGenericParamList(builder, gp, proto, *this);
 
     // Record inherited protocols.
@@ -6189,7 +6195,8 @@ static Type checkExtensionGenericParams(
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  tc.checkGenericParamList(&builder, genericParams, ext->getDeclContext());
+  auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
+  tc.checkGenericParamList(&builder, genericParams, parentSig);
   inferExtendedTypeReqs(builder);
   finalizeGenericParamList(builder, genericParams, ext, tc);
 

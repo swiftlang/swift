@@ -938,16 +938,8 @@ public:
     /// \p SecondName is the name.
     SourceLoc SecondNameLoc;
 
-    /// The location of the ':', if present, indicating that a type is
-    /// provided.
-    SourceLoc ColonLoc;
-
     /// The location of the '...', if present.
     SourceLoc EllipsisLoc;
-
-    /// The location of the '=', if present, indicating that a default argument
-    /// is provided.
-    SourceLoc EqualLoc;
 
     /// The first name.
     Identifier FirstName;
@@ -960,6 +952,9 @@ public:
 
     /// The default argument for this parameter.
     ExprHandle *DefaultArg = nullptr;
+    
+    /// True if we emitted a parse error about this parameter.
+    bool isInvalid = false;
   };
 
   /// Describes the context in which the given parameter is being parsed.

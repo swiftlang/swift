@@ -1669,7 +1669,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   if (fromDC != DC && DC->getGenericSignatureOfContext() &&
       fromDC->getGenericSignatureOfContext() && !isa<ProtocolDecl>(fromDC)) {
     // Map the type to an interface type.
-    type = TC.getInterfaceTypeFromInternalType(fromDC, type);
+    type = ArchetypeBuilder::mapTypeOutOfContext(fromDC, type);
 
     // Map the type into the conformance's context.
     type = Adoptee->getTypeOfMember(DC->getParentModule(), type, fromDC);
@@ -1739,7 +1739,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       aliasDecl->setInvalid();
     if (metaType->hasArchetype()) {
       aliasDecl->setInterfaceType(
-        TC.getInterfaceTypeFromInternalType(DC, metaType));
+        ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
     }
     
     // Inject the typealias into the nominal decl that conforms to the protocol.

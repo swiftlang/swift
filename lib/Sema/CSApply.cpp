@@ -2180,7 +2180,7 @@ namespace {
       // then we're in an ambiguity tolerant mode used for diagnostic
       // generation.  Just leave this as an unresolved member reference.
       Type resultTy = simplifyType(expr->getType());
-      if (resultTy->is<UnresolvedType>()) {
+      if (resultTy->getRValueType()->is<UnresolvedType>()) {
         expr->setType(resultTy);
         return expr;
       }

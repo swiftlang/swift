@@ -1427,8 +1427,11 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
         substType = substType->getAnyOptionalObjectType();
         if (isMeta && substType)
           substType = MetatypeType::get(substType);
+      } else if (cand.getKind() != OverloadChoiceKind::Decl) {
+        // Otherwise, if it is a remapping we can't handle, don't try to compute
+        // a substitution.
+        substType = Type();
       }
-
 
       if (substType)
         substType = substType->getTypeOfMember(CS->DC->getParentModule(),

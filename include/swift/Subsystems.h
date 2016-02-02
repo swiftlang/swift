@@ -44,6 +44,7 @@ namespace swift {
   class DiagnosticEngine;
   class FileUnit;
   class GenericParamList;
+  class GenericSignature;
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
@@ -187,13 +188,9 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  /// We pass in a vector of nested GenericParamLists and a vector of
-  /// ArchetypeBuilders with the innermost GenericParamList in the beginning
-  /// of the vector.
-  bool handleSILGenericParams(ASTContext &Ctx,
-                              SmallVectorImpl<GenericParamList *> &gps,
-                              DeclContext *DC,
-                              SmallVectorImpl<ArchetypeBuilder *> &builders);
+  GenericSignature *handleSILGenericParams(ASTContext &Ctx,
+                                           GenericParamList *genericParams,
+                                           DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///

@@ -351,21 +351,33 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   Foo -> Bar
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  GenericParamList *Generics;
+  // These two are only used in SIL mode, which is the only time
+  // we can have polymorphic function values.
+  GenericParamList *GenericParams;
+  GenericSignature *GenericSig;
+
   TypeRepr *ArgsTy;
   TypeRepr *RetTy;
   SourceLoc ArrowLoc;
   SourceLoc ThrowsLoc;
 
 public:
-  FunctionTypeRepr(GenericParamList *generics, TypeRepr *argsTy,
+  FunctionTypeRepr(GenericParamList *genericParams, TypeRepr *argsTy,
                    SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
     : TypeRepr(TypeReprKind::Function),
-      Generics(generics), ArgsTy(argsTy), RetTy(retTy),
+      GenericParams(genericParams), GenericSig(nullptr),
+      ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
 
-  GenericParamList *getGenericParams() const { return Generics; }
+  GenericParamList *getGenericParams() const { return GenericParams; }
+  GenericSignature *getGenericSignature() const { return GenericSig; }
+
+  void setGenericSignature(GenericSignature *genericSig) {
+    assert(GenericSig == nullptr);
+    GenericSig = genericSig;
+  }
+
   TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool throws() const { return ThrowsLoc.isValid(); }
