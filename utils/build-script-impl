@@ -193,7 +193,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     build-jobs ""                                "The number of parallel build jobs to use"
-    darwin-toolchain-alias             "swift"   "Swift alias for toolchain"
+    darwin-toolchain-alias             ""        "Swift alias for toolchain"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
 
