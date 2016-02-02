@@ -30,6 +30,14 @@ def update_working_copy(repo_path, branch):
 
     print("--- Updating '" + repo_path + "' ---")
     with WorkingDirectory(repo_path):
+        if branch:
+            status = check_output(['git', 'status', '--porcelain'])
+            if status:
+                print("Please, commit your changes.")
+                print(status)
+                exit(1)
+            check_call(['git', 'checkout', branch])
+
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
