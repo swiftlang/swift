@@ -188,6 +188,10 @@
 // CHECK-APPKIT: func drawAnywhereIn(_: NSView?, options: [Object : AnyObject] = [:])
 // CHECK-APPKIT: func drawAnywhere(options _: [Object : AnyObject] = [:])
 
+// Note: "Ref" variants are unavailable.
+// CHECK-CORECOOLING: @available(*, unavailable, message="Not available in Swift")
+// CHECK-CORECOOLING-NEXT: typealias CCPowerSupplyRef = CCPowerSupply
+
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)
 

@@ -1389,6 +1389,18 @@ namespace {
 
             // Record this as the alternate declaration.
             Impl.AlternateDecls[primary] = aliasRef;
+
+            // The "Ref" variants are deprecated and will be
+            // removed. Stage their removal via
+            // -enable-omit-needless-words.
+            auto attr = AvailableAttr::createUnconditional(
+                          Impl.SwiftContext,
+                          "",
+                          primary->getName().str(),
+                          Impl.OmitNeedlessWords
+                            ? UnconditionalAvailabilityKind::UnavailableInSwift
+                            : UnconditionalAvailabilityKind::Deprecated);
+            aliasRef->getAttrs().add(attr);
           };
 
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
