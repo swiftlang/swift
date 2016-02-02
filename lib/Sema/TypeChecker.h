@@ -636,12 +636,8 @@ public:
   void checkUnsupportedProtocolType(Stmt *stmt);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  /// We pass in a vector of nested GenericParamLists and a vector of
-  /// ArchetypeBuilders with the innermost GenericParamList in the beginning
-  /// of the vector.
-  bool handleSILGenericParams(SmallVectorImpl<ArchetypeBuilder *> &builders,
-                              SmallVectorImpl<GenericParamList *> &gps,
-                              DeclContext *DC);
+  GenericSignature *handleSILGenericParams(GenericParamList *genericParams,
+                                           DeclContext *DC);
 
   /// \brief Resolves a TypeRepr to a type.
   ///
@@ -955,7 +951,7 @@ public:
   /// parent generic parameter lists) according to the given resolver.
   bool checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
-                             DeclContext *parentDC,
+                             GenericSignature *parentSig,
                              bool adoptArchetypes = true,
                              GenericTypeResolver *resolver = nullptr);
 
@@ -975,17 +971,6 @@ public:
                              Type owner,
                              GenericSignature *genericSig,
                              ArrayRef<Type> genericArgs);
-
-  /// Given a type that was produced within the given generic declaration
-  /// context, produce the corresponding interface type.
-  ///
-  /// \param dc The declaration context in which the type was produced.
-  ///
-  /// \param type The type, which involves archetypes but not dependent types.
-  ///
-  /// \returns the type after mapping all archetypes to their corresponding
-  /// dependent types.
-  Type getInterfaceTypeFromInternalType(DeclContext *dc, Type type);
 
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;

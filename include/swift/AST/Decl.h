@@ -1098,19 +1098,11 @@ class GenericParamList {
   SourceLoc TrailingWhereLoc;
   unsigned FirstTrailingWhereArg;
 
-  /// The builder used to build archetypes for this list.
-  ArchetypeBuilder *Builder;
-
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericTypeParamDecl *> Params,
                    SourceLoc WhereLoc,
                    MutableArrayRef<RequirementRepr> Requirements,
                    SourceLoc RAngleLoc);
-  
-  void getAsGenericSignatureElements(ASTContext &C,
-                         llvm::DenseMap<ArchetypeType*, Type> &archetypeMap,
-                         SmallVectorImpl<GenericTypeParamType*> &genericParams,
-                         SmallVectorImpl<Requirement> &requirements) const;
   
   // Don't copy.
   GenericParamList(const GenericParamList &) = delete;
@@ -1262,11 +1254,6 @@ public:
     return getAllArchetypes().slice(0, getNumPrimaryArchetypes());
   }
   
-  /// \brief Retrieves the list containing only the associated archetypes.
-  ArrayRef<ArchetypeType *> getAssociatedArchetypes() const {
-    return getAllArchetypes().slice(getNumPrimaryArchetypes());
-  }
-
   /// \brief Sets all archetypes *without* copying the source array.
   void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
     assert(AA.size() >= size()
@@ -1344,17 +1331,7 @@ public:
       ++depth;
     return depth;
   }
-  
-  /// Get the generic parameter list as a GenericSignature in which the generic
-  /// parameters have been canonicalized.
-  ///
-  /// \param archetypeMap   This DenseMap is populated with a mapping of
-  ///                       context primary archetypes to dependent generic
-  ///                       types.
-  GenericSignature *getAsCanonicalGenericSignature(
-                           llvm::DenseMap<ArchetypeType*, Type> &archetypeMap,
-                           ASTContext &C) const;
-  
+
   /// Derive a type substitution map for this generic parameter list from a
   /// matching substitution vector.
   TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> Subs) const;
@@ -1366,14 +1343,6 @@ public:
                       SmallVectorImpl<ArchetypeType*> &archetypes);
 
   ArrayRef<Substitution> getForwardingSubstitutions(ASTContext &C);
-
-  void setBuilder(ArchetypeBuilder *builder) {
-    Builder = builder;
-  }
-
-  ArchetypeBuilder *getBuilder() const {
-    return Builder;
-  }
 
   /// Collect the nested archetypes of an archetype into the given
   /// collection.

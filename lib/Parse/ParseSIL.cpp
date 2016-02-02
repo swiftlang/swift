@@ -96,7 +96,6 @@ namespace {
     bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
     bool parseApplySubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
-    bool handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder);
     bool parseSpecConformanceSubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
     ProtocolConformance *parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -260,12 +259,11 @@ namespace {
     bool isStartOfSILInstruction();
 
     ProtocolConformance *parseProtocolConformance(ProtocolDecl *&proto,
-                             GenericParamList *&generics,
-                             ArchetypeBuilder &builder, bool localScope);
-    ProtocolConformance *parseProtocolConformance(ArchetypeBuilder &builder) {
+                             GenericParamList *&generics, bool localScope);
+    ProtocolConformance *parseProtocolConformance() {
       ProtocolDecl *dummy;
       GenericParamList *gp;
-      return parseProtocolConformance(dummy, gp, builder, true);
+      return parseProtocolConformance(dummy, gp, true);
     }
 
     Optional<llvm::coverage::Counter>
@@ -740,19 +738,6 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
   return Lookup[0];
 }
 
-bool SILParser::handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder) {
-  if (T.wasValidated() || !T.getType().isNull())
-     return false;
-
-  if (auto fnType = dyn_cast<FunctionTypeRepr>(T.getTypeRepr()))
-    if (auto gp = fnType->getGenericParams()) {
-      SmallVector<ArchetypeBuilder *, 1> builders(1, builder);
-      SmallVector<GenericParamList *, 1> gps(1, gp);
-      handleSILGenericParams(P.Context, gps, &P.SF, builders);
-    }
-  return false;
-}
-
 bool SILParser::parseASTType(CanType &result) {
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
@@ -789,32 +774,15 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
     if (auto generics = fnType->getGenericParams()) {
       GenericParams = generics;
 
-      // Collect the nested GenericParamLists and pass it to
-      // handleSILGenericParams.
-      SmallVector<GenericParamList *, 4> nestedLists;
-      SmallVector<ArchetypeBuilder *, 4> builders;
-      for (; generics; generics = generics->getOuterParameters()) {
-        nestedLists.push_back(generics);
-        auto *builder = new ArchetypeBuilder(*P.SF.getParentModule(), P.Diags);
-        generics->setBuilder(builder);
-        builders.push_back(builder);
-      }
-      handleSILGenericParams(P.Context, nestedLists, &P.SF, builders);
+      auto *genericSig = handleSILGenericParams(P.Context, generics, &P.SF);
+      fnType->setGenericSignature(genericSig);
     }
   }
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
 
-  // We need the builders to be live here for generating GenericSignature.
-  bool retCode = performTypeLocChecking(Ty);
-  for (auto generics = GenericParams; generics;
-       generics = generics->getOuterParameters())
-    if (auto *builder = generics->getBuilder()) {
-      delete builder;
-      generics->setBuilder(nullptr);
-    }
-  if (retCode)
+  if (performTypeLocChecking(Ty))
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
@@ -1417,100 +1385,6 @@ bool getApplySubstitutionsFromParsed(
     return true;
   }
   return false;
-}
-
-// FIXME: We work around the canonicalization of PolymorphicFunctionType
-// by generating a GenericSignature and transforming the input, output
-// types.
-static GenericSignature *canonicalPolymorphicFunctionType(
-                           PolymorphicFunctionType *Ty,
-                           ASTContext &Context,
-                           CanType &inTy, CanType &outTy) {
-  GenericSignature *genericSig = nullptr;
-  llvm::DenseMap<ArchetypeType*, Type> archetypeMap;
-  genericSig
-    = Ty->getGenericParams().getAsCanonicalGenericSignature(archetypeMap,
-                                                            Context);
-  
-  auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
-    if (!t) return t;
-    if (auto arch = t->getAs<ArchetypeType>()) {
-      // As a kludge, we allow Self archetypes of protocol_methods to be
-      // unapplied.
-      if (arch->getSelfProtocol() && !archetypeMap.count(arch))
-        return arch;
-      return arch->getAsDependentType(archetypeMap);
-    }
-    return t;
-  };
-  
-  inTy = Ty->getInput()
-    .transform(getArchetypesAsDependentTypes)
-    ->getCanonicalType();
-  outTy = Ty->getResult()
-    .transform(getArchetypesAsDependentTypes)
-    ->getCanonicalType();
-  return genericSig;
-}
-
-static bool checkPolymorphicFunctionType(PolymorphicFunctionType *Ty,
-                                         PolymorphicFunctionType *Ty2,
-                                         ASTContext &Context, unsigned depth) {
-  bool InputIsPoly = isa<PolymorphicFunctionType>(Ty->getInput().getPointer());
-  bool OutputIsPoly =
-    isa<PolymorphicFunctionType>(Ty->getResult().getPointer());
-  bool Input2IsPoly =
-    isa<PolymorphicFunctionType>(Ty2->getInput().getPointer());
-  bool Output2IsPoly =
-    isa<PolymorphicFunctionType>(Ty2->getResult().getPointer());
-
-  if ((InputIsPoly && !Input2IsPoly) || (!InputIsPoly && Input2IsPoly) ||
-      (OutputIsPoly && !Output2IsPoly) || (!OutputIsPoly && Output2IsPoly))
-    return false;
-
-  // FIXME: We currently have issues canonicalizing PolymorphicFunctionType
-  // whose input type or result type is also a PolymorphicFunctionType. We also
-  // have issues when PolymorphicFunctionType is part of a FunctionType.
-  // rdar://18021608
-  if (InputIsPoly || OutputIsPoly || depth)
-    return true;
-
-  // Try to canonicalize PolymorphicFunctionType and compare.
-  CanType inTy, outTy, inTy2, outTy2;
-  auto sig = canonicalPolymorphicFunctionType(Ty, Context, inTy, outTy);
-  auto sig2 = canonicalPolymorphicFunctionType(Ty2, Context, inTy2, outTy2);
-  return sig == sig2 && inTy == inTy2 && outTy == outTy2;
-}
-
-static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
-                              ASTContext &Context);
-
-static bool checkASTType(CanType Ty, CanType Ty2, ASTContext &Context,
-                         unsigned depth) {
-  if (Ty == Ty2)
-    return true;
-  if (auto *InputTy = dyn_cast<FunctionType>(Ty.getPointer())) {
-    auto *Input2Ty = dyn_cast<FunctionType>(Ty2.getPointer());
-    if (!Input2Ty)
-      return false;
-    return checkFunctionType(InputTy, Input2Ty, Context);
-  }
-  if (auto *InputPoly = dyn_cast<PolymorphicFunctionType>(Ty.getPointer())) {
-    auto *Input2Poly = dyn_cast<PolymorphicFunctionType>(Ty2.getPointer());
-    if (!Input2Poly)
-      return false;
-    return checkPolymorphicFunctionType(InputPoly, Input2Poly, Context, depth);
-  }
-  return false;
-}
-
-static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
-                              ASTContext &Context) {
-  return Ty == Ty2 ||
-         (checkASTType(Ty->getInput()->getCanonicalType(),
-                       Ty2->getInput()->getCanonicalType(), Context, 1) &&
-          checkASTType(Ty->getResult()->getCanonicalType(),
-                       Ty2->getResult()->getCanonicalType(), Context, 1));
 }
 
 static ArrayRef<ProtocolConformanceRef>
@@ -2648,12 +2522,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     TypeLoc Ty = TyR.get();
 
     // The type can be polymorphic.
-    ArchetypeBuilder builder(*P.SF.getParentModule(), P.Diags);
     if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
       if (auto generics = fnType->getGenericParams()) {
-        generics->setBuilder(&builder);
-        TypeLoc TyLoc = TyR.get();
-        handleGenericParams(TyLoc, &builder);
+        assert(!Ty.wasValidated() && Ty.getType().isNull());
+
+        auto *genericSig = handleSILGenericParams(P.Context, generics, &P.SF);
+        fnType->setGenericSignature(genericSig);
       }
     }
 
@@ -2671,10 +2545,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     auto unlabeledDecl =
       declTy->getUnlabeledType(P.Context)->getCanonicalType();
     for (unsigned I = 0, E = values.size(); I < E; I++) {
-      auto lookupTy = values[I]->getType()->getCanonicalType();
+      auto lookupTy = values[I]->getInterfaceType();
       auto unlabeledLookup =
         lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
-      if (checkASTType(unlabeledLookup, unlabeledDecl, P.Context, 0)) {
+      if (unlabeledDecl == unlabeledLookup) {
         TheDecl = values[I];
         // Update SILDeclRef to point to the right Decl.
         Member.loc = TheDecl;
@@ -3955,7 +3829,7 @@ bool SILParser::parseSpecConformanceSubstitutions(
 
 ProtocolConformance *SILParser::parseProtocolConformance(
            ProtocolDecl *&proto, GenericParamList *&generics,
-           ArchetypeBuilder &builder, bool localScope) {
+           bool localScope) {
   // Parse generic params for the protocol conformance. We need to make sure
   // they have the right scope.
   Optional<Scope> GenericsScope;
@@ -3964,10 +3838,7 @@ ProtocolConformance *SILParser::parseProtocolConformance(
 
   generics = P.maybeParseGenericParams().getPtrOrNull();
   if (generics) {
-    generics->setBuilder(&builder);
-    SmallVector<ArchetypeBuilder *, 1> builders(1, &builder);
-    SmallVector<GenericParamList *, 1> gps(1, generics);
-    handleSILGenericParams(P.Context, gps, &P.SF, builders);
+    handleSILGenericParams(P.Context, generics, &P.SF);
   }
 
   ProtocolConformance *retVal = parseProtocolConformanceHelper(proto,
@@ -3975,8 +3846,6 @@ ProtocolConformance *SILParser::parseProtocolConformance(
 
   if (localScope) {
     GenericsScope.reset();
-    if (generics)
-      generics->setBuilder(nullptr);
   }
   return retVal;
 }
@@ -4016,10 +3885,8 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
     ProtocolDecl *dummy;
-    ArchetypeBuilder genericBuilder(*P.SF.getParentModule(), P.Diags);
     GenericParamList *gp;
-    auto genericConform = parseProtocolConformance(dummy, gp,
-                                                   genericBuilder, localScope);
+    auto genericConform = parseProtocolConformance(dummy, gp, localScope);
     if (!genericConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
@@ -4039,8 +3906,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
-    ArchetypeBuilder baseBuilder(*P.SF.getParentModule(), P.Diags);
-    auto baseConform = parseProtocolConformance(baseBuilder);
+    auto baseConform = parseProtocolConformance();
     if (!baseConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
@@ -4087,8 +3953,7 @@ bool Parser::parseSILWitnessTable() {
   // Parse the protocol conformance.
   ProtocolDecl *proto;
   GenericParamList *dummy;
-  ArchetypeBuilder builder(*SF.getParentModule(), Diags);
-  auto conf = WitnessState.parseProtocolConformance(proto, dummy, builder,
+  auto conf = WitnessState.parseProtocolConformance(proto, dummy,
                                                     false/*localScope*/);
 
   NormalProtocolConformance *theConformance = conf ?
@@ -4140,9 +4005,7 @@ bool Parser::parseSILWitnessTable() {
           return true;
         if (parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
-        ArchetypeBuilder builder(*SF.getParentModule(), Diags);
-        ProtocolConformance *conform = WitnessState.parseProtocolConformance(
-                                           builder);
+        ProtocolConformance *conform = WitnessState.parseProtocolConformance();
         if (!conform) // Ignore this witness entry for now.
           continue;
 
@@ -4170,8 +4033,7 @@ bool Parser::parseSILWitnessTable() {
 
         ProtocolConformanceRef conformance(proto);
         if (Tok.getText() != "dependent") {
-          ArchetypeBuilder builder(*SF.getParentModule(), Diags);
-          auto concrete = WitnessState.parseProtocolConformance(builder);
+          auto concrete = WitnessState.parseProtocolConformance();
           if (!concrete) // Ignore this witness entry for now.
             continue;
           conformance = ProtocolConformanceRef(concrete);

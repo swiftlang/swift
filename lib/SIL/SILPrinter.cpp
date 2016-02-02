@@ -1183,13 +1183,13 @@ public:
   
   void visitClassMethodInst(ClassMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "class_method");
-    *this << " : " << AMI->getMember().getDecl()->getType();
+    *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
     *this << " , ";
     *this << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "super_method");
-    *this << " : " << AMI->getMember().getDecl()->getType();
+    *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
     *this << " , ";
     *this << AMI->getType();
   }
@@ -1206,7 +1206,7 @@ public:
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
     printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
-    *this << " : " << DMI->getMember().getDecl()->getType();
+    *this << " : " << DMI->getMember().getDecl()->getInterfaceType();
     *this << ", ";
     *this << DMI->getType();
   }

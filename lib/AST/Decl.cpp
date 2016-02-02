@@ -470,8 +470,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
     WhereLoc(WhereLoc), Requirements(Requirements),
     OuterParameters(nullptr),
-    FirstTrailingWhereArg(Requirements.size()),
-    Builder(nullptr)
+    FirstTrailingWhereArg(Requirements.size())
 {
   std::uninitialized_copy(Params.begin(), Params.end(),
                           reinterpret_cast<GenericTypeParamDecl **>(this + 1));
@@ -527,27 +526,6 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
-GenericSignature *
-GenericParamList::getAsCanonicalGenericSignature(
-                            llvm::DenseMap<ArchetypeType *, Type> &archetypeMap,
-                            ASTContext &C) const {
-  SmallVector<GenericTypeParamType *, 4> params;
-  SmallVector<Requirement, 4> requirements;
-  
-  getAsGenericSignatureElements(C, archetypeMap, params, requirements);
-
-  // Canonicalize the types in the signature.
-  for (auto &param : params)
-    param = cast<GenericTypeParamType>(param->getCanonicalType());
-  
-  for (auto &reqt : requirements)
-    reqt = Requirement(reqt.getKind(),
-                       reqt.getFirstType()->getCanonicalType(),
-                       reqt.getSecondType()->getCanonicalType());
-  
-  return GenericSignature::get(params, requirements, /*isKnownCanonical=*/true);
-}
-
 ArrayRef<Substitution>
 GenericParamList::getForwardingSubstitutions(ASTContext &C) {
   SmallVector<Substitution, 4> subs;
@@ -571,141 +549,6 @@ GenericParamList::getForwardingSubstitutions(ASTContext &C) {
   }
 
   return C.AllocateCopy(subs);
-}
-
-// Helper for getAsGenericSignatureElements to remap an archetype in a
-// requirement to a canonical dependent type.
-Type
-ArchetypeType::getAsDependentType(
-                   const llvm::DenseMap<ArchetypeType*, Type> &archetypeMap) {
-  // Map associated archetypes to DependentMemberTypes.
-  if (auto parent = getParent()) {
-    auto assocTy = getAssocType();
-    assert(assocTy);
-    Type base = parent->getAsDependentType(archetypeMap);
-    return DependentMemberType::get(base, assocTy, getASTContext());
-  }
-  // Map primary archetypes to generic type parameters.
-  auto found = archetypeMap.find(this);
-  assert(found != archetypeMap.end()
-         && "did not find generic param for archetype");
-  return found->second;
-}
-
-static Type getAsDependentType(Type t,
-                     const llvm::DenseMap<ArchetypeType*, Type> &archetypeMap) {
-  if (!t->hasArchetype())
-    return t;
-
-  return t.transform([&](Type type) -> Type {
-    if (auto arch = type->getAs<ArchetypeType>())
-      return arch->getAsDependentType(archetypeMap);
-    return type;
-  });
-}
-
-// A helper to recursively collect the generic parameters from the outer levels
-// of a generic parameter list.
-void
-GenericParamList::getAsGenericSignatureElements(ASTContext &C,
-                        llvm::DenseMap<ArchetypeType *, Type> &archetypeMap,
-                        SmallVectorImpl<GenericTypeParamType *> &genericParams,
-                        SmallVectorImpl<Requirement> &requirements) const {
-  // Collect outer generic parameters first.
-  if (OuterParameters) {
-    OuterParameters->getAsGenericSignatureElements(C, archetypeMap,
-                                                   genericParams,
-                                                   requirements);
-  }
-
-  // Collect our parameters.
-  for (auto paramIndex : indices(getParams())) {
-    auto param = getParams()[paramIndex];
-    
-    auto typeParamTy = param->getDeclaredType()->castTo<GenericTypeParamType>();
-
-    // Make sure we didn't visit this param already in the parent.
-    auto found = archetypeMap.find(param->getArchetype());
-    if (found != archetypeMap.end()) {
-      assert(found->second->isEqual(typeParamTy));
-      continue;
-    }
-    
-    // Set up a mapping we can use to remap requirements to dependent types.
-    ArchetypeType *archetype = getPrimaryArchetypes()[paramIndex];
-    archetypeMap[archetype] = typeParamTy;
-
-    genericParams.push_back(typeParamTy);
-    requirements.push_back(Requirement(RequirementKind::WitnessMarker,
-                                       typeParamTy, typeParamTy));
-    
-    // Collect conformance requirements declared on the archetype.
-    if (auto super = archetype->getSuperclass()) {
-      requirements.push_back(Requirement(RequirementKind::Superclass,
-                                         typeParamTy, super));
-    }
-    for (auto proto : archetype->getConformsTo()) {
-      requirements.push_back(Requirement(RequirementKind::Conformance,
-                                       typeParamTy, proto->getDeclaredType()));
-    }
-  }
-  
-  // FIXME: Emit WitnessMarker requirements for associated types in an order
-  // that preserves AllArchetypes order but otherwise makes no sense.
-  for (auto assocTy : getAssociatedArchetypes()) {
-    auto depTy = getAsDependentType(assocTy, archetypeMap);
-    requirements.push_back(Requirement(RequirementKind::WitnessMarker,
-                                       depTy, depTy));
-
-    // Add conformance requirements for this associated archetype.
-    for (const auto &repr : getRequirements()) {
-      // Handle same-type requirements later.
-      if (repr.getKind() != RequirementReprKind::TypeConstraint)
-        continue;
-
-      // Primary conformance declarations would have already been gathered as
-      // conformance requirements of the archetype.
-      if (auto arch = repr.getSubject()->getAs<ArchetypeType>())
-        if (!arch->getParent())
-          continue;
-
-      Type subject = getAsDependentType(repr.getSubject(), archetypeMap);
-      if (subject.getPointer() != depTy.getPointer())
-        continue;
-
-      Type constraint =
-        getAsDependentType(repr.getConstraint(), archetypeMap);
-
-      RequirementKind kind;
-      if (constraint->getClassOrBoundGenericClass()) {
-        kind = RequirementKind::Superclass;
-      } else {
-        kind = RequirementKind::Conformance;
-      }
-
-      Requirement reqt(kind, subject, constraint);
-      requirements.push_back(reqt);
-    }
-  }
-  
-  // Add all of the same-type requirements.
-  if (Builder) {
-    for (auto req : Builder->getSameTypeRequirements()) {
-      auto firstType = req.first->getDependentType(*Builder, false);
-      Type secondType;
-      if (auto concrete = req.second.dyn_cast<Type>())
-        secondType = getAsDependentType(concrete, archetypeMap);
-      else if (auto secondPA =
-               req.second.dyn_cast<ArchetypeBuilder::PotentialArchetype*>())
-        secondType = secondPA->getDependentType(*Builder, false);
-
-      if (firstType->is<ErrorType>() || secondType->is<ErrorType>())
-        continue;
-
-      requirements.push_back(Requirement(RequirementKind::SameType,
-                                         firstType, secondType));
-    }
-  }
 }
 
 /// \brief Add the nested archetypes of the given archetype to the set

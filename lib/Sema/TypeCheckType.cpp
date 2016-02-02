@@ -1811,10 +1811,16 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (!outputTy || outputTy->is<ErrorType>()) return outputTy;
 
   extInfo = extInfo.withThrows(repr->throws());
-  
+
+  ModuleDecl *M = DC->getParentModule();
+
   // SIL uses polymorphic function types to resolve overloaded member functions.
-  if (auto generics = repr->getGenericParams()) {
-    return PolymorphicFunctionType::get(inputTy, outputTy, generics, extInfo);
+  if (auto genericParams = repr->getGenericParams()) {
+    auto *genericSig = repr->getGenericSignature();
+    assert(genericSig != nullptr && "Did not call handleSILGenericParams()?");
+    inputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericParams, inputTy);
+    outputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericParams, outputTy);
+    return GenericFunctionType::get(genericSig, inputTy, outputTy, extInfo);
   }
 
   auto fnTy = FunctionType::get(inputTy, outputTy, extInfo);
@@ -1901,44 +1907,28 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     return ErrorType::get(Context);
   }
 
+  ModuleDecl *M = DC->getParentModule();
+
   // FIXME: Remap the parsed context types to interface types.
-  GenericSignature *genericSig = nullptr;
+  CanGenericSignature genericSig;
   SmallVector<SILParameterInfo, 4> interfaceParams;
   SILResultInfo interfaceResult;
   Optional<SILResultInfo> interfaceErrorResult;
-  if (repr->getGenericParams()) {
-    llvm::DenseMap<ArchetypeType*, Type> archetypeMap;
-    genericSig
-      = repr->getGenericParams()->getAsCanonicalGenericSignature(archetypeMap,
-                                                                 Context);
-    
-    auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
-      if (!t) return t;
-      if (auto arch = t->getAs<ArchetypeType>()) {
-        // As a kludge, we allow Self archetypes of protocol_methods to be
-        // unapplied.
-        if (arch->getSelfProtocol() && !archetypeMap.count(arch))
-          return arch;
-        return arch->getAsDependentType(archetypeMap);
-      }
-      return t;
-    };
-    
+  if (auto *genericParams = repr->getGenericParams()) {
+    genericSig = repr->getGenericSignature()->getCanonicalSignature();
+ 
     for (auto &param : params) {
-      auto transParamType =
-        param.getType().transform(getArchetypesAsDependentTypes)
-          ->getCanonicalType();
+      auto transParamType = ArchetypeBuilder::mapTypeOutOfContext(
+          M, genericParams, param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
-    auto transResultType =
-      result.getType().transform(getArchetypesAsDependentTypes)
-        ->getCanonicalType();
+    auto transResultType = ArchetypeBuilder::mapTypeOutOfContext(
+        M, genericParams, result.getType())->getCanonicalType();
     interfaceResult = result.getWithType(transResultType);
 
     if (errorResult) {
-      auto transErrorResultType =
-        errorResult->getType().transform(getArchetypesAsDependentTypes)
-          ->getCanonicalType();
+      auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
+          M, genericParams, errorResult->getType())->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }

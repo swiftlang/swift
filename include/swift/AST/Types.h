@@ -3734,11 +3734,6 @@ public:
     return T->getKind() == TypeKind::Archetype;
   }
   
-  /// Convert an archetype to a dependent generic parameter type using the
-  /// given mapping of primary archetypes to generic parameter types.
-  Type getAsDependentType(
-                    const llvm::DenseMap<ArchetypeType *, Type> &archetypeMap);
-  
   /// getIsRecursive - The archetype type refers back to itself.
   bool getIsRecursive() { return this->isRecursive; }
   
