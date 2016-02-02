@@ -20,7 +20,7 @@ struct X<T: P> {
 }
 
 func f<T : P>(z: T) {
- _ = X<T.A>()
+ _ = X<T.A>() // expected-error{{type 'X<T.A>' has no member 'A'}}
 }
 
 // -----
@@ -60,7 +60,7 @@ struct Y3 : DeclaredP {
 struct X3<T:P4> {}
 
 func f2<T:P4>(a: T) {
- _ = X3<T.A>()
+ _ = X3<T.A>() // expected-error{{type 'X3<T.A>' has no member 'A'}}
 }
 
 f2(Y3())
@@ -101,4 +101,24 @@ protocol AsExistentialAssocTypeAgainA {
 protocol AsExistentialAssocTypeAgainB {
   func aMethod(object : AsExistentialAssocTypeAgainA) // expected-error {{protocol 'AsExistentialAssocTypeAgainA' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
+
+// SR-547
+protocol A {
+    associatedtype B1: B // expected-error{{type may not reference itself as a requirement}}
+    associatedtype C1: C
+    
+    mutating func addObserver(observer: B1, forProperty: C1)
+}
+
+protocol C {
+    
+}
+
+protocol B {
+    associatedtype BA: A // expected-error{{type may not reference itself as a requirement}}
+    associatedtype BC: C
+    
+    func observeChangeOfProperty(property: BC, observable: BA)
+}
+
 

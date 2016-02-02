@@ -2588,7 +2588,7 @@ public:
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
 
-  void setIsRecursive() { AssociatedTypeDeclBits.Recursive = true; }
+  void setIsRecursive();
   bool isRecursive() { return AssociatedTypeDeclBits.Recursive; }
 
   /// Whether the declaration is currently being validated.
