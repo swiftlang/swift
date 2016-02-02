@@ -4,6 +4,7 @@
 // RUN:     -isysroot %clang-importer-sdk-path -fsyntax-only %t.m -I %S/Inputs | FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 // CHECK: enum Normal : Int {
 // CHECK-NOT: {{^}}}
