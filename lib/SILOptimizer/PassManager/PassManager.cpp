@@ -48,9 +48,9 @@ llvm::cl::opt<unsigned> SILNumOptPassesToRun(
     "sil-opt-pass-count", llvm::cl::init(UINT_MAX),
     llvm::cl::desc("Stop optimizing after <N> optimization passes"));
 
-llvm::cl::opt<unsigned> SILFunctionPassPipelineLimit(
-    "sil-pipeline-limit", llvm::cl::init(10),
-    llvm::cl::desc(""));
+llvm::cl::opt<unsigned> SILFunctionPassPipelineLimit("sil-pipeline-limit",
+                                                     llvm::cl::init(10),
+                                                     llvm::cl::desc(""));
 
 llvm::cl::opt<std::string>
     SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
@@ -296,7 +296,8 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
     auto *F = FunctionWorklist.back();
 
     if (CountOptimized[F] > SILFunctionPassPipelineLimit) {
-      DEBUG(llvm::dbgs() << "*** Hit limit optimizing: " << F->getName() << '\n');
+      DEBUG(llvm::dbgs() << "*** Hit limit optimizing: " << F->getName()
+                         << '\n');
       FunctionWorklist.pop_back();
       continue;
     }
