@@ -34,6 +34,9 @@ def printsync(msg, config):
         print(msg, file=sys.stderr)
 
 if __name__ == "__main__":
+    if sys.platform != "darwin":
+        sys.exit("Error: The profile data merge worker requires OS X.")
+
     parser = argparse.ArgumentParser()
 
     subparsers = parser.add_subparsers()
