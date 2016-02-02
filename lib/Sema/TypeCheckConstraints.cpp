@@ -1874,7 +1874,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   }
 
   Type destTy = simplifyType(dest->getType());
-  if (destTy->is<ErrorType>())
+  if (destTy->is<ErrorType>() || destTy->getRValueType()->is<UnresolvedType>())
     return Type();
 
   // If we have already resolved a concrete lvalue destination type, return it.

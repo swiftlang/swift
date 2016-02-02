@@ -207,6 +207,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       diagnose(Tok, diag::parameter_inout_var_let)
         .fixItRemove(Tok.getLoc());
       consumeToken();
+      param.isInvalid = true;
     }
 
     if (startsParameterName(*this, isClosure)) {
@@ -242,12 +243,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       // (':' type)?
-      if (Tok.is(tok::colon)) {
-        param.ColonLoc = consumeToken();
-
+      if (consumeIf(tok::colon)) {
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
+
+        // If we didn't parse a type, then we already diagnosed that the type
+        // was invalid.  Remember that.
+        if (type.isParseError() && !type.hasCodeCompletion())
+          param.isInvalid = true;
+       
         // Only allow 'inout' before the parameter name.
         if (auto InOutTy = dyn_cast_or_null<InOutTypeRepr>(param.Type)) {
           SourceLoc InOutLoc = InOutTy->getInOutLoc();
@@ -259,45 +264,64 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
       }
     } else {
-      SourceLoc typeStartLoc = Tok.getLoc();
-      auto type = parseType(diag::expected_parameter_type, false);
-      status |= type;
-      param.Type = type.getPtrOrNull();
+      // Otherwise, we have invalid code.  Check to see if this looks like a
+      // type.  If so, diagnose it as a common error.
+      bool isBareType = false;
+      {
+        BacktrackingScope backtrack(*this);
+        isBareType = canParseType() && Tok.isAny(tok::comma, tok::r_paren,
+                                                 tok::equal);
+      }
 
-      // Unnamed parameters must be written as "_: Type".
-      if (param.Type) {
-        diagnose(typeStartLoc, diag::parameter_unnamed)
-          .fixItInsert(typeStartLoc, "_: ");
+      if (isBareType) {
+        // Otherwise, if this is a bare type, then the user forgot to name the
+        // parameter, e.g. "func foo(Int) {}"
+        SourceLoc typeStartLoc = Tok.getLoc();
+        auto type = parseType(diag::expected_parameter_type, false);
+        status |= type;
+        param.Type = type.getPtrOrNull();
+
+        // Unnamed parameters must be written as "_: Type".
+        if (param.Type) {
+          diagnose(typeStartLoc, diag::parameter_unnamed)
+            .fixItInsert(typeStartLoc, "_: ");
+        } else {
+          param.isInvalid = true;
+        }
+      } else {
+        // Otherwise, we're not sure what is going on, but this doesn't smell
+        // like a parameter.
+        diagnose(Tok, diag::expected_parameter_name);
+        //skipUntil(tok::comma, tok::r_paren);
+        param.isInvalid = true;
       }
     }
-
+                        
     // '...'?
-    if (Tok.isEllipsis()) {
+    if (Tok.isEllipsis())
       param.EllipsisLoc = consumeToken();
-    }
 
     // ('=' expr)?
     if (Tok.is(tok::equal)) {
-      param.EqualLoc = Tok.getLoc();
+      SourceLoc EqualLoc = Tok.getLoc();
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
                                      param.DefaultArg, paramContext);
 
-      if (param.EllipsisLoc.isValid()) {
+      if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
         SourceRange defaultArgRange;
-        if (param.DefaultArg) {
-          if (auto init = param.DefaultArg->getExpr()) {
-            defaultArgRange = SourceRange(param.EllipsisLoc, init->getEndLoc());
-          }
-        }
+        if (auto init = param.DefaultArg->getExpr())
+          defaultArgRange = SourceRange(param.EllipsisLoc, init->getEndLoc());
 
-        diagnose(param.EqualLoc, diag::parameter_vararg_default)
+        diagnose(EqualLoc, diag::parameter_vararg_default)
           .highlight(param.EllipsisLoc)
           .fixItRemove(defaultArgRange);
+        param.isInvalid = true;
+        param.DefaultArg = nullptr;
       }
     }
 
-    // If we haven't made progress, don't add the param.
+    // If we haven't made progress, don't add the parameter.
     if (Tok.getLoc() == StartLoc) {
       // If we took a default argument index for this parameter, but didn't add
       // one, then give it back.
@@ -337,9 +361,8 @@ mapParsedParameters(Parser &parser,
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
 
-    // If we parsed a colon but have no type, then we already diagnosed this
-    // as a parse error.
-    if (paramInfo.ColonLoc.isValid() && !paramInfo.Type)
+    // If we diagnosed this parameter as a parse error, propagate to the decl.
+    if (paramInfo.isInvalid)
       param->setInvalid();
     
     // If a type was provided, create the type for the parameter.

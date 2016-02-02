@@ -1798,7 +1798,8 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   if (IsTopLevel) {
     // Skip the rest of the file to prevent the parser from constructing the
     // AST for it.  Forward references are not allowed at the top level.
-    skipUntil(tok::eof);
+    while (Tok.isNot(tok::eof))
+      consumeToken();
   }
 }
 

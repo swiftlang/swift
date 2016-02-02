@@ -79,7 +79,7 @@ func parseError3(a: unknown_type, b: ) {} // expected-error {{use of undeclared 
 
 func parseError4(a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
-func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}} expected-error 2{{expected ',' separator}} {{22-22=,}} {{22-22=,}} expected-error {{expected parameter type following ':'}}
+func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error 2 {{expected ',' separator}} {{22-22=,}} {{22-22=,}} expected-error {{expected parameter name followed by ':'}}
 
 func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
@@ -87,11 +87,10 @@ func parseError7(a: Int, goo b: unknown_type) {} // expected-error {{use of unde
 
 public func foo(a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
 
-// expected-error@+1{{unnamed parameters must be written}} {{24-24=_: }}
-func parenPatternInArg((a): Int) -> Int { // expected-error {{use of undeclared type 'a'}} expected-error 2{{expected ',' separator}} {{27-27=,}} {{27-27=,}} expected-error {{expected parameter type following ':'}}
-  return a
+func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}} expected-error {{expected ',' separator}}
+  return a  // expected-error {{use of unresolved identifier 'a'}}
 }
-parenPatternInArg(0)
+parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
 
 var nullaryClosure: Int -> Int = {_ in 0}
 nullaryClosure(0)
