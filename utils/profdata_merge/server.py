@@ -17,7 +17,9 @@ import logging
 
 from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
 
+
 class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
+
     def report(self, msg):
         """Convenience method for reporting status from the workers."""
         logging.info("[ProfdataTCPHandler]: %s" % msg)
@@ -34,8 +36,10 @@ class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
             self.report("received sentinel; killing server...")
             self.finish()
             self.connection.close()
+
             def kill_server(server):
                 server.shutdown()
+
             # must be killed on another thread, or else deadlock
             thread.start_new_thread(kill_server, (self.server,))
         else:
@@ -47,8 +51,10 @@ class ProfdataTCPHandler(SocketServer.StreamRequestHandler):
                 self.server.files_merged.add(f)
                 self.server.file_queue.put(f)
 
+
 class ProfdataServer(SocketServer.TCPServer, object):
     def __init__(self, file_queue):
-        super(ProfdataServer, self).__init__(SERVER_ADDRESS, ProfdataTCPHandler)
+        super(ProfdataServer, self).__init__(SERVER_ADDRESS,
+                                             ProfdataTCPHandler)
         self.file_queue = file_queue
         self.files_merged = set()

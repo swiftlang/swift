@@ -22,15 +22,16 @@ from server import ProfdataServer
 from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
 from config import Config
 
+
 def run_server(config):
     pid = os.getpid()
     if os.path.exists(config.pid_file_path):
         with open(config.pid_file_path) as pidfile:
             pid = pidfile.read()
             logging.error(("existing process found with pid %s." +
-                "Ensure there are no other test runners running," +
-                "and delete the file at %s")
-                % (pid, config.pid_file_path))
+                           "Ensure there are no other test runners running," +
+                           "and delete the file at %s") %
+                          (pid, config.pid_file_path))
         return
 
     with open(config.pid_file_path, "w") as pidfile:
@@ -62,18 +63,21 @@ def run_server(config):
             merge_final.filename_buffer.append(p.profdata_path)
     merge_final.merge_file_buffer()
 
+
 def stop_server(args):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(SERVER_ADDRESS)
     sock.send(TESTS_FINISHED_SENTINEL)
     sock.close()
 
+
 def start_server(args):
     config = Config(args.output_dir, args.no_remove)
     if not args.debug:
         pid = os.fork()
         if pid != 0:
-            sys.exit(0) # kill the parent process we forked from.
+            # kill the parent process we forked from.
+            sys.exit(0)
     try:
         run_server(config)
     finally:

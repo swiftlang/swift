@@ -17,13 +17,15 @@ import os
 import subprocess
 import logging
 
+
 class ProfdataMergerProcess(Process):
     def __init__(self, config, file_queue):
         super(ProfdataMergerProcess, self).__init__()
         self.config = config
         self.file_queue = file_queue
         self.filename_buffer = []
-        self.profdata_path = os.path.join(config.tmp_dir, "%s.profdata" % self.name)
+        self.profdata_path = os.path.join(config.tmp_dir,
+                                          "%s.profdata" % self.name)
         self.profdata_tmp_path = self.profdata_path + ".copy"
 
     def report(self, msg, level=logging.INFO):
@@ -45,12 +47,12 @@ class ProfdataMergerProcess(Process):
         # FIXME: This doesn't necessarily always line up with the version
         #        of clang++ used to build the binaries.
         llvm_cmd = ("xcrun llvm-profdata merge -o %s %s"
-            % (self.profdata_path, cleaned_files))
+                    % (self.profdata_path, cleaned_files))
         self.report(llvm_cmd)
         ret = subprocess.call(llvm_cmd, shell=True)
         if ret != 0:
             self.report("llvm profdata command failed -- Exited with code %d"
-                % ret, level=logging.ERROR)
+                        % ret, level=logging.ERROR)
         if self.config.remove_files:
             for f in self.filename_buffer:
                 if os.path.exists(f):
@@ -58,9 +60,9 @@ class ProfdataMergerProcess(Process):
         self.filename_buffer = []
 
     def run(self):
-        """Blocks and waits for the file queue, so it can fill its buffer
-        and execute merges. If it finds None in the queue, then it knows to
-        stop waiting for the queue, merge its current buffer, and kill itself"""
+        """Blocks and waits for the file queue so it can fill its buffer and
+        execute merges. If it finds None in the queue, then it knows to stop
+        waiting for the queue, merge its current buffer, and kill itself"""
         while True:
             filename = self.file_queue.get()
             self.report("received filename: %s" % filename)
@@ -74,4 +76,3 @@ class ProfdataMergerProcess(Process):
             if len(self.filename_buffer) >= 10:
                 self.merge_file_buffer()
                 self.file_queue.task_done()
-

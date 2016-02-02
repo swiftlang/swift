@@ -14,13 +14,14 @@
 import tempfile
 import os
 
+
 class Config():
     """A class to store configuration information specified by command-line
     arguments."""
     def __init__(self, out_dir, no_remove_files):
         self.out_dir = out_dir
         self.tmp_dir = tempfile.mkdtemp()
-        self.pid_file_path = os.path.join(self.out_dir, "profdata_merge_worker.pid")
+        self.pid_file_path = os.path.join(self.out_dir,
+                                          "profdata_merge_worker.pid")
         self.final_profdata_path = os.path.join(self.out_dir, "swift.profdata")
         self.remove_files = not no_remove_files
-

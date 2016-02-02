@@ -33,20 +33,21 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--log-file",
-        help="The file to write logs in debug mode.")
+                        help="The file to write logs in debug mode.")
 
     subparsers = parser.add_subparsers()
 
     start = subparsers.add_parser("start")
     start.add_argument("-d", "--debug",
-        help="Run in foreground and report status.",
-        action="store_true")
+                       help="Run in foreground and report status.",
+                       action="store_true")
     start.add_argument("-o", "--output-dir",
-        help="The directory to write the PID file and final profdata file.",
-        default=tempfile.gettempdir())
+                       help=("The directory to write the PID file" +
+                             "and final profdata file."),
+                       default=tempfile.gettempdir())
     start.add_argument("--no-remove",
-        action="store_true",
-        help="Don't remove profraw files after merging them.")
+                       action="store_true",
+                       help="Don't remove profraw files after merging them.")
     start.set_defaults(func=runner.start_server)
 
     stop = subparsers.add_parser("stop")
