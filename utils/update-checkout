@@ -68,7 +68,7 @@ def obtain_additional_swift_sources(with_ssh, branch):
                 check_call(['git', 'clone', remote, dir_name])
                 if branch:
                     src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + ".git"
-                    check_call(['git', '--git-dir', src_path, '--work-tree', SWIFT_SOURCE_ROOT, 'checkout', branch])
+                    check_call(['git', '--git-dir', src_path, '--work-tree', os.path.join(SWIFT_SOURCE_ROOT, dir_name), 'checkout', branch])
 
 def main():
     parser = argparse.ArgumentParser(
