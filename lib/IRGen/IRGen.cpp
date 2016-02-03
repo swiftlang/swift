@@ -205,7 +205,9 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 }
 
 /// An output stream which calculates the MD5 hash of the streamed data.
-struct MD5Stream : llvm::raw_ostream {
+class MD5Stream : public llvm::raw_ostream {
+private:
+
   uint64_t Pos;
   llvm::MD5 Hash;
 
@@ -215,6 +217,13 @@ struct MD5Stream : llvm::raw_ostream {
   }
 
   uint64_t current_pos() const override { return Pos; }
+
+public:
+
+  void final(MD5::MD5Result &Result) {
+    flush();
+    Hash.final(Result);
+  }
 };
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
@@ -234,8 +243,7 @@ static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
   // reflected in the llvm module itself.
   HashStream << Opts.getLLVMCodeGenOptionsHash();
 
-  HashStream.flush();
-  HashStream.Hash.final(Result);
+  HashStream.final(Result);
 }
 
 /// Returns false if the hash of the current module \p HashData matches the
