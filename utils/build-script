@@ -515,7 +515,7 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
         help="""enable code coverage analysis in Swift (false, not-merged,
         merged).""",
         choices=["false", "not-merged", "merged"],
-        default="false", # so CMake can see the inert mode as a false value
+        default="false",  # so CMake can see the inert mode as a false value
         dest="swift_analyze_code_coverage")
 
     parser.add_argument("--build-subdir",
