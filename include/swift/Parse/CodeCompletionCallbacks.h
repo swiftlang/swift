@@ -110,7 +110,7 @@ public:
         Callbacks->InObjCSelectorExpr = true;
     }
 
-    InObjCSelectorExprRAII() {
+    ~InObjCSelectorExprRAII() {
       if (Callbacks)
         Callbacks->InObjCSelectorExpr = false;
     }
