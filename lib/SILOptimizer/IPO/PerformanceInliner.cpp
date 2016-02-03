@@ -752,7 +752,6 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
-    unsigned loopDepth = LI->getLoopDepth(block);
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
@@ -775,6 +774,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
           DEBUG(llvm::dbgs() << "        Boost: apply const function at"
                              << *AI);
+          unsigned loopDepth = LI->getLoopDepth(block);
           Benefit += ConstCalleeBenefit + loopDepth * LoopBenefitFactor;
           testThreshold *= 2;
         }
