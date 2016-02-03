@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace importer;
 
-/// \brief Classify the given Clang enumeration to describe how to import it.
+/// Classify the given Clang enumeration to describe how to import it.
 void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
                             clang::Preprocessor &pp) {
   // Anonymous enumerations simply get mapped to constants of the
@@ -34,6 +34,13 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   // name for the Swift type.
   if (!decl->hasNameForLinkage()) {
     kind = EnumKind::Constants;
+    return;
+  }
+
+  // First, check for attributes that denote the classification
+  if (auto domainAttr = decl->getAttr<clang::NSErrorDomainAttr>()) {
+    kind = EnumKind::Enum;
+    attribute = domainAttr;
     return;
   }
 
@@ -65,8 +72,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   kind = EnumKind::Unknown;
 }
 
-/// \brief Returns the common prefix of two strings at camel-case word
-/// granularity.
+/// Returns the common prefix of two strings at camel-case word granularity.
 ///
 /// For example, given "NSFooBar" and "NSFooBas", returns "NSFoo"
 /// (not "NSFooBa"). The returned StringRef is a slice of the "a" argument.

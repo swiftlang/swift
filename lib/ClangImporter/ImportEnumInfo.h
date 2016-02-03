@@ -32,33 +32,41 @@ class MacroInfo;
 namespace swift {
 namespace importer {
 
-/// \brief Describes how a particular C enumeration type will be imported
+/// Describes how a particular C enumeration type will be imported
 /// into Swift. All of the possibilities have the same storage
 /// representation, but can be used in different ways.
 enum class EnumKind {
-  /// \brief The enumeration type should map to an enum, which means that
+  /// The enumeration type should map to an enum, which means that
   /// all of the cases are independent.
   Enum,
-  /// \brief The enumeration type should map to an option set, which means
+  /// The enumeration type should map to an option set, which means
   /// that
   /// the constants represent combinations of independent flags.
   Options,
-  /// \brief The enumeration type should map to a distinct type, but we don't
+  /// The enumeration type should map to a distinct type, but we don't
   /// know the intended semantics of the enum constants, so conservatively
   /// map them to independent constants.
   Unknown,
-  /// \brief The enumeration constants should simply map to the appropriate
+  /// The enumeration constants should simply map to the appropriate
   /// integer values.
   Constants,
 };
 
 class EnumInfo {
-  /// \brief The kind
+  using AttributePtrUnion = clang::NSErrorDomainAttr *;
+
+  /// The kind
   EnumKind kind = EnumKind::Unknown;
 
-  /// \brief The enum's common constant name prefix, which will be stripped from
+  /// The enum's common constant name prefix, which will be stripped from
   /// constants
   StringRef constantNamePrefix = StringRef();
+
+  /// The identifying attribute for specially imported enums
+  ///
+  /// Currently, only NS_ERROR_ENUM creates one for its error domain, but others
+  /// should in the future.
+  AttributePtrUnion attribute = nullptr;
 
 public:
   EnumInfo() = default;
@@ -71,6 +79,17 @@ public:
   EnumKind getKind() const { return kind; }
 
   StringRef getConstantNamePrefix() const { return constantNamePrefix; }
+
+  /// Whether this maps to an enum who also provides an error domain
+  bool isErrorEnum() const {
+    return getKind() == EnumKind::Enum && attribute;
+  }
+
+  /// For this error enum, extract the name of the error domain constant
+  clang::IdentifierInfo *getErrorDomain() const {
+    assert(isErrorEnum() && "not error enum");
+    return attribute->getErrorDomain();
+  }
 
 private:
   void determineConstantNamePrefix(const clang::EnumDecl *);

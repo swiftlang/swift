@@ -1167,6 +1167,83 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
   applyAvailableAttribute(valueDecl, requiredRange, C);
 }
 
+/// Add a domain error member, as required by conformance to _BridgedNSError
+/// Returns true on success, false on failure
+static bool addErrorDomain(NominalTypeDecl *swiftDecl,
+                           clang::NamedDecl *errorDomainDecl,
+                           ClangImporter::Implementation &importer) {
+  auto &swiftCtx = importer.SwiftContext;
+  auto swiftValueDecl =
+      dyn_cast_or_null<ValueDecl>(importer.importDecl(errorDomainDecl));
+  auto stringTy = swiftCtx.getStringDecl()->getDeclaredType();
+  assert(stringTy && "no string type available");
+  if (!swiftValueDecl || !swiftValueDecl->getType()->isEqual(stringTy)) {
+    // Couldn't actually import it as an error enum, fall back to enum
+    return false;
+  }
+
+  SourceLoc noLoc = SourceLoc();
+  bool isStatic = true;
+  bool isImplicit = true;
+
+  DeclRefExpr *domainDeclRef = new (swiftCtx)
+      DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
+  ParameterList *params[] = {
+      ParameterList::createWithoutLoc(
+          ParamDecl::createSelf(noLoc, swiftDecl, isStatic)),
+      ParameterList::createEmpty(swiftCtx)};
+  auto toStringTy = ParameterList::getFullType(stringTy, params);
+
+  FuncDecl *getterDecl = FuncDecl::create(
+      swiftCtx, noLoc, StaticSpellingKind::None, noLoc, {}, noLoc, noLoc, noLoc,
+      nullptr, toStringTy, params, TypeLoc::withoutLoc(stringTy), swiftDecl);
+
+  // Make the property decl
+  auto errorDomainPropertyDecl = new (swiftCtx) VarDecl(
+      isStatic,
+      /*isLet=*/false, noLoc, swiftCtx.Id_NSErrorDomain, stringTy, swiftDecl);
+  errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
+
+  swiftDecl->addMember(errorDomainPropertyDecl);
+  swiftDecl->addMember(getterDecl);
+  errorDomainPropertyDecl->makeComputed(noLoc, getterDecl, /*Set=*/nullptr,
+                                        /*MaterializeForSet=*/nullptr, noLoc);
+
+  getterDecl->setImplicit();
+  getterDecl->setStatic(isStatic);
+  getterDecl->setBodyResultType(stringTy);
+  getterDecl->setAccessibility(Accessibility::Public);
+
+  auto ret = new (swiftCtx) ReturnStmt(noLoc, {domainDeclRef});
+  getterDecl->setBody(
+      BraceStmt::create(swiftCtx, noLoc, {ret}, noLoc, isImplicit));
+  importer.registerExternalDecl(getterDecl);
+  return true;
+}
+
+/// As addErrorDomain above, but performs a lookup
+static bool addErrorDomain(NominalTypeDecl *swiftDecl,
+                           clang::IdentifierInfo *errorDomainDeclName,
+                           ClangImporter::Implementation &importer) {
+  auto &clangSema = importer.getClangSema();
+  clang::LookupResult lookupResult(
+      clangSema, clang::DeclarationName(errorDomainDeclName),
+      clang::SourceLocation(), clang::Sema::LookupNameKind::LookupOrdinaryName);
+
+  if (!clangSema.LookupName(lookupResult, clangSema.TUScope)) {
+    // Couldn't actually import it as an error enum, fall back to enum
+    return false;
+  }
+
+  auto clangNamedDecl = lookupResult.getAsSingle<clang::NamedDecl>();
+  if (!clangNamedDecl) {
+    // Couldn't actually import it as an error enum, fall back to enum
+    return false;
+  }
+
+  return addErrorDomain(swiftDecl, clangNamedDecl, importer);
+}
+
 namespace {
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
@@ -1893,7 +1970,8 @@ namespace {
       
       // Create the enum declaration and record it.
       NominalTypeDecl *result;
-      auto enumKind = Impl.getEnumKind(decl);
+      auto enumInfo = Impl.getEnumInfo(decl);
+      auto enumKind = enumInfo.getKind();
       switch (enumKind) {
       case EnumKind::Constants: {
         // There is no declaration. Rather, the type is mapped to the
@@ -1977,33 +2055,41 @@ namespace {
       }
 
       case EnumKind::Enum: {
+        auto &swiftCtx = Impl.SwiftContext;
         EnumDecl *nativeDecl;
         bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
         if (declaredNative && nativeDecl)
           return nativeDecl;
 
         // Compute the underlying type.
-        auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Enum,
-                                              isInSystemModule(dc),
-                                              /*isFullyBridgeable*/false);
+        auto underlyingType = Impl.importType(
+            decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
+            /*isFullyBridgeable*/ false);
         if (!underlyingType)
           return nullptr;
-        
-        auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(decl,
-                   Impl.importSourceLoc(decl->getLocStart()),
-                   name, Impl.importSourceLoc(decl->getLocation()),
-                   None, nullptr, dc);
+
+        auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
+            decl, Impl.importSourceLoc(decl->getLocStart()), name,
+            Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
         enumDecl->computeType();
-        
+
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
-        
+
         // Add protocol declarations to the enum declaration.
-        enumDecl->setInherited(
-          Impl.SwiftContext.AllocateCopy(
-            llvm::makeArrayRef(TypeLoc::withoutLoc(underlyingType))));
+        SmallVector<TypeLoc, 2> inheritedTypes;
+        inheritedTypes.push_back(TypeLoc::withoutLoc(underlyingType));
+        if (enumInfo.isErrorEnum())
+          inheritedTypes.push_back(TypeLoc::withoutLoc(
+              swiftCtx.getProtocol(KnownProtocolKind::BridgedNSError)
+                  ->getDeclaredType()));
+        enumDecl->setInherited(swiftCtx.AllocateCopy(inheritedTypes));
         enumDecl->setCheckedInheritanceClause();
+
+        // Set up error conformance to be lazily expanded
+        if (enumInfo.isErrorEnum())
+          enumDecl->getAttrs().add(new (swiftCtx) SynthesizedProtocolAttr(
+              KnownProtocolKind::BridgedNSError));
 
         // Provide custom implementations of the init(rawValue:) and rawValue
         // conversions that just do a bitcast. We can't reliably filter a
@@ -2011,23 +2097,21 @@ namespace {
         // undeclared values, and won't ever add cases.
         auto rawValueConstructor = makeEnumRawValueConstructor(Impl, enumDecl);
 
-        auto varName = Impl.SwiftContext.Id_rawValue;
-        auto rawValue = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                   /*IsLet*/ false,
-                                                   SourceLoc(), varName,
-                                                   underlyingType,
-                                                   enumDecl);
+        auto varName = swiftCtx.Id_rawValue;
+        auto rawValue = new (swiftCtx) VarDecl(/*static*/ false,
+                                               /*IsLet*/ false,
+                                               SourceLoc(), varName,
+                                               underlyingType, enumDecl);
         rawValue->setImplicit();
         rawValue->setAccessibility(Accessibility::Public);
         rawValue->setSetterAccessibility(Accessibility::Private);
-        
+
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);
-        
-        auto rawValueBinding =
-          PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
-                                     StaticSpellingKind::None, SourceLoc(),
-                                     varPattern, nullptr, enumDecl);
+
+        auto rawValueBinding = PatternBindingDecl::create(
+            swiftCtx, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+            varPattern, nullptr, enumDecl);
 
         auto rawValueGetter = makeEnumRawValueGetter(Impl, enumDecl, rawValue);
 
@@ -2035,11 +2119,15 @@ namespace {
         enumDecl->addMember(rawValueGetter);
         enumDecl->addMember(rawValue);
         enumDecl->addMember(rawValueBinding);
-        
         result = enumDecl;
+
+        // Add the domain error member
+        if (enumInfo.isErrorEnum())
+          addErrorDomain(enumDecl, enumInfo.getErrorDomain(), Impl);
+
         break;
       }
-          
+
       case EnumKind::Options: {
         result = importAsOptionSetType(dc, name, decl);
         if (!result)
