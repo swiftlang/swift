@@ -62,10 +62,10 @@ func test2() {
 // EXPR: 0
 // EXPR: false
 // EXPR: true
-// EXPR: "text"
-// EXPR: [item]
+// EXPR: "abc"
+// EXPR: [values]
 // EXPR: [key: value]
-// EXPR: (item, item)
+// EXPR: (values)
 // EXPR: nil
 // EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
 // EXPR: foo(a: Int)

@@ -55,7 +55,7 @@ func testHideLiteral02() {
   let x = #^HIDE_LITERALS_2^#
 // SHOW_STRING-NOT: [
 // SHOW_STRING-NOT: nil
-// SHOW_STRING: "text"
+// SHOW_STRING: "abc"
 // SHOW_STRING-NOT: nil
 // SHOW_STRING-NOT: [
 }

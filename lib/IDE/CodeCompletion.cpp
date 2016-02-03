@@ -3113,12 +3113,12 @@ public:
     }, /*isKeyword=*/true);
     addFromProto(LK::StringLiteral, "String", [&](Builder &builder) {
       builder.addTextChunk("\"");
-      builder.addSimpleNamedParameter("text");
+      builder.addSimpleNamedParameter("abc");
       builder.addTextChunk("\"");
     });
     addFromProto(LK::ArrayLiteral, "Array", [&](Builder &builder) {
       builder.addLeftBracket();
-      builder.addSimpleNamedParameter("item");
+      builder.addSimpleNamedParameter("values");
       builder.addRightBracket();
     });
     addFromProto(LK::DictionaryLiteral, "Dictionary", [&](Builder &builder) {
@@ -3157,9 +3157,7 @@ public:
       builder.setLiteralKind(LK::Tuple);
 
       builder.addLeftParen();
-      builder.addSimpleNamedParameter("item");
-      builder.addComma();
-      builder.addSimpleNamedParameter("item");
+      builder.addSimpleNamedParameter("values");
       builder.addRightParen();
       for (auto T : ExpectedTypes) {
         if (!T)
