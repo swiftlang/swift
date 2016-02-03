@@ -14,9 +14,9 @@ public enum Process {
   /// Return an array of string containing the list of command-line arguments
   /// with which the current process was invoked.
   internal static func _computeArguments() -> [String] {
-    var result :[String] = []
+    var result: [String] = []
     for i in 0..<Int(argc) {
-     result.append(
+      result.append(
        String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? "")
     }
     return result 
@@ -32,7 +32,7 @@ public enum Process {
     case ComputedArguments([String])
   }
 
-  internal static var _arguments : _ProcessArgumentsState = .NotYetComputed
+  internal static var _arguments: [String]? = nil 
 
   /// Access to the raw argc value from C.
   public static var argc: CInt {
@@ -46,16 +46,17 @@ public enum Process {
     return _unsafeArgv
   }
 
-  /// Access to the swift arguments, also compute the arguments lazily.
-  public static var arguments : [String] {
-    switch _arguments {
-    case .NotYetComputed:
-      let result: [String] = _computeArguments() 
-      _arguments = .ComputedArguments(result)
-      return result;
-    case .ComputedArguments(let args):
-      return args
+  /// Access to the swift arguments, also use lazy initialization of static
+  /// properties to safely initialize the swift arguments.
+  ///
+  /// NOTE: we can not use static lazy let initializer as they can be moved
+  /// around by the optimizer which will break the data dependence on argc
+  /// and argv.
+  public static var arguments: [String] {
+    if _arguments == nil { 
+      _arguments = _computeArguments()
     }
+    return _arguments!
   } 
 }
 
