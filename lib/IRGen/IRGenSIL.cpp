@@ -2272,6 +2272,10 @@ static llvm::Constant *getAddrOfString(IRGenModule &IGM, StringRef string,
   case swift::StringLiteralInst::Encoding::UTF8:
     return IGM.getAddrOfGlobalString(string);
 
+  case swift::StringLiteralInst::Encoding::UTF8NoNullPad:
+    return IGM.getAddrOfGlobalString(
+        string, /*willBeRelativelyAddressed=*/ false, /*addNull=*/ false);
+
   case swift::StringLiteralInst::Encoding::UTF16: {
     // This is always a GEP of a GlobalVariable with a nul terminator.
     auto addr = IGM.getAddrOfGlobalUTF16String(string);

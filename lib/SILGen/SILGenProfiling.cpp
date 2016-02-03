@@ -650,7 +650,7 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
       // TODO: In C++ we give this string linkage that matches the functions, so
       // that it's uniqued appropriately across TUs.
       Builder.createStringLiteral(Loc, StringRef(CurrentFuncName),
-                                  StringLiteralInst::Encoding::UTF8),
+                                  StringLiteralInst::Encoding::UTF8NoNullPad),
       Builder.createIntegerLiteral(Loc, Int64Ty, FunctionHash),
       Builder.createIntegerLiteral(Loc, Int32Ty, NumRegionCounters),
       // TODO: Should we take care to emit only one copy of each of the above
