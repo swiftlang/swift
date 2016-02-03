@@ -1,3 +1,4 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NO_CONTEXT_0 | FileCheck %s -check-prefix=NO_CONTEXT_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NIL_0 | FileCheck %s -check-prefix=NIL_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NIL_1 | FileCheck %s -check-prefix=NIL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NIL_2 | FileCheck %s -check-prefix=NIL_2
@@ -24,6 +25,22 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_1 | FileCheck %s -check-prefix=COLOR_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_0 | FileCheck %s -check-prefix=IMAGE_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_1 | FileCheck %s -check-prefix=IMAGE_1
+
+func testAll0() {
+  // Not type context.
+  let x = #^NO_CONTEXT_0^#
+// NO_CONTEXT_0-DAG: Begin completions
+// NO_CONTEXT_0-DAG: Literal[Integer]/None:              0[#Int#];
+// NO_CONTEXT_0-DAG: Literal[Boolean]/None:              true[#Bool#];
+// NO_CONTEXT_0-DAG: Literal[Boolean]/None:              false[#Bool#];
+// NO_CONTEXT_0-DAG: Literal[Nil]/None:                  nil;
+// NO_CONTEXT_0-DAG: Literal[String]/None:               "{#(abc)#}"[#String#];
+// NO_CONTEXT_0-DAG: Literal[Array]/None:                [{#(values)#}][#Array#];
+// NO_CONTEXT_0-DAG: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
+// NO_CONTEXT_0-DAG: Literal[_Color]/None:               [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#];
+// NO_CONTEXT_0-DAG: Literal[_Image]/None:               [#Image({#imageLiteral: String#})#];
+// NO_CONTEXT_0: End completions
+}
 
 struct MyNil1: NilLiteralConvertible {
   init(nilLiteral: ()) {}

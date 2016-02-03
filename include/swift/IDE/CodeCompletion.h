@@ -693,6 +693,7 @@ class CodeCompletionContext {
 public:
   CodeCompletionCache &Cache;
   CompletionKind CodeCompletionKind = CompletionKind::None;
+  bool HasExpectedTypeRelation = false;
 
   CodeCompletionContext(CodeCompletionCache &Cache)
       : Cache(Cache) {}

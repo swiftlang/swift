@@ -537,6 +537,7 @@ static void printResponse(sourcekitd_response_t resp, bool raw, bool structure,
   }
   ResponsePrinter p(llvm::outs(), 4, indentation, structure);
   p.printResponse(resp);
+  llvm::outs().flush();
 }
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -770,9 +771,11 @@ static int handleTestInvocation(TestOptions &options) {
             return true;
           }
           llvm::outs() << "Results for filterText: " << prefix << " [\n";
+          llvm::outs().flush();
           printResponse(response, options.rawOutput, options.structureOutput,
                         /*indentation*/ 4);
           llvm::outs() << "]\n";
+          llvm::outs().flush();
           return false;
         });
     if (isError)

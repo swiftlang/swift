@@ -75,7 +75,8 @@ class CodeCompletionOrganizer {
   Impl &impl;
   const Options &options;
 public:
-  CodeCompletionOrganizer(const Options &options, CompletionKind kind);
+  CodeCompletionOrganizer(const Options &options, CompletionKind kind,
+                          bool hasExpectedTypes);
   ~CodeCompletionOrganizer();
 
   static void

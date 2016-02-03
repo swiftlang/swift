@@ -1546,8 +1546,13 @@ public:
   }
 
   void setExpectedTypes(ArrayRef<Type> Types) {
-    ExpectedTypes = Types;
+    ExpectedTypes.reserve(Types.size());
+    for (auto T : Types)
+      if (T)
+        ExpectedTypes.push_back(T);
   }
+
+  bool hasExpectedTypes() const { return !ExpectedTypes.empty(); }
 
   bool needDot() const {
     return NeedLeadingDot;
@@ -4776,6 +4781,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     }
     Lookup.RequestedCachedResults.reset();
   }
+
+  CompletionContext.HasExpectedTypeRelation = Lookup.hasExpectedTypes();
 
   deliverCompletionResults();
 }

@@ -697,6 +697,10 @@ CompletionKind CodeCompletion::SessionCache::getCompletionKind() {
   llvm::sys::ScopedLock L(mtx);
   return completionKind;
 }
+bool CodeCompletion::SessionCache::getCompletionHasExpectedTypes() {
+  llvm::sys::ScopedLock L(mtx);
+  return completionHasExpectedTypes;
+}
 const CodeCompletion::FilterRules &
 CodeCompletion::SessionCache::getFilterRules() {
   llvm::sys::ScopedLock L(mtx);
@@ -928,7 +932,8 @@ static void transformAndForwardResults(
   };
 
   CodeCompletion::CodeCompletionOrganizer organizer(
-      options, session->getCompletionKind());
+      options, session->getCompletionKind(),
+      session->getCompletionHasExpectedTypes());
 
   bool hasEarlyInnerResults =
       session->getCompletionKind() == CompletionKind::PostfixExpr;
@@ -1060,10 +1065,12 @@ void SwiftLangSupport::codeCompleteOpen(
   }
 
   CompletionKind completionKind = CompletionKind::None;
+  bool hasExpectedTypes = false;
 
   SwiftCodeCompletionConsumer swiftConsumer(
       [&](ArrayRef<CodeCompletionResult *> results, SwiftCompletionInfo &info) {
         completionKind = info.completionContext->CodeCompletionKind;
+        hasExpectedTypes = info.completionContext->HasExpectedTypeRelation;
         completions =
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
       });
@@ -1097,7 +1104,7 @@ void SwiftLangSupport::codeCompleteOpen(
   std::vector<std::string> argsCopy(extendedArgs.begin(), extendedArgs.end());
   SessionCacheRef session{new SessionCache(
       std::move(sink), std::move(bufferCopy), std::move(argsCopy),
-      completionKind, std::move(filterRules))};
+      completionKind, hasExpectedTypes, std::move(filterRules))};
   session->setSortedCompletions(std::move(completions));
 
   if (!CCSessions.set(name, offset, session)) {

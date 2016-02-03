@@ -188,12 +188,13 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
 class CodeCompletionOrganizer::Impl {
   std::unique_ptr<Group> rootGroup;
   CompletionKind completionKind;
+  bool completionHasExpectedTypes;
 
   void groupStemsRecursive(Group *group, bool recurseIntoNewGroups,
                            StringRef(getStem)(StringRef));
 
 public:
-  Impl(CompletionKind kind);
+  Impl(CompletionKind kind, bool hasExpectedTypes);
 
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
                                 StringRef filterText, Options options,
@@ -249,8 +250,9 @@ public:
 //===----------------------------------------------------------------------===//
 
 CodeCompletionOrganizer::CodeCompletionOrganizer(const Options &options,
-                                                 CompletionKind kind)
-    : impl(*new Impl(kind)), options(options) {}
+                                                 CompletionKind kind,
+                                                 bool hasExpectedTypes)
+    : impl(*new Impl(kind, hasExpectedTypes)), options(options) {}
 CodeCompletionOrganizer::~CodeCompletionOrganizer() { delete &impl; }
 
 void CodeCompletionOrganizer::preSortCompletions(
@@ -383,8 +385,8 @@ static std::unique_ptr<Result> make_result(Completion *result) {
 // CodeCompletionOrganizer::Impl implementation
 //===----------------------------------------------------------------------===//
 
-CodeCompletionOrganizer::Impl::Impl(CompletionKind kind)
-    : completionKind(kind) {
+CodeCompletionOrganizer::Impl::Impl(CompletionKind kind, bool hasExpectedTypes)
+    : completionKind(kind), completionHasExpectedTypes(hasExpectedTypes) {
   assert(!rootGroup && "initialized twice");
   rootGroup = make_group("");
 }
@@ -516,7 +518,8 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         }
         if (completion->getExpectedTypeRelation() >= Completion::Convertible ||
             (completion->getKind() == Completion::Literal &&
-             completionKind != CompletionKind::StmtOrExpr))
+             completionKind != CompletionKind::StmtOrExpr &&
+             !completionHasExpectedTypes))
           break;
 
         if (completion->getKind() == Completion::Keyword &&
@@ -541,6 +544,16 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   pattern.normalize = true;
   for (Completion *completion : completions) {
     if (rules.hideCompletion(completion))
+      continue;
+
+    // Hide literals other than the ones that are also keywords if they don't
+    // match the expected types.
+    if (completion->getKind() == Completion::Literal &&
+        completionHasExpectedTypes &&
+        completion->getExpectedTypeRelation() < Completion::Convertible &&
+        completion->getLiteralKind() !=
+            CodeCompletionLiteralKind::BooleanLiteral &&
+        completion->getLiteralKind() != CodeCompletionLiteralKind::NilLiteral)
       continue;
 
     bool match = false;
@@ -641,7 +654,7 @@ enum class ResultBucket {
 };
 } // end anonymous namespace
 
-static ResultBucket getResultBucket(Item &item) {
+static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes) {
   if (isa<Group>(item))
     return ResultBucket::Normal; // FIXME: take best contained result.
   auto *completion = cast<Result>(item).value;
@@ -655,7 +668,15 @@ static ResultBucket getResultBucket(Item &item) {
 
   switch (completion->getKind()) {
   case Completion::Literal:
-    return matchesType ? ResultBucket::LiteralTypeMatch : ResultBucket::Literal;
+    if (matchesType) {
+      return ResultBucket::LiteralTypeMatch;
+    } else if (!hasExpectedTypes) {
+      return ResultBucket::Literal;
+    } else {
+      // When we have type context, we still show literals that are keywords,
+      // but we treat them as keywords instead of literals for prioritization.
+      return ResultBucket::Normal;
+    }
   case Completion::Keyword:
     return isHighPriorityKeyword(completion->getKeywordKind())
                ? ResultBucket::HighPriorityKeyword
@@ -721,13 +742,14 @@ static int compareLiterals(Item &a_, Item &b_) {
   return 0;
 }
 
-static void sortRecursive(const Options &options, Group *group) {
+static void sortRecursive(const Options &options, Group *group,
+                          bool hasExpectedTypes) {
   // Sort all of the subgroups first, and fill in the bucket for each result.
   auto &contents = group->contents;
   double best = -1.0;
   for (auto &item : contents) {
     if (Group *g = dyn_cast<Group>(item.get())) {
-      sortRecursive(options, g);
+      sortRecursive(options, g, hasExpectedTypes);
     } else {
       Result *r = cast<Result>(item.get());
       item->finalScore = combinedScore(options, item->matchScore, r->value);
@@ -749,40 +771,40 @@ static void sortRecursive(const Options &options, Group *group) {
     return;
   }
 
-  llvm::array_pod_sort(contents.begin(), contents.end(), [](const std::unique_ptr<Item> *a_, const std::unique_ptr<Item> *b_) {
-    Item &a = **a_;
-    Item &b = **b_;
+  std::sort(contents.begin(), contents.end(), [=](const std::unique_ptr<Item> &a_, const std::unique_ptr<Item> &b_) {
+    Item &a = *a_;
+    Item &b = *b_;
 
-    auto bucketA = getResultBucket(a);
-    auto bucketB = getResultBucket(b);
+    auto bucketA = getResultBucket(a, hasExpectedTypes);
+    auto bucketB = getResultBucket(b, hasExpectedTypes);
     if (bucketA < bucketB)
-      return 1;
+      return false;
     else if (bucketB < bucketA)
-      return -1;
+      return true;
 
     // Special internal orderings.
     switch (bucketA) {
     case ResultBucket::HighPriorityKeyword:
-      return compareHighPriorityKeywords(a, b);
+      return compareHighPriorityKeywords(a, b) < 0;
     case ResultBucket::Literal:
     case ResultBucket::LiteralTypeMatch:
-      return compareLiterals(a, b);
+      return compareLiterals(a, b) < 0;
     default:
       break;
     }
 
     // "Normal" order.
     if (a.finalScore < b.finalScore)
-      return 1;
+      return false;
     else if (b.finalScore < a.finalScore)
-      return -1;
+      return true;
 
-    return compareResultName(a, b);
+    return compareResultName(a, b) < 0;
   });
 }
 
 void CodeCompletionOrganizer::Impl::sort(Options options) {
-  sortRecursive(options, rootGroup.get());
+  sortRecursive(options, rootGroup.get(), completionHasExpectedTypes);
 }
 
 void CodeCompletionOrganizer::Impl::groupStemsRecursive(
