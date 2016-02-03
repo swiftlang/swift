@@ -366,7 +366,6 @@ static UIdent KindLiteralBoolean("source.lang.swift.literal.boolean");
 static UIdent KindLiteralColor("source.lang.swift.literal.color");
 static UIdent KindLiteralImage("source.lang.swift.literal.image");
 static UIdent KindLiteralDictionary("source.lang.swift.literal.dictionary");
-static UIdent KindLiteralFloat("source.lang.swift.literal.float");
 static UIdent KindLiteralInteger("source.lang.swift.literal.integer");
 static UIdent KindLiteralNil("source.lang.swift.literal.nil");
 static UIdent KindLiteralString("source.lang.swift.literal.string");
@@ -385,8 +384,6 @@ getUIDForCodeCompletionLiteralKind(CodeCompletionLiteralKind kind) {
     return KindLiteralImage;
   case CodeCompletionLiteralKind::DictionaryLiteral:
     return KindLiteralDictionary;
-  case CodeCompletionLiteralKind::FloatLiteral:
-    return KindLiteralFloat;
   case CodeCompletionLiteralKind::IntegerLiteral:
     return KindLiteralInteger;
   case CodeCompletionLiteralKind::NilLiteral:
@@ -549,8 +546,6 @@ getCodeCompletionLiteralKindForUID(UIdent uid) {
     return CodeCompletionLiteralKind::ImageLiteral;
   } else if (uid == KindLiteralDictionary) {
     return CodeCompletionLiteralKind::DictionaryLiteral;
-  } else if (uid == KindLiteralFloat) {
-    return CodeCompletionLiteralKind::FloatLiteral;
   } else if (uid == KindLiteralInteger) {
     return CodeCompletionLiteralKind::IntegerLiteral;
   } else if (uid == KindLiteralNil) {

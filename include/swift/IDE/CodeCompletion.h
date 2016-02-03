@@ -410,7 +410,6 @@ enum class CodeCompletionLiteralKind {
   BooleanLiteral,
   ColorLiteral,
   DictionaryLiteral,
-  FloatLiteral,
   IntegerLiteral,
   ImageLiteral,
   NilLiteral,

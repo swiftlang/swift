@@ -691,7 +691,6 @@ static int compareHighPriorityKeywords(Item &a_, Item &b_) {
 static int compareLiterals(Item &a_, Item &b_) {
   static CodeCompletionLiteralKind order[] = {
     CodeCompletionLiteralKind::IntegerLiteral,
-    CodeCompletionLiteralKind::FloatLiteral,
     CodeCompletionLiteralKind::BooleanLiteral,
     CodeCompletionLiteralKind::StringLiteral,
     CodeCompletionLiteralKind::ArrayLiteral,

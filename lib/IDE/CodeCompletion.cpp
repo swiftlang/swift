@@ -621,9 +621,6 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     case CodeCompletionLiteralKind::DictionaryLiteral:
       Prefix.append("[Dictionary]");
       break;
-    case CodeCompletionLiteralKind::FloatLiteral:
-      Prefix.append("[Float]");
-      break;
     case CodeCompletionLiteralKind::IntegerLiteral:
       Prefix.append("[Integer]");
       break;
@@ -1370,8 +1367,6 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
     return KnownProtocolKind::ImageLiteralConvertible;
   case CodeCompletionLiteralKind::DictionaryLiteral:
     return KnownProtocolKind::DictionaryLiteralConvertible;
-  case CodeCompletionLiteralKind::FloatLiteral:
-    return KnownProtocolKind::FloatLiteralConvertible;
   case CodeCompletionLiteralKind::IntegerLiteral:
     return KnownProtocolKind::IntegerLiteralConvertible;
   case CodeCompletionLiteralKind::NilLiteral:
