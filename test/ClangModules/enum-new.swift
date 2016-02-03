@@ -23,3 +23,19 @@ func test() {
   } // expected-error {{switch must be exhaustive, consider adding a default clause}}
 }
 
+func testError() {
+  let terr = getErr()
+  switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
+
+  switch (terr) { case .TENone, .TEOne: break }
+    // expected-error@-1 {{switch must be exhaustive, consider adding a default clause}}
+
+  let _ = TestError(rawValue: 2)!
+
+  do {
+    throw TestError.TEOne
+  } catch is TestError {
+  } catch {
+  }
+
+}
