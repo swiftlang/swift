@@ -8,8 +8,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_1 | FileCheck %s -check-prefix=INT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_2 | FileCheck %s -check-prefix=INT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=DOUBLE_0 | FileCheck %s -check-prefix=DOUBLE_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=DOUBLE_1 | FileCheck %s -check-prefix=DOUBLE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=DOUBLE_2 | FileCheck %s -check-prefix=DOUBLE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_0 | FileCheck %s -check-prefix=STRING_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_1 | FileCheck %s -check-prefix=STRING_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_2 | FileCheck %s -check-prefix=STRING_2
@@ -103,19 +101,9 @@ func testInt2() {
 // INT_2: Literal[Integer]/None/TypeRelation[Identical]: 0[#Int#];
 
 func testDouble0() {
-  let x: Int = #^DOUBLE_0^#
+  let x: Double = #^DOUBLE_0^#
 }
-// DOUBLE_0: Literal[Float]/None: 0.0[#Double#];
-
-func testDouble1() {
-  let x: MyDouble1 = #^DOUBLE_1^#
-}
-// DOUBLE_1: Literal[Float]/None/TypeRelation[Identical]: 0.0[#MyDouble1#];
-
-func testDouble2() {
-  let x: Double = #^DOUBLE_2^#
-}
-// DOUBLE_2: Literal[Float]/None/TypeRelation[Identical]: 0.0[#Double#];
+// DOUBLE_0: Literal[Integer]/None/TypeRelation[Identical]: 0[#Double#];
 
 func testString0() {
   let x: Int = #^STRING_0^#

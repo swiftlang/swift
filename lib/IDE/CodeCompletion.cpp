@@ -3102,9 +3102,6 @@ public:
     addFromProto(LK::IntegerLiteral, "Int", [](Builder &builder) {
       builder.addTextChunk("0");
     });
-    addFromProto(LK::FloatLiteral, "Double", [](Builder &builder) {
-      builder.addTextChunk("0.0");
-    });
     addFromProto(LK::BooleanLiteral, "Bool", [](Builder &builder) {
       builder.addTextChunk("true");
     }, /*isKeyword=*/true);

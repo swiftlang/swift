@@ -60,7 +60,6 @@ func test2() {
   (#^EXPR_0^#)
 }
 // EXPR: 0
-// EXPR: 0.0
 // EXPR: false
 // EXPR: true
 // EXPR: "text"
