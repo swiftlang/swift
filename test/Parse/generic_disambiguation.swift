@@ -26,9 +26,9 @@ var a, b, c, d : Int
 a < b
 (a < b, c > d)
 // Parses as generic because of lparen after '>'
-(a < b, c > (d)) // expected-error{{use of undeclared type 'b'}} expected-note{{while parsing this '<' as a type parameter bracket}}
+(a < b, c > (d)) // expected-error{{use of undeclared type 'b'}}
 // Parses as generic because of lparen after '>'
-(a<b, c>(d)) // expected-error{{use of undeclared type 'b'}} expected-note{{while parsing this '<' as a type parameter bracket}}
+(a<b, c>(d)) // expected-error{{use of undeclared type 'b'}} 
 a>(b)
 a > (b)
 

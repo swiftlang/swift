@@ -8,13 +8,13 @@ import CFAndObjC
 func assertUnmanaged<T: AnyObject>(t: Unmanaged<T>) {}
 func assertManaged<T: AnyObject>(t: T) {}
 
-func test0(fridge: CCRefrigeratorRef) {
+func test0(fridge: CCRefrigerator) {
   assertManaged(fridge)
 }
 
-func test1(power: Unmanaged<CCPowerSupplyRef>) {
+func test1(power: Unmanaged<CCPowerSupply>) {
   assertUnmanaged(power)
-  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupplyRef>' (aka 'Unmanaged<CCPowerSupply>') to expected argument type 'CCPowerSupply!'}}
+  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupply>' to expected argument type 'CCPowerSupply!'}}
   assertUnmanaged(fridge)
 }
 
@@ -88,10 +88,11 @@ func testTollFree1(ccmduct: CCMutableDuct) {
 }
 
 func testChainedAliases(fridge: CCRefrigerator) {
-  _ = fridge as CCRefrigeratorRef
+  _ = fridge as CCRefrigerator
 
   _ = fridge as CCFridge
-  _ = fridge as CCFridgeRef
+  _ = fridge as CCFridgeRef // expected-warning{{'CCFridgeRef' is deprecated: renamed to 'CCFridge'}}
+  // expected-note@-1{{use 'CCFridge' instead}}{{17-28=CCFridge}}
 }
 
 func testBannedImported(object: CCOpaqueTypeRef) {
@@ -137,4 +138,11 @@ func nameCollisions() {
 
   func isOptionalFloat(inout _: Optional<Float>) {}
   isOptionalFloat(&otherAlias) // okay
+
+  var np: NotAProblem?
+  var np2: NotAProblemRef? // expected-warning{{'NotAProblemRef' is deprecated: renamed to 'NotAProblem'}}
+  // expected-note@-1{{use 'NotAProblem' instead}}{{12-26=NotAProblem}}
+
+  np = np2
+  np2 = np
 }

@@ -105,6 +105,7 @@ demangledLine(std::string line) {
       return false;
     } else {
       out = demangled;
+      free(demangled);
       return true;
     }
   });

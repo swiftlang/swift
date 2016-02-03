@@ -1407,7 +1407,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     
     candidates.push_back({ decl, uncurryLevel });
 
-    // If we have a base type for this member, try to perform substitions into
+    // If we have a base type for this member, try to perform substitutions into
     // it to get a simpler and more concrete type.
     //
     if (baseType) {

@@ -1086,6 +1086,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool HasSpace = false;
   bool HasRParen = false;
   bool ShouldCompleteCallPatternAfterParen = true;
+  bool PreferFunctionReferencesToCalls = false;
   Optional<DeclKind> AttTargetDK;
 
   SmallVector<StringRef, 3> ParsedKeywords;
@@ -1420,6 +1421,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool HaveRParen = false;
   bool IsSuperRefExpr = false;
   bool IsDynamicLookup = false;
+  bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
 
   /// \brief True if we are code completing inside a static method.
@@ -1565,6 +1567,10 @@ public:
 
   void setIsDynamicLookup() {
     IsDynamicLookup = true;
+  }
+
+  void setPreferFunctionReferencesToCalls() {
+    PreferFunctionReferencesToCalls = true;
   }
 
   void setHaveLeadingSpace(bool value) { HaveLeadingSpace = value; }
@@ -1817,7 +1823,7 @@ public:
         type = ParamDecl::getVarargBaseTy(type);
 
       Builder.addCallParameter(param->getArgumentName(), type,
-                               param->isVariadic());
+                               param->isVariadic(), true);
     }
   }
 
@@ -1851,7 +1857,7 @@ public:
       else if (IsTopLevel)
         Builder.addAnnotatedLeftParen();
       Builder.addCallParameter(Identifier(), PT->getUnderlyingType(),
-                               /*IsVarArg*/false);
+                               /*IsVarArg*/false, IsTopLevel);
       if (IsTopLevel)
         Builder.addRightParen();
       return;
@@ -1862,7 +1868,7 @@ public:
     else if (IsTopLevel)
       Builder.addAnnotatedLeftParen();
 
-    Builder.addCallParameter(Label, T, IsVarArg);
+    Builder.addCallParameter(Label, T, IsVarArg, IsTopLevel);
     if (IsTopLevel)
       Builder.addRightParen();
   }
@@ -1937,9 +1943,10 @@ public:
         if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
           auto name = BodyParams->get(i)->getName();
-          Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg());
+          Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg(),
+                                   true);
         } else {
-          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
+          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg(), true);
         }
         modifiedBuilder = true;
         NeedComma = true;
@@ -1956,9 +1963,9 @@ public:
       if (BodyParams) {
         auto name = BodyParams->get(0)->getName();
         Builder.addCallParameter(Identifier(), name, T,
-                                 /*IsVarArg*/false);
+                                 /*IsVarArg*/false, true);
       } else
-        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false);
+        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false, true);
     }
 
     return modifiedBuilder;
@@ -1986,7 +1993,7 @@ public:
     Builder.addRightParen();
   }
 
-  void addPoundSelector() {
+  void addPoundSelector(bool needPound) {
     // #selector is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
@@ -1995,7 +2002,10 @@ public:
                                   CodeCompletionResult::ResultKind::Keyword,
                                   SemanticContextKind::ExpressionSpecific,
                                   ExpectedTypes);
-    Builder.addTextChunk("selector");
+    if (needPound)
+      Builder.addTextChunk("#selector");
+    else
+      Builder.addTextChunk("selector");
     Builder.addLeftParen();
     Builder.addSimpleTypedParameter("@objc method", /*isVarArg=*/false);
     Builder.addRightParen();
@@ -2114,7 +2124,7 @@ public:
 
         Builder.addLeftParen();
         Builder.addCallParameter(Ctx.Id_self, FirstInputType,
-                                 /*IsVarArg*/ false);
+                                 /*IsVarArg*/ false, true);
         Builder.addRightParen();
       } else {
         Builder.addLeftParen();
@@ -2400,6 +2410,43 @@ public:
     Builder.addDeclAttrKeyword(Name, Annotation);
   }
 
+  /// Add the compound function name for the given function.
+  void addCompoundFunctionName(AbstractFunctionDecl *AFD,
+                               DeclVisibilityKind Reason) {
+    CommandWordsPairs Pairs;
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(AFD, Reason), ExpectedTypes);
+    setClangDeclKeywords(AFD, Pairs, Builder);
+    Builder.setAssociatedDecl(AFD);
+
+    // Base name
+    addLeadingDot(Builder);
+    Builder.addTextChunk(AFD->getFullName().getBaseName().str());
+
+    // Add the argument labels.
+    auto ArgLabels = AFD->getFullName().getArgumentNames();
+    if (ArgLabels.size() > 0) {
+      if (!HaveLParen)
+        Builder.addLeftParen();
+      else
+        Builder.addAnnotatedLeftParen();
+
+      for (auto ArgLabel : ArgLabels) {
+        if (ArgLabel.empty())
+          Builder.addTextChunk("_");
+        else
+          Builder.addTextChunk(ArgLabel.str());
+        Builder.addTextChunk(":");
+      }
+
+      if (!HaveRParen)
+        Builder.addRightParen();
+      else
+        Builder.addAnnotatedRightParen();
+    }
+  }
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
@@ -2422,6 +2469,12 @@ public:
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+        // Do we want compound function names here?
+        if (PreferFunctionReferencesToCalls) {
+          addCompoundFunctionName(CD, Reason);
+          return;
+        }
+        
         if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
           if (HaveDot) {
             Type Ty;
@@ -2478,6 +2531,12 @@ public:
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
+
+        // Do we want compound function names here?
+        if (PreferFunctionReferencesToCalls) {
+          addCompoundFunctionName(FD, Reason);
+          return;
+        }
 
         addMethodCall(FD, Reason);
         return;
@@ -2863,7 +2922,8 @@ public:
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
     if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType, false);
+      builder.addCallParameter(Identifier(), Identifier(), RHSType, false,
+                               true);
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3078,15 +3138,16 @@ public:
       builder.addTextChunk("#Color");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("colorLiteralRed"),
-                               floatType, false);
+                               floatType, false, true);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("green"), floatType,
-                               false);
+                               false, true);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType, false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType,
+                               false, true);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("alpha"), floatType,
-                               false);
+                               false, true);
       builder.addRightParen();
       builder.addTextChunk("#");
       builder.addRightBracket();
@@ -3153,6 +3214,19 @@ public:
     }
 
     addValueLiteralCompletions();
+
+    // If the expected type is ObjectiveC.Selector, add #selector.
+    if (Ctx.LangOpts.EnableObjCInterop) {
+      for (auto T : ExpectedTypes) {
+        if (auto structDecl = T->getStructOrBoundGenericStruct()) {
+          if (structDecl->getName() == Ctx.Id_Selector &&
+              structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
+            addPoundSelector(/*needPound=*/true);
+            break;
+          }
+        }
+      }
+    }
   }
 
   struct LookupByName : public swift::VisibleDeclConsumer {
@@ -3581,6 +3655,8 @@ public:
       llvm::raw_svector_ostream OS(DeclStr);
       DeclNameOffsetLocatorPrinter Printer(OS);
       PrintOptions Options;
+      if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
+        Options.setArchetypeTransform(transformType, VD->getDeclContext());
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(DAK_NoReturn);
@@ -3744,6 +3820,9 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
     return;
 
   Kind = CompletionKind::DotExpr;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = E;
   this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
@@ -3765,6 +3844,9 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExp
     return;
 
   Kind = CompletionKind::PostfixExprBeginning;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   CurDeclContext = P.CurDeclContext;
   CStyleForLoopIterationVariable =
       CodeCompletionCallbacks::CStyleForLoopIterationVariable;
@@ -3780,6 +3862,9 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
 
   HasSpace = hasSpace;
   Kind = CompletionKind::PostfixExpr;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
 }
@@ -3818,6 +3903,9 @@ void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
     return;
 
   Kind = CompletionKind::SuperExpr;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;
 }
@@ -3828,6 +3916,9 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
     return;
 
   Kind = CompletionKind::SuperExprDot;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;
 }
@@ -4368,6 +4459,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ExprType) {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
+  if (PreferFunctionReferencesToCalls)
+    Lookup.setPreferFunctionReferencesToCalls();
 
   auto DoPostfixExprBeginning = [&] (){
     if (CStyleForLoopIterationVariable)
@@ -4592,7 +4685,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::AfterPound: {
     Lookup.addPoundAvailable(ParentStmtKind);
-    Lookup.addPoundSelector();
+    Lookup.addPoundSelector(/*needPound=*/false);
     break;
   }
 

@@ -5510,17 +5510,18 @@ bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
   // API availability ranges are contravariant: make sure the version range
   // of an overridden declaration is fully contained in the range of the
   // overriding declaration.
-  VersionRange overrideRange = AvailabilityInference::availableRange(override,
-                                                                     Context);
-  VersionRange baseRange = AvailabilityInference::availableRange(base, Context);
+  AvailabilityContext overrideInfo =
+      AvailabilityInference::availableRange(override, Context);
+  AvailabilityContext baseInfo =
+      AvailabilityInference::availableRange(base, Context);
 
-  return baseRange.isContainedIn(overrideRange);
+  return baseInfo.isContainedIn(overrideInfo);
 }
 
 bool TypeChecker::isAvailabilitySafeForConformance(
     ValueDecl *witness, ValueDecl *requirement,
     NormalProtocolConformance *conformance,
-    VersionRange &requiredRange) {
+    AvailabilityContext &requirementInfo) {
   DeclContext *DC = conformance->getDeclContext();
 
   // We assume conformances in
@@ -5541,25 +5542,27 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // (an over-approximation of) the intersection of the witnesses's available
   // range with both the conforming type's available range and the protocol
   // declaration's available range.
-  VersionRange witnessRange = AvailabilityInference::availableRange(witness,
-                                                                    Context);
-  requiredRange = AvailabilityInference::availableRange(requirement, Context);
+  AvailabilityContext witnessInfo =
+      AvailabilityInference::availableRange(witness, Context);
+  requirementInfo = AvailabilityInference::availableRange(requirement, Context);
 
-  VersionRange rangeOfConformingDecl = overApproximateOSVersionsAtLocation(
-      conformingDecl->getLoc(), conformingDecl);
+  AvailabilityContext infoForConformingDecl =
+      overApproximateAvailabilityAtLocation(conformingDecl->getLoc(),
+                                            conformingDecl);
 
   // Constrain over-approximates intersection of version ranges.
-  witnessRange.constrainWith(rangeOfConformingDecl);
-  requiredRange.constrainWith(rangeOfConformingDecl);
+  witnessInfo.constrainWith(infoForConformingDecl);
+  requirementInfo.constrainWith(infoForConformingDecl);
 
   ProtocolDecl *protocolDecl = conformance->getProtocol();
-  VersionRange rangeOfProtocolDecl =
-      overApproximateOSVersionsAtLocation(protocolDecl->getLoc(), protocolDecl);
+  AvailabilityContext infoForProtocolDecl =
+      overApproximateAvailabilityAtLocation(protocolDecl->getLoc(),
+                                            protocolDecl);
 
-  witnessRange.constrainWith(rangeOfProtocolDecl);
-  requiredRange.constrainWith(rangeOfProtocolDecl);
+  witnessInfo.constrainWith(infoForProtocolDecl);
+  requirementInfo.constrainWith(infoForProtocolDecl);
 
-  return requiredRange.isContainedIn(witnessRange);
+  return requirementInfo.isContainedIn(witnessInfo);
 }
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
@@ -5661,8 +5664,14 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType: {
     auto typeParam = cast<AbstractTypeParamDecl>(D);
+    auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam);
+    if (assocType && assocType->isRecursive()) {
+      D->setInvalid();
+      break;
+    }
+      
     if (!resolveTypeParams || typeParam->getArchetype()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
+      if (assocType) {
         DeclChecker(*this, false, false).visitAssociatedTypeDecl(assocType);
 
         if (!assocType->hasType())
@@ -5685,32 +5694,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     case DeclContextKind::NominalTypeDecl: {
       auto nominal = cast<NominalTypeDecl>(DC);
-      
       typeCheckDecl(nominal, true);
-      
-      // If this is an associated type that still has no type, then our type
-      // check of the nominal protocol type failed because it was invalid.  This
-      // happens in various cases where sema of the protocol gives up on the
-      // invalid protocol decl.  Install a type so that downstream things won't
-      // die due to getType() crashing on it.
-      //
-      // TODO: This is all really gross.  If type checking the protocol is what
-      // is supposed to set up the archetype for the associated types, then it
-      // should guarantee that it happens.
-      //
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
-        if (!assocType->hasType()) {
-          // Otherwise, fallback to setting it to error type.
-          if (nominal->isInvalid()) {
-            assocType->setType(Context.TheErrorType);
-          } else {
-            // Otherwise, we're in a recursive type checking situation, and
-            // the archetype for this AssocType may still be set.  Compute a
-            // type even though we don't have it yet.
-            assocType->computeType();
-          }
-        }
-      }
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
+        if (!assocType->hasType())
+          assocType->computeType();
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(nominal->getFormalAccess());
       break;

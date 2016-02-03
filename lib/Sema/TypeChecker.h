@@ -1618,18 +1618,19 @@ public:
 
   /// \brief Returns true if the availability of the witness
   /// is sufficient to safely conform to the requirement in the context
-  /// the provided conformance. On return, requiredRange holds the range
-  /// required for conformance.
-  bool isAvailabilitySafeForConformance(ValueDecl *witness,
-                                        ValueDecl *requirement,
-                                        NormalProtocolConformance *conformance,
-                                        VersionRange &requiredRange);
+  /// the provided conformance. On return, requiredAvailability holds th
+  /// availability levels required for conformance.
+  bool
+  isAvailabilitySafeForConformance(ValueDecl *witness,
+                                   ValueDecl *requirement,
+                                   NormalProtocolConformance *conformance,
+                                   AvailabilityContext &requiredAvailability);
 
   /// Returns an over-approximation of the range of operating system versions
   /// that could the passed-in location could be executing upon for
   /// the target platform.
-  VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
-                                                   const DeclContext *DC);
+  AvailabilityContext
+  overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///
@@ -1654,11 +1655,11 @@ public:
   /// reference DeclContext).
   /// If the declaration is available, return true.
   /// If the declaration is not available, return false and write the
-  /// declaration's available version range to the out parameter
-  /// OutAvailableRange.
+  /// declaration's availability info to the out parameter
+  /// \p OutAvailableRange.
   bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
                        const DeclContext *referenceDC,
-                       VersionRange &OutAvailableRange);
+                       AvailabilityContext &OutAvailableRange);
 
   /// Checks whether a declaration should be considered unavailable when
   /// referred to at the given location and, if so, returns the reason why the

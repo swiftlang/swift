@@ -1069,6 +1069,11 @@ static Type resolveNestedIdentTypeComponent(
         TC, memberType, comp->getIdLoc(), DC, genComp,
         options.contains(TR_GenericSignature), resolver);
 
+  // If we found a reference to an associated type or other member type that
+  // was marked invalid, just return ErrorType to silence downstream errors.
+  if (member && member->isInvalid())
+    memberType = ErrorType::get(TC.Context);
+
   if (member)
     comp->setValue(member);
   return memberType;

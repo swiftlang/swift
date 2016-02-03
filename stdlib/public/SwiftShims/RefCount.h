@@ -35,7 +35,7 @@ typedef struct {
 #include <stdint.h>
 #include <assert.h>
 
- #include "swift/Basic/type_traits.h"
+#include "swift/Basic/type_traits.h"
 
 // Strong reference count.
 

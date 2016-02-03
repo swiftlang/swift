@@ -996,3 +996,7 @@ extern void NSGlobalFunction(void);
 @interface NSString (URLExtraction)
 @property (nonnull,copy,readonly) NSArray<NSURL *> *URLsInText;
 @end
+
+@interface NSObject (Selectors)
+-(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
+@end

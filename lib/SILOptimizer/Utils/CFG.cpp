@@ -328,7 +328,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   switch (T->getTermKind()) {
   // Only Branch and CondBranch may have arguments.
   case TermKind::BranchInst: {
-    auto Br = dyn_cast<BranchInst>(T);
+    auto Br = cast<BranchInst>(T);
+    assert(OldDest == Br->getDestBB() && "wrong branch target");
     SmallVector<SILValue, 8> Args;
     if (PreserveArgs) {
       for (auto Arg : Br->getArgs())
@@ -341,7 +342,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   }
 
   case TermKind::CondBranchInst: {
-    auto CondBr = dyn_cast<CondBranchInst>(T);
+    auto CondBr = cast<CondBranchInst>(T);
     SmallVector<SILValue, 8> TrueArgs;
     if (OldDest == CondBr->getFalseBB() || PreserveArgs) {
       for (auto Arg : CondBr->getTrueArgs())
@@ -354,10 +355,12 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     }
     SILBasicBlock *TrueDest = CondBr->getTrueBB();
     SILBasicBlock *FalseDest = CondBr->getFalseBB();
-    if (OldDest == CondBr->getTrueBB())
+    if (OldDest == CondBr->getTrueBB()) {
       TrueDest = NewDest;
-    else
+    } else {
+      assert(OldDest == CondBr->getFalseBB() && "wrong cond_br target");
       FalseDest = NewDest;
+    }
 
     B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
         TrueDest, TrueArgs, FalseDest, FalseArgs);
@@ -367,7 +370,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   }
 
   case TermKind::SwitchValueInst: {
-    auto SII = dyn_cast<SwitchValueInst>(T);
+    auto SII = cast<SwitchValueInst>(T);
     SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SII, Cases, OldDest, NewDest);
     B.createSwitchValue(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
@@ -376,7 +379,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   }
 
   case TermKind::SwitchEnumInst: {
-    auto SEI = dyn_cast<SwitchEnumInst>(T);
+    auto SEI = cast<SwitchEnumInst>(T);
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
     B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
@@ -385,7 +388,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   }
 
   case TermKind::SwitchEnumAddrInst: {
-    auto SEI = dyn_cast<SwitchEnumAddrInst>(T);
+    auto SEI = cast<SwitchEnumAddrInst>(T);
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
     B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
@@ -394,7 +397,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   }
 
   case TermKind::DynamicMethodBranchInst: {
-    auto DMBI = dyn_cast<DynamicMethodBranchInst>(T);
+    auto DMBI = cast<DynamicMethodBranchInst>(T);
     assert(OldDest == DMBI->getHasMethodBB() || OldDest == DMBI->getNoMethodBB() && "Invalid edge index");
     auto HasMethodBB = OldDest == DMBI->getHasMethodBB() ? NewDest : DMBI->getHasMethodBB();
     auto NoMethodBB = OldDest == DMBI->getNoMethodBB() ? NewDest : DMBI->getNoMethodBB();
@@ -405,7 +408,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   }
 
   case TermKind::CheckedCastBranchInst: {
-    auto CBI = dyn_cast<CheckedCastBranchInst>(T);
+    auto CBI = cast<CheckedCastBranchInst>(T);
     assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
@@ -416,7 +419,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   }
 
   case TermKind::CheckedCastAddrBranchInst: {
-    auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T);
+    auto CBI = cast<CheckedCastAddrBranchInst>(T);
     assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();

@@ -713,13 +713,13 @@ Finally, classes allow the following changes that do not apply to structs:
   declaration of the original member must remain along with its original
   availability, but its body may consist of simply calling the new superclass
   implementation.
-- Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
-  is a subclass of ``A`` *and* class ``B``, along with any superclasses between
-  it and class ``A``, were introduced in the latest version of the library.
 - A non-final override of a method, subscript, property, or initializer may be
   removed as long as the generic parameters, formal parameters, and return type
   *exactly* match the overridden declaration. Any existing callers should 
   automatically use the superclass implementation.
+- Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
+  is a subclass of ``A`` *and* class ``B``, along with any superclasses between
+  it and class ``A``, were introduced in the latest version of the library.
 
 .. admonition:: TODO
 
@@ -806,6 +806,17 @@ does not have any affect on binary compatibility. However, they do affect
 changed at all except for the following:
 
 - Making a non-associative operator left- or right-associative.
+
+Operator declarations are not versioned.
+
+
+Typealiases
+~~~~~~~~~~~
+
+Like operators, typealiases only exist at compile-time, so changing them
+affects source compatibility but not binary compatibility. Since a typealias
+is only made up of its name and its type, it is recommended that it is never
+changed at all after being published. Typealiases are not versioned.
 
 
 A Unifying Theme
@@ -1070,6 +1081,30 @@ semantics and performance of client code, and so library owners also have tools
 to waive the ability to make certain future changes. The language guarantees
 that client code will never accidentally introduce implicit dependencies on
 specific versions of libraries.
+
+
+Related Proposals
+=================
+
+The following proposals (some currently in the process, some planned) will
+affect the model described in this document, or concern the parts of this
+document that affect language semantics:
+
+- `SE-0030 Property Behaviors`_
+- (planned) Making classes "sealed" by default
+- (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
+- (planned) Default implementations in protocols
+- (planned) Open and closed enums
+- (planned) Syntax for declaring "versioned" entities and their features
+- (planned) Syntax for declaring inlineable code
+- (planned) Syntax for declaring fixed-contents structs
+- (future) Performance annotations for types
+- (future) Attributes for stored property accessors
+
+.. _SE-0030 Property Behaviors: https://github.com/apple/swift-evolution/blob/master/proposals/0030-property-behavior-decls.md
+
+This does not mean all of these proposals need to be accepted, only that their
+acceptance or rejection will affect this document.
 
 
 Glossary

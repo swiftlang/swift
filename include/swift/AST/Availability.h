@@ -225,6 +225,97 @@ public:
   }
 };
 
+/// Represents everything that a particular chunk of code may assume about its
+/// runtime environment.
+///
+/// The AvailabilityContext structure forms a [lattice][], which allows it to
+/// have meaningful union and intersection operations ("join" and "meet"),
+/// which use conservative approximations to prevent availability violations.
+/// See #unionWith, #intersectWith, and #constrainWith.
+///
+/// [lattice]: http://mathworld.wolfram.com/Lattice.html
+class AvailabilityContext {
+  VersionRange OSVersion;
+public:
+  /// Creates a context that requires certain versions of the target OS.
+  explicit AvailabilityContext(VersionRange OSVersion) : OSVersion(OSVersion) {}
+
+  /// Creates a context that imposes no constraints.
+  ///
+  /// \see isAlwaysAvailable
+  static AvailabilityContext alwaysAvailable() {
+    return AvailabilityContext(VersionRange::all());
+  }
+
+  /// Creates a context that can never actually occur.
+  ///
+  /// \see isKnownUnreachable
+  static AvailabilityContext neverAvailable() {
+    return AvailabilityContext(VersionRange::empty());
+  }
+
+  /// Returns the range of possible OS versions required by this context.
+  VersionRange getOSVersion() const { return OSVersion; }
+
+  /// Returns true if \p other makes stronger guarantees than this context.
+  ///
+  /// That is, `a.isContainedIn(b)` implies `a.union(b) == b`.
+  bool isContainedIn(AvailabilityContext other) const {
+    return OSVersion.isContainedIn(other.OSVersion);
+  }
+
+  /// Returns true if this context has constraints that make it impossible to
+  /// actually occur.
+  ///
+  /// For example, the else branch of a `#available` check for iOS 8.0 when the
+  /// containing function already requires iOS 9.
+  bool isKnownUnreachable() const {
+    return OSVersion.isEmpty();
+  }
+
+  /// Returns true if there are no constraints on this context; that is,
+  /// nothing can be assumed.
+  bool isAlwaysAvailable() const {
+    return OSVersion.isAll();
+  }
+
+  /// Produces an under-approximation of the intersection of the two
+  /// availability contexts.
+  ///
+  /// That is, if the intersection can't be represented exactly, prefer
+  /// treating some valid deployment environments as unavailable. This is the
+  /// "meet" operation of the lattice.
+  ///
+  /// As an example, this is used when figuring out the required availability
+  /// for a type that references multiple nominal decls.
+  void intersectWith(AvailabilityContext other) {
+    OSVersion.intersectWith(other.getOSVersion());
+  }
+
+  /// Produces an over-approximation of the intersection of the two
+  /// availability contexts.
+  ///
+  /// That is, if the intersection can't be represented exactly, prefer
+  /// treating some invalid deployment environments as available.
+  ///
+  /// As an example, this is used for the true branch of `#available`.
+  void constrainWith(AvailabilityContext other) {
+    OSVersion.constrainWith(other.getOSVersion());
+  }
+
+  /// Produces an over-approximation of the union of two availability contexts.
+  ///
+  /// That is, if the union can't be represented exactly, prefer treating
+  /// some invalid deployment environments as available. This is the "join"
+  /// operation of the lattice.
+  ///
+  /// As an example, this is used for the else branch of a conditional with
+  /// multiple `#available` checks.
+  void unionWith(AvailabilityContext other) {
+    OSVersion.unionWith(other.getOSVersion());
+  }
+};
+
 
 class AvailabilityInference {
 public:
@@ -236,17 +327,17 @@ public:
                                  ArrayRef<const Decl *> InferredFromDecls,
                                  ASTContext &Context);
 
-  static VersionRange inferForType(Type t);
+  static AvailabilityContext inferForType(Type t);
 
-  /// \brief Returns the version range on which a declaration is available
+  /// \brief Returns the context where a declaration is available
   ///  We assume a declaration without an annotation is always available.
-  static VersionRange availableRange(const Decl *D, ASTContext &C);
+  static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
 
-  /// \brief Returns the version range for which the declaration
+  /// \brief Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
-  static Optional<VersionRange> annotatedAvailableRange(const Decl *D,
-                                                        ASTContext &C);
+  static Optional<AvailabilityContext> annotatedAvailableRange(const Decl *D,
+                                                               ASTContext &C);
 
 };
 

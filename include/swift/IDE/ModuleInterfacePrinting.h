@@ -40,13 +40,15 @@ typedef OptionSet<ModuleTraversal> ModuleTraversalOptions;
 
 void printModuleInterface(ModuleDecl *M,
                           ModuleTraversalOptions TraversalOptions,
-                          ASTPrinter &Printer, const PrintOptions &Options);
+                          ASTPrinter &Printer, const PrintOptions &Options,
+                          const bool PrintSynthesizedExtensions);
 
 // FIXME: this API should go away when Swift can represent Clang submodules as
 // 'swift::Module *' objects.
 void printSubmoduleInterface(ModuleDecl *M, ArrayRef<StringRef> FullModuleName,
                              ModuleTraversalOptions TraversalOptions,
-                             ASTPrinter &Printer, const PrintOptions &Options);
+                             ASTPrinter &Printer, const PrintOptions &Options,
+                             const bool PrintSynthesizedExtensions);
 
 /// Print the interface for a header that has been imported via the implicit
 /// objc header importing feature.

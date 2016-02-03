@@ -255,6 +255,7 @@ class FooUnavailableMembers : FooClassBase {
 }
 class FooCFType {
 }
+@available(*, deprecated, renamed="FooCFType")
 typealias FooCFTypeRef = FooCFType
 @available(*, unavailable, message="Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)
