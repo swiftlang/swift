@@ -611,17 +611,15 @@ public:
     }
 
     // Print inlined-at location, if any.
-    if (DS) {
-      while (DS->InlinedCallSite) {
-        *this << ": perf_inlined_at ";
-        auto CallSite = DS->InlinedCallSite->Loc;
-        if (!CallSite.isNull())
-          CallSite.getSourceLoc().print(
-              PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
-        else
-          *this << "?";
-        DS = DS->InlinedCallSite;
-      }
+    while (DS && DS->InlinedCallSite) {
+      *this << ": perf_inlined_at ";
+      auto CallSite = DS->InlinedCallSite->Loc;
+      if (!CallSite.isNull())
+        CallSite.getSourceLoc().print(
+            PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
+      else
+        *this << "?";
+      DS = DS->Parent.dyn_cast<const SILDebugScope *>();
     }
   }
 
