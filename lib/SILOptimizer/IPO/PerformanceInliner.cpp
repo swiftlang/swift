@@ -51,14 +51,14 @@ namespace {
 
   llvm::cl::opt<int> TestOpt("sil-inline-test",
                                    llvm::cl::init(0), llvm::cl::Hidden);
-  
+
   // The following constants define the cost model for inlining.
-  
+
   // The base value for every call: it represents the benefit of removing the
   // call overhead.
   // This value can be overridden with the -sil-inline-threshold option.
   const unsigned RemovedCallBenefit = 80;
-  
+
   // The benefit if the condition of a terminator instruction gets constant due
   // to inlining.
   const unsigned ConstTerminatorBenefit = 2;
@@ -66,10 +66,10 @@ namespace {
   // Benefit if the operand of an apply gets constant, e.g. if a closure is
   // passed to an apply instruction in the callee.
   const unsigned ConstCalleeBenefit = 150;
-  
+
   // Additional benefit for each loop level.
   const unsigned LoopBenefitFactor = 40;
-  
+
   // Approximately up to this cost level a function can be inlined without
   // increasing the code size.
   const unsigned TrivialFunctionThreshold = 20;
@@ -80,7 +80,7 @@ namespace {
   // Represents a value in integer constant evaluation.
   struct IntConst {
     IntConst() : isValid(false), isFromCaller(false) { }
-    
+
     IntConst(const APInt &value, bool isFromCaller) :
     value(value), isValid(true), isFromCaller(isFromCaller) { }
     
