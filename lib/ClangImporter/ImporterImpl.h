@@ -872,6 +872,10 @@ public:
                               clang::DeclContext **effectiveContext = nullptr,
                               clang::Sema *clangSemaOverride = nullptr);
 
+  /// Imports the name of the given Clang macro into Swift.
+  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                             const clang::MacroInfo *macro);
+
   /// \brief Import the given Clang identifier into Swift.
   ///
   /// \param identifier The Clang identifier to map into Swift.
@@ -905,9 +909,6 @@ public:
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
-
-  /// Returns true if it is expected that the macro is ignored.
-  bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro);
 
   /// \brief Classify the given Clang enumeration type to describe how it
   /// should be imported 
