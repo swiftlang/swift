@@ -38,9 +38,14 @@ public:
   /// Always points to the parent lexical scope.
   /// For top-level scopes, this is the SILFunction.
   PointerUnion<const SILDebugScope *, SILFunction *> Parent;
+  /// An optional chain of inlined call sites.
+  ///
   /// If this scope is inlined, this points to a special "scope" that
   /// holds only the location of the call site. The parent scope will be
   /// the scope of the inlined call site.
+  ///
+  /// Note that compared to the inlinedAt field in llvm::DILocation
+  /// the inlined call site chain in SILDebugScope uses the reversed order.
   const SILDebugScope *InlinedCallSite;
 
   SILDebugScope(SILLocation Loc, SILFunction &SILFn,
