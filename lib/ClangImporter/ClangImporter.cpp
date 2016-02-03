@@ -2571,9 +2571,11 @@ auto ClangImporter::Implementation::importFullName(
         baseName = baseName.substr(prefixLen);
 
         // If the result is a value, lowercase it.
-        if (isa<clang::ValueDecl>(D) && shouldLowercaseValueName(baseName))
-          baseName = camel_case::toLowercaseWord(baseName,
-                                                 omitNeedlessWordsScratch);
+        if (isa<clang::ValueDecl>(D) && shouldLowercaseValueName(baseName)) {
+          baseName =
+            camel_case::toLowercaseInitialisms(baseName,
+                                               omitNeedlessWordsScratch);
+        }
       }
     }
   }
