@@ -241,7 +241,7 @@ Version Version::getCurrentCompilerVersion() {
          "Embedded Swift language version couldn't be parsed: '"
          SWIFT_COMPILER_VERSION
          "'");
-  return currentVersion;
+  return currentVersion.getValue();
 #else
   return Version();
 #endif
