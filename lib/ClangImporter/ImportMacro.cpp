@@ -225,40 +225,12 @@ static bool isSignToken(const clang::Token &tok) {
          tok.is(clang::tok::tilde);
 }
 
-/// Returns true if it is expected that the macro is ignored.
-bool ClangImporter::Implementation::shouldIgnoreMacro(StringRef name,
-                                                const clang::MacroInfo *macro) {
-  // Ignore include guards.
-  if (macro->isUsedForHeaderGuard())
-    return true;
-
-  if (macro->tokens_empty())
-    return true;
-
-  // Consult the blacklist of macros to suppress.
-  auto suppressMacro =
-    llvm::StringSwitch<bool>(name)
-#define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
-#include "MacroTable.def"
-    .Default(false);
-
-  if (suppressMacro)
-    return true;
-
-  return false;
-}
-
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               DeclContext *DC,
                               Identifier name,
                               const clang::MacroInfo *macro,
                               const clang::MacroInfo *ClangN) {
-  if (impl.shouldIgnoreMacro(name.str(), macro))
-    return nullptr;
-
-  // Currently we only convert non-function-like macros.
-  if (macro->isFunctionLike())
-    return nullptr;
+  if (name.empty()) return nullptr;
 
   auto numTokens = macro->getNumTokens();
   auto tokenI = macro->tokens_begin(), tokenE = macro->tokens_end();

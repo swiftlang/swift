@@ -747,10 +747,6 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
     clang::MacroDirective *MD = pp.getLocalMacroDirectiveHistory(macro.first);
     if (!MD) continue;
 
-    // Import the name.
-    auto name = importIdentifier(macro.first);
-    if (name.empty()) continue;
-
     // Walk the history.
     for (; MD; MD = MD->getPrevious()) {
       // Check whether we have a macro defined in this module.
@@ -773,6 +769,8 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
         break;
 
       // Add this entry.
+      auto name = importMacroName(macro.first, info);
+      if (name.empty()) continue;
       table.addEntry(name, info, clangCtx.getTranslationUnitDecl());
     }
   }
@@ -2023,6 +2021,44 @@ static bool canStripModulePrefix(StringRef name) {
     return !nameConflictsWithStandardLibrary(*known);
 
   return true;
+}
+
+/// Returns true if it is expected that the macro is ignored.
+static bool shouldIgnoreMacro(const clang::IdentifierInfo *identifier,
+                              const clang::MacroInfo *macro) {
+  // Ignore include guards.
+  if (macro->isUsedForHeaderGuard())
+    return true;
+
+  // If there are no tokens, there is nothing to convert.
+  if (macro->tokens_empty())
+    return true;
+
+  // Currently we only convert non-function-like macros.
+  if (macro->isFunctionLike())
+    return nullptr;
+
+  // Consult the blacklist of macros to suppress.
+  auto suppressMacro =
+    llvm::StringSwitch<bool>(identifier->getName())
+#define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
+#include "MacroTable.def"
+    .Default(false);
+
+  if (suppressMacro)
+    return true;
+
+  return false;
+}
+
+Identifier ClangImporter::Implementation::importMacroName(
+             const clang::IdentifierInfo *clangIdentifier,
+             const clang::MacroInfo *macro) {
+  // If we're supposed to ignore this macro, return an empty identifier.
+  if (shouldIgnoreMacro(clangIdentifier, macro)) return Identifier();
+
+  // Import the identifier.
+  return importIdentifier(clangIdentifier);
 }
 
 auto ClangImporter::Implementation::importFullName(
@@ -3446,12 +3482,11 @@ void ClangImporter::lookupBridgingHeaderDecls(
       }
     }
   }
-  ASTContext &Ctx = Impl.SwiftContext;
   auto &ClangPP = Impl.getClangPreprocessor();
   for (clang::IdentifierInfo *II : Impl.BridgeHeaderMacros) {
     if (auto *MI = ClangPP.getMacroInfo(II)) {
       if (filter(MI)) {
-        Identifier Name = Ctx.getIdentifier(II->getName());
+        Identifier Name = Impl.importMacroName(II, MI);
         if (Decl *imported = Impl.importMacro(Name, MI))
           receiver(imported);
       }
@@ -3467,7 +3502,6 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
   if (!File)
     return true;
 
-  ASTContext &Ctx = Impl.SwiftContext;
   auto &ClangCtx = getClangASTContext();
   auto &ClangSM = ClangCtx.getSourceManager();
   auto &ClangPP = getClangPreprocessor();
@@ -3529,7 +3563,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
           auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
           if (auto *MI = ClangPP.getMacroInfo(II)) {
             if (filter(MI)) {
-              Identifier Name = Ctx.getIdentifier(II->getName());
+              Identifier Name = Impl.importMacroName(II, MI);
               if (Decl *imported = Impl.importMacro(Name, MI))
                 receiver(imported);
             }
@@ -3942,11 +3976,6 @@ std::string ClangImporter::getClangModuleHash() const {
 
 Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl);
-}
-
-bool ClangImporter::shouldIgnoreMacro(StringRef Name,
-                                      const clang::MacroInfo *Macro) {
-  return Impl.shouldIgnoreMacro(Name, Macro);
 }
 
 void ClangImporter::printStatistics() const {
