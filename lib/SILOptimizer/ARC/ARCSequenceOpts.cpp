@@ -83,8 +83,8 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
 // decrements to the delete list. Sets changed to true if anything was moved or
 // deleted.
 void ARCPairingContext::optimizeMatchingSet(
-    ARCMatchingSet &MatchSet,
-    llvm::SmallVectorImpl<SILInstruction *> &InstsToDelete) {
+    ARCMatchingSet &MatchSet, llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+    llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
 
   // Insert the new increments.
@@ -97,7 +97,7 @@ void ARCPairingContext::optimizeMatchingSet(
 
     MadeChange = true;
     SILInstruction *NewIncrement = createIncrement(MatchSet.Ptr, InsertPt);
-    (void)NewIncrement;
+    NewInsts.push_back(NewIncrement);
     DEBUG(llvm::dbgs() << "    Inserting new increment: " << *NewIncrement
                        << "        At insertion point: " << *InsertPt);
     ++NumRefCountOpsMoved;
@@ -113,7 +113,7 @@ void ARCPairingContext::optimizeMatchingSet(
 
     MadeChange = true;
     SILInstruction *NewDecrement = createDecrement(MatchSet.Ptr, InsertPt);
-    (void)NewDecrement;
+    NewInsts.push_back(NewDecrement);
     DEBUG(llvm::dbgs() << "    Inserting new NewDecrement: " << *NewDecrement
                        << "        At insertion point: " << *InsertPt);
     ++NumRefCountOpsMoved;
@@ -123,7 +123,7 @@ void ARCPairingContext::optimizeMatchingSet(
   for (SILInstruction *Increment : MatchSet.Increments) {
     MadeChange = true;
     DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
-    InstsToDelete.push_back(Increment);
+    DeadInsts.push_back(Increment);
     ++NumRefCountOpsRemoved;
   }
 
@@ -131,18 +131,18 @@ void ARCPairingContext::optimizeMatchingSet(
   for (SILInstruction *Decrement : MatchSet.Decrements) {
     MadeChange = true;
     DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
-    InstsToDelete.push_back(Decrement);
+    DeadInsts.push_back(Decrement);
     ++NumRefCountOpsRemoved;
   }
 }
 
-bool ARCPairingContext::performMatching() {
+bool ARCPairingContext::performMatching(
+    llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+    llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   bool MatchedPair = false;
 
   DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
                      << " ****\n");
-
-  llvm::SmallVector<SILInstruction *, 8> InstructionsToDelete;
 
   /// For each increment that we matched to a decrement, try to match it to a
   /// decrement -> increment pair.
@@ -168,13 +168,8 @@ bool ARCPairingContext::performMatching() {
       // Add the Set to the callback. *NOTE* No instruction destruction can
       // happen here since we may remove instructions that are insertion points
       // for other instructions.
-      optimizeMatchingSet(Set, InstructionsToDelete);
+      optimizeMatchingSet(Set, NewInsts, DeadInsts);
     }
-  }
-
-  // Then delete all of the instructions that we still have.
-  while (!InstructionsToDelete.empty()) {
-    InstructionsToDelete.pop_back_val()->eraseFromParent();
   }
 
   return MatchedPair;
@@ -207,23 +202,46 @@ void LoopARCPairingContext::runOnFunction(SILFunction *F) {
 bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
                                           bool FreezePostDomReleases,
                                           bool RecomputePostDomReleases) {
-  bool MadeChange = false;
-  bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
-                                             RecomputePostDomReleases);
-  bool MatchedPair = Context.performMatching();
-  MadeChange |= MatchedPair;
-  Evaluator.clearLoopState(Region);
-  Context.DecToIncStateMap.clear();
-  Context.IncToDecStateMap.clear();
+  llvm::SmallVector<SILInstruction *, 8> NewInsts;
+  llvm::SmallVector<SILInstruction *, 8> DeadInsts;
 
-  while (NestingDetected && MatchedPair) {
-    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases, false);
-    MatchedPair = Context.performMatching();
+  // We have already summarized all subloops of this loop. Now summarize our
+  // blocks so that we only visit interesting instructions.
+  Evaluator.summarizeSubregionBlocks(Region);
+
+  bool MadeChange = false;
+  bool NestingDetected = false;
+  bool MatchedPair = false;
+
+  do {
+    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
+                                          RecomputePostDomReleases);
+    MatchedPair = Context.performMatching(NewInsts, DeadInsts);
+
+    DEBUG(llvm::dbgs() << "    Adding new interesting insts!\n");
+    while (!NewInsts.empty()) {
+      auto *I = NewInsts.pop_back_val();
+      DEBUG(llvm::dbgs() << "    " << *I);
+      Evaluator.addInterestingInst(I);
+    }
+
+    DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
+    while (!DeadInsts.empty()) {
+      SILInstruction *I = DeadInsts.pop_back_val();
+      DEBUG(llvm::dbgs() << "    " << *I);
+      Evaluator.removeInterestingInst(I);
+      I->eraseFromParent();
+    }
+
     MadeChange |= MatchedPair;
     Evaluator.clearLoopState(Region);
     Context.DecToIncStateMap.clear();
     Context.IncToDecStateMap.clear();
-  }
+
+    // This ensures we only ever recompute post dominating releases on the first
+    // iteration.
+    RecomputePostDomReleases = false;
+  } while (NestingDetected && MatchedPair);
 
   return MadeChange;
 }
