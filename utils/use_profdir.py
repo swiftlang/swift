@@ -13,11 +13,11 @@
 # This script is used to help prevent profile data clobbering during code
 # coverage profiling.
 
-import sys
-import subprocess
 import os
-import string
 import random
+import string
+import subprocess
+import sys
 
 def random_string(N):
     """Return a random ascii_uppercase + digits string of length `N`"""
@@ -60,4 +60,4 @@ def main():
     return return_code
 
 if __name__ == '__main__':
-    exit(main())
+    sys.exit(main())
