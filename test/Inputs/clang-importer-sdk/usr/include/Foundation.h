@@ -992,3 +992,7 @@ int variadicFunc2(int A, ...);
 
 extern NSString *NSGlobalConstant;
 extern void NSGlobalFunction(void);
+
+@interface NSObject (Selectors)
+-(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
+@end
