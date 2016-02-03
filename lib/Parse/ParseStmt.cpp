@@ -1110,7 +1110,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   
   // This little helper function is used to consume a separator comma if
   // present, it returns false if it isn't there.  It also gracefully handles
-  // the case when the user used && isntead of comma, since that is a common
+  // the case when the user used && instead of comma, since that is a common
   // error.
   auto consumeSeparatorComma = [&]() -> bool {
     // If we have an "&&" token followed by a continuation of the statement
