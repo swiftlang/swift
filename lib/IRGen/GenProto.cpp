@@ -1669,6 +1669,7 @@ namespace {
     Optional<FulfillmentMap> Fulfillments;
     SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
       SpecializedBaseConformances;
+    // Metadata caches are stored at negative offsets.
     unsigned NextCacheIndex = 0;
     bool RequiresSpecialization = false;
 
@@ -1682,8 +1683,6 @@ namespace {
         SILEntries(SILWT->getEntries()),
         PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol()))
     {
-      // Cache entries start at the end of the table.
-      NextCacheIndex = PI.getNumWitnesses();
       // TODO: in conditional conformances, allocate space for the assumed
       // conformances here.
     }
@@ -2063,7 +2062,7 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
                                  llvm::Value *selfMetadata,
                                  llvm::function_ref<llvm::Value*()> body) {
   // Allocate a new cache slot and drill down to it.
-  unsigned cacheIndex = getNextCacheIndex();
+  int cacheIndex = -1 - getNextCacheIndex();
   Address cache = IGF.Builder.CreateConstArrayGEP(destTable, cacheIndex,
                                                   IGM.getPointerSize());
 
@@ -2211,6 +2210,9 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   //    /// The amount to copy from the pattern in words.  The rest is zeroed.
   //    uint16_t WitnessTableSizeInWordsToCopy;
   //
+  //    /// The protocol.
+  //    RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
+  //
   //    /// The pattern.
   //    RelativeDirectPointer<WitnessTable> WitnessTable;
   //
@@ -2235,17 +2237,28 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
     instantiationFn = llvm::ConstantInt::get(IGM.RelativeAddressTy, 0);    
   } else {
     llvm::Constant *fn = buildInstantiationFunction();
-    instantiationFn = IGM.emitDirectRelativeReference(fn, cache, { 3 });
+    instantiationFn = IGM.emitDirectRelativeReference(fn, cache, { 4 });
   }
+
+  auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                LinkEntity::forProtocolDescriptor(Conformance.getProtocol()),
+                IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
 
   // Fill in the global.
   auto cacheTy = cast<llvm::StructType>(cache->getValueType());
   llvm::Constant *cacheData[] = {
-    llvm::ConstantInt::get(IGM.Int16Ty, NextCacheIndex),
+    // WitnessTableSizeInWords
     llvm::ConstantInt::get(IGM.Int16Ty, Table.size()),
-    IGM.emitDirectRelativeReference(wtable, cache, { 2 }),
+    // WitnessTablePrivateSizeInWords
+    llvm::ConstantInt::get(IGM.Int16Ty, NextCacheIndex),
+    // RelativeIndirectablePointer<ProtocolDescriptor>
+    IGM.emitRelativeReference(descriptorRef, cache, { 2 }),
+    // RelativePointer<WitnessTable>
+    IGM.emitDirectRelativeReference(wtable, cache, { 3 }),
+    // Instantiation function
     instantiationFn,
-    llvm::Constant::getNullValue(cacheTy->getStructElementType(4))
+    // Private data
+    llvm::Constant::getNullValue(cacheTy->getStructElementType(5))
   };
   cache->setInitializer(llvm::ConstantStruct::get(cacheTy, cacheData));
 

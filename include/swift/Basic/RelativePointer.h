@@ -87,6 +87,11 @@ public:
       return reinterpret_cast<const ValueTy *>(address);
     }
   }
+
+  /// A zero relative offset encodes a null reference.
+  bool isNull() const & {
+    return RelativeOffsetPlusIndirect == 0;
+  }
   
   operator const ValueTy* () const & {
     return get();

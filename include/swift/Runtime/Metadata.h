@@ -1922,7 +1922,29 @@ struct ProtocolDescriptor {
   
   /// Additional flags.
   ProtocolDescriptorFlags Flags;
-  
+
+  /// The minimum size of any conforming witness table, in words.
+  ///
+  /// When a conformance is ultimately instantiated from a GenericWitnessTable,
+  /// this value must be greater than or equal to the GenericWitnessTable's
+  /// WitnessTableSizeInWords.
+  ///
+  /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
+  uint16_t MinimumWitnessTableSizeInWords;
+
+  /// The maximum amount to copy from the default requirements in words.
+  /// If any requirements beyond MinimumWitnessTableSizeInWords are present
+  /// in the witness table template, they will be not be overwritten with
+  /// defaults.
+  ///
+  /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
+  uint16_t DefaultWitnessTableSizeInWords;
+
+  /// Default requirements are tail-allocated here.
+  void **getDefaultWitnesses() const {
+    return (void **) (this + 1);
+  }
+
   constexpr ProtocolDescriptor(const char *Name,
                                const ProtocolDescriptorList *Inherited,
                                ProtocolDescriptorFlags Flags)
@@ -1932,7 +1954,9 @@ struct ProtocolDescriptor {
       _ObjC_OptionalClassMethods(nullptr),
       _ObjC_InstanceProperties(nullptr),
       DescriptorSize(sizeof(ProtocolDescriptor)),
-      Flags(Flags)
+      Flags(Flags),
+      MinimumWitnessTableSizeInWords(0),
+      DefaultWitnessTableSizeInWords(0)
   {}
 };
   
@@ -2136,13 +2160,30 @@ struct GenericMetadata {
   }
 };
 
-/// \brief The control structure of a generic protocol conformance.
+/// \brief The control structure of a generic or resilient protocol
+/// conformance.
+///
+/// Witness tables need to be instantiated at runtime in these cases:
+/// - For a generic conforming type, associated type requirements might be
+///   dependent on the conforming type.
+/// - For a type conforming to a resilient protocol, the runtime size of
+///   the witness table is not known because default requirements can be
+///   added resiliently.
+///
+/// One per conformance.
 struct GenericWitnessTable {
-  /// The size of the witness table in words.
+  /// The size of the witness table in words.  This amount is copied from
+  /// the witness table template into the instantiated witness table.
   uint16_t WitnessTableSizeInWords;
 
-  /// The amount to copy from the pattern in words.  The rest is zeroed.
-  uint16_t WitnessTableSizeInWordsToCopy;
+  /// The amount of private storage to allocate before the address point,
+  /// in words. This memory is zeroed out in the instantiated witness table
+  /// template.
+  uint16_t WitnessTablePrivateSizeInWords;
+
+  /// The protocol descriptor. Only used for resilient conformances.
+  RelativeIndirectablePointer<ProtocolDescriptor,
+                              /*nullable*/ true> Protocol;
 
   /// The pattern.
   RelativeDirectPointer<WitnessTable> Pattern;
@@ -2150,7 +2191,8 @@ struct GenericWitnessTable {
   /// The instantiation function, which is called after the template is copied.
   RelativeDirectPointer<void(WitnessTable *instantiatedTable,
                              const Metadata *type,
-                             void * const *instantiationArgs)> Instantiator;
+                             void * const *instantiationArgs),
+                        /*nullable*/ true> Instantiator;
 
   void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
 };
@@ -2447,8 +2489,18 @@ extern "C" Metadata *
 swift_allocateGenericValueMetadata(GenericMetadata *pattern,
                                    const void *arguments);
 
-/// Instantiate a generic protocol witness table.
+/// Instantiate a resilient or generic protocol witness table.
 ///
+/// \param genericTable - The witness table template for the
+///   conformance. It may either have fields that require runtime
+///   initialization, or be missing requirements at the end for
+///   which default witnesses are available.
+///
+/// \param type - The conforming type, used to form a uniquing key
+///   for the conformance. If the witness table is not dependent on
+///   the substituted type of the conformance, this can be set to
+///   nullptr, in which case there will only be one instantiated
+///   witness table per witness table template.
 ///
 /// \param instantiationArgs - An opaque pointer that's forwarded to
 ///   the instantiation function, used for conditional conformances.
@@ -2456,11 +2508,12 @@ swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 ///   never form part of the uniquing key for the conformance, which
 ///   is ultimately a statement about the user model of overlapping
 ///   conformances.
+///
 extern "C" const WitnessTable *
 swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
                              void * const *instantiationArgs);
-  
+
 /// \brief Fetch a uniqued metadata for a function type.
 extern "C" const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]);

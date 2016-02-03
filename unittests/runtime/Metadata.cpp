@@ -764,3 +764,195 @@ TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
   EXPECT_EQ(buf1.canary, (uintptr_t)0x5A5A5A5AU);
   EXPECT_EQ(buf2.canary, (uintptr_t)0xA5A5A5A5U);
 }
+
+// We cannot construct RelativeDirectPointer instances, so define
+// a "shadow" struct for that purpose
+struct GenericWitnessTableStorage {
+  uint16_t WitnessTableSizeInWords;
+  uint16_t WitnessTablePrivateSizeInWords;
+  int32_t Protocol;
+  int32_t Pattern;
+  int32_t Instantiator;
+  void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
+};
+
+template<typename T>
+static void initializeRelativePointer(int32_t *ptr, T value) {
+  *ptr = (int32_t)(value == nullptr ? 0 : (uintptr_t) value - (uintptr_t) ptr);
+}
+
+// Tests for resilient witness table instantiation, with runtime-provided
+// default requirements
+
+static void witnessTableInstantiator(WitnessTable *instantiatedTable,
+                                     const Metadata *type,
+                                     void * const *instantiationArgs) {
+  EXPECT_EQ(type, nullptr);
+  EXPECT_EQ(instantiationArgs, nullptr);
+
+  EXPECT_EQ(((void **) instantiatedTable)[0], (void*) 123);
+  EXPECT_EQ(((void **) instantiatedTable)[1], (void*) 234);
+
+  // The last witness is computed dynamically at instantiation time.
+  ((void **) instantiatedTable)[2] = (void *) 345;
+}
+
+// A mock protocol descriptor with some default witnesses at the end.
+//
+// Note: It is not standards-compliant to compare function pointers for
+// equality, so we just use fake addresses instead.
+struct TestProtocol {
+  ProtocolDescriptor descriptor;
+  const void *witnesses[2] = {
+    (void *) 996633,
+    (void *) 336699
+  };
+
+  TestProtocol()
+    : descriptor("TestProtocol",
+                 nullptr,
+                 ProtocolDescriptorFlags().withResilient(true)) {
+    descriptor.MinimumWitnessTableSizeInWords = 3;
+    descriptor.DefaultWitnessTableSizeInWords = 2;
+  }
+};
+
+// All of these have to be global to relative reference each other, and
+// the instantiator function.
+TestProtocol testProtocol;
+GenericWitnessTableStorage tableStorage1;
+GenericWitnessTableStorage tableStorage2;
+GenericWitnessTableStorage tableStorage3;
+GenericWitnessTableStorage tableStorage4;
+
+const void *witnesses[] = {
+  (void *) 123,
+  (void *) 234,
+  (void *) 0,   // filled in by instantiator function
+  (void *) 456,
+  (void *) 567
+};
+
+TEST(WitnessTableTest, getGenericWitnessTable) {
+  EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
+
+  EXPECT_EQ(testProtocol.descriptor.getDefaultWitnesses()[0],
+            (void *) 996633);
+  EXPECT_EQ(testProtocol.descriptor.getDefaultWitnesses()[1],
+            (void *) 336699);
+
+  // Conformance provides all requirements, and we don't have an
+  // instantiator, so we can just return the pattern.
+  {
+    tableStorage1.WitnessTableSizeInWords = 5;
+    tableStorage1.WitnessTablePrivateSizeInWords = 0;
+    initializeRelativePointer(&tableStorage1.Protocol, &testProtocol.descriptor);
+    initializeRelativePointer(&tableStorage1.Pattern, witnesses);
+    initializeRelativePointer(&tableStorage1.Instantiator, nullptr);
+
+    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
+        &tableStorage1);
+
+    RaceTest_ExpectEqual<const WitnessTable *>(
+      [&]() -> const WitnessTable * {
+        const WitnessTable *instantiatedTable =
+            swift_getGenericWitnessTable(table, nullptr, nullptr);
+
+        EXPECT_EQ(instantiatedTable, table->Pattern.get());
+        return instantiatedTable;
+      });
+  }
+
+  // Conformance provides all requirements, but we have private storage
+  // and an initializer, so we must instantiate.
+  {
+    tableStorage2.WitnessTableSizeInWords = 5;
+    tableStorage2.WitnessTablePrivateSizeInWords = 1;
+    initializeRelativePointer(&tableStorage2.Protocol, &testProtocol.descriptor);
+    initializeRelativePointer(&tableStorage2.Pattern, witnesses);
+    initializeRelativePointer(&tableStorage2.Instantiator,
+                              (const void *) witnessTableInstantiator);
+
+    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
+        &tableStorage2);
+
+    RaceTest_ExpectEqual<const WitnessTable *>(
+      [&]() -> const WitnessTable * {
+        const WitnessTable *instantiatedTable =
+            swift_getGenericWitnessTable(table, nullptr, nullptr);
+
+        EXPECT_NE(instantiatedTable, table->Pattern.get());
+
+        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 0);
+
+        EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
+        EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
+        EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
+        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) 456);
+        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) 567);
+
+        return instantiatedTable;
+      });
+  }
+
+  // Conformance needs one default requirement to be filled in
+  {
+    tableStorage3.WitnessTableSizeInWords = 4;
+    tableStorage3.WitnessTablePrivateSizeInWords = 1;
+    initializeRelativePointer(&tableStorage3.Protocol, &testProtocol.descriptor);
+    initializeRelativePointer(&tableStorage3.Pattern, witnesses);
+    initializeRelativePointer(&tableStorage3.Instantiator, witnessTableInstantiator);
+
+    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
+        &tableStorage3);
+
+    RaceTest_ExpectEqual<const WitnessTable *>(
+      [&]() -> const WitnessTable * {
+        const WitnessTable *instantiatedTable =
+            swift_getGenericWitnessTable(table, nullptr, nullptr);
+
+        EXPECT_NE(instantiatedTable, table->Pattern.get());
+
+        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 0);
+
+        EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
+        EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
+        EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
+        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) 456);
+        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) 336699);
+
+        return instantiatedTable;
+      });
+  }
+
+  // Third case: conformance needs both default requirements
+  // to be filled in
+  {
+    tableStorage4.WitnessTableSizeInWords = 3;
+    tableStorage4.WitnessTablePrivateSizeInWords = 1;
+    initializeRelativePointer(&tableStorage4.Protocol, &testProtocol.descriptor);
+    initializeRelativePointer(&tableStorage4.Pattern, witnesses);
+    initializeRelativePointer(&tableStorage4.Instantiator, witnessTableInstantiator);
+
+    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
+        &tableStorage4);
+
+    RaceTest_ExpectEqual<const WitnessTable *>(
+      [&]() -> const WitnessTable * {
+        const WitnessTable *instantiatedTable =
+            swift_getGenericWitnessTable(table, nullptr, nullptr);
+
+        EXPECT_NE(instantiatedTable, table->Pattern.get());
+
+        EXPECT_EQ(((void **) instantiatedTable)[-1], (void *) 0);
+
+        EXPECT_EQ(((void **) instantiatedTable)[0], (void *) 123);
+        EXPECT_EQ(((void **) instantiatedTable)[1], (void *) 234);
+        EXPECT_EQ(((void **) instantiatedTable)[2], (void *) 345);
+        EXPECT_EQ(((void **) instantiatedTable)[3], (void *) 996633);
+        EXPECT_EQ(((void **) instantiatedTable)[4], (void *) 336699);
+
+        return instantiatedTable;
+      });
+  }
+}

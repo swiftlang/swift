@@ -1136,6 +1136,27 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
   llvm_unreachable("bad link entity kind");
 }
 
+bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
+  // FIXME: Removing this triggers a linker bug
+  if (getKind() == Kind::ObjCClass ||
+      getKind() == Kind::ObjCMetaclass)
+    return true;
+
+  // This is a conservative estimate. For now, we say if the decl was defined
+  // in the same TU (not just the same module), it is not external.
+  if (isDeclKind(getKind())) {
+    auto *DC = getDecl()->getDeclContext()->getModuleScopeContext();
+    if (isa<ClangModuleUnit>(DC) ||
+        DC == IGM.SILMod->getAssociatedContext())
+      return false;
+  }
+
+  if (!hasPublicVisibility(getLinkage(IGM, NotForDefinition)))
+    return false;
+
+  return true;
+}
+
 bool LinkEntity::isFragile(IRGenModule &IGM) const {
   switch (getKind()) {
     case Kind::SILFunction:
@@ -1799,8 +1820,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   // relative references too, to avoid producing unnecessary GOT entries in
   // the final image.
   auto entry = GlobalVars[entity];
-  if (!hasPublicVisibility(entity.getLinkage(*this, NotForDefinition))
-      || isDefinition(entry)) {
+  if (!entity.isAvailableExternally(*this) || isDefinition(entry)) {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
     // platforms (rdar://problem/22450593 ), so substitute an alias with its
     // aliasee to work around that.
@@ -1815,7 +1835,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   }
 
   // Look up the global variable.
-  auto global = cast<llvm::GlobalValue>(GlobalVars[entity]);
+  auto global = cast<llvm::GlobalValue>(entry);
   // Use it as the initializer for an anonymous constant. LLVM can treat this as
   // equivalent to the global's GOT entry.
   llvm::SmallString<64> name;
@@ -1924,24 +1944,21 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
 }
 
 /// Form an LLVM constant for the relative distance between a reference
-/// (appearing at gep (0, arrayIndex, structIndex) of `base`) and
-/// `target`.
-static llvm::Constant *emitRelativeReference(IRGenModule &IGM,
-                               std::pair<llvm::Constant *,
-                                         IRGenModule::DirectOrGOT> target,
-                               llvm::Constant *base,
-                               unsigned arrayIndex,
-                               unsigned structIndex) {
+/// (appearing at gep (0, indices) of `base`) and `target`.
+llvm::Constant *
+IRGenModule::emitRelativeReference(std::pair<llvm::Constant *,
+                                             IRGenModule::DirectOrGOT> target,
+                                   llvm::Constant *base,
+                                   ArrayRef<unsigned> baseIndices) {
   llvm::Constant *relativeAddr =
-    IGM.emitDirectRelativeReference(target.first, base,
-                                    { arrayIndex, structIndex });
+    emitDirectRelativeReference(target.first, base, baseIndices);
 
   // If the reference is to a GOT entry, flag it by setting the low bit.
   // (All of the base, direct target, and GOT entry need to be pointer-aligned
   // for this to be OK.)
   if (target.second == IRGenModule::DirectOrGOT::GOT) {
     relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
-                             llvm::ConstantInt::get(IGM.RelativeAddressTy, 1));
+                             llvm::ConstantInt::get(RelativeAddressTy, 1));
   }
 
   return relativeAddr;
@@ -2039,10 +2056,12 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
       typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
 
+    unsigned arrayIdx = elts.size();
+
     llvm::Constant *recordFields[] = {
-      emitRelativeReference(*this, descriptorRef,   var, elts.size(), 0),
-      emitRelativeReference(*this, typeRef,         var, elts.size(), 1),
-      emitRelativeReference(*this, witnessTableRef, var, elts.size(), 2),
+      emitRelativeReference(descriptorRef,   var, { arrayIdx, 0 }),
+      emitRelativeReference(typeRef,         var, { arrayIdx, 1 }),
+      emitRelativeReference(witnessTableRef, var, { arrayIdx, 2 }),
       llvm::ConstantInt::get(Int32Ty, flags.getValue()),
     };
 
@@ -2099,8 +2118,9 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     auto typeRef = getAddrOfLLVMVariableOrGOTEquivalent(
             typeEntity.entity, getPointerAlignment(), typeEntity.defaultTy);
 
+    unsigned arrayIdx = elts.size();
     llvm::Constant *recordFields[] = {
-      emitRelativeReference(*this, typeRef, var, elts.size(), 0),
+      emitRelativeReference(typeRef, var, { arrayIdx, 0 }),
       llvm::ConstantInt::get(Int32Ty, typeEntity.flags.getValue()),
     };
 
@@ -2893,7 +2913,18 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
   if (auto ty = GenericWitnessTableCacheTy) return ty;
 
   GenericWitnessTableCacheTy = llvm::StructType::create(getLLVMContext(),
-    { Int16Ty, Int16Ty, RelativeAddressTy, RelativeAddressTy,
+    {
+      // WitnessTableSizeInWords
+      Int16Ty,
+      // WitnessTablePrivateSizeInWords
+      Int16Ty,
+      // Protocol
+      RelativeAddressTy,
+      // Pattern
+      RelativeAddressTy,
+      // Instantiator
+      RelativeAddressTy,
+      // PrivateData
       llvm::ArrayType::get(Int8PtrTy, swift::NumGenericMetadataPrivateDataWords)
     }, "swift.generic_witness_table_cache");
   return GenericWitnessTableCacheTy;

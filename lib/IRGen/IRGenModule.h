@@ -475,10 +475,6 @@ public:
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);
 
-  llvm::Constant *emitDirectRelativeReference(llvm::Constant *target,
-                                              llvm::Constant *base,
-                                              ArrayRef<unsigned> baseIndices);
-
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
@@ -853,6 +849,20 @@ public:
     Direct, GOT,
   };
 
+  std::pair<llvm::Constant *, DirectOrGOT>
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
+                                       llvm::Type *defaultType);
+
+  llvm::Constant *
+  emitRelativeReference(std::pair<llvm::Constant *, DirectOrGOT> target,
+                        llvm::Constant *base,
+                        ArrayRef<unsigned> baseIndices);
+
+  llvm::Constant *
+  emitDirectRelativeReference(llvm::Constant *target,
+                              llvm::Constant *base,
+                              ArrayRef<unsigned> baseIndices);
+
   /// Mark a global variable as true-const by putting it in the text section of
   /// the binary.
   void setTrueConstGlobal(llvm::GlobalVariable *var);
@@ -868,10 +878,6 @@ private:
                                         ForDefinition_t forDefinition,
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType);
-
-  std::pair<llvm::Constant *, DirectOrGOT>
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
-                                       llvm::Type *defaultType);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(CanType type);

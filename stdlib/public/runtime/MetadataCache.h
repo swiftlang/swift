@@ -211,14 +211,16 @@ public:
     entry->Next = Head;
     Head = entry;
 
-    key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
-    Bucket.push_front(EntryPair(key, entry));
+    auto newKey = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
+    assert(key == newKey);
+
+    Bucket.push_front(EntryPair(newKey, entry));
 
 #if SWIFT_DEBUG_RUNTIME
     printf("%s(%p): created %p\n",
            Entry::getName(), this, entry);
 #endif
-    return key.getEntry();
+    return newKey.getEntry();
   }
 
   /// Look up a cached metadata entry. If a cache match exists, return it.
