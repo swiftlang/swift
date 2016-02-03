@@ -170,7 +170,6 @@ namespace {
     bool simplifyProgramTerminationBlock(SILBasicBlock *BB);
     bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
-    bool trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT);
     void findLoopHeaders();
   };
 
@@ -237,28 +236,6 @@ void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
       }
     }
   }
-}
-
-/// Perform a dominator-based jump-threading for checked_cast_br [exact]
-/// instructions if they use the same condition (modulo upcasts and downcasts).
-/// This is very beneficial for code that:
-///  - references the same object multiple times (e.g. x.f1() + x.f2())
-///  - and for method invocation chaining (e.g. x.f3().f4().f5())
-bool
-SimplifyCFG::trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT) {
-  // Ignore unreachable blocks.
-  if (!DT->getNode(Term->getParent()))
-    return false;
-
-  SmallVector<SILBasicBlock *, 16> BBs;
-  auto Result = tryCheckedCastBrJumpThreading(Term, DT, BBs);
-
-  if (Result) {
-    for (auto BB: BBs)
-      addToWorklist(BB);
-  }
-
-  return Result;
 }
 
 static SILValue getTerminatorCondition(TermInst *Term) {
@@ -670,6 +647,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
       EnableJumpThread ? splitAllCriticalEdges(Fn, false, DT, nullptr) : false;
 
   unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
+  SmallVector<SILBasicBlock *, 16> BlocksForWorklist;
 
   bool HasChangedInCurrentIter;
   do {
@@ -678,26 +656,14 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // Do dominator based simplification of terminator condition. This does not
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
-    for (auto &BB : Fn) {
-      // Any method called from this loop should update
-      // the DT if it changes anything related to dominators.
-      TermInst *Term = BB.getTerminator();
-      switch (Term->getKind()) {
-      case ValueKind::SwitchValueInst:
-        // TODO: handle switch_value
-        break;
-      case ValueKind::CheckedCastBranchInst:
-        if (trySimplifyCheckedCastBr(BB.getTerminator(), DT)) {
-          HasChangedInCurrentIter = true;
-          // FIXME: trySimplifyCheckedCastBr function should preserve the
-          // dominator tree but its code to do so is buggy.
-          DT->recalculate(Fn);
-        }
-        break;
-      default:
-        break;
-      }
+    if (tryCheckedCastBrJumpThreading(&Fn, DT, BlocksForWorklist)) {
+      for (auto BB: BlocksForWorklist)
+        addToWorklist(BB);
+
+      HasChangedInCurrentIter = true;
+      DT->recalculate(Fn);
     }
+    BlocksForWorklist.clear();
 
     if (ShouldVerify)
       DT->verify();
