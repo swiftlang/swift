@@ -230,13 +230,16 @@ parse_operator:
       if (!GreaterThanIsOperator && startsWithGreater(Tok))
         goto done;
 
-      // If this is an "&& #available()" expression, then don't eat it.
-      // #available() is not a general expression, and && is an infix operator,
+      // If this is an "&& #available()" expression (or related things that
+      // show up in a stmt-condition production), then don't eat it.
+      //
+      // These are not general expressions, and && is an infix operator,
       // so the code is invalid.  We get better recovery if we bail out from
       // this, because then we can produce a fixit to rewrite the && into a ,
       // if we're in a stmt-condition.
       if (Tok.getText() == "&&" &&
-          peekToken().is(tok::pound_available))
+          peekToken().isAny(tok::pound_available,
+                            tok::kw_let, tok::kw_var, tok::kw_case))
         goto done;
       
       // Parse the operator.

@@ -464,6 +464,9 @@ func f21080671() {
 func f(x : Int, y : Int) {
   if x == y && #available(iOS 9, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
   if #available(iOS 9, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{27-29=,}}
+
+  // https://twitter.com/radexp/status/694790631881883648
+  if x == y && let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
 }
 
 
