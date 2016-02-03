@@ -691,14 +691,14 @@ static int compareHighPriorityKeywords(Item &a_, Item &b_) {
 static int compareLiterals(Item &a_, Item &b_) {
   static CodeCompletionLiteralKind order[] = {
     CodeCompletionLiteralKind::IntegerLiteral,
-    CodeCompletionLiteralKind::BooleanLiteral,
     CodeCompletionLiteralKind::StringLiteral,
+    CodeCompletionLiteralKind::BooleanLiteral,
+    CodeCompletionLiteralKind::ColorLiteral,
+    CodeCompletionLiteralKind::ImageLiteral,
     CodeCompletionLiteralKind::ArrayLiteral,
     CodeCompletionLiteralKind::DictionaryLiteral,
     CodeCompletionLiteralKind::Tuple,
     CodeCompletionLiteralKind::NilLiteral,
-    CodeCompletionLiteralKind::ColorLiteral,
-    CodeCompletionLiteralKind::ImageLiteral,
   };
   auto size = sizeof(order) / sizeof(order[0]);
 
@@ -710,7 +710,15 @@ static int compareLiterals(Item &a_, Item &b_) {
 
   auto a = getIndex(a_);
   auto b = getIndex(b_);
-  return a < b ? -1 : (b < a ? 1 : 0);
+
+  if (a != b)
+    return a < b ? -1 : 1;
+
+  // Sort true before false instead of alphabetically.
+  if (cast<Result>(a_).value->getLiteralKind() == CodeCompletionLiteralKind::BooleanLiteral)
+    return a_.name > b_.name;
+
+  return 0;
 }
 
 static void sortRecursive(const Options &options, Group *group) {

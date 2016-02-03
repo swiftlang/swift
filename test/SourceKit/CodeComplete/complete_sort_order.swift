@@ -60,13 +60,13 @@ func test2() {
   (#^EXPR_0^#)
 }
 // EXPR: 0
-// EXPR: false
-// EXPR: true
 // EXPR: "abc"
+// EXPR: true
+// EXPR: false
+// EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
+// EXPR: [#Image(imageLiteral: String)#]
 // EXPR: [values]
 // EXPR: [key: value]
 // EXPR: (values)
 // EXPR: nil
-// EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR: [#Image(imageLiteral: String)#]
 // EXPR: foo(a: Int)
