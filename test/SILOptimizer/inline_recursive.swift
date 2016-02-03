@@ -7,11 +7,13 @@ private func recFunc(x: Int32) -> Int32 {
   return 0
 }
 
-//CHECK-LABEL: sil {{.*}}callit
+// CHECK-LABEL: sil {{.*}}callit
 // CHECK: bb0:
-// CHECK-NEXT: integer_literal $Builtin.Int32, 0
-// CHECK-NEXT: struct
-// CHECK-NEXT: return
+// CHECK: [[REF:%.*]] = function_ref @_TF16inline_recursiveP33_38E63D320CFF538A1F98BBC31453B1EB7recFuncFVs5Int32S0_
+// CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.Int32, 3
+// CHECK: [[STRUCT:%.*]] = struct $Int32 ([[INTLIT]] : $Builtin.Int32)
+// CHECK: [[APPLY:%.*]] = apply [[REF]]([[STRUCT]])
+// CHECK: return [[APPLY]]
 
 func callit() -> Int32 {
   return recFunc(3)
