@@ -1218,8 +1218,8 @@ private:
         continue;
       }
 
-      AvailabilityContext Range = contextForSpec(Spec);
-      Query->setAvailableRange(Range.getOSVersion());
+      AvailabilityContext NewConstraint = contextForSpec(Spec);
+      Query->setAvailableRange(NewConstraint.getOSVersion());
 
       if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
         // The wildcard spec '*' represents the minimum deployment target, so
@@ -1234,7 +1234,7 @@ private:
       // If the version range for the current TRC is completely contained in
       // the range for the spec, then a version query can never be false, so the
       // spec is useless. If so, report this.
-      if (CurrentInfo.isContainedIn(Range)) {
+      if (CurrentInfo.isContainedIn(NewConstraint)) {
         DiagnosticEngine &Diags = TC.Diags;
         if (CurrentTRC->getReason() == TypeRefinementContext::Reason::Root) {
           // Diagnose for checks that are useless because the minimum deployment
@@ -1269,7 +1269,7 @@ private:
       FalseFlow.unionWith(CurrentInfo);
 
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          TC.Context, Query, LastElement, CurrentTRC, Range);
+          TC.Context, Query, LastElement, CurrentTRC, NewConstraint);
 
       pushContext(TRC, ParentTy());
       NestedCount++;
@@ -1333,8 +1333,7 @@ private:
   /// Return the availability context for the given spec.
   AvailabilityContext contextForSpec(AvailabilitySpec *Spec) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
-      return AvailabilityContext(
-          VersionRange::allGTE(TC.getLangOpts().getMinPlatformVersion()));
+      return AvailabilityContext::alwaysAvailable();
     }
 
     auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);

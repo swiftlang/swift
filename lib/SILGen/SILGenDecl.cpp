@@ -966,7 +966,6 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 /// (which has type Builtin.Int1) represents the result of this check.
 SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
                                                  const VersionRange &range) {
-
   // Emit constants for the checked version range.
   clang::VersionTuple Vers = range.getLowerEndpoint();
   unsigned major = Vers.getMajor();
@@ -1032,10 +1031,18 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
     }
     case StmtConditionElement::CK_Availability:
       // Check the running OS version to determine whether it is in the range
-      // specified by E.
-      auto *avail = elt.getAvailability();
-      booleanTestValue = emitOSVersionRangeCheck(loc,
-                                                 avail->getAvailableRange());
+      // specified by elt.
+      VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
+      assert(!OSVersion.isEmpty());
+
+      if (OSVersion.isAll()) {
+        // If there's no check for the current platform, this condition is
+        // trivially true.
+        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+        booleanTestValue = B.createIntegerLiteral(loc, i1, true);
+      } else {
+        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion);
+      }
       break;
     }
 
