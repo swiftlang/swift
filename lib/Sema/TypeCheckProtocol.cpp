@@ -1558,21 +1558,22 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
     return;
   }
 
-  VersionRange requiredRange = VersionRange::all();
+  auto requiredAvailability = AvailabilityContext::alwaysAvailable();
 
   if (!TC.getLangOpts().DisableAvailabilityChecking &&
       !TC.isAvailabilitySafeForConformance(match.Witness, requirement,
-                                           Conformance, requiredRange)) {
+                                           Conformance, requiredAvailability)) {
     auto witness = match.Witness;
     diagnoseOrDefer(requirement, false,
-      [witness, requirement, requiredRange](
+      [witness, requirement, requiredAvailability](
           TypeChecker &tc, NormalProtocolConformance *conformance) {
+        // FIXME: The problem may not be the OS version.
         tc.diagnose(witness,
                     diag::availability_protocol_requires_version,
                     conformance->getProtocol()->getFullName(),
                     witness->getFullName(),
                     prettyPlatformString(targetPlatform(tc.getLangOpts())),
-                    requiredRange.getLowerEndpoint()
+                    requiredAvailability.getOSVersion().getLowerEndpoint()
                     );
         tc.diagnose(requirement, diag::availability_protocol_requirement_here);
         tc.diagnose(conformance->getLoc(),

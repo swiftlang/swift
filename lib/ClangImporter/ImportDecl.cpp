@@ -1118,11 +1118,11 @@ StringRef ClangImporter::Implementation::getCFTypeName(
 
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
-static void applyAvailableAttribute(Decl *decl, VersionRange &range,
+static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                     ASTContext &C) {
   // If the range is "all", this is the same as not having an available
   // attribute.
-  if (!range.hasLowerEndpoint())
+  if (info.isAlwaysAvailable())
     return;
 
   clang::VersionTuple noVersion;
@@ -1130,7 +1130,7 @@ static void applyAvailableAttribute(Decl *decl, VersionRange &range,
                                       targetPlatform(C.LangOpts),
                                       /*message=*/StringRef(),
                                       /*rename=*/StringRef(),
-                                      range.getLowerEndpoint(),
+                                      info.getOSVersion().getLowerEndpoint(),
                                       /*deprecated=*/noVersion,
                                       /*obsoleted=*/noVersion,
                                       UnconditionalAvailabilityKind::None,
@@ -1152,15 +1152,16 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
   if (!valueDecl)
     return;
 
-  VersionRange requiredRange =
+  AvailabilityContext requiredRange =
       AvailabilityInference::inferForType(valueDecl->getType());
 
   ASTContext &C = impl.SwiftContext;
 
-  VersionRange containingDeclRange = AvailabilityInference::availableRange(
-      dc->getInnermostDeclarationDeclContext(), C);
+  const Decl *innermostDecl = dc->getInnermostDeclarationDeclContext();
+  AvailabilityContext containingDeclRange =
+      AvailabilityInference::availableRange(innermostDecl, C);
 
-  requiredRange.constrainWith(containingDeclRange);
+  requiredRange.intersectWith(containingDeclRange);
 
   applyAvailableAttribute(valueDecl, requiredRange, C);
 }
@@ -3180,16 +3181,19 @@ namespace {
       // FIXME: But if one of them is now deprecated, should we prefer the
       // other?
       clang::VersionTuple introduced = findLatestIntroduction(objcMethod);
-      VersionRange existingIntroduced =
+      AvailabilityContext existingAvailability =
           AvailabilityInference::availableRange(existingCtor,
                                                 Impl.SwiftContext);
-      assert(!existingIntroduced.isEmpty());
+      assert(!existingAvailability.isKnownUnreachable());
 
-      if (existingIntroduced.isAll()) {
+      if (existingAvailability.isAlwaysAvailable()) {
         if (!introduced.empty())
           return false;
-      } else if (introduced != existingIntroduced.getLowerEndpoint()) {
-        return introduced < existingIntroduced.getLowerEndpoint();
+      } else {
+        VersionRange existingIntroduced = existingAvailability.getOSVersion();
+        if (introduced != existingIntroduced.getLowerEndpoint()) {
+          return introduced < existingIntroduced.getLowerEndpoint();
+        }
       }
 
       // The "introduced" versions are the same. Prefer Convenience over
@@ -5542,7 +5546,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
       if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
         if (!result->getAttrs().hasAttribute<AvailableAttr>()) {
-          VersionRange protoRange =
+          AvailabilityContext protoRange =
             AvailabilityInference::availableRange(proto, SwiftContext);
           applyAvailableAttribute(result, protoRange, SwiftContext);
         }
