@@ -39,11 +39,12 @@ struct ARCPairingContext {
 
   ARCPairingContext(SILFunction &F, RCIdentityFunctionInfo *RCIA)
       : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
-  bool performMatching();
+  bool performMatching(llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+                       llvm::SmallVectorImpl<SILInstruction *> &DeadInsts);
 
-  void
-  optimizeMatchingSet(ARCMatchingSet &MatchSet,
-                      llvm::SmallVectorImpl<SILInstruction *> &InstsToDelete);
+  void optimizeMatchingSet(ARCMatchingSet &MatchSet,
+                           llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+                           llvm::SmallVectorImpl<SILInstruction *> &DeadInsts);
 };
 
 /// A composition of an ARCSequenceDataflowEvaluator and an
@@ -66,7 +67,12 @@ struct BlockARCPairingContext {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
 
-    bool MatchedPair = Context.performMatching();
+    llvm::SmallVector<SILInstruction *, 8> NewInsts;
+    llvm::SmallVector<SILInstruction *, 8> DeadInsts;
+    bool MatchedPair = Context.performMatching(NewInsts, DeadInsts);
+    NewInsts.clear();
+    while (!DeadInsts.empty())
+      DeadInsts.pop_back_val()->eraseFromParent();
     return NestingDetected && MatchedPair;
   }
 

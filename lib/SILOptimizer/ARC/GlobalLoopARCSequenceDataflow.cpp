@@ -285,7 +285,28 @@ void LoopARCSequenceDataflowEvaluator::summarizeLoop(
   RegionStateInfo[R]->summarize(LRFI, RegionStateInfo);
 }
 
+void LoopARCSequenceDataflowEvaluator::summarizeSubregionBlocks(
+    const LoopRegion *R) {
+  for (unsigned SubregionID : R->getSubregions()) {
+    auto *Subregion = LRFI->getRegion(SubregionID);
+    if (!Subregion->isBlock())
+      continue;
+    RegionStateInfo[Subregion]->summarizeBlock(Subregion->getBlock());
+  }
+}
+
 void LoopARCSequenceDataflowEvaluator::clearLoopState(const LoopRegion *R) {
   for (unsigned SubregionID : R->getSubregions())
     getARCState(LRFI->getRegion(SubregionID)).clear();
+}
+
+void LoopARCSequenceDataflowEvaluator::addInterestingInst(SILInstruction *I) {
+  auto *Region = LRFI->getRegion(I->getParent());
+  RegionStateInfo[Region]->addInterestingInst(I);
+}
+
+void LoopARCSequenceDataflowEvaluator::removeInterestingInst(
+    SILInstruction *I) {
+  auto *Region = LRFI->getRegion(I->getParent());
+  RegionStateInfo[Region]->removeInterestingInst(I);
 }
