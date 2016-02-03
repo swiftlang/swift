@@ -512,11 +512,11 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
         action="store_true")
 
     parser.add_argument("--swift-analyze-code-coverage",
-        help="enable code coverage analysis in Swift",
-        action="store_const",
-        const=True,
-        dest="swift_analyze_code_coverage",
-        default=False)
+        help="""enable code coverage analysis in Swift (false, not-merged,
+        merged).""",
+        choices=["false", "not-merged", "merged"],
+        default="false", # so CMake can see the inert mode as a false value
+        dest="swift_analyze_code_coverage")
 
     parser.add_argument("--build-subdir",
         help="""
@@ -726,7 +726,7 @@ the number of parallel build jobs to use""",
         swift_build_dir_label = args.swift_build_variant
         if args.swift_assertions:
             swift_build_dir_label += "Assert"
-        if args.swift_analyze_code_coverage:
+        if args.swift_analyze_code_coverage != "false":
             swift_build_dir_label += "Coverage"
 
         swift_stdlib_build_dir_label = args.swift_stdlib_build_variant

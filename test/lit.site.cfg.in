@@ -18,6 +18,8 @@ config.variant_sdk = "@VARIANT_SDK@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
+config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
+
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
 else:
@@ -41,11 +43,6 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 
 if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
     config.available_features.add('broken_std_regex')
-
-if "@SWIFT_ANALYZE_CODE_COVERAGE@" == "TRUE":
-    lit_config.useValgrind = True
-    lit_config.valgrindArgs = [os.path.join(config.swift_src_root,
-                                            "utils/use_profdir.py")]
 
 # Let the main config do the real work.
 if config.test_exec_root is None:
