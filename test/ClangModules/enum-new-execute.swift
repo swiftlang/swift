@@ -1,5 +1,5 @@
 // RUN: mkdir -p %t
-// RUN: %clang -fobjc-arc %S/Inputs/enum-new.m -c -o %t/enum-new.o
+// RUN: %clang %S/Inputs/enum-new.m -c -o %t/enum-new.o
 // RUN: %target-build-swift -import-objc-header %S/Inputs/enum-new.h -Xlinker %t/enum-new.o %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
