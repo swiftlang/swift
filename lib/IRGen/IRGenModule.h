@@ -839,6 +839,10 @@ public:
   /// the binary.
   void setTrueConstGlobal(llvm::GlobalVariable *var);
 
+  std::pair<llvm::Constant *, DirectOrGOT>
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
+                                       llvm::Type *defaultType);
+
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
                                         Alignment alignment,
@@ -850,10 +854,6 @@ private:
                                         ForDefinition_t forDefinition,
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType);
-
-  std::pair<llvm::Constant *, DirectOrGOT>
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
-                                       llvm::Type *defaultType);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(CanType type);

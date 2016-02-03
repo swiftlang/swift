@@ -1176,6 +1176,8 @@ struct HeapMetadata : Metadata {
   constexpr HeapMetadata(const Metadata &base) : Metadata(base) {}
 };
 
+struct ProtocolDescriptor;
+  
 /// Header for a generic parameter descriptor. This is a variable-sized
 /// structure that describes how to find and parse a generic parameter vector
 /// within the type metadata for an instance of a nominal type.
@@ -1199,15 +1201,33 @@ struct GenericParameterDescriptor {
   struct Parameter {
     /// The number of protocol witness tables required by this type parameter.
     uint32_t NumWitnessTables;
-    
-    // TODO: This is the bare minimum to be able to parse an opaque generic
-    // parameter vector. Should we include additional info, such as the
-    // required protocols?
+    /// The protocols required by this type parameter. If NumWitnessTables is
+    /// zero, this is absent.
+    RelativeIndirectablePointer<ProtocolDescriptor> Protocols[1];
   };
 
   /// The parameter descriptors are in a tail-emplaced array of NumParams
-  /// elements.
+  /// elements. Because Parameters are variable length, use getParameterAt()
+  /// to access them.
   Parameter Parameters[1];
+
+  const struct Parameter *getParameterAt(uint32_t index) const {
+    const struct Parameter *param = Parameters;
+
+    for (uint32_t i = 0; i < NumParams; ++i) {
+      if (i == index)
+        return param;
+
+      auto offset = sizeof(struct Parameter)
+                  - offsetof(struct Parameter, Protocols);
+      offset += param->NumWitnessTables *
+        sizeof(RelativeIndirectablePointer<ProtocolDescriptor>);
+      auto bytes = reinterpret_cast<const uint8_t *>(param) + offset;
+      param = reinterpret_cast<const Parameter *>(bytes);
+    }
+
+    return nullptr;
+  }
 };
   
 struct ClassTypeDescriptor;
@@ -1858,8 +1878,6 @@ struct TupleTypeMetadata : public Metadata {
 /// The standard metadata for the empty tuple type.
 extern "C" const FullMetadata<TupleTypeMetadata> _TMT_;
 
-struct ProtocolDescriptor;
-  
 /// An array of protocol descriptors with a header and tail-allocated elements.
 struct ProtocolDescriptorList {
   uintptr_t NumProtocols;

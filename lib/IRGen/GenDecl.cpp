@@ -2270,8 +2270,6 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (!section.empty())
     var->setSection(section);
 
-  // Keep type metadata around for all types, although the runtime can currently
-  // only perform name lookup of non-generic types.
   addRuntimeResolvableType(concreteType);
 
   // For metadata patterns, we're done.
@@ -2477,15 +2475,15 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   return result;
 }
 
-/// Return the address of a nominal type descriptor.  Right now, this
-/// must always be for purposes of defining it.
+/// Return the address of a nominal type descriptor.
 llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                                   llvm::Type *definitionType) {
-  assert(definitionType && "not defining nominal type descriptor?");
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(),
-                               definitionType, definitionType,
-                               DebugTypeInfo());
+  DebugTypeInfo DbgTy(D->getDeclaredType(), NominalTypeDescriptorPtrTy,
+                      getPointerSize(), getPointerAlignment(),
+                      nullptr);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definitionType,
+                               NominalTypeDescriptorPtrTy, DbgTy);
 }
 
 llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,

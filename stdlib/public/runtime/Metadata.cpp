@@ -1474,9 +1474,9 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
     if (genericParams.hasGenericParams()) {
       unsigned numParamWords = 0;
       for (unsigned i = 0; i < genericParams.NumParams; ++i) {
+        auto param = genericParams.getParameterAt(i);
         // 1 word for the type metadata, and 1 for every protocol witness
-        numParamWords +=
-            1 + genericParams.Parameters[i].NumWitnessTables;
+        numParamWords += 1 + param->NumWitnessTables;
       }
       memcpy(classWords + genericParams.Offset,
              superWords + genericParams.Offset,

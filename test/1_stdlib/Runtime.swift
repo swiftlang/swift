@@ -320,6 +320,50 @@ Runtime.test("typeByName") {
   expectTrue(_typeByName("a.SomeConformingClass") == SomeConformingClass.self)
 }
 
+// there is no public API yet to resolve types that are not top-level classes,
+// so use a private API now just so we can exercise the code that dynamically
+// specializes generic types.
+@_silgen_name("swift_getTypeByMangledName")
+func _getTypeByMangledName(
+    name: UnsafePointer<UInt8>,
+    _ nameLength: UInt)
+  -> Any.Type?
+
+private func typeByMangledName(name: String) -> Any.Type? {
+  let nameUTF8 = Array(name.utf8)
+  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
+    let type = _getTypeByMangledName(nameUTF8.baseAddress,
+                                     UInt(nameUTF8.endIndex))
+
+    return type
+  }
+}
+
+protocol Fungible {}
+protocol Runcible {}
+
+extension String : Fungible {}
+extension Int : Runcible, Fungible {}
+
+extension SomeStruct : Runcible, Equatable {}
+
+func ==(lhs: SomeStruct, rhs: SomeStruct) -> Bool {
+  return true
+}
+
+class MultiGenericClass<T: Runcible, U: Hashable> : Fungible {}
+
+struct MultiGenericStruct<T: Fungible, U: Runcible where U: Equatable> {}
+
+Runtime.test("genericTypeByName") {
+  expectTrue(typeByMangledName("GV1a18MultiGenericStructSSSi_")
+    == MultiGenericStruct<String, Int>.self)
+  expectTrue(typeByMangledName("GV1a18MultiGenericStructSSVS_10SomeStruct_")
+    == MultiGenericStruct<String, SomeStruct>.self)
+  expectTrue(typeByMangledName("GV1a18MultiGenericStructGCS_17MultiGenericClassVS_10SomeStructSS_Si_")
+    == MultiGenericStruct<MultiGenericClass<SomeStruct, String>, Int>.self)
+}
+
 Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
