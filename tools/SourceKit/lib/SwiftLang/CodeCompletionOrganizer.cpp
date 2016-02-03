@@ -699,6 +699,7 @@ static int compareLiterals(Item &a_, Item &b_) {
     CodeCompletionLiteralKind::Tuple,
     CodeCompletionLiteralKind::NilLiteral,
     CodeCompletionLiteralKind::ColorLiteral,
+    CodeCompletionLiteralKind::ImageLiteral,
   };
   auto size = sizeof(order) / sizeof(order[0]);
 

@@ -22,6 +22,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_2 | FileCheck %s -check-prefix=TUPLE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_0 | FileCheck %s -check-prefix=COLOR_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_1 | FileCheck %s -check-prefix=COLOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_0 | FileCheck %s -check-prefix=IMAGE_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_1 | FileCheck %s -check-prefix=IMAGE_1
 
 struct MyNil1: NilLiteralConvertible {
   init(nilLiteral: ()) {}
@@ -178,3 +180,16 @@ func testColor1() {
   let x: MyColor1 = #^COLOR_1^#
 }
 // COLOR_1: Literal[_Color]/None/TypeRelation[Identical]: [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#][#MyColor1#];
+
+struct MyImage1: _ImageLiteralConvertible {
+  init(imageLiteral: String) {}
+}
+func testImage0() {
+  let x: Int = #^IMAGE_0^#
+}
+// IMAGE_0: Literal[_Image]/None: [#Image({#imageLiteral: String#})#];
+
+func testImage1() {
+  let x: MyImage1 = #^IMAGE_1^#
+}
+// IMAGE_1: Literal[_Image]/None/TypeRelation[Identical]: [#Image({#imageLiteral: String#})#][#MyImage1#];

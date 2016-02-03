@@ -68,4 +68,5 @@ func test2() {
 // EXPR: (values)
 // EXPR: nil
 // EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
+// EXPR: [#Image(imageLiteral: String)#]
 // EXPR: foo(a: Int)

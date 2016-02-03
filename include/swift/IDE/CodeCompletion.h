@@ -412,6 +412,7 @@ enum class CodeCompletionLiteralKind {
   DictionaryLiteral,
   FloatLiteral,
   IntegerLiteral,
+  ImageLiteral,
   NilLiteral,
   StringLiteral,
   Tuple,

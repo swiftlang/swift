@@ -615,6 +615,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     case CodeCompletionLiteralKind::ColorLiteral:
       Prefix.append("[_Color]");
       break;
+    case CodeCompletionLiteralKind::ImageLiteral:
+      Prefix.append("[_Image]");
+      break;
     case CodeCompletionLiteralKind::DictionaryLiteral:
       Prefix.append("[Dictionary]");
       break;
@@ -1363,6 +1366,8 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
     return KnownProtocolKind::BooleanLiteralConvertible;
   case CodeCompletionLiteralKind::ColorLiteral:
     return KnownProtocolKind::ColorLiteralConvertible;
+  case CodeCompletionLiteralKind::ImageLiteral:
+    return KnownProtocolKind::ImageLiteralConvertible;
   case CodeCompletionLiteralKind::DictionaryLiteral:
     return KnownProtocolKind::DictionaryLiteralConvertible;
   case CodeCompletionLiteralKind::FloatLiteral:
@@ -3145,6 +3150,18 @@ public:
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("alpha"), floatType,
                                false, true);
+      builder.addRightParen();
+      builder.addTextChunk("#");
+      builder.addRightBracket();
+    });
+
+    auto stringType = context.getStringDecl()->getDeclaredType();
+    addFromProto(LK::ImageLiteral, "", [&](Builder &builder) {
+      builder.addLeftBracket();
+      builder.addTextChunk("#Image");
+      builder.addLeftParen();
+      builder.addCallParameter(context.getIdentifier("imageLiteral"),
+                               stringType, false, true);
       builder.addRightParen();
       builder.addTextChunk("#");
       builder.addRightBracket();
