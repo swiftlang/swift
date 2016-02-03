@@ -742,6 +742,9 @@ ERROR(expected_expr_conditional_letbinding,none,
 ERROR(expected_expr_conditional_letbinding_bool_conditions,none,
       "expected 'let' or 'var' in conditional; "
       "use '&&' to join boolean conditions", ())
+ERROR(expected_comma_stmtcondition,none,
+      "expected ',' joining parts of a multi-clause condition", ())
+
 ERROR(expected_expr_conditional_var,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
 ERROR(expected_expr_conditional_where,PointsToFirstBadToken,

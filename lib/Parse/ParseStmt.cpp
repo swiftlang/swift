@@ -1075,6 +1075,12 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
 }
 
 
+/// Return true if the specified token looks like the start of a clause in a
+/// stmt-condition.
+static bool isStartOfStmtConditionClause(const Token &Tok) {
+  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_case,tok::pound_available);
+}
+
 
 /// Parse the condition of an 'if' or 'while'.
 ///
@@ -1101,6 +1107,27 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
   SmallVector<StmtConditionElement, 4> result;
 
+  
+  // This little helper function is used to consume a separator comma if
+  // present, it returns false if it isn't there.  It also gracefully handles
+  // the case when the user used && isntead of comma, since that is a common
+  // error.
+  auto consumeSeparatorComma = [&]() -> bool {
+    // If we have an "&&" token followed by a continuation of the statement
+    // condition, then fixit the "&&" to "," and keep going.
+    if (Tok.isAny(tok::oper_binary_spaced, tok::oper_binary_unspaced) &&
+        Tok.getText() == "&&") {
+      diagnose(Tok, diag::expected_comma_stmtcondition)
+        .fixItReplace(Tok.getLoc(), ",");
+      consumeToken();
+      return true;
+    }
+    
+    // Otherwise, if a comma exists consume it and succeed.
+    return consumeIf(tok::comma);
+  };
+  
+  
   if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
     auto PoundPos = consumeToken();
     auto CodeCompletionPos = consumeToken();
@@ -1123,14 +1150,14 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
     result.push_back({res.get()});
 
-    if (!consumeIf(tok::comma)) {
+    if (!consumeSeparatorComma()) {
       Condition = Context.AllocateCopy(result);
       return Status;
     }
   }
 
   // Parse the leading boolean condition if present.
-  if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case, tok::pound_available)) {
+  if (!isStartOfStmtConditionClause(Tok)) {
     ParserResult<Expr> CondExpr = parseExprBasic(ID);
     Status |= CondExpr;
     result.push_back(CondExpr.getPtrOrNull());
@@ -1138,15 +1165,16 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     // If there is a comma after the expression, parse a list of let/var
     // bindings.
     SourceLoc CommaLoc = Tok.getLoc();
-    if (!consumeIf(tok::comma)) {
+    
+    // If there is no comma then we're done.
+    if (!consumeSeparatorComma()) {
       Condition = Context.AllocateCopy(result);
       return Status;
     }
     
     // If a let-binding doesn't follow, diagnose the problem with a tailored
     // error message.
-    if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case,
-                  tok::pound_available)) {
+    if (!isStartOfStmtConditionClause(Tok)) {
       // If an { exists after the comma, assume it is a stray comma and this is
       // the start of the if/while body.  If a non-expression thing exists after
       // the comma, then we don't know what is going on.
@@ -1166,10 +1194,9 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         ParserResult<Expr> CondExpr = parseExprBasic(ID);
         Status |= CondExpr;
         result.push_back(CondExpr.getPtrOrNull());
-      } while (consumeIf(tok::comma) &&
-               Tok.isNot(tok::kw_var, tok::kw_let));
+      } while (consumeIf(tok::comma) && !isStartOfStmtConditionClause(Tok));
       
-      if (Tok.isNot(tok::kw_var, tok::kw_let)) {
+      if (!isStartOfStmtConditionClause(Tok)) {
         Condition = Context.AllocateCopy(result);
         return Status;
       }
@@ -1315,8 +1342,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       //    let x = foo(), y = bar()
       // Alternatively, this could be start of another clause, as in:
       //    let x = foo(), let y = bar()
-      if (peekToken().isAny(tok::kw_let, tok::kw_var, tok::kw_case,
-                            tok::pound_available))
+      if (isStartOfStmtConditionClause(peekToken()))
         break;
 
       // At this point, we know that the next thing should be a pattern to
@@ -1367,7 +1393,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       result.push_back(WhereExpr.get());
     }
 
-  } while (consumeIf(tok::comma));
+  } while (consumeSeparatorComma());
 
   Condition = Context.AllocateCopy(result);
   return Status;
