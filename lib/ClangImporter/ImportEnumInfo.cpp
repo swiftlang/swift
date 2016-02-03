@@ -37,6 +37,20 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
     return;
   }
 
+  // First, check for attributes that denote the classification
+  clang::NSErrorDomainAttr *domainAttr = nullptr;
+  for (auto attr : decl->attrs()) {
+    if (isa<clang::NSErrorDomainAttr>(attr)) {
+      domainAttr = cast<clang::NSErrorDomainAttr>(attr);
+      break;
+    }
+  }
+  if (domainAttr) {
+    kind = EnumKind::Enum;
+    attribute = domainAttr;
+    return;
+  }
+
   // Was the enum declared using *_ENUM or *_OPTIONS?
   // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
   auto loc = decl->getLocStart();

@@ -53,12 +53,20 @@ enum class EnumKind {
 };
 
 class EnumInfo {
+  using AttributePtrUnion = clang::NSErrorDomainAttr *;
+
   /// \brief The kind
   EnumKind kind = EnumKind::Unknown;
 
   /// \brief The enum's common constant name prefix, which will be stripped from
   /// constants
   StringRef constantNamePrefix = StringRef();
+
+  /// \brief The identifying attribute for specially imported enums
+  ///
+  /// Currently, only NS_ERROR_ENUM creates one for its error domain, but others
+  /// should in the future.
+  AttributePtrUnion attribute = nullptr;
 
 public:
   EnumInfo() = default;
@@ -71,6 +79,17 @@ public:
   EnumKind getKind() const { return kind; }
 
   StringRef getConstantNamePrefix() const { return constantNamePrefix; }
+
+  /// \brief Whether this maps to an enum who also provides an error domain
+  bool isErrorEnum() const {
+    return getKind() == EnumKind::Enum && attribute;
+  }
+
+  /// \brief For this error enum, extract the name of the error domain constant
+  clang::IdentifierInfo *getErrorDomain() const {
+    assert(isErrorEnum() && "not error enum");
+    return attribute->getErrorDomain();
+  }
 
 private:
   void determineConstantNamePrefix(const clang::EnumDecl *);
