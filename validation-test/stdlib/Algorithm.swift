@@ -81,8 +81,8 @@ Algorithm.test("min,max") {
 }
 
 Algorithm.test("sorted/strings")
-  .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
-  .xfail(.FreeBSDAny(reason: "String comparison: ICU vs. Foundation"))
+  .xfail(.NativeRuntime("String comparison: ICU vs. Foundation " +
+    "https://bugs.swift.org/browse/SR-530"))
   .code {
   expectEqual(
     [ "Banana", "apple", "cherry" ],

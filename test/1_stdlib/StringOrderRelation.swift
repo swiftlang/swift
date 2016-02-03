@@ -14,8 +14,8 @@ import ObjectiveC
 var StringOrderRelationTestSuite = TestSuite("StringOrderRelation")
 
 StringOrderRelationTestSuite.test("StringOrderRelation/ASCII/NullByte")
-  .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
-  .xfail(.FreeBSDAny(reason: "String comparison: ICU vs. Foundation"))
+  .xfail(.NativeRuntime("String comparison: ICU vs. Foundation " +
+    "https://bugs.swift.org/browse/SR-630"))
   .code {
   let baseString = "a"
   let nullbyteString = "a\0"
