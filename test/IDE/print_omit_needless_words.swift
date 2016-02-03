@@ -172,6 +172,9 @@
 // Don't leave just a '_'.
 // CHECK-FOUNDATION: func NS_()
 
+// Lowercasing initialisms.
+// CHECK-FOUNDATION: let httpRequestKey: String
+
 // Lowercasing initialisms with plurals.
 // CHECK-FOUNDATION: var urlsInText: [URL] { get }
 

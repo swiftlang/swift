@@ -996,6 +996,7 @@ extern void NS123(void);
 extern void NSYELLING(void);
 extern void NS_SCREAMING(void);
 extern void NS_(void);
+extern NSString *NSHTTPRequestKey;
 
 @interface NSObject (Selectors)
 -(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
