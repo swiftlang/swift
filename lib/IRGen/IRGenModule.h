@@ -556,7 +556,8 @@ private:
 //--- Globals ---------------------------------------------------------------
 public:
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false);
+                                        bool willBeRelativelyAddressed = false,
+                                        bool addNull = true);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);

@@ -2744,7 +2744,8 @@ Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
 llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                               bool willBeRelativelyAddressed) {
+                                               bool willBeRelativelyAddressed,
+                                               bool addNull) {
   // Check whether this string already exists.
   auto &entry = GlobalStrings[data];
   if (entry.second) {
@@ -2756,7 +2757,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
   }
 
   // If not, create it.  This implicitly adds a trailing null.
-  auto init = llvm::ConstantDataArray::getString(LLVMContext, data);
+  auto init = llvm::ConstantDataArray::getString(LLVMContext, data, addNull);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);
