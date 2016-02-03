@@ -522,6 +522,8 @@ ParserResult<Expr> Parser::parseExprSelector() {
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
   // Parse the subexpression.
+  CodeCompletionCallbacks::InObjCSelectorExprRAII
+    InObjCSelectorExpr(CodeCompletion);
   ParserResult<Expr> subExpr = parseExpr(diag::expr_selector_expected_expr);
   if (subExpr.hasCodeCompletion())
     return subExpr;
