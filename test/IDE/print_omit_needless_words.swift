@@ -160,6 +160,18 @@
 // CHECK-FOUNDATION: let globalConstant: String
 // CHECK-FOUNDATION: func globalFunction()
 
+// Cannot strip because we end up with something that isn't an identifier
+// CHECK-FOUNDATION: func NS123()
+
+// Strip prefix, but don't lowercase ALL_CAPS.
+// CHECK-FOUNDATION: func YELLING()
+
+// Strip prefix along with '_', but don't lowercase ALL_CAPS.
+// CHECK-FOUNDATION: func SCREAMING()
+
+// Don't leave just a '_'.
+// CHECK-FOUNDATION: func NS_()
+
 // Lowercasing initialisms with plurals.
 // CHECK-FOUNDATION: var urlsInText: [URL] { get }
 
