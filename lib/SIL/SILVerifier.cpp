@@ -420,7 +420,7 @@ public:
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
-    require(DebugScope && DebugScope->getFunction() == &F,
+    require(DebugScope->Parent.get<SILFunction *>() == &F,
             "Scope of SIL function points to different function");
   }
 
@@ -509,25 +509,14 @@ public:
     }
   }
 
-  /// Return the SIL function of a SILDebugScope's ancestor.
-  static SILFunction *getFunction(const SILDebugScope *DS) {
-    if (DS->InlinedCallSite)
-      return getFunction(DS->InlinedCallSite);
-    if (auto *ParentScope = DS->Parent.dyn_cast<const SILDebugScope *>())
-      return getFunction(ParentScope);
-    return DS->Parent.get<SILFunction *>();
-  }
-
   void checkInstructionsSILLocation(SILInstruction *I) {
     // Check the debug scope.
     auto *DS = I->getDebugScope();
-    if (DS && !maybeScopeless(*I)) {
+    if (DS && !maybeScopeless(*I))
       require(DS, "instruction has a location, but no scope");
-      require(getFunction(DS) == I->getFunction(),
-              "parent scope of instruction points to a different function");
-    }
-    require(!DS || DS->InlinedCallSite || DS->getFunction() == I->getFunction(),
-            "scope of a non-inlined instruction points to different function");
+
+    require(!DS || DS->getParentFunction() == I->getFunction(),
+            "debug scope of instruction belongs to a different function");
 
     // Check the location kind.
     SILLocation L = I->getLoc();

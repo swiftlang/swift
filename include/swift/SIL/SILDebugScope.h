@@ -60,14 +60,15 @@ public:
   /// Create an inlined version of CalleeScope.
   SILDebugScope(const SILDebugScope *CallSiteScope,
                 const SILDebugScope *CalleeScope)
-      : Loc(CalleeScope->Loc), Parent(CalleeScope->Parent),
+    : Loc(CalleeScope->Loc), Parent(CalleeScope),
         InlinedCallSite(CallSiteScope) {
     assert(CallSiteScope && CalleeScope);
-    assert(CalleeScope->getFunction()->isInlined() &&
+    assert(CalleeScope->getParentFunction()->isInlined() &&
            "function of inlined debug scope is not inlined");
   }
 
-  SILFunction *getFunction() const {
+  /// Return the function this scope originated from before being inlined.
+  SILFunction *getInlinedFunction() const {
     if (Parent.isNull())
       return nullptr;
 
@@ -77,6 +78,18 @@ public:
     assert(Scope->Parent.is<SILFunction *>() && "orphaned scope");
     return Scope->Parent.get<SILFunction *>();
   }
+
+  /// Return the parent function of this scope. If the scope was
+  /// inlined this recursively returns the function it was inlined
+  /// into.
+  SILFunction *getParentFunction() const {
+    if (InlinedCallSite)
+      return InlinedCallSite->getParentFunction();
+    if (auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>())
+      return ParentScope->getParentFunction();
+    return Parent.get<SILFunction *>();
+  }
+
 };
 
 #ifndef NDEBUG

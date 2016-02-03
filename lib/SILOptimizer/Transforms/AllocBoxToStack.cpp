@@ -507,8 +507,8 @@ PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
                                                      PromotedParamIndices,
                                                      ClonedName)),
     Orig(Orig), PromotedParamIndices(PromotedParamIndices) {
-  assert(Orig->getDebugScope()->getFunction() !=
-         getCloned()->getDebugScope()->getFunction());
+  assert(Orig->getDebugScope()->getParentFunction() !=
+         getCloned()->getDebugScope()->getParentFunction());
 }
 
 static std::string getClonedName(SILFunction *F,

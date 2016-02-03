@@ -76,8 +76,8 @@ public:
   }
 
   void setCurrentDebugScope(const SILDebugScope *DS) {
-    assert((DS->InlinedCallSite || DS->getFunction() == &getFunction()) &&
-         "non-inlined scope belongs to different function");
+    assert((DS->getParentFunction() == &getFunction()) &&
+           "scope belongs to different function");
     CurDebugScope = DS;
   }
   const SILDebugScope *getCurrentDebugScope() const { return CurDebugScope; }

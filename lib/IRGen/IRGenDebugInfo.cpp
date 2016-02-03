@@ -267,7 +267,7 @@ static FullLocation getLocation(SourceManager &SM,
 /// Determine whether this debug scope belongs to an explicit closure.
 static bool isExplicitClosure(const SILDebugScope *DS) {
   if (DS) {
-    auto *SILFn = DS->getFunction();
+    auto *SILFn = DS->getInlinedFunction();
     if (SILFn && SILFn->hasLocation())
       if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
         if (isa<ClosureExpr>(E))
@@ -315,12 +315,9 @@ IRGenDebugInfo::createInlinedAt(const SILDebugScope *CallSite) {
 static bool parentScopesAreSane(const SILDebugScope *DS) {
   auto *Parent = DS;
   while ((Parent = Parent->Parent.dyn_cast<const SILDebugScope *>())) {
-    if (!DS->InlinedCallSite) {
+    if (!DS->InlinedCallSite)
       assert(!Parent->InlinedCallSite &&
              "non-inlined scope has an inlined parent");
-      assert(DS->getFunction() == Parent->getFunction() &&
-             "non-inlined parent scope from different function?");
-    }
   }
   return true;
 }
@@ -402,15 +399,9 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   if (CachedScope != ScopeCache.end())
     return cast<llvm::DIScope>(CachedScope->second);
 
-  // If this is a (inlined) function scope, the function may
+  // If this is an (inlined) function scope, the function may
   // not have been created yet.
-  if (!DS->Parent.is<const SILDebugScope*>() ||
-      DS->Loc.getKind() == SILLocation::SILFileKind ||
-      DS->Loc.isASTNode<AbstractFunctionDecl>() ||
-      DS->Loc.isASTNode<AbstractClosureExpr>() ||
-      DS->Loc.isASTNode<EnumElementDecl>()) {
-
-    auto *SILFn = DS->getFunction();
+  if (auto *SILFn = DS->Parent.dyn_cast<SILFunction *>()) {
     auto *FnScope = SILFn->getDebugScope();
     // FIXME: This is a bug in the SIL deserialization.
     if (!FnScope)
@@ -653,7 +644,9 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   if (cached != ScopeCache.end())
     return cast<llvm::DISubprogram>(cached->second);
 
-  SILFunction *SILFn = DS ? DS->getFunction() : nullptr;
+  // Some IRGen-generated helper functions don't have a corresponding
+  // SIL function, hence the dyn_cast.
+  SILFunction *SILFn = DS ? DS->Parent.dyn_cast<SILFunction *>() : nullptr;
   StringRef LinkageName;
   if (Fn)
     LinkageName = Fn->getName();

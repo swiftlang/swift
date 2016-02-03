@@ -932,7 +932,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
     if (!silBB->empty()) {
       SILInstruction &I = *silBB->begin();
       auto DS = I.getDebugScope();
-      assert(DS && (DS->InlinedCallSite || DS->getFunction() == IGF.CurSILFn));
+      assert(DS && (DS->getParentFunction() == IGF.CurSILFn));
       IGF.IGM.DebugInfo->setCurrentLoc(IGF.Builder, DS, I.getLoc());
     }
   }
@@ -1591,8 +1591,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         InCleanupBlock = false;
       }
 
-      assert((!DS || (DS->InlinedCallSite || DS->getFunction() == CurSILFn)) &&
-             "insn was not inlined, but belongs to a different function");
+      assert((!DS || (DS->getParentFunction() == CurSILFn)) &&
+             "insn belongs to a different function");
 
       // Until SILDebugScopes are properly serialized, bare functions
       // are allowed to not have a scope.
@@ -3433,7 +3433,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     DbgTy.unwrapLValueOrInOutType();
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope()) {
-      assert(DS->InlinedCallSite || DS->getFunction() == CurSILFn);
+      assert(DS->getParentFunction() == CurSILFn);
       emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
                                    i->getVarInfo().ArgNo);
     }
