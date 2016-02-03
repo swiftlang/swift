@@ -1,4 +1,4 @@
-//===--- GlobalARCPairingAnalysis.h -----------------------------*- C++ -*-===//
+//===--- ARCSequenceOpts.h ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_GLOBALARCPAIRINGANALYSIS_H
-#define SWIFT_SILOPTIMIZER_PASSMANAGER_GLOBALARCPAIRINGANALYSIS_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARCSEQUENCEOPTS_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_ARCSEQUENCEOPTS_H
 
 #include "GlobalARCSequenceDataflow.h"
 #include "GlobalLoopARCSequenceDataflow.h"
+#include "ARCMatchingSet.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "llvm/ADT/SetVector.h"
@@ -29,50 +30,8 @@ class LoopRegionFunctionInfo;
 class SILLoopInfo;
 class RCIdentityFunctionInfo;
 
-/// A set of matching reference count increments, decrements, increment
-/// insertion pts, and decrement insertion pts.
-struct ARCMatchingSet {
-
-  /// The pointer that this ARCMatchingSet is providing matching increment and
-  /// decrement sets for.
-  ///
-  /// TODO: This should really be called RCIdentity.
-  SILValue Ptr;
-
-  /// The set of reference count increments that were paired.
-  llvm::SetVector<SILInstruction *> Increments;
-
-  /// An insertion point for an increment means the earliest point in the
-  /// program after the increment has occurred that the increment can be moved to
-  /// without moving the increment over an instruction that may decrement a
-  /// reference count.
-  llvm::SetVector<SILInstruction *> IncrementInsertPts;
-
-  /// The set of reference count decrements that were paired.
-  llvm::SetVector<SILInstruction *> Decrements;
-
-  /// An insertion point for a decrement means the latest point in the program
-  /// before the decrement that the optimizer conservatively assumes that a
-  /// reference counted value could be used.
-  llvm::SetVector<SILInstruction *> DecrementInsertPts;
-
-  // This is a data structure that cannot be moved or copied.
-  ARCMatchingSet() = default;
-  ARCMatchingSet(const ARCMatchingSet &) = delete;
-  ARCMatchingSet(ARCMatchingSet &&) = delete;
-  ARCMatchingSet &operator=(const ARCMatchingSet &) = delete;
-  ARCMatchingSet &operator=(ARCMatchingSet &&) = delete;
-
-  void clear() {
-    Ptr = SILValue();
-    Increments.clear();
-    IncrementInsertPts.clear();
-    Decrements.clear();
-    DecrementInsertPts.clear();
-  }
-};
-
 class CodeMotionOrDeleteCallback {
+
   bool Changed = false;
   llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
 
@@ -95,7 +54,8 @@ public:
   bool madeChange() const { return Changed; }
 };
 
-/// A wrapper around the results of the bottom-up/top-down dataflow that knows how
+/// A wrapper around the results of the bottom-up/top-down dataflow that knows
+/// how
 /// to pair the retains/releases in those results.
 struct ARCPairingContext {
   SILFunction &F;

@@ -3,7 +3,7 @@ set(ARC_SOURCES
   ARC/ARCRegionState.cpp
   ARC/ARCLoopOpts.cpp
   ARC/ARCSequenceOpts.cpp
-  ARC/GlobalARCPairingAnalysis.cpp
+  ARC/ARCMatchingSet.cpp
   ARC/GlobalARCSequenceDataflow.cpp
   ARC/GlobalLoopARCSequenceDataflow.cpp
   ARC/RCStateTransition.cpp
