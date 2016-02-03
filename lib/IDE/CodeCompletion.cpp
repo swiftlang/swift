@@ -1086,6 +1086,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool HasSpace = false;
   bool HasRParen = false;
   bool ShouldCompleteCallPatternAfterParen = true;
+  bool PreferFunctionReferencesToCalls = false;
   Optional<DeclKind> AttTargetDK;
 
   SmallVector<StringRef, 3> ParsedKeywords;
@@ -1419,6 +1420,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool HaveRParen = false;
   bool IsSuperRefExpr = false;
   bool IsDynamicLookup = false;
+  bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
 
   /// \brief True if we are code completing inside a static method.
@@ -1564,6 +1566,10 @@ public:
 
   void setIsDynamicLookup() {
     IsDynamicLookup = true;
+  }
+
+  void setPreferFunctionReferencesToCalls() {
+    PreferFunctionReferencesToCalls = true;
   }
 
   void setHaveLeadingSpace(bool value) { HaveLeadingSpace = value; }
@@ -2402,6 +2408,43 @@ public:
     Builder.addDeclAttrKeyword(Name, Annotation);
   }
 
+  /// Add the compound function name for the given function.
+  void addCompoundFunctionName(AbstractFunctionDecl *AFD,
+                               DeclVisibilityKind Reason) {
+    CommandWordsPairs Pairs;
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(AFD, Reason), ExpectedTypes);
+    setClangDeclKeywords(AFD, Pairs, Builder);
+    Builder.setAssociatedDecl(AFD);
+
+    // Base name
+    addLeadingDot(Builder);
+    Builder.addTextChunk(AFD->getFullName().getBaseName().str());
+
+    // Add the argument labels.
+    auto ArgLabels = AFD->getFullName().getArgumentNames();
+    if (ArgLabels.size() > 0) {
+      if (!HaveLParen)
+        Builder.addLeftParen();
+      else
+        Builder.addAnnotatedLeftParen();
+
+      for (auto ArgLabel : ArgLabels) {
+        if (ArgLabel.empty())
+          Builder.addTextChunk("_");
+        else
+          Builder.addTextChunk(ArgLabel.str());
+        Builder.addTextChunk(":");
+      }
+
+      if (!HaveRParen)
+        Builder.addRightParen();
+      else
+        Builder.addAnnotatedRightParen();
+    }
+  }
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
@@ -2424,6 +2467,12 @@ public:
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+        // Do we want compound function names here?
+        if (PreferFunctionReferencesToCalls) {
+          addCompoundFunctionName(CD, Reason);
+          return;
+        }
+        
         if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
           if (HaveDot) {
             Type Ty;
@@ -2480,6 +2529,12 @@ public:
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
+
+        // Do we want compound function names here?
+        if (PreferFunctionReferencesToCalls) {
+          addCompoundFunctionName(FD, Reason);
+          return;
+        }
 
         addMethodCall(FD, Reason);
         return;
@@ -3759,6 +3814,9 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
     return;
 
   Kind = CompletionKind::DotExpr;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = E;
   this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
@@ -3780,6 +3838,9 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExp
     return;
 
   Kind = CompletionKind::PostfixExprBeginning;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   CurDeclContext = P.CurDeclContext;
   CStyleForLoopIterationVariable =
       CodeCompletionCallbacks::CStyleForLoopIterationVariable;
@@ -3795,6 +3856,9 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
 
   HasSpace = hasSpace;
   Kind = CompletionKind::PostfixExpr;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
 }
@@ -3833,6 +3897,9 @@ void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
     return;
 
   Kind = CompletionKind::SuperExpr;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;
 }
@@ -3843,6 +3910,9 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
     return;
 
   Kind = CompletionKind::SuperExprDot;
+  if (InObjCSelectorExpr)
+    PreferFunctionReferencesToCalls = true;
+
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;
 }
@@ -4376,6 +4446,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ExprType) {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
+  if (PreferFunctionReferencesToCalls)
+    Lookup.setPreferFunctionReferencesToCalls();
 
   auto DoPostfixExprBeginning = [&] (){
     if (CStyleForLoopIterationVariable)
