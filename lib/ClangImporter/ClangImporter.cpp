@@ -2009,13 +2009,49 @@ considerErrorImport(ClangImporter::Implementation &importer,
   return None;
 }
 
-/// Determine whether we are allowed to strip the module prefix from
-/// an entity with the given name.
-static bool canStripModulePrefix(StringRef name) {
-  if (auto known = getKnownFoundationEntity(name))
-    return !nameConflictsWithStandardLibrary(*known);
+// Determine whether we should strip the module prefix from a global-scope
+// entity in the given module and with the given base name.
+static unsigned stripModulePrefixLength(
+                  const llvm::StringMap<std::string> &modulePrefixes,
+                  StringRef moduleName,
+                  StringRef baseName) {
+  // Do we have a module prefix for this module?
+  auto prefixPos = modulePrefixes.find(moduleName);
+  if (prefixPos == modulePrefixes.end()) return 0;
 
-  return true;
+  // Is the prefix actually there?
+  if (!baseName.startswith(prefixPos->second)) return 0;
+
+  // Check whether this is a known Foundation entity that conflicts with the
+  // standard library.
+  if (auto known = getKnownFoundationEntity(baseName))
+    if (nameConflictsWithStandardLibrary(*known))
+      return 0;
+
+  // If the character following the prefix is a '_', eat that, too.
+  unsigned prefixLen = prefixPos->second.size();
+  if (prefixLen < baseName.size() && baseName[prefixLen] == '_')
+    ++prefixLen;
+
+  // Make sure we're left with an identifier.
+  if (prefixLen == baseName.size() ||
+      !Lexer::isIdentifier(baseName.substr(prefixLen)))
+    return 0;
+
+  // We can strip the module prefix.
+  return prefixLen;
+}
+
+/// Determine whether we should lowercase the first word of the given value
+/// name.
+static bool shouldLowercaseValueName(StringRef name) {
+  // If we see any lowercase characters, we can lowercase.
+  for (auto c : name) {
+    if (clang::isLowercase(c)) return true;
+  }
+
+  // Otherwise, lowercasing will either be a no-op or we have ALL_CAPS.
+  return false;
 }
 
 /// Returns true if it is expected that the macro is ignored.
@@ -2529,15 +2565,13 @@ auto ClangImporter::Implementation::importFullName(
         moduleName = module->getTopLevelModuleName();
       else
         moduleName = owningD->getASTContext().getLangOpts().CurrentModule;
-      auto prefixPos = ModulePrefixes.find(moduleName);
-      if (prefixPos != ModulePrefixes.end() &&
-          canStripModulePrefix(baseName) &&
-          baseName.startswith(prefixPos->second)) {
+      if (unsigned prefixLen = stripModulePrefixLength(ModulePrefixes,
+                                                       moduleName, baseName)) {
         // Strip off the prefix.
-        baseName = baseName.substr(prefixPos->second.size());
+        baseName = baseName.substr(prefixLen);
 
         // If the result is a value, lowercase it.
-        if (isa<clang::ValueDecl>(D))
+        if (isa<clang::ValueDecl>(D) && shouldLowercaseValueName(baseName))
           baseName = camel_case::toLowercaseWord(baseName,
                                                  omitNeedlessWordsScratch);
       }
