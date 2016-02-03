@@ -30,42 +30,20 @@ class LoopRegionFunctionInfo;
 class SILLoopInfo;
 class RCIdentityFunctionInfo;
 
-class CodeMotionOrDeleteCallback {
-
-  bool Changed = false;
-  llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
-
-public:
-  /// This call should process \p Set and modify any internal state of
-  /// ARCMatchingSetCallback given \p Set. This call should not remove any
-  /// instructions since any removed instruction might be used as an insertion
-  /// point for another retain, release pair.
-  void processMatchingSet(ARCMatchingSet &Set);
-
-  // Delete instructions after we have processed all matching sets so that we do
-  // not remove instructions that may be insertion points for other retain,
-  // releases.
-  void finalize() {
-    while (!InstructionsToDelete.empty()) {
-      InstructionsToDelete.pop_back_val()->eraseFromParent();
-    }
-  }
-
-  bool madeChange() const { return Changed; }
-};
-
-/// A wrapper around the results of the bottom-up/top-down dataflow that knows
-/// how
-/// to pair the retains/releases in those results.
 struct ARCPairingContext {
   SILFunction &F;
   BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
   BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
   RCIdentityFunctionInfo *RCIA;
+  bool MadeChange = false;
 
   ARCPairingContext(SILFunction &F, RCIdentityFunctionInfo *RCIA)
       : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
-  bool performMatching(CodeMotionOrDeleteCallback &Callback);
+  bool performMatching();
+
+  void
+  optimizeMatchingSet(ARCMatchingSet &MatchSet,
+                      llvm::SmallVectorImpl<SILInstruction *> &InstsToDelete);
 };
 
 /// A composition of an ARCSequenceDataflowEvaluator and an
@@ -84,13 +62,15 @@ struct BlockARCPairingContext {
         Evaluator(F, AA, POTA, RCFI, PTFI, Context.DecToIncStateMap,
                   Context.IncToDecStateMap) {}
 
-  bool run(bool FreezePostDomReleases, CodeMotionOrDeleteCallback &Callback) {
+  bool run(bool FreezePostDomReleases) {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
 
-    bool MatchedPair = Context.performMatching(Callback);
+    bool MatchedPair = Context.performMatching();
     return NestingDetected && MatchedPair;
   }
+
+  bool madeChange() const { return Context.MadeChange; }
 };
 
 /// A composition of a LoopARCSequenceDataflowEvaluator and an
@@ -102,7 +82,6 @@ struct LoopARCPairingContext : SILLoopVisitor {
   LoopARCSequenceDataflowEvaluator Evaluator;
   LoopRegionFunctionInfo *LRFI;
   SILLoopInfo *SLI;
-  CodeMotionOrDeleteCallback Callback;
 
   LoopARCPairingContext(SILFunction &F, AliasAnalysis *AA,
                         LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
@@ -111,17 +90,17 @@ struct LoopARCPairingContext : SILLoopVisitor {
       : SILLoopVisitor(&F, SLI), Context(F, RCFI),
         Evaluator(F, AA, LRFI, SLI, RCFI, PTFI, Context.DecToIncStateMap,
                   Context.IncToDecStateMap),
-        LRFI(LRFI), SLI(SLI), Callback() {}
+        LRFI(LRFI), SLI(SLI) {}
 
   bool process() {
     run();
-    if (!Callback.madeChange())
+    if (!madeChange())
       return false;
     run();
     return true;
   }
 
-  bool madeChange() const { return Callback.madeChange(); }
+  bool madeChange() const { return Context.MadeChange; }
 
   void runOnLoop(SILLoop *L) override;
   void runOnFunction(SILFunction *F) override;

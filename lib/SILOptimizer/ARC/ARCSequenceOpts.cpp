@@ -42,98 +42,6 @@ STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
-//                            ARC Pairing Context
-//===----------------------------------------------------------------------===//
-
-bool ARCPairingContext::performMatching(CodeMotionOrDeleteCallback &Callback) {
-  bool MatchedPair = false;
-
-  DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
-                     << " ****\n");
-
-  /// For each increment that we matched to a decrement, try to match it to a
-  /// decrement -> increment pair.
-  for (auto Pair : IncToDecStateMap) {
-    if (!Pair.hasValue())
-      continue;
-
-    SILInstruction *Increment = Pair->first;
-    if (!Increment)
-      continue; // blotted
-
-    DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
-    ARCMatchingSetBuilder Builder(DecToIncStateMap, IncToDecStateMap, RCIA);
-    Builder.init(Increment);
-    if (Builder.matchUpIncDecSetsForPtr()) {
-      MatchedPair |= Builder.matchedPair();
-      auto &Set = Builder.getResult();
-      for (auto *I : Set.Increments)
-        IncToDecStateMap.blot(I);
-      for (auto *I : Set.Decrements)
-        DecToIncStateMap.blot(I);
-
-      // Add the Set to the callback. *NOTE* No instruction destruction can
-      // happen here since we may remove instructions that are insertion points
-      // for other instructions.
-      Callback.processMatchingSet(Set);
-    }
-  }
-
-  // Then finalize the callback. This is the only place instructions can be
-  // deleted.
-  Callback.finalize();
-  return MatchedPair;
-}
-
-//===----------------------------------------------------------------------===//
-//                                  Loop ARC
-//===----------------------------------------------------------------------===//
-
-void LoopARCPairingContext::runOnLoop(SILLoop *L) {
-  auto *Region = LRFI->getRegion(L);
-  if (processRegion(Region, false, false)) {
-    // We do not recompute for now since we only look at the top function level
-    // for post dominating releases.
-    processRegion(Region, true, false);
-  }
-
-  // Now that we have finished processing the loop, summarize the loop.
-  Evaluator.summarizeLoop(Region);
-}
-
-void LoopARCPairingContext::runOnFunction(SILFunction *F) {
-  if (processRegion(LRFI->getTopLevelRegion(), false, false)) {
-    // We recompute the final post dom release since we may have moved the final
-    // post dominated releases.
-    processRegion(LRFI->getTopLevelRegion(), true, true);
-  }
-}
-
-bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
-                                          bool FreezePostDomReleases,
-                                          bool RecomputePostDomReleases) {
-  bool MadeChange = false;
-  bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
-                                             RecomputePostDomReleases);
-  bool MatchedPair = Context.performMatching(Callback);
-  MadeChange |= MatchedPair;
-  Evaluator.clearLoopState(Region);
-  Context.DecToIncStateMap.clear();
-  Context.IncToDecStateMap.clear();
-
-  while (NestingDetected && MatchedPair) {
-    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases, false);
-    MatchedPair = Context.performMatching(Callback);
-    MadeChange |= MatchedPair;
-    Evaluator.clearLoopState(Region);
-    Context.DecToIncStateMap.clear();
-    Context.IncToDecStateMap.clear();
-  }
-
-  return MadeChange;
-}
-
-//===----------------------------------------------------------------------===//
 //                                Code Motion
 //===----------------------------------------------------------------------===//
 
@@ -170,15 +78,13 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   return B.createReleaseValue(Loc, Ptr);
 }
 
-//===----------------------------------------------------------------------===//
-//                             Mutating Callback
-//===----------------------------------------------------------------------===//
-
 // This routine takes in the ARCMatchingSet \p MatchSet and inserts new
 // increments, decrements at the insertion points and adds the old increment,
 // decrements to the delete list. Sets changed to true if anything was moved or
 // deleted.
-void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
+void ARCPairingContext::optimizeMatchingSet(
+    ARCMatchingSet &MatchSet,
+    llvm::SmallVectorImpl<SILInstruction *> &InstsToDelete) {
   DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
 
   // Insert the new increments.
@@ -189,7 +95,7 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
       continue;
     }
 
-    Changed = true;
+    MadeChange = true;
     SILInstruction *NewIncrement = createIncrement(MatchSet.Ptr, InsertPt);
     (void)NewIncrement;
     DEBUG(llvm::dbgs() << "    Inserting new increment: " << *NewIncrement
@@ -205,7 +111,7 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
       continue;
     }
 
-    Changed = true;
+    MadeChange = true;
     SILInstruction *NewDecrement = createDecrement(MatchSet.Ptr, InsertPt);
     (void)NewDecrement;
     DEBUG(llvm::dbgs() << "    Inserting new NewDecrement: " << *NewDecrement
@@ -215,19 +121,111 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
 
   // Add the old increments to the delete list.
   for (SILInstruction *Increment : MatchSet.Increments) {
-    Changed = true;
+    MadeChange = true;
     DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
-    InstructionsToDelete.push_back(Increment);
+    InstsToDelete.push_back(Increment);
     ++NumRefCountOpsRemoved;
   }
 
   // Add the old decrements to the delete list.
   for (SILInstruction *Decrement : MatchSet.Decrements) {
-    Changed = true;
+    MadeChange = true;
     DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
-    InstructionsToDelete.push_back(Decrement);
+    InstsToDelete.push_back(Decrement);
     ++NumRefCountOpsRemoved;
   }
+}
+
+bool ARCPairingContext::performMatching() {
+  bool MatchedPair = false;
+
+  DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
+                     << " ****\n");
+
+  llvm::SmallVector<SILInstruction *, 8> InstructionsToDelete;
+
+  /// For each increment that we matched to a decrement, try to match it to a
+  /// decrement -> increment pair.
+  for (auto Pair : IncToDecStateMap) {
+    if (!Pair.hasValue())
+      continue;
+
+    SILInstruction *Increment = Pair->first;
+    if (!Increment)
+      continue; // blotted
+
+    DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
+    ARCMatchingSetBuilder Builder(DecToIncStateMap, IncToDecStateMap, RCIA);
+    Builder.init(Increment);
+    if (Builder.matchUpIncDecSetsForPtr()) {
+      MatchedPair |= Builder.matchedPair();
+      auto &Set = Builder.getResult();
+      for (auto *I : Set.Increments)
+        IncToDecStateMap.blot(I);
+      for (auto *I : Set.Decrements)
+        DecToIncStateMap.blot(I);
+
+      // Add the Set to the callback. *NOTE* No instruction destruction can
+      // happen here since we may remove instructions that are insertion points
+      // for other instructions.
+      optimizeMatchingSet(Set, InstructionsToDelete);
+    }
+  }
+
+  // Then delete all of the instructions that we still have.
+  while (!InstructionsToDelete.empty()) {
+    InstructionsToDelete.pop_back_val()->eraseFromParent();
+  }
+
+  return MatchedPair;
+}
+
+//===----------------------------------------------------------------------===//
+//                                  Loop ARC
+//===----------------------------------------------------------------------===//
+
+void LoopARCPairingContext::runOnLoop(SILLoop *L) {
+  auto *Region = LRFI->getRegion(L);
+  if (processRegion(Region, false, false)) {
+    // We do not recompute for now since we only look at the top function level
+    // for post dominating releases.
+    processRegion(Region, true, false);
+  }
+
+  // Now that we have finished processing the loop, summarize the loop.
+  Evaluator.summarizeLoop(Region);
+}
+
+void LoopARCPairingContext::runOnFunction(SILFunction *F) {
+  if (processRegion(LRFI->getTopLevelRegion(), false, false)) {
+    // We recompute the final post dom release since we may have moved the final
+    // post dominated releases.
+    processRegion(LRFI->getTopLevelRegion(), true, true);
+  }
+}
+
+bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
+                                          bool FreezePostDomReleases,
+                                          bool RecomputePostDomReleases) {
+  bool MadeChange = false;
+  bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
+                                             RecomputePostDomReleases);
+  bool MatchedPair = Context.performMatching();
+  MadeChange |= MatchedPair;
+  Evaluator.clearLoopState(Region);
+  Context.DecToIncStateMap.clear();
+  Context.IncToDecStateMap.clear();
+
+  while (NestingDetected && MatchedPair) {
+    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases, false);
+    MatchedPair = Context.performMatching();
+    MadeChange |= MatchedPair;
+    Evaluator.clearLoopState(Region);
+    Context.DecToIncStateMap.clear();
+    Context.IncToDecStateMap.clear();
+  }
+
+  return MadeChange;
 }
 
 //===----------------------------------------------------------------------===//
@@ -250,7 +248,6 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
 
   bool Changed = false;
   BlockARCPairingContext Context(F, AA, POTA, RCIA, PTFI);
-  CodeMotionOrDeleteCallback Callback;
   // Until we do not remove any instructions or have nested increments,
   // decrements...
   while (true) {
@@ -260,9 +257,9 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
     // We need to blot pointers we remove after processing an individual pointer
     // so we don't process pairs after we have paired them up. Thus we pass in a
     // lambda that performs the work for us.
-    bool ShouldRunAgain = Context.run(FreezePostDomReleases, Callback);
+    bool ShouldRunAgain = Context.run(FreezePostDomReleases);
 
-    Changed |= Callback.madeChange();
+    Changed |= Context.madeChange();
 
     // If we did not remove any instructions or have any nested increments, do
     // not perform another iteration.
