@@ -205,20 +205,20 @@ Algorithm.test("sorted/complexity") {
   // Check performance of sort on array of repeating values
   var comparisons_100 = 0
   ary = [Int](count: 100, repeatedValue: 0)
-  ary.sortInPlace { comparisons_100++; return $0 < $1 }
+  ary.sortInPlace { comparisons_100 += 1; return $0 < $1 }
   var comparisons_1000 = 0
   ary = [Int](count: 1000, repeatedValue: 0)
-  ary.sortInPlace { comparisons_1000++; return $0 < $1 }
+  ary.sortInPlace { comparisons_1000 += 1; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 
   // Try to construct 'bad' case for quicksort, on which the algorithm
   // goes quadratic.
   comparisons_100 = 0
   ary = makeQSortKiller(100)
-  ary.sortInPlace { comparisons_100++; return $0 < $1 }
+  ary.sortInPlace { comparisons_100 += 1; return $0 < $1 }
   comparisons_1000 = 0
   ary = makeQSortKiller(1000)
-  ary.sortInPlace { comparisons_1000++; return $0 < $1 }
+  ary.sortInPlace { comparisons_1000 += 1; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 }
 
