@@ -11,20 +11,28 @@
 //===----------------------------------------------------------------------===//
 
 public enum Process {
-  /// The list of command-line arguments with which the current
-  /// process was invoked.
-  public static let arguments: [String] = {
-    // Use lazy initialization of static properties to safely initialize the
-    // public 'arguments' property on first use.
-    (0..<Int(argc)).map { i in
-      String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? ""
+  /// Return an array of string containing the list of command-line arguments
+  /// with which the current process was invoked.
+  internal static func _computeArguments() -> [String] {
+    var result :[String] = []
+    for i in 0..<Int(argc) {
+     result.append(
+       String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? "")
     }
-  }()
+    return result 
+  }
 
   internal static var _argc: CInt = CInt()
   internal static var _unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
     = nil
+
+  internal enum _ProcessArgumentsState {
+    case NotYetComputed
+    case ComputedArguments([String])
+  }
+
+  internal static var _arguments : _ProcessArgumentsState = .NotYetComputed
 
   /// Access to the raw argc value from C.
   public static var argc: CInt {
@@ -37,6 +45,18 @@ public enum Process {
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>> {
     return _unsafeArgv
   }
+
+  /// Access to the swift arguments, also compute the arguments lazily.
+  public static var arguments : [String] {
+    switch _arguments {
+    case .NotYetComputed:
+      let result: [String] = _computeArguments() 
+      _arguments = .ComputedArguments(result)
+      return result;
+    case .ComputedArguments(let args):
+      return args
+    }
+  } 
 }
 
 /// Intrinsic entry point invoked on entry to a standalone program's "main".
