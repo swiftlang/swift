@@ -1330,7 +1330,7 @@ private:
     return FoundOtherSpec;
   }
 
-  /// Return the availablity context for the given spec.
+  /// Return the availability context for the given spec.
   AvailabilityContext contextForSpec(AvailabilitySpec *Spec) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
       return AvailabilityContext(
