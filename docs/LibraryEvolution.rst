@@ -1083,6 +1083,30 @@ that client code will never accidentally introduce implicit dependencies on
 specific versions of libraries.
 
 
+Related Proposals
+=================
+
+The following proposals (some currently in the process, some planned) will
+affect the model described in this document, or concern the parts of this
+document that affect language semantics:
+
+- `SE-0030 Property Behaviors`_
+- (planned) Making classes "sealed" by default
+- (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
+- (planned) Default implementations in protocols
+- (planned) Open and closed enums
+- (planned) Syntax for declaring "versioned" entities and their features
+- (planned) Syntax for declaring inlineable code
+- (planned) Syntax for declaring fixed-contents structs
+- (future) Performance annotations for types
+- (future) Attributes for stored property accessors
+
+.. _SE-0030 Property Behaviors: https://github.com/apple/swift-evolution/blob/master/proposals/0030-property-behavior-decls.md
+
+This does not mean all of these proposals need to be accepted, only that their
+acceptance or rejection will affect this document.
+
+
 Glossary
 ========
 
