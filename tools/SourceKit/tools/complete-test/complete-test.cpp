@@ -47,6 +47,7 @@ struct TestOptions {
   Optional<unsigned> hideUnderscores;
   Optional<bool> hideByName;
   Optional<bool> hideLowPriority;
+  Optional<unsigned> showTopNonLiteral;
   Optional<bool> fuzzyMatching;
   Optional<unsigned> fuzzyWeight;
   Optional<unsigned> popularityBonus;
@@ -91,6 +92,7 @@ static sourcekitd_uid_t KeyAddInitsToTopLevel;
 static sourcekitd_uid_t KeyFuzzyMatching;
 static sourcekitd_uid_t KeyFuzzyWeight;
 static sourcekitd_uid_t KeyPopularityBonus;
+static sourcekitd_uid_t KeyTopNonLiteral;
 static sourcekitd_uid_t KeyKind;
 static sourcekitd_uid_t KeyResults;
 static sourcekitd_uid_t KeyPopular;
@@ -224,6 +226,13 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.unpopularAPI = value;
     } else if (opt == "filter-rules") {
       options.filterRulesJSON = value;
+    } else if (opt == "top") {
+      unsigned uval;
+      if (value.getAsInteger(10, uval)) {
+        error = "unrecognized integer value for -tope=";
+        return false;
+      }
+      options.showTopNonLiteral = uval;
     }
   }
 
@@ -302,6 +311,8 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_uid_get_from_cstr("key.codecomplete.sort.fuzzyweight");
   KeyPopularityBonus =
       sourcekitd_uid_get_from_cstr("key.codecomplete.sort.popularitybonus");
+  KeyTopNonLiteral =
+      sourcekitd_uid_get_from_cstr("key.codecomplete.showtopnonliteralresults");
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
@@ -609,6 +620,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     addIntOption(KeyHideUnderscores, options.hideUnderscores);
     addIntOption(KeyFuzzyWeight, options.fuzzyWeight);
     addIntOption(KeyPopularityBonus, options.popularityBonus);
+    addIntOption(KeyTopNonLiteral, options.showTopNonLiteral);
 
     if (filterText)
       sourcekitd_request_dictionary_set_string(opts, KeyFilterText, filterText);

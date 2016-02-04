@@ -39,6 +39,7 @@ struct Options {
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
   unsigned minFuzzyLength = 2;
+  unsigned showTopNonLiteralResults = 3;
 
   // Options for combining priorities. The defaults are chosen so that a fuzzy
   // match just breaks ties within a semantic context.  If semanticContextWeight

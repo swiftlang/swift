@@ -742,6 +742,78 @@ static int compareLiterals(Item &a_, Item &b_) {
   return 0;
 }
 
+static bool isTopNonLiteralResult(Item &item, ResultBucket literalBucket) {
+  if (isa<Group>(item))
+    return true; // FIXME: should have a semantic context for groups.
+  auto *completion = cast<Result>(item).value;
+
+  switch (literalBucket) {
+  case ResultBucket::Literal:
+    return completion->getSemanticContext() <=
+           SemanticContextKind::CurrentNominal;
+  case ResultBucket::LiteralTypeMatch:
+    return completion->getExpectedTypeRelation() >= Completion::Convertible;
+  default:
+    llvm_unreachable("invalid literal bucket");
+  }
+}
+
+static void sortTopN(const Options &options, Group *group,
+                     bool hasExpectedTypes) {
+
+  auto &contents = group->contents;
+  if (contents.empty() || options.showTopNonLiteralResults == 0)
+    return;
+
+  auto best = getResultBucket(*contents[0], hasExpectedTypes);
+  if (best == ResultBucket::LiteralTypeMatch || best == ResultBucket::Literal) {
+
+    unsigned beginNewIndex = 0;
+    unsigned endNewIndex = 0;
+    for (unsigned i = 1; i < contents.size(); ++i) {
+      auto bucket = getResultBucket(*contents[i], hasExpectedTypes);
+      if (bucket < best) {
+        // This algorithm assumes we don't have both literal and
+        // literal-type-match at the start of the list.
+        assert(bucket != ResultBucket::Literal);
+        if (isTopNonLiteralResult(*contents[i], best)) {
+          beginNewIndex = i;
+          endNewIndex = beginNewIndex + 1;
+          for (; endNewIndex < contents.size() &&
+                 endNewIndex < beginNewIndex + options.showTopNonLiteralResults;
+               ++endNewIndex) {
+            if (!isTopNonLiteralResult(*contents[endNewIndex], best))
+              break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (!beginNewIndex)
+      return;
+
+    assert(endNewIndex > beginNewIndex && endNewIndex < contents.size());
+
+    // Temporarily copy the first result to temporary storage.
+    SmallVector<Item *, 16> firstResults;
+    for (unsigned i = 0; i < endNewIndex; ++i) {
+      firstResults.push_back(contents[i].release());
+    }
+
+    // Swap the literals with the next few results.
+    for (unsigned ci = 0, i = beginNewIndex; i < endNewIndex; ++i, ++ci) {
+      assert(ci < contents.size() && !contents[ci]);
+      contents[ci] = std::unique_ptr<Item>(firstResults[i]);
+    }
+    unsigned topN = endNewIndex - beginNewIndex;
+    for (unsigned ci = topN, i = 0; i < beginNewIndex; ++i, ++ci) {
+      assert(ci < contents.size() && !contents[ci]);
+      contents[ci] = std::unique_ptr<Item>(firstResults[i]);
+    }
+  }
+}
+
 static void sortRecursive(const Options &options, Group *group,
                           bool hasExpectedTypes) {
   // Sort all of the subgroups first, and fill in the bucket for each result.
@@ -805,6 +877,8 @@ static void sortRecursive(const Options &options, Group *group,
 
 void CodeCompletionOrganizer::Impl::sort(Options options) {
   sortRecursive(options, rootGroup.get(), completionHasExpectedTypes);
+  if (options.showTopNonLiteralResults != 0)
+    sortTopN(options, rootGroup.get(), completionHasExpectedTypes);
 }
 
 void CodeCompletionOrganizer::Impl::groupStemsRecursive(

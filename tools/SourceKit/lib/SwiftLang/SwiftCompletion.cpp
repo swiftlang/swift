@@ -783,6 +783,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
   static UIdent KeyFuzzyMatching("key.codecomplete.fuzzymatching");
+  static UIdent KeyTopNonLiteral("key.codecomplete.showtopnonliteralresults");
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
   static UIdent KeyFuzzyWeight("key.codecomplete.sort.fuzzyweight");
   static UIdent KeyPopularityBonus("key.codecomplete.sort.popularitybonus");
@@ -806,6 +807,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyFuzzyWeight, to.fuzzyMatchWeight);
   from.valueForOption(KeyPopularityBonus, to.popularityBonus);
   from.valueForOption(KeyHideByName, to.hideByNameStyle);
+  from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
 }
 
 static void translateFilterRules(ArrayRef<FilterRule> rawFilterRules,
