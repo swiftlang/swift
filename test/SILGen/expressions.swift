@@ -472,17 +472,17 @@ func if_expr(a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
 }
 
 
-// Test that magic identifiers expand properly.  We test __COLUMN__ here because
+// Test that magic identifiers expand properly.  We test #column here because
 // it isn't affected as this testcase slides up and down the file over time.
-func magic_identifier_expansion(a: Int = __COLUMN__) {
+func magic_identifier_expansion(a: Int = #column) {
   // CHECK-LABEL: sil hidden @{{.*}}magic_identifier_expansion
   
   // This should expand to the column number of the first _.
-  var tmp = __COLUMN__
+  var tmp = #column
   // CHECK: integer_literal $Builtin.Int2048, 13
 
   // This should expand to the column number of the (, not to the column number
-  // of __COLUMN__ in the default argument list of this function.
+  // of #column in the default argument list of this function.
   // rdar://14315674
   magic_identifier_expansion()
   // CHECK: integer_literal $Builtin.Int2048, 29

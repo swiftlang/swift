@@ -273,7 +273,7 @@ func expectLocalizedEquality(
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
 

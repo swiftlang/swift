@@ -214,7 +214,7 @@ class BridgedVerbatimRefType {
 func withSwiftObjectCanary<T>(
   createValue: () -> T,
   _ check: (T) -> Void,
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let stackTrace = SourceLocStack(SourceLoc(file, line))
 

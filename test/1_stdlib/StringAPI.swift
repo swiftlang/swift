@@ -33,7 +33,7 @@ struct ComparisonTest {
     _ expectedUnicodeCollation: ExpectedComparisonResult,
     _ lhs: String, _ rhs: String,
     xfail: TestRunPredicate = .Custom({false}, reason: ""),
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expectedUnicodeCollation = expectedUnicodeCollation
     self.lhs = lhs

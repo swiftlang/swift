@@ -15,9 +15,9 @@
 //
 // RUN: rm -rf %t.dir
 // RUN: mkdir -p %t.dir/subpath
-// RUN: echo "print(\"exec: \" + __FILE__)" > %t.dir/stdin
-// RUN: echo "print(\"exec: \" + __FILE__)" > %t.dir/t.swift
-// RUN: echo "print(\"exec: \" + __FILE__)" > %t.dir/subpath/build
+// RUN: echo "print(\"exec: \" + #file)" > %t.dir/stdin
+// RUN: echo "print(\"exec: \" + #file)" > %t.dir/t.swift
+// RUN: echo "print(\"exec: \" + #file)" > %t.dir/subpath/build
 // RUN: cd %t.dir && %swift_driver_plain - < %t.dir/stdin -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-STDIN-INVOKES-INTERPRETER %s
 // CHECK-SWIFT-STDIN-INVOKES-INTERPRETER: exec: <stdin>
 // RUN: cd %t.dir && %swift_driver_plain t.swift -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-SUFFIX-INVOKES-INTERPRETER %s
