@@ -2158,7 +2158,7 @@ namespace {
                                        + type->getName().str(),
                                      IGM.getModule());
     fn->setAttributes(IGM.constructInitialAttributes());
-    
+
     // Emit the body of the field type accessor later. We need to access
     // the type metadata for the fields, which could lead to infinite recursion
     // in recursive types if we build the field type accessor during metadata
@@ -2466,6 +2466,9 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
                              ArrayRef<FieldTypeInfo> fieldTypes)
 {
   IRGenFunction IGF(IGM, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
+
   auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
 
   CanType formalType = type->getDeclaredTypeInContext()->getCanonicalType();
