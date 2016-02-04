@@ -1082,7 +1082,7 @@ namespace {
         return visitLiteralExpr(expr);
 
       case MagicIdentifierLiteralExpr::DSOHandle: {
-        // __DSO_HANDLE__ has type UnsafeMutablePointer<Void>.
+        // #dsohandle has type UnsafeMutablePointer<Void>.
         auto &tc = CS.getTypeChecker();
         if (tc.requirePointerArgumentIntrinsics(expr->getLoc()))
           return nullptr;

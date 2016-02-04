@@ -280,7 +280,7 @@ public:
   SILFunction &F;
   
   /// The name of the function currently being emitted, as presented to user
-  /// code by __FUNCTION__.
+  /// code by #function.
   DeclName MagicFunctionName;
   std::string MagicFunctionString;
 
@@ -435,7 +435,7 @@ public:
   }
   
   /// This location, when set, is used as an override location for magic
-  /// identifier expansion (e.g. __FILE__).  This allows default argument
+  /// identifier expansion (e.g. #file).  This allows default argument
   /// expansion to report the location of the call, instead of the location
   /// of the original expr.
   Optional<SourceLoc> overrideLocationForMagicIdentifiers;

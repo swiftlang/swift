@@ -36,6 +36,8 @@ public:
     case swift::tok::kw_##X: return "kw_" #X; break;
   #define PUNCTUATOR(X, Y) \
     case swift::tok::X: return #X; break;
+#define POUND(X, Y) \
+    case swift::tok::pound_##X: return "pound_" #X; break;
   #include "swift/Parse/Tokens.def"
 
   #define OTHER(X) \
@@ -53,12 +55,6 @@ public:
         OTHER(floating_literal)
         OTHER(string_literal)
         OTHER(sil_local_name)
-        OTHER(pound_if)
-        OTHER(pound_else)
-        OTHER(pound_elseif)
-        OTHER(pound_endif)
-        OTHER(pound_line)
-        OTHER(pound_available)
         OTHER(comment)
 
       default:

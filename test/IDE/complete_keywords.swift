@@ -137,10 +137,10 @@
 // KW_DECL_STMT-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
 //
 // Literals
 //
@@ -157,10 +157,10 @@
 // KW_EXPR-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
 //
 // let and var
 //

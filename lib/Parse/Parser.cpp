@@ -446,11 +446,12 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
       return lastLoc;
 
 #define KEYWORD(X) case tok::kw_##X:
+#define POUND_KEYWORD(X) case tok::pound_##X:
 #include "swift/Parse/Tokens.def"
     // 'Self' can appear in types, skip it.
     if (Tok.is(tok::kw_Self))
       break;
-    if (isStartOfStmt() || isStartOfDecl())
+    if (isStartOfStmt() || isStartOfDecl() || Tok.is(tok::pound_endif))
       return lastLoc;
     break;
 

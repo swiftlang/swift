@@ -1702,9 +1702,13 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_associatedtype:
   case tok::kw_var:
   case tok::pound_if:
-  case tok::pound_line:
   case tok::identifier:
     return true;
+  case tok::pound_line:
+    // #line at the start of the line is a directive, #line within a line is
+    // an expression.
+    return Tok.isAtStartOfLine();
+
   case tok::kw_try:
     // 'try' is not a valid way to start a decl, but we special-case 'try let'
     // and 'try var' for better recovery.

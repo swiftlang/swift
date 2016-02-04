@@ -11,7 +11,7 @@ func test() {
 // RUN: FileCheck -check-prefix=NAME %s < %t.orig
 // Make sure the order is as below, foo(Int) should come before foo(String).
 
-// NAME: key.description: "__COLUMN__"
+// NAME: key.description: "#column"
 // NAME: key.description: "AbsoluteValuable"
 // NAME: key.description: "foo(a: Int)"
 // NAME-NOT: key.description
@@ -41,7 +41,7 @@ func test() {
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
 // CONTEXT: key.name: "AbsoluteValuable"
-// CONTEXT: key.name: "__COLUMN__"
+// CONTEXT: key.name: "#column"
 
 // RUN: %complete-test -tok=STMT_0 %s | FileCheck %s -check-prefix=STMT
 // RUN: %complete-test -tok=EXPR_0 %s | FileCheck %s -check-prefix=EXPR

@@ -171,6 +171,11 @@ POUND_KEYWORD(line)
 POUND_KEYWORD(available)
 POUND_KEYWORD(selector)
 
+POUND_KEYWORD(file)
+POUND_KEYWORD(column)
+POUND_KEYWORD(function)
+POUND_KEYWORD(dsohandle)
+
 
 #undef KEYWORD
 #undef DECL_KEYWORD

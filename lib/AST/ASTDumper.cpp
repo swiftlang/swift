@@ -784,22 +784,22 @@ namespace {
       switch (P->getDefaultArgumentKind()) {
       case DefaultArgumentKind::None: break;
       case DefaultArgumentKind::Column:
-        printField("default_arg", "__COLUMN__");
+        printField("default_arg", "#column");
         break;
       case DefaultArgumentKind::DSOHandle:
-        printField("default_arg", "__DSO_HANDLE__");
+        printField("default_arg", "#dsohandle");
         break;
       case DefaultArgumentKind::File:
-        printField("default_arg", "__FILE__");
+        printField("default_arg", "#file");
         break;
       case DefaultArgumentKind::Function:
-        printField("default_arg", "__FUNCTION__");
+        printField("default_arg", "#function");
         break;
       case DefaultArgumentKind::Inherited:
         printField("default_arg", "inherited");
         break;
       case DefaultArgumentKind::Line:
-        printField("default_arg", "__LINE__");
+        printField("default_arg", "#line");
         break;
       case DefaultArgumentKind::Nil:
         printField("default_arg", "nil");
@@ -1583,18 +1583,18 @@ public:
     printCommon(E, "magic_identifier_literal_expr") << " kind=";
     switch (E->getKind()) {
     case MagicIdentifierLiteralExpr::File:
-      OS << "__FILE__ encoding=";
+      OS << "#file encoding=";
       printStringEncoding(E->getStringEncoding());
       break;
 
     case MagicIdentifierLiteralExpr::Function:
-      OS << "__FUNCTION__ encoding=";
+      OS << "#function encoding=";
       printStringEncoding(E->getStringEncoding());
       break;
         
-    case MagicIdentifierLiteralExpr::Line:  OS << "__LINE__"; break;
-    case MagicIdentifierLiteralExpr::Column:  OS << "__COLUMN__"; break;
-    case MagicIdentifierLiteralExpr::DSOHandle:  OS << "__DSO_HANDLE__"; break;
+    case MagicIdentifierLiteralExpr::Line:  OS << "#line"; break;
+    case MagicIdentifierLiteralExpr::Column:  OS << "#column"; break;
+    case MagicIdentifierLiteralExpr::DSOHandle:  OS << "#dsohandle"; break;
     }
     OS << ')';
   }
@@ -2534,19 +2534,19 @@ namespace {
           break;
 
         case DefaultArgumentKind::Column:
-          printField("default_arg", "__COLUMN__");
+          printField("default_arg", "#column");
           break;
 
         case DefaultArgumentKind::DSOHandle:
-          printField("default_arg", "__DSO_HANDLE__");
+          printField("default_arg", "#dsohandle");
           break;
 
         case DefaultArgumentKind::File:
-          printField("default_arg", "__FILE__");
+          printField("default_arg", "#file");
           break;
 
         case DefaultArgumentKind::Function:
-          printField("default_arg", "__FUNCTION__");
+          printField("default_arg", "#function");
           break;
 
         case DefaultArgumentKind::Inherited:
@@ -2554,7 +2554,7 @@ namespace {
           break;
 
         case DefaultArgumentKind::Line:
-          printField("default_arg", "__LINE__");
+          printField("default_arg", "#line");
           break;
 
         case DefaultArgumentKind::Nil:

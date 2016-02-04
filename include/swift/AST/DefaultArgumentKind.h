@@ -34,15 +34,15 @@ enum class DefaultArgumentKind : unsigned {
   /// The default argument is inherited from the corresponding argument of the
   /// overridden declaration.
   Inherited,
-  /// The __FILE__ default argument, which is expanded at the call site.
+  /// The #file default argument, which is expanded at the call site.
   File,
-  /// The __LINE__ default argument, which is expanded at the call site.
+  /// The #line default argument, which is expanded at the call site.
   Line,
-  /// The __COLUMN__ default argument, which is expanded at the call site.
+  /// The #column default argument, which is expanded at the call site.
   Column,
-  /// The __FUNCTION__ default argument, which is expanded at the call site.
+  /// The #function default argument, which is expanded at the call site.
   Function,
-  /// The __DSO_HANDLE__ default argument, which is expanded at the call site.
+  /// The #dsohandle default argument, which is expanded at the call site.
   DSOHandle,
   /// The "nil" literal.
   Nil,
