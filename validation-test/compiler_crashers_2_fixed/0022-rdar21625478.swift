@@ -160,11 +160,16 @@ extension LoggingSequenceType
     return base._copyToNativeArrayBuffer()
   }
 
-  /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
+  /// Copy the contents of `self` into uninitialized contiguous memory
+  /// of size `capacity`, returning one past the last element
+  /// initialized, or a `nil` pointer if the copy cannot be safely
+  /// made given `capacity`.
+  public func _initializeTo(
+    ptr: UnsafeMutablePointer<Base.Generator.Element>,
+    capacity: Int
+  ) -> UnsafeMutablePointer<Base.Generator.Element>? {
     ++Log._initializeTo[selfType]
-    return base._initializeTo(ptr)
+    return base._initializeTo(ptr, capacity: capacity)
   }
 }
 

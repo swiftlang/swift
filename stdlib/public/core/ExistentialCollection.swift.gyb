@@ -132,7 +132,9 @@ internal class _AnySequenceBox<Element> {
 
   internal func _underestimateCount() -> Int { _abstract() }
 
-  internal func _initializeTo(ptr: UnsafeMutablePointer<Element>)
+  @warn_unused_result
+  internal func _initializeTo(
+    start: UnsafeMutablePointer<Element>, capacity: Int)
     -> UnsafeMutablePointer<Element> {
     _abstract()
   }
@@ -176,9 +178,11 @@ internal final class _${Kind}Box<
   override func _underestimateCount() -> Int {
     return _base.underestimateCount()
   }
-  override func _initializeTo(ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
-    return _base._initializeTo(ptr)
+  @warn_unused_result
+  override func _initializeTo(
+    start: UnsafeMutablePointer<Element>, capacity: Int
+  ) -> UnsafeMutablePointer<Element> {
+    return _base._initializeTo(start, capacity: capacity)
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return _base._copyToNativeArrayBuffer()._storage
@@ -296,9 +300,11 @@ extension Any${Kind} {
     return _box._underestimateCount()
   }
 
-  public func _initializeTo(ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
-    return _box._initializeTo(ptr)
+  @warn_unused_result
+  public func _initializeTo(
+    start: UnsafeMutablePointer<Element>, capacity: Int
+  ) -> UnsafeMutablePointer<Element> {
+    return _box._initializeTo(start, capacity: capacity)
   }
 
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {

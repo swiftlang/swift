@@ -71,10 +71,14 @@ extension SequenceType
     return _base._copyToNativeArrayBuffer()
   }
 
-  /// Copy a Sequence into an array, returning one past the last
-  /// element initialized.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
-    return _base._initializeTo(ptr)
+  /// Copy the contents of `self` into uninitialized contiguous memory
+  /// of size `capacity`, returning one past the last element
+  /// initialized, or a `nil` pointer if the copy cannot be safely
+  /// made given `capacity`.
+  @warn_unused_result
+  public func _initializeTo(
+    start: UnsafeMutablePointer<Base.Generator.Element>, capacity: Int
+  ) -> UnsafeMutablePointer<Base.Generator.Element> {
+    return _base._initializeTo(start, capacity: capacity)
   }
 }

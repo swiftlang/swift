@@ -87,10 +87,11 @@ extension LazyCollection : SequenceType {
     return _base._copyToNativeArrayBuffer()
   }
   
+  @warn_unused_result
   public func _initializeTo(
-    ptr: UnsafeMutablePointer<Base.Generator.Element>
+    start: UnsafeMutablePointer<Base.Generator.Element>, capacity: Int
   ) -> UnsafeMutablePointer<Base.Generator.Element> {
-    return _base._initializeTo(ptr)
+    return _base._initializeTo(start, capacity: capacity)
   }
 
   public func _customContainsEquatableElement(

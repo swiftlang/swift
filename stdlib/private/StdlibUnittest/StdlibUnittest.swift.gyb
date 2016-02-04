@@ -2013,14 +2013,16 @@ public func checkSequence<
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
-    let end = sequence._initializeTo(buf)
-    expectTrue(end == buf + count, "_initializeTo returned the wrong value")
-    var j = expected.startIndex
-    for i in 0..<(end - buf) {
-      expectTrue(sameValue(expected[j], buf[i]))
-      j = j.successor()
+    let end = sequence._initializeTo(buf, capacity: count)
+    if end != nil {
+      expectTrue(end == buf + count, "_initializeTo returned the wrong value")
+      var j = expected.startIndex
+      for i in 0..<(end - buf) {
+        expectTrue(sameValue(expected[j], buf[i]))
+        j = j.successor()
+      }
+      buf.destroy(end - buf)
     }
-    buf.destroy(end - buf)
     buf.dealloc(count)
   }
 }
