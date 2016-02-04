@@ -153,8 +153,16 @@ Certain uses of ``internal`` entities require them to be part of a library's
 binary interface, which means they need to be versioned as well. See
 `Versioning Internal Declarations`_ below.
 
+In additioned to versioned entities, there are also attributes that are safe to
+add to declarations when releasing a new version of a library. In most cases,
+clients can only take advantage of the attributes when using the new release of
+the library, and therefore the attributes also need to record the version in
+which they were introduced. If the version is omitted, it is assumed to be the
+version of the declaration to which the attribute is attached.
+
 The syntax for marking an entity as versioned has not yet been decided, but the
 rest of this document will use syntax #1 described below.
+
 
 Syntax #1: Attributes
 ~~~~~~~~~~~~~~~~~~~~~
@@ -235,12 +243,16 @@ The following changes are permitted:
 - Adding a default value to a parameter.
 - Changing or removing a default value is permitted but discouraged; it may
   break or change the meaning of existing source code.
+- The ``@noreturn`` attribute may be added to a function. ``@noreturn`` is a
+  `versioned attribute`.
+- The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
+  be added to a function without any additional versioning information.
 
 .. note::
 
-    Today's implementation of default values puts the evaluation of the default
-    value expression in the library, rather than in the client like C++ or C#.
-    This is problematic if we want to allow adding new default values.
+    Swift 2's implementation of default values puts the evaluation of the
+    default value expression in the library, rather than in the client like C++
+    or C#. We plan to change this.
 
 No other changes are permitted; the following are particularly of note:
 
@@ -250,6 +262,10 @@ No other changes are permitted; the following are particularly of note:
 - A versioned function may not add, remove, or reorder parameters, whether or
   not they have default values.
 - A versioned function that throws may not become non-throwing.
+- ``@noreturn`` may not be removed from a function.
+- The ``@noescape`` attribute may not be added to or removed from a parameter.
+  It is not a `versioned attribute` and so there is no way to guarantee that it
+  is safe when a client deploys against older versions of the library.
 
 
 Inlineable Functions
@@ -272,10 +288,9 @@ are a few common reasons for this:
   efficient access to the struct.
 
 A versioned function marked with the ``@inlineable`` attribute makes its body
-available to clients as part of the module's public interface. The
-``@inlineable`` attribute takes a version number, just like ``@available``;
-clients may not assume that the body of the function is suitable when deploying
-against older versions of the library.
+available to clients as part of the module's public interface. ``@inlineable``
+is a `versioned attribute`; clients may not assume that the body of the
+function is suitable when deploying against older versions of the library.
 
 Clients are not required to inline a function marked ``@inlineable``.
 
@@ -346,6 +361,9 @@ must take care to emit and use its own copy of the function. This is because
 analysis of the function body may not apply to the version of the function
 currently in the library.
 
+Default parameter value expressions are subject to the same restrictions as
+inlineable functions, because they are implemented as inlineable functions.
+
 Local Functions
 ---------------
 
@@ -375,6 +393,9 @@ changes are permitted:
   an existing variable. This is effectively the same as modifying the body of a
   setter.
 - Changing the initial value of a stored variable.
+- Adding or removing ``weak`` from a variable with ``Optional`` type.
+- Adding or removing ``unowned`` from a variable.
+- Adding or removing ``@NSCopying`` to/from a variable.
 
 .. admonition:: TODO
 
@@ -422,6 +443,10 @@ clients to access them more efficiently. This restricts changes a fair amount:
 - Changing the value of a constant is permitted but discouraged; like accessors,
   existing clients may use the new value, or the value from when they were
   compiled, or a mix of both.
+- Adding or removing ``weak`` is forbidden.
+- Adding or removing ``unowned`` is forbidden.
+- Adding or removing ``@NSCopying`` to/from a variable is permitted but
+  discouraged for the same reason.
 
 .. admonition:: TODO
 
@@ -473,6 +498,11 @@ layout.
 Like top-level constants, it is *not* safe to change a ``let`` property into a
 variable or vice versa. Properties declared with ``let`` are assumed not to
 change for the entire lifetime of the program once they have been initialized.
+
+It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
+or accessor within a struct. These modifiers are not `versioned attributes
+<versioned attribute>` and as such there is no safety guarantee for a client
+deploying against an earlier version of the library.
 
 
 New Conformances
@@ -578,11 +608,10 @@ defined in a C header and imported into Swift.
     a ``@fixed_contents`` struct, public or non-public, to have trivial
     accessors, i.e. no observing accessors and no behaviors.
 
-The ``@fixed_contents`` attribute takes a version number, just like
-``@available``. This is so that clients can deploy against older versions of
-the library, which may have a different layout for the struct. (In this case
-the client must manipulate the struct as if the ``@fixed_contents`` attribute
-were absent.)
+``@fixed_contents`` is a `versioned attribute`. This is so that clients can
+deploy against older versions of the library, which may have a different layout
+for the struct. (In this case the client must manipulate the struct as if the
+``@fixed_contents`` attribute were absent.)
 
 
 Enums
@@ -641,11 +670,11 @@ clients that the enum cases are exhaustive. In particular:
     the library would still have to treat the enum as opaque and would still
     have to be able to handle unknown cases in their ``switch`` statements.
 
-The ``@closed`` attribute takes a version number, just like ``@available``.
-This is so that clients can deploy against older versions of the library, which
-may have non-public cases in the enum. (In this case the client must manipulate
-the enum as if the ``@closed`` attribute were absent.) All cases that are not
-versioned become implicitly versioned with this number.
+``@closed`` is a `versioned attribute`. This is so that clients can deploy
+against older versions of the library, which may have non-public cases in the
+enum. (In this case the client must manipulate the enum as if the ``@closed``
+attribute were absent.) All cases that are not versioned become implicitly
+versioned with this number.
 
 Even for default "open" enums, adding new cases should not be done lightly. Any
 clients attempting to do an exhaustive switch over all enum cases will likely
@@ -670,14 +699,19 @@ There are very few safe changes to make to protocols:
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 
-However, any members may be added to protocol extensions, and non-public,
-non-versioned members may always be removed from protocol extensions.
+All other changes to the protocol itself are forbidden, including:
+
+- Making an existing requirement optional.
+- Making a non-``@objc`` protocol ``@objc`` or vice versa.
+
+Protocol extensions may be more freely modified; `see below`__.
+
+__ #protocol-extensions
 
 .. admonition:: TODO
 
     It would also be nice to be able to add new associated types with default
     values, but that seems trickier to implement.
-
 
 Classes
 ~~~~~~~
@@ -717,6 +751,13 @@ Finally, classes allow the following changes that do not apply to structs:
   removed as long as the generic parameters, formal parameters, and return type
   *exactly* match the overridden declaration. Any existing callers should 
   automatically use the superclass implementation.
+- ``@noreturn`` may be only added to a method if it is not publicly
+  overrideable.
+- ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
+  without providing any extra version information. Removing any of these is
+  permitted but discouraged.
+- Likewise, ``@IBDesignable`` may be added to a class without providing any
+  extra version information. Removing it is permitted but discouraged.
 - Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
   is a subclass of ``A`` *and* class ``B``, along with any superclasses between
   it and class ``A``, were introduced in the latest version of the library.
@@ -750,9 +791,22 @@ are permitted. In particular:
 - A ``final`` override of a member may *not* be removed, even if the type
   matches exactly; existing clients may be performing a direct call to the
   implementation instead of using dynamic dispatch.
+- It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
+  or accessor within a class. These modifiers are not `versioned attributes
+  <versioned attribute>` and as such there is no safety guarantee for a client
+  deploying against an earlier version of the library.
+- ``@objc`` and ``@nonobjc`` may not be added to or removed from the class or
+  any existing members.
+- ``@NSManaged`` may not be added to or removed from any existing members.
 
 .. note:: These restrictions tie in with the ongoing discussions about
   "``final``-by-default" and "non-publicly-subclassable-by-default".
+
+.. admonition:: TODO
+
+    The ``@NSManaged`` attribute as it is in Swift 2 exposes implementation
+    details to clients in a bad way. We need to fix this.
+    rdar://problem/20829214
 
 
 Possible Restrictions on Classes
@@ -785,8 +839,8 @@ the base type; see the sections on structs, enums, and classes above.
 Protocol Extensions
 -------------------
 
-Protocol extensions follow slightly different rules; the following changes
-are permitted:
+Protocol extensions follow slightly different rules from other extensions; the
+following changes are permitted:
 
 - Adding new extensions and removing empty extensions.
 - Moving a member from one extension to another within the same module, as long
@@ -1187,4 +1241,7 @@ Glossary
     without any indirection or reference-counting operations.
 
   versioned entity
+    See `Publishing Versioned API`_.
+
+  versioned attribute
     See `Publishing Versioned API`_.
