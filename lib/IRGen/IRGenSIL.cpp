@@ -1367,14 +1367,8 @@ void IRGenSILFunction::emitSILFunction() {
                                     activePoint.as<SILBasicBlock>());
   });
   
-  // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to
-  // correctly handle the generic parameters of a witness, which can come from
-  // both the requirement and witness contexts.
-  if (IGM.DebugInfo &&
-      CurSILFn->getRepresentation()
-        != SILFunctionTypeRepresentation::WitnessMethod) {
+  if (IGM.DebugInfo)
     IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
-  }
 
   // Map the entry bb.
   LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&*CurFn->begin(), {});

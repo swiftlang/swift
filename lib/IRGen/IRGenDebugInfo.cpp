@@ -640,9 +640,15 @@ static bool isAllocatingConstructor(SILFunctionTypeRepresentation Rep,
 llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     SILModule &SILMod, const SILDebugScope *DS, llvm::Function *Fn,
     SILFunctionTypeRepresentation Rep, SILType SILTy, DeclContext *DeclCtx) {
-  auto cached = ScopeCache.find(DS);
-  if (cached != ScopeCache.end())
-    return cast<llvm::DISubprogram>(cached->second);
+  auto Cached = ScopeCache.find(DS);
+  if (Cached != ScopeCache.end()) {
+    auto SP = cast<llvm::DISubprogram>(Cached->second);
+    // If we created the DISubprogram for a forward declaration,
+    // attach it to the function now.
+    if (!Fn->getSubprogram() && !Fn->isDeclaration())
+      Fn->setSubprogram(SP);
+    return SP;
+  }
 
   // Some IRGen-generated helper functions don't have a corresponding
   // SIL function, hence the dyn_cast.
