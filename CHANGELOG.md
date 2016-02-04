@@ -26,6 +26,11 @@ Swift 2.2
   Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
   types, and "x = x.successor()" on Index types.
 
+* New #file, #line, #column, and #function expressions have been introduced to
+  replace the existing __FILE__, __LINE__, __COLUMN__, and __FUNCTION__ symbols.
+  The __FILE__-style symbols have been deprecated, and will be removed in
+  Swift 3.
+
 * The operator identifier lexer grammar has been revised to simplify the rules
   for operators that start with a dot (".").  The new rule is that an operator
   that starts with a dot may contain other dots in it, but operators that start
