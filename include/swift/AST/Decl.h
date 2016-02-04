@@ -28,6 +28,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
   enum class AccessSemantics : unsigned char;
@@ -1034,7 +1035,10 @@ class NestedGenericParamListIterator;
 /// GenericParamList - A list of generic parameters that is part of a generic
 /// function or type, along with extra requirements placed on those generic
 /// parameters and types derived from them.
-class GenericParamList {
+class GenericParamList final :
+    private llvm::TrailingObjects<GenericParamList, GenericTypeParamDecl *> {
+  friend TrailingObjects;
+
   SourceRange Brackets;
   unsigned NumParams;
   SourceLoc WhereLoc;
@@ -1112,11 +1116,11 @@ public:
   }
   
   MutableArrayRef<GenericTypeParamDecl *> getParams() {
-    return { reinterpret_cast<GenericTypeParamDecl **>(this + 1), NumParams };
+    return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
   }
 
   ArrayRef<GenericTypeParamDecl *> getParams() const {
-    return const_cast<GenericParamList *>(this)->getParams();
+    return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
   }
 
   using iterator = GenericTypeParamDecl **;
@@ -1385,13 +1389,14 @@ GenericParamList::getNestedGenericParams() const {
 }
 
 /// A trailing where clause.
-class TrailingWhereClause {
+class alignas(RequirementRepr) TrailingWhereClause final :
+    private llvm::TrailingObjects<TrailingWhereClause, RequirementRepr> {
+  friend TrailingObjects;
+
   SourceLoc WhereLoc;
 
   /// The number of requirements. The actual requirements are tail-allocated.
-  /// FIXME: uintptr_t is larger than we need, but makes sure that we get the
-  /// right alignment for the requirement for the requirements that follow.
-  uintptr_t NumRequirements;
+  unsigned NumRequirements;
 
   TrailingWhereClause(SourceLoc whereLoc,
                       ArrayRef<RequirementRepr> requirements);
@@ -1406,13 +1411,12 @@ public:
 
   /// Retrieve the set of requirements.
   MutableArrayRef<RequirementRepr> getRequirements() {
-    return { reinterpret_cast<RequirementRepr *>(this + 1), NumRequirements };
+    return {getTrailingObjects<RequirementRepr>(), NumRequirements};
   }
 
   /// Retrieve the set of requirements.
   ArrayRef<RequirementRepr> getRequirements() const {
-    return { reinterpret_cast<const RequirementRepr *>(this + 1),
-             NumRequirements };
+    return {getTrailingObjects<RequirementRepr>(), NumRequirements};
   }
 
   /// Compute the source range containing this trailing where clause.
@@ -1440,7 +1444,10 @@ enum class ImportKind : uint8_t {
 /// ImportDecl - This represents a single import declaration, e.g.:
 ///   import Swift
 ///   import typealias Swift.Int
-class ImportDecl : public Decl {
+class ImportDecl final : public Decl,
+    private llvm::TrailingObjects<ImportDecl, std::pair<Identifier,SourceLoc>> {
+  friend TrailingObjects;
+
 public:
   typedef std::pair<Identifier, SourceLoc> AccessPathElement;
 
@@ -1456,13 +1463,6 @@ private:
   /// The resolved decls if this is a decl import.
   ArrayRef<ValueDecl *> Decls;
 
-  AccessPathElement *getPathBuffer() {
-    return reinterpret_cast<AccessPathElement*>(this+1);
-  }
-  const AccessPathElement *getPathBuffer() const {
-    return reinterpret_cast<const AccessPathElement*>(this+1);
-  }
-  
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
 
@@ -1486,7 +1486,7 @@ public:
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
-    return ArrayRef<AccessPathElement>(getPathBuffer(), NumPathElements);
+    return {getTrailingObjects<AccessPathElement>(), NumPathElements};
   }
 
   ArrayRef<AccessPathElement> getModulePath() const {
@@ -1840,7 +1840,10 @@ public:
 /// pattern "(a, b)" and the initializer "foo()".  The second contains the
 /// pattern "(c, d)" and the initializer "bar()".
 ///
-class PatternBindingDecl : public Decl {
+class PatternBindingDecl final : public Decl,
+    private llvm::TrailingObjects<PatternBindingDecl, PatternBindingEntry> {
+  friend TrailingObjects;
+
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 
@@ -1943,10 +1946,7 @@ public:
 private:
   MutableArrayRef<PatternBindingEntry> getMutablePatternList() {
     // Pattern entries are tail allocated.
-    return {
-      reinterpret_cast<PatternBindingEntry*>(this + 1),
-      numPatternEntries
-    };
+    return {getTrailingObjects<PatternBindingEntry>(), numPatternEntries};
   }
 };
   
@@ -4659,8 +4659,10 @@ class OperatorDecl;
 
 
 /// FuncDecl - 'func' declaration.
-class FuncDecl : public AbstractFunctionDecl {
+class FuncDecl final : public AbstractFunctionDecl,
+    private llvm::TrailingObjects<FuncDecl, ParameterList *> {
   friend class AbstractFunctionDecl;
+  friend TrailingObjects;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -4765,11 +4767,10 @@ public:
   /// The number of "top-level" elements will match the number of argument names
   /// in the compound name of the function or constructor.
   MutableArrayRef<ParameterList *> getParameterLists() {
-    auto Ptr = reinterpret_cast<ParameterList **>(cast<FuncDecl>(this) + 1);
-    return { Ptr, getNumParameterLists() };
+    return {getTrailingObjects<ParameterList *>(), getNumParameterLists()};
   }
   ArrayRef<const ParameterList *> getParameterLists() const {
-    return AbstractFunctionDecl::getParameterLists();
+    return {getTrailingObjects<ParameterList *>(), getNumParameterLists()};
   }
   ParameterList *getParameterList(unsigned i) {
     return getParameterLists()[i];
@@ -4994,7 +4995,9 @@ public:
   
 /// \brief This represents a 'case' declaration in an 'enum', which may declare
 /// one or more individual comma-separated EnumElementDecls.
-class EnumCaseDecl : public Decl {
+class EnumCaseDecl final : public Decl,
+    private llvm::TrailingObjects<EnumCaseDecl, EnumElementDecl *> {
+  friend TrailingObjects;
   SourceLoc CaseLoc;
   
   /// The number of tail-allocated element pointers.
@@ -5006,13 +5009,10 @@ class EnumCaseDecl : public Decl {
     : Decl(DeclKind::EnumCase, DC),
       CaseLoc(CaseLoc), NumElements(Elements.size())
   {
-    memcpy(this + 1, Elements.begin(), NumElements * sizeof(EnumElementDecl*));
+    std::uninitialized_copy(Elements.begin(), Elements.end(),
+                            getTrailingObjects<EnumElementDecl *>());
   }
-  
-  EnumElementDecl * const *getElementsBuf() const {
-    return reinterpret_cast<EnumElementDecl * const*>(this + 1);
-  }
-  
+
 public:
   static EnumCaseDecl *create(SourceLoc CaseLoc,
                               ArrayRef<EnumElementDecl*> Elements,
@@ -5020,7 +5020,7 @@ public:
   
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
-    return {getElementsBuf(), NumElements};
+    return {getTrailingObjects<EnumElementDecl *>(), NumElements};
   }
   
   SourceLoc getLoc() const {

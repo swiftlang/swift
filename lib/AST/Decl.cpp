@@ -473,7 +473,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
     FirstTrailingWhereArg(Requirements.size())
 {
   std::uninitialized_copy(Params.begin(), Params.end(),
-                          reinterpret_cast<GenericTypeParamDecl **>(this + 1));
+                          getTrailingObjects<GenericTypeParamDecl *>());
 }
 
 GenericParamList *
@@ -481,8 +481,7 @@ GenericParamList::create(ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc RAngleLoc) {
-  unsigned Size = sizeof(GenericParamList)
-                + sizeof(GenericTypeParamDecl *) * Params.size();
+  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
                                     MutableArrayRef<RequirementRepr>(),
@@ -496,8 +495,7 @@ GenericParamList::create(const ASTContext &Context,
                          SourceLoc WhereLoc,
                          MutableArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
-  unsigned Size = sizeof(GenericParamList)
-                + sizeof(GenericTypeParamDecl *) * Params.size();
+  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params,
                                     WhereLoc,
@@ -598,16 +596,15 @@ TrailingWhereClause::TrailingWhereClause(
   : WhereLoc(whereLoc),
     NumRequirements(requirements.size())
 {
-  memcpy(getRequirements().data(), requirements.data(),
-         NumRequirements * sizeof(RequirementRepr));
+  std::uninitialized_copy(requirements.begin(), requirements.end(),
+                          getTrailingObjects<RequirementRepr>());
 }
 
 TrailingWhereClause *TrailingWhereClause::create(
                        ASTContext &ctx,
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements) {
-  unsigned size = sizeof(TrailingWhereClause)
-                + requirements.size() * sizeof(RequirementRepr);
+  unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
   void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
   return new (mem) TrailingWhereClause(whereLoc, requirements);
 }
@@ -621,7 +618,7 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
   assert(Kind == ImportKind::Module || Path.size() > 1);
   assert(ClangN.isNull() || ClangN.getAsModule() ||
          isa<clang::ImportDecl>(ClangN.getAsDecl()));
-  size_t Size = sizeof(ImportDecl) + Path.size() * sizeof(AccessPathElement);
+  size_t Size = totalSizeToAlloc<AccessPathElement>(Path.size());
   void *ptr = allocateMemoryForDecl<ImportDecl>(Ctx, Size, !ClangN.isNull());
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
   if (ClangN)
@@ -635,7 +632,8 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
     NumPathElements(Path.size()) {
   ImportDeclBits.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
-  std::uninitialized_copy(Path.begin(), Path.end(), getPathBuffer());
+  std::uninitialized_copy(Path.begin(), Path.end(),
+                          getTrailingObjects<AccessPathElement>());
 }
 
 ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
@@ -878,10 +876,9 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            SourceLoc VarLoc,
                            ArrayRef<PatternBindingEntry> PatternList,
                            DeclContext *Parent) {
-  size_t Size = sizeof(PatternBindingDecl) +
-                PatternList.size() * sizeof(PatternBindingEntry);
+  size_t Size = totalSizeToAlloc<PatternBindingEntry>(PatternList.size());
   void *D = allocateMemoryForDecl<PatternBindingDecl>(Ctx, Size,
-                                                            false);
+                                                      /*ClangNode*/false);
   auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
                                           PatternList.size(), Parent);
 
@@ -3847,7 +3844,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                DeclContext *Parent,
                                ClangNode ClangN) {
   assert(NumParamPatterns > 0);
-  size_t Size = sizeof(FuncDecl) + NumParamPatterns * sizeof(Pattern *);
+  size_t Size = totalSizeToAlloc<ParameterList *>(NumParamPatterns);
   void *DeclPtr = allocateMemoryForDecl<FuncDecl>(Context, Size,
                                                   !ClangN.isNull());
   auto D = ::new (DeclPtr)

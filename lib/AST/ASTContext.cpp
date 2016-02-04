@@ -3017,8 +3017,8 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
   NumParameters = interfaceParams.size();
   assert(!isIndirectParameter(calleeConvention));
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
-  memcpy(getMutableParameters().data(), interfaceParams.data(),
-         interfaceParams.size() * sizeof(SILParameterInfo));
+  std::uninitialized_copy(interfaceParams.begin(), interfaceParams.end(),
+                          getMutableParameters().begin());
   if (interfaceErrorResult)
     getMutableErrorResult() = *interfaceErrorResult;
 
@@ -3097,9 +3097,8 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // All SILFunctionTypes are canonical.
 
   // Allocate storage for the object.
-  size_t bytes = sizeof(SILFunctionType)
-               + sizeof(SILParameterInfo) * interfaceParams.size()
-               + (interfaceErrorResult ? sizeof(SILResultInfo) : 0);
+  size_t bytes = totalSizeToAlloc<SILParameterInfo, SILResultInfo>(
+      interfaceParams.size(), interfaceErrorResult ? 1 : 0);
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   // Right now, generic SIL function types cannot be dependent or contain type
@@ -3330,7 +3329,7 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
   existential->getAnyExistentialTypeProtocols(conformsTo);
 
   // Tail-allocate space for the UUID.
-  void *archetypeBuf = ctx.Allocate(sizeof(ArchetypeType) + sizeof(UUID),
+  void *archetypeBuf = ctx.Allocate(totalSizeToAlloc<UUID>(1),
                                     alignof(ArchetypeType), arena);
   
   auto result = ::new (archetypeBuf) ArchetypeType(ctx, existential,
@@ -3442,9 +3441,8 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   }
 
   // Allocate and construct the new signature.
-  size_t bytes = sizeof(GenericSignature)
-               + sizeof(GenericTypeParamType *) * params.size()
-               + sizeof(Requirement) * requirements.size();
+  size_t bytes = totalSizeToAlloc<GenericTypeParamType *, Requirement>(
+      params.size(), requirements.size());
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
   auto newSig = new (mem) GenericSignature(params, requirements,
                                            isKnownCanonical);
@@ -3478,9 +3476,9 @@ void DeclName::initialize(ASTContext &C, Identifier baseName,
     return;
   }
 
-  auto buf = C.Allocate(sizeof(CompoundDeclName)
-                          + argumentNames.size() * sizeof(Identifier),
-                        alignof(CompoundDeclName));
+  size_t size =
+      CompoundDeclName::totalSizeToAlloc<Identifier>(argumentNames.size());
+  auto buf = C.Allocate(size, alignof(CompoundDeclName));
   auto compoundName = new (buf) CompoundDeclName(baseName,argumentNames.size());
   std::uninitialized_copy(argumentNames.begin(), argumentNames.end(),
                           compoundName->getArgumentNames().begin());

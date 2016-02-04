@@ -133,8 +133,8 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
     NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc)
 {
-  memcpy(getElementsStorage(), elts.data(),
-         elts.size() * sizeof(ASTNode));
+  std::uninitialized_copy(elts.begin(), elts.end(),
+                          getTrailingObjects<ASTNode>());
 }
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
@@ -143,8 +143,7 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
-  void *Buffer = ctx.Allocate(sizeof(BraceStmt)
-                                + elts.size() * sizeof(ASTNode),
+  void *Buffer = ctx.Allocate(totalSizeToAlloc<ASTNode>(elts.size()),
                               alignof(BraceStmt));
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
@@ -233,8 +232,7 @@ DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
                                  ArrayRef<CatchStmt*> catches,
                                  Optional<bool> implicit) {
-  void *mem = ctx.Allocate(sizeof(DoCatchStmt) +
-                           catches.size() * sizeof(catches[0]),
+  void *mem = ctx.Allocate(totalSizeToAlloc<CatchStmt*>(catches.size()),
                            alignof(DoCatchStmt));
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }
@@ -269,9 +267,7 @@ PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,
                                        ArrayRef<AvailabilitySpec *> queries,
                                                      SourceLoc RParenLoc) {
-  unsigned size = sizeof(PoundAvailableInfo) +
-                  queries.size() * sizeof(AvailabilitySpec *);
-  
+  unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
 }
@@ -394,7 +390,7 @@ CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
       BodyAndHasBoundDecls(Body, HasBoundDecls),
       NumPatterns(CaseLabelItems.size()) {
   assert(NumPatterns > 0 && "case block must have at least one pattern");
-  MutableArrayRef<CaseLabelItem> Items{ getCaseLabelItemsBuffer(),
+  MutableArrayRef<CaseLabelItem> Items{ getTrailingObjects<CaseLabelItem>(),
                                         NumPatterns };
 
   for (unsigned i = 0; i < NumPatterns; ++i) {
@@ -407,8 +403,7 @@ CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
                            ArrayRef<CaseLabelItem> CaseLabelItems,
                            bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
                            Optional<bool> Implicit) {
-  void *Mem = C.Allocate(sizeof(CaseStmt) +
-                             CaseLabelItems.size() * sizeof(CaseLabelItem),
+  void *Mem = C.Allocate(totalSizeToAlloc<CaseLabelItem>(CaseLabelItems.size()),
                          alignof(CaseStmt));
   return ::new (Mem) CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls, ColonLoc,
                               Body, Implicit);
@@ -420,12 +415,12 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                ArrayRef<CaseStmt *> Cases,
                                SourceLoc RBraceLoc,
                                ASTContext &C) {
-  void *p = C.Allocate(sizeof(SwitchStmt) + Cases.size() * sizeof(SwitchStmt*),
+  void *p = C.Allocate(totalSizeToAlloc<CaseStmt *>(Cases.size()),
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
                                                Cases.size(), RBraceLoc);
-  memcpy(theSwitch->getCaseBuffer(),
-         Cases.data(), Cases.size() * sizeof(CaseStmt*));
+  std::uninitialized_copy(Cases.begin(), Cases.end(),
+                          theSwitch->getTrailingObjects<CaseStmt *>());
   return theSwitch;
 }

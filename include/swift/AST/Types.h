@@ -32,6 +32,7 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
   struct fltSemantics;
@@ -2824,7 +2825,19 @@ typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 /// This type is defined by the AST library because it must be capable
 /// of appearing in secondary positions, e.g. within tuple and
 /// function parameter and result types.
-class SILFunctionType : public TypeBase, public llvm::FoldingSetNode {
+class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
+                                  SILResultInfo> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
+    return NumParameters;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SILResultInfo>) const {
+    return hasErrorResult() ? 1 : 0;
+  }
+
 public:
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
@@ -2943,13 +2956,12 @@ private:
   SILResultInfo InterfaceResult;
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
-    auto ptr = reinterpret_cast<SILParameterInfo*>(this + 1);
-    return MutableArrayRef<SILParameterInfo>(ptr, NumParameters);
+    return {getTrailingObjects<SILParameterInfo>(), NumParameters};
   }
 
   SILResultInfo &getMutableErrorResult() {
     assert(hasErrorResult());
-    return *reinterpret_cast<SILResultInfo*>(getMutableParameters().end());
+    return *getTrailingObjects<SILResultInfo>();
   }
 
   SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
@@ -3489,7 +3501,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 /// Archetypes are used to represent generic type parameters and their
 /// associated types, as well as the runtime type stored within an
 /// existential container.
-class ArchetypeType : public SubstitutableType {
+class ArchetypeType final : public SubstitutableType,
+    private llvm::TrailingObjects<ArchetypeType, UUID> {
+  friend TrailingObjects;
+
 public:
   typedef llvm::PointerUnion<AssociatedTypeDecl *, ProtocolDecl *>
     AssocTypeOrProtocolType;
@@ -3549,7 +3564,7 @@ private:
   void setOpenedExistentialID(UUID value) {
     assert(getOpenedExistentialType() && "Not an opened existential archetype");
     // The UUID is tail-allocated at the end of opened existential archetypes.
-    *reinterpret_cast<UUID *>(this + 1) = value;
+    *getTrailingObjects<UUID>() = value;
   }
 
   void resolveNestedType(std::pair<Identifier, NestedType> &nested) const;
@@ -3697,7 +3712,7 @@ public:
   UUID getOpenedExistentialID() const {
     assert(getOpenedExistentialType() && "Not an opened existential archetype");
     // The UUID is tail-allocated at the end of opened existential archetypes.
-    return *reinterpret_cast<const UUID *>(this + 1);
+    return *getTrailingObjects<UUID>();
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -4073,6 +4088,9 @@ END_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
 
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {
+  // Note: We can't use llvm::TrailingObjects here because the trailing object
+  // type is opaque.
+
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
