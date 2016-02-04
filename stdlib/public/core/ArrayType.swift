@@ -76,6 +76,5 @@ protocol _ArrayType
   associatedtype _Buffer : _ArrayBufferType
   init(_ buffer: _Buffer)
 
-  // For testing.
   var _buffer: _Buffer { get }
 }

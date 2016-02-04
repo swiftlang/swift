@@ -903,14 +903,7 @@ internal struct _InitializeMemoryFromCollection<
   C: CollectionType
 > : _PointerFunctionType {
   func call(rawMemory: UnsafeMutablePointer<C.Generator.Element>, count: Int) {
-    var p = rawMemory
-    var q = newValues.startIndex
-    for _ in 0..<count {
-      p.initialize(newValues[q])
-      q = q.successor()
-      p += 1
-    }
-    _expectEnd(q, newValues)
+    _initializeMemoryFromCollection(rawMemory, from: newValues, count: count)
   }
 
   init(_ newValues: C) {
@@ -939,6 +932,28 @@ internal func _arrayOutOfPlaceReplace<
     subRange.startIndex - source.startIndex, insertCount,
     _InitializeMemoryFromCollection(newValues)
   )
+}
+
+internal func _initializeMemoryFromCollection<
+  C : CollectionType
+>(ptr: UnsafeMutablePointer<C.Generator.Element>, from source: C, count: Int) {
+  if count == 0 {
+    return
+  }
+  let end = source._initializeTo(ptr, capacity: count)
+  if end != nil {
+    _debugPrecondition(end == ptr + count)
+  }
+  else {
+    var p = ptr
+    var i = source.startIndex
+    for _ in 0..<count {
+      p.initialize(source[i])
+      p += 1
+      i._successorInPlace()
+    }
+    _expectEnd(i, source)
+  }
 }
 
 /// A _debugPrecondition check that `i` has exactly reached the end of
@@ -992,14 +1007,6 @@ public func += <
   Element, S : SequenceType
   where S.Generator.Element == Element
 >(lhs: inout ${Self}<Element>, rhs: S) {
-  let oldCount = lhs.count
-  let capacity = lhs.capacity
-  let newCount = oldCount + rhs.underestimateCount()
-
-  if newCount > capacity {
-    lhs.reserveCapacity(
-      max(newCount, _growArrayCapacity(capacity)))
-  }
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
@@ -1021,7 +1028,10 @@ public func += <
     max(newCount, _growArrayCapacity(capacity))
     : newCount)
 
-  (lhs._buffer.firstElementAddress + oldCount).initializeFrom(rhs)
+  _initializeMemoryFromCollection(
+    lhs._buffer.firstElementAddress + oldCount,
+    from: rhs,
+    count: rhsCount)
   lhs._buffer.count = newCount
 }
 % end
@@ -1223,31 +1233,40 @@ internal func _arrayAppendSequence<
 >(
   buffer: inout Buffer, _ newItems: S
 ) {
-  var stream = newItems.generate()
-  var nextItem = stream.next()
+  let minimumCapacity = buffer.count + newItems.underestimateCount()
+  let newCapacity = (
+    minimumCapacity > buffer.capacity
+    ? max(minimumCapacity, _growArrayCapacity(buffer.capacity))
+    : minimumCapacity)
 
-  if nextItem == nil {
+  // This will force uniqueness
+  _arrayReserve(&buffer, newCapacity)
+
+  var count = buffer.count
+  let remainingCapacity = buffer.capacity - count
+  let start = buffer.firstElementAddress + count
+  let end = newItems._initializeTo(start, capacity: remainingCapacity)
+  if end != nil {
+    let growth = end - start
+    _precondition(growth >= 0 && growth <= remainingCapacity, 
+      "invalid SequenceType: _initializeTo returned an out of bounds pointer")
+    buffer.count += growth
     return
   }
 
-  // This will force uniqueness
-  var count = buffer.count
-  _arrayReserve(&buffer, count + 1)
-  while true {
-    let capacity = buffer.capacity
-    let base = buffer.firstElementAddress
-
-    while (nextItem != nil) && count < capacity {
-      (base + count).initialize(nextItem!)
-      count += 1
-      nextItem = stream.next()
+  var capacity = buffer.capacity
+  var base = buffer.firstElementAddress
+  for item in newItems {
+    if _slowPath(count == capacity) {
+      buffer.count = count
+      _arrayReserve(&buffer, max(1, _growArrayCapacity(buffer.capacity)))
+      capacity = buffer.capacity
+      base = buffer.firstElementAddress
     }
-    buffer.count = count
-    if nextItem == nil {
-      return
-    }
-    _arrayReserve(&buffer, _growArrayCapacity(capacity))
+    (base + count).initialize(item)
+    count += 1
   }
+  buffer.count = count
 }
 
 % for (Self, a_Self) in arrayTypes:

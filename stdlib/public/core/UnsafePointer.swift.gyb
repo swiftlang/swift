@@ -275,20 +275,7 @@ ${comment}
     C : CollectionType where C.Generator.Element == Memory
   >(source: C) {
     let count: Int = numericCast(source.count)
-    let end = source._initializeTo(self, capacity: count)
-    if end != nil {
-      _debugPrecondition(end == self + count)
-    }
-    else {
-      var p = self
-      var i = source.startIndex
-      for _ in 0..<count {
-        p.initialize(source[i])
-        i = i.successor()
-        p += 1
-      }
-      _expectEnd(i, source)
-    }
+    _initializeMemoryFromCollection(self, from: source, count: count)
   }
 
   /// Assign from `count` values beginning at `source` into initialized

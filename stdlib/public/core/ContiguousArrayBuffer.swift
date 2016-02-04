@@ -550,21 +550,9 @@ internal func _copySequenceToNativeArrayBuffer<
   var builder =
     _UnsafePartiallyInitializedContiguousArrayBuffer<S.Generator.Element>(
       initialCapacity: initialCapacity)
-
-  var generator = source.generate()
-
-  // FIXME(performance): use _initializeTo().
-
-  // Add elements up to the initial capacity without checking for regrowth.
-  for _ in 0..<initialCapacity {
-    builder.addWithExistingCapacity(generator.next()!)
-  }
-
-  // Add remaining elements, if any.
-  while let element = generator.next() {
-    builder.add(element)
-  }
-
+  builder.addFrom(source)
+  _debugPrecondition(builder.count >= initialCapacity,
+    "invalid SequenceType: underestimateCount was larger than actual count")
   return builder.finish()
 }
 
@@ -604,15 +592,19 @@ internal func _copyCollectionToNativeArrayBuffer<
     minimumCapacity: 0
   )
 
-  var p = result.firstElementAddress
-  var i = source.startIndex
-  for _ in 0..<count {
-    // FIXME(performance): use _initializeTo().
-    p.initialize(source[i])
-    i._successorInPlace()
-    p._successorInPlace()
+  let end = source._initializeTo(result.firstElementAddress, capacity: count)
+  if end != nil {
+    _debugPrecondition(end == result.firstElementAddress + count)
+  } else {
+    var p = result.firstElementAddress
+    var i = source.startIndex
+    for _ in 0..<count {
+      p.initialize(source[i])
+      i._successorInPlace()
+      p._successorInPlace()
+    }
+    _expectEnd(i, source)
   }
-  _expectEnd(i, source)
   return result
 }
 
@@ -641,6 +633,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     remainingCapacity = result.capacity
   }
 
+  var count: Int {
+    return result.capacity - remainingCapacity
+  }
+  
   /// Add an element to the buffer, reallocating if necessary.
   @inline(__always) // For performance reasons.
   mutating func add(element: Element) {
@@ -669,6 +665,32 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
 
     p.initialize(element)
     p += 1
+  }
+
+  /// Add elements of a sequence to the buffer.
+  @inline(__always) // For performance reasons.
+  mutating func addFrom<
+    S : SequenceType where S.Generator.Element == Element
+  >(source: S) {
+    let q = source._initializeTo(p, capacity: remainingCapacity)
+    if q != nil {
+      let growth = q - p
+      _precondition(growth >= 0 && growth <= remainingCapacity, 
+        "invalid SequenceType: _initializeTo returned an out of bounds pointer")
+      p = q
+      remainingCapacity -= growth
+      return
+    }
+
+    var generator = source.generate()
+    while true {
+      for _ in 0..<remainingCapacity {
+        guard let element = generator.next() else { return }
+        addWithExistingCapacity(element)
+      }
+      guard let element = generator.next() else { return }
+      add(element)
+    }
   }
 
   /// Finish initializing the buffer, adjusting its count to the final
