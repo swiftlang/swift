@@ -1,4 +1,4 @@
-//===--- CodeCompletionTypeChecking.h - Type-check entry points -*- C++ -*-===//
+//===-------- IDETypeChecking.h - Type-check entry points -*- C++ -*-------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_CODECOMPLETIONTYPECHECKING_H
-#define SWIFT_SEMA_CODECOMPLETIONTYPECHECKING_H
+#ifndef SWIFT_SEMA_IDETYPECHECKING_H
+#define SWIFT_SEMA_IDETYPECHECKING_H
 
 #include "swift/Basic/SourceLoc.h"
 #include <memory>

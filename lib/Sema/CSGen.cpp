@@ -20,7 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 
