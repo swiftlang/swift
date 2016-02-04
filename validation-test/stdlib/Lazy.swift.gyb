@@ -411,7 +411,8 @@ func expectSequencePassthrough<
   SequenceLog._initializeTo.expectIncrement(baseType) { () -> Void in
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
 
-    if let end = s._initializeTo(buf, capacity: count) {
+    let end = s._initializeTo(buf, capacity: count)
+    if end != nil {
       expectTrue(end >= buf && end <= buf + count)
       buf.destroy(end - buf)
     }

@@ -326,14 +326,14 @@ extension CollectionType {
     var result = ContiguousArray<T>()
     result.reserveCapacity(count)
 
-    var i = self.startIndex
-
+    var generator = self.generate()
     for _ in 0..<count {
-      result.append(try transform(self[i]))
-      i = i.successor()
+      let element = generator.next()
+      _collectionAssert(element != nil)
+      result.append(try transform(element!))
     }
-
-    _expectEnd(i, self)
+    _collectionAssert(generator.next() == nil)
+    
     return Array(result)
   }
 

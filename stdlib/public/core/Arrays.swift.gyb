@@ -934,6 +934,9 @@ internal func _arrayOutOfPlaceReplace<
   )
 }
 
+/// Copy elements from `source` into uninitialized memory starting at `ptr`.
+/// `ptr` must have enough space to take `count` elements, which must be
+/// equal to `source.count`.
 internal func _initializeMemoryFromCollection<
   C : CollectionType
 >(ptr: UnsafeMutablePointer<C.Generator.Element>, from source: C, count: Int) {
@@ -942,28 +945,35 @@ internal func _initializeMemoryFromCollection<
   }
   let end = source._initializeTo(ptr, capacity: count)
   if end != nil {
-    _debugPrecondition(end == ptr + count)
+    _collectionAssert(end == ptr + count)
   }
   else {
     var p = ptr
-    var i = source.startIndex
+    var generator = source.generate()
     for _ in 0..<count {
-      p.initialize(source[i])
+      guard let element = generator.next() else { break }
+      p.initialize(element)
       p += 1
-      i._successorInPlace()
     }
-    _expectEnd(i, source)
+    _collectionAssert(p - ptr == count && generator.next() == nil)
   }
 }
 
-/// A _debugPrecondition check that `i` has exactly reached the end of
-/// `s`.  This test is never used to ensure memory safety; that is
-/// always guaranteed by measuring `s` once and re-using that value.
-internal func _expectEnd<C : CollectionType>(i: C.Index, _ s: C) {
+/// This wrapper around a _debugPrecondition is used to produce a
+/// consistent error message when a collection's `count` is not in
+/// agreement with its actual contents. This is important because it
+/// isn't always clear that the problem is with the collection, not
+/// with the code that's using it.
+///
+/// This is never used to ensure memory safety; that is always
+/// guaranteed by never copying more items than the count that we
+/// actually allocated space for.
+@_transparent
+internal func _collectionAssert(@autoclosure condition: ()->Bool) {
   _debugPrecondition(
-    i == s.endIndex,
-      "invalid CollectionType: count differed in successive traversals"
-    )
+    condition(),
+    "invalid CollectionType: inconsistent element count"
+  )
 }
 
 @warn_unused_result

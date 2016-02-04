@@ -1610,14 +1610,7 @@ final class EvilCollection : CollectionType {
 
 for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
 
-  let message = step < 0 && evilBoundsCheck
-    ? evilBoundsError
-    : "invalid CollectionType: count differed in successive traversals"
-
-  let constructionMessage =
-    /*_isStdlibInternalChecksEnabled() && !evilBoundsCheck && step <= 0
-      ? "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity"
-      :*/ message
+  let message = "invalid CollectionType: inconsistent element count"
 
   // The invalid CollectionType error is a _debugPreconditon that will only fire
   // in a Debug assert configuration.
@@ -1651,7 +1644,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
 
   let t2 = ArrayTestSuite.test("\(testPrefix)/Construction")
   (_isDebugAssertConfiguration() && expectedToFail
-    ? t2.crashOutputMatches(constructionMessage) : t2)
+    ? t2.crashOutputMatches(message) : t2)
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
 

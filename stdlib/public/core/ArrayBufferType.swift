@@ -157,28 +157,31 @@ extension _ArrayBufferType {
       newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
 
       // Assign over the original subRange
-      var i = newValues.startIndex
-      for j in subRange {
-        elements[j] = newValues[i]
-        i._successorInPlace()
+      var generator = newValues.generate()
+      for i in subRange { 
+        let element = generator.next()
+        _collectionAssert(element != nil)
+        elements[i] = element!
       }
       // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(newValues[i])
-        i._successorInPlace()
+      for i in oldTailIndex..<newTailIndex {
+        let element = generator.next()
+        _collectionAssert(element != nil)
+        (elements + i).initialize(element!)
       }
-      _expectEnd(i, newValues)
+      _collectionAssert(generator.next() == nil)
     }
     else { // We're not growing the buffer
       // Assign all the new elements into the start of the subRange
       var i = subRange.startIndex
-      var j = newValues.startIndex
+      var generator = newValues.generate()
       for _ in 0..<newCount {
-        elements[i] = newValues[j]
+        let element = generator.next()
+        _collectionAssert(element != nil)
+        elements[i] = element!
         i._successorInPlace()
-        j._successorInPlace()
       }
-      _expectEnd(j, newValues)
+      _collectionAssert(generator.next() == nil)
 
       // If the size didn't change, we're done.
       if growth == 0 {

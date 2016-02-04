@@ -1341,7 +1341,11 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
   }
 
   public func generate() -> MinimalGenerator<Element> {
-    return MinimalGenerator(Array(self))
+    var array: [Element] = []
+    for index in startIndex..<endIndex {
+      array.append(self[index])
+    }
+    return MinimalGenerator(array)
   }
 
   public subscript(index: Index) -> Element {
