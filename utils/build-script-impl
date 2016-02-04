@@ -861,20 +861,6 @@ if [[ ! -d ${CMARK_SOURCE_DIR} ]]; then
     exit 1
 fi
 
-# Migration code for the cmark repository.  Can be removed in February 2016.
-pushd ${CMARK_SOURCE_DIR} > /dev/null
-if git show 077611288ad990bf5962b3e1d844172392d3e8d8 > /dev/null 2>&1 ; then
-    echo ""
-    echo "You have an old copy of the cmark repository."
-    echo "You need to remove it and clone again:"
-    echo ""
-    echo " $ rm -rf ${CMARK_SOURCE_DIR}"
-    echo " $ ${SWIFT_SOURCE_DIR}/utils/update-checkout --clone"
-    echo ""
-    exit 1
-fi
-popd > /dev/null
-
 if [[ ! "${SKIP_BUILD_LLBUILD}" && ! -d ${LLBUILD_SOURCE_DIR} ]]; then
     echo "Couldn't find llbuild source directory."
     exit 1
