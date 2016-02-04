@@ -2351,16 +2351,9 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   // Just use the generic signature from the context.
   // This isn't necessarily optimal.
-  auto generics = F.getContextGenericParams();
   auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
-  if (generics) {
-    for (auto archetype : generics->getAllNestedArchetypes()) {
-      SmallVector<ProtocolConformanceRef, 4> conformances;
-      for (auto proto : archetype->getConformsTo())
-        conformances.push_back(ProtocolConformanceRef(proto));
-      subs.push_back({ archetype, getASTContext().AllocateCopy(conformances) });
-    }
-  }
+  auto subsArray = F.getForwardingSubstitutions();
+  subs.append(subsArray.begin(), subsArray.end());
 
   // Add the function type as the parameter.
   SmallVector<SILParameterInfo, 4> params;
@@ -2378,30 +2371,27 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
-  auto *moduleDecl = SGM.M.getSwiftModule();
   for (auto &param : params) {
     interfaceParams.push_back(
       SILParameterInfo(
-          ArchetypeBuilder::mapTypeOutOfContext(
-              moduleDecl, generics, param.getType())
-                ->getCanonicalType(),
+          F.mapTypeOutOfContext(param.getType())
+              ->getCanonicalType(),
           param.getConvention()));
   }
 
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getAllResults()) {
     auto interfaceResult = result.getWithType(
-        ArchetypeBuilder::mapTypeOutOfContext(
-            moduleDecl, generics, result.getType())->getCanonicalType());
+        F.mapTypeOutOfContext(result.getType())
+            ->getCanonicalType());
     interfaceResults.push_back(interfaceResult);
   }
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     interfaceErrorResult = SILResultInfo(
-      ArchetypeBuilder::mapTypeOutOfContext(
-        moduleDecl, generics, expectedType->getErrorResult().getType())
-            ->getCanonicalType(),
+      F.mapTypeOutOfContext(expectedType->getErrorResult().getType())
+          ->getCanonicalType(),
       expectedType->getErrorResult().getConvention());
   }
   
@@ -2413,7 +2403,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                                         getASTContext());
 
   // Define the substituted function type for partial_apply's purposes.
-  if (!generics) {
+  if (!genericSig) {
     substFnType = thunkType;
   } else {
     substFnType = SILFunctionType::get(nullptr, extInfo,
