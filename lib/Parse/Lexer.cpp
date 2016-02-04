@@ -594,13 +594,20 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
 
 /// Is the operator ending at the given character (actually one past the end)
 /// "right-bound"?
-static bool isRightBound(const char *tokEnd, bool isLeftBound) {
+///
+/// The code-completion point is considered right-bound.
+static bool isRightBound(const char *tokEnd, bool isLeftBound,
+                         const char *codeCompletionPtr) {
   switch (*tokEnd) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
   case ',': case ';': case ':':              // expression separators
-  case '\0':                                 // whitespace / last char in file
     return false;
+
+  case '\0':
+    if (tokEnd == codeCompletionPtr)         // code-completion
+      return true;
+    return false;                            // whitespace / last char in file
 
   case '.':
     // Prefer the '^' in "x^.y" to be a postfix op, not binary, but the '^' in
@@ -637,7 +644,7 @@ void Lexer::lexOperatorIdentifier() {
   // It's binary if either both sides are bound or both sides are not bound.
   // Otherwise, it's postfix if left-bound and prefix if right-bound.
   bool leftBound = isLeftBound(TokStart, BufferStart);
-  bool rightBound = isRightBound(CurPtr, leftBound);
+  bool rightBound = isRightBound(CurPtr, leftBound, CodeCompletionPtr);
 
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
@@ -669,17 +676,16 @@ void Lexer::lexOperatorIdentifier() {
       const char *AfterHorzWhitespace = CurPtr;
       while (*AfterHorzWhitespace == ' ' || *AfterHorzWhitespace == '\t')
         ++AfterHorzWhitespace;
-      
-      // First, when we are code completing "x.<ESC>", then make sure to return
+
+      // First, when we are code completing "x. <ESC>", then make sure to return
       // a tok::period, since that is what the user is wanting to know about.
-      // FIXME: isRightBound should consider this to be right bound.
       if (*AfterHorzWhitespace == '\0' &&
           AfterHorzWhitespace == CodeCompletionPtr) {
         diagnose(TokStart, diag::expected_member_name);
         return formToken(tok::period, TokStart);
       }
-      
-      if (isRightBound(AfterHorzWhitespace, leftBound) &&
+
+      if (isRightBound(AfterHorzWhitespace, leftBound, CodeCompletionPtr) &&
           // Don't consider comments to be this.  A leading slash is probably
           // either // or /* and most likely occurs just in our testsuite for
           // expected-error lines.
