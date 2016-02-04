@@ -19,6 +19,7 @@
 #include "Explosion.h"
 #include "GenMeta.h"
 #include "GenProto.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "TypeInfo.h"
@@ -321,6 +322,8 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   fn->setAttributes(IGM.constructInitialAttributes());
   
   IRGenFunction IGF(IGM, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
   Explosion args = IGF.collectParameters();
 
   auto value = args.claimNext();
