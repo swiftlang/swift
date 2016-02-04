@@ -562,138 +562,121 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return tryToConcatenateStrings(AI, Builder);
 }
 
-/// Find an init_open_existential_addr or open_existential_addr, which
-/// is used to initialize a given alloc_stack value.
-static SILValue getInitOrOpenExistential(AllocStackInst *ASI, SILValue &Src) {
-  CopyAddrInst *FoundCAI = nullptr;
-  InitExistentialAddrInst *FoundIEAI = nullptr;
-  bool isLegal = true;
+/// Returns the address of an object with which the stack location \p ASI is
+/// initialized. This is either a init_existential_addr or the source of a
+/// copy_addr. Returns a null value if the address does not dominate the
+/// alloc_stack user \p ASIUser.
+static SILValue getAddressOfStackInit(AllocStackInst *ASI,
+                                      SILInstruction *ASIUser) {
+  SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
   for (auto Use : ASI->getUses()) {
     auto *User = Use->getUser();
-    if (isa<DeallocStackInst>(User) ||
+
+    // Ignore instructions which don't write to the stack location.
+    // Also ignore ASIUser (only kicks in if ASIUser is the original apply).
+    if (isa<DeallocStackInst>(User) || isa<DebugValueAddrInst>(User) ||
         isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
-        isa<DeinitExistentialAddrInst>(User) || isa<OpenExistentialAddrInst>(User) ||
-        isa<ApplyInst>(User))
+        isa<DeinitExistentialAddrInst>(User) ||
+        isa<OpenExistentialAddrInst>(User) ||
+        User == ASIUser) {
       continue;
+    }
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (!FoundCAI && !FoundIEAI) {
-        if (CAI->getDest() == ASI)
-          FoundCAI = CAI;
+      if (CAI->getDest() == ASI) {
+        if (SingleWrite)
+          return SILValue();
+        SingleWrite = CAI;
       }
       continue;
     }
-    else if (auto *IEAI = dyn_cast<InitExistentialAddrInst>(User)) {
-      if (!FoundIEAI && !FoundCAI) {
-        FoundIEAI = IEAI;
-        continue;
-      }
+    if (isa<InitExistentialAddrInst>(User)) {
+      if (SingleWrite)
+        return SILValue();
+      SingleWrite = User;
+      continue;
     }
-    isLegal = false;
-    break;
-  }
-
-  SILValue SrcValue;
-
-  if (isLegal && FoundCAI) {
-    // Try to derive the type from the copy_addr that was used to
-    // initialize the alloc_stack.
-    SrcValue = FoundCAI->getSrc();
-    if (auto *ASI = dyn_cast<AllocStackInst>(SrcValue)) {
-      SILValue Tmp;
-      SrcValue = getInitOrOpenExistential(ASI, Tmp);
+    if (isa<ApplyInst>(User) || isa<TryApplyInst>(User)) {
+      // Ignore function calls which do not write to the stack location.
+      auto Params = FullApplySite(User).getSubstCalleeType()->getParameters();
+      auto Idx = Use->getOperandNumber() - ApplyInst::getArgumentOperandNumber();
+      ParameterConvention Conv = Params[Idx].getConvention();
+      if (Conv != ParameterConvention::Indirect_In &&
+          Conv != ParameterConvention::Indirect_In_Guaranteed)
+        return SILValue();
+      continue;
     }
+    // Bail if there is any unknown (and potentially writing) instruction.
+    return SILValue();
   }
-
-  if (isLegal && FoundIEAI) {
-    SrcValue = FoundIEAI;
-  }
-
-  if (!SrcValue)
+  if (!SingleWrite)
     return SILValue();
 
-  if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(SrcValue)) {
-    Src = OEAI->getOperand();
-    return OEAI;
-  }
-  if (auto *IEAI = dyn_cast<InitExistentialAddrInst>(SrcValue)) {
-    Src = IEAI->getOperand();
-    return IEAI;
-  }
+  // A very simple dominance check. As ASI is an operand of ASIUser,
+  // SingleWrite dominates ASIUser if it is in the same block as ASI or ASIUser.
+  SILBasicBlock *BB = SingleWrite->getParent();
+  if (BB != ASI->getParent() && BB != ASIUser->getParent())
+    return SILValue();
 
-  return SrcValue;
+  if (auto *CAI = dyn_cast<CopyAddrInst>(SingleWrite)) {
+    // Try to derive the type from the copy_addr that was used to
+    // initialize the alloc_stack.
+    SILValue CAISrc = CAI->getSrc();
+    if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
+      return getAddressOfStackInit(ASI, CAI);
+    return CAISrc;
+  }
+  return SingleWrite;
 }
 
-/// find the init_existential, which could be used to determine a concrete
+/// Find the init_existential, which could be used to determine a concrete
 /// type of the \p Self.
 static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
                                            CanType &OpenedArchetype) {
-  SILInstruction *InitExistential = nullptr;
-
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
-    SILValue Src;
-    auto Existential = getInitOrOpenExistential(Instance, Src);
-    if (Existential)
-      Self = Existential;
+    // In case the Self operand is an alloc_stack where a copy_addr copies the
+    // result of an open_existential_addr to this stack location.
+    if (SILValue Src = getAddressOfStackInit(Instance, AI.getInstruction()))
+      Self = Src;
   }
 
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(Self)) {
     auto Op = Open->getOperand();
-    if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
-      SILValue Src;
-      if (getInitOrOpenExistential(ASI, Src)) {
-        if (Src)
-          Op = Src;
-      }
-    }
+    auto *ASI = dyn_cast<AllocStackInst>(Op);
+    if (!ASI)
+      return nullptr;
 
-    for (auto Use : Op->getUses()) {
-      SILValue User = Use->getUser();
+    SILValue StackWrite = getAddressOfStackInit(ASI, Open);
+    if (!StackWrite)
+      return nullptr;
 
-      if (auto *IE = dyn_cast<InitExistentialAddrInst>(User)) {
-        // IE should dominate Instance.
-        // Without a DomTree we want to be very defensive
-        // and only allow this optimization when it is used
-        // inside the same BB.
-        if (IE->getParent() != AI.getParent())
-          continue;
+    auto *IE = dyn_cast<InitExistentialAddrInst>(StackWrite);
+    if (!IE)
+      return nullptr;
 
-        OpenedArchetype = Open->getType().getSwiftRValueType();
-        InitExistential = IE;
-      }
-    }
+    OpenedArchetype = Open->getType().getSwiftRValueType();
+    return IE;
   }
 
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(Self)) {
     if (auto *IE = dyn_cast<InitExistentialRefInst>(Open->getOperand())) {
-      // IE should dominate Instance.
-      // Without a DomTree we want to be very defensive
-      // and only allow this optimization when it is used
-      // inside the same BB.
-      if (IE->getParent() != AI.getParent())
-        return nullptr;
       OpenedArchetype = Open->getType().getSwiftRValueType();
-      InitExistential = IE;
+      return IE;
     }
+    return nullptr;
   }
 
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
     if (auto *IE =
           dyn_cast<InitExistentialMetatypeInst>(Open->getOperand())) {
-      // IE should dominate Instance.
-      // Without a DomTree we want to be very defensive
-      // and only allow this optimization when it is used
-      // inside the same BB.
-      if (IE->getParent() != AI.getParent())
-        return nullptr;
       OpenedArchetype = Open->getType().getSwiftRValueType();
       while (auto Metatype = dyn_cast<MetatypeType>(OpenedArchetype))
         OpenedArchetype = Metatype.getInstanceType();
-      InitExistential = IE;
+      return IE;
     }
+    return nullptr;
   }
-
-  return InitExistential;
+  return nullptr;
 }
 
 /// Create a new apply instructions that uses the concrete type instead
