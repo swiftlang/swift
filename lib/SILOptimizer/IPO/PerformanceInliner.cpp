@@ -234,6 +234,7 @@ namespace {
 
     SILFunction *getEligibleFunction(FullApplySite AI);
 
+    /// Return true if inlining this call site is profitable.
     bool isProfitableToInline(FullApplySite AI, unsigned loopDepthOfAI,
                               DominanceAnalysis *DA,
                               SILLoopAnalysis *LA,
@@ -724,59 +725,55 @@ static SILBasicBlock *getTakenBlock(TermInst *term,
   return nullptr;
 }
 
-/// Return true if inlining this call site is profitable.
-bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
-                                              unsigned loopDepthOfAI,
-                                              DominanceAnalysis *DA,
-                                              SILLoopAnalysis *LA,
-                                              ConstantTracker &callerTracker,
-                                              unsigned &NumCallerBlocks) {
-  SILFunction *Callee = AI.getCalleeFunction();
-  
-  if (Callee->getInlineStrategy() == AlwaysInline)
-    return true;
-  
-  ConstantTracker constTracker(Callee, &callerTracker, AI);
-  
+
+/// Return a pair of cost/benefit integers for the callee.
+/// The cost is the size added to the caller, and the benefit is the
+/// performance gain.
+static std::pair<unsigned, unsigned>
+getCostBenefitInfo(FullApplySite CallSite,
+                   unsigned loopDepthOfAI,
+                   DominanceAnalysis *DA,
+                   SILLoopAnalysis *LA,
+                   ConstantTracker &callerTracker,
+                   unsigned InlineCostThreshold) {
+  SILFunction *Callee = CallSite.getCalleeFunction();
+  ConstantTracker constTracker(Callee, &callerTracker, CallSite);
   DominanceInfo *DT = DA->get(Callee);
   SILLoopInfo *LI = LA->get(Callee);
 
   DominanceOrder domOrder(&Callee->front(), DT, Callee->size());
-  
+
   // Calculate the inlining cost of the callee.
-  unsigned CalleeCost = 0;
+  unsigned Cost = 0;
   unsigned Benefit = InlineCostThreshold > 0 ? InlineCostThreshold :
                                                RemovedCallBenefit;
   Benefit += loopDepthOfAI * LoopBenefitFactor;
-  int testThreshold = TestThreshold;
 
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
-      
+
       auto ICost = instructionInlineCost(I);
-      
-      if (testThreshold >= 0) {
+
+      if (TestThreshold >= 0) {
         // We are in test-mode: use a simplified cost model.
-        CalleeCost += testCost(&I);
+        Cost += testCost(&I);
       } else {
         // Use the regular cost model.
-        CalleeCost += unsigned(ICost);
+        Cost += unsigned(ICost);
       }
-      
+
       if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
-        
         // Check if the callee is passed as an argument. If so, increase the
         // threshold, because inlining will (probably) eliminate the closure.
         SILInstruction *def = constTracker.getDefInCaller(AI->getCallee());
         if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def))) {
 
           DEBUG(llvm::dbgs() << "        Boost: apply const function at"
-                             << *AI);
+                << *AI);
           unsigned loopDepth = LI->getLoopDepth(block);
           Benefit += ConstCalleeBenefit + loopDepth * LoopBenefitFactor;
-          testThreshold *= 2;
         }
       }
     }
@@ -788,17 +785,38 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
       DEBUG(llvm::dbgs() << "      Take bb" << takenBlock->getDebugID() <<
             " of" << *block->getTerminator());
       domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
-        return child->getSinglePredecessor() != block || child == takenBlock;
-      });
+                              return child->getSinglePredecessor() != block ||
+                                     child == takenBlock;
+                              });
     } else {
       domOrder.pushChildren(block);
     }
   }
 
-  unsigned Threshold = Benefit; // The default.
-  if (testThreshold >= 0) {
+  return std::make_pair(Cost, Benefit);
+}
+
+bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
+                                              unsigned loopDepthOfAI,
+                                              DominanceAnalysis *DA,
+                                              SILLoopAnalysis *LA,
+                                              ConstantTracker &callerTracker,
+                                              unsigned &NumCallerBlocks) {
+  SILFunction *Callee = AI.getCalleeFunction();
+
+  if (Callee->getInlineStrategy() == AlwaysInline)
+    return true;
+
+  unsigned Cost;
+  unsigned Benefit;
+  std::tie(Cost, Benefit) = getCostBenefitInfo(AI, loopDepthOfAI, DA, LA,
+                                               callerTracker,
+                                               InlineCostThreshold);
+  // The default.
+  unsigned Threshold = Benefit;
+  if (TestThreshold >= 0) {
     // We are in testing mode.
-    Threshold = testThreshold;
+    Threshold = TestThreshold;
   } else if (AI.getFunction()->isThunk()) {
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
@@ -817,13 +835,13 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
       Threshold = TrivialFunctionThreshold;
   }
 
-  if (CalleeCost > Threshold) {
+  if (Cost > Threshold) {
     DEBUG(llvm::dbgs() << "        NO: Function too big to inline, "
-          "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
+          "cost: " << Cost << ", threshold: " << Threshold << "\n");
     return false;
   }
   DEBUG(llvm::dbgs() << "        YES: ready to inline, "
-        "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
+        "cost: " << Cost << ", threshold: " << Threshold << "\n");
   NumCallerBlocks += Callee->size();
   return true;
 }
