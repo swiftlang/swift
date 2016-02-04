@@ -5018,6 +5018,8 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
 
 bool ClangImporter::Implementation::shouldTrySwift3Migration(
        Decl *swiftDecl, const clang::NamedDecl *clangDecl) {
+  if (!SwiftContext.LangOpts.Swift3Migration) return false;
+
   // Never map subscript declarations.
   if (isa<SubscriptDecl>(swiftDecl)) return false;
 
