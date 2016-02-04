@@ -2067,7 +2067,7 @@ static bool shouldIgnoreMacro(const clang::IdentifierInfo *identifier,
 
   // Currently we only convert non-function-like macros.
   if (macro->isFunctionLike())
-    return nullptr;
+    return false;
 
   // Consult the blacklist of macros to suppress.
   auto suppressMacro =
