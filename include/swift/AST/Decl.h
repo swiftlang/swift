@@ -3653,9 +3653,6 @@ private:
   void configureObservingRecord(ObservingRecord *record,
                                 FuncDecl *willSet, FuncDecl *didSet);
 
-  struct GetSetRecordWithAddressors : AddressorRecord, GetSetRecord {};
-  struct ObservingRecordWithAddressors : AddressorRecord, ObservingRecord {};
-
   llvm::PointerIntPair<GetSetRecord*, 2, OptionalEnum<Accessibility>> GetSetInfo;
 
   ObservingRecord &getDidSetInfo() const {

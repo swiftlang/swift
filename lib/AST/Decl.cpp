@@ -2746,14 +2746,17 @@ void AbstractStorageDecl::makeComputedWithMutableAddress(SourceLoc lbraceLoc,
   assert(mutableAddressor);
   auto &ctx = getASTContext();
 
-  void *mem = ctx.Allocate(sizeof(GetSetRecordWithAddressors),
-                           alignof(GetSetRecordWithAddressors));
-  auto info = new (mem) GetSetRecordWithAddressors();
+  static_assert(alignof(AddressorRecord) == alignof(GetSetRecord),
+                "inconsistent alignment");
+  void *mem = ctx.Allocate(sizeof(AddressorRecord) + sizeof(GetSetRecord),
+                           alignof(AddressorRecord));
+  auto addressorInfo = new (mem) AddressorRecord();
+  auto info = new (addressorInfo->getGetSet()) GetSetRecord();
   info->Braces = SourceRange(lbraceLoc, rbraceLoc);
   GetSetInfo.setPointer(info);
   setStorageKind(ComputedWithMutableAddress);
 
-  configureAddressorRecord(info, nullptr, mutableAddressor);
+  configureAddressorRecord(addressorInfo, nullptr, mutableAddressor);
   configureGetSetRecord(info, get, set, materializeForSet);
 }
 
@@ -2801,14 +2804,17 @@ void AbstractStorageDecl::makeAddressed(SourceLoc lbraceLoc, FuncDecl *addressor
 
   auto &ctx = getASTContext();
 
-  void *mem = ctx.Allocate(sizeof(GetSetRecordWithAddressors),
-                           alignof(GetSetRecordWithAddressors));
-  auto info = new (mem) GetSetRecordWithAddressors();
+  static_assert(alignof(AddressorRecord) == alignof(GetSetRecord),
+                "inconsistent alignment");
+  void *mem = ctx.Allocate(sizeof(AddressorRecord) + sizeof(GetSetRecord),
+                           alignof(AddressorRecord));
+  auto addressorInfo = new (mem) AddressorRecord();
+  auto info = new (addressorInfo->getGetSet()) GetSetRecord();
   info->Braces = SourceRange(lbraceLoc, rbraceLoc);
   GetSetInfo.setPointer(info);
   setStorageKind(Addressed);
 
-  configureAddressorRecord(info, addressor, mutableAddressor);
+  configureAddressorRecord(addressorInfo, addressor, mutableAddressor);
 }
 
 void AbstractStorageDecl::makeStoredWithObservers(SourceLoc LBraceLoc,
@@ -2863,15 +2869,18 @@ void AbstractStorageDecl::makeAddressedWithObservers(SourceLoc lbraceLoc,
          "Can't be Observing without one or the other");
 
   auto &ctx = getASTContext();
-  void *mem = ctx.Allocate(sizeof(ObservingRecordWithAddressors),
-                           alignof(ObservingRecordWithAddressors));
-  auto info = new (mem) ObservingRecordWithAddressors();
-  info->Braces = SourceRange(lbraceLoc, rbraceLoc);
-  GetSetInfo.setPointer(info);
+  static_assert(alignof(AddressorRecord) == alignof(ObservingRecord),
+                "inconsistent alignment");
+  void *mem = ctx.Allocate(sizeof(AddressorRecord) + sizeof(ObservingRecord),
+                           alignof(AddressorRecord));
+  auto addressorInfo = new (mem) AddressorRecord();
+  auto observerInfo = new (addressorInfo->getGetSet()) ObservingRecord();
+  observerInfo->Braces = SourceRange(lbraceLoc, rbraceLoc);
+  GetSetInfo.setPointer(observerInfo);
   setStorageKind(AddressedWithObservers);
 
-  configureAddressorRecord(info, addressor, mutableAddressor);
-  configureObservingRecord(info, willSet, didSet);
+  configureAddressorRecord(addressorInfo, addressor, mutableAddressor);
+  configureObservingRecord(observerInfo, willSet, didSet);
 }
 
 /// \brief Specify the synthesized get/set functions for a Observing var.
