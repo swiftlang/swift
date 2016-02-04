@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
-// RUN: FileCheck %s --check-prefix SANITY < %t.ll
 // RUN: FileCheck %s --check-prefix CHECK-HIDDEN < %t.ll
 // RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
 // RUN: FileCheck %s --check-prefix LOC-CHECK < %t.ll
@@ -8,10 +7,6 @@
 // RUN: dwarfdump --verify %t.o
 
 // REQUIRES: OS=macosx
-
-// Sanity check for the regex above.
-// SANITY: {{^ *ret }}
-// SANITY: !DICompileUnit(
 
 // CHECK-HIDDEN: @[[HIDDEN_GV:_TWVVSC.*]] = linkonce_odr hidden
 // CHECK-HIDDEN-NOT: !DIGlobalVariable({{.*}}[[HIDDEN_GV]]
