@@ -7,6 +7,8 @@
 // REQUIRES: objc_interop
 
 // CHECK-LABEL: <<Foundation lookup table>>
+// CHECK:   NSTimeIntervalSince1970:
+// CHECK:     TU: Macro
 // CHECK: Categories:{{.*}}NSValue(NSValueCreation){{.*}}
 
 // CHECK-LABEL: <<ObjectiveC lookup table>>
@@ -79,6 +81,10 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 
 // CHECK: Categories: SNSomeClass(), SNSomeClass(Category1)
+
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: <<Foundation lookup table>>
+// CHECK-OMIT-NEEDLESS-WORDS:   timeIntervalSince1970:
+// CHECK-OMIT-NEEDLESS-WORDS:     TU: Macro
 
 // CHECK-OMIT-NEEDLESS-WORDS: <<ObjectiveC lookup table>>
 // CHECK-OMIT-NEEDLESS-WORDS-NOT: lookup table

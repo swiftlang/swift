@@ -1005,3 +1005,6 @@ extern NSString *NSHTTPRequestKey;
 @interface NSObject (Selectors)
 -(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
 @end
+
+#define NSTimeIntervalSince1970  978307200.0
+#define NS_DO_SOMETHING 17

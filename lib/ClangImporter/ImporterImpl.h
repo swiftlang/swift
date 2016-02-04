@@ -874,7 +874,8 @@ public:
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                             const clang::MacroInfo *macro);
+                             const clang::MacroInfo *macro,
+                             clang::ASTContext &clangCtx);
 
   /// \brief Import the given Clang identifier into Swift.
   ///
