@@ -9,6 +9,8 @@
 // RUN: %target-build-swift %s -Xlinker %t/resilient_struct.o -Xlinker %t/resilient_enum.o -I %t -L %t -o %t/main
 // RUN: %target-run %t/main
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 import resilient_enum
 import resilient_struct
