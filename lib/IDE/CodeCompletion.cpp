@@ -1822,7 +1822,7 @@ public:
         type = ParamDecl::getVarargBaseTy(type);
 
       Builder.addCallParameter(param->getArgumentName(), type,
-                               param->isVariadic());
+                               param->isVariadic(), true);
     }
   }
 
@@ -1856,7 +1856,7 @@ public:
       else if (IsTopLevel)
         Builder.addAnnotatedLeftParen();
       Builder.addCallParameter(Identifier(), PT->getUnderlyingType(),
-                               /*IsVarArg*/false);
+                               /*IsVarArg*/false, IsTopLevel);
       if (IsTopLevel)
         Builder.addRightParen();
       return;
@@ -1867,7 +1867,7 @@ public:
     else if (IsTopLevel)
       Builder.addAnnotatedLeftParen();
 
-    Builder.addCallParameter(Label, T, IsVarArg);
+    Builder.addCallParameter(Label, T, IsVarArg, IsTopLevel);
     if (IsTopLevel)
       Builder.addRightParen();
   }
@@ -1942,9 +1942,10 @@ public:
         if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
           auto name = BodyParams->get(i)->getName();
-          Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg());
+          Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg(),
+                                   true);
         } else {
-          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
+          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg(), true);
         }
         modifiedBuilder = true;
         NeedComma = true;
@@ -1961,9 +1962,9 @@ public:
       if (BodyParams) {
         auto name = BodyParams->get(0)->getName();
         Builder.addCallParameter(Identifier(), name, T,
-                                 /*IsVarArg*/false);
+                                 /*IsVarArg*/false, true);
       } else
-        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false);
+        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false, true);
     }
 
     return modifiedBuilder;
@@ -2122,7 +2123,7 @@ public:
 
         Builder.addLeftParen();
         Builder.addCallParameter(Ctx.Id_self, FirstInputType,
-                                 /*IsVarArg*/ false);
+                                 /*IsVarArg*/ false, true);
         Builder.addRightParen();
       } else {
         Builder.addLeftParen();
@@ -2920,7 +2921,8 @@ public:
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
     if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType, false);
+      builder.addCallParameter(Identifier(), Identifier(), RHSType, false,
+                               true);
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3135,15 +3137,16 @@ public:
       builder.addTextChunk("#Color");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("colorLiteralRed"),
-                               floatType, false);
+                               floatType, false, true);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("green"), floatType,
-                               false);
+                               false, true);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType, false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType,
+                               false, true);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("alpha"), floatType,
-                               false);
+                               false, true);
       builder.addRightParen();
       builder.addTextChunk("#");
       builder.addRightBracket();

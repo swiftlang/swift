@@ -15,6 +15,7 @@
 
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -247,16 +248,26 @@ public:
       addTypeAnnotation(Annotation);
   }
 
-  bool escapeKeyword(StringRef Word, llvm::SmallString<16> &EscapedKeyword) {
-#define KEYWORD(kw)                                                           \
-    if (Word.equals(#kw)) {                                                   \
-      EscapedKeyword.append("`");                                             \
-      EscapedKeyword.append(Word);                                            \
-      EscapedKeyword.append("`");                                             \
-      return true;                                                            \
-    }
+  StringRef escapeArgumentLabel(StringRef Word,
+                                bool escapeAllKeywords,
+                                llvm::SmallString<16> &EscapedKeyword) {
+    bool shouldEscape = false;
+    if (escapeAllKeywords) {
+#define KEYWORD(kw) .Case(#kw, true)
+      shouldEscape = llvm::StringSwitch<bool>(Word)
 #include "swift/Parse/Tokens.def"
-    return false;
+        .Default(false);
+    } else {
+      shouldEscape = !canBeArgumentLabel(Word);
+    }
+
+    if (!shouldEscape)
+      return Word;
+
+    EscapedKeyword.append("`");
+    EscapedKeyword.append(Word);
+    EscapedKeyword.append("`");
+    return EscapedKeyword;
   }
 
   void addCallParameterColon() {
@@ -285,7 +296,7 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg) {
+                        bool IsVarArg, bool Outermost) {
     CurrentNestingLevel++;
 
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
@@ -301,8 +312,9 @@ public:
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
           // if the name is not annotation, we need to escape keyword
-          !IsAnnotation && escapeKeyword(NameStr, EscapedKeyword) ?
-            EscapedKeyword.str() : NameStr);
+          IsAnnotation ? NameStr
+                       : escapeArgumentLabel(NameStr, !Outermost,
+                                             EscapedKeyword));
       if (IsAnnotation)
         getLastChunk().setIsAnnotation();
 
@@ -324,8 +336,7 @@ public:
       // Use local (non-API) parameter name if we have nothing else.
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-          escapeKeyword(LocalName.str(), EscapedKeyword) ? EscapedKeyword.str()
-                                                         : LocalName.str());
+            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
@@ -364,8 +375,9 @@ public:
     CurrentNestingLevel--;
   }
 
-  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg) {
-    addCallParameter(Name, Identifier(), Ty, IsVarArg);
+  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg,
+                        bool Outermost) {
+    addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost);
   }
 
   void addGenericParameter(StringRef Name) {
