@@ -17,7 +17,7 @@ public struct DropFirstTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], dropElements: Int, expected: [Int],
-      file: String = __FILE__, line: UInt = __LINE__) {
+      file: String = #file, line: UInt = #line) {
     self.sequence = sequence
     self.dropElements = dropElements
     self.expected = expected
@@ -32,7 +32,7 @@ public struct DropLastTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], dropElements: Int, expected: [Int],
-      file: String = __FILE__, line: UInt = __LINE__) {
+      file: String = #file, line: UInt = #line) {
     self.sequence = sequence
     self.dropElements = dropElements
     self.expected = expected
@@ -52,7 +52,7 @@ public struct ElementsEqualTest {
     _ expected: Bool, _ sequence: [Int], _ other: [Int],
     _ expectedLeftoverSequence: [Int],
     _ expectedLeftoverOther: [Int],
-    file: String = __FILE__, line: UInt = __LINE__,
+    file: String = #file, line: UInt = #line,
     comment: String = ""
   ) {
     self.expected = expected
@@ -78,7 +78,7 @@ public struct EnumerateTest {
 
   public init(
     _ expected: [(Int, Int)], _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__,
+    file: String = #file, line: UInt = #line,
     comment: String = ""
   ) {
     self.expected = expected
@@ -97,7 +97,7 @@ public struct FilterTest {
     _ expected: [Int],
     _ sequence: [Int],
     _ includeElement: (Int) -> Bool,
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -116,7 +116,7 @@ public struct FindTest {
   public init(
     expected: Int?, element: Int, sequence: [Int],
     expectedLeftoverSequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
@@ -137,7 +137,7 @@ public struct FlatMapTest {
     expected: [Int32],
     sequence: [Int],
     transform: (Int) -> [Int32],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -156,7 +156,7 @@ public struct FlatMapToOptionalTest {
     _ expected: [Int32],
     _ sequence: [Int],
     _ transform: (Int) -> Int32?,
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -174,7 +174,7 @@ internal struct ForEachTest {
 
   init(
     _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.sequence = sequence
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -193,7 +193,7 @@ public struct LexicographicalCompareTest {
     _ expected: ExpectedComparisonResult, _ sequence: [Int], _ other: [Int],
     _ expectedLeftoverSequence: [Int],
     _ expectedLeftoverOther: [Int],
-    file: String = __FILE__, line: UInt = __LINE__,
+    file: String = #file, line: UInt = #line,
     comment: String = ""
   ) {
     self.expected = expected
@@ -222,7 +222,7 @@ public struct MapTest {
     _ expected: [Int32],
     _ sequence: [Int],
     _ transform: (Int) -> Int32,
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -245,7 +245,7 @@ public struct MinMaxElementTest {
     maxValue expectedMaxValue: Int?,
     index expectedMaxIndex: Int?,
     _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__,
+    file: String = #file, line: UInt = #line,
     comment: String = ""
   ) {
     self.expectedMinValue = expectedMinValue
@@ -264,7 +264,7 @@ public struct PrefixTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], maxLength: Int, expected: [Int],
-      file: String = __FILE__, line: UInt = __LINE__) {
+      file: String = #file, line: UInt = #line) {
     self.sequence = sequence
     self.maxLength = maxLength
     self.expected = expected
@@ -278,7 +278,7 @@ public struct ReduceTest {
 
   public init(
     _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.sequence = sequence
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -292,7 +292,7 @@ public struct ReverseTest {
 
   public init(
     _ expected: [Int], _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -307,7 +307,7 @@ public struct SuffixTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], maxLength: Int, expected: [Int],
-      file: String = __FILE__, line: UInt = __LINE__) {
+      file: String = #file, line: UInt = #line) {
     self.sequence = sequence
     self.maxLength = maxLength
     self.expected = expected
@@ -324,7 +324,7 @@ public struct SplitTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], maxSplit: Int, separator: Int, expected: [[Int]],
-       allowEmptySlices: Bool, file: String = __FILE__, line: UInt = __LINE__) {
+       allowEmptySlices: Bool, file: String = #file, line: UInt = #line) {
     self.sequence = sequence
     self.maxSplit = maxSplit
     self.separator = separator
@@ -346,7 +346,7 @@ public struct StartsWithTest {
     _ expected: Bool, _ sequence: [Int], _ prefix: [Int],
     _ expectedLeftoverSequence: [Int],
     _ expectedLeftoverPrefix: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -370,7 +370,7 @@ public struct ZipTest {
     _ other: [Int32],
     leftovers expectedLeftoverSequence: [Int],
     _ expectedLeftoverOther: [Int32],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -1453,10 +1453,10 @@ extension TestSuite {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     func makeWrappedSequence(elements: [OpaqueValue<Int>]) -> Sequence {
       return makeSequence(elements.map(wrapValue))

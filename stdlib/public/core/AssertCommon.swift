@@ -185,13 +185,13 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
 @_transparent @noreturn
 public // COMPILER_INTRINSIC
 func _unimplemented_initializer(className: StaticString,
-                                initName: StaticString = __FUNCTION__,
-                                file: StaticString = __FILE__,
-                                line: UInt = __LINE__,
-                                column: UInt = __COLUMN__) {
+                                initName: StaticString = #function,
+                                file: StaticString = #file,
+                                line: UInt = #line,
+                                column: UInt = #column) {
   // This function is marked @_transparent so that it is inlined into the caller
   // (the initializer stub), and, depending on the build configuration,
-  // redundant parameter values (__FILE__ etc.) are eliminated, and don't leak
+  // redundant parameter values (#file etc.) are eliminated, and don't leak
   // information about the user's source.
 
   if _isDebugAssertConfiguration() {
@@ -227,7 +227,7 @@ func _unimplemented_initializer(className: StaticString,
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailed("fatal error", message(), file, line)
 }
