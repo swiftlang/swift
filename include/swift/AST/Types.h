@@ -2692,16 +2692,6 @@ public:
     return getWithType(fn(getType()));
   }
 
-  /// Replace references to substitutable types with new, concrete types and
-  /// return the substituted result.
-  ///
-  /// The API is comparable to Type::subst.
-  SILParameterInfo subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
-                         SubstOptions options) const {
-    Type type = getType().subst(module, substitutions, options);
-    return getWithType(type->getCanonicalType());
-  }
-
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(Ty.getPointer());
     id.AddInteger((unsigned)Convention);
@@ -2786,16 +2776,6 @@ public:
   template <typename F>
   SILResultInfo map(F &&fn) const {
     return getWithType(fn(getType()));
-  }
-
-  /// Replace references to substitutable types with new, concrete types and
-  /// return the substituted result.
-  ///
-  /// The API is comparable to Type::subst.
-  SILResultInfo subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
-                      SubstOptions options) const {
-    Type type = getType().subst(module, substitutions, options);
-    return getWithType(type->getCanonicalType());
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
