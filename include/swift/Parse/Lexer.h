@@ -423,6 +423,7 @@ private:
   void skipHashbang();
 
   void skipSlashStarComment();
+  void lexHash();
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();

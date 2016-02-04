@@ -38,17 +38,11 @@ enum class tok {
   floating_literal,
   string_literal,
   sil_local_name,      // %42 in SIL mode.
-  pound_if,
-  pound_else,
-  pound_elseif,
-  pound_endif,
-  pound_line,
-  pound_available,
-  pound_selector,
   comment,
   
 #define KEYWORD(X) kw_ ## X,
 #define PUNCTUATOR(X, Y) X,
+#define POUND_KEYWORD(X) pound_ ## X,
 #include "swift/Parse/Tokens.def"
   
   NUM_TOKENS

@@ -575,6 +575,48 @@ void Lexer::lexIdentifier() {
   return formToken(Kind, TokStart);
 }
 
+/// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
+void Lexer::lexHash() {
+  const char *TokStart = CurPtr-1;
+  if (*CurPtr == ']') { // #]
+    CurPtr++;
+    return formToken(tok::r_square_lit, TokStart);
+  }
+  
+  // Allow a hashbang #! line at the beginning of the file.
+  if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
+    CurPtr--;
+    if (BufferID != SourceMgr.getHashbangBufferID())
+      diagnose(CurPtr, diag::lex_hashbang_not_allowed);
+    skipHashbang();
+    return lexImpl();
+  }
+
+  // Scan for [a-z]+ to see what we match.
+  const char *tmpPtr = CurPtr;
+  while (clang::isLowercase(*tmpPtr))
+    ++tmpPtr;
+
+  // Map the character sequence onto
+  tok Kind = llvm::StringSwitch<tok>(StringRef(CurPtr, tmpPtr-CurPtr))
+#define KEYWORD(kw)
+#define POUND_KEYWORD(id) \
+  .Case(#id, tok::pound_##id)
+#include "swift/Parse/Tokens.def"
+  .Default(tok::pound);
+
+  // If we didn't find a match, then just return tok::pound.  This is highly
+  // dubious in terms of error recovery, but is useful for code completion and
+  // SIL parsing.
+  if (Kind == tok::pound)
+    return formToken(tok::pound, TokStart);
+
+  // If we found something specific, return it.
+  CurPtr = tmpPtr;
+  return formToken(Kind, TokStart);
+}
+
+
 /// Is the operator beginning at the given character "left-bound"?
 static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   // The first character in the file is not left-bound.
@@ -1578,65 +1620,10 @@ Restart:
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);
 
-  case '#': {
-    if (*CurPtr == ']') { // #]
-      CurPtr++;
-      return formToken(tok::r_square_lit, TokStart);
-    }
+  case '#':
+    return lexHash();
 
-    if (getSubstring(TokStart + 1, 2).equals("if") &&
-        isWhitespace(CurPtr[2])) {
-      CurPtr += 2;
-      return formToken(tok::pound_if, TokStart);
-    }
-    
-    if (getSubstring(TokStart + 1, 4).equals("else") &&
-        isWhitespace(CurPtr[4])) {
-      CurPtr += 4;
-      return formToken(tok::pound_else, TokStart);
-    }
-    
-    if (getSubstring(TokStart + 1, 6).equals("elseif") &&
-        isWhitespace(CurPtr[6])) {
-      CurPtr += 6;
-      return formToken(tok::pound_elseif, TokStart);
-    }
-
-    if (getSubstring(TokStart + 1, 5).equals("endif") &&
-        (isWhitespace(CurPtr[5]) || CurPtr[5] == '\0')) {
-      CurPtr += 5;
-      return formToken(tok::pound_endif, TokStart);
-    }
-
-    if (getSubstring(TokStart + 1, 4).equals("line") &&
-        isWhitespace(CurPtr[4])) {
-      CurPtr += 4;
-      return formToken(tok::pound_line, TokStart);
-    }
-    
-    if (getSubstring(TokStart + 1, 9).equals("available")) {
-      CurPtr += 9;
-      return formToken(tok::pound_available, TokStart);
-    }
-
-    if (getSubstring(TokStart + 1, 8).equals("selector")) {
-      CurPtr += 8;
-      return formToken(tok::pound_selector, TokStart);
-    }
-
-    // Allow a hashbang #! line at the beginning of the file.
-    if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
-      CurPtr--;
-      if (BufferID != SourceMgr.getHashbangBufferID())
-        diagnose(CurPtr, diag::lex_hashbang_not_allowed);
-      skipHashbang();
-      goto Restart;
-    }
-
-    return formToken(tok::pound, TokStart);
-  }
-
-  // Operator characters.
+      // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment();
