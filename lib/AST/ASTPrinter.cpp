@@ -117,14 +117,33 @@ public:
 };
 
 class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
-  NominalTypeDecl *NTD;
-  ASTContext &Ctx;
+  Type BaseTy;
+  DeclContext &DC;
+  const ASTContext &Ctx;
+  std::unique_ptr<PrinterArchetypeTransformer> NameTransformer;
+
   llvm::StringMap<Type> Map;
   std::vector<std::unique_ptr<std::string>> Buffers;
 
+  Type tryNamedArchetypeTransform(Type T) {
+    if (NameTransformer) {
+      return NameTransformer->transform(T);
+    }
+    return T;
+  }
+
+  StringRef tryNamedArchetypeTransform(StringRef T) {
+    if (NameTransformer) {
+      return NameTransformer->transform(T);
+    }
+    return T;
+  }
+
   std::function<Type(Type)> F = [&] (Type Ty) {
+    auto Original = Ty;
+    Ty = Ty->getDesugaredType();
     if (Ty->getKind() != TypeKind::Archetype)
-      return Ty;
+      return Original;
     auto ATT = cast<ArchetypeType>(Ty.getPointer());
     ArchetypeType *Self = ATT;
     std::vector<Identifier> Names;
@@ -132,17 +151,23 @@ class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
       Names.insert(Names.begin(), Self->getName());
     }
     if (!Self->getSelfProtocol() || Names.empty())
-      return Ty;
-    Type Result = checkMemberType(*NTD, NTD->getDeclaredTypeInContext(), Names);
+      return tryNamedArchetypeTransform(Ty);
+    Type Result = checkMemberType(DC, BaseTy, Names);
     if (Result)
       return Type(Result->getDesugaredType());
     else
-      return Ty;
+      return tryNamedArchetypeTransform(Ty);
   };
 
 public:
-  ArchetypeSelfTransformer(NominalTypeDecl *NTD): NTD(NTD),
-                                                  Ctx(NTD->getASTContext()) {}
+  ArchetypeSelfTransformer(NominalTypeDecl *NTD):
+    BaseTy(NTD->getDeclaredTypeInContext()),
+    DC(*NTD),
+    Ctx(NTD->getASTContext()) {}
+
+  ArchetypeSelfTransformer(Type BaseTy, DeclContext &DC):
+    BaseTy(BaseTy->getRValueType()), DC(DC), Ctx(DC.getASTContext()),
+    NameTransformer(new PrinterArchetypeNameTransformer(BaseTy, &DC)){}
 
   Type transform(Type Ty) override {
     return Ty.transform(F);
@@ -157,7 +182,7 @@ public:
         continue;
       Names.push_back(Ctx.getIdentifier(Parts[I]));
     }
-    Type Result = checkMemberType(*NTD, NTD->getDeclaredTypeInContext(), Names);
+    Type Result = checkMemberType(DC, BaseTy, Names);
     if (Result) {
       Result = Result->getDesugaredType();
       std::unique_ptr<std::string> pBuffer(new std::string);
@@ -167,7 +192,7 @@ public:
       Buffers.push_back(std::move(pBuffer));
       return StringRef(*Buffers.back());
     }
-    return TypeName;
+    return tryNamedArchetypeTransform(TypeName);
   }
 };
 }
@@ -181,6 +206,10 @@ PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
 
 void PrintOptions::setArchetypeTransform(Type T, const DeclContext *DC) {
   pTransformer = std::make_shared<PrinterArchetypeNameTransformer>(T, DC);
+}
+
+void PrintOptions::setArchetypeTransformForQuickHelp(Type T, DeclContext *DC) {
+  pTransformer = std::make_shared<ArchetypeSelfTransformer>(T, *DC);
 }
 
 void PrintOptions::initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D) {

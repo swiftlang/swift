@@ -253,6 +253,8 @@ struct PrintOptions {
 
   void setArchetypeTransform(Type T, const DeclContext *DC);
 
+  void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
+
   void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
 
   void clearArchetypeTransformerForSynthesizedExtensions();
