@@ -17,9 +17,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> 
     return true
   }
 
-  // FIXME: This is not ambiguous, the actual problem is that 'u' has the wrong
-  // type - "U" is not the same as "T".
-  return t1.isEqual(u) // expected-error {{type of expression is ambiguous without more context}}
+  return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}} expected-note {{expected an argument list of type '(T)'}}
 }
 
 protocol MethodLessComparable {
@@ -171,9 +169,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
 
-  // FIXME: This is not ambiguous, the actual problem is that 'u' has the wrong
-  // type - "U" is not the same as "T".
-  T.isEqual(t, y: u) // expected-error{{type of expression is ambiguous without more context}}
+  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}} expected-note {{expected an argument list of type '(T, y: T)'}}
 }
 
 //===----------------------------------------------------------------------===//

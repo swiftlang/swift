@@ -71,6 +71,7 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 // Generic member does not conform.
 extension Int {
   func wibble<T: P2>(x: T, _ y: T) -> T { return x }
+  func wubble<T>(x: Int -> T) -> T { return x(self) }
 }
 i.wibble(3, 4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 
@@ -80,6 +81,15 @@ struct A : P2 {
 }
 let a = A()
 for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'SequenceType'}}
+}
+
+// Generic as part of function/tuple types
+func f6<T:P2>(g: Void -> T) -> (c: Int, i: T) {
+  return (c: 0, i: g())
+}
+func f7() -> (c: Int, v: A) {
+  let g: Void -> A = { return A() }
+  return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals

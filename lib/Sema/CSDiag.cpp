@@ -17,6 +17,8 @@
 #include "ConstraintSystem.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/TypeWalker.h"
+#include "swift/AST/TypeMatcher.h"
 
 using namespace swift;
 using namespace constraints;
@@ -836,7 +838,7 @@ namespace {
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
     std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
-    evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs);
+    evaluateCloseness(DeclContext *dc, Type candArgListType, ArrayRef<CallArgParam> actualArgs);
       
     void filterList(ArrayRef<CallArgParam> actualArgs);
     void filterList(Type actualArgsType) {
@@ -980,11 +982,71 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
   return false;
 }
 
+/// Given a parameter type that may contain generic type params and an actual
+/// argument type, decide whether the param and actual arg have the same shape
+/// and equal fixed type portions, and return by reference each archetype and
+/// the matching portion of the actual arg type where that archetype appears.
+static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actualArgType,
+                                     SmallVector<ArchetypeType *, 4> &archetypes,
+                                     SmallVector<Type, 4> &substitutions) {
+  class GenericVisitor : public TypeMatcher<GenericVisitor> {
+    DeclContext *dc;
+    SmallVector<ArchetypeType *, 4> &archetypes;
+    SmallVector<Type, 4> &substitutions;
+
+  public:
+    GenericVisitor(DeclContext *dc,
+                   SmallVector<ArchetypeType *, 4> &archetypes,
+                   SmallVector<Type, 4> &substitutions)
+    : dc(dc), archetypes(archetypes), substitutions(substitutions) {}
+    
+    bool mismatch(TypeBase *paramType, TypeBase *argType) {
+      return paramType->isEqual(argType);
+    }
+    
+    bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
+      Type type = paramType;
+      if (dc && type->isTypeParameter())
+        type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
+      
+      if (auto archetype = type->getAs<ArchetypeType>()) {
+        for (unsigned i = 0, c = archetypes.size(); i < c; i++) {
+          if (archetypes[i]->isEqual(archetype))
+            return substitutions[i]->isEqual(argType);
+        }
+        archetypes.push_back(archetype);
+        substitutions.push_back(argType);
+        return true;
+      }
+      return false;
+    }
+  };
+  
+  // If paramType contains any substitutions already, find them and add them
+  // to our list before matching the two types to find more.
+  paramType.findIf([&](Type type) -> bool {
+    if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
+      Type original = substitution->getOriginal();
+      if (dc && original->isTypeParameter())
+        original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
+      
+      if (auto archetype = original->getAs<ArchetypeType>()) {
+        archetypes.push_back(archetype);
+        substitutions.push_back(substitution->getReplacementType());
+      }
+    }
+    return false;
+  });
+  
+  GenericVisitor visitor(dc, archetypes, substitutions);
+  return visitor.match(paramType, actualArgType);
+}
+
 /// Determine how close an argument list is to an already decomposed argument
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
 std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
-CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
+CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
                   ArrayRef<CallArgParam> actualArgs) {
   auto candArgs = decomposeArgParamType(candArgListType);
 
@@ -1064,16 +1126,28 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
       // more parameters.
       // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?
-      if (rArgType->isEqual(paramType))
+
+      SmallVector<ArchetypeType *, 4> archetypes;
+      SmallVector<Type, 4> substitutions;
+      bool matched;
+      if (paramType->is<UnresolvedType>())
+        matched = false;
+      else
+        matched = findGenericSubstitutions(dc, paramType, rArgType,
+                                           archetypes, substitutions);
+      
+      if (matched && archetypes.size() == 0)
         continue;
-      if (auto genericParam = paramType->getAs<GenericTypeParamType>())
-        paramType = genericParam->getDecl()->getArchetype();
-      if (paramType->is<ArchetypeType>() && !rArgType->hasTypeVariable()) {
+      if (matched && archetypes.size() == 1 && !rArgType->hasTypeVariable()) {
+        auto archetype = archetypes[0];
+        auto substitution = substitutions[0];
+        
         if (singleArchetype) {
-          if (!paramType->isEqual(singleArchetype))
+          if (!archetype->isEqual(singleArchetype))
             // Multiple archetypes, too complicated.
             return { CC_ArgumentMismatch, {}};
-          if (rArgType->isEqual(matchingArgType)) {
+          
+          if (substitution->isEqual(matchingArgType)) {
             if (nonSubstitutableArgs == 0)
               continue;
             ++nonSubstitutableArgs;
@@ -1087,20 +1161,18 @@ CalleeCandidateInfo::evaluateCloseness(Type candArgListType,
               // If we have only one nonSubstitutableArg so far, then this different
               // type might be the one that we should be substituting for instead.
               // Note that failureInfo is already set correctly for that case.
-              auto archetype = paramType->castTo<ArchetypeType>();
-              if (CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC)) {
-                mismatchesAreNearMisses = argumentMismatchIsNearMiss(matchingArgType, rArgType);
-                matchingArgType = rArgType;
+              if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
+                mismatchesAreNearMisses = argumentMismatchIsNearMiss(matchingArgType, substitution);
+                matchingArgType = substitution;
                 continue;
               }
             }
           }
         } else {
-          matchingArgType = rArgType;
-          singleArchetype = paramType;
+          matchingArgType = substitution;
+          singleArchetype = archetype;
 
-          auto archetype = paramType->getAs<ArchetypeType>();
-          if (CS->TC.isSubstitutableFor(rArgType, archetype, CS->DC)) {
+          if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
             continue;
           }
           ++nonSubstitutableArgs;
@@ -1325,7 +1397,9 @@ void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return { CC_GeneralMismatch, {}};
-    return evaluateCloseness(inputType, actualArgs);
+    Decl *decl = candidate.getDecl();
+    return evaluateCloseness(decl ? decl->getInnermostDeclContext() : nullptr,
+                             inputType, actualArgs);
   });
 }
 
@@ -3540,8 +3614,10 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     }
     
     // Explode out multi-index subscripts to find the best match.
+    Decl *decl = cand.getDecl();
     auto indexResult =
-      calleeInfo.evaluateCloseness(cand.getArgumentType(), decomposedIndexType);
+      calleeInfo.evaluateCloseness(decl ? decl->getInnermostDeclContext() : nullptr,
+                                   cand.getArgumentType(), decomposedIndexType);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
     return indexResult;
