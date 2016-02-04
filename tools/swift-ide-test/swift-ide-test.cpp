@@ -477,6 +477,11 @@ SkipUnderscoredStdlibProtocols("skip-underscored-stdlib-protocols",
                 llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+SkipDocumentationComments("skip-print-doc-comments",
+             llvm::cl::desc("Don't print documentation comments from clang module headers"),
+             llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 PrintRegularComments("print-regular-comments",
              llvm::cl::desc("Print regular comments from clang module headers"),
              llvm::cl::init(false));
@@ -2532,6 +2537,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
     PrintOpts.PrintAccessibility = options::PrintAccessibility;
     PrintOpts.AccessibilityFilter = options::AccessibilityFilter;
+    PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
     PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
     PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
