@@ -152,7 +152,9 @@ public func dump<T, TargetStream : OutputStreamType>(
 ) -> T {
   var maxItemCounter = maxItems
   var visitedItems = [ObjectIdentifier : Int]()
-  _dumpObject(
+  targetStream._lock()
+  defer { targetStream._unlock() }
+  _dumpObject_unlocked(
     x, name, indent, maxDepth, &maxItemCounter, &visitedItems,
     &targetStream)
   return x
@@ -168,7 +170,7 @@ public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
 }
 
 /// Dump an object's contents. User code should use dump().
-internal func _dumpObject<TargetStream : OutputStreamType>(
+internal func _dumpObject_unlocked<TargetStream : OutputStreamType>(
     object: Any, _ name: String?, _ indent: Int, _ maxDepth: Int,
     inout _ maxItemCounter: Int,
     inout _ visitedItems: [ObjectIdentifier : Int],
@@ -177,19 +179,21 @@ internal func _dumpObject<TargetStream : OutputStreamType>(
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
 
-  for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
+  for _ in 0..<indent { targetStream.write(" ") }
 
   let mirror = Mirror(reflecting: object)
   let count = mirror.children.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
-  print("\(bullet) ", terminator: "", toStream: &targetStream)
+  targetStream.write(bullet)
+  targetStream.write(" ")
 
   if let nam = name {
-    print("\(nam): ", terminator: "", toStream: &targetStream)
+    targetStream.write(nam)
+    targetStream.write(": ")
   }
   // This takes the place of the old mirror API's 'summary' property
-  _dumpPrint(object, mirror, &targetStream)
+  _dumpPrint_unlocked(object, mirror, &targetStream)
 
   let id: ObjectIdentifier?
   if let classInstance = object as? AnyObject where object.dynamicType is AnyObject.Type {
@@ -203,49 +207,53 @@ internal func _dumpObject<TargetStream : OutputStreamType>(
   }
   if let theId = id {
     if let previous = visitedItems[theId] {
-      print(" #\(previous)", toStream: &targetStream)
+      targetStream.write(" #")
+      _print_unlocked(previous, &targetStream)
+      targetStream.write("\n")
       return
     }
     let identifier = visitedItems.count
     visitedItems[theId] = identifier
-    print(" #\(identifier)", terminator: "", toStream: &targetStream)
+    targetStream.write(" #")
+    _print_unlocked(identifier, &targetStream)
   }
 
-  print("", toStream: &targetStream)
+  targetStream.write("\n")
 
   guard maxDepth > 0 else { return }
 
   if let superclassMirror = mirror.superclassMirror() {
-    _dumpSuperclass(superclassMirror, indent + 2, maxDepth - 1, &maxItemCounter, &visitedItems, &targetStream)
+    _dumpSuperclass_unlocked(superclassMirror, indent + 2, maxDepth - 1, &maxItemCounter, &visitedItems, &targetStream)
   }
 
   var currentIndex = mirror.children.startIndex
   for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
-        print(" ", terminator: "", toStream: &targetStream)
+        _print_unlocked(" ", &targetStream)
       }
       let remainder = count - i
-      print("(\(remainder)", terminator: "", toStream: &targetStream)
-      if i > 0 { print(" more", terminator: "", toStream: &targetStream) }
+      targetStream.write("(")
+      _print_unlocked(remainder, &targetStream)
+      if i > 0 { targetStream.write(" more") }
       if remainder == 1 {
-        print(" child)", toStream: &targetStream)
+        targetStream.write(" child)\n")
       } else {
-        print(" children)", toStream: &targetStream)
+        targetStream.write(" children)\n")
       }
       return
     }
 
     let (name, child) = mirror.children[currentIndex]
     currentIndex = currentIndex.successor()
-    _dumpObject(child, name, indent + 2, maxDepth - 1,
-                    &maxItemCounter, &visitedItems, &targetStream)
+    _dumpObject_unlocked(child, name, indent + 2, maxDepth - 1,
+                         &maxItemCounter, &visitedItems, &targetStream)
   }
 }
 
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
-internal func _dumpSuperclass<TargetStream : OutputStreamType>(
+internal func _dumpSuperclass_unlocked<TargetStream : OutputStreamType>(
     mirror: Mirror, _ indent: Int, _ maxDepth: Int,
     inout _ maxItemCounter: Int,
     inout _ visitedItems: [ObjectIdentifier : Int],
@@ -254,43 +262,45 @@ internal func _dumpSuperclass<TargetStream : OutputStreamType>(
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
 
-  for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
+  for _ in 0..<indent { targetStream.write(" ") }
 
   let count = mirror.children.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
-  print("\(bullet) ", terminator: "", toStream: &targetStream)
-  print("super: \(String(reflecting: mirror.subjectType))",
-            toStream: &targetStream)
+  targetStream.write(bullet)
+  targetStream.write(" super: ")
+  _debugPrint_unlocked(mirror.subjectType, &targetStream)
+  targetStream.write("\n")
 
   guard maxDepth > 0 else { return }
 
   if let superclassMirror = mirror.superclassMirror() {
-    _dumpSuperclass(superclassMirror, indent + 2, maxDepth - 1,
-                        &maxItemCounter, &visitedItems, &targetStream)
+    _dumpSuperclass_unlocked(superclassMirror, indent + 2, maxDepth - 1,
+                             &maxItemCounter, &visitedItems, &targetStream)
   }
 
   var currentIndex = mirror.children.startIndex
   for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
-        print(" ", terminator: "", toStream: &targetStream)
+        targetStream.write(" ")
       }
       let remainder = count - i
-      print("(\(remainder)", terminator: "", toStream: &targetStream)
-      if i > 0 { print(" more", terminator: "", toStream: &targetStream) }
+      targetStream.write("(")
+      _print_unlocked(remainder, &targetStream)
+      if i > 0 { targetStream.write(" more") }
       if remainder == 1 {
-        print(" child)", toStream: &targetStream)
+        targetStream.write(" child)\n")
       } else {
-        print(" children)", toStream: &targetStream)
+        targetStream.write(" children)\n")
       }
       return
     }
 
     let (name, child) = mirror.children[currentIndex]
     currentIndex = currentIndex.successor()
-    _dumpObject(child, name, indent + 2, maxDepth - 1,
-                    &maxItemCounter, &visitedItems, &targetStream)
+    _dumpObject_unlocked(child, name, indent + 2, maxDepth - 1,
+                         &maxItemCounter, &visitedItems, &targetStream)
   }
 }
 

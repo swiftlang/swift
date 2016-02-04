@@ -39,7 +39,7 @@ typedef long int __swift_ssize_t;
 void _swift_stdlib_free(void *ptr);
 
 // Input/output <stdio.h>
-int _swift_stdlib_putchar(int c);
+int _swift_stdlib_putchar_unlocked(int c);
 
 // String handling <string.h>
 __attribute__((pure))
