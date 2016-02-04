@@ -60,15 +60,8 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
     return Type();
 
   // Find the nominal type decl related to VD.
-  auto TC = VD->getDeclContext()->getInnermostTypeContext();
-  NominalTypeDecl *NTD = dyn_cast_or_null<NominalTypeDecl>(TC);
-  if (!NTD) {
-    ExtensionDecl *ED = dyn_cast_or_null<ExtensionDecl>(TC);
-    if (ED) {
-      if (auto T = ED->getExtendedType())
-        NTD = T->getAnyNominal();
-    }
-  }
+  NominalTypeDecl *NTD = VD->getDeclContext()->
+    isNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return Type();
   Type Result;
