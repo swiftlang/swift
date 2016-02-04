@@ -2055,8 +2055,7 @@ static bool shouldLowercaseValueName(StringRef name) {
 }
 
 /// Returns true if it is expected that the macro is ignored.
-static bool shouldIgnoreMacro(const clang::IdentifierInfo *identifier,
-                              const clang::MacroInfo *macro) {
+static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
   // Ignore include guards.
   if (macro->isUsedForHeaderGuard())
     return true;
@@ -2071,7 +2070,7 @@ static bool shouldIgnoreMacro(const clang::IdentifierInfo *identifier,
 
   // Consult the blacklist of macros to suppress.
   auto suppressMacro =
-    llvm::StringSwitch<bool>(identifier->getName())
+    llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
 #include "MacroTable.def"
     .Default(false);
@@ -2082,11 +2081,17 @@ static bool shouldIgnoreMacro(const clang::IdentifierInfo *identifier,
   return false;
 }
 
+bool ClangImporter::shouldIgnoreMacro(StringRef Name,
+                                      const clang::MacroInfo *Macro) {
+  return ::shouldIgnoreMacro(Name, Macro);
+}
+
 Identifier ClangImporter::Implementation::importMacroName(
              const clang::IdentifierInfo *clangIdentifier,
              const clang::MacroInfo *macro) {
   // If we're supposed to ignore this macro, return an empty identifier.
-  if (shouldIgnoreMacro(clangIdentifier, macro)) return Identifier();
+  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
+    return Identifier();
 
   // Import the identifier.
   return importIdentifier(clangIdentifier);
