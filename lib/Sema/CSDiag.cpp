@@ -806,11 +806,13 @@ namespace {
     struct FailedArgumentInfo {
       int argumentNumber = -1;      ///< Arg # at the call site.
       Type parameterType = Type();  ///< Expected type at the decl site.
+      DeclContext *declContext = nullptr; ///< Context at the candidate declaration.
       
       bool isValid() const { return argumentNumber != -1; }
       
       bool operator!=(const FailedArgumentInfo &other) {
         if (argumentNumber != other.argumentNumber) return true;
+        if (declContext != other.declContext) return true;
         // parameterType can be null, and isEqual doesn't handle this.
         if (!parameterType || !other.parameterType)
           return parameterType.getPointer() != other.parameterType.getPointer();
@@ -1186,6 +1188,8 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
       
       failureInfo.argumentNumber = argNo;
       failureInfo.parameterType = paramType;
+      if (paramType->hasTypeParameter())
+        failureInfo.declContext = dc;
     }
   }
   
@@ -1735,18 +1739,25 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
 /// archetype that has argument type errors, diagnose that error and
 /// return true.
 bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
-  bool foundFailure = false;
-  Type paramType = failedArgument.parameterType;
   Type argType = badArgExpr->getType();
-
-  if (auto genericParam = paramType->getAs<GenericTypeParamType>())
-    paramType = genericParam->getDecl()->getArchetype();
   
-  if (paramType->is<ArchetypeType>() && !argType->hasTypeVariable() &&
-      // FIXME: For protocol argument types, could add specific error
-      // similar to could_not_use_member_on_existential.
-      !argType->is<ProtocolType>() && !argType->is<ProtocolCompositionType>()) {
-    auto archetype = paramType->castTo<ArchetypeType>();
+  // FIXME: For protocol argument types, could add specific error
+  // similar to could_not_use_member_on_existential.
+  if (argType->hasTypeVariable() || argType->is<ProtocolType>() ||
+      argType->is<ProtocolCompositionType>())
+    return false;
+  
+  bool foundFailure = false;
+  SmallVector<ArchetypeType *, 4> archetypes;
+  SmallVector<Type, 4> substitutions;
+  
+  if (!findGenericSubstitutions(failedArgument.declContext, failedArgument.parameterType,
+                                argType, archetypes, substitutions))
+    return false;
+
+  for (unsigned i = 0, c = archetypes.size(); i < c; i++) {
+    auto archetype = archetypes[i];
+    auto argType = substitutions[i];
     
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
     
