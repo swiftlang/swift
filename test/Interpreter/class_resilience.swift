@@ -10,6 +10,8 @@
 
 // RUN: %target-run %t/main
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This

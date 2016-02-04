@@ -3,6 +3,7 @@
 // RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
 // RUN: %target-build-swift %s -Xlinker %t/resilient_struct.o -I %t -L %t -o %t/main
 // RUN: %target-run %t/main
+// REQUIRES: executable_test
 
 import StdlibUnittest
 
