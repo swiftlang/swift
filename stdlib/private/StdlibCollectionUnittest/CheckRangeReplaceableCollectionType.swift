@@ -69,7 +69,7 @@ internal struct ReplaceRangeTest {
   internal init(
     collection: [Int], newElements: [Int],
     rangeSelection: RangeSelection, expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElements = newElements.map(OpaqueValue.init)
@@ -87,7 +87,7 @@ internal struct AppendTest {
 
   internal init(
     collection: [Int], newElement: Int, expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElement = OpaqueValue(newElement)
@@ -104,7 +104,7 @@ internal struct AppendContentsOfTest {
 
   internal init(
     collection: [Int], newElements: [Int], expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElements = newElements.map(OpaqueValue.init)
@@ -122,7 +122,7 @@ internal struct InsertTest {
 
   internal init(
     collection: [Int], newElement: Int, indexSelection: IndexSelection,
-    expected: [Int], file: String = __FILE__, line: UInt = __LINE__
+    expected: [Int], file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElement = OpaqueValue(newElement)
@@ -141,7 +141,7 @@ internal struct InsertContentsOfTest {
 
   internal init(
     collection: [Int], newElements: [Int], indexSelection: IndexSelection,
-    expected: [Int], file: String = __FILE__, line: UInt = __LINE__
+    expected: [Int], file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElements = newElements.map(OpaqueValue.init)
@@ -161,7 +161,7 @@ internal struct RemoveAtIndexTest {
   internal init(
     collection: [Int], indexSelection: IndexSelection,
     expectedRemovedElement: Int, expectedCollection: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.indexSelection = indexSelection
@@ -179,7 +179,7 @@ internal struct RemoveLastNTest {
 
   internal init(
     collection: [Int], numberToRemove: Int, expectedCollection: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.numberToRemove = numberToRemove
@@ -196,7 +196,7 @@ internal struct RemoveRangeTest {
 
   internal init(
     collection: [Int], rangeSelection: RangeSelection, expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.rangeSelection = rangeSelection
@@ -212,7 +212,7 @@ internal struct RemoveAllTest {
 
   internal init(
     collection: [Int], expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.expected = expected
@@ -227,7 +227,7 @@ internal struct ReserveCapacityTest {
 
   internal init(
     collection: [Int], requestedCapacity: Int,
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.requestedCapacity = requestedCapacity
@@ -243,7 +243,7 @@ internal struct OperatorPlusTest {
 
   internal init(
     lhs: [Int], rhs: [Int], expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.lhs = lhs.map(OpaqueValue.init)
     self.rhs = rhs.map(OpaqueValue.init)
@@ -365,10 +365,10 @@ extension TestSuite {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addForwardCollectionTests(
       testNamePrefix,
@@ -1126,10 +1126,10 @@ self.test("\(testNamePrefix).OperatorPlus") {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addForwardRangeReplaceableCollectionTests(
       testNamePrefix,
@@ -1252,10 +1252,10 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addBidirectionalRangeReplaceableCollectionTests(
       testNamePrefix,

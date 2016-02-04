@@ -19,7 +19,7 @@ public struct PartitionExhaustiveTest {
 
   public init(
     _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.sequence = sequence
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -102,10 +102,10 @@ extension TestSuite {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addForwardCollectionTests(
       testNamePrefix,
@@ -407,10 +407,10 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addForwardMutableCollectionTests(
       testNamePrefix,
@@ -525,10 +525,10 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addBidirectionalMutableCollectionTests(
       testNamePrefix,

@@ -31,7 +31,7 @@
 public func assert(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
@@ -62,7 +62,7 @@ public func assert(
 public func precondition(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
@@ -97,7 +97,7 @@ public func precondition(
 @inline(__always)
 public func assertionFailure(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
     _assertionFailed("fatal error", message(), file, line,
@@ -126,7 +126,7 @@ public func assertionFailure(
 @_transparent @noreturn
 public func preconditionFailure(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
@@ -142,7 +142,7 @@ public func preconditionFailure(
 @_transparent @noreturn
 public func fatalError(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   _assertionFailed("fatal error", message(), file, line,
     flags: _fatalErrorFlags())
@@ -157,7 +157,7 @@ public func fatalError(
 @_transparent
 public func _precondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
@@ -174,7 +174,7 @@ public func _precondition(
 @_transparent @noreturn
 public func _preconditionFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__) {
+  file: StaticString = #file, line: UInt = #line) {
 
   _precondition(false, message, file:file, line: line)
 
@@ -187,7 +187,7 @@ public func _preconditionFailure(
 @_transparent
 public func _overflowChecked<T>(
   args: (T, Bool),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
@@ -212,7 +212,7 @@ public func _overflowChecked<T>(
 @_transparent
 public func _debugPrecondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
@@ -226,7 +226,7 @@ public func _debugPrecondition(
 @_transparent @noreturn
 public func _debugPreconditionFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__) {
+  file: StaticString = #file, line: UInt = #line) {
   if _isDebugAssertConfiguration() {
     _precondition(false, message, file: file, line: line)
   }
@@ -242,7 +242,7 @@ public func _debugPreconditionFailure(
 @_transparent
 public func _sanityCheck(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), true) {
@@ -255,7 +255,7 @@ public func _sanityCheck(
 @_transparent @noreturn
 public func _sanityCheckFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   _sanityCheck(false, message, file: file, line: line)
   _conditionallyUnreachable()

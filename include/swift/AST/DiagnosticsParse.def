@@ -699,6 +699,11 @@ ERROR(invalid_label_on_stmt,none,
 NOTE(discard_result_of_closure,none,
      "explicitly discard the result of the closure by assigning to '_'", ())
 
+WARNING(snake_case_deprecated,none,
+        "%0 is deprecated and will be removed in Swift 3, please use %1",
+        (StringRef, StringRef))
+
+
 // Assignment statement
 ERROR(expected_expr_assignment,none,
       "expected expression in assignment", ())

@@ -48,8 +48,8 @@ func rejectsAssertStringLiteral() {
 
 
 // <rdar://problem/22243469> QoI: Poor error message with throws, default arguments, & overloads
-func process(line: UInt = __LINE__, _ fn: () -> Void) {}
-func process(line: UInt = __LINE__) -> Int { return 0 }
+func process(line: UInt = #line, _ fn: () -> Void) {}
+func process(line: UInt = #line) -> Int { return 0 }
 func dangerous() throws {}
 
 func test() {

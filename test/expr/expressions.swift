@@ -583,9 +583,14 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  _ = __FILE__
-  _ = __LINE__ + __COLUMN__
-  var _: UInt8 = __LINE__ + __COLUMN__
+  _ = __FILE__  // expected-warning {{__FILE__ is deprecated and will be removed in Swift 3, please use #file}}
+  _ = __LINE__  // expected-warning {{__LINE__ is deprecated and will be removed in Swift 3, please use #line}}
+  _ = __COLUMN__  // expected-warning {{__COLUMN__ is deprecated and will be removed in Swift 3, please use #column}}
+  _ = __DSO_HANDLE__  // expected-warning {{__DSO_HANDLE__ is deprecated and will be removed in Swift 3, please use #dsohandle}}
+
+  _ = #file
+  _ = #line + #column
+  var _: UInt8 = #line + #column
 }
 
 //===----------------------------------------------------------------------===//

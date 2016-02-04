@@ -15,7 +15,7 @@ import SwiftShims
 % traversals = ['Forward', 'Bidirectional', 'RandomAccess']
 
 @noreturn @inline(never)
-internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
+internal func _abstract(file: StaticString = #file, line: UInt = #line) {
   fatalError("Method must be overridden", file: file, line: line)
 }
 

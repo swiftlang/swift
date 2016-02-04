@@ -36,7 +36,7 @@ public struct SourceLoc {
   }
 
   public func withCurrentLoc(
-      file: String = __FILE__, line: UInt = __LINE__
+      file: String = #file, line: UInt = #line
   ) -> SourceLocStack {
     return SourceLocStack(self).with(SourceLoc(file, line))
   }
@@ -74,7 +74,7 @@ public struct SourceLocStack {
   }
 
   public func withCurrentLoc(
-      file: String = __FILE__, line: UInt = __LINE__
+      file: String = #file, line: UInt = #line
   ) -> SourceLocStack {
     return with(SourceLoc(file, line))
   }
@@ -90,7 +90,7 @@ public struct SourceLocStack {
   TRACE = '''@autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UInt = __LINE__'''
+    file: String = #file, line: UInt = #line'''
 
   # When the parameter list would start with a ${TRACE}, we use 
   # ${TRACE1} instead, to avoid the warning about an extraneous 
@@ -876,7 +876,7 @@ public class TestSuite {
 
   public func test(
     name: String,
-    file: String = __FILE__, line: UInt = __LINE__,
+    file: String = #file, line: UInt = #line,
     _ testFunction: () -> Void
   ) {
     _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
@@ -884,7 +884,7 @@ public class TestSuite {
   }
 
   public func test(
-    name: String, file: String = __FILE__, line: UInt = __LINE__
+    name: String, file: String = #file, line: UInt = #line
   ) -> _TestBuilder {
     return _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
   }

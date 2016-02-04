@@ -881,16 +881,31 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
   }
 
-  case tok::pound_column:
-  case tok::pound_file:
-  case tok::pound_function:
-  case tok::pound_line:
-  case tok::pound_dsohandle:
   case tok::kw___FILE__:
   case tok::kw___LINE__:
   case tok::kw___COLUMN__:
   case tok::kw___FUNCTION__:
   case tok::kw___DSO_HANDLE__: {
+    StringRef replacement = "";
+    switch (Tok.getKind()) {
+    default: llvm_unreachable("can't get here");
+    case tok::kw___FILE__: replacement = "#file"; break;
+    case tok::kw___LINE__: replacement = "#line"; break;
+    case tok::kw___COLUMN__: replacement = "#column"; break;
+    case tok::kw___FUNCTION__:  replacement = "#function"; break;
+    case tok::kw___DSO_HANDLE__: replacement = "#dsohandle"; break;
+    }
+
+    diagnose(Tok.getLoc(), diag::snake_case_deprecated,
+             Tok.getText(), replacement)
+      .fixItReplace(Tok.getLoc(), replacement);
+    SWIFT_FALLTHROUGH;
+  }
+  case tok::pound_column:
+  case tok::pound_file:
+  case tok::pound_function:
+  case tok::pound_line:
+  case tok::pound_dsohandle: {
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
     Result = makeParserResult(

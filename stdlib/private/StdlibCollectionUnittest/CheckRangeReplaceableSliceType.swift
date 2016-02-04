@@ -38,10 +38,10 @@ extension TestSuite {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addForwardRangeReplaceableCollectionTests(
       testNamePrefix,
@@ -169,10 +169,10 @@ extension TestSuite {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addForwardRangeReplaceableSliceTests(
       testNamePrefix,
@@ -314,10 +314,10 @@ extension TestSuite {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addBidirectionalRangeReplaceableSliceTests(
       testNamePrefix,
