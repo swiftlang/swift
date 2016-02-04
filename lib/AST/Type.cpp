@@ -2109,22 +2109,6 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
-                                                        ArrayRef<Type> args) {
-  TypeSubstitutionMap map;
-  for (auto &param : getGenericParams().getNestedGenericParams()) {
-    map.insert(std::make_pair(param->getArchetype(), args.front()));
-    args = args.slice(1);
-  }
-  
-  assert(args.empty()
-         && "number of args did not match number of generic params");
-  
-  Type input = getInput().subst(module, map, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(module, map, SubstFlags::IgnoreMissing);
-  return FunctionType::get(input, result, getExtInfo());
-}
-
 TypeSubstitutionMap
 GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
   TypeSubstitutionMap map;
@@ -2138,16 +2122,6 @@ GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
   
   assert(Subs.empty() && "did not use all substitutions?!");
   return map;
-}
-
-FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
-                                                  ArrayRef<Substitution> subs) {
-  TypeSubstitutionMap map
-    = getGenericParams().getSubstitutionMap(subs);
-  
-  Type input = getInput().subst(module, map, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(module, map, SubstFlags::IgnoreMissing);
-  return FunctionType::get(input, result, getExtInfo());
 }
 
 FunctionType *
