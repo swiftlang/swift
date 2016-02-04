@@ -20,9 +20,10 @@
 
 #include "swift/AST/Decl.h"
 
+#include "ValueWitness.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "ValueWitness.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
   class CanType;
@@ -141,7 +142,10 @@ public:
 };
 
 /// An abstract description of a protocol.
-class ProtocolInfo {
+class ProtocolInfo final :
+    private llvm::TrailingObjects<ProtocolInfo, WitnessTableEntry> {
+  friend TrailingObjects;
+
   /// A singly-linked-list of all the protocols that have been laid out.
   const ProtocolInfo *NextConverted;
   friend class TypeConverter;
@@ -157,17 +161,10 @@ class ProtocolInfo {
   mutable llvm::SmallDenseMap<const ProtocolConformance*, ConformanceInfo*, 2>
     Conformances;
 
-  WitnessTableEntry *getEntriesBuffer() {
-    return reinterpret_cast<WitnessTableEntry*>(this+1);
-  }
-  const WitnessTableEntry *getEntriesBuffer() const {
-    return reinterpret_cast<const WitnessTableEntry*>(this+1);
-  }
-
   ProtocolInfo(unsigned numWitnesses, ArrayRef<WitnessTableEntry> table)
     : NumWitnesses(numWitnesses), NumTableEntries(table.size()) {
-    std::memcpy(getEntriesBuffer(), table.data(),
-                sizeof(WitnessTableEntry) * table.size());
+    std::uninitialized_copy(table.begin(), table.end(),
+                            getTrailingObjects<WitnessTableEntry>());
   }
 
   static ProtocolInfo *create(unsigned numWitnesses,
@@ -185,7 +182,7 @@ public:
   }
 
   ArrayRef<WitnessTableEntry> getWitnessEntries() const {
-    return ArrayRef<WitnessTableEntry>(getEntriesBuffer(), NumTableEntries);
+    return {getTrailingObjects<WitnessTableEntry>(), NumTableEntries};
   }
 
   const WitnessTableEntry &getWitnessEntry(Decl *member) const {

@@ -334,16 +334,15 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
 }
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
-  Chunk *TailChunks = reinterpret_cast<Chunk *>(this + 1);
-  std::copy(Chunks.begin(), Chunks.end(), TailChunks);
+  std::uninitialized_copy(Chunks.begin(), Chunks.end(),
+                          getTrailingObjects<Chunk>());
   NumChunks = Chunks.size();
 }
 
 CodeCompletionString *CodeCompletionString::create(llvm::BumpPtrAllocator &Allocator,
                                                    ArrayRef<Chunk> Chunks) {
-  void *CCSMem = Allocator.Allocate(sizeof(CodeCompletionString) +
-                                    Chunks.size() * sizeof(CodeCompletionString::Chunk),
-                                    llvm::alignOf<CodeCompletionString>());
+  void *CCSMem = Allocator.Allocate(totalSizeToAlloc<Chunk>(Chunks.size()),
+                                    alignof(CodeCompletionString));
   return new (CCSMem) CodeCompletionString(Chunks);
 }
 

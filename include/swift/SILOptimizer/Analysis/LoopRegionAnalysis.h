@@ -136,6 +136,8 @@ namespace swift {
 /// data is tail allocated so that the basic block case is not penalized by
 /// storing this unnecessary information.
 class LoopRegion {
+  // FIXME: This should use llvm::TrailingObjects for its tail allocations, but
+  // that requires restructuring the file a bit.
 
   /// This is a data structure that is an unsigned integer with a top bit flag
   /// that says whether it is an RPO ID for a BB Region or is an RPO ID of the

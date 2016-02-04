@@ -34,7 +34,8 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
     Nested(constraints), Locator(locator)
 {
   assert(kind == ConstraintKind::Disjunction);
-  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+  std::uninitialized_copy(typeVars.begin(), typeVars.end(),
+                          getTypeVariablesBuffer().begin());
 }
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
@@ -564,8 +565,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, locator, typeVars);
 }
@@ -582,8 +582,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
   }
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(type, choice, locator, typeVars);
 }
@@ -602,8 +601,7 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, restriction, first, second, locator,
                               typeVars);
@@ -622,8 +620,7 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint)
-  + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
 }
@@ -675,8 +672,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
 
   // Create the disjunction constraint.
   uniqueTypeVariables(typeVars);
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,
                               cs.allocateCopy(constraints), locator, typeVars);
