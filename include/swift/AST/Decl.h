@@ -4199,7 +4199,7 @@ class ParamDecl : public VarDecl {
   /// resolve the type.
   bool IsTypeLocImplicit = false;
   
-  /// Information about a symbolic default argument, like __FILE__.
+  /// Information about a symbolic default argument, like #file.
   DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
   
 public:

@@ -22,7 +22,6 @@ x x // expected-error{{consecutive statements}} {{2-2=;}}
 
 // rdar://19582475
 public struct S {
-// expected-error@+2{{consecutive declarations on a line must be separated by ';'}} {{5-5=;}}
 // expected-error@+1{{expected declaration}}
 / ###line 25 "line-directive.swift"
 }

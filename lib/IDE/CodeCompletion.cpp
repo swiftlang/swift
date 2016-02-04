@@ -597,6 +597,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
 #define KEYWORD(X) case CodeCompletionKeywordKind::kw_##X: \
       Prefix.append("[" #X "]"); \
       break;
+#define POUND_KEYWORD(X) case CodeCompletionKeywordKind::pound_##X: \
+      Prefix.append("[#" #X "]"); \
+      break;
 #include "swift/Parse/Tokens.def"
     }
     break;
@@ -4161,12 +4164,12 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   AddKeyword("try?", StringRef(), CodeCompletionKeywordKind::kw_try);
   // FIXME: The pedantically correct way to find the type is to resolve the
   // Swift.StringLiteralType type.
-  AddKeyword("__FUNCTION__", "String", CodeCompletionKeywordKind::kw___FUNCTION__);
-  AddKeyword("__FILE__", "String", CodeCompletionKeywordKind::kw___FILE__);
+  AddKeyword("#function", "String", CodeCompletionKeywordKind::pound_function);
+  AddKeyword("#file", "String", CodeCompletionKeywordKind::pound_file);
   // Same: Swift.IntegerLiteralType.
-  AddKeyword("__LINE__", "Int", CodeCompletionKeywordKind::kw___LINE__);
-  AddKeyword("__COLUMN__", "Int", CodeCompletionKeywordKind::kw___COLUMN__);
-  AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>", CodeCompletionKeywordKind::kw___DSO_HANDLE__);
+  AddKeyword("#line", "Int", CodeCompletionKeywordKind::pound_line);
+  AddKeyword("#column", "Int", CodeCompletionKeywordKind::pound_column);
+  AddKeyword("#dsohandle", "UnsafeMutablePointer<Void>", CodeCompletionKeywordKind::pound_dsohandle);
 }
 
 
