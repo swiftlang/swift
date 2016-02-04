@@ -1722,9 +1722,10 @@ public:
       Type ContextTy = VD->getDeclContext()->getDeclaredTypeOfContext();
       if (ContextTy) {
         Type MaybeNominalType = ExprType->getRValueInstanceType();
-        if (ContextTy->getAnyNominal() == MaybeNominalType->getAnyNominal() &&
+        if (ContextTy->lookThroughAllAnyOptionalTypes()->getAnyNominal() ==
+            MaybeNominalType->lookThroughAllAnyOptionalTypes()->getAnyNominal() &&
             !isBoringBoundGenericType(MaybeNominalType)) {
-          if (Type T = MaybeNominalType->getTypeOfMember(
+          if (Type T = MaybeNominalType->lookThroughAllAnyOptionalTypes()->getTypeOfMember(
               CurrDeclContext->getParentModule(), VD, TypeResolver.get()))
             return TransformerPt ? T.transform(TransformerPt->getTransformerFunc()) :
                                    T;

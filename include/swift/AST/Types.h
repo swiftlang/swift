@@ -3152,7 +3152,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBlockStorageType, Type)
 
 /// A type with a special syntax that is always sugar for a library type.
 ///
-/// The prime examples are arrays (T[] -> Array<T>) and
+/// The prime examples are arrays ([T] -> Array<T>) and
 /// optionals (T? -> Optional<T>).
 class SyntaxSugarType : public TypeBase {
   Type Base;
