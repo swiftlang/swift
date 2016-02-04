@@ -16,6 +16,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
 
@@ -1758,6 +1759,57 @@ ProjectionTree::ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA,
 ProjectionTree::~ProjectionTree() {
   for (auto *N : ProjectionTreeNodes)
     N->~ProjectionTreeNode();
+}
+
+SILValue
+ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
+                                                  SILLocation Loc,
+                                                  ProjectionTreeNode *Node,
+                                                  LeafValueMapTy &LeafValues) {
+  // Use the child node value if the child is alive.
+  if (Node->ChildProjections.empty()) {
+    auto Iter = LeafValues.find(Node->getIndex());
+    if (Iter != LeafValues.end())
+      return Iter->second;
+    // Return undef for dead node.
+    return SILUndef::get(Node->getType(), Mod);
+  }
+
+  // This is an aggregate node, construct its value from its children
+  // recursively. 
+  //
+  // NOTE: We do not expect to have too many levels of nesting, so
+  // recursion should be fine.
+  llvm::SmallVector<SILValue, 8> ChildValues;
+  for (unsigned ChildIdx : Node->ChildProjections) {
+    ProjectionTreeNode *Child = getNode(ChildIdx);
+    ChildValues.push_back(computeExplodedArgumentValueInner(Builder, Loc, Child,
+                                                            LeafValues));
+  }
+
+  // Form and return the aggregate.
+  NullablePtr<swift::SILInstruction> AI =
+      Projection::createAggFromFirstLevelProjections(Builder, Loc,
+                                                     Node->getType(),
+                                                     ChildValues);
+
+  assert(AI.get() && "Failed to get a part of the debug value");
+  return SILValue(AI.get());
+}
+
+SILValue
+ProjectionTree::computeExplodedArgumentValue(SILBuilder &Builder, 
+                                             SILLocation Loc,
+                                             llvm::SmallVector<SILValue, 8> &LeafValues) {
+  // Construct the leaf index to leaf value map.
+  llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;
+  for (unsigned i = 0; i < LeafValues.size(); ++i) {
+    LeafIndexToValue[LeafIndices[i]] = LeafValues[i];
+  }
+
+  // Compute the full root node debug node by walking down the projection tree.
+  return computeExplodedArgumentValueInner(Builder, Loc, getRoot(),
+                                           LeafIndexToValue);
 }
 
 void

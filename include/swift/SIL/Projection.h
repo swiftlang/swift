@@ -1291,6 +1291,8 @@ class ProjectionTree {
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
   llvm::SmallVector<unsigned, 3> LeafIndices;
 
+  using LeafValueMapTy = llvm::DenseMap<unsigned, SILValue>;
+
 public:
   /// Construct a projection tree from BaseTy.
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
@@ -1304,6 +1306,16 @@ public:
   /// Compute liveness and use information in this projection tree using Base.
   /// All debug instructions (debug_value, debug_value_addr) are ignored.
   void computeUsesAndLiveness(SILValue Base);
+
+  /// Create a root SILValue iout of the given leaf node values by walking on
+  /// the projection tree.
+  SILValue computeExplodedArgumentValue(SILBuilder &Builder,
+                                        SILLocation Loc, 
+                                        llvm::SmallVector<SILValue, 8> &LVs);
+  SILValue computeExplodedArgumentValueInner(SILBuilder &Builder,
+                                             SILLocation Loc, 
+                                             ProjectionTreeNode *Node,
+                                             LeafValueMapTy &LeafValues);
 
   /// Return the module associated with this tree.
   SILModule &getModule() const { return Mod; }

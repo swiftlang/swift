@@ -395,10 +395,16 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
   ProjTree.replaceValueUsesWithLeafUses(Builder, BB->getParent()->getLocation(),
                                         LeafValues);
 
-  // Replace all uses of the original arg with undef so it does not have any
-  // uses.
+  // We ignored debugvalue uses when we constructed the new arguments, in order
+  // to preserve as much information as possible, we construct a new value for
+  // OrigArg from the leaf values and use that in place of the OrigArg.
+  SILValue NewOrigArgValue = ProjTree.computeExplodedArgumentValue(Builder,
+                                           BB->getParent()->getLocation(),
+                                           LeafValues);
+
+  // Replace all uses of the original arg with the new value.
   SILArgument *OrigArg = BB->getBBArg(OldArgOffset);
-  OrigArg->replaceAllUsesWith(SILUndef::get(OrigArg->getType(), BB->getModule()));
+  OrigArg->replaceAllUsesWith(NewOrigArgValue);
 
   // Now erase the old argument since it does not have any uses. We also
   // decrement ArgOffset since we have one less argument now.
