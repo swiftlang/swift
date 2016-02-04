@@ -22,14 +22,6 @@ import StdlibUnittestFoundationExtras
 
 var StringTests = TestSuite("StringTests")
 
-var objCPresent: Bool {
-#if _runtime(_ObjC)
-  return true
-#else
-  return false
-#endif
-}
-
 struct ComparisonTest {
   let expectedUnicodeCollation: ExpectedComparisonResult
   let lhs: String
@@ -58,11 +50,11 @@ let comparisonTests = [
   // ASCII cases
   ComparisonTest(.LT, "t", "tt"),
   ComparisonTest(.GT, "t", "Tt",
-    xfail: .Custom({ objCPresent == false },
-      reason: "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
+    xfail: .NativeRuntime(
+      "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
   ComparisonTest(.GT, "\u{0}", "",
-    xfail: .Custom({ objCPresent == false },
-      reason: "Null-related issue: https://bugs.swift.org/browse/SR-630")),
+    xfail: .NativeRuntime(
+      "Null-related issue: https://bugs.swift.org/browse/SR-630")),
   ComparisonTest(.EQ, "\u{0}", "\u{0}"),
   // Currently fails:
   // ComparisonTest(.LT, "\r\n", "t"),
@@ -106,8 +98,8 @@ let comparisonTests = [
   ComparisonTest(.EQ, "\u{212b}", "\u{c5}"),
   ComparisonTest(.EQ, "A\u{30a}", "\u{c5}"),
   ComparisonTest(.LT, "A\u{30a}", "a",
-    xfail: .Custom({ objCPresent == false },
-      reason: "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
+    xfail: .NativeRuntime(
+      "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
   ComparisonTest(.LT, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
@@ -145,11 +137,9 @@ let comparisonTests = [
   // U+0341 has a canonical decomposition mapping of U+0301.
   ComparisonTest(.EQ, "\u{0301}", "\u{0341}"),
   ComparisonTest(.LT, "\u{0301}", "\u{0954}",
-    xfail: .Custom({ objCPresent == false },
-      reason: "Compares as equal with ICU")),
+    xfail: .NativeRuntime("Compares as equal with ICU")),
   ComparisonTest(.LT, "\u{0341}", "\u{0954}",
-    xfail: .Custom({ objCPresent == false },
-      reason: "Compares as equal with ICU")),
+    xfail: .NativeRuntime("Compares as equal with ICU")),
 ]
 
 func checkStringComparison(
@@ -273,8 +263,8 @@ func checkHasPrefixHasSuffix(
 }
 
 StringTests.test("hasPrefix,hasSuffix")
-  .skip(.Custom({ objCPresent == false },
-      reason: "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
+  .skip(.NativeRuntime(
+    "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
   for test in comparisonTests {
     checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
@@ -284,8 +274,8 @@ StringTests.test("hasPrefix,hasSuffix")
 
 StringTests.test("Failures{hasPrefix,hasSuffix}-CF")
   .xfail(.Custom({ true }, reason: "rdar://problem/19034601"))
-  .skip(.Custom({ objCPresent == false },
-    reason: "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
+  .skip(.NativeRuntime(
+    "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
   let test = ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}")
   checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
@@ -293,8 +283,8 @@ StringTests.test("Failures{hasPrefix,hasSuffix}-CF")
 
 StringTests.test("Failures{hasPrefix,hasSuffix}")
   .xfail(.Custom({ true }, reason: "blocked on rdar://problem/19036555"))
-  .skip(.Custom({ objCPresent == false },
-    reason: "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
+  .skip(.NativeRuntime(
+    "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
   let tests =
     [ComparisonTest(.LT, "\r\n", "t"), ComparisonTest(.GT, "\r\n", "\n")]
