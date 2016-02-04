@@ -48,7 +48,6 @@ We also intend to provide tools to detect inadvertent changes in interfaces.
   * A discussion of back-dating, and how it usually is not allowed.
   * A revisal of the discussion on fixed-layout classes.
   * A brief discussion of "deployment files", which represent distribution groupings that are themselves versioned. (For example, OS X 10.10.3 contains Foundation version 1153.20.) Deployment files are likely to provide a concrete implementation of "resilience domains".
-  * A way to specify "minimum deployment libraries", like today's minimum deployment targets.
 
 Introduction
 ============
@@ -115,6 +114,25 @@ for fallback behavior when the requested library version is not present::
 This is essentially the same model as the availability checking released in
 Swift 2.0, but generalized for checking library versions instead of just OS
 versions.
+
+
+Declaring Library Version Dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Swift 2's availability model includes the notion of a *minimum deployment
+target,* the version of an OS that can be assumed present for the program being
+compiled to run at all. For example, a program compiled with a minimum
+deployment target of iOS 9.2 will not launch on iOS 9.0.
+
+The generalized model above suggests being able to make similar guarantees for
+individual libraries. For example, a client program may depend on version 1.1
+of the "Magician" library; trying to run using version 1.0 will result in
+errors. By declaring this at compile-time, the client code can omit
+``@available`` and ``#available`` checks that are satisfied by the minimum
+library version.
+
+Both the syntax and enforcement of this feature are not covered by this
+document.
 
 
 Publishing Versioned API
