@@ -1091,6 +1091,7 @@ affect the model described in this document, or concern the parts of this
 document that affect language semantics:
 
 - `SE-0030 Property Behaviors`_
+- (planned) Overridable methods in extensions
 - (planned) Making classes "sealed" by default
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) Default implementations in protocols
