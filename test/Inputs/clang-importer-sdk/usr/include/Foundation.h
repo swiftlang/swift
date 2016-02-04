@@ -1005,3 +1005,7 @@ extern NSString *NSHTTPRequestKey;
 @interface NSString (URLExtraction)
 @property (nonnull,copy,readonly) NSArray<NSURL *> *URLsInText;
 @end
+
+#define NSTimeIntervalSince1970  978307200.0
+#define NS_DO_SOMETHING 17
+

@@ -769,7 +769,7 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
         break;
 
       // Add this entry.
-      auto name = importMacroName(macro.first, info);
+      auto name = importMacroName(macro.first, info, clangCtx);
       if (name.empty()) continue;
       table.addEntry(name, info, clangCtx.getTranslationUnitDecl());
     }
@@ -2093,13 +2093,42 @@ bool ClangImporter::shouldIgnoreMacro(StringRef Name,
 
 Identifier ClangImporter::Implementation::importMacroName(
              const clang::IdentifierInfo *clangIdentifier,
-             const clang::MacroInfo *macro) {
+             const clang::MacroInfo *macro,
+             clang::ASTContext &clangCtx) {
   // If we're supposed to ignore this macro, return an empty identifier.
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
 
-  // Import the identifier.
-  return importIdentifier(clangIdentifier);
+  // If we aren't omitting needless words, no transformation is applied to the
+  // name.
+  StringRef name = clangIdentifier->getName();
+  if (!OmitNeedlessWords) return SwiftContext.getIdentifier(name);
+
+  // Determine which module defines this macro.
+  StringRef moduleName;
+  if (auto moduleID = macro->getOwningModuleID()) {
+    if (auto module = clangCtx.getExternalSource()->getModule(moduleID))
+      moduleName = module->getTopLevelModuleName();
+  }
+
+  if (moduleName.empty())
+    moduleName = clangCtx.getLangOpts().CurrentModule;
+
+  // Check whether we have a prefix to strip.
+  unsigned prefixLen = stripModulePrefixLength(ModulePrefixes, moduleName,
+                                               name);
+  if (prefixLen == 0) return SwiftContext.getIdentifier(name);
+
+  // Strip the prefix.
+  name = name.substr(prefixLen);
+
+  // If we should lowercase, do so.
+  StringScratchSpace scratch;
+  if (shouldLowercaseValueName(name))
+    name = camel_case::toLowercaseInitialisms(name, scratch);
+
+  // We're done.
+  return SwiftContext.getIdentifier(name);
 }
 
 auto ClangImporter::Implementation::importFullName(
@@ -3523,11 +3552,13 @@ void ClangImporter::lookupBridgingHeaderDecls(
       }
     }
   }
+
+  auto &ClangCtx = Impl.getClangASTContext();
   auto &ClangPP = Impl.getClangPreprocessor();
   for (clang::IdentifierInfo *II : Impl.BridgeHeaderMacros) {
     if (auto *MI = ClangPP.getMacroInfo(II)) {
       if (filter(MI)) {
-        Identifier Name = Impl.importMacroName(II, MI);
+        Identifier Name = Impl.importMacroName(II, MI, ClangCtx);
         if (Decl *imported = Impl.importMacro(Name, MI))
           receiver(imported);
       }
@@ -3604,7 +3635,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
           auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
           if (auto *MI = ClangPP.getMacroInfo(II)) {
             if (filter(MI)) {
-              Identifier Name = Impl.importMacroName(II, MI);
+              Identifier Name = Impl.importMacroName(II, MI, ClangCtx);
               if (Decl *imported = Impl.importMacro(Name, MI))
                 receiver(imported);
             }
@@ -4367,7 +4398,7 @@ SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
 ///
 /// FIXME: this is an elaborate hack to badly reflect Clang's
 /// submodule visibility into Swift.
-static bool isVisibleClangEntry(clang::Preprocessor &pp,
+static bool isVisibleClangEntry(clang::ASTContext &ctx,
                                 StringRef name,
                                 SwiftLookupTable::SingleEntry entry) {
   if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
@@ -4383,20 +4414,25 @@ static bool isVisibleClangEntry(clang::Preprocessor &pp,
   }
 
   // Check whether the macro is defined.
-  // FIXME: We could get the wrong macro definition here.
-  return pp.isMacroDefined(name);
+  auto clangMacro = entry.get<clang::MacroInfo *>();
+  if (auto moduleID = clangMacro->getOwningModuleID()) {
+    if (auto module = ctx.getExternalSource()->getModule(moduleID)) 
+      return module->NameVisibility == clang::Module::AllVisible;
+  }
+
+  return true;
 }
 
 void ClangImporter::Implementation::lookupValue(
        SwiftLookupTable &table, DeclName name,
        VisibleDeclConsumer &consumer) {
-  auto clangTU = getClangASTContext().getTranslationUnitDecl();
-  auto &clangPP = getClangPreprocessor();
+  auto &clangCtx = getClangASTContext();
+  auto clangTU = clangCtx.getTranslationUnitDecl();
   auto baseName = name.getBaseName().str();
 
   for (auto entry : table.lookup(name.getBaseName().str(), clangTU)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangPP, baseName, entry)) continue;
+    if (!isVisibleClangEntry(clangCtx, baseName, entry)) continue;
 
     ValueDecl *decl;
 
@@ -4449,12 +4485,12 @@ void ClangImporter::Implementation::lookupObjCMembers(
        SwiftLookupTable &table,
        DeclName name,
        VisibleDeclConsumer &consumer) {
-  auto &clangPP = getClangPreprocessor();
+  auto &clangCtx = getClangASTContext();
   auto baseName = name.getBaseName().str();
 
   for (auto clangDecl : table.lookupObjCMembers(baseName)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangPP, baseName, clangDecl)) continue;
+    if (!isVisibleClangEntry(clangCtx, baseName, clangDecl)) continue;
 
     // Import the declaration.
     auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl));

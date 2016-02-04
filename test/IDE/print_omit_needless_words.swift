@@ -178,6 +178,10 @@
 // Lowercasing initialisms with plurals.
 // CHECK-FOUNDATION: var urlsInText: [URL] { get }
 
+// Prefix stripping for macro names.
+// CHECK-FOUNDATION: var timeIntervalSince1970: Double { get }
+// CHECK-FOUNDATION: var DO_SOMETHING: Int
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
