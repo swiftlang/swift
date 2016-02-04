@@ -35,10 +35,6 @@
 // CHECK-NEXT:     TU: SNCollision{{$}}
 // CHECK-NEXT:   SNCollisionProtocol:
 // CHECK-NEXT:     TU: SNCollision{{$}}
-// CHECK-NEXT:   SWIFT_ENUM:
-// CHECK-NEXT:     TU: Macro
-// CHECK-NEXT:   SWIFT_NAME:
-// CHECK-NEXT:     TU: Macro
 // CHECK-NEXT:   SomeClass:
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:

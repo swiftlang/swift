@@ -19,10 +19,6 @@
 // CHECK-NEXT:     SNColorChoice: SNColorRed
 // CHECK-NEXT:   SNColorChoice:
 // CHECK-NEXT:     TU: SNColorChoice, SNColorChoice
-// CHECK-NEXT:   SWIFT_ENUM:
-// CHECK-NEXT:     TU: Macro
-// CHECK-NEXT:   SWIFT_NAME:
-// CHECK-NEXT:     TU: Macro
 // CHECK-NEXT:   SomeStruct:
 // CHECK-NEXT:     TU: SNSomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace:
