@@ -7,6 +7,8 @@
 // RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix DWARF-CHECK
 // RUN: dwarfdump --verify %t.o
 
+// REQUIRES: OS=macosx
+
 // Sanity check for the regex above.
 // SANITY: {{^ *ret }}
 // SANITY: !DICompileUnit(
