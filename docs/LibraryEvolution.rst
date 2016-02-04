@@ -171,7 +171,7 @@ Certain uses of ``internal`` entities require them to be part of a library's
 binary interface, which means they need to be versioned as well. See
 `Versioning Internal Declarations`_ below.
 
-In additioned to versioned entities, there are also attributes that are safe to
+In addition to versioned entities, there are also attributes that are safe to
 add to declarations when releasing a new version of a library. In most cases,
 clients can only take advantage of the attributes when using the new release of
 the library, and therefore the attributes also need to record the version in
@@ -770,7 +770,7 @@ Finally, classes allow the following changes that do not apply to structs:
   *exactly* match the overridden declaration. Any existing callers should 
   automatically use the superclass implementation.
 - ``@noreturn`` may be only added to a method if it is not publicly
-  overrideable.
+  overridable.
 - ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
   without providing any extra version information. Removing any of these is
   permitted but discouraged.
