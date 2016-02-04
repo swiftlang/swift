@@ -885,10 +885,20 @@ Operator declarations are not versioned.
 Typealiases
 ~~~~~~~~~~~
 
-Like operators, typealiases only exist at compile-time, so changing them
-affects source compatibility but not binary compatibility. Since a typealias
-is only made up of its name and its type, it is recommended that it is never
-changed at all after being published. Typealiases are not versioned.
+Typealiases only exist at compile-time, so changing a top-level typealias
+affects source compatibility but not binary compatibility. Since a typealias is
+only made up of its name and its type, it is recommended that a public
+top-level typealias is never changed at all after being published.
+
+Public typealiases within structs, enums, and protocols may be used for
+protocol conformances (to satisfy associated type requirements), not only
+within the library but within client modules as well. Therefore, changing a
+member typealias in any way is not permitted.
+
+It is always permitted to change the *use* of a public typealias to its
+underlying type, and vice versa, at any location in the program.
+
+Neither top-level nor member typealiases are versioned.
 
 
 A Unifying Theme
