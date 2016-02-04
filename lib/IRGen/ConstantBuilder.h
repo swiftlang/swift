@@ -1,4 +1,4 @@
-//===--- ConstantBuilder.h - IR generation for constant structs -----------===//
+//===--- ConstantBuilder.h - IR generation for constant structs -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
