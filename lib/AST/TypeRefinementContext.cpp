@@ -32,6 +32,7 @@ TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
   if (Parent) {
     assert(SrcRange.isValid());
     Parent->addChild(this);
+    assert(Info.isContainedIn(Parent->getAvailabilityInfo()));
   }
   Ctx.addDestructorCleanup(Children);
 }
