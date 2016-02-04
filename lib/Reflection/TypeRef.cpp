@@ -1,4 +1,4 @@
-//===--- TypeRef.cpp - Swift Type References for Reflection -----*- C++ -*-===//
+//===--- TypeRef.cpp - Swift Type References for Reflection ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
