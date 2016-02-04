@@ -752,7 +752,7 @@ Finally, classes allow the following changes that do not apply to structs:
   *exactly* match the overridden declaration. Any existing callers should 
   automatically use the superclass implementation.
 - ``@noreturn`` may be only added to a method if it is not publicly
-  overrideable.
+  overridable.
 - ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
   without providing any extra version information. Removing any of these is
   permitted but discouraged.
