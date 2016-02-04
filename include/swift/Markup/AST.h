@@ -13,9 +13,10 @@
 #ifndef LLVM_MARKUP_AST_H
 #define LLVM_MARKUP_AST_H
 
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/ADT/Optional.h"
 #include "swift/Markup/LineList.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
 namespace markup {
@@ -61,20 +62,13 @@ public:
   void operator delete(void *Data) = delete;
 };
 
-class MarkupASTNode;
-
 #pragma mark Markdown Nodes
 
-class Document final : public MarkupASTNode {
+class Document final : public MarkupASTNode,
+    private llvm::TrailingObjects<Document, MarkupASTNode *> {
+  friend TrailingObjects;
+
   size_t NumChildren;
-
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
-
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
 
   Document(ArrayRef<MarkupASTNode*> Children);
 
@@ -82,42 +76,36 @@ public:
   static Document *create(MarkupContext &MC,
                           ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
-  }
-
   ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+  }
 
   static bool classof(const MarkupASTNode *N) {
     return N->getKind() == ASTNodeKind::Document;
   }
 };
 
-class BlockQuote final : public MarkupASTNode {
+class BlockQuote final : public MarkupASTNode,
+    private llvm::TrailingObjects<BlockQuote, MarkupASTNode *> {
+  friend TrailingObjects;
+
   size_t NumChildren;
 
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
-
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-
   BlockQuote(ArrayRef<MarkupASTNode *> Children);
+
 public:
   static BlockQuote *create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -125,17 +113,12 @@ public:
   }
 };
 
-class List final : public MarkupASTNode {
+class List final : public MarkupASTNode,
+    private llvm::TrailingObjects<List, MarkupASTNode *> {
+  friend TrailingObjects;
+
   size_t NumChildren;
   bool Ordered;
-
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
 
   List(ArrayRef<MarkupASTNode *> Children, bool IsOrdered);
 
@@ -144,19 +127,17 @@ public:
                       bool IsOrdered);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  void setChildren(const SmallVectorImpl<MarkupASTNode *> &NewChildren) {
+  void setChildren(ArrayRef<MarkupASTNode *> NewChildren) {
     assert(NewChildren.size() <= NumChildren);
-    auto Buffer = getChildrenBuffer();
-    for (size_t i = 0; i < NewChildren.size(); ++i)
-      Buffer[i] = NewChildren[i];
-
+    std::copy(NewChildren.begin(), NewChildren.end(),
+              getTrailingObjects<MarkupASTNode *>());
     NumChildren = NewChildren.size();
   }
 
@@ -169,27 +150,23 @@ public:
   }
 };
 
-class Item final : public MarkupASTNode {
-  size_t NumChildren;
+class Item final : public MarkupASTNode,
+    private llvm::TrailingObjects<Item, MarkupASTNode *> {
+  friend TrailingObjects;
 
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
+  size_t NumChildren;
 
   Item(ArrayRef<MarkupASTNode *> Children);
 
 public:
   static Item *create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -240,15 +217,11 @@ public:
   }
 };
 
-class Paragraph final : public MarkupASTNode {
-  size_t NumChildren;
+class Paragraph final : public MarkupASTNode,
+    private llvm::TrailingObjects<Paragraph, MarkupASTNode *> {
+  friend TrailingObjects;
 
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
+  size_t NumChildren;
 
   Paragraph(ArrayRef<MarkupASTNode *> Children);
 
@@ -256,12 +229,12 @@ public:
   static Paragraph *create(MarkupContext &MC,
                            ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -269,16 +242,12 @@ public:
   }
 };
 
-class Header final : public MarkupASTNode {
+class Header final : public MarkupASTNode,
+    private llvm::TrailingObjects<Header, MarkupASTNode *> {
+  friend TrailingObjects;
+
   size_t NumChildren;
   unsigned Level;
-
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
 
   Header(unsigned Level, ArrayRef<MarkupASTNode *> Children);
 
@@ -286,12 +255,12 @@ public:
   static Header *create(MarkupContext &MC, unsigned Level,
                         ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   unsigned getLevel() const {
@@ -466,27 +435,23 @@ public:
   }
 };
 
-class Emphasis final : public InlineContent {
-  size_t NumChildren;
+class Emphasis final : public InlineContent,
+    private llvm::TrailingObjects<Emphasis, MarkupASTNode *> {
+  friend TrailingObjects;
 
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
+  size_t NumChildren;
 
   Emphasis(ArrayRef<MarkupASTNode *> Children);
 public:
   static Emphasis *create(MarkupContext &MC,
                           ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -494,27 +459,23 @@ public:
   }
 };
 
-class Strong final : public InlineContent {
-  size_t NumChildren;
+class Strong final : public InlineContent,
+    private llvm::TrailingObjects<Strong, MarkupASTNode *> {
+  friend TrailingObjects;
 
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
+  size_t NumChildren;
 
   Strong(ArrayRef<MarkupASTNode *> Children);
 public:
   static Strong *create(MarkupContext &MC,
                         ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -522,16 +483,13 @@ public:
   }
 };
 
-class Link final : public InlineContent {
-  size_t NumChildren;
-  StringRef Destination;
+class Link final : public InlineContent,
+    private llvm::TrailingObjects<Link, MarkupASTNode *> {
+  friend TrailingObjects;
 
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
+  size_t NumChildren;
+
+  StringRef Destination;
 
   Link(StringRef Destination, ArrayRef<MarkupASTNode *> Children);
 
@@ -542,12 +500,12 @@ public:
 
   StringRef getDestination() const { return Destination; }
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -555,18 +513,15 @@ public:
   }
 };
 
-class Image final : public InlineContent {
+class Image final : public InlineContent,
+    private llvm::TrailingObjects<Image, MarkupASTNode *> {
+  friend TrailingObjects;
+
   size_t NumChildren;
+
   // FIXME: Hyperlink destinations can't be wrapped - use a Line
   StringRef Destination;
   Optional<StringRef> Title;
-
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
 
   Image(StringRef Destination, Optional<StringRef> Title,
         ArrayRef<MarkupASTNode *> Children);
@@ -577,14 +532,6 @@ public:
                       Optional<StringRef> Title,
                       ArrayRef<MarkupASTNode *> Children);
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
-  }
-
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
-  }
-
   StringRef getDestination() const { return Destination; }
 
   bool hasTitle() const {
@@ -593,6 +540,14 @@ public:
 
   StringRef getTitle() const {
     return StringRef(Title.getValue());
+  }
+
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+  }
+
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -622,16 +577,13 @@ public:
   }
 };
 
-class ParamField final : public PrivateExtension {
-  StringRef Name;
+class ParamField final : public PrivateExtension,
+    private llvm::TrailingObjects<ParamField, MarkupASTNode *> {
+  friend TrailingObjects;
+
   size_t NumChildren;
 
-  MarkupASTNode **getChildrenBuffer() {
-    return reinterpret_cast<MarkupASTNode**>(this + 1);
-  }
-  const MarkupASTNode *const *getChildrenBuffer() const {
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
-  }
+  StringRef Name;
 
   ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children);
 
@@ -644,12 +596,12 @@ public:
     return Name;
   }
 
-  ArrayRef<const MarkupASTNode *> getChildren() const {
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
-  ArrayRef<MarkupASTNode *> getChildren() {
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -658,27 +610,23 @@ public:
 };
 
 #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
-class Id final : public PrivateExtension { \
-  size_t NumChildren; \
+class Id final : public PrivateExtension, \
+    private llvm::TrailingObjects<Id, MarkupASTNode *> { \
+  friend TrailingObjects; \
 \
-  MarkupASTNode **getChildrenBuffer() { \
-    return reinterpret_cast<MarkupASTNode**>(this + 1); \
-  } \
-  const MarkupASTNode *const *getChildrenBuffer() const { \
-    return reinterpret_cast<const MarkupASTNode *const *>(this + 1); \
-  } \
+  size_t NumChildren; \
 \
   Id(ArrayRef<MarkupASTNode *> Children);\
 \
 public: \
   static Id *create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children); \
 \
-  ArrayRef<const MarkupASTNode *> getChildren() const { \
-    return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren); \
+  ArrayRef<MarkupASTNode *> getChildren() { \
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren}; \
   } \
 \
-  ArrayRef<MarkupASTNode *> getChildren() { \
-    return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren); \
+  ArrayRef<const MarkupASTNode *> getChildren() const { \
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren}; \
   } \
 \
   static bool classof(const MarkupASTNode *N) { \
