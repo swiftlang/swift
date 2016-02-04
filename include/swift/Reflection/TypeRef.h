@@ -20,12 +20,15 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
+class NodePointer;
+
 namespace swift {
 namespace reflection {
+
+class ReflectionContext;
 
 using llvm::ArrayRef;
 using llvm::StringRef;
@@ -35,36 +38,6 @@ enum class TypeRefKind {
 #define TYPEREF(Id, Parent) Id,
 #include "swift/Reflection/TypeRefs.def"
 #undef TYPEREF
-};
-
-class ReflectionContext {
-  llvm::BumpPtrAllocator Allocator;
-
-public:
-  void *allocate(size_t Bytes, size_t Alignment) {
-    return Allocator.Allocate(Bytes, Alignment);
-  }
-
-  template <typename T, typename It>
-  T *allocateCopy(It Begin, It End) {
-    T *Result = static_cast<T *>(allocate(sizeof(T) * (End - Begin),
-                                          alignof(T)));
-    for (size_t i = 0; Begin != End; ++Begin, ++i)
-      new (Result + i) T(*Begin);
-    return Result;
-  }
-
-  template <typename T>
-  llvm::MutableArrayRef<T> allocateCopy(llvm::ArrayRef<T> Array) {
-    return llvm::MutableArrayRef<T>(allocateCopy<T>(Array.begin(), Array.end()),
-                              Array.size());
-  }
-
-  StringRef allocateCopy(StringRef Str) {
-    llvm::ArrayRef<char> Result =
-    allocateCopy(llvm::makeArrayRef(Str.data(), Str.size()));
-    return StringRef(Result.data(), Result.size());
-  }
 };
 
 class TypeRef {
@@ -87,7 +60,7 @@ class BuiltinTypeRef : public TypeRef {
   BuiltinTypeRef(StringRef MangledName);
 
 public:
-  BuiltinTypeRef *create(ReflectionContext &RC, StringRef MangledName);
+  static BuiltinTypeRef *create(ReflectionContext &RC, StringRef MangledName);
 
   StringRef getMangledName() const {
     return MangledName;
@@ -103,7 +76,7 @@ class NominalTypeRef : public TypeRef {
 
   NominalTypeRef(StringRef MangledName);
 public:
-  NominalTypeRef *create(ReflectionContext &RC, StringRef MangledName);
+  static NominalTypeRef *create(ReflectionContext &RC, StringRef MangledName);
 
   StringRef getMangledName() const {
     return MangledName;
@@ -130,8 +103,13 @@ class BoundGenericTypeRef : public TypeRef {
                       ArrayRef<TypeRef *> GenericParams);
 
 public:
-  BoundGenericTypeRef *create(ReflectionContext &RC, StringRef MangledName,
-                              ArrayRef<TypeRef *> GenericParams);
+  static BoundGenericTypeRef *create(ReflectionContext &RC,
+                                     StringRef MangledName,
+                                     ArrayRef<TypeRef *> GenericParams);
+
+  StringRef getMangledName() const {
+    return MangledName;
+  }
 
   ArrayRef<TypeRef *> getGenericParams() {
     return ArrayRef<TypeRef *>(getGenericParameterBuffer(), NumGenericParams);
@@ -161,7 +139,8 @@ class TupleTypeRef : public TypeRef {
   TupleTypeRef(ArrayRef<TypeRef *> Elements);
 
 public:
-  TupleTypeRef *create(ReflectionContext &RC, ArrayRef<TypeRef *> Elements);
+  static TupleTypeRef *create(ReflectionContext &RC,
+                              ArrayRef<TypeRef *> Elements);
 
   ArrayRef<TypeRef *> getElements() {
     return ArrayRef<TypeRef *>(getElementBuffer(), NumElements);
@@ -182,7 +161,7 @@ class FunctionTypeRef : public TypeRef {
 
   FunctionTypeRef(TypeRef *Input, TypeRef *Result);
 public:
-  FunctionTypeRef *create(ReflectionContext &RC, TypeRef *Input,
+  static FunctionTypeRef *create(ReflectionContext &RC, TypeRef *Input,
                           TypeRef *Result);
 
   TypeRef *getInput() {
@@ -207,15 +186,21 @@ public:
 };
 
 class ProtocolTypeRef : public TypeRef {
-  StringRef MangledName;
+  StringRef ModuleName;
+  StringRef Name;
 
-  ProtocolTypeRef(StringRef MangledName);
+  ProtocolTypeRef(StringRef ModuleName, StringRef Name);
 
 public:
-  ProtocolTypeRef *create(ReflectionContext &RC, StringRef MangledName);
+  static ProtocolTypeRef *create(ReflectionContext &RC, StringRef ModuleName,
+                                 StringRef Name);
 
-  StringRef getMangledName() const {
-    return MangledName;
+  StringRef getName() const {
+    return Name;
+  }
+
+  StringRef getModuleName() const {
+    return ModuleName;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -237,7 +222,7 @@ class ProtocolCompositionTypeRef : public TypeRef {
   }
 
 public:
-  ProtocolCompositionTypeRef *create(ReflectionContext &RC,
+  static ProtocolCompositionTypeRef *create(ReflectionContext &RC,
                                      ArrayRef<TypeRef *> Protocols);
 
   ArrayRef<TypeRef *>getProtocols() {
@@ -259,7 +244,7 @@ class MetatypeTypeRef : public TypeRef {
   MetatypeTypeRef(TypeRef *InstanceType);
 
 public:
-  MetatypeTypeRef *create(ReflectionContext &RC, TypeRef *InstanceType);
+  static MetatypeTypeRef *create(ReflectionContext &RC, TypeRef *InstanceType);
 
   TypeRef *getInstanceType() {
     return InstanceType;
@@ -279,7 +264,7 @@ class ExistentialMetatypeTypeRef : public TypeRef {
 
   ExistentialMetatypeTypeRef(TypeRef *InstanceType);
 public:
-  ExistentialMetatypeTypeRef *create(ReflectionContext &RC,
+  static ExistentialMetatypeTypeRef *create(ReflectionContext &RC,
                                      TypeRef *InstanceType);
 
   TypeRef *getInstanceType() {
@@ -302,8 +287,8 @@ class GenericTypeParameterTypeRef : public TypeRef {
   GenericTypeParameterTypeRef(uint32_t Index, uint32_t Depth);
 public:
 
-  GenericTypeParameterTypeRef *create(ReflectionContext &RC, uint32_t Index,
-                                      uint32_t Depth);
+  static GenericTypeParameterTypeRef *create(ReflectionContext &RC,
+                                             uint32_t Index, uint32_t Depth);
 
   uint32_t getIndex() const {
     return Index;
@@ -319,16 +304,20 @@ public:
 };
 
 class DependentMemberTypeRef : public TypeRef {
-  StringRef Name;
+  TypeRef *Member;
   TypeRef *Base;
 
-  DependentMemberTypeRef(StringRef Name, TypeRef *Base);
+  DependentMemberTypeRef(TypeRef *Member, TypeRef *Base);
 public:
-  DependentMemberTypeRef *create(ReflectionContext &RC, StringRef Name,
+  static DependentMemberTypeRef *create(ReflectionContext &RC,
+                                 TypeRef *Member,
                                  TypeRef *Base);
+  TypeRef *getMember() {
+    return Member;
+  }
 
-  StringRef getName() const {
-    return Name;
+  const TypeRef *getMember() const {
+    return Member;
   }
 
   TypeRef *getBase() {
@@ -371,7 +360,10 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
 
   template<typename T>
   llvm::raw_ostream &printField(StringRef name, const T &value) {
-    OS << " " << name << ": " << value;
+    if (!name.empty())
+      OS << " " << name << "=" << value;
+    else
+      OS << " " << value;
     return OS;
   }
 
@@ -393,65 +385,84 @@ public:
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     printHeader("builtin");
-    printField("type", B->getMangledName());
+    auto demangled = Demangle::demangleTypeAsString(B->getMangledName());
+    printField("", demangled);
+    OS << ')';
   }
 
   void visitNominalTypeRef(const NominalTypeRef *N) {
     printHeader("nominal");
-    printField("type", N->getMangledName());
+    auto demangled = Demangle::demangleTypeAsString(N->getMangledName());
+    printField("", demangled);
+    OS << ')';
   }
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     printHeader("bound-generic");
+    auto demangled = Demangle::demangleTypeAsString(BG->getMangledName());
+    printField("", demangled);
     for (auto param : BG->getGenericParams())
       printRec(param);
+    OS << ')';
   }
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
     printHeader("tuple");
     for (auto element : T->getElements())
       printRec(element);
+    OS << ')';
   }
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
     printHeader("function");
     printRec(F->getInput());
     printRec(F->getResult());
+    OS << ')';
   }
 
   void visitProtocolTypeRef(const ProtocolTypeRef *P) {
     printHeader("protocol");
-    printField("type", P->getMangledName());
+    printField("module", P->getModuleName());
+    printField("name", P->getName());
+    OS << ')';
   }
 
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol-composition");
     for (auto protocol : PC->getProtocols())
       printRec(protocol);
+    OS << ')';
   }
 
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     printHeader("metatype");
     printRec(M->getInstanceType());
+    OS << ')';
   }
 
   void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     printHeader("existential-metatype");
     printRec(EM->getInstanceType());
+    OS << ')';
   }
 
   void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
     printHeader("generic-type-parameter");
     printField("index", GTP->getIndex());
     printField("depth", GTP->getDepth());
+    OS << ')';
   }
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     printHeader("dependent-member");
+    printRec(DM->getMember());
     printRec(DM->getBase());
-    printField("name", DM->getName());
+    OS << ')';
   }
 };
+
+TypeRef *decodeDemangleNode(ReflectionContext &RC,
+                            Demangle::NodePointer Node);
 
 } // end namespace reflection
 } // end namespace swift

@@ -2266,22 +2266,6 @@ public:
   const Metadata *getCanonicalTypeMetadata() const;
 };
 
-struct FieldRecord {
-private:
-  RelativeIndirectablePointer<const char> MangledTypeName;
-
-  RelativeIndirectablePointer<const char> FieldName;
-
-public:
-  const char *getMangledTypeName() const {
-    return MangledTypeName;
-  }
-
-  const char *getFieldName()  const {
-    return FieldName;
-  }
-};
-
 /// The structure of a protocol conformance record.
 ///
 /// This contains enough static information to recover the witness table for a
