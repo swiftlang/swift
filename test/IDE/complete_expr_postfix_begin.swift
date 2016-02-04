@@ -2,6 +2,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_2 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_3 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_4 | FileCheck %s -check-prefix=COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_5 | FileCheck %s -check-prefix=COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_6 | FileCheck %s -check-prefix=COMMON
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IGNORED_1 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IGNORED_2 | FileCheck %s -check-prefix=COMMON
@@ -123,6 +125,13 @@ func testExprPostfixBegin3(fooParam: FooStruct) {
 
 func testExprPostfixBegin4(fooParam: FooStruct) {
   "\(#^EXPR_POSTFIX_BEGIN_4^#)"
+}
+
+func testExprPostfixBegin3(fooParam: FooStruct) {
+  1+#^EXPR_POSTFIX_BEGIN_5^#
+}
+func testExprPostfixBegin3(fooParam: FooStruct) {
+  for i in 1...#^EXPR_POSTFIX_BEGIN_6^#
 }
 
 //===--- Test that we sometimes ignore the expr-postfix.

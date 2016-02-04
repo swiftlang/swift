@@ -887,7 +887,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     }
   }
   if (parsingContext == GuardedPatternContext::Case &&
-      P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
+      P.Tok.isAny(tok::period_prefix, tok::period) &&
+      P.peekToken().is(tok::code_complete)) {
     setErrorResult();
     if (P.CodeCompletion) {
       P.consumeToken();
