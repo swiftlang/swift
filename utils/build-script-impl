@@ -926,11 +926,11 @@ fi
 if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
-if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" foundation)
-fi
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
+fi
+if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" foundation)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1801,6 +1801,12 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 LLVM_BIN="$(build_directory_bin ${deployment_target} llvm)"
                 NINJA_BIN="ninja"
 
+                # Staging: require opt-in for building with dispatch
+                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+                    LIBDISPATCH_BUILD_DIR="$(build_directory ${deployment_target} libdispatch)"
+                    LIBDISPATCH_BUILD_ARGS="-DLIBDISPATCH_SOURCE_DIR=${LIBDISPATCH_SOURCE_DIR} -DLIBDISPATCH_BUILD_DIR=${LIBDISPATCH_BUILD_DIR}"
+                fi
+
                 if [[ "${BUILD_NINJA}" ]]; then
                     NINJA_BUILD_DIR=$(build_directory build ninja)
                     NINJA_BIN="${NINJA_BUILD_DIR}/ninja"
@@ -1809,7 +1815,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
-                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="${INSTALL_DESTDIR}" PREFIX="${INSTALL_PREFIX}" ./configure "${FOUNDATION_BUILD_TYPE}" -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR}
+                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="${INSTALL_DESTDIR}" PREFIX="${INSTALL_PREFIX}" ./configure "${FOUNDATION_BUILD_TYPE}" -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
                 ${NINJA_BIN}
                 popd
                 { set +x; } 2>/dev/null
@@ -1819,6 +1825,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 ;;
             libdispatch)
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${deployment_target} ${product})
+                SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
 
                 set -x
                 if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
@@ -1828,7 +1835,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     autoreconf -fvi
                     popd
                     pushd "${LIBDISPATCH_BUILD_DIR}"
-                    "${LIBDISPATCH_SOURCE_DIR}"/configure --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"
+                    "${LIBDISPATCH_SOURCE_DIR}"/configure --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}" --with-swift-toolchain="${SWIFT_BUILD_PATH}"
                     popd
                 fi
                 pushd "${LIBDISPATCH_BUILD_DIR}"
