@@ -611,15 +611,16 @@ public:
     }
 
     // Print inlined-at location, if any.
-    while (DS && DS->InlinedCallSite) {
-      *this << ": perf_inlined_at ";
-      auto CallSite = DS->InlinedCallSite->Loc;
-      if (!CallSite.isNull())
-        CallSite.getSourceLoc().print(
+    if (DS) {
+      for (auto *CS : reversed(DS->flattenedInlineTree())) {
+        *this << ": perf_inlined_at ";
+        auto CallSite = CS->Loc;//DS->InlinedCallSite->Loc;
+        if (!CallSite.isNull())
+          CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
-      else
-        *this << "?";
-      DS = DS->Parent.dyn_cast<const SILDebugScope *>();
+        else
+          *this << "?";
+      }
     }
   }
 
@@ -1998,4 +1999,42 @@ void SILCoverageMap::print(llvm::raw_ostream &OS, bool ShouldSort,
 
 void SILCoverageMap::dump() const {
   print(llvm::errs());
+}
+
+void SILDebugScope::flatten(const SILDebugScope *DS,
+                            SILDebugScope::InlineScopeList &List) {
+  if (DS) {
+    if (auto *CS = DS->InlinedCallSite) {
+      flatten(CS->Parent.dyn_cast<const SILDebugScope *>(), List);
+      List.push_back(CS);
+    }
+    flatten(DS->Parent.dyn_cast<const SILDebugScope *>(), List);
+  }
+}
+
+void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
+                         unsigned Indent) const {
+  OS << "{\n";
+  OS.indent(Indent);
+  Loc.getSourceLoc().print(OS, SM);
+  OS << "\n";
+  OS.indent(Indent + 2);
+  OS << " parent: ";
+  if (auto *P = Parent.dyn_cast<const SILDebugScope *>()) {
+    P->dump(SM, OS, Indent + 2);
+    OS.indent(Indent + 2);
+  }
+  else if (auto *F = Parent.dyn_cast<SILFunction *>())
+    OS << "@" << F->getName();
+  else
+    OS << "nullptr";
+
+  OS << "\n";
+  OS.indent(Indent + 2);
+  if (auto *CS = InlinedCallSite) {
+    OS << "inlinedCallSite: ";
+    CS->dump(SM, OS, Indent + 2);
+    OS.indent(Indent + 2);
+  }
+  OS << "}\n";
 }
