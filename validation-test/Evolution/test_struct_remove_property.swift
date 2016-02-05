@@ -19,6 +19,8 @@
 // RUN: %target-run %t/after_before
 // RUN: %target-run %t/after_after
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 import struct_remove_property
 
