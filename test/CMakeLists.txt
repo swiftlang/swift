@@ -202,9 +202,10 @@ if(PYTHONINTERP_FOUND)
 
         if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
           set(command_profdata_merge_start
-            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" start
-                -o "${swift_test_results_dir}"
-                -l "${swift_test_results_dir}/profdata_merge.log")
+            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
+                -l "${swift_test_results_dir}/profdata_merge.log"
+                start
+                -o "${swift_test_results_dir}")
           set(command_profdata_merge_stop
             COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
         else()
