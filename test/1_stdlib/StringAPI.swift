@@ -24,7 +24,7 @@ struct ComparisonTest {
   init(
     _ expectedUnicodeCollation: ExpectedComparisonResult,
     _ lhs: String, _ rhs: String,
-    xfail: TestRunPredicate = .custom({false}, reason: ""),
+    xfail: TestRunPredicate = .never,
     file: String = #file, line: UInt = #line
   ) {
     self.expectedUnicodeCollation = expectedUnicodeCollation
@@ -33,25 +33,28 @@ struct ComparisonTest {
     self.loc = SourceLoc(file, line, comment: "test data")
     self.xfail = xfail
   }
+
+  func replacingPredicate(_ xfail: TestRunPredicate) -> ComparisonTest {
+    return ComparisonTest(expectedUnicodeCollation, lhs, rhs,
+      xfail: xfail, file: loc.file, line: loc.line)
+  }
 }
 
-let comparisonTests = [
+// List test cases for comparisons and prefix/suffix. Ideally none fail.
+
+let tests = [
   ComparisonTest(.eq, "", ""),
   ComparisonTest(.lt, "", "a"),
 
   // ASCII cases
   ComparisonTest(.lt, "t", "tt"),
-  ComparisonTest(.gt, "t", "Tt",
-    xfail: .nativeRuntime(
-      "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
-  ComparisonTest(.gt, "\u{0}", "",
-    xfail: .nativeRuntime(
-      "Null-related issue: https://bugs.swift.org/browse/SR-630")),
+  ComparisonTest(.gt, "t", "Tt"),
+  ComparisonTest(.gt, "\u{0}", ""),
   ComparisonTest(.eq, "\u{0}", "\u{0}"),
-  // Currently fails:
-  // ComparisonTest(.lt, "\r\n", "t"),
-  // ComparisonTest(.gt, "\r\n", "\n"),
-  // ComparisonTest(.lt, "\u{0}", "\u{0}\u{0}"),
+
+  ComparisonTest(.lt, "\r\n", "t"),
+  ComparisonTest(.gt, "\r\n", "\n"),
+  ComparisonTest(.lt, "\u{0}", "\u{0}\u{0}"),
 
   // Whitespace
   // U+000A LINE FEED (LF)
@@ -89,9 +92,7 @@ let comparisonTests = [
   ComparisonTest(.eq, "\u{212b}", "A\u{30a}"),
   ComparisonTest(.eq, "\u{212b}", "\u{c5}"),
   ComparisonTest(.eq, "A\u{30a}", "\u{c5}"),
-  ComparisonTest(.lt, "A\u{30a}", "a",
-    xfail: .nativeRuntime(
-      "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
+  ComparisonTest(.lt, "A\u{30a}", "a"),
   ComparisonTest(.lt, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
@@ -114,6 +115,10 @@ let comparisonTests = [
   ComparisonTest(.eq, "\u{fb01}", "\u{fb01}"),
   ComparisonTest(.lt, "fi", "\u{fb01}"),
 
+  // U+1F1E7 REGIONAL INDICATOR SYMBOL LETTER B
+  // \u{1F1E7}\u{1F1E7} Flag of Barbados
+  ComparisonTest(.lt, "\u{1F1E7}", "\u{1F1E7}\u{1F1E7}"),
+
   // Test that Unicode collation is performed in deterministic mode.
   //
   // U+0301 COMBINING ACUTE ACCENT
@@ -128,10 +133,8 @@ let comparisonTests = [
   // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
   // U+0341 has a canonical decomposition mapping of U+0301.
   ComparisonTest(.eq, "\u{0301}", "\u{0341}"),
-  ComparisonTest(.lt, "\u{0301}", "\u{0954}",
-    xfail: .nativeRuntime("Compares as equal with ICU")),
-  ComparisonTest(.lt, "\u{0341}", "\u{0954}",
-    xfail: .nativeRuntime("Compares as equal with ICU")),
+  ComparisonTest(.lt, "\u{0301}", "\u{0954}"),
+  ComparisonTest(.lt, "\u{0341}", "\u{0954}"),
 ]
 
 func checkStringComparison(
@@ -167,6 +170,28 @@ func checkStringComparison(
     expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
     stackTrace: stackTrace.withCurrentLoc())
 #endif
+}
+
+// Mark the test cases that are expected to fail in checkStringComparison
+
+let comparisonTests = tests.map {
+  (test: ComparisonTest) -> ComparisonTest in
+  switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
+  case (.gt, "t", "Tt"), (.lt, "A\u{30a}", "a"):
+    return test.replacingPredicate(.nativeRuntime(
+      "Comparison reversed between ICU and CFString, https://bugs.swift.org/browse/SR-530"))
+
+  case (.gt, "\u{0}", ""), (.lt, "\u{0}", "\u{0}\u{0}"):
+    return test.replacingPredicate(.nativeRuntime(
+      "Null-related issue: https://bugs.swift.org/browse/SR-630"))
+
+  case (.lt, "\u{0301}", "\u{0954}"), (.lt, "\u{0341}", "\u{0954}"):
+    return test.replacingPredicate(.nativeRuntime(
+      "Compares as equal with ICU"))
+
+  default:
+    return test
+  }
 }
 
 for test in comparisonTests {
@@ -257,11 +282,38 @@ StringTests.test("LosslessStringConvertible") {
   checkLosslessStringConvertible(comparisonTests.map { $0.rhs })
 }
 
-StringTests.test("hasPrefix,hasSuffix")
-  .skip(.nativeRuntime(
-    "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
-  .code {
-  for test in comparisonTests {
+// Mark the test cases that are expected to fail in checkHasPrefixHasSuffix
+
+let substringTests = tests.map {
+  (test: ComparisonTest) -> ComparisonTest in
+  switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
+  case (.eq, "\u{0}", "\u{0}"):
+    return test.replacingPredicate(.objCRuntime(
+      "https://bugs.swift.org/browse/SR-332"))
+
+  case (.gt, "\r\n", "\n"):
+    return test.replacingPredicate(.objCRuntime(
+      "blocked on rdar://problem/19036555"))
+
+  case (.eq, "\u{0301}", "\u{0341}"):
+    return test.replacingPredicate(.objCRuntime(
+      "https://bugs.swift.org/browse/SR-243"))
+
+  case (.lt, "\u{1F1E7}", "\u{1F1E7}\u{1F1E7}"):
+    return test.replacingPredicate(.objCRuntime(
+      "https://bugs.swift.org/browse/SR-367"))
+
+  default:
+    return test
+  }
+}
+
+for test in substringTests {
+  StringTests.test("hasPrefix,hasSuffix: line \(test.loc.line)")
+    .skip(.nativeRuntime(
+        "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
+    .xfail(test.xfail)
+    .code {
     checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
     checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
 
@@ -272,26 +324,6 @@ StringTests.test("hasPrefix,hasSuffix")
     checkHasPrefixHasSuffix(fragment + test.lhs, test.rhs, test.loc.withCurrentLoc())
     checkHasPrefixHasSuffix(test.lhs + combiner, test.rhs, test.loc.withCurrentLoc())
     checkHasPrefixHasSuffix(combiner + test.lhs, test.rhs, test.loc.withCurrentLoc())
-  }
-}
-
-StringTests.test("Failures{hasPrefix,hasSuffix}-CF")
-  .skip(.nativeRuntime(
-    "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
-  .code {
-  let test = ComparisonTest(.lt, "\u{0}", "\u{0}\u{0}")
-  checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
-}
-
-StringTests.test("Failures{hasPrefix,hasSuffix}")
-  .xfail(.custom({ true }, reason: "blocked on rdar://problem/19036555"))
-  .skip(.nativeRuntime(
-    "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
-  .code {
-  let tests =
-    [ComparisonTest(.lt, "\r\n", "t"), ComparisonTest(.gt, "\r\n", "\n")]
-  tests.forEach {
-    checkHasPrefixHasSuffix($0.lhs, $0.rhs, $0.loc.withCurrentLoc())
   }
 }
 
@@ -312,8 +344,7 @@ StringTests.test("SameTypeComparisons") {
 
 StringTests.test("CompareStringsWithUnpairedSurrogates")
   .xfail(
-    .custom({ true },
-    reason: "<rdar://problem/18029104> Strings referring to underlying " +
+    .always("<rdar://problem/18029104> Strings referring to underlying " +
       "storage with unpaired surrogates compare unequal"))
   .code {
   let donor = "abcdef"
