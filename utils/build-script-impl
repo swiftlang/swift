@@ -131,10 +131,13 @@ KNOWN_SETTINGS=(
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
+    skip-test-ios-host          ""               "set to skip testing the host parts of the iOS toolchain"
     skip-test-tvos              ""               "set to skip testing Swift stdlibs for tvOS"
     skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
+    skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
     skip-test-watchos           ""               "set to skip testing Swift stdlibs for Apple watchOS"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
+    skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
     skip-test-validation        ""               "set to skip validation test suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
@@ -561,6 +564,7 @@ if [[ "${SKIP_IOS}" ]] ; then
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
     SKIP_TEST_IOS=1
+    SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
 
@@ -569,6 +573,7 @@ if [[ "${SKIP_TVOS}" ]] ; then
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
     SKIP_TEST_TVOS=1
+    SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
 
@@ -577,6 +582,7 @@ if [[ "${SKIP_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
     SKIP_TEST_WATCHOS=1
+    SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
@@ -585,6 +591,7 @@ if [[ "${SKIP_BUILD_IOS}" ]] ; then
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
     SKIP_TEST_IOS=1
+    SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
 
@@ -593,6 +600,7 @@ if [[ "${SKIP_BUILD_TVOS}" ]] ; then
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
     SKIP_TEST_TVOS=1
+    SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
 
@@ -601,6 +609,7 @@ if [[ "${SKIP_BUILD_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
     SKIP_TEST_WATCHOS=1
+    SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
@@ -632,14 +641,17 @@ if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
 fi
 
 if [[ "${SKIP_TEST_IOS}" ]] ; then
+    SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
 
 if [[ "${SKIP_TEST_TVOS}" ]] ; then
+    SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
 
 if [[ "${SKIP_TEST_WATCHOS}" ]] ; then
+    SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
@@ -926,6 +938,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     build_for_this_target=1
     perftest_this_target=
     test_this_target=1
+    test_host_only=
     case ${deployment_target} in
         linux-*)
             build_for_this_target=1
@@ -943,7 +956,11 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         iphoneos-*)
             build_for_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
             perftest_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-            test_this_target=
+            if [[ ! "${SKIP_TEST_IOS_HOST}" ]] ; then
+                test_host_only=1
+            else
+                test_this_target=
+            fi
             ;;
         iphonesimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
@@ -952,7 +969,11 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         appletvos-*)
             build_for_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
             perftest_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-            test_this_target=
+            if [[ ! "${SKIP_TEST_TVOS_HOST}" ]] ; then
+                test_host_only=1
+            else
+                test_this_target=
+            fi
             ;;
         appletvsimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_TVOS_SIMULATOR})
@@ -961,7 +982,11 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         watchos-*)
             build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
             perftest_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-            test_this_target=
+            if [[ ! "${SKIP_TEST_WATCHOS_HOST}" ]] ; then
+                test_host_only=1
+            else
+                test_this_target=
+            fi
             ;;
         watchsimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_SIMULATOR})
@@ -991,17 +1016,20 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             "${SWIFT_PERFTEST_TARGETS[@]}" "swift-perftest-${deployment_target}")
     fi
     if [[ "${test_this_target}" ]] ; then
+        if [[ -n "${test_host_only}" ]] ; then
+            test_target_suffix="-non-executable"
+        fi
         if [[ "${SKIP_TEST_VALIDATION}" ]] ; then
             SWIFT_TEST_TARGETS=(
-                "${SWIFT_TEST_TARGETS[@]}" "check-swift-${deployment_target}")
-            if [[ $(not ${SKIP_TEST_OPTIMIZED}) ]] ; then
+                "${SWIFT_TEST_TARGETS[@]}" "check-swift${test_target_suffix}-${deployment_target}")
+            if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
               SWIFT_TEST_TARGETS=(
                  "${SWIFT_TEST_TARGETS[@]}" "check-swift-optimize-${deployment_target}")
             fi
         else
             SWIFT_TEST_TARGETS=(
-                "${SWIFT_TEST_TARGETS[@]}" "check-swift-all-${deployment_target}")
-            if [[ $(not ${SKIP_TEST_OPTIMIZED}) ]] ; then
+                "${SWIFT_TEST_TARGETS[@]}" "check-swift-all${test_target_suffix}-${deployment_target}")
+            if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
               SWIFT_TEST_TARGETS=(
                  "${SWIFT_TEST_TARGETS[@]}" "check-swift-all-optimize-${deployment_target}")
             fi
