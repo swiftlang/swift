@@ -45,6 +45,7 @@
 using namespace swift;
 
 % for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
+SWIFT_RUNTIME_STDLIB_INTERFACE
 @interface _SwiftNativeNS${Class}Base : NS${Class}
 {
   // TODO: Workaround for rdar://problem/18950072
@@ -94,6 +95,7 @@ using namespace swift;
 @end
 % end
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool
 swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
                               NSObject *NS_RELEASES_ARGUMENT rhs) {
@@ -103,6 +105,7 @@ swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
   return Result;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
     NSString *NS_RELEASES_ARGUMENT lhs, NSString *NS_RELEASES_ARGUMENT rhs) {
   // 'kCFCompareNonliteral' actually means "normalize to NFD".
@@ -113,6 +116,7 @@ extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
   return Result;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
 swift_stdlib_NSStringNFDHashValue(NSString *NS_RELEASES_ARGUMENT str) {
   int Result = str.decomposedStringWithCanonicalMapping.hash;
@@ -121,6 +125,7 @@ swift_stdlib_NSStringNFDHashValue(NSString *NS_RELEASES_ARGUMENT str) {
 }
 
 // For strings we know only have ASCII
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
 swift_stdlib_NSStringASCIIHashValue(NSString *NS_RELEASES_ARGUMENT str) {
   int Result = str.hash;
@@ -128,6 +133,7 @@ swift_stdlib_NSStringASCIIHashValue(NSString *NS_RELEASES_ARGUMENT str) {
   return Result;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
                                                   NSString *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
@@ -140,6 +146,7 @@ extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
   return Result;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool
 swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
                                   NSString *NS_RELEASES_ARGUMENT suffix) {
@@ -153,6 +160,7 @@ swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
   return Result;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.lowercaseString);
@@ -160,6 +168,7 @@ swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   return Result;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.uppercaseString);
@@ -167,6 +176,7 @@ swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   return Result;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void swift_stdlib_CFSetGetValues(NSSet *NS_RELEASES_ARGUMENT set,
                                             const void **values) {
   CFSetGetValues((__bridge CFSetRef)set, values);

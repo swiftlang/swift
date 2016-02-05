@@ -73,6 +73,7 @@ namespace swift {
 // Swift reference counting. [super dealloc] MUST NOT be called after this,
 // for the object will have already been deallocated by the time
 // this function returns.
+SWIFT_RUNTIME_EXPORT
 extern "C" void swift_rootObjCDealloc(HeapObject *self);
 
 }

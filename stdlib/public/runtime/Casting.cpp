@@ -340,6 +340,7 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C"
 TwoWordPair<const char *, uintptr_t>::Return
 swift_getTypeName(const Metadata *type, bool qualified) {
@@ -805,6 +806,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
+SWIFT_RUNTIME_EXPORT
 extern "C" id
 swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -836,6 +838,7 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   }
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" id
 swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -2512,6 +2515,7 @@ findBridgeWitness(const Metadata *T) {
 }
 
 /// \param value passed at +1, consumed.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
   OpaqueValue *value, const Metadata *T
 ) {
@@ -2534,6 +2538,7 @@ extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
   return nullptr;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
   const Metadata *value, const Metadata *T
 ) {
@@ -2555,6 +2560,7 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
 //     nativeType: NativeType.Type
 //     inout result: T?
 // )
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void
 swift_bridgeNonVerbatimFromObjectiveC(
   HeapObject *sourceValue,
@@ -2597,6 +2603,7 @@ swift_bridgeNonVerbatimFromObjectiveC(
 //   nativeType: T.Type,
 //   inout result: T?
 // ) -> Bool
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool
 swift_bridgeNonVerbatimFromObjectiveCConditional(
   HeapObject *sourceValue,
@@ -2636,6 +2643,7 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
 }
 
 // func isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
   const Metadata *value, const Metadata *T
 ) {
@@ -2647,12 +2655,14 @@ extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
 #endif
 
 // func isClassOrObjCExistential<T>(x: T.Type) -> Bool
+SWIFT_RUNTIME_EXPORT
 extern "C" bool swift_isClassOrObjCExistentialType(const Metadata *value,
                                                const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
 // func swift_class_getSuperclass(_: AnyClass) -> AnyClass?
+SWIFT_RUNTIME_EXPORT
 extern "C" const Metadata *swift_class_getSuperclass(
   const Metadata *theClass
 ) {
@@ -2662,10 +2672,12 @@ extern "C" const Metadata *swift_class_getSuperclass(
   return nullptr;
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }
