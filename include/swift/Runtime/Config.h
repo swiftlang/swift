@@ -59,5 +59,7 @@
 # define SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif
 
-#endif // SWIFT_RUNTIME_CONFIG_H
+// Bring in visibility attribute macros
+#include "../../../stdlib/public/SwiftShims/Visibility.h"
 
+#endif // SWIFT_RUNTIME_CONFIG_H

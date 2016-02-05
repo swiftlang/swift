@@ -21,6 +21,7 @@
 
 #include "SwiftStdint.h"
 #include "SwiftStddef.h"
+#include "Visibility.h"
 
 #ifdef __cplusplus
 namespace swift { extern "C" {
@@ -36,27 +37,38 @@ typedef long int __swift_ssize_t;
 
 // General utilities <stdlib.h>
 // Memory management functions
+SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_free(void *ptr);
 
 // Input/output <stdio.h>
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_putchar_unlocked(int c);
 
 // String handling <string.h>
 __attribute__((pure))
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_size_t _swift_stdlib_strlen(const char *s);
+
 __attribute__((pure))
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
 // <unistd.h>
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t _swift_stdlib_write(int fd, const void *buf,
                                     __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
 __attribute__((const))
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_size_t _swift_stdlib_malloc_size(const void *ptr);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t _swift_stdlib_arc4random(void);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t _swift_stdlib_arc4random_uniform(__swift_uint32_t upper_bound);
 
 #ifdef __cplusplus

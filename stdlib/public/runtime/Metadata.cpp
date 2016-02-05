@@ -1726,6 +1726,7 @@ getMetatypeValueWitnesses(const Metadata *instanceType) {
 }
 
 /// \brief Fetch a uniqued metadata for a metatype type.
+SWIFT_RUNTIME_EXPORT
 extern "C" const MetatypeMetadata *
 swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
@@ -1837,6 +1838,7 @@ getExistentialMetatypeValueWitnesses(ExistentialMetatypeState &EM,
 }
 
 /// \brief Fetch a uniqued metadata for a metatype type.
+SWIFT_RUNTIME_EXPORT
 extern "C" const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
@@ -2425,6 +2427,7 @@ Metadata::getClassObject() const {
 }
 
 #ifndef NDEBUG
+SWIFT_RUNTIME_EXPORT
 extern "C"
 void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
                                             const void *runtimeValue,
@@ -2457,6 +2460,7 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 }
 #endif
 
+SWIFT_RUNTIME_EXPORT
 extern "C"
 void swift_initializeSuperclass(ClassMetadata *theClass,
                                 bool copyFieldOffsetVectors) {
@@ -2468,12 +2472,6 @@ void swift_initializeSuperclass(ClassMetadata *theClass,
   swift_instantiateObjCClass(theClass);
 #endif
 }
-
-namespace llvm { namespace hashing { namespace detail {
-  // An extern variable expected by LLVM's hashing templates. We don't link any
-  // LLVM libs into the runtime, so define this here.
-  size_t fixed_seed_override = 0;
-} } }
 
 /*** Protocol witness tables *************************************************/
 
@@ -2597,6 +2595,7 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
   return entry;
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" const WitnessTable *
 swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                                     const Metadata *type,

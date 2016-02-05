@@ -123,6 +123,7 @@ private:
 ///  <0 the left string is less than the right string.
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 int32_t _swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
                                                   int32_t LeftLength,
@@ -138,6 +139,7 @@ int32_t _swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
 ///  <0 the left string is less than the right string.
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 int32_t _swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
                                                  int32_t LeftLength,
@@ -163,6 +165,7 @@ int32_t _swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
 ///  <0 the left string is less than the right string.
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 int32_t _swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
                                                 int32_t LeftLength,
@@ -230,6 +233,7 @@ static intptr_t hashFinish(intptr_t HashState) {
   return HashState;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 intptr_t _swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
@@ -242,6 +246,7 @@ intptr_t _swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   return hashFinish(HashState);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str,
                                                      int32_t Length) {
   const ASCIICollation *Table = ASCIICollation::getTable();
@@ -269,6 +274,7 @@ extern "C" intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str,
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
 /// the required length to get an uppercase version of the string.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                          int32_t DestinationCapacity,
@@ -288,6 +294,7 @@ int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
 /// the required length to get a lowercase version of the string.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 int32_t _swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                          int32_t DestinationCapacity,

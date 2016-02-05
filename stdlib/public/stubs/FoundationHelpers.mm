@@ -17,7 +17,9 @@
 //===----------------------------------------------------------------------===//
 
 #import <CoreFoundation/CoreFoundation.h>
+#include "swift/Runtime/Config.h"
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 void _swift_stdlib_CFStringGetCharacters(CFStringRef theString,
                                          CFRange range,
@@ -25,16 +27,19 @@ void _swift_stdlib_CFStringGetCharacters(CFStringRef theString,
   return CFStringGetCharacters(theString, range, buffer);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 const UniChar * _swift_stdlib_CFStringGetCharactersPtr(CFStringRef theString) {
   return CFStringGetCharactersPtr(theString);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 CFIndex _swift_stdlib_CFStringGetLength(CFStringRef theString) {
   return CFStringGetLength(theString);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 CFStringRef _swift_stdlib_CFStringCreateWithSubstring(CFAllocatorRef alloc,
                                                       CFStringRef str,
@@ -42,12 +47,14 @@ CFStringRef _swift_stdlib_CFStringCreateWithSubstring(CFAllocatorRef alloc,
   return CFStringCreateWithSubstring(alloc, str, range);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 UniChar _swift_stdlib_CFStringGetCharacterAtIndex(CFStringRef theString,
                                                   CFIndex idx) {
   return CFStringGetCharacterAtIndex(theString, idx);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 CFStringRef
 _swift_stdlib_CFStringCreateCopy(CFAllocatorRef alloc,
@@ -55,12 +62,14 @@ _swift_stdlib_CFStringCreateCopy(CFAllocatorRef alloc,
   return CFStringCreateCopy(alloc, theString);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 const char *_swift_stdlib_CFStringGetCStringPtr(CFStringRef theString,
                                                 CFStringEncoding encoding) {
   return CFStringGetCStringPtr(theString, encoding);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" CFComparisonResult
 _swift_stdlib_CFStringCompare(CFStringRef theString1,
                               CFStringRef theString2,
@@ -68,6 +77,7 @@ _swift_stdlib_CFStringCompare(CFStringRef theString1,
   return CFStringCompare(theString1, theString2, compareOptions);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" Boolean
 _swift_stdlib_CFStringFindWithOptions(CFStringRef theString,
                                       CFStringRef stringToFind,
@@ -78,6 +88,7 @@ _swift_stdlib_CFStringFindWithOptions(CFStringRef theString,
                                  searchOptions, result);
 }
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" CFStringRef
 _swift_stdlib_objcDebugDescription(id __nonnull nsObject) {
   return (__bridge CFStringRef)[nsObject debugDescription];
