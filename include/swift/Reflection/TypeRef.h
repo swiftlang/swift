@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_REFLECTION_TYPEREF
-#define SWIFT_REFLECTION_TYPEREF
+#ifndef SWIFT_REFLECTION_TYPEREF_H
+#define SWIFT_REFLECTION_TYPEREF_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -467,4 +467,4 @@ TypeRef *decodeDemangleNode(ReflectionContext &RC,
 } // end namespace reflection
 } // end namespace swift
 
-#endif // SWIFT_REFLECTION_TYPEREF
+#endif // SWIFT_REFLECTION_TYPEREF_H

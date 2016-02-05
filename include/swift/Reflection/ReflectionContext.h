@@ -15,6 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
+#define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
+
 #include "swift/Runtime/Metadata.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -157,3 +160,5 @@ public:
 
 } // end namespace reflection
 } // end namespace swift
+
+#endif // SWIFT_REFLECTION_REFLECTIONCONTEXT_H
