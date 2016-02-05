@@ -3,6 +3,9 @@
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
 
+// <rdar://problem/24533118> watchOS armv7k "abitypes.swift" test is broken
+// XFAIL: OS=watchos
+
 import gadget
 import Foundation
 
