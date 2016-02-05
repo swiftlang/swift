@@ -16,11 +16,13 @@
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/MachO.h"
+#include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/CommandLine.h"
 
 using llvm::dyn_cast;
 using llvm::StringRef;
+using namespace llvm::object;
 
 using namespace swift;
 using namespace reflection;
@@ -48,30 +50,51 @@ Action(llvm::cl::desc("Mode:"),
 static llvm::cl::opt<std::string>
 BinaryFilename("binary-filename", llvm::cl::desc("Filename of the binary file"),
                llvm::cl::Required);
+
+static llvm::cl::opt<std::string>
+Architecture("arch", llvm::cl::desc("Architecture to inspect in the binary"),
+             llvm::cl::Required);
 } // end namespace options
 
-static int doDumpReflectionSection(StringRef BinaryFilename) {
 
-  llvm::object::SectionRef reflectionSectionRef;
+static void guardError(std::error_code error) {
+  if (!error) return;
+  llvm::errs() << "swift-reflection-test error: " << error.message() << "\n";
+  exit(EXIT_FAILURE);
+}
 
-  auto binaryOrError = llvm::object::createBinary(BinaryFilename);
-  if (auto errorCode = binaryOrError.getError()) {
-    llvm::errs() << "swift-reflection-test: '" << BinaryFilename << '\'';
-    llvm::errs() << ": " << errorCode.message() << "\n";
-    return EXIT_FAILURE;
-  }
-  auto binary = binaryOrError.get().getBinary();
-
-  auto object = cast<llvm::object::ObjectFile>(binary);
-  for (auto section : object->sections()) {
+static llvm::object::SectionRef
+getReflectionSectionRef(const ObjectFile *objectFile) {
+  for (auto section : objectFile->sections()) {
     StringRef sectionName;
     section.getName(sectionName);
     if (sectionName.equals("__swift3_reflect") ||
         sectionName.equals(".swift3_reflect")) {
-      reflectionSectionRef = section;
-      break;
+      return section;
     }
   }
+  return llvm::object::SectionRef();
+}
+
+static llvm::object::SectionRef
+getReflectionSectionRef(const Binary *binaryFile, StringRef arch) {
+  if (auto objectFile = dyn_cast<ObjectFile>(binaryFile))
+    return getReflectionSectionRef(objectFile);
+  if (auto machoUniversal = dyn_cast<MachOUniversalBinary>(binaryFile)) {
+    const auto objectOrError = machoUniversal->getObjectForArch(arch);
+    guardError(objectOrError.getError());
+    return getReflectionSectionRef(objectOrError.get().get());
+  }
+  return SectionRef();
+}
+
+static int doDumpReflectionSection(StringRef BinaryFilename, StringRef arch) {
+  auto binaryOrError = llvm::object::createBinary(BinaryFilename);
+  guardError(binaryOrError.getError());
+
+  const auto binary = binaryOrError.get().getBinary();
+
+  auto reflectionSectionRef = getReflectionSectionRef(binary, arch);
 
   if (reflectionSectionRef.getObject() == nullptr) {
     llvm::errs() << BinaryFilename;
@@ -95,25 +118,23 @@ static int doDumpReflectionSection(StringRef BinaryFilename) {
     auto mangledTypeName = descriptor.getMangledTypeName();
     auto demangleTree = demangleTypeAsNode(mangledTypeName);
     auto TR = decodeDemangleNode(RC, demangleTree);
-    llvm::errs() << typeName << '\n';
+    llvm::outs() << typeName << '\n';
     for (size_t i = 0; i < typeName.size(); ++i)
-      llvm::errs() << '=';
-    llvm::errs() << '\n';
+      llvm::outs() << '=';
+    llvm::outs() << '\n';
 
-    TR->dump();
-    llvm::errs() << "\n";
+    TR->dump(llvm::outs());
+    llvm::outs() << "\n";
 
     for (auto &field : descriptor.getFieldRecords()) {
       auto fieldDemangleTree = demangleTypeAsNode(field.getMangledTypeName());
       auto fieldTR = decodeDemangleNode(RC, fieldDemangleTree);
       auto fieldName = field.getFieldName();
-      llvm::errs() << "- " << fieldName << ":\n";
+      llvm::outs() << "- " << fieldName << ":\n";
 
-      fieldTR->dump();
-      llvm::errs() << "\n";
+      fieldTR->dump(llvm::outs());
+      llvm::outs() << "\n";
     }
-
-    llvm::errs() << '\n';
   }
 
   return EXIT_SUCCESS;
@@ -121,10 +142,9 @@ static int doDumpReflectionSection(StringRef BinaryFilename) {
 
 int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Test\n");
-
   switch (options::Action) {
   case ActionType::DumpReflectionSection:
-    return doDumpReflectionSection(options::BinaryFilename);
+    return doDumpReflectionSection(options::BinaryFilename, options::Architecture);
     break;
   case ActionType::None:
     llvm::cl::PrintHelpMessage();
