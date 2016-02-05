@@ -58,9 +58,9 @@ public:
   const uint32_t NumFields;
   const uint32_t FieldRecordSize;
 
-  ArrayRef<const FieldRecord> getFieldRecords() const {
+  const ArrayRef<FieldRecord> getFieldRecords() const {
     auto Begin = reinterpret_cast<const FieldRecord *>(this + 1);
-    return ArrayRef<const FieldRecord>(Begin, NumFields);
+    return ArrayRef<FieldRecord>(Begin, NumFields);
   }
 
   const char *getMangledTypeName() const {
