@@ -1176,10 +1176,10 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
 
   // Prepopulate the set of module prefixes.
   // FIXME: Hard-coded list should move into the module map language.
-  if (OmitNeedlessWords) {
-    ModulePrefixes["Foundation"] = "NS";
-    ModulePrefixes["ObjectiveC"] = "NS";
-  }
+  //if (OmitNeedlessWords) {
+    //ModulePrefixes["Foundation"] = "NS";
+    //ModulePrefixes["ObjectiveC"] = "NS";
+  //}
 }
 
 
