@@ -67,8 +67,7 @@ class A {
   func a(text:String, something:Int?=nil) {
   }
 }
-A().a(text:"sometext") // expected-error {{argument labels '(text:)' do not match any available overloads}}
-// expected-note @-1 {{overloads for 'a' exist with these partially matching parameter lists: (String), (String, something: Int?)}}
+A().a(text:"sometext") // expected-error{{extraneous argument label 'text:' in call}}{{7-12=}}
 
 
 // <rdar://problem/22451001> QoI: incorrect diagnostic when argument to print has the wrong type

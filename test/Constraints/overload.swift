@@ -133,3 +133,31 @@ func test_contextual_result() {
   return overloaded_identity()  // expected-error {{no 'overloaded_identity' candidates produce the expected contextual result type '()'}}
   // expected-note @-1 {{overloads for 'overloaded_identity' exist with these result types: Int, Float}}
 }
+
+// rdar://problem/24128153
+struct X0 {
+  init(_ i: Any.Type) { }
+  init?(_ i: Any.Type, _ names: String...) { }
+}
+
+let x0 = X0(Int.self)
+let x0check: X0 = x0 // okay: chooses first initializer
+
+struct X1 {
+  init?(_ i: Any.Type) { }
+  init(_ i: Any.Type, _ names: String...) { }
+}
+
+let x1 = X1(Int.self)
+let x1check: X1 = x1 // expected-error{{value of optional type 'X1?' not unwrapped; did you mean to use '!' or '?'?}}
+
+
+struct X2 {
+  init?(_ i: Any.Type) { }
+  init(_ i: Any.Type, a: Int = 0) { }
+  init(_ i: Any.Type, a: Int = 0, b: Int = 0) { }
+  init(_ i: Any.Type, a: Int = 0, c: Int = 0) { }
+}
+
+let x2 = X2(Int.self)
+let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' not unwrapped; did you mean to use '!' or '?'?}}
