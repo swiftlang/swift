@@ -1399,19 +1399,19 @@ public typealias _FileReferenceLiteralType = NSURL
 //===----------------------------------------------------------------------===//
 
 extension NSURL : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .URL(absoluteString)
   }
 }
 
 extension NSRange : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, children: ["location": location, "length": length])
   }
 }
 
 extension NSRange : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .Range(Int64(location), Int64(length))
   }
 }
@@ -1421,34 +1421,34 @@ extension NSDate : CustomPlaygroundQuickLookable {
     let df = NSDateFormatter()
     df.dateStyle = .MediumStyle
     df.timeStyle = .ShortStyle
-    return df.stringFromDate(self)
+    return df.stringFrom(self)
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .Text(summary)
   }
 }
 
 extension NSSet : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: self as Set<NSObject>)
   }
 }
 
 extension NSString : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .Text(self as String)
   }
 }
 
 extension NSArray : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: self as [AnyObject])
   }
 }
 
 extension NSDictionary : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(reflecting: self as [NSObject : AnyObject])
   }
 }

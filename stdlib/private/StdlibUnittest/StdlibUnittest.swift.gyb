@@ -2660,7 +2660,7 @@ public func < (
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public struct MinimalComparableIndexValue : Comparable, ForwardIndexType {
+public struct MinimalComparableIndexValue : Comparable, ForwardIndex {
   public static var timesEqualEqualWasCalled = ResettableValue(0)
   public static var timesLessWasCalled = ResettableValue(0)
 

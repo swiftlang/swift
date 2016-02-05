@@ -35,11 +35,11 @@ public extension CGPoint {
 }
 
 extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, children: ["x": x, "y": y], displayStyle: .Struct)
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .Point(Double(x), Double(y))
   }
 }
@@ -75,11 +75,11 @@ public extension CGSize {
 }
 
 extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, children: ["width": width, "height": height], displayStyle: .Struct)
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .Size(Double(width), Double(height))
   }
 }
@@ -294,11 +294,11 @@ public extension CGRect {
 }
 
 extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, children: ["origin": origin, "size": size], displayStyle: .Struct)
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .Rectangle(Double(origin.x), Double(origin.y), Double(size.width), Double(size.height))
   }
 }

@@ -15,7 +15,7 @@
 % for Self in ['SKShapeNode', 'SKSpriteNode', 'SKTextureAtlas', 'SKTexture']:
 
 extension ${Self} : CustomPlaygroundQuickLookable {
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     // this code comes straight from the quicklooks
       
     let data = (self as AnyObject)._copyImageData?()

@@ -482,7 +482,7 @@ extension ${Self} : CustomPlaygroundQuickLookable {
     return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  public func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .Text(summary)
   }
 }

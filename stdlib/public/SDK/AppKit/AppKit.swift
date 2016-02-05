@@ -37,8 +37,8 @@ extension NSView : CustomPlaygroundQuickLookable {
     } else {
       _NSViewQuickLookState.views.insert(self)
       let result: PlaygroundQuickLook
-      if let b = bitmapImageRepForCachingDisplayInRect(bounds) {
-        cacheDisplayInRect(bounds, toBitmapImageRep: b)
+      if let b = bitmapImageRepForCachingDisplayIn(bounds) {
+        cacheDisplayIn(bounds, to: b)
         result = .View(b)
       } else {
         result = .View(NSImage())

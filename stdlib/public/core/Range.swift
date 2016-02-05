@@ -142,7 +142,7 @@ public struct Range<
 }
 
 extension Range : CustomReflectable {
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, children: ["startIndex": startIndex, "endIndex": endIndex])
   }
 }

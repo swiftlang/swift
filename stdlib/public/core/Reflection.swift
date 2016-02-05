@@ -227,7 +227,7 @@ internal func _dumpObject_unlocked<TargetStream : OutputStream>(
 
   guard maxDepth > 0 else { return }
 
-  if let superclassMirror = mirror.superclassMirror() {
+  if let superclassMirror = mirror.superclassMirror {
     _dumpSuperclass_unlocked(superclassMirror, indent + 2, maxDepth - 1, &maxItemCounter, &visitedItems, &targetStream)
   }
 
@@ -279,7 +279,7 @@ internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
 
   guard maxDepth > 0 else { return }
 
-  if let superclassMirror = mirror.superclassMirror() {
+  if let superclassMirror = mirror.superclassMirror {
     _dumpSuperclass_unlocked(superclassMirror, indent + 2, maxDepth - 1,
                              &maxItemCounter, &visitedItems, &targetStream)
   }

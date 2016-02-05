@@ -3997,17 +3997,15 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   }
 }
 
-extension ${Self}Generator : CustomReflectable {
+extension ${Self}Iterator : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  @warn_unused_result
-  public func customMirror() -> Mirror {
+  public var customMirror: Mirror {
     return Mirror(self, children: [])
   }
 }
 
 extension ${Self} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  @warn_unused_result
   public var customMirror: Mirror {
 %if Self == 'Set':
     let style = Mirror.DisplayStyle.Set

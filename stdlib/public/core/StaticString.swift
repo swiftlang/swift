@@ -232,7 +232,7 @@ public struct StaticString
 
 extension StaticString {
   public var customMirror: Mirror {
-    return Mirror(reflecting: stringValue)
+    return Mirror(reflecting: String(self))
   }
 }
 

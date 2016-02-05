@@ -136,7 +136,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
         }
         target.write(")")
       case .Enum:
-        if let caseName = String.fromCString(_getEnumCaseName(value)) {
+        if let caseName = String(validatingUTF8: _getEnumCaseName(value)) {
           // Write the qualified type name in debugPrint.
           if isDebugPrint {
             printTypeName(mirror.subjectType)
@@ -252,7 +252,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
-internal func _dumpPrint_unlocked<T, TargetStream : OutputStreamType>(
+internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
     value: T, _ mirror: Mirror, inout _ target: TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
@@ -303,7 +303,7 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStreamType>(
         return
       case .Enum:
         target.write(_typeName(mirror.subjectType, qualified: true))
-        if let caseName = String.fromCString(_getEnumCaseName(value)) {
+        if let caseName = String(validatingUTF8: _getEnumCaseName(value)) {
           target.write(".")
           target.write(caseName)
         }

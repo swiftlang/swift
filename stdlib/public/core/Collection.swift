@@ -221,8 +221,8 @@ extension Collection where SubSequence == Self {
   }
 }
 
-extension CollectionType where
-    SubSequence == Self, Index : BidirectionalIndexType {
+extension Collection where
+    SubSequence == Self, Index : BidirectionalIndex {
   /// If `!self.isEmpty`, remove the last element and return it, otherwise
   /// return `nil`.
   ///
