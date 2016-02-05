@@ -379,7 +379,7 @@ macro(add_sourcekit_xpc_service name framework_target)
   endif()
 
   set(XPCSERVICE_NAME ${name})  
-  set(XPCSERVICE_IDENTIFIER "${name}.${SOURCEKIT_VERSION_STRING}")
+  set(XPCSERVICE_IDENTIFIER "com.apple.${name}.${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
   configure_file(
