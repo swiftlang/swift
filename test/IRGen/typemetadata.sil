@@ -25,7 +25,7 @@ bb0:
   return %100 : $()
 }
 
-// CHECK-LABEL: define %swift.type* @_TMaC12typemetadata1C()
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaC12typemetadata1C()
 // CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @_TMLC12typemetadata1C, align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]

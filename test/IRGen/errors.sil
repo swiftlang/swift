@@ -14,7 +14,7 @@ entry:
   unreachable
 }
 
-// CHECK: define void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
+// CHECK: define{{( protected)?}} void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
 sil @throws : $@convention(thin) () -> @error ErrorType {
   // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned ErrorType
@@ -27,7 +27,7 @@ sil @throws : $@convention(thin) () -> @error ErrorType {
   throw %1 : $ErrorType
 }
 
-// CHECK: define void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
+// CHECK: define{{( protected)?}} void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error ErrorType {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
@@ -39,8 +39,8 @@ sil @doesnt_throw : $@convention(thin) () -> @error ErrorType {
 
 sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType)
 
-// CHECK-objc: define void @try_apply(%objc_object*)
-// CHECK-native: define void @try_apply(%swift.refcounted*)
+// CHECK-objc: define{{( protected)?}} void @try_apply(%objc_object*)
+// CHECK-native: define{{( protected)?}} void @try_apply(%swift.refcounted*)
 sil @try_apply : $@convention(thin) (@owned AnyObject) -> () {
 entry(%0 : $AnyObject):
   // CHECK:      [[ERRORSLOT:%.*]] = alloca %swift.error*, align
@@ -93,7 +93,7 @@ bb0(%0 : $ErrorType):
 
 // rdar://21084084 - Partial application of throwing functions.
 
-// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
+// CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
 // CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @_TPA_partial_apply_single_helper to i8*), %swift.refcounted* undef },
 // CHECK-LABEL: define internal void @_TPA_partial_apply_single_helper(%swift.refcounted*, %swift.error**)
 // CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %C6errors1A*

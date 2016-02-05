@@ -20,7 +20,7 @@ declare void @user(%swift.refcounted*)
 declare void @noread_user_bridged(%swift.bridge*) readnone
 declare void @user_bridged(%swift.bridge*)
 
-; CHECK-LABEL: define void @fixlifetime_removal(i8*) {
+; CHECK-LABEL: define{{( protected)?}} void @fixlifetime_removal(i8*) {
 ; CHECK-NOT: call void swift_fixLifetime
 define void @fixlifetime_removal(i8*) {
 entry:
@@ -29,7 +29,7 @@ entry:
   ret void
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractRetainN(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainN(%swift.refcounted* %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
@@ -67,7 +67,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractRetainNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainNWithRCIdentity(%swift.refcounted* %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
@@ -99,7 +99,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractReleaseN(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseN(%swift.refcounted* %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
@@ -137,7 +137,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractReleaseNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseNWithRCIdentity(%swift.refcounted* %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
@@ -173,7 +173,7 @@ bb3:
 ; Make sure that we do not form retainN,releaseN over uses that may
 ; read the reference count of the object.
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractRetainNWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainNWithUnknown(%swift.refcounted* %A) {
 ; CHECK-NOT: call %swift.refcounted* @swift_retain_n
 define %swift.refcounted* @swift_contractRetainNWithUnknown(%swift.refcounted* %A) {
 entry:
@@ -197,7 +197,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractReleaseNWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseNWithUnknown(%swift.refcounted* %A) {
 ; CHECK-NOT: call void @swift_release_n
 define %swift.refcounted* @swift_contractReleaseNWithUnknown(%swift.refcounted* %A) {
 entry:
@@ -222,7 +222,7 @@ bb3:
 }
 
 ; But do make sure that we can form retainN, releaseN in between such uses
-; CHECK-LABEL: define %swift.refcounted* @swift_contractRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
 ; CHECK: tail call void @swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
@@ -274,7 +274,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: @swift_release(
 ; CHECK-NEXT: @user
@@ -306,7 +306,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: tail call void @swift_retain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
@@ -362,7 +362,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractUnknownRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
 ; CHECK: tail call void @swift_unknownRetain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
@@ -414,7 +414,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractUnknownReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: @swift_unknownRelease(
 ; CHECK-NEXT: @user
@@ -446,7 +446,7 @@ bb3:
   ret %swift.refcounted* %A
 }
 
-; CHECK-LABEL: define %swift.refcounted* @swift_contractUnknownRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: tail call void @swift_unknownRetain(%swift.refcounted* %A)
 ; CHECK-NEXT: call void @user(%swift.refcounted* %A)
@@ -502,7 +502,7 @@ bb3:
 }
 
 
-; CHECK-LABEL: define %swift.bridge* @swift_contractBridgeRetainWithBridge(%swift.bridge* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.bridge* @swift_contractBridgeRetainWithBridge(%swift.bridge* %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: [[RET0:%.+]] = tail call %swift.bridge* @swift_bridgeObjectRetain_n(%swift.bridge* %A, i32 2)
 ; CHECK-NEXT: tail call void @swift_bridgeObjectRelease(%swift.bridge* [[RET0:%.+]])
@@ -517,7 +517,7 @@ bb1:
   ret %swift.bridge* %A
 }
 
-; CHECK-LABEL: define %swift.bridge* @swift_contractBridgeRetainReleaseNInterleavedWithBridge(%swift.bridge* %A) {
+; CHECK-LABEL: define{{( protected)?}} %swift.bridge* @swift_contractBridgeRetainReleaseNInterleavedWithBridge(%swift.bridge* %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: [[RET0:%.+]] = tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
 ; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)

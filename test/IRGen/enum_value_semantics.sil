@@ -92,7 +92,7 @@ enum GenericFixedLayout<T> {
 }
 
 
-// CHECK-LABEL: @_TWVO20enum_value_semantics20SinglePayloadTrivial = constant [26 x i8*] [
+// CHECK-LABEL: @_TWVO20enum_value_semantics20SinglePayloadTrivial = {{(protected )?}}constant [26 x i8*] [
 // CHECK:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
@@ -130,7 +130,7 @@ enum GenericFixedLayout<T> {
 // CHECK: }>
 
 
-// CHECK-LABEL: @_TWVO20enum_value_semantics23SinglePayloadNontrivial = constant [26 x i8*] [
+// CHECK-LABEL: @_TWVO20enum_value_semantics23SinglePayloadNontrivial = {{(protected )?}}constant [26 x i8*] [
 // CHECK:   i8* bitcast (void ([24 x i8]*, %swift.type*)* @_TwXXO20enum_value_semantics23SinglePayloadNontrivial to i8*),
 // CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @_TwCPO20enum_value_semantics23SinglePayloadNontrivial to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
@@ -171,7 +171,7 @@ enum GenericFixedLayout<T> {
 // CHECK: }>
 
 
-// CHECK-LABEL: @_TMPO20enum_value_semantics18GenericFixedLayout = global <{{[{].*\* [}]}}> <{
+// CHECK-LABEL: @_TMPO20enum_value_semantics18GenericFixedLayout = {{(protected )?}}global <{{[{].*\* [}]}}> <{
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericFixedLayout
 // CHECK:   i32 48, i16 1, i16 8,
 // CHECK:   [16 x i8*] zeroinitializer,
@@ -191,7 +191,7 @@ bb0(%0 : $SinglePayloadNontrivial):
   return %v : $()
 }
 
-// CHECK-LABEL: define void @single_payload_nontrivial_copy_destroy(i64)
+// CHECK-LABEL: define{{( protected)?}} void @single_payload_nontrivial_copy_destroy(i64)
 // CHECK:      switch i64 %0, label [[PRESENT:%.*]] [
 // CHECK-NEXT:   i64 0, label [[NOT_PRESENT:%.*]]
 // CHECK-NEXT:   i64 2, label [[NOT_PRESENT]]

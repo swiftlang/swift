@@ -13,7 +13,7 @@ import gizmo
 // CHECK: @_TMOSC16NSRuncingOptions = linkonce_odr hidden global
 // CHECK: @_TWPOSC28NeverActuallyMentionedByNames9Equatable5gizmo = linkonce_odr hidden constant
 
-// CHECK-LABEL: define i32 @main
+// CHECK-LABEL: define{{( protected)?}} i32 @main
 // CHECK:         call %swift.type* @_TMaOSC16NSRuncingOptions()
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_aFT_OSC16NSRuncingOptions()

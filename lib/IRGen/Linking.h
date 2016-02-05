@@ -616,7 +616,12 @@ public:
                                   Optional<SILLocation> DebugLoc = None,
                                   StringRef DebugName = StringRef());
 
-  bool isUsed() const;
+  bool isUsed() const {
+    return ForDefinition && isUsed(Linkage, Visibility);
+  }
+  
+  static bool isUsed(llvm::GlobalValue::LinkageTypes Linkage,
+                     llvm::GlobalValue::VisibilityTypes Visibility);
 };
 
 } // end namespace irgen

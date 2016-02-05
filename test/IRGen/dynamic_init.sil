@@ -16,7 +16,7 @@ sil @_TFC12dynamic_init1CcfMS0_FT_S0_ : $@convention(method) (@owned C) -> @owne
 sil @_TFC12dynamic_init1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
 sil @_TFC12dynamic_init1CD : $@convention(method) (@owned C) -> ()
 
-// CHECK-LABEL: define void @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_
+// CHECK-LABEL: define{{( protected)?}} void @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_
 sil @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_ : $@convention(thin) (@thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META:%[0-9]+]] = bitcast %swift.type* %0 to %C12dynamic_init1C* (%swift.type*)**

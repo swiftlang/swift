@@ -44,7 +44,7 @@ sil_vtable C {}
 // \ CHECK: }>
 
 // Destroying destructor
-// CHECK: define [[REF]]* @_TFC5class1Cd([[C_CLASS]]*) {{.*}} {
+// CHECK: define{{( protected)?}} [[REF]]* @_TFC5class1Cd([[C_CLASS]]*) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
 // CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
@@ -55,7 +55,7 @@ bb0(%0 : $C):
 }
 
 // Deallocating destructor
-// CHECK: define void @_TFC5class1CD([[C_CLASS]]*)
+// CHECK: define{{( protected)?}} void @_TFC5class1CD([[C_CLASS]]*)
 sil @_TFC5class1CD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
   // CHECK-NEXT: entry
@@ -72,7 +72,7 @@ bb0(%0 : $C):
   return %5 : $()                                 // id: %6
 }
 
-// CHECK: define [[REF]]* @unchecked_ref_cast_cast([[C_CLASS]]*)
+// CHECK: define{{( protected)?}} [[REF]]* @unchecked_ref_cast_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* {{%.*}} to [[REF]]*
 sil @unchecked_ref_cast_cast : $@convention(thin) C -> Builtin.NativeObject {
 entry(%c : $C):
@@ -80,7 +80,7 @@ entry(%c : $C):
   return %r : $Builtin.NativeObject
 }
 
-// CHECK: define [[OBJCOBJ]]* @ref_to_objc_pointer_cast([[C_CLASS]]*)
+// CHECK: define{{( protected)?}} [[OBJCOBJ]]* @ref_to_objc_pointer_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* %0 to [[OBJCOBJ]]*
 sil @ref_to_objc_pointer_cast : $@convention(thin) C -> Builtin.UnknownObject {
 entry(%c : $C):
@@ -88,7 +88,7 @@ entry(%c : $C):
   return %r : $Builtin.UnknownObject
 }
 
-// CHECK-LABEL: define %C5class1C* @alloc_ref_dynamic(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %C5class1C* @alloc_ref_dynamic(%swift.type*)
 sil @alloc_ref_dynamic : $@convention(thin) (@thick C.Type) -> @owned C {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
@@ -105,7 +105,7 @@ bb0(%0 : $@thick C.Type):
   return %1 : $C
 }
 
-// CHECK-LABEL: define %C5class1C* @autorelease(%C5class1C*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} %C5class1C* @autorelease(%C5class1C*) {{.*}} {
 // CHECK:         %1 = bitcast %C5class1C* %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret %C5class1C* %0
@@ -115,7 +115,7 @@ entry(%c : $C):
   return %c : $C
 }
 
-// CHECK-LABEL: define i64 @autorelease_optional(i64) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} i64 @autorelease_optional(i64) {{.*}} {
 // CHECK:         %1 = inttoptr i64 %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret i64 %0
@@ -163,7 +163,7 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
   %b = load %a : $*ClassConstraintConformance
   return %b : $ClassConstraintConformance
 }
-// CHECK-LABEL: define %C5class26ClassConstraintConformance* @fixed_class_generic_field(%C5class28ClassConstrainedGenericField*)
+// CHECK-LABEL: define{{( protected)?}} %C5class26ClassConstraintConformance* @fixed_class_generic_field(%C5class28ClassConstrainedGenericField*)
 // CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %C5class28ClassConstrainedGenericField, %C5class28ClassConstrainedGenericField* %0, i32 0, i32 1
 // CHECK:         [[FIELD_ADDR_CONCRETE:%.*]] = bitcast %objc_object** [[FIELD_ADDR_GENERIC]] to %C5class26ClassConstraintConformance**
 // CHECK:         load %C5class26ClassConstraintConformance*, %C5class26ClassConstraintConformance** [[FIELD_ADDR_CONCRETE]]

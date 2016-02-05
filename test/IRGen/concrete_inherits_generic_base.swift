@@ -17,7 +17,7 @@ class Base<T> {
   }
 }
 
-// CHECK-LABEL: define %swift.type* @_TMaC3foo12SuperDerived()
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaC3foo12SuperDerived()
 // CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo12SuperDerived
 // CHECK-NEXT:     [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
@@ -33,7 +33,7 @@ class Base<T> {
 class SuperDerived: Derived {
 }
 
-// CHECK-LABEL: define %swift.type* @_TMaC3foo7Derived()
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaC3foo7Derived()
 // CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** @_TMLC3foo7Derived
 // CHECK-NEXT:     [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
@@ -69,7 +69,7 @@ presentBase(Derived(x: "two"))
 presentBase(Base(x: "two"))
 presentBase(Base(x: 2))
 
-// CHECK-LABEL: define private %swift.type* @create_generic_metadata_SuperDerived(%swift.type_pattern*, i8**)
+// CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_SuperDerived(%swift.type_pattern*, i8**)
 // CHECK:         [[TMP:%.*]] = call %swift.type* @_TMaC3foo7Derived()
 // CHECK-NEXT:    [[SUPER:%.*]] = bitcast %swift.type* [[TMP:%.*]] to %objc_class*
 // CHECK-NEXT:    [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])

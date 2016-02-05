@@ -35,12 +35,12 @@ extension Base {
 }
 
 public class PublicClass {
-  // CHECK: define void @_TFC14method_linkage11PublicClass{{.*}}4pfoofT_T_
+  // CHECK: define{{( protected)?}} void @_TFC14method_linkage11PublicClass{{.*}}4pfoofT_T_
   @inline(never)
   private func pfoo() {
   }
 
-  // CHECK: define void @_TFC14method_linkage11PublicClass4pbarfT_T_
+  // CHECK: define{{( protected)?}} void @_TFC14method_linkage11PublicClass4pbarfT_T_
   @inline(never)
   internal func pbar() {
   }

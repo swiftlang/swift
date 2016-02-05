@@ -49,13 +49,13 @@ protocol InternalProtocol {
   func f()
 }
 
-// CHECK: @_TMp19protocol_resilience5Proto = constant %swift.protocol {
+// CHECK: @_TMp19protocol_resilience5Proto = {{(protected )?}}constant %swift.protocol {
 // CHECK-SAME:   i32 1031,
 // CHECK-SAME:   i16 0,
 // CHECK-SAME:   i16 0
 // CHECK-SAME: }
 
-// CHECK: @_TMp19protocol_resilience17ResilientProtocol = constant <{{.*}}> <{
+// CHECK: @_TMp19protocol_resilience17ResilientProtocol = {{(protected )?}}constant <{{.*}}> <{
 // CHECK-SAME:   i32 1031,
 // CHECK-SAME:   i16 4,
 // CHECK-SAME:   i16 2,
@@ -63,7 +63,7 @@ protocol InternalProtocol {
 // CHECK-SAME:   void (%swift.opaque*, %swift.type*)* @defaultD  
 // CHECK-SAME: }>
 
-// CHECK: @_TMp19protocol_resilience16InternalProtocol = constant %swift.protocol {
+// CHECK: @_TMp19protocol_resilience16InternalProtocol = {{(protected )?}}constant %swift.protocol {
 // CHECK-SAME:   i32 7,
 // CHECK-SAME:   i16 0,
 // CHECK-SAME:   i16 0

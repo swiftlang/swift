@@ -2,7 +2,7 @@
 
 import Swift
 
-// CHECK-LABEL: define void @retain_release_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( protected)?}} void @retain_release_boxed_existential(%swift.error*)
 sil @retain_release_boxed_existential : $@convention(thin) (ErrorType) -> () {
 entry(%e : $ErrorType):
   // CHECK-objc: @swift_errorRetain
@@ -14,7 +14,7 @@ entry(%e : $ErrorType):
   return undef : $()
 }
 
-// CHECK-LABEL: define %swift.error* @alloc_boxed_existential(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.ErrorType)
+// CHECK-LABEL: define{{( protected)?}} %swift.error* @alloc_boxed_existential(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.ErrorType)
 sil @alloc_boxed_existential : $@convention(thin) <T: ErrorType> (@in T) -> @owned ErrorType {
 entry(%x : $*T):
   // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T.ErrorType, %swift.opaque* null, i1 false)
@@ -33,7 +33,7 @@ struct SomeError: ErrorType {
   let _code: Int
 }
 
-// CHECK-LABEL: define %swift.error* @alloc_boxed_existential_concrete
+// CHECK-LABEL: define{{( protected)?}} %swift.error* @alloc_boxed_existential_concrete
 sil @alloc_boxed_existential_concrete : $@convention(thin) (@owned SomeError) -> @owned ErrorType {
 entry(%x : $SomeError):
   // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_TMfV17boxed_existential9SomeError, {{.*}}, i8** @_TWPV17boxed_existential9SomeErrors9ErrorTypeS_, %swift.opaque* null, i1 false)
@@ -47,7 +47,7 @@ entry(%x : $SomeError):
   return %b : $ErrorType
 }
 
-// CHECK-LABEL: define void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.ErrorType)
+// CHECK-LABEL: define{{( protected)?}} void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.ErrorType)
 sil @dealloc_boxed_existential : $@convention(thin) <T: ErrorType> (@owned ErrorType) -> () {
 entry(%b : $ErrorType):
   // CHECK: call void @swift_deallocError(%swift.error* %0, %swift.type* %T)
@@ -55,7 +55,7 @@ entry(%b : $ErrorType):
   return undef : $()
 }
 
-// CHECK-LABEL: define {{i[0-9]+}} @project_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( protected)?}} {{i[0-9]+}} @project_boxed_existential(%swift.error*)
 sil @project_boxed_existential : $@convention(thin) (@owned ErrorType) -> Int {
 entry(%b : $ErrorType):
   // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])
@@ -75,7 +75,7 @@ entry(%b : $ErrorType):
   return %l : $Int
 }
 
-// CHECK-LABEL: define {{i[0-9]+}} @open_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( protected)?}} {{i[0-9]+}} @open_boxed_existential(%swift.error*)
 sil @open_boxed_existential : $@convention(thin) (@owned ErrorType) -> Int {
 entry(%b : $ErrorType):
   // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])
