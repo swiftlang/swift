@@ -177,8 +177,8 @@ lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
   }
 
   // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableLookupCache.find(NormalC);
-  if (found == WitnessTableLookupCache.end()) {
+  auto found = WitnessTableMap.find(NormalC);
+  if (found == WitnessTableMap.end()) {
 #ifndef NDEBUG
     // Make sure that all witness tables are in the witness table lookup
     // cache.
@@ -517,7 +517,7 @@ void SILModule::eraseFunction(SILFunction *F) {
 
 /// Erase a global SIL variable from the module.
 void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
-  GlobalVariableTable.erase(G->getName());
+  GlobalVariableMap.erase(G->getName());
   getSILGlobalList().erase(G);
 }
 
@@ -526,8 +526,8 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
     return nullptr;
 
   // First try to look up R from the lookup table.
-  auto R = VTableLookupTable.find(C);
-  if (R != VTableLookupTable.end())
+  auto R = VTableMap.find(C);
+  if (R != VTableMap.end())
     return R->second;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
@@ -538,7 +538,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
     return nullptr;
 
   // If we succeeded, map C -> VTbl in the table and return VTbl.
-  VTableLookupTable[C] = Vtbl;
+  VTableMap[C] = Vtbl;
   return Vtbl;
 }
 

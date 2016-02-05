@@ -54,10 +54,10 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
                                            Name.str(), Conformance, entries);
 
   // Make sure we have not seen this witness table yet.
-  assert(M.WitnessTableLookupCache.find(Conformance) ==
-         M.WitnessTableLookupCache.end() && "Attempting to create duplicate "
+  assert(M.WitnessTableMap.find(Conformance) ==
+         M.WitnessTableMap.end() && "Attempting to create duplicate "
          "witness table.");
-  M.WitnessTableLookupCache[Conformance] = wt;
+  M.WitnessTableMap[Conformance] = wt;
   M.witnessTables.push_back(wt);
 
   // Return the resulting witness table.
@@ -80,10 +80,10 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                                                     Conformance);
 
   // Update the SILModule state in light of wT.
-  assert(M.WitnessTableLookupCache.find(Conformance) ==
-         M.WitnessTableLookupCache.end() && "Attempting to create duplicate "
+  assert(M.WitnessTableMap.find(Conformance) ==
+         M.WitnessTableMap.end() && "Attempting to create duplicate "
          "witness table.");
-  M.WitnessTableLookupCache[Conformance] = wt;
+  M.WitnessTableMap[Conformance] = wt;
   M.witnessTables.push_back(wt);
 
   // Return the resulting witness table.

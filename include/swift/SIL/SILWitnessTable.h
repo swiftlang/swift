@@ -32,7 +32,6 @@
 
 namespace swift {
 
-class ClassDecl;
 class SILFunction;
 class SILModule;
 class NormalProtocolConformance;

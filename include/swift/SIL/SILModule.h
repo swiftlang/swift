@@ -122,20 +122,20 @@ private:
   llvm::BumpPtrAllocator zombieFunctionNames;
   
   /// Lookup table for SIL vtables from class decls.
-  llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
+  llvm::DenseMap<const ClassDecl *, SILVTable *> VTableMap;
 
   /// The list of SILVTables in the module.
   VTableListType vtables;
 
   /// Lookup table for SIL witness tables from conformances.
   llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
-  WitnessTableLookupCache;
+  WitnessTableMap;
 
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
 
   /// Lookup table for SIL Global Variables.
-  llvm::StringMap<SILGlobalVariable *> GlobalVariableTable;
+  llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
 
   /// The list of SILGlobalVariables in the module.
   GlobalListType silGlobals;
@@ -360,7 +360,7 @@ public:
   ///
   /// \return null if this module has no such global variable
  SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
-    return GlobalVariableTable.lookup(name);
+    return GlobalVariableMap.lookup(name);
   }
 
   /// Look for a function by name.

@@ -32,7 +32,7 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
                          alignof(SILVTable));
   SILVTable *vt = ::new (buf) SILVTable(Class, Entries);
   M.vtables.push_back(vt);
-  M.VTableLookupTable[Class] = vt;
+  M.VTableMap[Class] = vt;
   return vt;
 }
 
