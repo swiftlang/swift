@@ -34,7 +34,7 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 //===----------------------------------------------------------------------===//
 
 /// This is a list we use to store a set of indices. We create the set by
-/// sorting, uniqueing at the appropriate time. The reason why it makes sense to
+/// sorting, uniquing at the appropriate time. The reason why it makes sense to
 /// just use a sorted vector with std::count is because generally functions do
 /// not have that many arguments and even fewer promoted arguments.
 using ParamIndexList = llvm::SmallVector<unsigned, 8>;
@@ -179,7 +179,7 @@ static bool useCaptured(Operand *UI) {
 }
 
 static bool partialApplyEscapes(SILValue V, bool examineApply) {
-  for (auto UI : V.getUses()) {
+  for (auto UI : V->getUses()) {
     auto *User = UI->getUser();
 
     // These instructions do not cause the address to escape.
@@ -333,9 +333,9 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
                                             bool inAppliedFunction,
                             llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
-  assert((Box.getType().is<SILBoxType>()
-          || Box.getType()
-                 == SILType::getNativeObjectType(Box.getType().getASTContext()))
+  assert((Box->getType().is<SILBoxType>()
+          || Box->getType()
+                 == SILType::getNativeObjectType(Box->getType().getASTContext()))
          && "Expected an object pointer!");
 
   llvm::SmallVector<Operand *, 4> LocalPromotedOperands;
@@ -343,7 +343,7 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
   // Scan all of the uses of the retain count value, collecting all
   // the releases and validating that we don't have an unexpected
   // user.
-  for (auto UI : Box.getUses()) {
+  for (auto UI : Box->getUses()) {
     auto *User = UI->getUser();
 
     // Retains and releases are fine. Deallocs are fine if we're not
@@ -507,7 +507,8 @@ PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
                                                      PromotedParamIndices,
                                                      ClonedName)),
     Orig(Orig), PromotedParamIndices(PromotedParamIndices) {
-  assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
+  assert(Orig->getDebugScope()->getParentFunction() !=
+         getCloned()->getDebugScope()->getParentFunction());
 }
 
 static std::string getClonedName(SILFunction *F,

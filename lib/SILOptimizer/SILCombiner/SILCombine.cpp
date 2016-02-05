@@ -147,13 +147,13 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       ++NumSimplified;
 
       DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
-                         << "    New = " << *Result.getDef() << '\n');
+                         << "    New = " << *Result << '\n');
 
       // Everything uses the new instruction now.
-      replaceInstUsesWith(*I, Result.getDef(), 0, Result.getResultNumber());
+      replaceInstUsesWith(*I, Result);
 
       // Push the new instruction and any users onto the worklist.
-      Worklist.addUsersToWorklist(Result.getDef());
+      Worklist.addUsersToWorklist(Result);
 
       eraseInstFromFunction(*I);
       MadeChange = true;
@@ -278,28 +278,6 @@ SILInstruction *SILCombiner::replaceInstUsesWith(SILInstruction &I,
   return &I;
 }
 
-/// This is meant to be used when one is attempting to replace only one of the
-/// results of I with a result of V.
-SILInstruction *
-SILCombiner::
-replaceInstUsesWith(SILInstruction &I, ValueBase *V, unsigned IIndex,
-                    unsigned VIndex) {
-  assert(IIndex < I.getNumTypes() && "Cannot have more results than "
-         "types.");
-  assert(VIndex < V->getNumTypes() && "Cannot have more results than "
-         "types.");
-
-  // Add all modified instrs to worklist.
-  Worklist.addUsersToWorklist(&I, IIndex);
-
-  DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
-        "    with " << *V << '\n');
-
-  SILValue(&I, IIndex).replaceAllUsesWith(SILValue(V, VIndex));
-
-  return &I;
-}
-
 // Some instructions can never be "trivially dead" due to side effects or
 // producing a void value. In those cases, since we cannot rely on
 // SILCombines trivially dead instruction DCE in order to delete the
@@ -324,7 +302,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
     }
   }
 
-  for (Operand *DU : getDebugUses(I))
+  for (Operand *DU : getDebugUses(&I))
     Worklist.remove(DU->getUser());
 
   Worklist.remove(&I);

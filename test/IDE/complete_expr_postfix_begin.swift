@@ -2,6 +2,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_2 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_3 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_4 | FileCheck %s -check-prefix=COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_5 | FileCheck %s -check-prefix=COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_6 | FileCheck %s -check-prefix=COMMON
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IGNORED_1 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IGNORED_2 | FileCheck %s -check-prefix=COMMON
@@ -97,10 +99,10 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int32[#Int32#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int64[#Int64#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:      Bool[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
-// COMMON-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
 // COMMON: End completions
 
 // NO_SELF-NOT: Self
@@ -123,6 +125,13 @@ func testExprPostfixBegin3(fooParam: FooStruct) {
 
 func testExprPostfixBegin4(fooParam: FooStruct) {
   "\(#^EXPR_POSTFIX_BEGIN_4^#)"
+}
+
+func testExprPostfixBegin3(fooParam: FooStruct) {
+  1+#^EXPR_POSTFIX_BEGIN_5^#
+}
+func testExprPostfixBegin3(fooParam: FooStruct) {
+  for i in 1...#^EXPR_POSTFIX_BEGIN_6^#
 }
 
 //===--- Test that we sometimes ignore the expr-postfix.

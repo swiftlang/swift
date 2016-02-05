@@ -463,3 +463,12 @@ bb0(%0 : $X):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @fix_lifetime_test
+// CHECK: <func=,param0=r>
+sil @fix_lifetime_test : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  fix_lifetime %0 : $X
+  %3 = tuple()
+  return %3 : $()
+}

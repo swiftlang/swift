@@ -1,0 +1,1384 @@
+//===--- MinimalCollections.swift.gyb -------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+  TRACE = '''@autoclosure _ message: () -> String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line'''
+
+  stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
+}%
+
+import StdlibUnittest
+
+/// State that is created every time a fresh generator is created with
+/// `MinimalSequence.generate()`.
+internal class _MinimalGeneratorPrivateState<T> {
+  internal init() {}
+
+  internal var returnedNilCounter: Int = 0
+}
+
+/// State shared by all generators of a MinimalSequence.
+internal class _MinimalGeneratorSharedState<T> {
+  internal init(_ data: [T]) {
+    self.data = data
+  }
+
+  internal let data: [T]
+  internal var i: Int = 0
+  internal var underestimatedCount: Int = 0
+}
+
+//===----------------------------------------------------------------------===//
+// MinimalGenerator
+//===----------------------------------------------------------------------===//
+
+/// A GeneratorType that implements the protocol contract in the most
+/// narrow way possible.
+///
+/// This generator will return `nil` only once.
+public struct MinimalGenerator<T> : GeneratorType {
+  public init<S : SequenceType where S.Generator.Element == T>(_ s: S) {
+    self._sharedState = _MinimalGeneratorSharedState(Array(s))
+  }
+
+  public init(_ data: [T]) {
+    self._sharedState = _MinimalGeneratorSharedState(data)
+  }
+
+  internal init(_ _sharedState: _MinimalGeneratorSharedState<T>) {
+    self._sharedState = _sharedState
+  }
+
+  public func next() -> T? {
+    if _sharedState.i == _sharedState.data.count {
+      if isConsumed {
+        expectUnreachable("next() was called on a consumed generator")
+      }
+      _privateState.returnedNilCounter += 1
+      return nil
+    }
+    defer { _sharedState.i += 1 }
+    return _sharedState.data[_sharedState.i]
+  }
+
+  public var isConsumed: Bool {
+    return returnedNilCounter >= 1
+  }
+
+  public var returnedNilCounter: Int {
+    return _privateState.returnedNilCounter
+  }
+
+  internal let _privateState: _MinimalGeneratorPrivateState<T> =
+    _MinimalGeneratorPrivateState()
+  internal let _sharedState: _MinimalGeneratorSharedState<T>
+}
+
+// A protocol to identify MinimalGenerator.
+public protocol _MinimalGeneratorType {}
+extension MinimalGenerator : _MinimalGeneratorType {}
+
+//===----------------------------------------------------------------------===//
+// MinimalSequence
+//===----------------------------------------------------------------------===//
+
+public enum UnderestimateCountBehavior {
+  /// Return the actual number of elements.
+  case Precise
+
+  /// Return the actual number of elements divided by 2.
+  case Half
+
+  /// Return an overestimated count.  Useful to test how algorithms reserve
+  /// memory.
+  case Overestimate
+
+  /// Return the provided value.
+  case Value(Int)
+}
+
+public protocol StrictSequenceType : SequenceType {
+  associatedtype Element
+  init(base: MinimalSequence<Element>)
+  var base: MinimalSequence<Element> { get }
+}
+
+extension StrictSequenceType {
+  public init<S : SequenceType where S.Generator.Element == Element>(
+    elements: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self.init(base: MinimalSequence(
+      elements: elements, underestimatedCount: underestimatedCount))
+  }
+
+  public func underestimateCount() -> Int {
+    return base.underestimateCount()
+  }
+}
+
+extension StrictSequenceType where Generator : _MinimalGeneratorType {
+  public func generate() -> MinimalGenerator<Element> {
+    return base.generate()
+  }
+}
+
+/// A SequenceType that implements the protocol contract in the most
+/// narrow way possible.
+///
+/// This sequence is consumed when its generator is advanced.
+public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
+  public init<S : SequenceType where S.Generator.Element == T>(
+    elements: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    let data = Array(elements)
+    self._sharedState = _MinimalGeneratorSharedState(data)
+
+    switch underestimatedCount {
+    case .Precise:
+      self._sharedState.underestimatedCount = data.count
+
+    case .Half:
+      self._sharedState.underestimatedCount = data.count / 2
+
+    case .Overestimate:
+      self._sharedState.underestimatedCount = data.count * 3 + 5
+
+    case .Value(let count):
+      self._sharedState.underestimatedCount = count
+    }
+  }
+
+  public func generate() -> MinimalGenerator<T> {
+    return MinimalGenerator(_sharedState)
+  }
+
+  public func underestimateCount() -> Int {
+    return max(0, self._sharedState.underestimatedCount - self._sharedState.i)
+  }
+
+  public var debugDescription: String {
+    return "MinimalSequence(\(_sharedState.data[_sharedState.i..<_sharedState.data.count]))"
+  }
+
+  internal let _sharedState: _MinimalGeneratorSharedState<T>
+}
+
+//===----------------------------------------------------------------------===//
+// Index invalidation checking
+//===----------------------------------------------------------------------===//
+
+internal enum _CollectionOperation : Equatable {
+  case ReserveCapacity(capacity: Int)
+  case Append
+  case AppendContentsOf(count: Int)
+  case ReplaceRange(subRange: Range<Int>, replacementCount: Int)
+  case Insert(atIndex: Int)
+  case InsertContentsOf(atIndex: Int, count: Int)
+  case RemoveAtIndex(index: Int)
+  case RemoveLast
+  case RemoveRange(subRange: Range<Int>)
+  case RemoveAll(keepCapacity: Bool)
+
+  internal func _applyTo(
+    elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
+    var result = elementsLastMutatedStateIds
+    switch self {
+    case ReserveCapacity:
+      let invalidIndices = result.indices
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case Append:
+      result.append(nextStateId)
+
+    case AppendContentsOf(let count):
+      result.appendContentsOf(
+        Repeat(count: count, repeatedValue: nextStateId))
+
+    case ReplaceRange(let subRange, let replacementCount):
+      result.replaceRange(
+        subRange,
+        with: Repeat(count: replacementCount, repeatedValue: nextStateId))
+
+      let invalidIndices = subRange.startIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case Insert(let atIndex):
+      result.insert(nextStateId, atIndex: atIndex)
+
+      let invalidIndices = atIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case InsertContentsOf(let atIndex, let count):
+      result.insertContentsOf(
+        Repeat(count: count, repeatedValue: nextStateId),
+        at: atIndex)
+
+      let invalidIndices = atIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case RemoveAtIndex(let index):
+      result.removeAtIndex(index)
+
+      let invalidIndices = index..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case RemoveLast:
+      result.removeLast()
+
+    case RemoveRange(let subRange):
+      result.removeRange(subRange)
+
+      let invalidIndices = subRange.startIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case RemoveAll(let keepCapacity):
+      result.removeAll(keepCapacity: keepCapacity)
+    }
+    return result
+  }
+}
+
+internal func == (
+  lhs: _CollectionOperation,
+  rhs: _CollectionOperation
+) -> Bool {
+  switch (lhs, rhs) {
+  case (.ReserveCapacity(let lhsCapacity), .ReserveCapacity(let rhsCapacity)):
+    return lhsCapacity == rhsCapacity
+
+  case (.Append, .Append):
+    return true
+
+  case (.AppendContentsOf(let lhsCount), .AppendContentsOf(let rhsCount)):
+    return lhsCount == rhsCount
+
+  case (
+    .ReplaceRange(let lhsSubRange, let lhsReplacementCount),
+    .ReplaceRange(let rhsSubRange, let rhsReplacementCount)):
+
+    return lhsSubRange == rhsSubRange &&
+      lhsReplacementCount == rhsReplacementCount
+
+  case (.Insert(let lhsAtIndex), .Insert(let rhsAtIndex)):
+    return lhsAtIndex == rhsAtIndex
+
+  case (
+    .InsertContentsOf(let lhsAtIndex, let lhsCount),
+    .InsertContentsOf(let rhsAtIndex, let rhsCount)):
+
+    return lhsAtIndex == rhsAtIndex && lhsCount == rhsCount
+
+  case (.RemoveAtIndex(let lhsIndex), .RemoveAtIndex(let rhsIndex)):
+    return lhsIndex == rhsIndex
+
+  case (.RemoveLast, .RemoveLast):
+    return true
+
+  case (.RemoveRange(let lhsSubRange), .RemoveRange(let rhsSubRange)):
+    return lhsSubRange == rhsSubRange
+
+  case (.RemoveAll(let lhsKeepCapacity), .RemoveAll(let rhsKeepCapacity)):
+    return lhsKeepCapacity == rhsKeepCapacity
+
+  default:
+    return false
+  }
+}
+
+public struct _CollectionState : Equatable, Hashable {
+  internal static var _nextUnusedState: Int = 0
+  internal static var _namedStates: [String : _CollectionState] = [:]
+
+  internal let _id: Int
+  internal let _elementsLastMutatedStateIds: [Int]
+
+  internal init(id: Int, elementsLastMutatedStateIds: [Int]) {
+    self._id = id
+    self._elementsLastMutatedStateIds = elementsLastMutatedStateIds
+  }
+
+  internal init(newRootStateForElementCount count: Int) {
+    self._id = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
+    self._elementsLastMutatedStateIds =
+      Array(Repeat(count: count, repeatedValue: self._id))
+  }
+
+  internal init(name: String, elementCount: Int) {
+    if let result = _CollectionState._namedStates[name] {
+      self = result
+    } else {
+      self = _CollectionState(newRootStateForElementCount: elementCount)
+      _CollectionState._namedStates[name] = self
+    }
+  }
+
+  public var hashValue: Int {
+    return _id.hashValue
+  }
+}
+
+public func == (lhs: _CollectionState, rhs: _CollectionState) -> Bool {
+  return lhs._id == rhs._id
+}
+
+internal struct _CollectionStateTransition {
+  internal let _previousState: _CollectionState
+  internal let _operation: _CollectionOperation
+  internal let _nextState: _CollectionState
+
+  internal static var _allTransitions:
+    [_CollectionState : Box<[_CollectionStateTransition]>] = [:]
+
+  internal init(
+    previousState: _CollectionState,
+    operation: _CollectionOperation,
+    nextState: _CollectionState
+  ) {
+    var transitions =
+      _CollectionStateTransition._allTransitions[previousState]
+    if transitions == nil {
+      transitions = Box<[_CollectionStateTransition]>([])
+      _CollectionStateTransition._allTransitions[previousState] = transitions
+    }
+    if let i = transitions!.value.indexOf({ $0._operation == operation }) {
+      self = transitions!.value[i]
+      return
+    }
+    self._previousState = previousState
+    self._operation = operation
+    self._nextState = nextState
+    transitions!.value.append(self)
+  }
+
+  internal init(
+    previousState: _CollectionState,
+    operation: _CollectionOperation
+  ) {
+    let nextStateId = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
+    let newElementStates = operation._applyTo(
+      previousState._elementsLastMutatedStateIds, nextStateId: nextStateId)
+    let nextState = _CollectionState(
+      id: nextStateId, elementsLastMutatedStateIds: newElementStates)
+    self = _CollectionStateTransition(
+      previousState: previousState,
+      operation: operation,
+      nextState: nextState)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MinimalForwardIndex
+//===----------------------------------------------------------------------===//
+
+/// Asserts that the two indices are allowed to participate in a binary
+/// operation.
+internal func _expectCompatibleIndices<Index : _MinimalIndexType>(
+  first: Index,
+  _ second: Index,
+  ${TRACE}
+) {
+  if let firstStateId = first._collectionState?._id,
+    let secondStateId = second._collectionState?._id
+    where firstStateId == secondStateId {
+
+    // The indices are derived from the same state.
+    return
+  }
+
+  // The indices are derived from different states.  Check that they point
+  // to elements that persisted from the same state.
+
+  func getLastMutatedStateId(i: Index) -> Int? {
+    guard let state = i._collectionState else { return nil }
+    let offset = i._offset
+    if offset == state._elementsLastMutatedStateIds.endIndex {
+      return state._id
+    }
+    return state._elementsLastMutatedStateIds[offset]
+  }
+
+  let firstElementLastMutatedStateId = getLastMutatedStateId(first)
+  let secondElementLastMutatedStateId = getLastMutatedStateId(second)
+
+  expectEqual(
+    firstElementLastMutatedStateId,
+    secondElementLastMutatedStateId,
+    "Indices are not compatible:\n" +
+    "first: \(first)\n" +
+    "second: \(second)\n" +
+    "first element last mutated in state id: \(firstElementLastMutatedStateId)\n" +
+    "second element last mutated in state id: \(secondElementLastMutatedStateId)\n",
+    stackTrace: ${stackTrace})
+
+  // To make writing assertions easier, perform a trap.
+  if firstElementLastMutatedStateId != secondElementLastMutatedStateId {
+    fatalError("Indices are not compatible")
+  }
+}
+
+public protocol _MinimalIndexType {
+  /// Distance from start index.
+  var _offset: Int { get }
+
+  var _collectionState: _CollectionState? { get }
+}
+
+% for Distance in [ '', 'Int32' ]:
+%   Index = 'MinimalForward%sIndex' % Distance
+
+public struct ${Index} : ForwardIndexType {
+% if Distance != '':
+  public typealias Distance = ${Distance}
+% else:
+  public typealias Distance = Int
+% end
+
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self = ${Index}(
+      collectionState: nil,
+      position: position,
+      startIndex: startIndex,
+      endIndex: endIndex)
+  }
+
+  internal init(
+    collectionState: _CollectionState?,
+    position: Int,
+    startIndex: Int,
+    endIndex: Int
+  ) {
+    expectLE(startIndex, position)
+    expectGE(endIndex, position)
+    self._collectionState = collectionState
+    self.position = position
+    self.startIndex = startIndex
+    self.endIndex = endIndex
+  }
+
+  public func successor() -> ${Index} {
+    expectNotEqual(endIndex, position)
+    return ${Index}(
+      collectionState: _collectionState,
+      position: position + 1, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public static func _failEarlyRangeCheck(
+    index: ${Index}, bounds: Range<${Index}>
+  ) {
+    expectLE(bounds.startIndex.position, index.position)
+    expectGT(bounds.endIndex.position, index.position)
+
+    if ${Index}.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck(
+        index.position,
+        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+    }
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: ${Index}, rangeEnd: ${Index},
+    boundsStart: ${Index}, boundsEnd: ${Index}
+  ) {
+    let range = rangeStart..<rangeEnd
+    let bounds = boundsStart..<boundsEnd
+    expectLE(bounds.startIndex.position, range.startIndex.position)
+    expectGE(bounds.endIndex.position, range.startIndex.position)
+    expectLE(bounds.startIndex.position, range.endIndex.position)
+    expectGE(bounds.endIndex.position, range.endIndex.position)
+
+    if ${Index}.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck2(
+        rangeStart.position,
+        rangeEnd: rangeEnd.position,
+        boundsStart: boundsStart.position,
+        boundsEnd: boundsEnd.position)
+    }
+  }
+
+  public let _collectionState: _CollectionState?
+
+  public let position: Int
+  public let startIndex: Int
+  public let endIndex: Int
+
+  public static var trapOnRangeCheckFailure = ResettableValue(true)
+}
+
+public func == (lhs: ${Index}, rhs: ${Index}) -> Bool {
+  _expectCompatibleIndices(lhs, rhs)
+  return lhs.position == rhs.position
+}
+
+extension ${Index} : _MinimalIndexType {
+  public var _offset: Int {
+    return position - startIndex
+  }
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// MinimalBidirectionalIndex
+//===----------------------------------------------------------------------===//
+
+public struct MinimalBidirectionalIndex : BidirectionalIndexType {
+  public typealias Distance = Int
+
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self = MinimalBidirectionalIndex(
+      collectionState: nil,
+      position: position,
+      startIndex: startIndex,
+      endIndex: endIndex)
+  }
+
+  internal init(
+    collectionState: _CollectionState?,
+    position: Int,
+    startIndex: Int,
+    endIndex: Int
+  ) {
+    expectLE(startIndex, position)
+    expectGE(endIndex, position)
+    self._collectionState = collectionState
+    self.position = position
+    self.startIndex = startIndex
+    self.endIndex = endIndex
+  }
+
+  public func successor() -> MinimalBidirectionalIndex {
+    expectNotEqual(endIndex, position)
+    return MinimalBidirectionalIndex(
+      collectionState: _collectionState,
+      position: position + 1, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public func predecessor() -> MinimalBidirectionalIndex {
+    expectNotEqual(startIndex, position)
+    return MinimalBidirectionalIndex(
+      collectionState: _collectionState,
+      position: position - 1, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public static func _failEarlyRangeCheck(
+    index: MinimalBidirectionalIndex,
+    bounds: Range<MinimalBidirectionalIndex>
+  ) {
+    expectLE(bounds.startIndex.position, index.position)
+    expectGT(bounds.endIndex.position, index.position)
+
+    if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck(
+        index.position,
+        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+    }
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: MinimalBidirectionalIndex,
+    rangeEnd: MinimalBidirectionalIndex,
+    boundsStart: MinimalBidirectionalIndex,
+    boundsEnd: MinimalBidirectionalIndex
+  ) {
+    let range = rangeStart..<rangeEnd
+    let bounds = boundsStart..<boundsEnd
+    expectLE(bounds.startIndex.position, range.startIndex.position)
+    expectGE(bounds.endIndex.position, range.startIndex.position)
+    expectLE(bounds.startIndex.position, range.endIndex.position)
+    expectGE(bounds.endIndex.position, range.endIndex.position)
+
+    if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck2(
+        rangeStart.position,
+        rangeEnd: rangeEnd.position,
+        boundsStart: boundsStart.position,
+        boundsEnd: boundsEnd.position)
+    }
+  }
+
+  public let _collectionState: _CollectionState?
+
+  public let position: Int
+  public let startIndex: Int
+  public let endIndex: Int
+
+  public static var trapOnRangeCheckFailure = ResettableValue(true)
+}
+
+public func == (
+  lhs: MinimalBidirectionalIndex,
+  rhs: MinimalBidirectionalIndex
+) -> Bool {
+  _expectCompatibleIndices(lhs, rhs)
+  return lhs.position == rhs.position
+}
+
+extension MinimalBidirectionalIndex : _MinimalIndexType {
+  public var _offset: Int {
+    return position - startIndex
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Strict Index Types
+//===----------------------------------------------------------------------===//
+
+% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+
+public protocol ${StrictIndexType} : ${Traversal}IndexType {
+  associatedtype Base : ${Traversal}IndexType
+  init(_ base: Base)
+  var base: Base { get set }
+
+  func logSuccessor()
+  func logPredecessor()
+}
+
+extension ${StrictIndexType} {
+  public func successor() -> Self {
+    logSuccessor()
+    return Self(base.successor())
+  }
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func predecessor() -> Self {
+    logPredecessor()
+    return Self(base.predecessor())
+  }
+%   end
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// Defaulted Index Types
+//===----------------------------------------------------------------------===//
+% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+%   DefaultedIndex = 'Defaulted{}Index'.format(Traversal)
+
+public struct ${DefaultedIndex}: ${StrictIndexType} {
+  public typealias Distance = Int
+  public typealias Base = Int
+  public var base: Base
+  public static var timesSuccessorCalled = ResettableValue(0)
+  public static var timesPredecessorCalled = ResettableValue(0)
+
+  public init(_ base: Base) {
+    self.base = base
+  }
+
+  public init(position: Base, startIndex: Base, endIndex: Base) {
+    expectLE(startIndex, position)
+    expectGE(endIndex, position)
+    self.init(position)
+  }
+
+  public func logSuccessor() {
+    ${DefaultedIndex}.timesSuccessorCalled.value += 1
+  }
+
+  public func logPredecessor() {
+    ${DefaultedIndex}.timesPredecessorCalled.value += 1
+  }
+
+% if Traversal == 'RandomAccess':
+  public func distanceTo(n: ${DefaultedIndex}) -> Distance {
+    return n.base - base
+  }
+
+  public func advancedBy(n: Distance) -> ${DefaultedIndex} {
+    return ${DefaultedIndex}(base + n)
+  }
+% end
+}
+
+public func == (lhs: ${DefaultedIndex}, rhs: ${DefaultedIndex}) -> Bool {
+  return rhs.base == lhs.base
+}
+
+% end
+
+
+
+//===----------------------------------------------------------------------===//
+// MinimalRandomAccessIndex
+//===----------------------------------------------------------------------===//
+
+public struct MinimalRandomAccessIndex : RandomAccessIndexType {
+  public typealias Distance = Int
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self = MinimalRandomAccessIndex(
+      collectionState: nil,
+      position: position,
+      startIndex: startIndex,
+      endIndex: endIndex)
+  }
+
+  internal init(
+    collectionState: _CollectionState?,
+    position: Int,
+    startIndex: Int,
+    endIndex: Int
+  ) {
+    expectLE(startIndex, position)
+    expectGE(endIndex, position) /*{
+      "position=\(self.position) startIndex=\(self.startIndex) endIndex=\(self.endIndex)"
+    }*/
+
+    self._collectionState = collectionState
+    self.position = position
+    self.startIndex = startIndex
+    self.endIndex = endIndex
+  }
+
+  public func successor() -> MinimalRandomAccessIndex {
+    expectNotEqual(endIndex, position)
+    return MinimalRandomAccessIndex(
+      collectionState: _collectionState,
+      position: position + 1, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public func predecessor() -> MinimalRandomAccessIndex {
+    expectNotEqual(startIndex, position)
+    return MinimalRandomAccessIndex(
+      collectionState: _collectionState,
+      position: position - 1, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public func distanceTo(other: MinimalRandomAccessIndex) -> Int {
+    _expectCompatibleIndices(self, other)
+    return other.position - position
+  }
+
+  public func advancedBy(n: Int) -> MinimalRandomAccessIndex {
+    let newPosition = position + n
+    expectLE(startIndex, newPosition)
+    expectGE(
+      endIndex, newPosition,
+      "position=\(self.position) startIndex=\(self.startIndex)")
+    return MinimalRandomAccessIndex(
+      collectionState: _collectionState,
+      position: newPosition, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public static func _failEarlyRangeCheck(
+    index: MinimalRandomAccessIndex,
+    bounds: Range<MinimalRandomAccessIndex>
+  ) {
+    expectLE(bounds.startIndex.position, index.position)
+    expectGT(bounds.endIndex.position, index.position)
+
+    if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck(
+        index.position,
+        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+    }
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: MinimalRandomAccessIndex,
+    rangeEnd: MinimalRandomAccessIndex,
+    boundsStart: MinimalRandomAccessIndex,
+    boundsEnd: MinimalRandomAccessIndex
+  ) {
+    let range = rangeStart..<rangeEnd
+    let bounds = boundsStart..<boundsEnd
+    expectLE(bounds.startIndex.position, range.startIndex.position)
+    expectGE(bounds.endIndex.position, range.startIndex.position)
+    expectLE(bounds.startIndex.position, range.endIndex.position)
+    expectGE(bounds.endIndex.position, range.endIndex.position)
+
+    if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck2(
+        rangeStart.position,
+        rangeEnd: rangeEnd.position,
+        boundsStart: boundsStart.position,
+        boundsEnd: boundsEnd.position)
+    }
+  }
+
+  public let _collectionState: _CollectionState?
+
+  public let position: Int
+  public let startIndex: Int
+  public let endIndex: Int
+
+  public static var trapOnRangeCheckFailure = ResettableValue(true)
+}
+
+public func == (
+  lhs: MinimalRandomAccessIndex,
+  rhs: MinimalRandomAccessIndex
+) -> Bool {
+  _expectCompatibleIndices(lhs, rhs)
+  return lhs.position == rhs.position
+}
+
+extension MinimalRandomAccessIndex : _MinimalIndexType {
+  public var _offset: Int {
+    return position - startIndex
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Minimal***[Mutable]?Collection
+//===----------------------------------------------------------------------===//
+
+% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%   for mutable in [ False, True ]:
+// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%     Protocol = 'Strict%s%sCollectionType' % (traversal, 'Mutable' if mutable else '')
+%     Self = 'Minimal%s%sCollection' % (traversal, 'Mutable' if mutable else '')
+%     Index = 'Minimal%sIndex' % traversal
+
+public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'CollectionType'} {
+  associatedtype Element
+  init(base: ${Self}<Element>)
+%     if mutable:
+  var base: ${Self}<Element> { get set }
+%     else:
+  var base: ${Self}<Element> { get }
+%     end
+}
+
+extension ${Protocol} {
+  public init<S : SequenceType where S.Generator.Element == Element>(
+    elements: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self.init(base:
+      ${Self}(elements: elements, underestimatedCount: underestimatedCount))
+  }
+
+  public func underestimateCount() -> Int {
+    return base.underestimateCount()
+  }
+}
+
+extension ${Protocol} where Generator : _MinimalGeneratorType {
+  public func generate() -> MinimalGenerator<Element> {
+    return base.generate()
+  }
+}
+
+extension ${Protocol} where Index : _MinimalIndexType {
+  public var startIndex: ${Index} {
+    return base.startIndex
+  }
+
+  public var endIndex: ${Index} {
+    return base.endIndex
+  }
+
+  public subscript(i: ${Index}) -> Element {
+    get {
+      _expectCompatibleIndices(self.startIndex, i)
+      return base[i]
+    }
+%     if mutable:
+    set {
+      _expectCompatibleIndices(self.startIndex, i)
+      base[i] = newValue
+    }
+%     end
+  }
+}
+
+/// A minimal implementation of `CollectionType` with extra checks.
+public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'CollectionType'} {
+  public init<S : SequenceType where S.Generator.Element == T>(
+    elements: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self._elements = Array(elements)
+
+    self._collectionState = _CollectionState(
+      newRootStateForElementCount: self._elements.count)
+
+    switch underestimatedCount {
+    case .Precise:
+      self.underestimatedCount = _elements.count
+
+    case .Half:
+      self.underestimatedCount = _elements.count / 2
+
+    case .Overestimate:
+      self.underestimatedCount = _elements.count * 3 + 5
+
+    case .Value(let count):
+      self.underestimatedCount = count
+    }
+  }
+
+  public func generate() -> MinimalGenerator<T> {
+    return MinimalGenerator(_elements)
+  }
+
+  public var startIndex: ${Index} {
+    return ${Index}(
+      collectionState: _collectionState,
+      position: 0,
+      startIndex: 0,
+      endIndex: _elements.endIndex)
+  }
+
+  public var endIndex: ${Index} {
+    return ${Index}(
+      collectionState: _collectionState,
+      position: _elements.endIndex,
+      startIndex: 0,
+      endIndex: _elements.endIndex)
+  }
+
+  public subscript(i: ${Index}) -> T {
+    get {
+      _expectCompatibleIndices(self.startIndex, i)
+      return _elements[i.position]
+    }
+%     if mutable:
+    set {
+      _expectCompatibleIndices(self.startIndex, i)
+      _elements[i.position] = newValue
+    }
+%     end
+  }
+
+  public func underestimateCount() -> Int {
+    return underestimatedCount
+  }
+
+  public var underestimatedCount: Int
+
+  internal var _elements: [T]
+  internal let _collectionState: _CollectionState
+}
+
+%   end
+% end
+
+//===----------------------------------------------------------------------===//
+// Minimal***RangeReplaceableCollectionType
+//===----------------------------------------------------------------------===//
+
+% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%   Protocol = 'Strict%sRangeReplaceableCollectionType' % traversal
+%   Self = 'Minimal%sRangeReplaceableCollection' % traversal
+%   Index = 'Minimal%sIndex' % traversal
+
+public protocol ${Protocol} : RangeReplaceableCollectionType {
+  associatedtype Element
+  init(base: ${Self}<Element>)
+  var base: ${Self}<Element> { get set }
+}
+
+extension ${Protocol} {
+  public mutating func replaceRange<
+    C: CollectionType where C.Generator.Element == Element
+  >(subRange: Range<${Self}<Element>.Index>,
+    with newElements: C) {
+    base.replaceRange(subRange, with: newElements)
+  }
+
+  public mutating func removeLast() -> Element {
+    return base.removeLast()
+  }
+}
+
+extension ${Protocol} where Generator : _MinimalGeneratorType {
+  public func generate() -> MinimalGenerator<Element> {
+    return base.generate()
+  }
+}
+
+extension ${Protocol} where Index : _MinimalIndexType {
+  public var startIndex: ${Index} {
+    return base.startIndex
+  }
+
+  public var endIndex: ${Index} {
+    return base.endIndex
+  }
+
+  public subscript(i: ${Index}) -> Element {
+    get {
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      return base[i]
+    }
+    set {
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      base[i] = newValue
+    }
+  }
+}
+
+/// A minimal implementation of `RangeReplaceableCollectionType` with extra
+/// checks.
+public struct ${Self}<T> : RangeReplaceableCollectionType {
+  /// Creates a collection with given contents, but a unique modification
+  /// history.  No other instance has the same modification history.
+  public init<S : SequenceType where S.Generator.Element == T>(
+    elements: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self.elements = Array(elements)
+
+    self._collectionState = _CollectionState(
+      newRootStateForElementCount: self.elements.count)
+
+    switch underestimatedCount {
+    case .Precise:
+      self.underestimatedCount = self.elements.count
+
+    case .Half:
+      self.underestimatedCount = self.elements.count / 2
+
+    case .Overestimate:
+      self.underestimatedCount = self.elements.count * 3 + 5
+
+    case .Value(let count):
+      self.underestimatedCount = count
+    }
+  }
+
+  public init() {
+    self.underestimatedCount = 0
+    self.elements = []
+    self._collectionState = _CollectionState(name: "\(self.dynamicType)", elementCount: 0)
+  }
+
+  public init<
+    S : SequenceType where S.Generator.Element == T
+  >(_ elements: S) {
+    self.underestimatedCount = 0
+    self.elements = Array(elements)
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: self.elements.count)
+  }
+
+  public func generate() -> MinimalGenerator<T> {
+    return MinimalGenerator(elements)
+  }
+
+  public func underestimateCount() -> Int {
+    return underestimatedCount
+  }
+
+  public var startIndex: ${Index} {
+    return ${Index}(
+      collectionState: _collectionState,
+      position: 0,
+      startIndex: 0,
+      endIndex: elements.endIndex)
+  }
+
+  public var endIndex: ${Index} {
+    return ${Index}(
+      collectionState: _collectionState,
+      position: elements.endIndex,
+      startIndex: 0,
+      endIndex: elements.endIndex)
+  }
+
+  public subscript(i: ${Index}) -> T {
+    get {
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      return elements[i.position]
+    }
+    set {
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      elements[i.position] = newValue
+    }
+  }
+
+  public mutating func reserveCapacity(n: Int) {
+    _willMutate(.ReserveCapacity(capacity: n))
+    elements.reserveCapacity(n)
+    reservedCapacity = max(reservedCapacity, n)
+  }
+
+  public mutating func append(x: T) {
+    _willMutate(.Append)
+    elements.append(x)
+  }
+
+  public mutating func appendContentsOf<
+    S : SequenceType where S.Generator.Element == T
+  >(newElements: S) {
+    let oldCount = count
+    elements.appendContentsOf(newElements)
+    let newCount = count
+    _willMutate(.AppendContentsOf(count: newCount - oldCount))
+  }
+
+  public mutating func replaceRange<
+    C : CollectionType where C.Generator.Element == T
+  >(
+    subRange: Range<${Index}>, with newElements: C
+  ) {
+    let oldCount = count
+    elements.replaceRange(
+      subRange.startIndex.position..<subRange.endIndex.position,
+      with: newElements)
+    let newCount = count
+    _willMutate(.ReplaceRange(
+      subRange: subRange.startIndex._offset..<subRange.endIndex._offset,
+      replacementCount: subRange.count + newCount - oldCount))
+  }
+
+  public mutating func insert(newElement: T, atIndex i: ${Index}) {
+    _willMutate(.Insert(atIndex: i._offset))
+    elements.insert(newElement, atIndex: i.position)
+  }
+
+  public mutating func insertContentsOf<
+    S : CollectionType where S.Generator.Element == T
+  >(newElements: S, at i: ${Index}) {
+    let oldCount = count
+    elements.insertContentsOf(newElements, at: i.position)
+    let newCount = count
+
+    if newCount - oldCount != 0 {
+      _willMutate(.InsertContentsOf(
+        atIndex: i._offset,
+        count: newCount - oldCount))
+    }
+  }
+
+  public mutating func removeAtIndex(i: ${Index}) -> T {
+    _willMutate(.RemoveAtIndex(index: i._offset))
+    return elements.removeAtIndex(i.position)
+  }
+
+  public mutating func removeLast() -> T {
+    _willMutate(.RemoveLast)
+    return elements.removeLast()
+  }
+
+  public mutating func removeRange(subRange: Range<${Index}>) {
+    if !subRange.isEmpty {
+      _willMutate(.RemoveRange(
+        subRange: subRange.startIndex._offset..<subRange.endIndex._offset))
+    }
+    elements.removeRange(
+      subRange.startIndex.position..<subRange.endIndex.position
+    )
+  }
+
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+    _willMutate(.RemoveAll(keepCapacity: keepCapacity))
+    // Ignore the value of `keepCapacity`.
+    elements.removeAll(keepCapacity: false)
+  }
+
+  internal mutating func _willMutate(operation: _CollectionOperation) {
+    _collectionState = _CollectionStateTransition(
+      previousState: _collectionState,
+      operation: operation)._nextState
+  }
+
+  public var underestimatedCount: Int
+  public var reservedCapacity: Int = 0
+
+  public var elements: [T]
+  internal var _collectionState: _CollectionState
+}
+
+% end
+
+/// A Sequence that uses as many default implementations as
+/// `SequenceType` can provide.
+public struct DefaultedSequence<Element> : StrictSequenceType {
+  public let base: MinimalSequence<Element>
+
+  public init(base: MinimalSequence<Element>) {
+    self.base = base
+  }
+}
+
+% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+
+/// A Collection that uses as many default implementations as
+/// `CollectionType` can provide.
+public struct Defaulted${traversal}Collection<Element>
+  : Strict${traversal}CollectionType {
+
+  public typealias Base = Minimal${traversal}Collection<Element>
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = Minimal${traversal}Index
+
+  public let base: Base
+
+  public init(base: Base) {
+    self.base = base
+  }
+
+  public init(_ array: [Element]) {
+    self.base = Base(elements: array)
+  }
+
+  public init(elements: [Element]) {
+    self.base = Base(elements: elements)
+  }
+}
+
+public struct Defaulted${traversal}MutableCollection<Element>
+  : Strict${traversal}MutableCollectionType {
+
+  public typealias Base = Minimal${traversal}MutableCollection<Element>
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = Minimal${traversal}Index
+
+  public var base: Base
+
+  public init(base: Base) {
+    self.base = base
+  }
+
+  public init(_ array: [Element]) {
+    self.base = Base(elements: array)
+  }
+
+  public init(elements: [Element]) {
+    self.base = Base(elements: elements)
+  }
+}
+
+public struct Defaulted${traversal}RangeReplaceableCollection<Element>
+  : Strict${traversal}RangeReplaceableCollectionType {
+
+  public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = Minimal${traversal}Index
+
+  public var base: Base
+
+  public init() {
+    base = Base()
+  }
+
+  public init(base: Base) {
+    self.base = base
+  }
+
+  public init(_ array: [Element]) {
+    self.base = Base(elements: array)
+  }
+
+  public init(elements: [Element]) {
+    self.base = Base(elements: elements)
+  }
+}
+
+public struct Defaulted${traversal}RangeReplaceableSlice<Element>
+  : RangeReplaceableCollectionType {
+
+  public typealias Self_ = Defaulted${traversal}RangeReplaceableSlice<Element>
+  public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = Minimal${traversal}Index
+
+  public var base: Base
+  public var startIndex: Index
+  public var endIndex: Index
+
+  public init() {
+    expectSliceType(Self_.self)
+
+    self.base = Base()
+    self.startIndex = base.startIndex
+    self.endIndex = base.endIndex
+  }
+
+  public init(base: Base) {
+    self.base = base
+    self.startIndex = base.startIndex
+    self.endIndex = base.endIndex
+  }
+
+  public init(base: Base, bounds: Range<Index>) {
+    self.base = base
+    self.startIndex = bounds.startIndex
+    self.endIndex = bounds.endIndex
+  }
+
+  public init(_ array: [Element]) {
+    self = Defaulted${traversal}RangeReplaceableSlice(
+      base: Base(elements: array))
+  }
+
+  public init(elements: [Element]) {
+    self = Defaulted${traversal}RangeReplaceableSlice(
+      base: Base(elements: elements))
+  }
+
+  public func generate() -> MinimalGenerator<Element> {
+    return MinimalGenerator(Array(self))
+  }
+
+  public subscript(index: Index) -> Element {
+    Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+    return base[index]
+  }
+
+  public subscript(bounds: Range<Index>) -> Self_ {
+    Index._failEarlyRangeCheck2(
+      bounds.startIndex, rangeEnd: bounds.endIndex,
+      boundsStart: startIndex, boundsEnd: endIndex)
+    return Defaulted${traversal}RangeReplaceableSlice(
+      base: base, bounds: bounds)
+  }
+
+  public mutating func replaceRange<
+    C : CollectionType where C.Generator.Element == Element
+  >(
+    subRange: Range<Index>,
+    with newElements: C
+  ) {
+    let startOffset = startIndex.position
+    let endOffset =
+      endIndex.position
+      - subRange.count
+      + numericCast(newElements.count) as Int
+    Index._failEarlyRangeCheck2(
+      subRange.startIndex, rangeEnd: subRange.endIndex,
+      boundsStart: startIndex, boundsEnd: endIndex)
+    base.replaceRange(subRange, with: newElements)
+    startIndex = base.startIndex.advancedBy(startOffset)
+    endIndex = base.startIndex.advancedBy(endOffset)
+  }
+}
+
+% end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

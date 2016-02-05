@@ -146,7 +146,7 @@ public protocol LazySequenceProtocol : Sequence {
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
-  var elements: Elements {get} 
+  var elements: Elements { get } 
 }
 
 /// When there's no special associated `Elements` type, the `elements`

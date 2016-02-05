@@ -84,14 +84,14 @@ if var v = o, z = o where v > z {}
 // CHECK: <switch>switch <elem-expr>v</elem-expr> {
 // CHECK:   <case>case <elem-pattern>1</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2</elem-pattern>, <elem-pattern>3</elem-pattern>: break;</case>
-// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<param>let x</param>, <param>let y</param>)</call> where x < y</elem-pattern>: break;</case>
+// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<param>var x</param>, <param>var y</param>)</call> where x < y</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2 where <call><name>foo</name>()</call></elem-pattern>, <elem-pattern>3 where <call><name>bar</name>()</call></elem-pattern>: break;</case>
 // CHECK:   <case><elem-pattern>default</elem-pattern>: break;</case>
 // CHECK: }</switch>
 switch v {
   case 1: break;
   case 2, 3: break;
-  case Foo(let x, let y) where x < y: break;
+  case Foo(var x, var y) where x < y: break;
   case 2 where foo(), 3 where bar(): break;
   default: break;
 }

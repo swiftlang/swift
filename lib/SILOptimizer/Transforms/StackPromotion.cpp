@@ -391,7 +391,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
           // to fix the nesting.
           if (!isa<AllocRefInst>(AI))
             return false;
-          auto *Alloc = dyn_cast<SILInstruction>(I.getOperand(0).getDef());
+          auto *Alloc = dyn_cast<SILInstruction>(I.getOperand(0));
           if (!Alloc)
             return false;
           // This should always be the case, but let's be on the safe side.

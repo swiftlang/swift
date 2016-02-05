@@ -151,7 +151,7 @@ SOURCEKITD_PUBLIC SOURCEKITD_NONNULL1 SOURCEKITD_WARN_RESULT
 sourcekitd_uid_t
 sourcekitd_uid_get_from_buf(const char *buf, size_t length);
 
-/// \brief Get the length of the string associated with  a \c sourcekitd_uid_t.
+/// \brief Get the length of the string associated with a \c sourcekitd_uid_t.
 SOURCEKITD_PUBLIC SOURCEKITD_NONNULL1 SOURCEKITD_WARN_RESULT
 size_t
 sourcekitd_uid_get_length(sourcekitd_uid_t obj);
@@ -559,6 +559,13 @@ sourcekitd_variant_description_dump_filedesc(sourcekitd_variant_t obj, int fd);
 SOURCEKITD_PUBLIC
 char *
 sourcekitd_variant_description_copy(sourcekitd_variant_t obj);
+
+/// \brief Copies a string representation of the variant object in JSON format.
+/// \returns A string representation of the variant object. This string should
+/// be disposed of with \c free when done.
+SOURCEKITD_PUBLIC
+char *
+sourcekitd_variant_json_description_copy(sourcekitd_variant_t obj);
 
 /// @}
 

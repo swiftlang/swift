@@ -266,10 +266,13 @@ static FullLocation getLocation(SourceManager &SM,
 
 /// Determine whether this debug scope belongs to an explicit closure.
 static bool isExplicitClosure(const SILDebugScope *DS) {
-  if (DS)
-    if (Expr *E = DS->Loc.getAsASTNode<Expr>())
-      if (isa<ClosureExpr>(E))
-        return true;
+  if (DS) {
+    auto *SILFn = DS->getInlinedFunction();
+    if (SILFn && SILFn->hasLocation())
+      if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
+        if (isa<ClosureExpr>(E))
+          return true;
+  }
   return false;
 }
 
@@ -282,27 +285,25 @@ static bool isAbstractClosure(const SILLocation &Loc) {
 }
 
 /// Construct an inlined-at location from a SILScope.
-llvm::MDNode* IRGenDebugInfo::createInlinedAt(const SILDebugScope *InlinedScope) {
-  assert(InlinedScope);
-  assert(InlinedScope->InlinedCallSite && "not an inlined scope");
-  const SILDebugScope *CallSite = InlinedScope->InlinedCallSite;
+llvm::MDNode *
+IRGenDebugInfo::createInlinedAt(const SILDebugScope *CallSite) {
+  if (!CallSite)
+    return nullptr;
 
-#ifndef NDEBUG
-  auto *S = getOrCreateScope(InlinedScope);
-  while (!isa<llvm::DISubprogram>(S)) {
-    auto *LB = dyn_cast<llvm::DILexicalBlockBase>(S);
-    S = LB->getScope();
-    assert(S && "Lexical block parent chain must contain a subprogram");
-  }
-#endif
+  // In SIL the inlined-at information is part of the scopes, in LLVM
+  // IR it is part of the location. Transforming the inlined-at SIL scope
+  // to a location means skipping the inlined-at scope.
+  llvm::DIScope * ParentScope;
+  if (auto *Parent = CallSite->Parent.dyn_cast<const SILDebugScope *>())
+    ParentScope = getOrCreateScope(Parent);
+  else
+    ParentScope = getOrCreateScope(CallSite);
 
-  auto ParentScope = getOrCreateScope(CallSite->Parent);
   llvm::MDNode *InlinedAt = nullptr;
 
   // If this is itself an inlined location, recursively create the
   // inlined-at location for it.
-  if (CallSite->InlinedCallSite)
-    InlinedAt = createInlinedAt(CallSite);
+  InlinedAt = createInlinedAt(CallSite->InlinedCallSite);
 
   auto InlineLoc = getLoc(SM, CallSite->Loc.getDebugSourceLoc());
   return llvm::DebugLoc::get(InlineLoc.Line, InlineLoc.Col, ParentScope,
@@ -312,15 +313,11 @@ llvm::MDNode* IRGenDebugInfo::createInlinedAt(const SILDebugScope *InlinedScope)
 #ifndef NDEBUG
 /// Perform a couple of sanity checks on scopes.
 static bool parentScopesAreSane(const SILDebugScope *DS) {
-  const SILDebugScope *Parent = DS->Parent;
-  while (Parent) {
-    if (!DS->InlinedCallSite) {
+  auto *Parent = DS;
+  while ((Parent = Parent->Parent.dyn_cast<const SILDebugScope *>())) {
+    if (!DS->InlinedCallSite)
       assert(!Parent->InlinedCallSite &&
              "non-inlined scope has an inlined parent");
-      assert(DS->SILFn == Parent->SILFn
-             && "non-inlined parent scope from different function?");
-    }
-    Parent = Parent->Parent;
   }
   return true;
 }
@@ -383,12 +380,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   LastDebugLoc = L;
   LastScope = DS;
 
-  llvm::MDNode *InlinedAt = nullptr;
-  if (DS->InlinedCallSite) {
-    assert(Scope && "Inlined location without a lexical scope");
-    InlinedAt = createInlinedAt(DS);
-  }
-
+  auto *InlinedAt = createInlinedAt(DS->InlinedCallSite);
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
   auto DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
@@ -407,18 +399,13 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   if (CachedScope != ScopeCache.end())
     return cast<llvm::DIScope>(CachedScope->second);
 
-  // If this is a (inlined) function scope, the function may
+  // If this is an (inlined) function scope, the function may
   // not have been created yet.
-  if (!DS->Parent ||
-      DS->Loc.getKind() == SILLocation::SILFileKind ||
-      DS->Loc.isASTNode<AbstractFunctionDecl>() ||
-      DS->Loc.isASTNode<AbstractClosureExpr>() ||
-      DS->Loc.isASTNode<EnumElementDecl>()) {
-
-    auto *FnScope = DS->SILFn->getDebugScope();
+  if (auto *SILFn = DS->Parent.dyn_cast<SILFunction *>()) {
+    auto *FnScope = SILFn->getDebugScope();
     // FIXME: This is a bug in the SIL deserialization.
     if (!FnScope)
-      DS->SILFn->setDebugScope(DS);
+      SILFn->setDebugScope(DS);
 
     auto CachedScope = ScopeCache.find(FnScope);
     if (CachedScope != ScopeCache.end())
@@ -427,16 +414,19 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
     // Force the debug info for the function to be emitted, even if it
     // is external or has been inlined.
     llvm::Function *Fn = nullptr;
-    if (!DS->SILFn->getName().empty() && !DS->SILFn->isZombie())
-      Fn = IGM.getAddrOfSILFunction(DS->SILFn, NotForDefinition);
-    auto *SP = emitFunction(*DS->SILFn, Fn);
+    if (!SILFn->getName().empty() && !SILFn->isZombie())
+      Fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
+    auto *SP = emitFunction(*SILFn, Fn);
 
     // Cache it.
     ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
     return SP;
   }
 
-  llvm::DIScope *Parent = getOrCreateScope(DS->Parent);
+  auto *ParentScope = DS->Parent.get<const SILDebugScope *>();
+  llvm::DIScope *Parent = getOrCreateScope(ParentScope);
+  assert(isa<llvm::DILocalScope>(Parent) && "not a local scope");
+
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return Parent;
 
@@ -650,22 +640,31 @@ static bool isAllocatingConstructor(SILFunctionTypeRepresentation Rep,
 llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     SILModule &SILMod, const SILDebugScope *DS, llvm::Function *Fn,
     SILFunctionTypeRepresentation Rep, SILType SILTy, DeclContext *DeclCtx) {
-  auto cached = ScopeCache.find(DS);
-  if (cached != ScopeCache.end())
-    return cast<llvm::DISubprogram>(cached->second);
+  auto Cached = ScopeCache.find(DS);
+  if (Cached != ScopeCache.end()) {
+    auto SP = cast<llvm::DISubprogram>(Cached->second);
+    // If we created the DISubprogram for a forward declaration,
+    // attach it to the function now.
+    if (!Fn->getSubprogram() && !Fn->isDeclaration())
+      Fn->setSubprogram(SP);
+    return SP;
+  }
 
+  // Some IRGen-generated helper functions don't have a corresponding
+  // SIL function, hence the dyn_cast.
+  SILFunction *SILFn = DS ? DS->Parent.dyn_cast<SILFunction *>() : nullptr;
   StringRef LinkageName;
   if (Fn)
     LinkageName = Fn->getName();
   else if (DS)
-    LinkageName = DS->SILFn->getName();
+    LinkageName = SILFn->getName();
   else
     llvm_unreachable("function has no mangled name");
 
   StringRef Name;
   if (DS) {
     if (DS->Loc.getKind() == SILLocation::SILFileKind)
-      Name = DS->SILFn->getName();
+      Name = SILFn->getName();
     else
       Name = getName(DS->Loc);
   }
@@ -676,7 +675,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   // is especially important for shared functions like reabstraction
   // thunk helpers, where getLocation() returns an arbitrary location
   // of whichever use was emitted first.
-  if (DS && (!DS->SILFn || (!DS->SILFn->isBare() && !DS->SILFn->isThunk()))) {
+  if (DS && (!SILFn || (!SILFn->isBare() && !SILFn->isThunk()))) {
     auto FL = getLocation(SM, DS->Loc);
     L = FL.Loc;
     ScopeLine = FL.LocForLinetable.Line;
@@ -685,8 +684,8 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   auto Line = L.Line;
   auto File = getOrCreateFile(L.Filename);
   llvm::DIScope *Scope = MainModule;
-  if (DS->SILFn && DS->SILFn->getDeclContext())
-    Scope = getOrCreateContext(DS->SILFn->getDeclContext()->getParent());
+  if (SILFn && SILFn->getDeclContext())
+    Scope = getOrCreateContext(SILFn->getDeclContext()->getParent());
 
   // We know that main always comes from MainFile.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
@@ -1083,11 +1082,7 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
                                       unsigned Col, llvm::DILocalScope *Scope,
                                       const SILDebugScope *DS) {
   // Set the location/scope of the intrinsic.
-  llvm::MDNode *InlinedAt = nullptr;
-  if (DS && DS->InlinedCallSite) {
-    assert(Scope && "Inlined location without a lexical scope");
-    InlinedAt = createInlinedAt(DS);
-  }
+  auto *InlinedAt = createInlinedAt(DS->InlinedCallSite);
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) && llvm::FindAllocaDbgDeclare(Storage))

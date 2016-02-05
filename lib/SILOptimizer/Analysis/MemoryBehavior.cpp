@@ -108,9 +108,9 @@ public:
 #define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                             \
   MemBehavior visit##Name(Name *I) {                                    \
     for (Operand &Op : I->getAllOperands()) {                           \
-      if (!AA->isNoAlias(Op.get(), V)) {                                 \
+      if (!AA->isNoAlias(Op.get(), V)) {                                \
         DEBUG(llvm::dbgs() << "  " #Name                                \
-              " does alias inst. Returning  Normal behavior.\n");       \
+              " does alias inst. Returning Normal behavior.\n");        \
         return I->getMemoryBehavior();                                  \
       }                                                                 \
     }                                                                   \
@@ -257,7 +257,7 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
       if (NewBehavior != Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
-        if (!Arg.getType().isAddress() ||
+        if (!Arg->getType().isAddress() ||
             !AA->isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
           Behavior = NewBehavior;
         }
@@ -330,15 +330,18 @@ MemBehavior
 AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
                                           RetainObserveKind InspectionMode) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
-                     << *V.getDef());
+                     << *V);
   assert(SEA && "SideEffectsAnalysis must be initialized!");
   return MemoryBehaviorVisitor(this, SEA, EA, V, InspectionMode).visit(Inst);
 }
 
 MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILValue V1, SILValue V2,
                                                     RetainObserveKind M) {
-  size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1.getDef());
-  size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2.getDef());
-  unsigned R2 = V2.getResultNumber();
-  return {idx1, idx2, R2, M};
+  size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1);
+  assert(idx1 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
+  size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2);
+  assert(idx2 != std::numeric_limits<size_t>::max() &&
+         "~0 index reserved for empty/tombstone keys");
+  return {idx1, idx2, M};
 }

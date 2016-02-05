@@ -48,6 +48,10 @@ llvm::cl::opt<unsigned> SILNumOptPassesToRun(
     "sil-opt-pass-count", llvm::cl::init(UINT_MAX),
     llvm::cl::desc("Stop optimizing after <N> optimization passes"));
 
+llvm::cl::opt<unsigned> SILFunctionPassPipelineLimit("sil-pipeline-limit",
+                                                     llvm::cl::init(10),
+                                                     llvm::cl::desc(""));
+
 llvm::cl::opt<std::string>
     SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
                     llvm::cl::desc("Only print out the sil for this function"));
@@ -169,7 +173,8 @@ bool SILPassManager::continueTransforming() {
 }
 
 void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
-                                         SILFunction *F) {
+                                         SILFunction *F,
+                                         bool runToCompletion) {
 
   const SILOptions &Options = getOptions();
 
@@ -182,11 +187,21 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
 
     // If nothing changed since the last run of this pass, we can skip this
     // pass.
-    if (completedPasses.test((size_t)SFT->getPassKind()))
+    if (completedPasses.test((size_t)SFT->getPassKind())) {
+      if (SILPrintPassName)
+        llvm::dbgs() << "(Skip) Stage: " << StageName
+                     << " Pass: " << SFT->getName()
+                     << ", Function: " << F->getName() << "\n";
       continue;
+    }
 
-    if (isDisabled(SFT))
+    if (isDisabled(SFT)) {
+      if (SILPrintPassName)
+        llvm::dbgs() << "(Disabled) Stage: " << StageName
+                     << " Pass: " << SFT->getName()
+                     << ", Function: " << F->getName() << "\n";
       continue;
+    }
 
     CurrentPassHasInvalidated = false;
 
@@ -238,10 +253,16 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
 
     ++NumPassesRun;
 
+    if (!continueTransforming())
+      return;
+
+    if (runToCompletion)
+      continue;
+
     // If running the transform resulted in new functions on the top
     // of the worklist, we'll return so that we can begin processing
     // those new functions.
-    if (newFunctionsAdded || !continueTransforming())
+    if (shouldRestartPipeline() || newFunctionsAdded)
       return;
   }
 }
@@ -274,17 +295,40 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   while (!FunctionWorklist.empty() && continueTransforming()) {
     auto *F = FunctionWorklist.back();
 
-    runPassesOnFunction(FuncTransforms, F);
+    if (CountOptimized[F] > SILFunctionPassPipelineLimit) {
+      DEBUG(llvm::dbgs() << "*** Hit limit optimizing: " << F->getName()
+                         << '\n');
+      FunctionWorklist.pop_back();
+      continue;
+    }
 
+    assert(
+        !shouldRestartPipeline() &&
+        "Did not expect function pipeline set up to restart from beginning!");
+
+    assert(CountOptimized[F] <= SILFunctionPassPipelineLimit &&
+           "Function optimization count exceeds limit!");
+    auto runToCompletion = CountOptimized[F] == SILFunctionPassPipelineLimit;
+
+    runPassesOnFunction(FuncTransforms, F, runToCompletion);
     ++CountOptimized[F];
+
+    if (runToCompletion) {
+      FunctionWorklist.pop_back();
+      clearRestartPipeline();
+      continue;
+    }
+
 
     // If running the function transforms did not result in new
     // functions being added to the top of the worklist, then we're
     // done with this function and can pop it off and continue.
     // Otherwise, we'll return to this function and reoptimize after
     // processing the new functions that were added.
-    if (F == FunctionWorklist.back())
+    if (F == FunctionWorklist.back() && !shouldRestartPipeline())
       FunctionWorklist.pop_back();
+
+    clearRestartPipeline();
   }
 }
 
@@ -430,6 +474,12 @@ SILPassManager::~SILPassManager() {
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
   }
+}
+
+void SILPassManager::restartWithCurrentFunction(SILTransform *T) {
+  assert(isa<SILFunctionTransform>(T) &&
+         "Can only restart the pipeline from function passes");
+  RestartPipeline = true;
 }
 
 /// \brief Reset the state of the pass manager and remove all transformation

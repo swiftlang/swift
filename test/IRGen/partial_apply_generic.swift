@@ -25,8 +25,11 @@ struct Spoon: Runcible {
   typealias Element = Mince
 }
 
-func split<Seq: Runcible>(seq: Seq)(isSeparator: Seq.Element -> Bool) { }
-
+func split<Seq: Runcible>(seq: Seq) -> (Seq.Element -> Bool) -> () {
+  return {(isSeparator: Seq.Element -> Bool) in
+    return ()
+  }
+}
 var seq = Spoon()
 var x = seq ~> split
 
@@ -39,10 +42,15 @@ var x = seq ~> split
 // CHECK:         tail call { i8*, %swift.refcounted* } @_TF21partial_apply_generic5split{{.*}}(%swift.opaque* noalias nocapture [[REABSTRACT]],
 
 struct HugeStruct { var a, b, c, d: Int }
-func hugeStructReturn()(h: HugeStruct) -> HugeStruct { return h }
-var y = hugeStructReturn()
-// CHECK-LABEL: define internal void @_TPA__TF21partial_apply_generic16hugeStructReturn{{.*}}(%V21partial_apply_generic10HugeStruct* noalias nocapture sret, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable({{.*}}), %swift.refcounted*) {{.*}} {
-// CHECK:   tail call void @_TF21partial_apply_generic16hugeStructReturn{{.*}}(%V21partial_apply_generic10HugeStruct* noalias nocapture sret %0, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable({{.*}}) %1)
+struct S {
+  func hugeStructReturn(h: HugeStruct) -> HugeStruct { return h }
+}
+
+let s = S()
+var y = s.hugeStructReturn
+// CHECK-LABEL: define internal void @_TPA__TFV21partial_apply_generic1S16hugeStructReturnfVS_10HugeStructS1_(%V21partial_apply_generic10HugeStruct* noalias nocapture sret, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable(32), %swift.refcounted*) #0 {
+// CHECK: entry:
+// CHECK:   tail call void @_TFV21partial_apply_generic1S16hugeStructReturnfVS_10HugeStructS1_(%V21partial_apply_generic10HugeStruct* noalias nocapture sret %0, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable(32) %1) #0
 // CHECK:   ret void
 // CHECK: }
 

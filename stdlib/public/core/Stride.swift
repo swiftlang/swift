@@ -139,8 +139,8 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a half-open interval.
-public struct StrideTo<Element : Strideable> : Sequence {
-  // FIXME: should really be a Collection, as it is multipass
+public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
+  // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return an *iterator* over the elements of this *sequence*.
   ///
@@ -161,6 +161,10 @@ public struct StrideTo<Element : Strideable> : Sequence {
   internal let _start: Element
   internal let _end: Element
   internal let _stride: Element.Stride
+
+  public var customMirror: Mirror {
+    return Mirror(self, children: ["from": _start, "to": _end, "by": _stride])
+  }
 }
 
 extension Strideable {
@@ -200,8 +204,8 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a closed interval.
-public struct StrideThrough<Element : Strideable> : Sequence {
-  // FIXME: should really be a Collection, as it is multipass
+public struct StrideThrough<Element : Strideable> : Sequence, CustomReflectable {
+  // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return an *iterator* over the elements of this *sequence*.
   ///
@@ -221,6 +225,10 @@ public struct StrideThrough<Element : Strideable> : Sequence {
   internal let _start: Element
   internal let _end: Element
   internal let _stride: Element.Stride
+
+  public var customMirror: Mirror {
+    return Mirror(self, children: ["from": _start, "through": _end, "by": _stride])
+  }
 }
 
 extension Strideable {

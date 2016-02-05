@@ -105,7 +105,7 @@ bool ArrayAllocation::mapInitializationStores() {
   if (!UnsafeMutablePointerExtract)
     return false;
   auto *PointerToAddress = dyn_cast_or_null<PointerToAddressInst>(
-      getSingleNonDebugUser(*UnsafeMutablePointerExtract));
+      getSingleNonDebugUser(UnsafeMutablePointerExtract));
   if (!PointerToAddress)
     return false;
 
@@ -116,7 +116,7 @@ bool ArrayAllocation::mapInitializationStores() {
 
     // Store to the base.
     auto *SI = dyn_cast<StoreInst>(Inst);
-    if (SI && SI->getDest() == SILValue(PointerToAddress, 0)) {
+    if (SI && SI->getDest() == PointerToAddress) {
       // We have already seen an entry for this index bail.
       if (ElementValueMap.count(0))
         return false;
@@ -129,8 +129,8 @@ bool ArrayAllocation::mapInitializationStores() {
     auto *IndexAddr = dyn_cast<IndexAddrInst>(Inst);
     if (!IndexAddr)
       return false;
-    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(*IndexAddr));
-    if (!SI || SI->getDest().getDef() != IndexAddr)
+    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(IndexAddr));
+    if (!SI || SI->getDest() != IndexAddr)
       return false;
     auto *Index = dyn_cast<IntegerLiteralInst>(IndexAddr->getIndex());
     if (!Index)
@@ -185,7 +185,7 @@ bool ArrayAllocation::findValueReplacements() {
 /// Collect all get_element users and check that there are no escapes or uses
 /// that could change the array value.
 bool ArrayAllocation::analyseArrayValueUses() {
-  return recursivelyCollectUses(ArrayValue.getDef());
+  return recursivelyCollectUses(ArrayValue);
 }
 
 static bool doesNotChangeArray(ArraySemanticsCall &C) {

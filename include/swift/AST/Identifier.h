@@ -118,8 +118,12 @@ public:
         || (C >= 0xE0100 && C <= 0xE01EF);
   }
 
+  static bool isEditorPlaceholder(StringRef name) {
+    return name.startswith("<#");
+  }
+
   bool isEditorPlaceholder() const {
-    return !empty() && Pointer[0] == '<' && Pointer[1] == '#';
+    return !empty() && isEditorPlaceholder(str());
   }
   
   void *getAsOpaquePointer() const { return (void *)Pointer; }

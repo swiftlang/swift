@@ -11,7 +11,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)
     set_property(TARGET sourcekitd-repl APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate=swift-%p.profraw -fcoverage-mapping")
+      LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
 endif()
 

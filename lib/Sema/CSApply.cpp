@@ -30,7 +30,7 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief  Get a substitution corresponding to the type witness.
+/// \brief Get a substitution corresponding to the type witness.
 /// Inspired by ProtocolConformance::getTypeWitnessByName.
 const Substitution *
 getTypeWitnessByName(ProtocolConformance *conformance,
@@ -365,7 +365,7 @@ namespace {
 
   public:
     /// \brief Build a reference to the given declaration.
-    Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
+    Expr *buildDeclRef(ValueDecl *decl, DeclNameLoc loc, Type openedType,
                        ConstraintLocatorBuilder locator,
                        bool specialized, bool implicit,
                        AccessSemantics semantics) {
@@ -379,7 +379,8 @@ namespace {
         auto openedFnType = openedType->castTo<FunctionType>();
         auto baseTy = simplifyType(openedFnType->getInput())
                         ->getRValueInstanceType();
-        Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
+        Expr *base = TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
+                                                  ctx);
         auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
                                      loc, openedFnType->getResult(),
                                      locator, locator, implicit, semantics,
@@ -411,8 +412,9 @@ namespace {
       // missing an ampersand in front of the ref.
       if (auto inoutType = type->getAs<InOutType>()) {
         auto &tc = cs.getTypeChecker();
-        tc.diagnose(loc, diag::missing_address_of, inoutType->getInOutObjectType())
-          .fixItInsert(loc, "&");
+        tc.diagnose(loc.getBaseNameLoc(), diag::missing_address_of,
+                    inoutType->getInOutObjectType())
+          .fixItInsert(loc.getBaseNameLoc(), "&");
         return nullptr;
       }
         
@@ -693,7 +695,7 @@ namespace {
 
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
-                         ValueDecl *member, SourceLoc memberLoc,
+                         ValueDecl *member, DeclNameLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator,
                          bool Implicit, AccessSemantics semantics,
@@ -941,6 +943,9 @@ namespace {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        if (Implicit) {
+          apply->setImplicit();
+        }
       }
       return finishApply(apply, openedType, nullptr);
     }
@@ -1243,7 +1248,7 @@ namespace {
 
     /// \brief Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
-                                   ConstructorDecl *ctor, SourceLoc loc,
+                                   ConstructorDecl *ctor, DeclNameLoc loc,
                                    ConstraintLocatorBuilder locator,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
@@ -1348,13 +1353,13 @@ namespace {
 
       if (conformsToBridgedToObjectiveC) {
         // The conformance to _BridgedToObjectiveC is statically known.
-        // Retrieve the  bridging operation to be used if a static conformance
+        // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC can be proven.
         fn = conditional
                  ? tc.Context.getConditionallyBridgeFromObjectiveCBridgeable(&tc)
                  : tc.Context.getForceBridgeFromObjectiveCBridgeable(&tc);
       } else {
-        // Retrieve the  bridging operation to be used if a static conformance
+        // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC cannot be proven.
         fn = conditional ? tc.Context.getConditionallyBridgeFromObjectiveC(&tc)
                          : tc.Context.getForceBridgeFromObjectiveC(&tc);
@@ -1403,7 +1408,8 @@ namespace {
       }
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
-      Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef, object->getLoc(),
+      Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
+                                                 DeclNameLoc(object->getLoc()),
                                                  /*Implicit=*/true);
       TypeSubstitutionMap subMap;
       auto genericParam = fnGenericParams[0];
@@ -1422,6 +1428,7 @@ namespace {
                            object->getLoc(), object->getLoc(),
                            MetatypeType::get(valueType))
       };
+      args[1]->setImplicit();
 
       // Form the argument tuple.
       Expr *argTuple = TupleExpr::createImplicit(tc.Context, args, {});
@@ -1914,11 +1921,12 @@ namespace {
       // FIXME: This location info is bogus.
       auto typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
                                                   type, tc.Context);
-      Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
-                                                       expr->getStartLoc(),
-                                                       member,
-                                                       expr->getStartLoc(),
-                                                       /*Implicit=*/true);
+      Expr *memberRef =
+        new (tc.Context) MemberRefExpr(typeRef,
+                                       expr->getStartLoc(),
+                                       member,
+                                       DeclNameLoc(expr->getStartLoc()),
+                                       /*Implicit=*/true);
       bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
       assert(!failed && "Could not reference string interpolation witness");
       (void)failed;
@@ -1951,7 +1959,8 @@ namespace {
         auto memberRef = buildMemberRef(
                            typeRef, choice.openedFullType,
                            segment->getStartLoc(), choice.choice.getDecl(),
-                           segment->getStartLoc(), choice.openedType,
+                           DeclNameLoc(segment->getStartLoc()),
+                           choice.openedType,
                            locator, locator, /*Implicit=*/true,
                            AccessSemantics::Ordinary,
                            /*isDynamic=*/false);
@@ -2048,26 +2057,6 @@ namespace {
       return expr;
     }
 
-    /// \brief Retrieve the type of a reference to the given declaration.
-    Type getTypeOfDeclReference(ValueDecl *decl, bool isSpecialized) {
-      if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-        // Resolve the reference to this type declaration in our
-        // current context.
-        auto type = cs.getTypeChecker().resolveTypeInContext(typeDecl, dc,
-                                                             TR_InExpression,
-                                                             isSpecialized);
-        if (!type)
-          return nullptr;
-
-        // Refer to the metatype of this type.
-        return MetatypeType::get(type);
-      }
-
-      return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc,
-                                              /*base=*/nullptr,
-                                              /*wantInterfaceType=*/true);
-    }
-
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       auto locator = cs.getConstraintLocator(expr);
 
@@ -2085,10 +2074,10 @@ namespace {
 
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      return buildDeclRef(decl, expr->getLoc(), selected->openedFullType,
-                                  locator, expr->isSpecialized(),
-                                  expr->isImplicit(),
-                                  expr->getAccessSemantics());
+      return buildDeclRef(decl, expr->getNameLoc(), selected->openedFullType,
+                          locator, expr->isSpecialized(),
+                          expr->isImplicit(),
+                          expr->getAccessSemantics());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2109,104 +2098,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
-      // Resolve the callee to the constructor declaration selected.
-      auto ctorLocator = cs.getConstraintLocator(
-                           expr,
-                           ConstraintLocator::ConstructorMember);
-      
-      auto selected = getOverloadChoiceIfAvailable(ctorLocator);
-      
-      // If we didn't form a ConstructorMember constraint, then it
-      // acts like a normal member reference to '.init'.
-      if (!selected) {
-        return applyMemberRefExpr(expr, expr->getSubExpr(), expr->getDotLoc(),
-                                expr->getConstructorLoc(), expr->isImplicit());
-      }
-        
-      
-      auto choice = selected->choice;
-      auto *ctor = cast<ConstructorDecl>(choice.getDecl());
-
-      auto arg = expr->getSubExpr()->getSemanticsProvidingExpr();
-      auto &tc = cs.getTypeChecker();
-
-      // If the subexpression is a metatype, build a direct reference to the
-      // constructor.
-      if (arg->getType()->is<AnyMetatypeType>()) {
-        return buildMemberRef(expr->getSubExpr(),
-                              selected->openedFullType,
-                              expr->getDotLoc(),
-                              ctor,
-                              expr->getConstructorLoc(),
-                              expr->getType(),
-                              ConstraintLocatorBuilder(
-                                cs.getConstraintLocator(expr)),
-                              ctorLocator,
-                              expr->isImplicit(),
-                              AccessSemantics::Ordinary,
-                              /*isDynamic=*/false);
-      }
-
-      // The subexpression must be either 'self' or 'super'.
-      if (!arg->isSuperExpr()) {
-        // 'super' references have already been fully checked; handle the
-        // 'self' case below.
-        bool diagnoseBadInitRef = true;
-        if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
-          if (dre->getDecl()->getName() == cs.getASTContext().Id_self) {
-            // We have a reference to 'self'.
-            diagnoseBadInitRef = false;
-
-            // Make sure the reference to 'self' occurs within an initializer.
-            if (!dyn_cast_or_null<ConstructorDecl>(
-                   cs.DC->getInnermostMethodContext())) {
-              if (!SuppressDiagnostics)
-                tc.diagnose(expr->getDotLoc(),
-                            diag::init_delegation_outside_initializer);
-              return nullptr;
-            }
-          }
-        }
-
-        // If we need to diagnose this as a bad reference to an initializer,
-        // do so now.
-        if (diagnoseBadInitRef) {
-          // Determine whether 'super' would have made sense as a base.
-          bool hasSuper = false;
-          if (auto func = cs.DC->getInnermostMethodContext()) {
-            if (auto nominalType
-                       = func->getDeclContext()->getDeclaredTypeOfContext()) {
-              if (auto classDecl = nominalType->getClassOrBoundGenericClass()) {
-                hasSuper = classDecl->hasSuperclass();
-              }
-            }
-          }
-          
-          if (SuppressDiagnostics)
-            return nullptr;
-
-          tc.diagnose(expr->getDotLoc(), diag::bad_init_ref_base, hasSuper);
-        }
-      }
-      
-      // Build a partial application of the delegated initializer.
-      Expr *ctorRef = buildOtherConstructorRef(
-                        selected->openedFullType,
-                        ctor, expr->getConstructorLoc(),
-                        cs.getConstraintLocator(
-                          expr,
-                          ConstraintLocator::ConstructorMember),
-                        expr->isImplicit());
-      auto *call
-        = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
-                                                     expr->getDotLoc(),
-                                                     expr->getSubExpr());
-      return finishApply(call, expr->getType(),
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr)));
-    }
-
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       return simplifyExprType(expr);
     }
@@ -2218,7 +2109,7 @@ namespace {
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
-      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+      return buildDeclRef(decl, expr->getNameLoc(), selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit(),
                           AccessSemantics::Ordinary);
     }
@@ -2289,7 +2180,7 @@ namespace {
       // then we're in an ambiguity tolerant mode used for diagnostic
       // generation.  Just leave this as an unresolved member reference.
       Type resultTy = simplifyType(expr->getType());
-      if (resultTy->is<UnresolvedType>()) {
+      if (resultTy->getRValueType()->is<UnresolvedType>()) {
         expr->setType(resultTy);
         return expr;
       }
@@ -2352,9 +2243,91 @@ namespace {
     /// A list of optional injections that have been diagnosed.
     llvm::SmallPtrSet<InjectIntoOptionalExpr *, 4>  DiagnosedOptionalInjections;
   private:
+    /// Create a member reference to the given constructor.
+    Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
+                           DeclNameLoc nameLoc, bool implicit,
+                           ConstraintLocator *ctorLocator,
+                           ConstructorDecl *ctor,
+                           Type openedType) {
+      // If the subexpression is a metatype, build a direct reference to the
+      // constructor.
+      if (base->getType()->is<AnyMetatypeType>()) {
+        return buildMemberRef(base, openedType, dotLoc, ctor, nameLoc,
+                              expr->getType(),
+                              ConstraintLocatorBuilder(
+                                cs.getConstraintLocator(expr)),
+                              ctorLocator,
+                              implicit,
+                              AccessSemantics::Ordinary,
+                              /*isDynamic=*/false);
+      }
+
+      // The subexpression must be either 'self' or 'super'.
+      if (!base->isSuperExpr()) {
+        // 'super' references have already been fully checked; handle the
+        // 'self' case below.
+        auto &tc = cs.getTypeChecker();
+        bool diagnoseBadInitRef = true;
+        auto arg = base->getSemanticsProvidingExpr();
+        if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
+          if (dre->getDecl()->getName() == cs.getASTContext().Id_self) {
+            // We have a reference to 'self'.
+            diagnoseBadInitRef = false;
+
+            // Make sure the reference to 'self' occurs within an initializer.
+            if (!dyn_cast_or_null<ConstructorDecl>(
+                   cs.DC->getInnermostMethodContext())) {
+              if (!SuppressDiagnostics)
+                tc.diagnose(dotLoc, diag::init_delegation_outside_initializer);
+              return nullptr;
+            }
+          }
+        }
+
+        // If we need to diagnose this as a bad reference to an initializer,
+        // do so now.
+        if (diagnoseBadInitRef) {
+          // Determine whether 'super' would have made sense as a base.
+          bool hasSuper = false;
+          if (auto func = cs.DC->getInnermostMethodContext()) {
+            if (auto nominalType
+                       = func->getDeclContext()->getDeclaredTypeOfContext()) {
+              if (auto classDecl = nominalType->getClassOrBoundGenericClass()) {
+                hasSuper = classDecl->hasSuperclass();
+              }
+            }
+          }
+
+          if (SuppressDiagnostics)
+            return nullptr;
+
+          tc.diagnose(dotLoc, diag::bad_init_ref_base, hasSuper);
+        }
+      }
+
+      // Build a partial application of the delegated initializer.
+      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, nameLoc,
+                                               ctorLocator, implicit);
+      auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
+                                                              base);
+      return finishApply(call, expr->getType(),
+                         ConstraintLocatorBuilder(
+                           cs.getConstraintLocator(expr)));
+    }
 
     Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
-                             SourceLoc nameLoc, bool implicit) {
+                             DeclNameLoc nameLoc, bool implicit) {
+      // If we have a constructor member, handle it as a constructor.
+      auto ctorLocator = cs.getConstraintLocator(
+                           expr,
+                           ConstraintLocator::ConstructorMember);
+      if (auto selected = getOverloadChoiceIfAvailable(ctorLocator)) {
+        auto choice = selected->choice;
+        auto *ctor = cast<ConstructorDecl>(choice.getDecl());
+        return applyCtorRefExpr(expr, base, dotLoc, nameLoc, implicit,
+                                ctorLocator, ctor, selected->openedFullType);
+      }
+
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
@@ -2427,10 +2400,37 @@ namespace {
                                          cs.getConstraintLocator(base));
         }
 
+        Type toType = simplifyType(expr->getType());
+        
+        // Don't allow lvalues when indexing into a tuple expr.
+        // If we get any lvalues, add load exprs to convert the tuple to be all rvalues.
+        if (auto *tupleExpr = dyn_cast<TupleExpr>(base)) {
+          unsigned count = tupleExpr->getNumElements();
+          unsigned lvalues = 0;
+          auto &tc = cs.getTypeChecker();
+          SmallVector<TupleTypeElt, 4> tupleElts;
+          for (unsigned i = 0; i < count; i++) {
+            Expr *elementExpr = tupleExpr->getElement(i);
+            Type elementType = elementExpr->getType();
+            if (elementType->isLValueType()) {
+              lvalues++;
+              elementExpr->propagateLValueAccessKind(AccessKind::Read, true);
+              elementExpr = new (tc.Context) LoadExpr(elementExpr, elementType->getRValueType());
+              tupleExpr->setElement(i, elementExpr);
+            }
+            tupleElts.push_back(elementExpr->getType());
+          }
+          
+          if (lvalues > 0) {
+            auto &Context = tupleExpr->getType()->getASTContext();
+            tupleExpr->setType(TupleType::get(tupleElts, Context));
+            toType = toType->getRValueType();
+          }
+        }
+
         return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
                                           selected.choice.getTupleIndex(),
-                                          nameLoc,
-                                          simplifyType(expr->getType()));
+                                          nameLoc.getBaseNameLoc(), toType);
       }
 
       case OverloadChoiceKind::BaseType: {
@@ -2444,13 +2444,6 @@ namespace {
     }
     
   public:
-    Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
-      return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
-                                expr->getNameRange().Start,
-                                expr->isImplicit());
-    }
-    
-    
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
                                 expr->getNameLoc(), expr->isImplicit());
@@ -2666,7 +2659,8 @@ namespace {
       // to do this unconditionally here and then overwrite in the exception
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
-      expr->getSubExpr()->propagateLValueAccessKind(AccessKind::ReadWrite);
+      if (!expr->getSubExpr()->getType()->is<UnresolvedType>())
+        expr->getSubExpr()->propagateLValueAccessKind(AccessKind::ReadWrite);
       auto objectTy = expr->getSubExpr()->getType()->getRValueType();
 
       // The type is simply inout of whatever the lvalue's object type was.
@@ -3063,12 +3057,13 @@ namespace {
           tc.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
             .fixItRemove(SourceRange(expr->getLoc(),
                                  expr->getCastTypeLoc().getSourceRange().End));
-          return sub;
+
+        } else {
+          tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
+                      sub->getType(), toType)
+            .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
+                          "as");
         }
-        tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
-                    sub->getType(), toType)
-          .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
-                        "as");
 
         // Convert the subexpression.
         bool failed = tc.convertToType(sub, toType, cs.DC);
@@ -3264,7 +3259,7 @@ namespace {
         tc.diagnose(E->getLoc(), diag::missing_undefined_runtime);
         return nullptr;
       }
-      DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, SourceLoc(),
+      DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, DeclNameLoc(),
                                                  /*Implicit=*/true);
       StringRef msg = "attempt to evaluate editor placeholder";
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
@@ -3277,6 +3272,147 @@ namespace {
       (void) invalid;
       assert(!invalid && "conversion cannot fail");
       E->setSemanticExpr(callExpr);
+      return E;
+    }
+
+    Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+      // Dig out the reference to a declaration.
+      Expr *subExpr = E->getSubExpr();
+      ValueDecl *foundDecl = nullptr;
+      while (subExpr) {
+        // Declaration reference.
+        if (auto declRef = dyn_cast<DeclRefExpr>(subExpr)) {
+          foundDecl = declRef->getDecl();
+          break;
+        }
+
+        // Constructor reference.
+        if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(subExpr)) {
+          foundDecl = ctorRef->getDecl();
+          break;
+        }
+
+        // Member reference.
+        if (auto memberRef = dyn_cast<MemberRefExpr>(subExpr)) {
+          foundDecl = memberRef->getMember().getDecl();
+          break;
+        }
+
+        // Dynamic member reference.
+        if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(subExpr)) {
+          foundDecl = dynMemberRef->getMember().getDecl();
+          break;
+        }
+
+        // Look through parentheses.
+        if (auto paren = dyn_cast<ParenExpr>(subExpr)) {
+          subExpr = paren->getSubExpr();
+          continue;
+        }
+
+        // Look through "a.b" to "b".
+        if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(subExpr)) {
+          subExpr = dotSyntax->getRHS();
+          continue;
+        }
+
+        // Look through self-rebind expression.
+        if (auto rebindSelf = dyn_cast<RebindSelfInConstructorExpr>(subExpr)) {
+          subExpr = rebindSelf->getSubExpr();
+          continue;
+        }
+
+        // Look through optional binding within the monadic "?".
+        if (auto bind = dyn_cast<BindOptionalExpr>(subExpr)) {
+          subExpr = bind->getSubExpr();
+          continue;
+        }
+
+        // Look through optional evaluation of the monadic "?".
+        if (auto optEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+          subExpr = optEval->getSubExpr();
+          continue;
+        }
+
+        // Look through an implicit force-value.
+        if (auto force = dyn_cast<ForceValueExpr>(subExpr)) {
+          subExpr = force->getSubExpr();
+          continue;
+        }
+
+        // Look through implicit open-existential operations.
+        if (auto open = dyn_cast<OpenExistentialExpr>(subExpr)) {
+          if (open->isImplicit()) {
+            subExpr = open->getSubExpr();
+            continue;
+          }
+          break;
+        }
+
+        // Look to the referenced member in a self-application.
+        if (auto selfApply = dyn_cast<SelfApplyExpr>(subExpr)) {
+          subExpr = selfApply->getFn();
+          continue;
+        }
+
+        // Look through implicit conversions.
+        if (auto conversion = dyn_cast<ImplicitConversionExpr>(subExpr)) {
+          subExpr = conversion->getSubExpr();
+          continue;
+        }
+
+        // Look through explicit coercions.
+        if (auto coercion = dyn_cast<CoerceExpr>(subExpr)) {
+          subExpr = coercion->getSubExpr();
+          continue;
+        }
+
+        break;
+      }
+
+      if (!subExpr) return nullptr;
+
+      // If we didn't find any declaration at all, we're stuck.
+      auto &tc = cs.getTypeChecker();
+      if (!foundDecl) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
+          .highlight(subExpr->getSourceRange());
+        return E;
+      }
+
+      // If the declaration we found was not a method or initializer,
+      // complain.
+      auto func = dyn_cast<AbstractFunctionDecl>(foundDecl);
+      if (!func) {
+        tc.diagnose(E->getLoc(),
+                    isa<VarDecl>(foundDecl)
+                      ? diag::expr_selector_property
+                      : diag::expr_selector_not_method_or_init)
+          .highlight(subExpr->getSourceRange());
+        tc.diagnose(foundDecl, diag::decl_declared_here,
+                    foundDecl->getFullName());
+        return E;
+      }
+
+      // The declaration we found must be exposed to Objective-C.
+      if (!func->isObjC()) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
+                    isa<ConstructorDecl>(func))
+          .highlight(subExpr->getSourceRange());
+        if (foundDecl->getLoc().isValid()) {
+          tc.diagnose(foundDecl,
+                      diag::expr_selector_make_objc,
+                      isa<ConstructorDecl>(func))
+            .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+                         "@objc ");
+        } else {
+          tc.diagnose(foundDecl, diag::decl_declared_here,
+                      foundDecl->getFullName());
+        }
+        return E;
+      }
+
+      E->setMethod(func);
       return E;
     }
 
@@ -3344,6 +3480,107 @@ namespace {
     }
   };
 }
+
+
+/// Resolve a locator to the specific declaration it references, if possible.
+///
+/// \param cs The constraint system in which the locator will be resolved.
+///
+/// \param locator The locator to resolve.
+///
+/// \param findOvlChoice A function that searches for the overload choice
+/// associated with the given locator, or an empty optional if there is no such
+/// overload.
+///
+/// \returns the decl to which the locator resolved.
+///
+static ConcreteDeclRef
+resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
+   std::function<Optional<SelectedOverload>(ConstraintLocator *)> findOvlChoice,
+   std::function<ConcreteDeclRef (ValueDecl *decl,
+                                  Type openedType)> getConcreteDeclRef)
+{
+  assert(locator && "Null locator");
+  if (!locator->getAnchor())
+    return ConcreteDeclRef();
+
+  auto anchor = locator->getAnchor();
+  // Unwrap any specializations, constructor calls, implicit conversions, and
+  // '.'s.
+  // FIXME: This is brittle.
+  do {
+    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(anchor)) {
+      anchor = specialize->getSubExpr();
+      continue;
+    }
+
+    if (auto implicit = dyn_cast<ImplicitConversionExpr>(anchor)) {
+      anchor = implicit->getSubExpr();
+      continue;
+    }
+
+    if (auto identity = dyn_cast<IdentityExpr>(anchor)) {
+      anchor = identity->getSubExpr();
+      continue;
+    }
+
+    if (auto tryExpr = dyn_cast<AnyTryExpr>(anchor)) {
+      if (isa<OptionalTryExpr>(tryExpr))
+        break;
+
+      anchor = tryExpr->getSubExpr();
+      continue;
+    }
+
+    if (auto selfApply = dyn_cast<SelfApplyExpr>(anchor)) {
+      anchor = selfApply->getFn();
+      continue;
+    }
+
+    if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(anchor)) {
+      anchor = dotSyntax->getRHS();
+      continue;
+    }
+    break;
+  } while (true);
+  
+  // Simple case: direct reference to a declaration.
+  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
+    return dre->getDeclRef();
+    
+  // Simple case: direct reference to a declaration.
+  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
+    return mre->getMember();
+  
+  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
+    return ctorRef->getDeclRef();
+
+  if (isa<OverloadedDeclRefExpr>(anchor) ||
+      isa<OverloadedMemberRefExpr>(anchor) ||
+      isa<UnresolvedDeclRefExpr>(anchor)) {
+    // Overloaded and unresolved cases: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(anchor);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType);
+    }
+  }
+  
+  if (isa<UnresolvedMemberExpr>(anchor)) {
+    // Unresolved member: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(anchor,
+                           ConstraintLocator::UnresolvedMember);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType);
+    }
+  }
+
+  return ConcreteDeclRef();
+}
+
 
 /// \brief Given a constraint locator, find the owner of default arguments for
 /// that tuple, i.e., a FuncDecl.
@@ -3416,7 +3653,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
               
               return decl;
             })) {
-    return resolved.getDecl();
+    return resolved;
   }
 
   return nullptr;
@@ -4290,11 +4527,15 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     // If the element changed, rebuild a new ParenExpr.
     assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
     if (fromTupleExpr[0] != argParen->getSubExpr()) {
+      bool argParenImplicit = argParen->isImplicit();
       argParen = new (tc.Context) ParenExpr(argParen->getLParenLoc(),
                                             fromTupleExpr[0],
                                             argParen->getRParenLoc(),
                                             argParen->hasTrailingClosure(),
                                             fromTupleExpr[0]->getType());
+      if (argParenImplicit) {
+        argParen->setImplicit();
+      }
       arg = argParen;
     } else {
       // coerceToType may have updated the element type of the ParenExpr in
@@ -4719,7 +4960,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
       tc.validateDecl(fn);
       ConcreteDeclRef fnDeclRef(fn);
-      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef, expr->getLoc(),
+      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef,
+                                                 DeclNameLoc(expr->getLoc()),
                                                  /*Implicit=*/true);
       fnRef->setType(fn->getInterfaceType());
       Expr *call = new (tc.Context) CallExpr(fnRef, expr,
@@ -5116,7 +5358,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     // If there is no argument to the constructor function, then just pass in
     // the empty tuple.
     literal = TupleExpr::createEmpty(tc.Context, literal->getLoc(),
-                                     literal->getLoc(), /*implicit*/true);
+                                     literal->getLoc(),
+                                     /*implicit*/!literal->getLoc().isValid());
   } else {
     // Otherwise, figure out the type of the constructor function and coerce to
     // it.
@@ -5179,7 +5422,7 @@ static bool isNonFinalClass(Type type) {
 // constructor must be required.
 bool
 TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
-                                                     SourceLoc memberRefLoc,
+                                                     DeclNameLoc memberRefLoc,
                                                      AnyMetatypeType *metaTy,
                                                      ConstructorDecl *ctorDecl,
                                                      bool SuppressDiagnostics) {
@@ -5340,7 +5583,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   Expr *declRef = buildMemberRef(fn,
                                  selected->openedFullType,
                                  /*DotLoc=*/SourceLoc(),
-                                 decl, fn->getEndLoc(),
+                                 decl, DeclNameLoc(fn->getEndLoc()),
                                  selected->openedType,
                                  locator,
                                  ctorLocator,
@@ -6025,7 +6268,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     } while (current);
 
     if (fromRawCall) {
-      TC.diagnose(fromRawRef->getNameLoc(), 
+      TC.diagnose(fromRawRef->getNameLoc().getBaseNameLoc(), 
                   diag::migrate_from_raw_to_init)
         .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
                                   fromRawCall->getArg()->getStartLoc()),
@@ -6068,7 +6311,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (toRawCall) {
       TC.diagnose(toRawRef->getNameLoc(),
                   diag::migrate_to_raw_to_raw_value)
-        .fixItReplace(SourceRange(toRawRef->getNameLoc(),
+        .fixItReplace(SourceRange(toRawRef->getNameLoc().getBaseNameLoc(),
                                   toRawCall->getArg()->getEndLoc()),
                       "rawValue");
     } else {
@@ -6085,7 +6328,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     do {
       // We haven't found the reference to allZeros yet, look for it now.
       if ((allZerosRef = dyn_cast<UnresolvedDotExpr>(current))) {
-        if (allZerosRef->getName().str() == "allZeros")
+        if (allZerosRef->getName().isSimpleName(TC.Context.Id_allZeros))
           break;
         allZerosRef = nullptr;
       }
@@ -6096,8 +6339,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (allZerosRef) {
       TC.diagnose(allZerosRef->getNameLoc(),
                   diag::migrate_from_allZeros)
-        .fixItReplace(SourceRange(allZerosRef->getDotLoc(),
-                                  allZerosRef->getNameLoc()),
+        .fixItReplace(SourceRange(
+                        allZerosRef->getDotLoc(),
+                        allZerosRef->getNameLoc().getSourceRange().End),
                       "()");
     } else {
       // Diagnostic without Fix-It; we couldn't find what we needed.
@@ -6321,12 +6565,25 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
       ++i;
     }
 
+    // The tuple should have the source range enclosing its arguments unless
+    // they are invalid or there are no arguments.
+    SourceLoc TupleStartLoc = base->getStartLoc();
+    SourceLoc TupleEndLoc = base->getEndLoc();
+    if (arguments.size() > 0) {
+      SourceLoc AltStartLoc = arguments.front()->getStartLoc();
+      SourceLoc AltEndLoc = arguments.back()->getEndLoc();
+      if (AltStartLoc.isValid() && AltEndLoc.isValid()) {
+        TupleStartLoc = AltStartLoc;
+        TupleEndLoc = AltEndLoc;
+      }
+    }
+
     arg = TupleExpr::create(Context,
-                            base->getStartLoc(),
+                            TupleStartLoc,
                             arguments,
                             names,
                             { },
-                            base->getEndLoc(),
+                            TupleEndLoc,
                             /*hasTrailingClosure=*/false,
                             /*Implicit=*/true,
                             TupleType::get(elementTypes, Context));
@@ -6354,7 +6611,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   auto memberRef = rewriter.buildMemberRef(base, openedFullType,
                                            base->getStartLoc(),
-                                           witness, base->getEndLoc(),
+                                           witness,
+                                           DeclNameLoc(base->getEndLoc()),
                                            openedType, locator, locator,
                                            /*Implicit=*/true,
                                            AccessSemantics::Ordinary,
@@ -6436,7 +6694,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     
     // Form a reference to this member.
     Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
-                                              witness, expr->getEndLoc(),
+                                              witness,
+                                              DeclNameLoc(expr->getEndLoc()),
                                               /*Implicit=*/true);
     bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
     if (failed) {
@@ -6474,7 +6733,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
   // Form a reference to the builtin method.
   Expr *memberRef = new (ctx) MemberRefExpr(expr, SourceLoc(),
-                                            builtinMethod, expr->getLoc(),
+                                            builtinMethod,
+                                            DeclNameLoc(expr->getLoc()),
                                             /*Implicit=*/true);
   bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
   assert(!failed && "Could not reference witness?");
@@ -6530,7 +6790,7 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   Substitution sub(unwrappedOptionalType, {});
   ConcreteDeclRef fnSpecRef(ctx, fn, sub);
   auto *fnRef =
-      new (ctx) DeclRefExpr(fnSpecRef, SourceLoc(), /*Implicit=*/true);
+      new (ctx) DeclRefExpr(fnSpecRef, DeclNameLoc(), /*Implicit=*/true);
 
   TypeSubstitutionMap subMap;
   auto genericParam = fn->getGenericSignatureOfContext()->getGenericParams()[0];

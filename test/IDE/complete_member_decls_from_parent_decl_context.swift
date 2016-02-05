@@ -31,6 +31,9 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_E_1 | FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_E_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SR627_SUBCLASS | FileCheck %s -check-prefix=SR627_SUBCLASS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SR627_SUB_SUBCLASS | FileCheck %s -check-prefix=SR627_SUB_SUBCLASS
+
 //===---
 //===--- Test that we can code complete in methods, and correctly distinguish
 //===--- static and non-static contexts.
@@ -584,3 +587,23 @@ func testOuterE() {
 // NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc2()[#Void#]; name=dFunc2()
 // NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc1()[#Void#]; name=dFunc1()
 // NESTED_NOMINAL_DECL_E_1: End completions
+
+class SR627_BaseClass<T> {
+  func myFunction(x: T) -> T? {
+    return nil
+  }
+}
+
+class SR627_Subclass: SR627_BaseClass<String> {
+  #^SR627_SUBCLASS^#
+// SR627_SUBCLASS: Begin completions
+// SR627_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(x: String) -> String? {|}; name=myFunction(x: String) -> String?
+// SR627_SUBCLASS: End completions
+}
+
+class SR627_SubSubclass: SR627_Subclass {
+  #^SR627_SUB_SUBCLASS^#
+  // SR627_SUB_SUBCLASS: Begin completions
+  // SR627_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(x: String) -> String? {|}; name=myFunction(x: String) -> String?
+  // SR627_SUB_SUBCLASS: End completions
+}

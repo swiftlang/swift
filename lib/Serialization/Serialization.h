@@ -1,4 +1,4 @@
-//===--- Serialization.h - Read and write Swift modules -------------------===//
+//===--- Serialization.h - Read and write Swift modules ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

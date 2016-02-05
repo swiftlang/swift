@@ -109,15 +109,15 @@ private:
                             llvm::SmallVectorImpl<ValueBase *> &Operands) {
     switch (Term->getTermKind()) {
     case TermKind::BranchInst:
-      return Operands.push_back(cast<BranchInst>(Term)->getArg(Index).getDef());
+      return Operands.push_back(cast<BranchInst>(Term)->getArg(Index));
 
     case TermKind::CondBranchInst: {
       auto *CBI = cast<CondBranchInst>(Term);
       if (SuccBB == CBI->getTrueBB())
-        return Operands.push_back(CBI->getTrueArgs()[Index].getDef());
+        return Operands.push_back(CBI->getTrueArgs()[Index]);
       assert(SuccBB == CBI->getFalseBB() &&
              "Block is not a successor of terminator!");
-      Operands.push_back(CBI->getFalseArgs()[Index].getDef());
+      Operands.push_back(CBI->getFalseArgs()[Index]);
       return;
     }
 
@@ -127,7 +127,7 @@ private:
     case TermKind::CheckedCastAddrBranchInst:
     case TermKind::DynamicMethodBranchInst:
       assert(Index == 0 && "Expected argument index to always be zero!");
-      return Operands.push_back(Term->getOperand(0).getDef());
+      return Operands.push_back(Term->getOperand(0));
 
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
@@ -137,7 +137,7 @@ private:
 
     case TermKind::TryApplyInst:
       for (auto &O : cast<TryApplyInst>(Term)->getAllOperands())
-        Operands.push_back(O.get().getDef());
+        Operands.push_back(O.get());
       return;
     }
   }
@@ -146,7 +146,7 @@ private:
                               llvm::SmallVectorImpl<ValueBase *> &Operands) {
     if (auto *I = dyn_cast<SILInstruction>(User)) {
       for (auto &O : I->getAllOperands())
-        Operands.push_back(O.get().getDef());
+        Operands.push_back(O.get());
       return;
     }
 

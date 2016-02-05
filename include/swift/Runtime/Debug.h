@@ -1,4 +1,4 @@
-//===--- Debug.h - Swift Runtime debug helpers ----------------------------===//
+//===--- Debug.h - Swift Runtime debug helpers ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,9 +18,9 @@
 #define _SWIFT_RUNTIME_DEBUG_HELPERS_
 
 #include <llvm/Support/Compiler.h>
+#include <stdint.h>
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <stdint.h>
 
 #define CRASH_REPORTER_CLIENT_HIDDEN __attribute__((visibility("hidden")))
 #define CRASHREPORTER_ANNOTATIONS_VERSION 5
@@ -81,7 +81,7 @@ static inline void crash(const char *message) {
 // but makes no attempt to preserve register state.
 LLVM_ATTRIBUTE_NORETURN
 extern void
-fatalError(const char *format, ...);
+fatalError(uint32_t flags, const char *format, ...);
 
 struct Metadata;
 
@@ -102,7 +102,7 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                          const char *message = nullptr);
 
 extern "C"
-void swift_reportError(const char *message);
+void swift_reportError(uint32_t flags, const char *message);
 
 // namespace swift
 }

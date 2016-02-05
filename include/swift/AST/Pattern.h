@@ -88,6 +88,8 @@ public:
   /// to the user of the compiler in any way.
   static StringRef getKindName(PatternKind K);
 
+  /// A pattern is implicit if it is compiler-generated and there
+  /// exists no source code for it.
   bool isImplicit() const { return PatternBits.isImplicit; }
   void setImplicit() { PatternBits.isImplicit = true; }
 

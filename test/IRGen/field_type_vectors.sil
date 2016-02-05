@@ -5,38 +5,38 @@
 import Swift
 
 // CHECK-LABEL: @_TMnV18field_type_vectors3Foo = constant 
-// CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 struct Foo {
   var x: Int
 }
 
 // CHECK-LABEL: @_TMnV18field_type_vectors3Bar = constant
-// CHECK:         %swift.type** (%swift.type*)* [[BAR_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[BAR_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPV18field_type_vectors3Bar = global
 // -- There should be 5 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, { {{[^}]*}} }*, %swift.type*, i64, %swift.type*, %swift.type**
+// CHECK:         i64, <{ {{[^}]*}} }>*, %swift.type*, i64, %swift.type*, %swift.type**
 struct Bar<T> {
   var y: Int
 }
 
 // CHECK-LABEL: @_TMnV18field_type_vectors3Bas = constant
-// CHECK:         %swift.type** (%swift.type*)* [[BAS_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[BAS_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPV18field_type_vectors3Bas = global
 // -- There should be 7 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, { {{[^}]*}} }*, %swift.type*, i64, i64, %swift.type*, %swift.type*, %swift.type**
+// CHECK:         i64, <{ {{[^}]*}} }>*, %swift.type*, i64, i64, %swift.type*, %swift.type*, %swift.type**
 struct Bas<T, U> {
   var foo: Foo
   var bar: Bar<T>
 }
 
 // CHECK-LABEL: @_TMnC18field_type_vectors3Zim = constant
-// CHECK:         %swift.type** (%swift.type*)* [[ZIM_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[ZIM_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPC18field_type_vectors3Zim = global
 // -- There should be 14 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
+// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, <{ {{[^}]*}} }>*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
 class Zim<T, U> {
   var foo: Foo? = nil
   var bar: Bar<T>? = nil
@@ -47,11 +47,11 @@ sil_vtable Zim {}
 sil @_TFC18field_type_vectors3ZimcU___fMGS0_Q_Q0__FT_GS0_Q_Q0__ : $@convention(method) <T, U> (@owned Zim<T, U>) -> @owned Zim<T, U>
 
 // CHECK-LABEL: @_TMnC18field_type_vectors4Zang = constant
-// CHECK:         %swift.type** (%swift.type*)* [[ZANG_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[ZANG_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPC18field_type_vectors4Zang = global
 // -- There should be 16 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type*, i64, %swift.type**
+// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, <{ {{[^}]*}} }>*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type*, i64, %swift.type**
 class Zang<V>: Zim<V, V> {
   var zung: Int = 0
 }
@@ -98,8 +98,7 @@ sil_vtable StorageQualified {}
 // CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 // CHECK:   br
 // CHECK:   store {{.*}} @_TMfV18field_type_vectors3Foo
-// CHECK:   [[T:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   call %swift.type* @swift_getGenericMetadata1({{.*}} @_TMPV18field_type_vectors3Bar {{.*}}, i8* [[T]])
+// CHECK:   call %swift.type* @_TMaV18field_type_vectors3Bar(%swift.type* %T)
 
 // CHECK: define private %swift.type** [[ZIM_TYPES_ACCESSOR]](%swift.type* %"Zim<T, U>")
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %"Zim<T, U>" to %swift.type***

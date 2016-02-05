@@ -73,31 +73,6 @@ bb0(%0 : $B, %1 : $*Agg1):
   %11 = return %10 : $()
 }
 
-// CHECK-LABEL: sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
-// CHECK: bb0([[INPUT_PTR1:%[0-9]+]] : $*Builtin.Int32, [[INPUT_PTR2:%[0-9]+]] : $*Builtin.Int32):
-// CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $Builtin.Int32
-// CHECK-NEXT: [[INT_LITERAL:%[0-9]+]] = integer_literal
-// CHECK-NEXT: [[INT_LOADED:%[0-9]+]] = load [[INPUT_PTR1]] : $*Builtin.Int32
-// CHECK-NEXT: store [[INT_LITERAL]] to [[ALLOCA]] : $*Builtin.Int32
-// CHECK-NEXT: store [[INT_LITERAL]] to [[INPUT_PTR2]] : $*Builtin.Int32
-// CHECK-NEXT: dealloc_stack [[ALLOCA]]
-// CHECK-NEXT: tuple ([[INT_LOADED]] : $Builtin.Int32, [[INT_LOADED]] : $Builtin.Int32, [[INT_LITERAL]] : $Builtin.Int32)
-// CHECK-NEXT: return
-sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
-bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
-  %2 = alloc_stack $Builtin.Int32
-  %3 = integer_literal $Builtin.Int32, 32
-  store %3 to %2 : $*Builtin.Int32
-  %4 = load %0 : $*Builtin.Int32
-  store %3 to %1 : $*Builtin.Int32
-  store %3 to %2 : $*Builtin.Int32
-  %5 = load %0 : $*Builtin.Int32
-  store %3 to %1 : $*Builtin.Int32
-  %6 = load %2 : $*Builtin.Int32
-  dealloc_stack %2 : $*Builtin.Int32
-  %7 = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32)
-  return %7 : $(Builtin.Int32, Builtin.Int32, Builtin.Int32)
-}
 
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
 // CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
@@ -283,58 +258,6 @@ bb0(%0 : $C):
   return %9999 : $()
 }
 
-// Check that we can perform partial load forwarding.
-// CHECK-LABEL: sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
-// CHECK: bb0([[INPUT_PTR:%.*]] : $*AA):
-// CHECK: [[INPUT_GEP1:%.*]] = struct_element_addr [[INPUT_PTR]] : $*AA, #AA.a
-// CHECK: [[INPUT_GEP2:%.*]] = struct_element_addr [[INPUT_GEP1]] : $*A, #A.i
-// CHECK: [[LOAD_INPUT_GEP2:%.*]] = load [[INPUT_GEP2]]
-// CHECK: [[LOAD_INPUT:%.*]] = load [[INPUT_PTR]]
-// CHECK: [[USE_FUN:%.*]] = function_ref @use
-// CHECK: apply [[USE_FUN]]([[LOAD_INPUT_GEP2]])
-// CHECK: apply [[USE_FUN]]([[LOAD_INPUT_GEP2]])
-// CHECK: [[EXT_LOAD_INPUT:%.*]] = struct_extract [[LOAD_INPUT]] : $AA, #AA.i
-// CHECK: apply [[USE_FUN]]([[EXT_LOAD_INPUT]])
-// CHECK: [[ALLOC_STACK:%.*]] = alloc_stack $AA
-// CHECK: [[STACK_GEP1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*AA, #AA.a
-// CHECK: [[STACK_GEP2:%.*]] = struct_element_addr [[STACK_GEP1]] : $*A, #A.i
-// CHECK: [[LOAD_STACK_GEP2:%.*]] = load [[STACK_GEP2]]
-// CHECK: apply [[USE_FUN]]([[LOAD_STACK_GEP2]])
-// CHECK: apply [[USE_FUN]]([[LOAD_STACK_GEP2]])
-sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
-bb0(%0 : $*AA):
-  %1 = struct_element_addr %0 : $*AA, #AA.a
-  %2 = struct_element_addr %1 : $*A, #A.i
-  %3 = load %2 : $*Builtin.Int32
-
-  %4 = load %0 : $*AA
-  %5 = struct_extract %4 : $AA, #AA.a
-  %6 = struct_extract %5 : $A, #A.i
-  %7 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
-  apply %7(%3) : $@convention(thin) (Builtin.Int32) -> ()
-  apply %7(%6) : $@convention(thin) (Builtin.Int32) -> ()
-
-  %8 = struct_extract %4 : $AA, #AA.i
-  apply %7(%8) : $@convention(thin) (Builtin.Int32) -> ()
-
-  %9 = alloc_stack $AA
-
-  %10 = struct_element_addr %9 : $*AA, #AA.a
-  %11 = struct_element_addr %10 : $*A, #A.i
-  %12 = load %11 : $*Builtin.Int32
-
-  %13 = load %9 : $*AA
-  %14 = struct_extract %13 : $AA, #AA.a
-  %15 = struct_extract %14 : $A, #A.i
-
-  apply %7(%12) : $@convention(thin) (Builtin.Int32) -> ()
-  apply %7(%15) : $@convention(thin) (Builtin.Int32) -> ()
-
-  dealloc_stack %9 : $*AA
-
-  %9999 = tuple()
-  return %9999 : $()
-}
 
 /// Make sure that we don't crash and don't optimize here.
 // CHECK-LABEL: sil @covering_store_with_unchecked_addr : $@convention(thin) (C, C) -> () {
@@ -360,33 +283,6 @@ bb3:
   dealloc_stack %2 : $*C
   %9999 = tuple()
   return %9999 : $()
-}
-
-/// Make sure we don't ignore aliasing stores.
-// CHECK-LABEL: sil @aliasing_store
-// CHECK:  [[ALLOC:%.*]] = alloc_stack $A
-// CHECK:  [[CONST0:%.*]] = integer_literal $Builtin.Int32, 0
-// CHECK:  [[STRUCT:%.*]] = struct $A ([[CONST0]] : $Builtin.Int32)
-// CHECK:  store [[STRUCT]] to [[ALLOC]] : $*A
-// CHECK:  [[STRUCTADDR:%.*]] = struct_element_addr [[ALLOC]] : $*A, #A.i
-// CHECK:  [[CONST1:%.*]] = integer_literal $Builtin.Int32, 1
-// CHECK:  store [[CONST1]] to [[STRUCTADDR]] : $*Builtin.Int32
-// CHECK:  [[LD:%.*]] = load [[ALLOC]] : $*A
-// CHECK:  store [[LD]] to %0 : $*A
-sil @aliasing_store : $@convention(thin) (@inout A) -> () {
-bb0(%0: $*A):
-  %1 = alloc_stack $A
-  %2 = integer_literal $Builtin.Int32, 0
-  %3 = struct $A (%2 : $Builtin.Int32)
-  store %3 to %1 : $*A
-  %4 = struct_element_addr %1 : $*A, #A.i
-  %5 = integer_literal $Builtin.Int32, 1
-  store  %5 to %4 : $*Builtin.Int32
-  %6 = load %1 : $*A
-  store %6 to %0: $*A
-  dealloc_stack %1 : $*A
-  %7 = tuple()
-  return %7 : $()
 }
 
 /// Make sure that we properly invalidate %3 in the following situation.

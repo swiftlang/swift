@@ -208,6 +208,9 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
+  /// Emit field type records for nominal types for reflection purposes.
+  void emitReflectionMetadataRecords();
+
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
@@ -323,6 +326,10 @@ public:
   /// signatures of Objective-C methods and C functions.
   CodeGenABITypes *ABITypes;
 
+  /// A global variable which stores the hash of the module. Used for
+  /// incremental compilation.
+  llvm::GlobalVariable *ModuleHash;
+
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
@@ -389,8 +396,12 @@ public:
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::StructType *ProtocolConformanceRecordTy;
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
+  llvm::StructType *NominalTypeDescriptorTy;
+  llvm::PointerType *NominalTypeDescriptorPtrTy;
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
+  llvm::StructType *FieldDescriptorTy;
+  llvm::PointerType *FieldDescriptorPtrTy;
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
@@ -419,6 +430,11 @@ public:
   }
   Alignment getTypeMetadataAlignment() const {
     return getPointerAlignment();
+  }
+
+  Size::int_type getOffsetInWords(Size offset) {
+    assert(offset.isMultipleOf(getPointerSize()));
+    return offset / getPointerSize();
   }
 
   llvm::Type *getReferenceType(ReferenceCounting style);
@@ -523,7 +539,7 @@ public:
     return *ClangASTContext;
   }
 
-  bool isResilient(Decl *decl, ResilienceExpansion expansion);
+  bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
@@ -543,7 +559,11 @@ private:
   
 //--- Globals ---------------------------------------------------------------
 public:
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8);
+  std::pair<llvm::GlobalVariable *, llvm::Constant *>
+  createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
+                       StringRef sectionName = "");
+  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
+                                        bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
@@ -552,6 +572,7 @@ public:
   llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                            ForDefinition_t forDefinition);
   void addUsedGlobal(llvm::GlobalValue *global);
+  void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addProtocolConformanceRecord(NormalProtocolConformance *conformance);
 
@@ -560,6 +581,12 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
+  llvm::Constant *emitReflectionMetadataRecords();
+  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
+  llvm::Constant *getAddrOfFieldName(StringRef Name);
+  StringRef getReflectionMetadataSectionName();
+  StringRef getReflectionStringsSectionName();
+  StringRef getReflectionTypeRefSectionName();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -571,8 +598,13 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::StringMap<llvm::Constant*> GlobalStrings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
+    GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
+    StringsForTypeRef;
+  llvm::DenseMap<CanType, llvm::GlobalVariable*> TypeRefs;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>> FieldNames;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
 
@@ -581,6 +613,14 @@ private:
   /// forcing visibility of symbols which may otherwise be optimized
   /// out.
   SmallVector<llvm::WeakVH, 4> LLVMUsed;
+
+  /// LLVMCompilerUsed - List of global values which are required to be
+  /// present in the object file; bitcast to i8*. This is used for
+  /// forcing visibility of symbols which may otherwise be optimized
+  /// out.
+  ///
+  /// Similar to LLVMUsed, but emitted as llvm.compiler.used.
+  SmallVector<llvm::WeakVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
   ///
@@ -599,6 +639,8 @@ private:
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
+  /// Collection of nominal types to generate field metadata records.
+  SmallVector<const NominalTypeDecl *, 4> NominalTypeDecls;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -714,6 +756,7 @@ public:
   void emitClangDecl(clang::Decl *decl);
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
+  void addNominalTypeDecl(const NominalTypeDecl *Decl);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeSet &attrs);
@@ -745,6 +788,10 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfGenericTypeMetadataAccessFunction(
+                                             NominalTypeDecl *nominal,
+                                             ArrayRef<llvm::Type *> genericArgs,
+                                             ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
@@ -805,6 +852,10 @@ public:
   enum class DirectOrGOT {
     Direct, GOT,
   };
+
+  /// Mark a global variable as true-const by putting it in the text section of
+  /// the binary.
+  void setTrueConstGlobal(llvm::GlobalVariable *var);
 
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,

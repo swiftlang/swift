@@ -8,6 +8,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # POSIX APIs it imports the Darwin module on Apple platforms, so it can't
     # be built separately from the SDK overlay.
     add_subdirectory(StdlibUnittest)
+    add_subdirectory(StdlibCollectionUnittest)
     add_subdirectory(StdlibUnittestFoundationExtras)
     add_subdirectory(SwiftPrivateDarwinExtras)
     add_subdirectory(SwiftPrivatePthreadExtras)
@@ -16,6 +17,7 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
   add_subdirectory(StdlibUnittest)
+  add_subdirectory(StdlibCollectionUnittest)
   add_subdirectory(SwiftPrivateDarwinExtras)
   add_subdirectory(SwiftPrivatePthreadExtras)
 endif()

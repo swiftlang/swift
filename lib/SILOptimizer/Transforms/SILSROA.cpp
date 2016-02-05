@@ -47,8 +47,6 @@ class SROAMemoryUseAnalyzer {
   llvm::SmallVector<LoadInst *, 4> Loads;
   // Stores to AI.
   llvm::SmallVector<StoreInst *, 4> Stores;
-  // Dealloc instructions for AI.
-  llvm::SmallVector<DeallocStackInst *, 4> Deallocs;
   // Instructions which extract from aggregates.
   llvm::SmallVector<SILInstruction *, 4> ExtractInsts;
 
@@ -146,7 +144,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     // If we store the alloca pointer, we cannot analyze its uses so bail...
     // It is ok if we store into the alloca pointer though.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
-      if (SI->getDest().getDef() == AI) {
+      if (SI->getDest() == AI) {
         DEBUG(llvm::dbgs() << "        Found a store into the "
               "projection.\n");
         Stores.push_back(SI);
@@ -238,7 +236,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
       Elements.push_back(B.createLoad(LI->getLoc(), NewAI));
     auto *Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
                           Elements);
-    SILValue(LI).replaceAllUsesWith(Agg);
+    LI->replaceAllUsesWith(Agg);
     LI->eraseFromParent();
   }
 
@@ -254,14 +252,14 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Forward any field extracts to the new allocation.
   for (auto *Ext : ExtractInsts) {
-    SILValue NewValue = NewAllocations[getEltNoForProjection(Ext)];
-    SILValue(Ext).replaceAllUsesWith(NewValue);
+    AllocStackInst *NewValue = NewAllocations[getEltNoForProjection(Ext)];
+    Ext->replaceAllUsesWith(NewValue);
     Ext->eraseFromParent();
   }
 
   // Find all dealloc instructions for AI and then chop them up.
   llvm::SmallVector<DeallocStackInst *, 4> ToRemove;
-  for (auto *Operand : getNonDebugUses(SILValue(AI, 0))) {
+  for (auto *Operand : getNonDebugUses(SILValue(AI))) {
     SILInstruction *User = Operand->getUser();
     SILBuilderWithScope B(User);
 

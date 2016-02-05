@@ -141,7 +141,7 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(a: Int)(b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func test2(a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}}
  a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b
@@ -583,9 +583,14 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  _ = __FILE__
-  _ = __LINE__ + __COLUMN__
-  var _: UInt8 = __LINE__ + __COLUMN__
+  _ = __FILE__  // expected-warning {{__FILE__ is deprecated and will be removed in Swift 3, please use #file}}
+  _ = __LINE__  // expected-warning {{__LINE__ is deprecated and will be removed in Swift 3, please use #line}}
+  _ = __COLUMN__  // expected-warning {{__COLUMN__ is deprecated and will be removed in Swift 3, please use #column}}
+  _ = __DSO_HANDLE__  // expected-warning {{__DSO_HANDLE__ is deprecated and will be removed in Swift 3, please use #dsohandle}}
+
+  _ = #file
+  _ = #line + #column
+  var _: UInt8 = #line + #column
 }
 
 //===----------------------------------------------------------------------===//
@@ -646,13 +651,13 @@ func unusedExpressionResults() {
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{expression type '[_]' is ambiguous without more context}}
+  var c = []  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{expression type '[_ : _]' is ambiguous without more context}}
+  var c = [:]  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
 }
 
 func invalidDictionaryLiteral() {
@@ -667,6 +672,8 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected key expression in dictionary literal}}
 }
 
+    
+// FIXME: The issue here is a type compatibility problem, there is no ambiguity.
 [4].joinWithSeparator([1]) // expected-error {{type of expression is ambiguous without more context}}
 [4].joinWithSeparator([[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
 
@@ -684,10 +691,10 @@ nil != Int.self // expected-error {{binary operator '!=' cannot be applied to op
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
   a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{4-5=}}
-  a?._getMirror()
+  a?.customMirror()
 
   b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
-  b?._getMirror()
+  b?.customMirror()
 
   var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }
@@ -827,5 +834,11 @@ func swift22_deprecation_increment_decrement() {
   _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
 }
 
-
-
+// SR-628 mixing lvalues and rvalues in tuple expression
+var x = 0
+var y = 1
+let _ = (x, x.successor()).0
+let _ = (x, 3).1
+(x,y) = (2,3)
+(x,4) = (1,2) // expected-error {{cannot assign to value: function call returns immutable value}}
+(x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}

@@ -1,4 +1,4 @@
-//===--- ConcreteDeclRef.cpp - Reference to a concrete decl -----*- C++ -*-===//
+//===--- ConcreteDeclRef.cpp - Reference to a concrete decl ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

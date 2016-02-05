@@ -148,8 +148,9 @@ struct MaterializeForSetEmitter {
       // When we're emitting a standard implementation, use direct semantics.
       // If we used TheAccessSemantics::Ordinary here, the only downside would
       // be unnecessary vtable dispatching for class materializeForSets.
-      if (WitnessStorage->hasStorage() ||
-          WitnessStorage->hasAddressors())
+      if (!WitnessStorage->hasObservers() &&
+          (WitnessStorage->hasStorage() ||
+           WitnessStorage->hasAddressors()))
         TheAccessSemantics = AccessSemantics::DirectToStorage;
       else if (WitnessStorage->hasClangNode() ||
                WitnessStorage->getAttrs().hasAttribute<NSManagedAttr>())
@@ -242,7 +243,7 @@ struct MaterializeForSetEmitter {
     // Eagerly loading here could cause an unnecessary
     // load+materialize in some cases, but it's not really important.
     SILValue selfValue = self.getValue();
-    if (selfValue.getType().isAddress()) {
+    if (selfValue->getType().isAddress()) {
       selfValue = gen.B.createLoad(loc, selfValue);
     }
 
@@ -449,7 +450,6 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
 
   // Translate and reabstract the index values by recursively walking
   // the abstracted index type.
-  SmallVector<ManagedValue, 4> translatedIndices;
   translateIndices(gen, loc, pattern, substIndicesType,
                    sourceIndices, result);
   assert(sourceIndices.empty() && "index value not claimed!");
@@ -457,9 +457,8 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
   return result;
 }
 
-static AnyFunctionType *getMaterializeForSetCallbackType(ASTContext &ctx,
-                                                         Type selfType,
-                                            GenericParamList *genericParams) {
+static FunctionType *getMaterializeForSetCallbackType(ASTContext &ctx,
+                                                      Type selfType) {
   //       (inout storage: Builtin.ValueBuffer,
   //        inout self: Self,
   //        @thick selfType: Self.Type) -> ()
@@ -474,11 +473,7 @@ static AnyFunctionType *getMaterializeForSetCallbackType(ASTContext &ctx,
   FunctionType::ExtInfo extInfo = FunctionType::ExtInfo()
                      .withRepresentation(FunctionType::Representation::Thin);
 
-  if (genericParams) {
-    return PolymorphicFunctionType::get(input, result, genericParams, extInfo);
-  } else {
-    return FunctionType::get(input, result, extInfo);
-  }
+  return FunctionType::get(input, result, extInfo);
 }
 
 static Type getSelfTypeForCallbackDeclaration(FuncDecl *witness) {
@@ -509,8 +504,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
                         /*discriminator*/ 0,
                         /*context*/ Witness);
     closure.setType(getMaterializeForSetCallbackType(ctx,
-                                 getSelfTypeForCallbackDeclaration(Witness),
-                                                     nullptr));
+                                 getSelfTypeForCallbackDeclaration(Witness)));
     closure.getCaptureInfo().setGenericParamCaptures(true);
 
     Mangle::Mangler mangler;
@@ -529,11 +523,16 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
   Type selfMetatypeType = MetatypeType::get(SelfInterfaceType,
                                             MetatypeRepresentation::Thick);
 
-  // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
-  // selfMetatypeType.
-  if (auto metatype = selfType->getAs<MetatypeType>())
-    if (!metatype->hasRepresentation())
-      selfType = SGM.getLoweredType(metatype).getSwiftRValueType();
+  {
+    GenericContextScope scope(SGM.Types, GenericSig);
+
+    // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
+    // selfMetatypeType.
+    if (auto metatype = selfType->getAs<MetatypeType>()) {
+      if (!metatype->hasRepresentation())
+        selfType = SGM.getLoweredType(metatype).getSwiftRValueType();
+    }
+  }
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {

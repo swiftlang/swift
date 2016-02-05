@@ -55,7 +55,7 @@ static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
-  if (Ptr.getType().isReferenceCounted(B.getModule()))
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
     return B.createStrongRetain(Loc, Ptr);
 
   // Otherwise, create the retain_value.
@@ -71,7 +71,7 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   auto Loc = SILFileLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create a strong_release.
-  if (Ptr.getType().isReferenceCounted(B.getModule()))
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
     return B.createStrongRelease(Loc, Ptr);
 
   // Otherwise create a release value.

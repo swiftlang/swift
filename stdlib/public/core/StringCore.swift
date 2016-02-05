@@ -680,7 +680,7 @@ extension _StringCore : RangeReplaceableCollection {
     var width = elementWidth
     if width == 1 {
       if let hasNonAscii = s._preprocessingPass({
-          s in s.contains { $0 > 0x7f }
+          s.contains { $0 > 0x7f }
         }) {
         width = hasNonAscii ? 2 : 1
       }

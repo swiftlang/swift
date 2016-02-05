@@ -1,4 +1,4 @@
-//===--- Reverse.swift - Lazy sequence reversal ---------------*- swift -*-===//
+//===--- Reverse.swift - Lazy sequence reversal ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -100,7 +100,7 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
 public protocol _ReverseCollection : Collection {
   associatedtype Index : ReverseIndexProtocol
   associatedtype Base : Collection
-  var _base: Base {get}
+  var _base: Base { get }
 }
 
 extension Collection

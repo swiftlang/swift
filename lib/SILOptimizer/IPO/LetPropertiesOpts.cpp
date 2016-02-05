@@ -98,7 +98,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
     Dest->getParent()->push_front(Cloned);
     Cloned->moveBefore(Dest);
     SILClonerWithScopes<InstructionsCloner>::postProcess(Orig, Cloned);
-    AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+    AvailVals.push_back(std::make_pair(Orig, Cloned));
   }
 
   // Clone all instructions from Insns into DestBB
@@ -222,12 +222,11 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
 
 /// Compare to SILValues structurally.
 static bool CmpSILValues(SILValue LHS, SILValue RHS) {
-  if (LHS.getResultNumber() != RHS.getResultNumber() ||
-      LHS.getType() != RHS.getType())
+  if (LHS->getType() != RHS->getType())
     return false;
 
-  auto L = dyn_cast<SILInstruction>(LHS.getDef());
-  return L->isIdenticalTo(dyn_cast<SILInstruction>(RHS.getDef()), CmpSILValues);
+  auto L = dyn_cast<SILInstruction>(LHS);
+  return L->isIdenticalTo(dyn_cast<SILInstruction>(RHS), CmpSILValues);
 };
 
 /// Compare two sequences of SIL instructions. They should be structurally equivalent.

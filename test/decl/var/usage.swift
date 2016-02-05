@@ -12,13 +12,9 @@ func basicTests() -> Int {
   return y
 }
 
-// expected-error@+2 {{Use of 'var' binding here is not allowed}} {{41-45=}}
-// expected-error@+1 {{Use of 'var' binding here is not allowed}} {{54-58=}}
-func mutableParameter(a : Int, h : Int, var i : Int, var j: Int, 
-       var g : Int) -> Int { // expected-error {{Use of 'var' binding here is not allowed}} {{8-12=}}
-  // expected-error@+1 {{left side of mutating operator isn't mutable: 'g' is a 'let' constant}}
-  g += 1
-  // expected-error@+1 {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+func mutableParameter(a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{parameters may not have the 'var' specifier}}
+  i += 1
+  var j = j
   swap(&i, &j)
   return i+g
 }
@@ -102,11 +98,13 @@ func testSubscript() -> [Int] {
 }
 
 
-func testTuple(var x : Int) -> Int { // expected-error {{Use of 'var' binding here is not allowed}} {{16-19=}}
+func testTuple(x : Int) -> Int {
+  var x = x
   var y : Int  // Ok, stored by a tuple
   
-  // expected-error@+1 {{cannot assign to value: 'x' is a 'let' constant}}
   (x, y) = (1,2)
+  _ = x
+  _ = y
   return y
 }
   
@@ -166,9 +164,10 @@ protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
 }
-func testOpenExistential(var x: Fooable, // expected-error {{Use of 'var' binding here is not allowed}} {{26-29=}}
+func testOpenExistential(x: Fooable,
                          y: Fooable) {
-  // expected-error@+1 {{cannot use mutating member on immutable value}}
+  var x = x
+  let y = y
   x.mutFoo()
   y.immutFoo()
 }
@@ -177,48 +176,24 @@ func testOpenExistential(var x: Fooable, // expected-error {{Use of 'var' bindin
 func couldThrow() throws {}
 
 func testFixitsInStatementsWithPatterns(a : Int?) {
-  if var b = a,    // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
-      var b2 = a {  // expected-error {{Use of 'var' binding here is not allowed}} {{7-10=let}}
-    b = 1
-    b2 = 1
+  if var b = a,    // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{6-9=let}}
+      var b2 = a {   // expected-warning {{variable 'b2' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
     _ = b
     _ = b2
   }
-
-  var g = [1,2,3].iterator()
-  // FIXME: rdar://problem/23378003
-  // This will eventually be an error.
-  while var x = g.next() { // expected-error {{Use of 'var' binding here is not allowed}} {{9-12=let}}
-    x = 0
-    _ = x
-  }
-
-  guard var y = Optional.Some(1) else { // expected-error {{Use of 'var' binding here is not allowed}} {{9-12=let}}
-    return
-  }
-  y = 0
-  _ = y
-
-  for var b in [42] {   // expected-error {{Use of 'var' binding here is not allowed}} {{7-11=}}
-    b = 42
-    _ = b
-  }
-
-  for let b in [42] {   // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
+  
+  for var b in [42] {   // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
     _ = b
   }
 
   do {
     try couldThrow()
-  } catch var err {  // expected-error {{Use of 'var' binding here is not allowed}} {{11-14=let}}
-    // expected-warning@-1 {{variable 'err' was never mutated; consider changing to 'let' constant}}
+  } catch var err {  // expected-warning {{variable 'err' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
     _ = err
   }
 
   switch a {
-    case var b: // expected-error {{Use of 'var' binding here is not allowed}} {{10-13=let}}
-      // expected-warning@-1 {{was never mutated; consider changing to 'let' constant}}
-      _ = b
+    case var b: _ = b  // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{10-13=let}}
   }
 }
 

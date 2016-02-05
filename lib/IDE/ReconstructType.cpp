@@ -1,4 +1,4 @@
-//===--- ReconstructType.cpp ------------------------------------*- C++ -*-===//
+//===--- ReconstructType.cpp ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -77,6 +77,64 @@ static std::string stringWithFormat(const std::string fmt_str, ...) {
   return std::string(formatted.get());
 }
 
+static swift::TypeBase*
+GetTemplateArgument (swift::TypeBase* type,
+                     size_t arg_idx)
+{
+    if (type)
+    {
+        swift::CanType swift_can_type = type->getDesugaredType()->getCanonicalType();
+        
+        const swift::TypeKind type_kind = swift_can_type->getKind();
+        switch (type_kind)
+        {
+            case swift::TypeKind::UnboundGeneric:
+            {
+                swift::UnboundGenericType *unbound_generic_type = swift_can_type->getAs<swift::UnboundGenericType>();
+                if (!unbound_generic_type)
+                    break;
+                swift::NominalTypeDecl *nominal_type_decl = unbound_generic_type->getDecl();
+                if (!nominal_type_decl)
+                    break;
+                swift::GenericParamList *generic_param_list = nominal_type_decl->getGenericParams();
+                if (!generic_param_list)
+                    break;
+                if (arg_idx >= generic_param_list->getAllArchetypes().size())
+                    break;
+                return generic_param_list->getAllArchetypes()[arg_idx];
+            }
+                break;
+            case swift::TypeKind::BoundGenericClass:
+            case swift::TypeKind::BoundGenericStruct:
+            case swift::TypeKind::BoundGenericEnum:
+            {
+                swift::BoundGenericType *bound_generic_type = swift_can_type->getAs<swift::BoundGenericType>();
+                if (!bound_generic_type)
+                    break;
+                const llvm::ArrayRef<swift::Substitution>& substitutions = bound_generic_type->getSubstitutions(nullptr,nullptr);
+                if (arg_idx >= substitutions.size())
+                    break;
+                const swift::Substitution& substitution = substitutions[arg_idx];
+                return substitution.getReplacement().getPointer();
+            }
+            case swift::TypeKind::PolymorphicFunction:
+            {
+                swift::PolymorphicFunctionType *polymorphic_func_type = swift_can_type->getAs<swift::PolymorphicFunctionType>();
+                if (!polymorphic_func_type)
+                    break;
+                if (arg_idx >= polymorphic_func_type->getGenericParameters().size())
+                    break;
+                return polymorphic_func_type->getGenericParameters()[arg_idx]->getArchetype();
+            }
+                break;
+            default:
+                break;
+        }
+    }
+    
+    return nullptr;
+}
+
 enum class MemberType : uint32_t {
   Invalid,
   BaseClass,
@@ -100,10 +158,6 @@ struct MemberInfo {
   is_fragile(false)
   {
   }
-};
-
-struct CachedMemberInfo {
-  std::vector<MemberInfo> member_infos;
 };
 
 struct EnumElementInfo {
@@ -473,6 +527,30 @@ public:
     return (this->operator bool()) && (_type == Type::Extension);
   }
 
+    swift::Type
+    GetQualifiedArchetype (size_t index,
+                           swift::ASTContext* ast)
+    {
+        if (this->operator bool() && ast)
+        {
+            switch (_type)
+            {
+                case Type::Extension:
+                {
+                    swift::TypeBase *type_ptr = _extension._decl->getType().getPointer();
+                    if (swift::MetatypeType *metatype_ptr = type_ptr->getAs<swift::MetatypeType>())
+                        type_ptr = metatype_ptr->getInstanceType().getPointer();
+                    swift::TypeBase *archetype = GetTemplateArgument(type_ptr, index);
+                    return swift::Type(archetype);
+                }
+                    break;
+                default:
+                    break;
+            }
+        }
+        return swift::Type();
+    }
+    
 private:
   Type _type;
 
@@ -560,24 +638,11 @@ struct VisitNodeResult {
     return _types.size() == 1 && _types.front();
   }
 
-  bool
-  HasSingleDecl ()
-  {
-    return _decls.size() == 1 && _decls.front();
-  }
-
   swift::Type
   GetFirstType ()
   {
     // Must ensure there is a type prior to calling this
     return _types.front();
-  }
-
-  swift::Decl*
-  GetFirstDecl ()
-  {
-    // Must ensure there is a decl prior to calling this
-    return _decls.front();
   }
 
   void
@@ -816,7 +881,7 @@ FindNamedDecls (SwiftASTContext *ast,
       }
     }
   }
-  else  if (result._module)
+  else if (result._module)
   {
     swift::Module::AccessPathTy access_path;
     llvm::SmallVector<swift::ValueDecl*, 4> decls;
@@ -2256,6 +2321,66 @@ VisitNodeQualifiedArchetype (SwiftASTContext *ast,
                              const VisitNodeResult &generic_context, // set by GenericType case
                              Log *log)
 {
+    if (cur_node->begin() != cur_node->end())
+    {
+        swift::Demangle::Node::iterator end = cur_node->end();
+        VisitNodeResult type_result;
+        uint64_t index = 0xFFFFFFFFFFFFFFFF;
+        for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+        {
+            switch (pos->get()->getKind())
+            {
+                case swift::Demangle::Node::Kind::Number:
+                    index = pos->get()->getIndex();
+                    break;
+                case swift::Demangle::Node::Kind::DeclContext:
+                    nodes.push_back(*pos);
+                    VisitNode (ast, nodes, type_result, generic_context, log);
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (index != 0xFFFFFFFFFFFFFFFF)
+        {
+            if (type_result._types.size() == 1 && type_result._decls.size() == 1)
+            {
+                // given a method defined as func ... (args) -> (ret) {...}
+                // the Swift type system represents it as
+                // (SomeTypeMoniker) -> (args) -> (ret), where SomeTypeMoniker is an appropriately crafted
+                // reference to the type that contains the method (e.g. for a struct, an @inout StructType)
+                // For a qualified archetype of a method, we do not care about the first-level function, but about
+                // the returned function, which is the thing whose archetypes we truly care to extract
+                // TODO: this might be a generally useful operation, but it requires a Decl as well as a type
+                // to be reliably performed, and as such we cannot just put it in CompilerType as of now
+                // (consider, func foo (@inout StructType) -> (Int) -> () vs struct StructType {func foo(Int) -> ()} to see why)
+                swift::TypeBase *type_ptr = type_result._types[0].getPointer();
+                swift::Decl* decl_ptr = type_result._decls[0];
+                // if this is a function...
+                if (type_ptr && type_ptr->is<swift::AnyFunctionType>())
+                {
+                    // if this is defined in a type...
+                    if (decl_ptr->getDeclContext()->isTypeContext())
+                    {
+                        // if I can get the function type from it
+                        if (auto func_type = llvm::dyn_cast_or_null<swift::AnyFunctionType>(type_ptr))
+                        {
+                            // and it has a return type which is itself a function
+                            auto return_func_type = llvm::dyn_cast_or_null<swift::AnyFunctionType>(func_type->getResult().getPointer());
+                            if (return_func_type)
+                                type_ptr = return_func_type; // then use IT as our source of archetypes
+                        }
+                    }
+                }
+                swift::TypeBase *arg_type = GetTemplateArgument(type_ptr, index);
+                result._types.push_back(swift::Type(arg_type));
+            }
+            else if (type_result._module.IsExtension())
+            {
+                result._types.push_back(type_result._module.GetQualifiedArchetype(index, ast));
+            }
+        }
+    }
 }
 
 static void
@@ -2665,6 +2790,31 @@ swift::Type swift::ide::getTypeFromMangledTypename(swift::ASTContext &Ctx,
   else
   {
     error = stringWithFormat("type for typename '%s' was not found",mangled_typename);
+    return swift::Type();
+  }
+  return swift::Type();
+}
+
+swift::Type swift::ide::getTypeFromMangledSymbolname(swift::ASTContext &Ctx,
+                                                     const char *mangled_typename,
+                                                     std::string &error)
+{
+  ConstString mangled_name (mangled_typename);
+  std::vector<swift::Demangle::NodePointer> nodes;
+  nodes.push_back(swift::Demangle::demangleSymbolAsNode(mangled_typename,
+                                                        mangled_name.length()));
+  VisitNodeResult empty_generic_context;
+  VisitNodeResult result;
+
+  VisitNode(&Ctx, nodes, result, empty_generic_context, nullptr);
+  error = result._error;
+  if (error.empty() && result._types.size() == 1)
+  {
+    return result._types.front().getPointer();
+  }
+  else
+  {
+    error = stringWithFormat("type for symbolname '%s' was not found",mangled_typename);
     return swift::Type();
   }
   return swift::Type();

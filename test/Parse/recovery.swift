@@ -474,24 +474,20 @@ Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of t
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
-  public static func convertFromExtenndition(
-    // expected-error@+6{{unnamed parameters must be written}} {{5-5=_: }}
-    // expected-error@+5 2{{expected parameter type following ':'}}
-    // expected-error@+4 {{expected ',' separator}} {{18-18=,}}
-    // expected-error@+3 {{expected ',' separator}} {{18-18=,}}
-    // expected-error@+2 {{expected ',' separator}} {{24-24=,}}
-    // expected-error@+1{{use of undeclared type 's'}}
+  // expected-error @+2 {{expected ',' separator}}
+  // expected-error @+1{{expected '{' in body of function declaration}}
+  public static func convertFromExtenndition( // expected-error {{expected parameter name followed by ':'}}
+    // expected-error@+2 {{expected ',' separator}}
+    // expected-error@+1{{expected parameter name followed by ':'}}
     s._core.count != 0, "Can't form a Character from an empty String")
 }
 
 public enum TestB {
-  public static func convertFromExtenndition(
-    // expected-error@+6{{unnamed parameters must be written}} {{5-5=_: }}
-    // expected-error@+5 2{{expected parameter type following ':'}}
-    // expected-error@+4 {{expected ',' separator}} {{18-18=,}}
-    // expected-error@+3 {{expected ',' separator}} {{18-18=,}}
-    // expected-error@+2 {{expected ',' separator}} {{24-24=,}}
-    // expected-error@+1{{use of undeclared type 's'}}
+  // expected-error@+2 {{expected ',' separator}}
+  // expected-error@+1{{expected '{' in body of function declaration}}
+  public static func convertFromExtenndition( // expected-error {{expected parameter name followed by ':'}}
+    // expected-error@+2 {{expected ',' separator}}
+    // expected-error@+1 {{expected parameter name followed by ':'}}
     s._core.count ?= 0, "Can't form a Character from an empty String")
 }
 
@@ -500,9 +496,9 @@ public enum TestB {
 // <rdar://problem/18634543> Infinite loop and unbounded memory consumption in parser
 class bar {}
 var baz: bar
-// expected-error@+1{{unnamed parameters must be written}} {{11-11=_: }}
+// expected-error@+1{{unnamed parameters must be written with the empty name '_'}}
 func foo1(bar!=baz) {}
-// expected-error@+1{{unnamed parameters must be written}} {{11-11=_: }}
+// expected-error@+1{{unnamed parameters must be written with the empty name '_'}}
 func foo2(bar! = baz) {}
 
 
@@ -527,24 +523,26 @@ case let (jeb):
 // expected-error@+1{{extraneous '}' at top level}} {{1-2=}}
 }
 
+
+#if true
+
 // rdar://19605164
-// expected-note@+3{{to match this opening '('}}
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {}
-// expected-error@+4{{expected parameter type following ':'}}
-// expected-error@+3{{expected ')' in parameter}}
-// expected-error@+2{{expected ',' separator}} {{3-3=,}}
-// expected-error@+1{{expected ',' separator}} {{3-3=,}}
+func a(s: S[{{g) -> Int {}  // expected-note {{to match this opening '('}}
+// expected-error@+3 {{expected parameter name followed by ':'}}
+// expected-error@+2 2 {{expected ',' separator}}
+// expected-error@+1 {{expected ')' in parameter}}
 }}}
-
-
+#endif
+  
+  
+  
 // rdar://19605567
 // expected-error@+3{{expected '(' for initializer parameters}}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
 func F() { init<( } )}
-
 
 // rdar://20337695
 func f1() {
@@ -567,9 +565,9 @@ func testMultiPatternConditionRecovery(x: Int?) {
     _ = z
   }
 
-  // expected-error@+1 {{binding ended by previous 'where' clause; use 'let' to introduce a new one}} {{30-30=let }}
-  if let y = x where y == 0, z = x {
-    _ = z
+  // expected-error@+1 {{binding ended by previous 'where' clause; use 'var' to introduce a new one}} {{30-30=var }}
+  if var y = x where y == 0, z = x {
+    z = y; y = z
   }
 
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors

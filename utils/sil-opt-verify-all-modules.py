@@ -58,16 +58,16 @@ def get_verify_resource_dir_modules_commands(
     print("sil-opt path: " + sil_opt)
 
     known_platforms = [
-      ( 'appletvos', 'arm64', 'arm64-apple-tvos9.0' ),
-      ( 'appletvsimulator', 'x86_64', 'x86_64-apple-tvos9.0' ),
-      ( 'iphoneos', 'armv7', 'armv7-apple-ios7.0' ),
-      ( 'iphoneos', 'armv7s', 'armv7s-apple-ios7.0' ),
-      ( 'iphoneos', 'arm64', 'arm64-apple-ios7.0' ),
-      ( 'iphonesimulator', 'i386', 'i386-apple-ios7.0' ),
-      ( 'iphonesimulator', 'x86_64', 'x86_64-apple-ios7.0' ),
-      ( 'macosx', 'x86_64', 'x86_64-apple-macosx10.9' ),
-      ( 'watchos', 'armv7k', 'armv7k-apple-watchos2.0' ),
-      ( 'watchsimulator', 'i386', 'i386-apple-watchos2.0' ),
+        ('appletvos', 'arm64', 'arm64-apple-tvos9.0'),
+        ('appletvsimulator', 'x86_64', 'x86_64-apple-tvos9.0'),
+        ('iphoneos', 'armv7', 'armv7-apple-ios7.0'),
+        ('iphoneos', 'armv7s', 'armv7s-apple-ios7.0'),
+        ('iphoneos', 'arm64', 'arm64-apple-ios7.0'),
+        ('iphonesimulator', 'i386', 'i386-apple-ios7.0'),
+        ('iphonesimulator', 'x86_64', 'x86_64-apple-ios7.0'),
+        ('macosx', 'x86_64', 'x86_64-apple-macosx10.9'),
+        ('watchos', 'armv7k', 'armv7k-apple-watchos2.0'),
+        ('watchsimulator', 'i386', 'i386-apple-watchos2.0'),
     ]
 
     commands = []
@@ -94,7 +94,7 @@ def get_verify_resource_dir_modules_commands(
 
 
 def quote_shell_command(args):
-    return " ".join([ pipes.quote(a) for a in args ])
+    return " ".join([pipes.quote(a) for a in args])
 
 
 def run_commands_in_parallel(commands):
@@ -142,15 +142,14 @@ def main():
         print("--verify-build-dir and --verify-xcode can't be used together")
         return 1
 
-
     if args.verify_build_dir is not None:
         commands = get_verify_build_dir_commands(args.verify_build_dir)
 
     if args.verify_xcode:
         # Find Xcode.
-        swift_path = subprocess.check_output([ 'xcrun', '--find', 'swift' ])
+        swift_path = subprocess.check_output(['xcrun', '--find', 'swift'])
         xcode_path = swift_path
-        for i in range(0, 7):
+        for _ in range(0, 7):
             xcode_path = os.path.dirname(xcode_path)
 
         toolchains_dir = os.path.join(

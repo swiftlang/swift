@@ -2926,7 +2926,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   @_transparent
   internal var guaranteedNative: Bool {
-    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
 
   @warn_unused_result
@@ -3067,6 +3067,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   internal typealias Index = ${Self}Index<${TypeParameters}>
 
   internal var startIndex: Index {
+    if _fastPath(guaranteedNative) {
+      return ._Native(native.startIndex)
+    }
+
     switch self {
     case .Native:
       return ._Native(native.startIndex)
@@ -3080,6 +3084,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   internal var endIndex: Index {
+    if _fastPath(guaranteedNative) {
+      return ._Native(native.endIndex)
+    }
+
     switch self {
     case .Native:
       return ._Native(native.endIndex)
@@ -3094,6 +3102,13 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   @warn_unused_result
   internal func indexForKey(key: Key) -> Index? {
+    if _fastPath(guaranteedNative) {
+      if let nativeIndex = native.indexForKey(key) {
+        return ._Native(nativeIndex)
+      }
+      return nil
+    }
+
     switch self {
     case .Native:
       if let nativeIndex = native.indexForKey(key) {
@@ -3115,6 +3130,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   @warn_unused_result
   internal func assertingGet(i: Index) -> SequenceElement {
+    if _fastPath(guaranteedNative) {
+      return native.assertingGet(i._nativeIndex)
+    }
+
     switch self {
     case .Native:
       return native.assertingGet(i._nativeIndex)
@@ -3139,6 +3158,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   @warn_unused_result
   internal func assertingGet(key: Key) -> Value {
+    if _fastPath(guaranteedNative) {
+      return native.assertingGet(key)
+    }
+
     switch self {
     case .Native:
       return native.assertingGet(key)
@@ -3169,6 +3192,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   @warn_unused_result
   internal func maybeGet(key: Key) -> Value? {
+    if _fastPath(guaranteedNative) {
+      return native.maybeGet(key)
+    }
+
     switch self {
     case .Native:
       return native.maybeGet(key)
@@ -3462,6 +3489,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   internal var count: Int {
+    if _fastPath(guaranteedNative) {
+      return native.count
+    }
+
     switch self {
     case .Native:
       return native.count
@@ -3914,7 +3945,7 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
 %if Self == 'Set':
     return _canBeClass(Element.self) == 0
 %elif Self == 'Dictionary':
-    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
 %end
   }
 
@@ -3966,108 +3997,24 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   }
 }
 
-internal struct ${Self}MirrorPosition<${TypeParametersDecl}> {
-  internal typealias MirroredType = ${Self}<${TypeParameters}>
-
-  internal var _intPos: Int
-  internal var ${Self}Pos: MirroredType.Index
-
-  internal init(_ m: MirroredType) {
-    _intPos = 0
-    ${Self}Pos = m.startIndex
-  }
-
-  internal mutating func successor() {
-    _intPos = _intPos + 1
-    ${Self}Pos._successorInPlace()
-  }
-
-}
-
-@warn_unused_result
-internal func == <${TypeParametersDecl}> (
-  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
-) -> Bool {
-  return lhs._intPos == rhs
-}
-
-@warn_unused_result
-internal func > <${TypeParametersDecl}> (
-  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
-) -> Bool {
-  return lhs._intPos > rhs
-}
-
-@warn_unused_result
-internal func < <${TypeParametersDecl}> (
-  lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
-) -> Bool {
-  return lhs._intPos < rhs
-}
-
-internal class ${Self}Mirror<${TypeParametersDecl}> : _Mirror {
-  typealias MirroredType = ${Self}<${TypeParameters}>
-  internal let _mirror : MirroredType
-  internal var _pos : ${Self}MirrorPosition<${TypeParameters}>
-
-  internal init(_ m : MirroredType) {
-    _mirror = m
-    _pos = ${Self}MirrorPosition(m)
-  }
-
-  internal var value: Any { return (_mirror as Any) }
-
-  internal var valueType: Any.Type { return (_mirror as Any).dynamicType }
-
-  internal var objectIdentifier: ObjectIdentifier? { return nil }
-
-  internal var count: Int { return _mirror.count }
-
-  internal subscript(i: Int) -> (String, _Mirror) {
-    _require(i >= 0 && i < count, "_Mirror access out of bounds")
-
-    if _pos > i {
-      _pos._intPos = 0
-    }
-
-    while _pos < i && !(_pos == i) {
-      _pos.successor()
-    }
-%if Self == 'Set':
-    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
-%elif Self == 'Dictionary':
-    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
-%end
-  }
-
-  internal var summary: String {
-%if Self == 'Set':
-    if count == 1 {
-      return "1 member"
-    }
-    return "\(count) members"
-%elif Self == 'Dictionary':
-    if count == 1 {
-      return "1 key/value pair"
-    }
-    return "\(count) key/value pairs"
-%end
-  }
-
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
-
-%if Self == 'Set':
-  internal var disposition: _MirrorDisposition { return .MembershipContainer }
-%elif Self == 'Dictionary':
-  internal var disposition: _MirrorDisposition { return .KeyContainer }
-%end
-}
-
-extension ${Self} : _Reflectable {
+extension ${Self}Generator : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func _getMirror() -> _Mirror {
-    return ${Self}Mirror(self)
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: [])
+  }
+}
+
+extension ${Self} : CustomReflectable {
+  /// Returns a mirror that reflects `self`.
+  @warn_unused_result
+  public var customMirror: Mirror {
+%if Self == 'Set':
+    let style = Mirror.DisplayStyle.Set
+%elif Self == 'Dictionary':
+    let style = Mirror.DisplayStyle.Dictionary
+%end
+    return Mirror(self, unlabeledChildren: self, displayStyle: style)
   }
 }
 

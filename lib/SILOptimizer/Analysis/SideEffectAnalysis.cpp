@@ -317,6 +317,11 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
   }
   // Handle some kind of instructions specially.
   switch (I->getKind()) {
+    case ValueKind::FixLifetimeInst:
+      // A fix_lifetime instruction acts like a read on the operand. Retains can move after it
+      // but the last release can't move before it.
+      FInfo->FE.getEffectsOn(I->getOperand(0))->Reads = true;
+      return;
     case ValueKind::AllocStackInst:
     case ValueKind::DeallocStackInst:
       return;

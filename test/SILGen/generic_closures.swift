@@ -6,9 +6,8 @@ var zero: Int
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures28generic_nondependent_context{{.*}}
 func generic_nondependent_context<T>(x: T, y: Int) -> Int {
-  var y = y
   func foo() -> Int { return y }
-  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) (@owned @box Int) -> Int
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) (Int) -> Int
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
   return foo()
 }
@@ -82,12 +81,6 @@ class NestedGeneric<U> {
     return .Some({})
   }
 }
-
-// CHECK-LABEL: sil hidden @_TF16generic_closures24generic_curried_function{{.*}} : $@convention(thin) <T, U> (@in U, @in T) -> () {
-// CHECK-LABEL: sil shared @_TF16generic_closures24generic_curried_function{{.*}}
-func generic_curried_function<T, U>(x: T)(y: U) { }
-
-var f: (Int) -> () = generic_curried_function(zero)
 
   // <rdar://problem/15417773>
   // Ensure that nested closures capture the generic parameters of their nested

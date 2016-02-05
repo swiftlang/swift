@@ -771,11 +771,11 @@ extension ${Self} : _ArrayProtocol {
   }
 }
 
-extension ${Self} : _Reflectable {
+extension ${Self} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func _getMirror() -> _Mirror {
-    return _ArrayProtocolMirror(self)
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: self, displayStyle: .Collection)
   }
 }
 
@@ -1267,6 +1267,8 @@ public func == <Element : Equatable>(
     return true
   }
 
+%if Self == 'ArraySlice':
+
   var streamLHS = lhs.iterator()
   var streamRHS = rhs.iterator()
 
@@ -1278,6 +1280,19 @@ public func == <Element : Equatable>(
     }
     nextLHS = streamLHS.next()
   }
+
+%else:
+
+  _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
+  _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+
+  // We know that lhs.count == rhs.count, compare element wise.
+  for idx in 0..<lhsCount {
+    if lhs[idx] != rhs[idx] {
+      return false
+    }
+  }
+%end
 
   return true
 }

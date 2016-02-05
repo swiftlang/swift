@@ -4,6 +4,7 @@ add_swift_library(swiftAST
   ASTDumper.cpp
   ASTNode.cpp
   ASTPrinter.cpp
+  ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
   Availability.cpp
@@ -14,6 +15,7 @@ add_swift_library(swiftAST
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclNameLoc.cpp
   DefaultArgumentKind.cpp
   DiagnosticList.cpp
   DiagnosticEngine.cpp
@@ -39,7 +41,6 @@ add_swift_library(swiftAST
   TypeRepr.cpp
   TypeWalker.cpp
   USRGeneration.cpp
-  Verifier.cpp
   LINK_LIBRARIES
     swiftMarkup
     swiftBasic

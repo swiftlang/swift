@@ -19,7 +19,7 @@ case (0..<10, _, _),
 }
 
 switch (1, 2) {
-case (let a, a): // expected-error {{use of unresolved identifier 'a'}}
+case (var a, a): // expected-error {{use of unresolved identifier 'a'}}
   ()
 }
 
@@ -27,17 +27,17 @@ case (let a, a): // expected-error {{use of unresolved identifier 'a'}}
 
 protocol P { func p() }
 
-class B : P {
-  init() {}
+class B : P { 
+  init() {} 
   func p() {}
   func b() {}
 }
 class D : B {
-  override init() { super.init() }
+  override init() { super.init() } 
   func d() {}
 }
 class E {
-  init() {}
+  init() {} 
   func e() {}
 }
 
@@ -140,7 +140,7 @@ default: break
 
 // <rdar://problem/21995744> QoI: Binary operator '~=' cannot be applied to operands of type 'String' and 'String?'
 switch ("foo" as String?) {
-case "what": break // expected-error{{expression pattern of type 'String' cannot match values of type 'String?'}}
+case "what": break // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
 default: break
 }
 
@@ -165,12 +165,9 @@ case x ?? 42: break // match value
 default: break
 }
 
-// FIXME: rdar://problem/23378003
-// These will eventually become errors.
-for (var x) in 0...100 {} // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=}}
-for var x in 0...100 {}  // expected-error {{Use of 'var' binding here is not allowed}} {{5-9=}}
-
-for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
+for (var x) in 0...100 {}
+for var x in 0...100 {}  // rdar://20167543
+for (let x) in 0...100 {} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
 let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}

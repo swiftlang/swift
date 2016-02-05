@@ -238,7 +238,8 @@ static NSString *_getClassDescription(Class cls) {
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
   Class cls = (Class) _swift_getClassOfAllocated(self);
-  fatalError("Unrecognized selector %c[%s %s]\n", 
+  fatalError(/* flags = */ 0,
+             "Unrecognized selector %c[%s %s]\n",
              class_isMetaClass(cls) ? '+' : '-', 
              class_getName(cls), sel_getName(sel));
 }

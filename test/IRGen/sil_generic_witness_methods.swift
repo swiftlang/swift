@@ -39,7 +39,6 @@ func call_methods<T: P, U>(x: T, y: S, z: U) {
 
 // CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods24call_existential_methods{{.*}}(%P27sil_generic_witness_methods1P_* noalias nocapture dereferenceable({{.*}}))
 func call_existential_methods(x: P, y: S) {
-  var y = y
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_, %P27sil_generic_witness_methods1P_* [[X:%0]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]], align 8
   // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_, %P27sil_generic_witness_methods1P_* [[X]], i32 0, i32 2

@@ -47,9 +47,11 @@ struct TestOptions {
   Optional<unsigned> hideUnderscores;
   Optional<bool> hideByName;
   Optional<bool> hideLowPriority;
+  Optional<unsigned> showTopNonLiteral;
   Optional<bool> fuzzyMatching;
   Optional<unsigned> fuzzyWeight;
   Optional<unsigned> popularityBonus;
+  StringRef filterRulesJSON;
   bool rawOutput = false;
   bool structureOutput = false;
   ArrayRef<const char *> compilerArgs;
@@ -78,6 +80,7 @@ static sourcekitd_uid_t KeyUseImportDepth;
 static sourcekitd_uid_t KeyGroupOverloads;
 static sourcekitd_uid_t KeyGroupStems;
 static sourcekitd_uid_t KeyFilterText;
+static sourcekitd_uid_t KeyFilterRules;
 static sourcekitd_uid_t KeyRequestStart;
 static sourcekitd_uid_t KeyRequestLimit;
 static sourcekitd_uid_t KeyHideUnderscores;
@@ -89,6 +92,7 @@ static sourcekitd_uid_t KeyAddInitsToTopLevel;
 static sourcekitd_uid_t KeyFuzzyMatching;
 static sourcekitd_uid_t KeyFuzzyWeight;
 static sourcekitd_uid_t KeyPopularityBonus;
+static sourcekitd_uid_t KeyTopNonLiteral;
 static sourcekitd_uid_t KeyKind;
 static sourcekitd_uid_t KeyResults;
 static sourcekitd_uid_t KeyPopular;
@@ -220,6 +224,15 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.popularAPI = value;
     } else if (opt == "unpopular") {
       options.unpopularAPI = value;
+    } else if (opt == "filter-rules") {
+      options.filterRulesJSON = value;
+    } else if (opt == "top") {
+      unsigned uval;
+      if (value.getAsInteger(10, uval)) {
+        error = "unrecognized integer value for -tope=";
+        return false;
+      }
+      options.showTopNonLiteral = uval;
     }
   }
 
@@ -276,6 +289,7 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_uid_get_from_cstr("key.codecomplete.group.overloads");
   KeyGroupStems = sourcekitd_uid_get_from_cstr("key.codecomplete.group.stems");
   KeyFilterText = sourcekitd_uid_get_from_cstr("key.codecomplete.filtertext");
+  KeyFilterRules = sourcekitd_uid_get_from_cstr("key.codecomplete.filterrules");
   KeyRequestLimit =
       sourcekitd_uid_get_from_cstr("key.codecomplete.requestlimit");
   KeyRequestStart =
@@ -297,6 +311,8 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_uid_get_from_cstr("key.codecomplete.sort.fuzzyweight");
   KeyPopularityBonus =
       sourcekitd_uid_get_from_cstr("key.codecomplete.sort.popularitybonus");
+  KeyTopNonLiteral =
+      sourcekitd_uid_get_from_cstr("key.codecomplete.showtopnonliteralresults");
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
@@ -532,6 +548,21 @@ static void printResponse(sourcekitd_response_t resp, bool raw, bool structure,
   }
   ResponsePrinter p(llvm::outs(), 4, indentation, structure);
   p.printResponse(resp);
+  llvm::outs().flush();
+}
+
+static std::unique_ptr<llvm::MemoryBuffer>
+getBufferForFilename(StringRef name) {
+
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(name);
+
+  if (!buffer) {
+    llvm::errs() << "error reading '" << name
+                 << "': " << buffer.getError().message() << "\n";
+    return nullptr;
+  }
+  return std::move(buffer.get());
 }
 
 static sourcekitd_object_t createBaseRequest(sourcekitd_uid_t requestUID,
@@ -589,9 +620,28 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     addIntOption(KeyHideUnderscores, options.hideUnderscores);
     addIntOption(KeyFuzzyWeight, options.fuzzyWeight);
     addIntOption(KeyPopularityBonus, options.popularityBonus);
+    addIntOption(KeyTopNonLiteral, options.showTopNonLiteral);
 
     if (filterText)
       sourcekitd_request_dictionary_set_string(opts, KeyFilterText, filterText);
+
+    if (!options.filterRulesJSON.empty()) {
+      auto buffer = getBufferForFilename(options.filterRulesJSON);
+      if (!buffer)
+        return 1;
+
+      char *err = nullptr;
+      auto dict =
+          sourcekitd_request_create_from_yaml(buffer->getBuffer().data(), &err);
+      if (!dict) {
+        assert(err);
+        llvm::errs() << err;
+        free(err);
+        return 1;
+      }
+
+      sourcekitd_request_dictionary_set_value(opts, KeyFilterRules, dict);
+    }
   }
   sourcekitd_request_dictionary_set_value(request, KeyCodeCompleteOptions,opts);
   sourcekitd_request_release(opts);
@@ -678,19 +728,14 @@ static bool setupPopularAPI(const TestOptions &options) {
 static int handleTestInvocation(TestOptions &options) {
 
   StringRef SourceFilename = options.sourceFile;
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> SourceBuf =
-      llvm::MemoryBuffer::getFile(SourceFilename);
-
-  if (!SourceBuf) {
-    llvm::errs() << "error reading '" << SourceFilename
-                 << "': " << SourceBuf.getError().message() << "\n";
+  auto SourceBuf = getBufferForFilename(SourceFilename);
+  if (!SourceBuf)
     return 1;
-  }
 
   unsigned CodeCompletionOffset;
   SmallVector<std::string, 4> prefixes;
   std::string CleanFile = removeCodeCompletionTokens(
-      SourceBuf.get().get()->getBuffer(), options.completionToken, prefixes,
+      SourceBuf->getBuffer(), options.completionToken, prefixes,
       &CodeCompletionOffset);
 
   if (CodeCompletionOffset == ~0U) {
@@ -738,9 +783,11 @@ static int handleTestInvocation(TestOptions &options) {
             return true;
           }
           llvm::outs() << "Results for filterText: " << prefix << " [\n";
+          llvm::outs().flush();
           printResponse(response, options.rawOutput, options.structureOutput,
                         /*indentation*/ 4);
           llvm::outs() << "]\n";
+          llvm::outs().flush();
           return false;
         });
     if (isError)

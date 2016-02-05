@@ -23,7 +23,6 @@
 
 namespace swift {
 
-class SILValue;
 class SILInstruction;
 class AliasAnalysis;
 class PostOrderAnalysis;

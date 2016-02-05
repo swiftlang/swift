@@ -2011,7 +2011,24 @@ void Driver::printHelp(bool ShowHidden) const {
 }
 
 static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple) {
-  return llvm::Triple(DefaultTargetTriple);
+  llvm::Triple triple = llvm::Triple(DefaultTargetTriple);
+
+  // armv6l and armv7l (which come from linux) are mapped to armv6 and 
+  // armv7 (respectively) within llvm.  When a Triple is created by llvm,
+  // the string is preserved, which keeps the 'l'.  This extra character
+  // causes problems later down the line.
+  // By explicitly setting the architecture to the subtype that it aliases to,
+  // we remove that extra character while not introducing other side effects.
+  if (triple.getOS() == llvm::Triple::Linux) {
+    if (triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7) {
+      triple.setArchName("armv7");
+    }
+    if (triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v6) {
+      triple.setArchName("armv6");
+    }
+  }
+
+  return triple;
 }
 
 const ToolChain *Driver::getToolChain(const ArgList &Args) const {

@@ -456,6 +456,30 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
 }
 
+/// Collect elements of an already-existing global list with the given
+/// \c name into \c list.
+///
+/// We use this when Clang code generation might populate the list.
+static void collectGlobalList(IRGenModule &IGM,
+                              SmallVectorImpl<llvm::WeakVH> &list,
+                              StringRef name) {
+  if (auto *existing = IGM.Module.getGlobalVariable(name)) {
+    auto *globals = cast<llvm::ConstantArray>(existing->getInitializer());
+    for (auto &use : globals->operands()) {
+      auto *global = use.get();
+      list.push_back(global);
+    }
+    existing->eraseFromParent();
+  }
+
+  std::for_each(list.begin(), list.end(),
+                [](const llvm::WeakVH &global) {
+    assert(!isa<llvm::GlobalValue>(global) ||
+           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
+           "all globals in the 'used' list must be definitions");
+  });
+}
+
 /// Emit a global list, i.e. a global constant array holding all of a
 /// list of values.  Generally these lists are for various LLVM
 /// metadata or runtime purposes.
@@ -651,6 +675,13 @@ void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
   LLVMUsed.push_back(global);
 }
 
+/// Add the given global value to @llvm.compiler.used.
+///
+/// This value must have a definition by the time the module is finalized.
+void IRGenModule::addCompilerUsedGlobal(llvm::GlobalValue *global) {
+  LLVMCompilerUsed.push_back(global);
+}
+
 /// Add the given global value to the Objective-C class list.
 void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
   ObjCClasses.push_back(classPtr);
@@ -731,24 +762,16 @@ void IRGenModule::emitGlobalLists() {
   // @llvm.used
 
   // Collect llvm.used globals already in the module (coming from ClangCodeGen).
-  auto *ExistingLLVMUsed = Module.getGlobalVariable("llvm.used");
-  if (ExistingLLVMUsed) {
-    auto *Globals =
-        cast<llvm::ConstantArray>(ExistingLLVMUsed->getInitializer());
-    for (auto &Use : Globals->operands()) {
-      auto *Global = Use.get();
-      LLVMUsed.push_back(Global);
-    }
-    ExistingLLVMUsed->eraseFromParent();
-  }
-
-  std::for_each(LLVMUsed.begin(), LLVMUsed.end(),
-                [](const llvm::WeakVH &global) {
-    assert(!isa<llvm::GlobalValue>(global) ||
-           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
-           "all globals in the 'used' list must be definitions");
-  });
+  collectGlobalList(*this, LLVMUsed, "llvm.used");
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
+                 llvm::GlobalValue::AppendingLinkage,
+                 Int8PtrTy,
+                 false);
+
+  // Collect llvm.compiler.used globals already in the module (coming
+  // from ClangCodeGen).
+  collectGlobalList(*this, LLVMCompilerUsed, "llvm.compiler.used");
+  emitGlobalList(*this, LLVMCompilerUsed, "llvm.compiler.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
                  false);
@@ -825,6 +848,10 @@ void IRGenModule::finishEmitAfterTopLevel() {
   finalizeClangCodeGen();
 }
 
+void IRGenModule::addNominalTypeDecl(const NominalTypeDecl *Decl) {
+  NominalTypeDecls.push_back(Decl);
+}
+
 static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
   auto decl = type.getAnyNominal();
   assert(decl);
@@ -849,6 +876,12 @@ void IRGenModuleDispatcher::emitProtocolConformances() {
 void IRGenModuleDispatcher::emitTypeMetadataRecords() {
   for (auto &m : *this) {
     m.second->emitTypeMetadataRecords();
+  }
+}
+
+void IRGenModuleDispatcher::emitReflectionMetadataRecords() {
+  for (auto &m : *this) {
+    m.second->emitReflectionMetadataRecords();
   }
 }
 
@@ -1051,8 +1084,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
 
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-    switch (getTypeMetadataAccessStrategy(IGM, getType(),
-                                          /*preferDirectAccess=*/false)) {
+    switch (getTypeMetadataAccessStrategy(IGM, getType())) {
     case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
     case MetadataAccessStrategy::HiddenUniqueAccessor:
@@ -1060,7 +1092,6 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     case MetadataAccessStrategy::PrivateAccessor:
       return getSILLinkage(FormalLinkage::Private, forDefinition);
     case MetadataAccessStrategy::NonUniqueAccessor:
-    case MetadataAccessStrategy::Direct:
       return SILLinkage::Shared;
     }
     llvm_unreachable("bad metadata access kind");
@@ -1840,19 +1871,11 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
   if (IGM.hasMetadataPattern(nom)) {
     // Conformances for generics, concrete subclasses of generics, and
     // resiliently-sized types are represented by referencing the
-    // metadata pattern.
-    //
-    // FIXME: this is wrong if the conforming type is a resilient type from
-    // another module. In that case, we don't know if we require runtime
-    // metadata instantiation or not, and instead, we need a way to reference
-    // the metadata accessor function from the conformance table.
-    typeKind = TypeMetadataRecordKind::UniqueGenericPattern;
-    entity = LinkEntity::forTypeMetadata(
-                         nom->getDeclaredType()->getCanonicalType(),
-                         TypeMetadataAddress::AddressPoint,
-                         /*isPattern*/ true);
-    defaultTy = IGM.TypeMetadataPatternStructTy;
-    defaultPtrTy = IGM.TypeMetadataPatternPtrTy;
+    // nominal type descriptor.
+    typeKind = TypeMetadataRecordKind::UniqueNominalTypeDescriptor;
+    entity = LinkEntity::forNominalTypeDescriptor(nom);
+    defaultTy = IGM.NominalTypeDescriptorTy;
+    defaultPtrTy = IGM.NominalTypeDescriptorPtrTy;
   } else if (auto ct = dyn_cast<ClassType>(conformingType)) {
     auto clas = ct->getDecl();
     if (clas->isForeign()) {
@@ -2167,12 +2190,37 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
   return entry;
 }
 
+/// Fetch the type metadata access function for the given generic type.
+llvm::Function *
+IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
+                                           NominalTypeDecl *nominal,
+                                           ArrayRef<llvm::Type *> genericArgs,
+                                           ForDefinition_t forDefinition) {
+  assert(!genericArgs.empty());
+  assert(nominal->isGenericContext());
+
+  auto type = nominal->getDeclaredType()->getCanonicalType();
+  assert(isa<UnboundGenericType>(type));
+  LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  return entry;
+}
+
 /// Get or create a type metadata cache variable.  These are an
 /// implementation detail of type metadata access functions.
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
+  assert(!type->hasUnboundGenericType());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
                                TypeMetadataPtrTy, DebugTypeInfo());
@@ -2701,27 +2749,24 @@ Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
 ///
 /// \returns an i8* with a null terminator; note that embedded nulls
 ///   are okay
-llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data) {
+///
+/// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
+/// resolving relative references to coalesceable symbols.
+/// It should be removed when fixed. rdar://problem/22674524
+llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
+                                               bool willBeRelativelyAddressed) {
   // Check whether this string already exists.
   auto &entry = GlobalStrings[data];
-  if (entry) return entry;
+  if (entry.second) {
+    // FIXME: Clear unnamed_addr if the global will be relative referenced
+    // to work around an ld64 bug. rdar://problem/22674524
+    if (willBeRelativelyAddressed)
+      entry.first->setUnnamedAddr(false);
+    return entry.second;
+  }
 
-  // If not, create it.  This implicitly adds a trailing null.
-  auto init = llvm::ConstantDataArray::getString(LLVMContext, data);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
-  global->setUnnamedAddr(true);
-
-  // Drill down to make an i8*.
-  auto zero = llvm::ConstantInt::get(SizeTy, 0);
-  llvm::Constant *indices[] = { zero, zero };
-  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      global->getValueType(), global, indices);
-
-  // Cache and return.
-  entry = address;
-  return address;
+  entry = createStringConstant(data, willBeRelativelyAddressed);
+  return entry.second;
 }
 
 /// Get or create a global UTF-16 string constant.
@@ -2779,19 +2824,8 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
 /// - For enums, new cases can be added
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
-bool IRGenModule::isResilient(Decl *D, ResilienceExpansion expansion) {
-  auto NTD = dyn_cast<NominalTypeDecl>(D);
-  if (!NTD)
-    return false;
-
-  switch (expansion) {
-  case ResilienceExpansion::Maximal:
-    return !NTD->hasFixedLayout(SILMod->getSwiftModule());
-  case ResilienceExpansion::Minimal:
-    return !NTD->hasFixedLayout();
-  }
-
-  llvm_unreachable("Bad resilience scope");
+bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
+  return !D->hasFixedLayout(SILMod->getSwiftModule(), expansion);
 }
 
 // The most general resilience expansion where the given declaration is visible.

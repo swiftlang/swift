@@ -46,10 +46,8 @@ We also intend to provide tools to detect inadvertent changes in interfaces.
   restructuring are still planned, including:
 
   * A discussion of back-dating, and how it usually is not allowed.
-  * A brief discussion of the implementation issues for fixed-layout value types with resilient members, and with non-public members.
   * A revisal of the discussion on fixed-layout classes.
   * A brief discussion of "deployment files", which represent distribution groupings that are themselves versioned. (For example, OS X 10.10.3 contains Foundation version 1153.20.) Deployment files are likely to provide a concrete implementation of "resilience domains".
-  * A way to specify "minimum deployment libraries", like today's minimum deployment targets.
 
 Introduction
 ============
@@ -118,6 +116,25 @@ Swift 2.0, but generalized for checking library versions instead of just OS
 versions.
 
 
+Declaring Library Version Dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Swift 2's availability model includes the notion of a *minimum deployment
+target,* the version of an OS that can be assumed present for the program being
+compiled to run at all. For example, a program compiled with a minimum
+deployment target of iOS 9.2 will not launch on iOS 9.0.
+
+The generalized model above suggests being able to make similar guarantees for
+individual libraries. For example, a client program may depend on version 1.1
+of the "Magician" library; trying to run using version 1.0 will result in
+errors. By declaring this at compile-time, the client code can omit
+``@available`` and ``#available`` checks that are satisfied by the minimum
+library version.
+
+Both the syntax and enforcement of this feature are not covered by this
+document.
+
+
 Publishing Versioned API
 ========================
 
@@ -135,7 +152,12 @@ version of the library where the entity may be used.
   a declaration in Swift, because a client may depend on them
   See `New Conformances`_, below.
 
-Code within a library may always use all other entities declared within the
+In a versioned library, any top-level public entity from the list above may not
+be made ``public`` without an appropriate version. A public entity declared
+within a versioned type (or an extension of a versioned type) will default to
+having the same version as the type.
+
+Code within a library may generally use all other entities declared within the
 library (barring their own availability checks), since the entire library is
 shipped as a unit. That is, even if a particular API was introduced in v1.0,
 its (non-public) implementation may refer to APIs introduced in later versions.
@@ -145,12 +167,20 @@ is not enforced by the language.
 
 .. _semantic versioning: http://semver.org
 
-Normally only public entities are treated as versioned. However, in some cases
-it may be useful to version an ``internal`` entity as well. See `Pinning`_ 
-below.
+Certain uses of ``internal`` entities require them to be part of a library's
+binary interface, which means they need to be versioned as well. See
+`Versioning Internal Declarations`_ below.
+
+In addition to versioned entities, there are also attributes that are safe to
+add to declarations when releasing a new version of a library. In most cases,
+clients can only take advantage of the attributes when using the new release of
+the library, and therefore the attributes also need to record the version in
+which they were introduced. If the version is omitted, it is assumed to be the
+version of the declaration to which the attribute is attached.
 
 The syntax for marking an entity as versioned has not yet been decided, but the
 rest of this document will use syntax #1 described below.
+
 
 Syntax #1: Attributes
 ~~~~~~~~~~~~~~~~~~~~~
@@ -221,42 +251,39 @@ Anything *not* listed in this document should be assumed unsafe.
 Top-Level Functions
 ~~~~~~~~~~~~~~~~~~~
 
-A public top-level function is fairly restricted in how it can be changed. The
-following changes are permitted:
+A versioned top-level function is fairly restricted in how it can be changed.
+The following changes are permitted:
 
 - Changing the body of the function.
 - Changing *internal* parameter names (i.e. the names used within the function
   body, not the labels that are part of the function's full name).
 - Reordering generic requirements (but not the generic parameters themselves).
 - Adding a default value to a parameter.
-- Changing a default value is permitted but discouraged; it changes the meaning
-  of existing source code.
+- Changing or removing a default value is permitted but discouraged; it may
+  break or change the meaning of existing source code.
+- The ``@noreturn`` attribute may be added to a function. ``@noreturn`` is a
+  `versioned attribute`.
+- The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
+  be added to a function without any additional versioning information.
 
 .. note::
 
-    Today's implementation of default values puts the evaluation of the default
-    value expression in the library, rather than in the client like C++ or C#.
-    This is problematic if we want to allow adding new default values.
-
-.. admonition:: TODO
-
-    Is *removing* a default value something we want to allow? It breaks source
-    compatibility, but not binary compatibility under the inlining model. That
-    said, changing a default value is discouraged, and removing + adding is the
-    same thing.
+    Swift 2's implementation of default values puts the evaluation of the
+    default value expression in the library, rather than in the client like C++
+    or C#. We plan to change this.
 
 No other changes are permitted; the following are particularly of note:
 
-- A public function may not change its parameters or return type.
-- A public function may not change its generic requirements.
-- A public function may not change its external parameter names (labels).
-- A public function may not add, remove, or reorder parameters, whether or not
-  they have default values.
-
-.. admonition:: TODO
-
-    Can a throwing function become non-throwing? It's a "safe" change but
-    it's hard to document how it used to behave for backwards-deployers.
+- A versioned function may not change its parameters or return type.
+- A versioned function may not change its generic requirements.
+- A versioned function may not change its external parameter names (labels).
+- A versioned function may not add, remove, or reorder parameters, whether or
+  not they have default values.
+- A versioned function that throws may not become non-throwing.
+- ``@noreturn`` may not be removed from a function.
+- The ``@noescape`` attribute may not be added to or removed from a parameter.
+  It is not a `versioned attribute` and so there is no way to guarantee that it
+  is safe when a client deploys against older versions of the library.
 
 
 Inlineable Functions
@@ -274,15 +301,14 @@ are a few common reasons for this:
   save the overhead of a cross-library function call and allow further
   optimization of callers.
 
-- The function accesses a fixed-layout struct with non-public members; this
+- The function accesses a fixed-contents struct with non-public members; this
   allows the library author to preserve invariants while still allowing
   efficient access to the struct.
 
-A public function marked with the ``@inlineable`` attribute makes its body
-available to clients as part of the module's public interface. The
-``@inlineable`` attribute takes a version number, just like ``@available``;
-clients may not assume that the body of the function is suitable when deploying
-against older versions of the library.
+A versioned function marked with the ``@inlineable`` attribute makes its body
+available to clients as part of the module's public interface. ``@inlineable``
+is a `versioned attribute`; clients may not assume that the body of the
+function is suitable when deploying against older versions of the library.
 
 Clients are not required to inline a function marked ``@inlineable``.
 
@@ -334,12 +360,13 @@ the following restrictions on the bodies of inlineable functions:
   functions declared within the inlineable function itself.
 
 - **They must not reference any** ``internal`` **entities except for those that
-  have been** `availability-pinned`_. See below for a discussion of pinning.
+  have been** `versioned`_. See below for a discussion of versioning internal
+  API.
 
 - **They must not reference any entities less available than the function
   itself.**
 
-.. _availability-pinned: #pinning
+.. _versioned: #versioning-internal-api
 
 An inlineable function is still emitted into its own module's binary. This
 makes it possible to take an existing function and make it inlineable, as long
@@ -351,6 +378,9 @@ If the body of an inlineable function is used in any way by a client module
 must take care to emit and use its own copy of the function. This is because
 analysis of the function body may not apply to the version of the function
 currently in the library.
+
+Default parameter value expressions are subject to the same restrictions as
+inlineable functions, because they are implemented as inlineable functions.
 
 Local Functions
 ---------------
@@ -365,55 +395,25 @@ considered to have ``shared`` linkage.)
 Local functions are subject to the same restrictions as the inlineable
 functions containing them, as described above.
 
-Pinning
--------
-
-FIXME: We're just going to call this "internal but versioned".
-
-An `availability-pinned` entity is simply an ``internal`` member, free
-function, or global binding that has been marked ``@available``. This promises
-that the entity will be available at link time in the containing module's
-binary. This makes it safe to refer to such an entity from an inlineable
-function. If a pinned entity is ever made ``public``, its availability should
-not be changed.
-
-.. note::
-
-    Why isn't this a special form of ``public``? Because we don't want it to
-    imply everything that ``public`` does, such as requiring overrides to be
-    ``public``.
-
-Because a pinned class member may eventually be made public, it must be assumed
-that new overrides may eventually appear from outside the module unless the
-member is marked ``final`` or the class is not publicly subclassable.
-
-We could do away with the entire "pinning" feature if we restricted inlineable
-functions to only refer to public entities. However, this removes one of the
-primary reasons to make something inlineable: to allow efficient access to a
-type while still protecting its invariants.
-
-.. note::
-
-    Types are not allowed to be pinned because that would have many more ripple
-    effects. It's not technically impossible; it just requires a lot more
-    thought.
-
 
 Top-Level Variables and Constants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Given a public module-scope variable declared with ``var``, the following
+Given a versioned module-scope variable declared with ``var``, the following
 changes are permitted:
 
 - Adding (but not removing) a public setter to a computed variable.
-- Adding or removing a non-public setter.
+- Adding or removing a non-public, non-versioned setter.
 - Changing from a stored variable to a computed variable, or vice versa, as
-  long as a previously-public setter is not removed.
+  long as a previously-versioned setter is not removed.
 - Changing the body of an accessor.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
   setter.
 - Changing the initial value of a stored variable.
+- Adding or removing ``weak`` from a variable with ``Optional`` type.
+- Adding or removing ``unowned`` from a variable.
+- Adding or removing ``@NSCopying`` to/from a variable.
 
 .. admonition:: TODO
 
@@ -448,8 +448,8 @@ Giving Up Flexibility
 Both top-level constants and variables can be marked ``@inlineable`` to allow
 clients to access them more efficiently. This restricts changes a fair amount:
 
-- Adding a public setter to a computed variable is still permitted.
-- Adding or removing a non-public setter is still permitted.
+- Adding a versioned setter to a computed variable is still permitted.
+- Adding or removing a non-public, non-versioned setter is still permitted.
 - Changing from stored to computed or vice versa is forbidden, because it would
   break existing clients.
 - Changing the body of an accessor is permitted but discouraged; existing
@@ -461,6 +461,10 @@ clients to access them more efficiently. This restricts changes a fair amount:
 - Changing the value of a constant is permitted but discouraged; like accessors,
   existing clients may use the new value, or the value from when they were
   compiled, or a mix of both.
+- Adding or removing ``weak`` is forbidden.
+- Adding or removing ``unowned`` is forbidden.
+- Adding or removing ``@NSCopying`` to/from a variable is permitted but
+  discouraged for the same reason.
 
 .. admonition:: TODO
 
@@ -495,7 +499,7 @@ the following changes are permitted:
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
   setter.
-- Removing any non-public members, including stored properties.
+- Removing any non-public, non-versioned members, including stored properties.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
 
@@ -504,7 +508,7 @@ layout.
 
 .. admonition:: TODO
 
-    We need to pin down how this, and the ``@fixed_layout`` attribute below,
+    We need to pin down how this, and the ``@fixed_contents`` attribute below,
     interacts with the "Behaviors" proposal. Behaviors that just change the
     accessors of a property are fine, but those that provide new entry points
     are trickier.
@@ -512,6 +516,11 @@ layout.
 Like top-level constants, it is *not* safe to change a ``let`` property into a
 variable or vice versa. Properties declared with ``let`` are assumed not to
 change for the entire lifetime of the program once they have been initialized.
+
+It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
+or accessor within a struct. These modifiers are not `versioned attributes
+<versioned attribute>` and as such there is no safety guarantee for a client
+deploying against an earlier version of the library.
 
 
 New Conformances
@@ -554,85 +563,74 @@ declare themselves to be either more or less available than what the extension
 provides.
 
 
-Fixed-layout Structs
---------------------
+Fixed-Contents Structs
+----------------------
 
-To opt out of this flexibility, a struct may be marked ``@fixed_layout``. This
-promises that no stored properties will be added to or removed from the struct,
-even ``private`` or ``internal`` ones. In effect:
+To opt out of this flexibility, a struct may be marked ``@fixed_contents``.
+This promises that no stored properties will be added to or removed from the
+struct, even ``private`` or ``internal`` ones. Additionally, all versioned
+stored properties in a ``@fixed_contents`` struct are implicitly declared
+``@inlineable`` (as described above for top-level variables). In effect:
 
-- Reordering stored instance properties relative to one another is not
-  permitted. Reordering all other members is still permitted.
+- Reordering all members, including stored properties, is still permitted.
 - Adding new stored instance properties (public or non-public) is not permitted.
   Adding any other new members is still permitted.
 - Existing instance properties may not be changed from stored to computed or
   vice versa.
-- Changing the body of any *existing* methods, initializers, or accessors is
-  permitted.
-- Adding or removing observing accessors from public stored properties is still
-  permitted.
+- Changing the body of any *existing* methods, initializers, computed property
+  accessors, or non-instance stored property accessors is permitted. Changing
+  the body of a stored instance property observing accessor is only permitted
+  if the property is not `versioned <versioned entity>`.
+- Adding or removing observing accessors from any
+  `versioned <versioned entity>` stored instance properties (public or
+  non-public) is not permitted.
 - Removing stored instance properties is not permitted. Removing any other
-  non-public members is still permitted.
+  non-public, non-versioned members is still permitted.
 - Adding a new protocol conformance is still permitted.
 - Removing conformances to non-public protocols is still permitted.
 
-The ``@fixed_layout`` attribute takes a version number, just like
-``@available``. This is so that clients can deploy against older versions of
-the library, which may have a different layout for the struct. (In this case
-the client must manipulate the struct as if the ``@fixed_layout`` attribute
-were absent.)
-
-.. admonition:: TODO
-
-    We really shouldn't care about the *order* of the stored properties.
-
-.. admonition:: TODO
-
-    Because observing accessors can still be added to public stored properties,
-    we don't get efficient setters unless they are also marked ``@inlineable``.
-    This seems suboptimal.
-
-.. admonition:: TODO
-
-    There are implementation concerns when the non-public fields do not have
-    public types. We probably just want to ban that configuration; otherwise,
-    clients will silently get slow performance copying the struct around.
-
-
-Fixed Properties
-----------------
-
-As shown above, the ``@fixed_layout`` attribute promises that all stored
-properties currently in a type will remain stored in all future library
-versions, but sometimes that isn't a reasonable promise. In this case, a
-library owner may still want to allow clients to rely on a *specific* stored
-property remaining stored, by applying the ``@fixed`` attribute to the property.
-
-.. admonition:: TODO
-
-    Is it valid for a fixed property to have observing accessors, or is it more
-    useful to promise that the setter is just a direct field access too? If it
-    were spelled ``@fragile``, I would assume that accessors are permitted but
-    they become inlineable, and so not having any accessors is just a
-    degenerate case of that.
-
-Like all other attributes in this section, the ``@fixed`` attribute must
-specify in which version of the library clients may rely on the property being
-stored. The attribute may not be applied to non-final properties in classes.
+Additionally, if the type of any stored instance property includes a struct or
+enum, that struct or enum must be `versioned <versioned entity>`. This includes
+generic parameters and members of tuples.
 
 .. note::
 
-    It would be possible to allow ``@fixed`` on non-final properties, and have
-    it only apply when the client code is definitively working with an instance
-    of the base class, not any of its subclasses. But this is probably too
-    subtle, and makes it look like the attribute is doing something useful when
-    it actually isn't.
+    This name is intentionally awful to encourage us to come up with a better
+    one.
+
+A ``@fixed_contents`` struct is *not* guaranteed to use the same layout as a C
+struct with a similar "shape". If such a struct is necessary, it should be
+defined in a C header and imported into Swift.
 
 .. note::
 
-    This is getting into "diminishing returns" territory. Should we just take
-    it out of the document for now? We can probably add it later, although like
-    the other attributes it couldn't be backdated.
+    We can add a *different* feature to control layout some day, or something
+    equivalent, but this feature should not restrict Swift from doing useful
+    things like minimizing member padding.
+
+.. note::
+
+    It would be possible to say that a ``@fixed_contents`` struct only
+    guarantees the "shape" of the struct, so to speak, while
+    leaving all property accesses to go through function calls. This would
+    allow stored properties to change their accessors, or (with the Behaviors
+    proposal) to change a behavior's implementation, or change from one
+    behavior to another. However, the *most common case* here is probably just
+    a simple C-like struct that groups together simple values, with only public
+    stored properties and no observing accessors, and having to opt into direct
+    access to those properties seems unnecessarily burdensome. The struct is
+    being declared ``@fixed_contents`` for a reason, after all: it's been
+    discovered that its use is causing performance issues.
+
+    Consequently, as a first pass we may just require all stored properties in
+    a ``@fixed_contents`` struct, public or non-public, to have trivial
+    accessors, i.e. no observing accessors and no behaviors.
+
+``@fixed_contents`` is a `versioned attribute`. This is so that clients can
+deploy against older versions of the library, which may have a different layout
+for the struct. (In this case the client must manipulate the struct as if the
+``@fixed_contents`` attribute were absent.)
+
 
 Enums
 ~~~~~
@@ -647,9 +645,9 @@ accommodate new values. More specifically, the following changes are permitted:
   an enum is RawRepresentable, changing the raw representations of cases may
   break existing clients who use them for serialization.
 - Adding a raw type to an enum that does not have one.
-- Removing a non-public case.
+- Removing a non-public, non-versioned case.
 - Adding any other members.
-- Removing any non-public members.
+- Removing any non-public, non-versioned members.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
 
@@ -666,39 +664,35 @@ accommodate new values. More specifically, the following changes are permitted:
     be useful, and they require essentially the same implementation work as
     cases added in future versions of a library.
 
-.. admonition:: TODO
-
-    This states that adding/removing ``indirect`` (on either a case or the
-    entire enum) is considered a breaking change. Is that what we want?
-
 
 Closed Enums
 ------------
 
-A library owner may opt out of this flexibility by marking the enum as
-``@closed``. A "closed" enum may not have any ``private`` or ``internal`` cases
-and may not add new cases in the future. This guarantees to clients that the
-enum cases are exhaustive. In particular:
+A library owner may opt out of this flexibility by marking a versioned enum as
+``@closed``. A "closed" enum may not have any cases with less access than the
+enum itself, and may not add new cases in the future. This guarantees to
+clients that the enum cases are exhaustive. In particular:
 
 - Adding new cases is not permitted
 - Reordering existing cases is not permitted.
 - Adding a raw type to an enum that does not have one is still permitted.
 - Removing a non-public case is not applicable.
 - Adding any other members is still permitted.
-- Removing any non-public members is still permitted.
+- Removing any non-public, non-versioned members is still permitted.
 - Adding a new protocol conformance is still permitted.
 - Removing conformances to non-public protocols is still permitted.
 
 .. note::
 
-    Were a "closed" enum allowed to have non-public cases, clients of the
-    library would still have to treat the enum as opaque and would still have
-    to be able to handle unknown cases in their ``switch`` statements.
+    Were a public "closed" enum allowed to have non-public cases, clients of
+    the library would still have to treat the enum as opaque and would still
+    have to be able to handle unknown cases in their ``switch`` statements.
 
-The ``@closed`` attribute takes a version number, just like ``@available``.
-This is so that clients can deploy against older versions of the library, which
-may have non-public cases in the enum. (In this case the client must manipulate
-the enum as if the ``@closed`` attribute were absent.)
+``@closed`` is a `versioned attribute`. This is so that clients can deploy
+against older versions of the library, which may have non-public cases in the
+enum. (In this case the client must manipulate the enum as if the ``@closed``
+attribute were absent.) All cases that are not versioned become implicitly
+versioned with this number.
 
 Even for default "open" enums, adding new cases should not be done lightly. Any
 clients attempting to do an exhaustive switch over all enum cases will likely
@@ -723,19 +717,19 @@ There are very few safe changes to make to protocols:
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 
-However, any members may be added to protocol extensions, and non-public
-members may always be removed from protocol extensions.
+All other changes to the protocol itself are forbidden, including:
 
-.. admonition:: TODO
+- Making an existing requirement optional.
+- Making a non-``@objc`` protocol ``@objc`` or vice versa.
 
-    We don't have an implementation model hammered out for adding new
-    defaulted requirements, but it is desirable.
+Protocol extensions may be more freely modified; `see below`__.
+
+__ #protocol-extensions
 
 .. admonition:: TODO
 
     It would also be nice to be able to add new associated types with default
     values, but that seems trickier to implement.
-
 
 Classes
 ~~~~~~~
@@ -750,7 +744,7 @@ support all of the following changes:
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
   setter.
-- Removing any non-public members, including stored properties.
+- Removing any non-public, non-versioned members, including stored properties.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
 
@@ -771,12 +765,20 @@ Finally, classes allow the following changes that do not apply to structs:
   declaration of the original member must remain along with its original
   availability, but its body may consist of simply calling the new superclass
   implementation.
+- A non-final override of a method, subscript, property, or initializer may be
+  removed as long as the generic parameters, formal parameters, and return type
+  *exactly* match the overridden declaration. Any existing callers should 
+  automatically use the superclass implementation.
+- ``@noreturn`` may be only added to a method if it is not publicly
+  overridable.
+- ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
+  without providing any extra version information. Removing any of these is
+  permitted but discouraged.
+- Likewise, ``@IBDesignable`` may be added to a class without providing any
+  extra version information. Removing it is permitted but discouraged.
 - Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
   is a subclass of ``A`` *and* class ``B``, along with any superclasses between
   it and class ``A``, were introduced in the latest version of the library.
-- A non-final override of a method, subscript, property, or initializer may be
-  removed; any existing callers should automatically use the superclass
-  implementation.
 
 .. admonition:: TODO
 
@@ -804,19 +806,32 @@ are permitted. In particular:
   be subclasses/overrides that would be broken by the change.
 - ``dynamic`` may not be added to *or* removed from any members. Existing
   clients would not know to invoke the member dynamically.
-- A ``final`` override of a member may *not* be removed; existing clients may
-  be performing a direct call to the implementation instead of using dynamic
-  dispatch.
+- A ``final`` override of a member may *not* be removed, even if the type
+  matches exactly; existing clients may be performing a direct call to the
+  implementation instead of using dynamic dispatch.
+- It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
+  or accessor within a class. These modifiers are not `versioned attributes
+  <versioned attribute>` and as such there is no safety guarantee for a client
+  deploying against an earlier version of the library.
+- ``@objc`` and ``@nonobjc`` may not be added to or removed from the class or
+  any existing members.
+- ``@NSManaged`` may not be added to or removed from any existing members.
 
 .. note:: These restrictions tie in with the ongoing discussions about
   "``final``-by-default" and "non-publicly-subclassable-by-default".
+
+.. admonition:: TODO
+
+    The ``@NSManaged`` attribute as it is in Swift 2 exposes implementation
+    details to clients in a bad way. We need to fix this.
+    rdar://problem/20829214
 
 
 Possible Restrictions on Classes
 --------------------------------
 
 In addition to ``final``, it may be useful to restrict the size of a class
-instance (like a struct's ``@fixed_layout``) or the number of overridable
+instance (like a struct's ``@fixed_contents``) or the number of overridable
 members in its virtual dispatch table. These annotations have not been designed.
 
 
@@ -842,15 +857,15 @@ the base type; see the sections on structs, enums, and classes above.
 Protocol Extensions
 -------------------
 
-Protocol extensions follow slightly different rules; the following changes
-are permitted:
+Protocol extensions follow slightly different rules from other extensions; the
+following changes are permitted:
 
 - Adding new extensions and removing empty extensions.
 - Moving a member from one extension to another within the same module, as long
   as both extensions have the exact same constraints.
 - Adding any new member.
 - Reordering members.
-- Removing any non-public member.
+- Removing any non-public, non-versioned member.
 - Changing the body of any methods, initializers, or accessors.
 
 
@@ -864,13 +879,34 @@ changed at all except for the following:
 
 - Making a non-associative operator left- or right-associative.
 
+Operator declarations are not versioned.
+
+
+Typealiases
+~~~~~~~~~~~
+
+Typealiases only exist at compile-time, so changing a top-level typealias
+affects source compatibility but not binary compatibility. Since a typealias is
+only made up of its name and its type, it is recommended that a public
+top-level typealias is never changed at all after being published.
+
+Public typealiases within structs, enums, and protocols may be used for
+protocol conformances (to satisfy associated type requirements), not only
+within the library but within client modules as well. Therefore, changing a
+member typealias in any way is not permitted.
+
+It is always permitted to change the *use* of a public typealias to its
+underlying type, and vice versa, at any location in the program.
+
+Neither top-level nor member typealiases are versioned.
+
 
 A Unifying Theme
 ~~~~~~~~~~~~~~~~
 
 So far this proposal has talked about ways to give up flexibility for several
 different kinds of declarations: ``@inlineable`` for functions,
-``@fixed_layout`` for structs, etc. Each of these has a different set of
+``@fixed_contents`` for structs, etc. Each of these has a different set of
 constraints it enforces on the library author and promises it makes to clients.
 However, they all follow a common theme of giving up the flexibility of future
 changes in exchange for improved performance and perhaps some semantic
@@ -881,6 +917,54 @@ Given that these attributes share several characteristics, we could consider
 converging on a single common attribute, say ``@fixed``, ``@inline``, or
 ``@fragile``. However, this may be problematic if the same declaration has
 multiple kinds of flexibility, as in the description of classes above.
+
+
+Versioning Internal Declarations
+================================
+
+The initial discussion on versioning focused on ``public`` APIs, making sure
+that a client knows what features they can use when a specific version of a
+library is present. Inlineable functions have much the same constraints, except
+the inlineable function is the client and the entities being used may not be
+``public``.
+
+Adding a versioning annotation to an ``internal`` entity promises that the
+entity will be available at link time in the containing module's binary. This
+makes it safe to refer to such an entity from an inlineable function. If the
+entity is ever made ``public``, its availability should not be changed; not
+only is it safe for new clients to rely on it, but *existing* clients require
+its presence as well.
+
+.. note::
+
+    Why isn't this a special form of ``public``? Because we don't want it to
+    imply everything that ``public`` does, such as requiring overrides to be
+    ``public``.
+
+Because a versioned class member may eventually be made ``public``, it must be
+assumed that new overrides may eventually appear from outside the module unless
+the member is marked ``final`` or the class is not publicly subclassable.
+
+Non-public conformances are never considered versioned, even if both the
+conforming type and the protocol are versioned.
+
+Entities declared ``private`` may not be versioned; the mangled name of such an
+entity includes an identifier based on the containing file, which means moving
+the declaration to another file changes the entity's mangled name. This implies
+that a client would not be able to find the entity at run time if the source
+code is reorganized, which is unacceptable.
+
+.. note::
+
+    There are ways around this limitation, the most simple being that versioned
+    ``private`` entities are subject to the same cross-file redeclaration rules
+    as ``internal`` entities. However, this is a purely additive feature, so to
+    keep things simple we'll stick with the basics.
+
+We could do away with the entire feature if we restricted inlineable functions
+and fixed-contents structs to only refer to public entities. However, this
+removes one of the primary reasons to make something inlineable: to allow
+efficient access to a type while still protecting its invariants.
 
 
 Optimization
@@ -936,11 +1020,11 @@ containing library is the version attached to the ``@inlineable`` attribute.
 Code within this context must be treated as if the containing library were just
 a normal dependency.
 
-A publicly inlineable function still has a public symbol, which may be used
-when the function is referenced from a client rather than called. This version
-of the function is not subject to the same restrictions as the version that
-may be inlined, and so it may be desirable to compile a function twice: once
-for inlining, once for maximum performance.
+A versioned inlineable function still has an exported symbol in the library
+binary, which may be used when the function is referenced from a client rather
+than called. This version of the function is not subject to the same
+restrictions as the version that may be inlined, and so it may be desirable to
+compile a function twice: once for inlining, once for maximum performance.
 
 
 Local Availability Contexts
@@ -969,6 +1053,11 @@ except that they can be enforced by the compiler.
 
 - ``size_in_bits(N)``: Promises that the type is not larger than a certain
   size. (It may be smaller.)
+
+- ``fixed_size``: Promises that the type has *some* size known at compile-time,
+  allowing optimizations like promoting allocations to the stack. Only applies
+  to fixed-contents structs and closed enums, which can already infer this
+  information; the explicit annotation allows it to be enforced.
 
 Collectively these features are known as "performance assertions", to
 underscore the fact that they do not affect how a type is used at the source
@@ -1019,16 +1108,16 @@ check their work. Therefore, we intend to ship a tool that can compare two
 versions of a library's public interface, and present any suspect differences
 for verification. Important cases include but are not limited to:
 
-- Removal of public entities.
+- Removal of versioned entities.
 
-- Incompatible modifications to public entities, such as added protocol
+- Incompatible modifications to versioned entities, such as added protocol
   conformances lacking versioning information.
 
 - Unsafely-backdated "fragile" attributes as discussed in the `Giving Up
   Flexibility`_ section.
 
 - Unsafe modifications to entities marked with the "fragile" attributes, such as
-  adding a stored property to a ``@fixed_layout`` struct.
+  adding a stored property to a ``@fixed_contents`` struct.
 
 
 Automatic Versioning
@@ -1076,6 +1165,31 @@ that client code will never accidentally introduce implicit dependencies on
 specific versions of libraries.
 
 
+Related Proposals
+=================
+
+The following proposals (some currently in the process, some planned) will
+affect the model described in this document, or concern the parts of this
+document that affect language semantics:
+
+- `SE-0030 Property Behaviors`_
+- (planned) Overridable methods in extensions
+- (planned) Making classes "sealed" by default
+- (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
+- (planned) Default implementations in protocols
+- (planned) Open and closed enums
+- (planned) Syntax for declaring "versioned" entities and their features
+- (planned) Syntax for declaring inlineable code
+- (planned) Syntax for declaring fixed-contents structs
+- (future) Performance annotations for types
+- (future) Attributes for stored property accessors
+
+.. _SE-0030 Property Behaviors: https://github.com/apple/swift-evolution/blob/master/proposals/0030-property-behavior-decls.md
+
+This does not mean all of these proposals need to be accepted, only that their
+acceptance or rejection will affect this document.
+
+
 Glossary
 ========
 
@@ -1098,9 +1212,6 @@ Glossary
     are always properly nested, and the global availability context includes
     the module's minimum deployment target and minimum dependency versions.
 
-  availability-pinned
-    See `Pinning`_.
-
   backwards-compatible
     A modification to an API that does not break existing clients. May also
     describe the API in question.
@@ -1121,7 +1232,9 @@ Glossary
     (Note that this is a dynamic constraint.)
 
   entity
-    A type, function, member, or global in a Swift program.
+    A type, function, member, or global in a Swift program. Occasionally the
+    term "entities" also includes conformances, since these have a runtime
+    presence and are depended on by clients.
 
   forwards-compatible
     An API that is designed to handle future clients, perhaps allowing certain
@@ -1154,3 +1267,9 @@ Glossary
   trivial
     A value whose assignment just requires a fixed-size bit-for-bit copy
     without any indirection or reference-counting operations.
+
+  versioned entity
+    See `Publishing Versioned API`_.
+
+  versioned attribute
+    See `Publishing Versioned API`_.

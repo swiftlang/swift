@@ -89,7 +89,7 @@ enum class ProtocolConformanceState {
 ///
 /// ProtocolConformance is an abstract base class, implemented by subclasses
 /// for the various kinds of conformance (normal, specialized, inherited).
-class ProtocolConformance {
+class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// The kind of protocol conformance.
   ProtocolConformanceKind Kind;
 
@@ -455,7 +455,7 @@ public:
   }
 };
 
-/// Specalized protocol conformance, which projects a generic protocol
+/// Specialized protocol conformance, which projects a generic protocol
 /// conformance to one of the specializations of the generic type.
 ///
 /// For example:

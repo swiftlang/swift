@@ -1,4 +1,4 @@
-//===--- SILSSAUpdater.cpp - Unstructured SSA Update Tool -------*- C++ -*-===//
+//===--- SILSSAUpdater.cpp - Unstructured SSA Update Tool -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -101,7 +101,7 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
            "The function_refs need to have the same value");
     SILInstruction *User = Op.getUser();
     auto *NewFR = FR->clone(User);
-    Op.set(SILValue(NewFR, Op.get().getResultNumber()));
+    Op.set(NewFR);
     return;
   } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Op.get()))
     if (areIdentical(getAvailVals(AV))) {
@@ -109,7 +109,7 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
       // ctlz).
       SILInstruction *User = Op.getUser();
       auto *NewIL = IL->clone(User);
-      Op.set(SILValue(NewIL, Op.get().getResultNumber()));
+      Op.set(NewIL);
       return;
     }
 
@@ -204,7 +204,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
                                                                PredVals.end());
     for (auto *Arg : BB->getBBArgs())
       if (isEquivalentPHI(Arg, ValueMap))
-        return SILValue(Arg, 0);
+        return Arg;
 
   }
 
@@ -216,7 +216,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   if (InsertedPHIs)
     InsertedPHIs->push_back(PHI);
 
-  return SILValue(PHI, 0);
+  return PHI;
 }
 
 /// SSAUpdaterTraits<MachineSSAUpdater> - Traits for the SSAUpdaterImpl
@@ -306,20 +306,20 @@ public:
 
   static SILValue GetUndefVal(SILBasicBlock *BB,
                               SILSSAUpdater *Updater) {
-    return SILValue(SILUndef::get(Updater->ValType, &BB->getModule()), 0);
+    return SILUndef::get(Updater->ValType, &BB->getModule());
   }
 
   /// Add an Argument to the basic block.
   static SILValue CreateEmptyPHI(SILBasicBlock *BB, unsigned NumPreds,
                                  SILSSAUpdater *Updater) {
     // Add the argument to the block.
-    SILValue PHI(new (BB->getModule()) SILArgument(BB, Updater->ValType), 0);
+    SILValue PHI(new (BB->getModule()) SILArgument(BB, Updater->ValType));
 
     // Mark all predecessor blocks with the sentinel undef value.
     SmallVector<SILBasicBlock*, 4> Preds(BB->pred_begin(), BB->pred_end());
     for (auto *PredBB: Preds) {
       TermInst *TI = PredBB->getTerminator();
-      addNewEdgeValueToBranch(TI, BB, SILValue(Updater->PHISentinel.get(), 0));
+      addNewEdgeValueToBranch(TI, BB, Updater->PHISentinel.get());
     }
     return PHI;
   }
@@ -344,7 +344,7 @@ public:
   /// ValueIsPHI - Check if the instruction that defines the specified register
   /// is a PHI instruction.
   static SILArgument *ValueIsPHI(SILValue V, SILSSAUpdater *Updater) {
-    return InstrIsPHI(V.getDef());
+    return InstrIsPHI(V);
   }
 
   /// Like ValueIsPHI but also check if the PHI has no source
@@ -364,7 +364,7 @@ public:
 
         SILValue V = Edges[PhiIdx];
         // Check for the 'not set' sentinel.
-        if (V.getDef() != Updater->PHISentinel.get())
+        if (V != Updater->PHISentinel.get())
           return nullptr;
       }
       return PHI;
@@ -373,7 +373,7 @@ public:
   }
 
   static SILValue GetPHIValue(SILArgument *PHI) {
-    return SILValue(PHI, 0);
+    return PHI;
   }
 };
 

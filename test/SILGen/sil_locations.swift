@@ -64,12 +64,13 @@ func ifexpr_rval() -> Int {
 
 // TODO: missing info on the first branch.
 func forstmt_empty_cond(i: Int) -> Int {
-  for var i=0;;++i {}
+  var i = i
+  for i=0;;++i {}
     // CHECK-LABEL: sil hidden  @{{.*}}forstmt_empty_cond{{.*}}
-    // CHECK: apply {{.*}} line:[[@LINE-2]]:13
+    // CHECK: apply {{.*}} line:[[@LINE-2]]:9
     // CHECK: br [[TRUE_BB:bb[0-9]+]]
     // CHECK: [[TRUE_BB:bb[0-9]+]]:
-    // CHECK: br [[TRUE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-5]]:21
+    // CHECK: br [[TRUE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-5]]:17
 }
 
 // --- Test function calls.
@@ -87,7 +88,7 @@ func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden  @_TF13sil_locations15useTemplateTestFT_Si
 
-  // CHECK: function_ref @_TFSiC{{.*}} line:87
+  // CHECK: function_ref @_TFSiC{{.*}}
 }
 
 func foo(x: Int) -> Int {
@@ -149,7 +150,7 @@ func testSwitch() {
   // CHECK: integer_literal $Builtin.Int2048, 200  // {{.*}} line:[[@LINE-2]]:18
     x = z
   // CHECK:  strong_release [[VAR_Z]]{{.*}}        // {{.*}} line:[[@LINE-1]]:9:cleanup
-  case (3, let y):
+  case (3, var y):
     x += 1
   }
 }
@@ -308,7 +309,7 @@ enum SinglePayloadAddressOnly {
 }
 func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   switch v {
-  case .x(let runcible):
+  case .x(var runcible):
     runcible.runce()
   case .y:
     runcibleWhy()

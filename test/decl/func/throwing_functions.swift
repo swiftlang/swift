@@ -39,23 +39,12 @@ var d : () throws -> () throws -> () = curry3Throws
 
 // Partial application ////////////////////////////////////////////////////////
 
-func partialApply1(a: Int)(b: Int)(c: Int) throws { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-
-func partialApply2<T>(a: T)(b: Int)(c: Int) throws { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-
 protocol Parallelogram {
-  static func partialApply3(a: Int) throws
+  static func partialApply1(a: Int) throws
 }
 
-let f11 = partialApply1
-let f12 = partialApply1(1)
-let f13 = partialApply1(1)(b: 2)
-
-let f22 = partialApply2(1)
-let f23 = partialApply2(1)(b: 2)
-
-func partialApply4<T: Parallelogram>(t: T) {
-  _ = T.partialApply3
+func partialApply2<T: Parallelogram>(t: T) {
+  _ = T.partialApply1
 }
 
 // Overload resolution/////////////////////////////////////////////////////////
@@ -78,8 +67,6 @@ func barT() -> Int { return 0 } // expected-error{{invalid redeclaration of 'bar
 
 func fooT(callback: () throws -> Bool) {} //OK
 func fooT(callback: () -> Bool) {}
-
-func jerry(i: Int)(j: Int) throws -> Int { return 0 } // (Int) -> (Int) throws -> Int expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 
 // Throwing and non-throwing types are not equivalent.
 struct X<T> { }

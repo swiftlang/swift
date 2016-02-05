@@ -2,6 +2,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 struct S1 {}
 struct S2 {}
 
@@ -13,7 +21,6 @@ func test_expectType() {
 
 func test_expectEqualType() {
   expectEqualType(S1.self, S1.self)
-  expectEqualType(S1.self, S2.self) // expected-error {{cannot invoke 'expectEqualType' with an argument list of type '(S1.Type, S2.Type)'}}
-  // expected-note @-1 {{expected an argument list of type '(T.Type, T.Type)'}}
+  expectEqualType(S1.self, S2.self) // expected-error {{cannot convert value of type 'S2.Type' to expected argument type 'S1'}}
 }
 

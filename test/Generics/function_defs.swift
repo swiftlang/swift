@@ -17,8 +17,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> 
     return true
   }
 
-  return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}} expected-note {{expected an argument list of type '(T)'}}
 }
 
 protocol MethodLessComparable {
@@ -76,8 +75,8 @@ protocol Overload {
   associatedtype B
   func getA() -> A
   func getB() -> B
-  func f1(_: A) -> A
-  func f1(_: B) -> B
+  func f1(_: A) -> A // expected-note{{found this candidate}}
+  func f1(_: B) -> B // expected-note{{found this candidate}}
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
   func f3(_: Int) -> Int // expected-note {{found this candidate}}
@@ -107,8 +106,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
-  // expected-note @-1 {{overloads for 'f1' exist with these partially matching parameter lists: (Self.A), (Self.B)}}
+  other.f1(a) // expected-error{{ambiguous reference to member 'f1'}}
                                                         
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3
@@ -134,7 +132,7 @@ protocol Subscriptable {
   func getIndex() -> Index
   func getValue() -> Value
 
-  subscript (index : Index) -> Value { get set }
+  subscript (index : Index) -> Value { get set } // expected-note{{found this candidate}}
 }
 
 protocol IntSubscriptable {
@@ -142,7 +140,7 @@ protocol IntSubscriptable {
 
   func getElement() -> ElementType
 
-  subscript (index : Int) -> ElementType { get  }
+  subscript (index : Int) -> ElementType { get  } // expected-note{{found this candidate}}
 }
 
 func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
@@ -155,8 +153,7 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   element = t[17]
   t[42] = element // expected-error{{cannot assign through subscript: subscript is get-only}}
 
-  t[value] = 17 // expected-error{{cannot subscript a value of type 'T' with an index of type 'T.Value'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Self.Index), (Int)}}
+  t[value] = 17 // expected-error{{ambiguous reference to member 'subscript'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -171,8 +168,8 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
 
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
-  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}}
-  // expected-note @-1 {{expected an argument list of type '(T, y: T)'}}
+
+  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}} expected-note {{expected an argument list of type '(T, y: T)'}}
 }
 
 //===----------------------------------------------------------------------===//

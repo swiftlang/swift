@@ -148,7 +148,7 @@ Condition SILGenFunction::emitCondition(Expr *E,
     FullExpr Scope(Cleanups, CleanupLocation(E));
     V = emitRValue(E).forwardAsSingleValue(*this, E);
   }
-  assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
+  assert(V->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
 
   return emitCondition(V, E, hasFalseCode, invertValue, contArgs);
 }

@@ -78,6 +78,12 @@ public struct CollectionOfOne<Element> : Collection {
   let element: Element
 }
 
+extension CollectionOfOne : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, children: ["element": element])
+  }
+}
+
 @available(*, unavailable, renamed="IteratorOverOne")
 public struct GeneratorOfOne<Element> {}
 

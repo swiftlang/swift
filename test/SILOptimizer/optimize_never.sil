@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline -specdevirt  %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -generic-specializer -inline %s > %t.sil
+// RUN: %target-sil-opt -enable-sil-verify-all -specdevirt %t.sil | FileCheck %s
 
 // Check that the  @_semantics("optimize.sil.never") annotation prevents
 // any optimizations of the annotated function:

@@ -55,7 +55,7 @@ for item in [AnyObject]() {  // No warning in for-each loop.
 
 
 // <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
-var ptr = nil // expected-error {{type of expression is ambiguous without more context}}
+var ptr = nil // expected-error {{'nil' requires a contextual type}}
 
 func testAnyObjectOptional() -> AnyObject? {
   let x = testAnyObjectOptional()

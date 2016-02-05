@@ -2,21 +2,21 @@
 
 import itertools
 
-traversal_options = [ 'Forward', 'Bidirectional', 'RandomAccess' ]
-base_kind_options = [ 'Defaulted', 'Minimal' ]
-mutable_options = [ False, True ]
+traversal_options = ['Forward', 'Bidirectional', 'RandomAccess']
+base_kind_options = ['Defaulted', 'Minimal']
+mutable_options = [False, True]
 for traversal, base_kind, mutable in itertools.product(traversal_options,
                                                        base_kind_options,
                                                        mutable_options):
     # Test Slice<Base> and MutableSlice<Base> of various collections using value
     # types as elements.
-    wrapper_types = [ 'Slice', 'MutableSlice' ] if mutable else [ 'Slice' ]
+    wrapper_types = ['Slice', 'MutableSlice'] if mutable else ['Slice']
     for Wrapper in wrapper_types:
         for name, prefix, suffix in [
-          ('FullWidth', '[]', '[]'),
-          ('WithPrefix', '[ -9999, -9998, -9997 ]', '[]'),
-          ('WithSuffix', '[]', '[ -9999, -9998, -9997 ]'),
-          ('WithPrefixAndSuffix', '[ -9999, -9998, -9997, -9996, -9995 ]', '[ -9994, -9993, -9992 ]')
+                ('FullWidth', '[]', '[]'),
+                ('WithPrefix', '[-9999, -9998, -9997]', '[]'),
+                ('WithSuffix', '[]', '[ -9999, -9998, -9997]'),
+                ('WithPrefixAndSuffix', '[-9999, -9998, -9997, -9996, -9995]', '[-9994, -9993, -9992]')
         ]:
             Base = '%s%s%sCollection' % (base_kind, traversal, 'Mutable' if mutable else '')
             testFilename = Wrapper + '_Of_' + Base + '_' + name + '.swift'
@@ -35,6 +35,7 @@ for traversal, base_kind, mutable in itertools.product(traversal_options,
 // REQUIRES: optimized_stdlib
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
@@ -61,12 +62,7 @@ ${{SliceTest}}
 
 runAllTests()
 """.format(
-    testFilename=testFilename,
-    traversal=traversal,
-    base_kind=base_kind,
-    mutable=mutable,
-    Wrapper=Wrapper,
-    name=name,
-    prefix=prefix,
-    suffix=suffix
-))
+                    testFilename=testFilename, traversal=traversal,
+                    base_kind=base_kind, mutable=mutable,
+                    Wrapper=Wrapper, name=name, prefix=prefix,
+                    suffix=suffix))

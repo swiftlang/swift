@@ -317,13 +317,6 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 
-bool SILType::hasFixedLayout(SILModule &M) const {
-  if (auto *NTD = getNominalOrBoundGenericNominal())
-    return NTD->hasFixedLayout(M.getSwiftModule());
-
-  llvm_unreachable("hasFixedLayout on non-nominal types not implemented");
-}
-
 /// True if the type, or the referenced type of an address type, is
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.

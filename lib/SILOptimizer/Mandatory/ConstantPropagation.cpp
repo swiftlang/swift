@@ -766,7 +766,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
     return false;
 
   // Replace all uses of the old instruction by a new instruction.
-  SILValue(AI).replaceAllUsesWith(Concatenated);
+  AI->replaceAllUsesWith(Concatenated);
 
   auto RemoveCallback = [&](SILInstruction *DeadI) { WorkList.remove(DeadI); };
   // Remove operands that are not used anymore.
@@ -777,7 +777,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
   for (auto &Op : AI->getAllOperands()) {
     SILValue Val = Op.get();
     Op.drop();
-    if (Val.use_empty()) {
+    if (Val->use_empty()) {
       auto *DeadI = dyn_cast<SILInstruction>(Val);
       recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
                                                  RemoveCallback);
@@ -861,7 +861,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
 
         InvalidateInstructions = true;
-        SILValue(I).replaceAllUsesWith(V);
+        I->replaceAllUsesWith(V);
       },
       [&](SILInstruction *I) { /* EraseAction */
         auto *TI = dyn_cast<TermInst>(I);
@@ -1022,12 +1022,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
           // If the user is a tuple_extract, just substitute the right value in.
           if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
             SILValue NewVal = TI->getOperand(TEI->getFieldNo());
-            assert(TEI->getTypes().size() == 1 &&
-                   "Currently, we only support single result instructions.");
-            SILValue(TEI, 0).replaceAllUsesWith(NewVal);
+            TEI->replaceAllUsesWith(NewVal);
             TEI->dropAllReferences();
             FoldedUsers.insert(TEI);
-            if (auto *Inst = dyn_cast<SILInstruction>(NewVal.getDef()))
+            if (auto *Inst = dyn_cast<SILInstruction>(NewVal))
               WorkList.insert(Inst);
           }
         }
@@ -1038,12 +1036,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
 
       // We were able to fold, so all users should use the new folded value.
-      assert(User->getTypes().size() == 1 &&
-             "Currently, we only support single result instructions");
-      SILValue(User).replaceAllUsesWith(C);
+      User->replaceAllUsesWith(C);
 
       // The new constant could be further folded now, add it to the worklist.
-      if (auto *Inst = dyn_cast<SILInstruction>(C.getDef()))
+      if (auto *Inst = dyn_cast<SILInstruction>(C))
         WorkList.insert(Inst);
     }
 

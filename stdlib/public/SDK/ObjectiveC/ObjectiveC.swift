@@ -61,10 +61,10 @@ public struct ObjCBool : Boolean, BooleanLiteralConvertible {
   }
 }
 
-extension ObjCBool : _Reflectable {
+extension ObjCBool : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _Mirror {
-    return _reflect(boolValue)
+  public var customMirror: Mirror {
+    return Mirror(reflecting: boolValue)
   }
 }
 
@@ -165,10 +165,10 @@ extension String {
   }
 }
 
-extension Selector : _Reflectable {
+extension Selector : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _Mirror {
-    return _reflect(String(_sel: self))
+  public var customMirror: Mirror {
+    return Mirror(reflecting: String(_sel: self))
   }
 }
 
@@ -187,6 +187,9 @@ public struct NSZone : NilLiteralConvertible {
     pointer = nil
   }
 }
+
+// Note: NSZone becomes Zone in Swift 3.
+typealias Zone = NSZone
 
 //===----------------------------------------------------------------------===//
 // FIXME: @autoreleasepool substitute

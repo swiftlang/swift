@@ -1,4 +1,4 @@
-//===--- IVAnalysis.cpp - SIL IV Analysis -----------------------*- C++ -*-===//
+//===--- IVAnalysis.cpp - SIL IV Analysis ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -70,7 +70,7 @@ SILArgument *IVInfo::isInductionSequence(SCCType &SCC) {
     }
 
     case ValueKind::TupleExtractInst: {
-      assert(inSCC(cast<TupleExtractInst>(I)->getOperand().getDef(), SCC) &&
+      assert(inSCC(cast<TupleExtractInst>(I)->getOperand(), SCC) &&
              "TupleExtract operand not an induction var");
       break;
     }

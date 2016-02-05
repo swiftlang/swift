@@ -36,7 +36,7 @@ public struct StaticString
     StringLiteralConvertible,
     CustomStringConvertible,
     CustomDebugStringConvertible,
-    _Reflectable {
+    CustomReflectable {
 
   /// Either a pointer to the start of UTF-8 data, or an integer representation
   /// of a single Unicode scalar.
@@ -227,6 +227,12 @@ public struct StaticString
 
   public func _getMirror() -> _Mirror {
     return _reflect(self.description)
+  }
+}
+
+extension StaticString {
+  public var customMirror: Mirror {
+    return Mirror(reflecting: stringValue)
   }
 }
 

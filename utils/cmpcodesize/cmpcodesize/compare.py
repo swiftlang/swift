@@ -18,31 +18,31 @@ from operator import itemgetter
 
 Prefixes = {
     # Cpp
-    "__Z" : "CPP",
-    "_swift" : "CPP",
-    "__swift" : "CPP",
+    "__Z": "CPP",
+    "_swift": "CPP",
+    "__swift": "CPP",
 
     # Objective-C
-    "+[" : "ObjC",
-    "-[" : "ObjC",
+    "+[": "ObjC",
+    "-[": "ObjC",
 
     # Swift
-    "__TP"  : "Partial Apply",
-    "__TTW" : "Protocol Witness",
-    "__Tw"  : "Value Witness",
-    "__TM"  : "Type Metadata",
-    "__TF"  : "Swift Function",
-    "__TTSg" : "Generic Spec",
-    "__TTSf" : "FuncSig Spec",
-    "__TZF" : "Static Func",
+    "__TP": "Partial Apply",
+    "__TTW": "Protocol Witness",
+    "__Tw": "Value Witness",
+    "__TM": "Type Metadata",
+    "__TF": "Swift Function",
+    "__TTSg": "Generic Spec",
+    "__TTSf": "FuncSig Spec",
+    "__TZF": "Static Func",
     # Function signature specialization of a generic specialization.
-    "__TTSGF" : "FuncSigGen Spec",
-    "__TTo" : "Swift @objc Func",
+    "__TTSGF": "FuncSigGen Spec",
+    "__TTo": "Swift @objc Func",
 }
 
 Infixes = {
-  #Swift
-  "q_" : "Generic Function"
+    #Swift
+    "q_": "Generic Function"
 }
 
 GenericFunctionPrefix = "__TTSg"
@@ -180,7 +180,7 @@ def compareSizesOfFile(oldFiles, newFiles, allSections, listCategories):
     compareSizes(oldSizes, newSizes, "__text", title)
     if listCategories:
         prev = None
-        for categoryName in sorted(Prefixes.values()) + sorted(Infixes.values())+ ["Unknown"]:
+        for categoryName in sorted(Prefixes.values()) + sorted(Infixes.values()) + ["Unknown"]:
             if categoryName != prev:
                 compareSizes(oldSizes, newSizes, categoryName, "")
             prev = categoryName
@@ -264,7 +264,7 @@ def compareFunctionSizes(oldFiles, newFiles):
                 sizeDecrease -= diff
             if diff == 0:
                 inBothSize += newSize
-            print("%8d %8d %8d %s" %(oldSize, newSize, newSize - oldSize, func))
+            print("%8d %8d %8d %s" % (oldSize, newSize, newSize - oldSize, func))
         print("Total size of functions with the same size in both files: {}".format(inBothSize))
         print("Total size of functions that got smaller: {}".format(sizeDecrease))
         print("Total size of functions that got bigger: {}".format(sizeIncrease))

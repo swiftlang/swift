@@ -25,17 +25,17 @@ public protocol Interval {
   func clamp(intervalToClamp: Self) -> Self
 
   /// `true` iff `self` is empty.
-  var isEmpty: Bool {get}
+  var isEmpty: Bool { get }
 
 
   /// The `Interval`'s lower bound.
   ///
   /// Invariant: `start` <= `end`.
-  var start: Bound {get}
+  var start: Bound { get }
   /// The `Interval`'s upper bound.
   ///
   /// Invariant: `start` <= `end`.
-  var end: Bound {get}
+  var end: Bound { get }
 }
 
 % for Kind, rangeOperator, upperBoundCompare in [
@@ -58,7 +58,8 @@ selfDocComment += """
 
 ${selfDocComment}
 public struct ${Self}<Bound : Comparable>
-  : Interval, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
+  : Interval, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
+  CustomReflectable, CustomPlaygroundQuickLookable {
 
   /// Construct a copy of `x`.
   public init(_ x: ${Self}) {
@@ -126,8 +127,12 @@ public struct ${Self}<Bound : Comparable>
 
 
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _Mirror {
-    return _IntervalMirror(self)
+  public var customMirror: Mirror {
+    return Mirror(self, children: ["start": _start, "end": _end])
+  }
+
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .Text(description)
   }
 
   internal var _start: Bound
@@ -188,36 +193,6 @@ public func ... <Bound : Comparable>(
 @warn_unused_result
 public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
-}
-
-// Reflection support
-%import gyb
-%TBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
-
-%Boilerplate = gyb.executeTemplate(TBoilerplate,
-%                                  introspecteeType='T',
-%                                  disposition='Struct')
-
-internal struct _IntervalMirror<
-  T : protocol<Interval, CustomStringConvertible>
-> : _Mirror {
-  ${Boilerplate}
-
-  internal var count: Int { return 2 }
-
-  internal subscript(i: Int) -> (String, _Mirror) {
-    switch i {
-    case 0: return ("start", _reflect(_value.start))
-    case 1: return ("end", _reflect(_value.end))
-    default: _requirementFailure("_Mirror access out of bounds")
-    }
-  }
-
-  internal var summary: String { return _value.description }
-
-  internal var quickLookObject: PlaygroundQuickLook? {
-    return .Text(summary)
-  }
 }
 
 @available(*, unavailable, renamed="Interval")

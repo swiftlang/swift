@@ -578,7 +578,7 @@ of failability.
 
 One limitation of this approach is that we need to be able to reconstruct
 the selector to use when an overload of a method is introduced.  For this
-reason, the import is likely to be limited to methods where  the error
+reason, the import is likely to be limited to methods where the error
 parameter is the last one and the corresponding selector
 chunk is either ``error:`` or the first chunk (see below).  Empirically,
 this seems to do the right thing for all but two sets of APIs in the

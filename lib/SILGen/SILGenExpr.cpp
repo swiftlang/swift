@@ -48,14 +48,14 @@ using namespace Lowering;
 
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v) {
-  auto &lowering = getTypeLowering(v.getType().getSwiftRValueType());
+  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
   return emitManagedRetain(loc, v, lowering);
 }
 
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType() == v.getType());
+  assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
@@ -65,13 +65,13 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  auto &lowering = getTypeLowering(v.getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType() == v.getType());
+  assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
   
@@ -79,13 +79,13 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
-  auto &lowering = getTypeLowering(v.getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedBufferWithCleanup(v, lowering);
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType().getAddressType() == v.getType());
+  assert(lowering.getLoweredType().getAddressType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
 
@@ -197,6 +197,7 @@ namespace {
                                               SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
+    RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
@@ -255,7 +256,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
   if (It != VarLocs.end()) {
     // If this has an address, return it.  By-value let's have no address.
     SILValue ptr = It->second.value;
-    if (ptr.getType().isAddress())
+    if (ptr->getType().isAddress())
       return ManagedValue::forLValue(ptr);
     
     // Otherwise, it is an RValue let.
@@ -367,14 +368,14 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
       // Mutable lvalue and address-only 'let's are LValues.
-      assert(!It->second.value.getType().isAddress() &&
+      assert(!It->second.value->getType().isAddress() &&
              "LValue cases should be handled above");
 
       SILValue Scalar = It->second.value;
 
       // For weak and unowned types, convert the reference to the right
       // pointer.
-      if (Scalar.getType().is<ReferenceStorageType>()) {
+      if (Scalar->getType().is<ReferenceStorageType>()) {
         Scalar = emitConversionToSemanticRValue(loc, Scalar,
                                                 getTypeLowering(refType));
         // emitConversionToSemanticRValue always produces a +1 strong result.
@@ -442,14 +443,22 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // Get the lowered AST types:
   //  - the original type
-  auto origLoweredFormalType = AbstractionPattern(constantInfo.LoweredType);
+  auto origLoweredFormalType =
+      AbstractionPattern(constantInfo.LoweredInterfaceType);
   if (hasLocalCaptures) {
-    auto formalTypeWithoutCaptures =
-      cast<AnyFunctionType>(constantInfo.FormalType.getResult());
+    // Get the unlowered formal type of the constant, stripping off
+    // the first level of function application, which applies captures.
+    origLoweredFormalType =
+      AbstractionPattern(constantInfo.FormalInterfaceType)
+          .getFunctionResultType();
+
+    // Lower it, being careful to use the right generic signature.
     origLoweredFormalType =
       AbstractionPattern(
-              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures,0,
-                                                  silDeclRef));
+          origLoweredFormalType.getGenericSignature(),
+          SGM.Types.getLoweredASTFunctionType(
+              cast<FunctionType>(origLoweredFormalType.getType()),
+              0, silDeclRef));
   }
 
   // - the substituted type
@@ -822,6 +831,9 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
   case StringLiteralInst::Encoding::UTF8:
     Elts = EltsArray;
     break;
+
+  case StringLiteralInst::Encoding::ObjCSelector:
+    llvm_unreachable("Objective-C selectors cannot be formed here");
   }
 
   return RValue(Elts, ty);
@@ -1039,7 +1051,7 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   // such in the SIL type system, for example, a cast from DynamicSelf.Type
   // directly to its own Self.Type.
   auto loweredResultTy = SGF.getLoweredLoadableType(E->getType());
-  if (metaBase.getType() == loweredResultTy)
+  if (metaBase->getType() == loweredResultTy)
     return RValue(SGF, E, ManagedValue::forUnmanaged(metaBase));
 
   auto upcast = SGF.B.createUpcast(E, metaBase, loweredResultTy);
@@ -1081,6 +1093,7 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toSubsts = toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr);
   assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
          "wrong number of generic collection parameters");
+  (void) fnArcheTypes;
   
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;
@@ -1592,30 +1605,6 @@ public:
   ~NominalTypeMemberRefRValueEmitter() = default;
 
 private:
-  bool hasStructWithAtMostOneNonTrivialField(SILGenFunction &SGF) const {
-    auto *S = dyn_cast<StructDecl>(Base);
-    if (!S)
-      return false;
-
-    bool FoundNonTrivialField = false;
-
-    for (auto Field : S->getStoredProperties()) {
-      SILType Ty = SGF.getLoweredType(Field->getType()->getCanonicalType());
-      if (Ty.isTrivial(SGF.F.getModule()))
-        continue;
-
-      // We already found a non-trivial field, so we have two. Return false.
-      if (FoundNonTrivialField)
-        return false;
-
-      // We found one non-trivial field.
-      FoundNonTrivialField = true;
-    }
-
-    // We found at most one non-trivial field.
-    return true;
-  }
-
   RValue emitStructDecl(SILGenFunction &SGF) {
     ManagedValue base =
       SGF.emitRValueAsSingleValue(Expr->getBase(),
@@ -1913,6 +1902,8 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
+  // Ensure that weak captures are in a separate scope.
+  DebugScope scope(SGF, CleanupLocation(E));
   // ClosureExpr's evaluate their bound variables.
   for (auto capture : E->getCaptureList()) {
     SGF.visit(capture.Var);
@@ -1955,10 +1946,50 @@ visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 
+RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
+  SILType loweredSelectorTy = SGF.getLoweredType(e->getType());
+
+  // Dig out the declaration of the Selector type.
+  auto selectorDecl = e->getType()->getAs<StructType>()->getDecl();
+
+  // Dig out the type of its pointer.
+  Type selectorMemberTy;
+  for (auto member : selectorDecl->getMembers()) {
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      if (!var->isStatic() && var->hasStorage()) {
+        selectorMemberTy = var->getInterfaceType()->getRValueType();
+        break;
+      }
+    }
+  }
+  if (!selectorMemberTy) {
+    SGF.SGM.diagnose(e, diag::objc_selector_malformed);
+    return RValue(SGF, e, SGF.emitUndef(e, loweredSelectorTy));
+  }
+
+  // Form the selector string.
+  llvm::SmallString<64> selectorScratch;
+  auto selectorString =
+    e->getMethod()->getObjCSelector().getString(selectorScratch);
+
+  // Create an Objective-C selector string literal.
+  auto selectorLiteral =
+    SGF.B.createStringLiteral(e, selectorString,
+                              StringLiteralInst::Encoding::ObjCSelector);
+
+  // Create the pointer struct from the raw pointer.
+  SILType loweredPtrTy = SGF.getLoweredType(selectorMemberTy);
+  auto ptrValue = SGF.B.createStruct(e, loweredPtrTy, { selectorLiteral });
+
+  // Wrap that up in a Selector and return it.
+  auto selectorValue = SGF.B.createStruct(e, loweredSelectorTy, { ptrValue });
+  return RValue(SGF, e, ManagedValue::forUnmanaged(selectorValue));
+}
+
 static StringRef
 getMagicFunctionString(SILGenFunction &gen) {
   assert(gen.MagicFunctionName
-         && "asking for __FUNCTION__ but we don't have a function name?!");
+         && "asking for #function but we don't have a function name?!");
   if (gen.MagicFunctionString.empty()) {
     llvm::raw_string_ostream os(gen.MagicFunctionString);
     gen.MagicFunctionName.printPretty(os);
@@ -2364,7 +2395,7 @@ RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
   SILType abstractedTy
     = SGF.getLoweredType(AbstractionPattern(E->getAbstractionPatternType()),
                          E->getSubExpr()->getType()->getLValueOrInOutObjectType());
-  if (address.getType().getObjectType() != abstractedTy)
+  if (address->getType().getObjectType() != abstractedTy)
     SGF.SGM.diagnose(E, diag::not_implemented,
                      "abstraction difference in inout conversion");
   
@@ -3108,7 +3139,7 @@ public:
     // Convert the value back to a +1 strong reference.
     auto unowned = std::move(value).getAsSingleValue(gen, loc).getUnmanagedValue();
     auto strongType = SILType::getPrimitiveObjectType(
-              unowned.getType().castTo<UnmanagedStorageType>().getReferentType());
+              unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = gen.B.createUnmanagedToRef(loc, unowned, strongType);
     gen.B.createRetainValue(loc, owned);
     auto ownedMV = gen.emitManagedRValueWithCleanup(owned);
@@ -3123,7 +3154,7 @@ public:
     SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue());
     // Convert it to unowned.
     auto unownedType = SILType::getPrimitiveObjectType(
-            CanUnmanagedStorageType::get(owned.getType().getSwiftRValueType()));
+            CanUnmanagedStorageType::get(owned->getType().getSwiftRValueType()));
     SILValue unowned = gen.B.createRefToUnmanaged(loc, owned, unownedType);
     
     return ManagedValue::forUnmanaged(unowned);

@@ -1,4 +1,4 @@
-//===--- LibcShims.h - Access to POSIX for Swift's core stdlib ------------===//
+//===--- LibcShims.h - Access to POSIX for Swift's core stdlib --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -39,12 +39,12 @@ typedef long int __swift_ssize_t;
 void _swift_stdlib_free(void *ptr);
 
 // Input/output <stdio.h>
-int _swift_stdlib_putchar(int c);
+int _swift_stdlib_putchar_unlocked(int c);
 
 // String handling <string.h>
 __attribute__((pure))
 __swift_size_t _swift_stdlib_strlen(const char *s);
- __attribute__((pure))
+__attribute__((pure))
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
 // <unistd.h>
@@ -54,6 +54,7 @@ __swift_ssize_t _swift_stdlib_write(int fd, const void *buf,
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
+__attribute__((const))
 __swift_size_t _swift_stdlib_malloc_size(const void *ptr);
 __swift_uint32_t _swift_stdlib_arc4random(void);
 __swift_uint32_t _swift_stdlib_arc4random_uniform(__swift_uint32_t upper_bound);

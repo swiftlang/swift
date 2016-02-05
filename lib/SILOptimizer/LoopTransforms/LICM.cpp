@@ -1,4 +1,4 @@
-//===--- LICM.cpp - Loop invariant code motion ------------------*- C++ -*-===//
+//===--- LICM.cpp - Loop invariant code motion ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -27,6 +27,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -111,7 +112,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 
   return std::all_of(Opds.begin(), Opds.end(), [=](Operand &Op) {
 
-    auto *Def = Op.get().getDef();
+    ValueBase *Def = Op.get();
 
     // Operand is defined outside the loop.
     if (auto *Inst = dyn_cast<SILInstruction>(Def))
@@ -125,7 +126,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
 
 /// Check if an address does not depend on other values in a basic block.
 static SILInstruction *addressIndependent(SILValue Addr) {
-  Addr = Addr.stripCasts();
+  Addr = stripCasts(Addr);
   if (GlobalAddrInst *SGAI = dyn_cast<GlobalAddrInst>(Addr))
     return SGAI;
   if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))
@@ -347,7 +348,7 @@ static bool sinkFixLifetime(SILLoop *Loop, DominanceInfo *DomTree,
   // Sink the fix_lifetime instruction.
   bool Changed = false;
   for (auto *FLI : FixLifetimeInsts)
-    if (DomTree->dominates(FLI->getOperand().getDef()->getParentBB(),
+    if (DomTree->dominates(FLI->getOperand()->getParentBB(),
                            Preheader)) {
       auto Succs = ExitingBB->getSuccessors();
       for (unsigned EdgeIdx = 0; EdgeIdx <  Succs.size(); ++EdgeIdx) {

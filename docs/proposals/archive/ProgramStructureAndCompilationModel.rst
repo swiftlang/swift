@@ -57,7 +57,7 @@ world.
 In the trivial hello world example, the source file gets implicitly dropped into
 a default component (since it doesn't have a component declaration). The default
 component has settings that corresponds to an executable. As the app grows and
-wants to start using sub- libraries, the author would have to know about
+wants to start using sub-libraries, the author would have to know about
 components. This ensures a simple model for new people, because they don't need
 to know anything about components until they want to define a library and stable
 APIs.
@@ -132,7 +132,7 @@ Components can optionally be broken into a set of "**Subcomponents**", which are
 organizational units within a top-level component. Subcomponents exist to
 support extremely large components that have multiple different teams
 contributing to a single large product. Subcomponents are purely an
-implementation detail of top- level components and have no runtime,
+implementation detail of top-level components and have no runtime,
 naming/namespace, or other externally visible artifacts that persist once the
 entire domain is built. If version 1.0 of a domain is shipped, version 1.1 can
 completely reshuffle the internal subcomponent organization without affecting
@@ -275,7 +275,7 @@ diagnosed here.
 
 If this directory is a subcomponent (as opposed to a top-level component), the
 subcomponent declaration has already been read. If this subcomponent depends on
-any other components that are not up-to- date, those are recursively
+any other components that are not up-to-date, those are recursively
 rebuilt. Explicit subcomponent dependencies are acyclic and cycles are diagnosed
 here. Now all depended-on top-level components and subcomponents are built.
 
@@ -306,7 +306,7 @@ declared cyclic dependencies match the given and actual prototype. 2) resources
 are copied or processed into the product directory. 3) the explicit dependence
 graph is verified, extraneous edges are warned about, missing edges are errors.
 
-In terms of implementation, this should be relatively straight- forward, and is
+In terms of implementation, this should be relatively straight-forward, and is
 carefully layered to be memory efficient (e.g. only processing an SCC at a time
 instead of an entire component) as well as highly parallel for multicore
 machines. For incremental builds, we will have a huge win because the

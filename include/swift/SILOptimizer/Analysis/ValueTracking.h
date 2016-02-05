@@ -21,12 +21,6 @@
 
 namespace swift {
 
-class SILValue;
-
-/// Strip off casts/indexing insts/address projections from V until there is
-/// nothing left to strip.
-SILValue getUnderlyingObject(SILValue V);
-
 /// Returns true if \p V is a function argument which may not alias to
 /// any other pointer in the function.
 /// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for

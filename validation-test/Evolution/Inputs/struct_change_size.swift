@@ -1,12 +1,12 @@
 
 public struct ChangeSize {
-  public init() {
-    _value = 0
+  public init(version: Int32) {
+    self._version = T(version)
   }
 
-  public var value: Int32 {
-    get { return Int32(_value) }
-    set { _value = T(newValue) }
+  public var version: Int32 {
+    get { return Int32(_version) }
+    set { _version = T(newValue) }
   }
 
 #if BEFORE
@@ -15,19 +15,21 @@ public struct ChangeSize {
   typealias T = Int64
 #endif
 
-  private var _value: T
+  private var _version: T
 }
 
 @_fixed_layout public struct ChangeFieldOffsetsOfFixedLayout {
-  public init() {
-    v1 = ChangeSize()
-    v2 = ChangeSize()
+  public init(major: Int32, minor: Int32, patch: Int32) {
+    self.major = ChangeSize(version: major)
+    self.minor = ChangeSize(version: minor)
+    self.patch = ChangeSize(version: patch)
   }
 
-  public var v1: ChangeSize
-  public var v2: ChangeSize
+  public var major: ChangeSize
+  public var minor: ChangeSize
+  public var patch: ChangeSize
 
-  public func getTotal() -> Int32 {
-    return v1.value + v2.value
+  public func getVersion() -> String {
+    return "\(major.version).\(minor.version).\(patch.version)"
   }
 }

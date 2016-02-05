@@ -69,9 +69,10 @@ func test_property_of_lvalue(x: ErrorProtocol) -> String {
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs13ErrorProtocol_SS
 // CHECK:         [[VAR:%.*]] = alloc_box $ErrorProtocol
-// CHECK:         [[PB:%.*]] = project_box [[VAR]]
-// CHECK:         store %0 to [[PB]]
-// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[PB]]
+// CHECK-NEXT:    [[PVAR:%.*]] = project_box [[VAR]]
+// CHECK-NEXT:    strong_retain %0 : $ErrorProtocol
+// CHECK-NEXT:    store %0 to [[PVAR]]
+// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[PVAR]]
 // CHECK-NEXT:    strong_retain [[VALUE_BOX]]
 // CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $ErrorProtocol to $*[[VALUE_TYPE:@opened\(.*\) ErrorProtocol]]
 // CHECK-NEXT:    [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]

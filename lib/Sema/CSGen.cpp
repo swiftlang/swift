@@ -20,7 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 
@@ -35,7 +35,7 @@ static Expr *skipImplicitConversions(Expr *expr) {
 }
 
 /// \brief Find the declaration directly referenced by this expression.
-static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
+static ValueDecl *findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
   do {
     expr = expr->getSemanticsProvidingExpr();
 
@@ -45,7 +45,7 @@ static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
     }
 
     if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-      loc = dre->getLoc();
+      loc = dre->getNameLoc();
       return dre->getDecl();
     }
 
@@ -61,6 +61,15 @@ static bool isDelayedOperatorDecl(ValueDecl *vd) {
   return vd && (vd->getName().str() == "==");
 }
 
+static bool isArithmeticOperatorDecl(ValueDecl *vd) {
+  return vd && 
+  ( vd->getName().str() == "+" ||
+    vd->getName().str() == "-" ||
+    vd->getName().str() == "*" ||
+    vd->getName().str() == "/" ||
+    vd->getName().str() == "%" );
+}
+
 namespace {
   
   /// Internal struct for tracking information about types within a series
@@ -71,11 +80,26 @@ namespace {
     uint haveStringLiteral : 1;
     
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
+
+    llvm::SmallVector<TypeVariableType *, 16> intLiteralTyvars;
+    llvm::SmallVector<TypeVariableType *, 16> floatLiteralTyvars;
+    llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
+
+    llvm::SmallVector<ClosureExpr *, 4> closureExprs;
+    llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
+
+    // TODO: manage as a set of lists, to speed up addition of binding
+    // constraints.
+    llvm::SmallVector<DeclRefExpr *, 16> anonClosureParams;
     
     LinkedTypeInfo() {
       haveIntLiteral = false;
       haveFloatLiteral = false;
       haveStringLiteral = false;
+    }
+
+    bool haveLiteral() { 
+      return haveIntLiteral || haveFloatLiteral || haveStringLiteral; 
     }
   };
 
@@ -96,7 +120,15 @@ namespace {
       if (isa<BinaryExpr>(expr) ||
           
           // Literal exprs are contextually typed, so store them off as well.
-          isa<LiteralExpr>(expr)) {
+          isa<LiteralExpr>(expr) ||
+
+          // We'd like to take a look at implicit closure params, so store
+          // them.
+          isa<ClosureExpr>(expr) ||
+
+          // We'd like to look at the elements of arrays and dictionaries.
+          isa<ArrayExpr>(expr) ||
+          isa<DictionaryExpr>(expr)) {
         LinkedExprs.push_back(expr);
         return {false, expr};
       }
@@ -134,40 +166,115 @@ namespace {
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
-        return {false, expr};
+        auto tyvar = expr->getType()->getAs<TypeVariableType>();
+
+        if (tyvar) {
+          LTI.intLiteralTyvars.push_back(tyvar);
+        }
+        
+        return { false, expr };
       }
       
       if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
-        return {false, expr};
+        auto tyvar = expr->getType()->getAs<TypeVariableType>();
+
+        if (tyvar) {
+          LTI.floatLiteralTyvars.push_back(tyvar);
+        }
+
+        return { false, expr };
       }
       
       if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
-        return {false, expr};
+        auto tyvar = expr->getType()->getAs<TypeVariableType>();
+
+        if (tyvar)  {
+          LTI.stringLiteralTyvars.push_back(tyvar);
+        }
+
+        return { false, expr };
       }
       
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
         
-        if (UDE->getType() &&
-            !isa<TypeVariableType>(UDE->getType().getPointer()))
+        if (UDE->getType())
           LTI.collectedTypes.insert(UDE->getType().getPointer());
         
         // Don't recurse into the base expression.
-        return {false, expr};
+        return { false, expr };
       }
-      
-      if (auto favoredType = CS.getFavoredType(expr)) {
-        LTI.collectedTypes.insert(favoredType);
-        return {false, expr};
+
+
+      if (auto CE = dyn_cast<ClosureExpr>(expr)) {
+        if (!(LTI.closureExprs.size() || *LTI.closureExprs.end() == CE)) {
+          LTI.closureExprs.push_back(CE);
+          return { true, expr };
+        } else {
+          CS.optimizeConstraints(expr);
+          return { false, expr };
+        }
       }
-      
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
+        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
+          if (varDecl->isAnonClosureParam()) {
+            LTI.anonClosureParams.push_back(DRE);
+          } else if (DRE->getType()) {
+            LTI.collectedTypes.insert(DRE->getType().getPointer());
+          }
+          return { false, expr };
+        } 
+      }             
+
       // In the case of a function application, we would have already captured
       // the return type during constraint generation, so there's no use in
       // looking any further.
       if (isa<ApplyExpr>(expr) &&
           !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
-            isa<PostfixUnaryExpr>(expr))) {
+            isa<PostfixUnaryExpr>(expr))) {      
+        return { false, expr };
+      }
+
+      if (isa<BinaryExpr>(expr)) {
+        LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
+      }  
+      
+      if (auto favoredType = CS.getFavoredType(expr)) {
+        LTI.collectedTypes.insert(favoredType);
+
+        // If we're analyzing a nested closure, continue to recurse, so we can
+        //make further connections amongst the arguments.
+        return { false, expr };
+      }
+
+      // TODO: The systems that we need to solve for interpolated string expressions
+      // require bespoke logic that don't currently work with this approach.
+      if (isa<InterpolatedStringLiteralExpr>(expr)) {
+        return { false, expr };
+      }
+
+      // For exprs of a structural type that are not modeling argument lists,
+      // avoid merging the type variables. (We need to allow for cases like
+      // (Int, Int32).)
+      if (isa<TupleExpr>(expr) && !isa<ApplyExpr>(Parent.getAsExpr())) {
+        return { false, expr };
+      }
+
+      // Coercion exprs have a rigid type, so there's no use in gathering info
+      // about them.
+      if (isa<CoerceExpr>(expr)) {
+        LTI.collectedTypes.insert(expr->getType().getPointer());
+
+        return { false, expr };
+      }
+
+      // Don't walk into subscript expressions - to do so would risk factoring
+      // the index expression into edge contraction. (We don't want to do this
+      // if the index expression is a literal type that differs from the return
+      // type of the subscript operation.)
+      if (isa<SubscriptExpr>(expr) || isa<DynamicLookupExpr>(expr)) {
         return { false, expr };
       }
       
@@ -175,6 +282,13 @@ namespace {
     }
     
     Expr *walkToExprPost(Expr *expr) override {
+
+      if (auto CE = dyn_cast<ClosureExpr>(expr)) {
+        if (LTI.closureExprs.size() && *LTI.closureExprs.end() == CE) {
+          LTI.closureExprs.pop_back();
+        }
+      }
+
       return expr;
     }
     
@@ -193,19 +307,157 @@ namespace {
     LinkedTypeInfo lti;
     
     expr->walk(LinkedExprAnalyzer(lti, CS));
-    
-    if (!lti.collectedTypes.empty()) {
-      // TODO: Compute the BCT.
-      CS.setFavoredType(expr, *lti.collectedTypes.begin());
-      return true;
+
+    // Link anonymous closure params of the same index.
+    // TODO: As stated above, we should bucket these whilst collecting the
+    // exprs to avoid quadratic behavior.
+    for (auto acp1 : lti.anonClosureParams) {
+      for (auto acp2 : lti.anonClosureParams) {
+        if (acp1 == acp2)
+          continue;
+
+        if (acp1->getDecl()->getName().str() ==
+              acp2->getDecl()->getName().str()) {
+
+          auto tyvar1 = acp1->getType()->getAs<TypeVariableType>();
+          auto tyvar2 = acp2->getType()->getAs<TypeVariableType>();
+
+          if (tyvar1 && tyvar2) {
+            auto rep1 = CS.getRepresentative(tyvar1);
+            auto rep2 = CS.getRepresentative(tyvar2);
+
+            if (rep1 != rep2) {
+              CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+            }
+          }
+        }
+      }
     }
+
+    // Link integer literal tyvars.
+    if (lti.intLiteralTyvars.size() > 1) {
+      auto rep1 = CS.getRepresentative(lti.intLiteralTyvars[0]);
+
+      for (size_t i = 1; i < lti.intLiteralTyvars.size(); i++) {
+        auto rep2 = CS.getRepresentative(lti.intLiteralTyvars[i]);
+
+        if (rep1 != rep2)
+          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+      }
+    }
+
+    // Link float literal tyvars.
+    if (lti.floatLiteralTyvars.size() > 1) {
+      auto rep1 = CS.getRepresentative(lti.floatLiteralTyvars[0]);
+
+      for (size_t i = 1; i < lti.floatLiteralTyvars.size(); i++) {
+        auto rep2 = CS.getRepresentative(lti.floatLiteralTyvars[i]);
+        
+        if (rep1 != rep2)
+          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+      }
+    }
+
+    // Link string literal tyvars.
+    if (lti.stringLiteralTyvars.size() > 1) {
+      auto rep1 = CS.getRepresentative(lti.stringLiteralTyvars[0]);
+
+      for (size_t i = 1; i < lti.stringLiteralTyvars.size(); i++) {
+        auto rep2 = CS.getRepresentative(lti.stringLiteralTyvars[i]);
+
+        if (rep1 != rep2)
+          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+      }
+    }
+
+    if (lti.collectedTypes.size() == 1) {
+      // TODO: Compute the BCT.
+
+      auto favoredTy = (*lti.collectedTypes.begin())->getLValueOrInOutObjectType();
+
+      CS.setFavoredType(expr, favoredTy.getPointer());
+      
+      // If we have a chain of identical binop expressions with homogeneous
+      // argument types, we can directly simplify the associated constraint
+      // graph.
+      auto simplifyBinOpExprTyVars = [&]() {
+        if (!lti.haveLiteral()) {
+          for (auto binExp1 : lti.binaryExprs) {
+            for (auto binExp2 : lti.binaryExprs) {
+              if (binExp1 == binExp2)
+                continue;
+
+              auto fnTy1 = binExp1->getType()->getAs<TypeVariableType>();
+              auto fnTy2 = binExp2->getType()->getAs<TypeVariableType>();
+
+              if (!(fnTy1 && fnTy2))
+                return;
+
+              auto ODR1 = dyn_cast<OverloadedDeclRefExpr>(binExp1->getFn());
+              auto ODR2 = dyn_cast<OverloadedDeclRefExpr>(binExp2->getFn());
+
+              if (!(ODR1 && ODR2))
+                return; 
+
+              // TODO: We currently limit this optimization to known arithmetic
+              // operators, but we should be able to broaden this out to
+              // logical operators as well.
+              if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
+                return;
+
+              if (ODR1->getDecls()[0]->getName().str() != 
+                   ODR2->getDecls()[0]->getName().str())
+                return;
+
+              // All things equal, we can merge the tyvars for the function
+              // types.
+              auto rep1 = CS.getRepresentative(fnTy1);
+              auto rep2 = CS.getRepresentative(fnTy2);
+
+              if (rep1 != rep2) {
+                CS.mergeEquivalenceClasses(rep1, rep2, 
+                                           /*updateWorkList*/ false);
+
+                // Since we're merging argument constraints, make sure that
+                // the representative tyvar is properly bound to the argument
+                // type.
+                CS.addConstraint(ConstraintKind::Bind,
+                                 rep1,
+                                 favoredTy,
+                                 CS.getConstraintLocator(binExp1));
+              }                    
+
+              auto odTy1 = ODR1->getType()->getAs<TypeVariableType>();
+              auto odTy2 = ODR2->getType()->getAs<TypeVariableType>();
+
+              if (odTy1 && odTy2) {
+                auto odRep1 = CS.getRepresentative(odTy1);
+                auto odRep2 = CS.getRepresentative(odTy2);
+
+                // Since we'll be choosing the same overload, we can merge
+                // the overload tyvar as well.
+                if (odRep1 != odRep2)
+                  CS.mergeEquivalenceClasses(odRep1, odRep2,
+                                             /*updateWorkList*/ false);
+              }
+            }
+          }
+        }
+      };
+
+      simplifyBinOpExprTyVars();       
+
+      return true;
+    }    
     
     if (lti.haveFloatLiteral) {
       if (auto floatProto =
             CS.TC.Context.getProtocol(
                                   KnownProtocolKind::FloatLiteralConvertible)) {
         if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
-          CS.setFavoredType(expr, defaultType.getPointer());
+          if (!CS.getFavoredType(expr)) {
+            CS.setFavoredType(expr, defaultType.getPointer());
+          }
           return true;
         }
       }
@@ -216,7 +468,9 @@ namespace {
             CS.TC.Context.getProtocol(
                                 KnownProtocolKind::IntegerLiteralConvertible)) {
         if (auto defaultType = CS.TC.getDefaultType(intProto, CS.DC)) {
-          CS.setFavoredType(expr, defaultType.getPointer());
+          if (!CS.getFavoredType(expr)) {
+            CS.setFavoredType(expr, defaultType.getPointer());
+          }
           return true;
         }
       }
@@ -227,7 +481,9 @@ namespace {
           CS.TC.Context.getProtocol(
                                 KnownProtocolKind::StringLiteralConvertible)) {
         if (auto defaultType = CS.TC.getDefaultType(stringProto, CS.DC)) {
-          CS.setFavoredType(expr, defaultType.getPointer());
+          if (!CS.getFavoredType(expr)) {
+            CS.setFavoredType(expr, defaultType.getPointer());
+          }
           return true;
         }
       }
@@ -706,33 +962,7 @@ namespace {
     auto argTupleTy = argTy->castTo<TupleType>();
     auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
     Type firstArgTy = getInnerParenType(argTupleTy->getElement(0).getType());
-    Type secondArgTy =
-    getInnerParenType(argTupleTy->getElement(1).getType());
-    
-    auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElement(0));
-    auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElement(1));
-    
-    auto favoredExprTy = CS.getFavoredType(expr);
-    
-    // If the parent has been favored on the way down, propagate that
-    // information to its children.
-    if (!firstFavoredTy) {
-      CS.setFavoredType(argTupleExpr->getElement(0), favoredExprTy);
-      firstFavoredTy = favoredExprTy;
-    }
-    
-    if (!secondFavoredTy) {
-      CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
-      secondFavoredTy = favoredExprTy;
-    }
-    
-    if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
-      firstArgTy = firstFavoredTy;
-    }
-    
-    if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
-      secondArgTy = secondFavoredTy;
-    }
+    Type secondArgTy = getInnerParenType(argTupleTy->getElement(1).getType());
     
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
@@ -741,6 +971,34 @@ namespace {
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
+
+      auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElement(0));
+      auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElement(1));
+      
+      auto favoredExprTy = CS.getFavoredType(expr);
+      
+      if (isArithmeticOperatorDecl(value)) {
+        // If the parent has been favored on the way down, propagate that
+        // information to its children.
+        // TODO: This is only valid for arithmetic expressions.
+        if (!firstFavoredTy) {
+          CS.setFavoredType(argTupleExpr->getElement(0), favoredExprTy);
+          firstFavoredTy = favoredExprTy;
+        }
+        
+        if (!secondFavoredTy) {
+          CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
+          secondFavoredTy = favoredExprTy;
+        }
+        
+        if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
+          firstArgTy = firstFavoredTy;
+        }
+        
+        if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
+          secondArgTy = secondFavoredTy;
+        }
+      }
       
       // Figure out the parameter type.
       if (value->getDeclContext()->isTypeContext()) {
@@ -761,7 +1019,7 @@ namespace {
       return
         (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
          isFavoredParamAndArg(CS, secondParamTy, secondArgTy, firstArgTy)) &&
-        firstParamTy->isEqual(secondParamTy) &&
+         firstParamTy->isEqual(secondParamTy) &&
         (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
@@ -1082,7 +1340,7 @@ namespace {
         return visitLiteralExpr(expr);
 
       case MagicIdentifierLiteralExpr::DSOHandle: {
-        // __DSO_HANDLE__ has type UnsafeMutablePointer<Void>.
+        // #dsohandle has type UnsafeMutablePointer<Void>.
         auto &tc = CS.getTypeChecker();
         if (tc.requirePointerArgumentIntrinsics(expr->getLoc()))
           return nullptr;
@@ -1205,44 +1463,6 @@ namespace {
       return MetatypeType::get(type);
     }
 
-    Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
-      ASTContext &C = CS.getASTContext();
-      
-      // Open a member constraint for constructor delegations on the subexpr
-      // type.
-      if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
-        auto baseTy = expr->getSubExpr()->getType()
-                        ->getLValueOrInOutObjectType();
-        // 'self' or 'super' will reference an instance, but the constructor
-        // is semantically a member of the metatype. This:
-        //   self.init()
-        //   super.init()
-        // is really more like:
-        //   self = Self.init()
-        //   self.super = Super.init()
-        baseTy = MetatypeType::get(baseTy, CS.getASTContext());
-        
-        auto argsTy = CS.createTypeVariable(
-                        CS.getConstraintLocator(expr),
-                        TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
-        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                              /*options=*/0);
-        auto methodTy = FunctionType::get(argsTy, resultTy);
-        CS.addValueMemberConstraint(baseTy, C.Id_init,
-          methodTy,
-          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
-        
-        // The result of the expression is the partial application of the
-        // constructor to the subexpression.
-        return methodTy;
-      }
-      
-      // If we aren't delegating from within an initializer, then 'x.init' is
-      // just a reference to the constructor as a member of the metatype value
-      // 'x'.
-      return addMemberRefConstraints(expr, expr->getSubExpr(), C.Id_init);
-    }
-    
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -1387,10 +1607,36 @@ namespace {
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
-      return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
-    }
-    
-    Type visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
+      // Open a member constraint for constructor delegations on the
+      // subexpr type.
+      if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
+        auto baseTy = expr->getBase()->getType()
+                        ->getLValueOrInOutObjectType();
+
+        // 'self' or 'super' will reference an instance, but the constructor
+        // is semantically a member of the metatype. This:
+        //   self.init()
+        //   super.init()
+        // is really more like:
+        //   self = Self.init()
+        //   self.super = Super.init()
+        baseTy = MetatypeType::get(baseTy, CS.getASTContext());
+
+        auto argsTy = CS.createTypeVariable(
+                        CS.getConstraintLocator(expr),
+                        TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                              /*options=*/0);
+        auto methodTy = FunctionType::get(argsTy, resultTy);
+        CS.addValueMemberConstraint(baseTy, expr->getName(),
+          methodTy,
+          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+
+        // The result of the expression is the partial application of the
+        // constructor to the subexpression.
+        return methodTy;
+      }
+
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
     
@@ -1449,7 +1695,6 @@ namespace {
 
       // FIXME: If the base type is a type variable, constrain it to a metatype
       // of a bound generic type.
-      
       tc.diagnose(expr->getSubExpr()->getLoc(),
                   diag::not_a_generic_definition);
       tc.diagnose(expr->getLAngleLoc(),
@@ -2016,6 +2261,7 @@ namespace {
       if (expr->hasExplicitResultType() &&
           expr->getExplicitResultTypeLoc().getType()) {
         funcTy = expr->getExplicitResultTypeLoc().getType();
+        CS.setFavoredType(expr, funcTy.getPointer());
       } else if (!crt.isNull()) {
         funcTy = crt;
       } else{
@@ -2104,7 +2350,7 @@ namespace {
           outputTy = fnType->getResult();
         }
       } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
-        outputTy = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+        outputTy = TE->getInstanceType();
         NominalTypeDecl *NTD = nullptr;
         
         if (auto nominalType = outputTy->getAs<NominalType>()) {
@@ -2491,6 +2737,26 @@ namespace {
       // case we return the null type.
       return E->getType();
     }
+
+    Type visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+      // #selector only makes sense when we have the Objective-C
+      // runtime.
+      auto &tc = CS.getTypeChecker();
+      if (!tc.Context.LangOpts.EnableObjCInterop) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_no_objc_runtime);
+        return nullptr;
+      }
+
+      // Make sure we can reference ObjectiveC.Selector.
+      // FIXME: Fix-It to add the import?
+      auto type = CS.getTypeChecker().getObjCSelectorType(CS.DC);
+      if (!type) {
+        tc.diagnose(E->getLoc(), diag::expr_selector_module_missing);
+        return nullptr;
+      }
+
+      return type;
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the
@@ -2518,7 +2784,7 @@ namespace {
         // A DotSyntaxCallExpr is a member reference that has already been
         // type-checked down to a call; turn it back into an overloaded
         // member reference expression.
-        SourceLoc memberLoc;
+        DeclNameLoc memberLoc;
         if (auto member = findReferencedDecl(dotCall->getFn(), memberLoc)) {
           auto base = skipImplicitConversions(dotCall->getArg());
           auto members
@@ -2534,7 +2800,7 @@ namespace {
         // already been type-checked down to a call where the argument doesn't
         // actually matter; turn it back into an overloaded member reference
         // expression.
-        SourceLoc memberLoc;
+        DeclNameLoc memberLoc;
         if (auto member = findReferencedDecl(dotIgnored->getRHS(), memberLoc)) {
           auto base = skipImplicitConversions(dotIgnored->getLHS());
           auto members
@@ -2589,6 +2855,7 @@ namespace {
           // return type.
           auto resultTy = closure->getResultType();
           auto bodyTy = closure->getSingleExpressionBody()->getType();
+          CG.getConstraintSystem().setFavoredType(expr, bodyTy.getPointer());
           CG.getConstraintSystem()
             .addConstraint(ConstraintKind::Conversion, bodyTy,
                            resultTy,
@@ -2831,8 +3098,14 @@ Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
   if (Names.empty())
     return BaseTy;
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
+
+  std::unique_ptr<TypeChecker> CreatedTC;
+  // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
-  assert(TC && "Expected a type resolver");
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    TC = CreatedTC.get();
+  }
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 

@@ -31,7 +31,7 @@ static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringToNSStringFn());
 
   SILValue nsstr = gen.B.createApply(loc, stringToNSStringFn,
-                           stringToNSStringFn.getType(),
+                           stringToNSStringFn->getType(),
                            gen.getLoweredType(gen.SGM.Types.getNSStringType()),
                            {}, str.forward(gen));
   return gen.emitManagedRValueWithCleanup(nsstr);
@@ -53,7 +53,7 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
   }
 
   SILType nativeTy = gen.getLoweredType(gen.SGM.Types.getStringType());
-  SILValue str = gen.B.createApply(loc, bridgeFn, bridgeFn.getType(), nativeTy,
+  SILValue str = gen.B.createApply(loc, bridgeFn, bridgeFn->getType(), nativeTy,
                                    {}, { nsstr.forward(gen) });
 
   return gen.emitManagedRValueWithCleanup(str);
@@ -77,7 +77,7 @@ static ManagedValue emitBridgeCollectionFromNative(SILGenFunction &gen,
   auto inputTy
     = collection.getType().getSwiftRValueType()->castTo<BoundGenericType>();
   auto subs = inputTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  auto substFnType = bridgeFn.getType().substGenericArgs(gen.SGM.M, subs);
+  auto substFnType = bridgeFn->getType().substGenericArgs(gen.SGM.M, subs);
   SILValue bridged = gen.B.createApply(loc, bridgeFn,
                                        substFnType,
                                        bridgedTy,
@@ -103,7 +103,7 @@ static ManagedValue emitBridgeCollectionToNative(SILGenFunction &gen,
   auto collectionTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
   auto subs = collectionTy->getSubstitutions(gen.SGM.M.getSwiftModule(),
                                              nullptr);
-  auto substFnType = bridgeFn.getType().substGenericArgs(gen.SGM.M, subs);
+  auto substFnType = bridgeFn->getType().substGenericArgs(gen.SGM.M, subs);
 
   Type inputType = collection.getType().getSwiftRValueType();
   if (!inputType->getOptionalObjectType()) {
@@ -133,7 +133,7 @@ static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
   SILType resultTy =gen.getLoweredLoadableType(gen.SGM.Types.getObjCBoolType());
 
   SILValue result = gen.B.createApply(loc, boolToObjCBoolFn,
-                                      boolToObjCBoolFn.getType(),
+                                      boolToObjCBoolFn->getType(),
                                       resultTy, {}, swiftBool.forward(gen));
   return gen.emitManagedRValueWithCleanup(result);
 }
@@ -149,7 +149,7 @@ static ManagedValue emitBridgeBoolToDarwinBoolean(SILGenFunction &gen,
       gen.getLoweredLoadableType(gen.SGM.Types.getDarwinBooleanType());
 
   SILValue result = gen.B.createApply(loc, boolToDarwinBooleanFn,
-                                      boolToDarwinBooleanFn.getType(),
+                                      boolToDarwinBooleanFn->getType(),
                                       resultTy, {}, swiftBool.forward(gen));
   return gen.emitManagedRValueWithCleanup(result);
 }
@@ -163,7 +163,7 @@ static ManagedValue emitBridgeForeignBoolToBool(SILGenFunction &gen,
 
   SILType resultTy = gen.getLoweredLoadableType(gen.SGM.Types.getBoolType());
 
-  SILValue result = gen.B.createApply(loc, bridgingFn, bridgingFn.getType(),
+  SILValue result = gen.B.createApply(loc, bridgingFn, bridgingFn->getType(),
                                       resultTy, {}, foreignBool.forward(gen));
   return gen.emitManagedRValueWithCleanup(result);
 }
@@ -274,7 +274,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   switch (blockTy->getResult().getConvention()) {
   case ResultConvention::UnownedInnerPointer:
   case ResultConvention::Unowned:
-    assert(gen.getTypeLowering(resultVal.getType()).isTrivial()
+    assert(gen.getTypeLowering(resultVal->getType()).isTrivial()
            && "nontrivial result is returned unowned?!");
     gen.B.createReturn(loc, resultVal);
     break;
@@ -653,13 +653,13 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
 #endif
 
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorProtocolFn());
-  auto bridgeFnType = bridgeFn.getType().castTo<SILFunctionType>();
+  auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
   auto nativeErrorProtocol = bridgeFnType->getResult().getSILType();
   assert(bridgeFnType->getResult().getConvention() == ResultConvention::Owned);
   assert(bridgeFnType->getParameters()[0].getConvention()
            == ParameterConvention::Direct_Owned);
 
-  SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn.getType(),
+  SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
                                        nativeErrorProtocol, {},
                                        bridgedError.forward(*this));
   return emitManagedRValueWithCleanup(nativeError);
@@ -673,12 +673,12 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
          "only handling NSError for now");
 
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorProtocolToNSErrorFn());
-  auto bridgeFnType = bridgeFn.getType().castTo<SILFunctionType>();
+  auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
   assert(bridgeFnType->getResult().getConvention() == ResultConvention::Owned);
   assert(bridgeFnType->getParameters()[0].getConvention()
            == ParameterConvention::Direct_Owned);
 
-  SILValue bridgedError = B.createApply(loc, bridgeFn, bridgeFn.getType(),
+  SILValue bridgedError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
                                         bridgeFnType->getResult().getSILType(),
                                         {}, nativeError.forward(*this));
   return emitManagedRValueWithCleanup(bridgedError);
@@ -707,13 +707,13 @@ static void emitObjCReturnValue(SILGenFunction &gen,
                                 SILLocation loc,
                                 SILValue result,
                                 SILResultInfo resultInfo) {
-  assert(result.getType() == resultInfo.getSILType());
+  assert(result->getType() == resultInfo.getSILType());
 
   // Autorelease the bridged result if necessary.
   switch (resultInfo.getConvention()) {
   case ResultConvention::UnownedInnerPointer:
   case ResultConvention::Unowned:
-    assert(gen.getTypeLowering(result.getType()).isTrivial()
+    assert(gen.getTypeLowering(result->getType()).isTrivial()
            && "nontrivial result is returned unowned?!");
     SWIFT_FALLTHROUGH;
   case ResultConvention::Autoreleased:
@@ -727,10 +727,10 @@ static void emitObjCReturnValue(SILGenFunction &gen,
 static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
                                            SILLocation loc,
                                            SILValue arg) {
-  auto &lowering = gen.getTypeLowering(arg.getType());
+  auto &lowering = gen.getTypeLowering(arg->getType());
   // If address-only, make a +1 copy and operate on that.
   if (lowering.isAddressOnly()) {
-    auto tmp = gen.emitTemporaryAllocation(loc, arg.getType().getObjectType());
+    auto tmp = gen.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     gen.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     return tmp;
   }
@@ -1106,7 +1106,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args, subs,
                                            foreignCI);
 
-    auto fnType = fn.getType().castTo<SILFunctionType>();
+    auto fnType = fn->getType().castTo<SILFunctionType>();
     fnType = fnType->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
 
     result = emitApply(fd, ManagedValue::forUnmanaged(fn),

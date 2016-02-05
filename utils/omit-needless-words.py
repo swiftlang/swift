@@ -10,13 +10,13 @@ import argparse
 import subprocess
 
 DEFAULT_TARGET_BASED_ON_SDK = {
-    'macosx'              : 'x86_64-apple-macosx10.11',
-    'iphoneos'            : 'arm64-apple-ios9.0',
-    'iphonesimulator'     : 'x86_64-apple-ios9.0',
-    'watchos'             : 'armv7k-apple-watchos2.0',
-    'watchos.simulator'   : 'i386-apple-watchos2.0',
-    'appletvos'           : 'arm64-apple-tvos9',
-    'appletvos.simulator' : 'x86_64-apple-tvos9',
+    'macosx': 'x86_64-apple-macosx10.11',
+    'iphoneos': 'arm64-apple-ios9.0',
+    'iphonesimulator': 'x86_64-apple-ios9.0',
+    'watchos': 'armv7k-apple-watchos2.0',
+    'watchos.simulator': 'i386-apple-watchos2.0',
+    'appletvos': 'arm64-apple-tvos9',
+    'appletvos.simulator': 'x86_64-apple-tvos9',
 }
 
 def create_parser():

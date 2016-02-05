@@ -79,7 +79,7 @@ func parseError3(a: unknown_type, b: ) {} // expected-error {{use of undeclared 
 
 func parseError4(a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
-func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}} expected-error 2{{expected ',' separator}} {{22-22=,}} {{22-22=,}} expected-error {{expected parameter type following ':'}}
+func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error 2 {{expected ',' separator}} {{22-22=,}} {{22-22=,}} expected-error {{expected parameter name followed by ':'}}
 
 func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
@@ -87,11 +87,10 @@ func parseError7(a: Int, goo b: unknown_type) {} // expected-error {{use of unde
 
 public func foo(a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
 
-// expected-error@+1{{unnamed parameters must be written}} {{24-24=_: }}
-func parenPatternInArg((a): Int) -> Int { // expected-error {{use of undeclared type 'a'}} expected-error 2{{expected ',' separator}} {{27-27=,}} {{27-27=,}} expected-error {{expected parameter type following ':'}}
-  return a
+func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}} expected-error {{expected ',' separator}}
+  return a  // expected-error {{use of unresolved identifier 'a'}}
 }
-parenPatternInArg(0)
+parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
 
 var nullaryClosure: Int -> Int = {_ in 0}
 nullaryClosure(0)
@@ -121,10 +120,8 @@ func testObjCMethodCurry(a : ClassWithObjCMethod) -> (Int) -> () {
 }
 
 // We used to crash on this.
-func rdar16786220(var let c: Int) -> () { // expected-error {{Use of 'var' binding here is not allowed}} {{19-22=}} expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
-  var c = c
+func rdar16786220(inout let c: Int) -> () { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{25-29=}}
   c = 42
-  _ = c
 }
 
 
@@ -137,27 +134,21 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
-func inout_inout_error(inout inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{30-36=}}
-// expected-error@+1 {{Use of 'var' binding here is not allowed}} {{22-25=}}
-func var_inout_error(var inout x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-32=}}
-  var x = x
-  x = 2
-  _ = x
-}
+func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{28-32=}}
 
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}
 
 // Test fixits on curried functions.
 func testCurryFixits() {
-  func f1(x: Int)(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=, }}
+  func f1(x: Int)(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=, }}
   func f1a(x: Int, y: Int) {}
-  func f2(x: Int)(y: Int)(z: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=, }} {{25-27=, }}
+  func f2(x: Int)(y: Int)(z: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=, }} {{25-27=, }}
   func f2a(x: Int, y: Int, z: Int) {}
-  func f3(x: Int)() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=}}
+  func f3(x: Int)() {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=}}
   func f3a(x: Int) {}
-  func f4()(x: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{11-13=}}
+  func f4()(x: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{11-13=}}
   func f4a(x: Int) {}
-  func f5(x: Int)()(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift; use a single parameter list}} {{17-19=}} {{19-21=, }}
+  func f5(x: Int)()(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{17-19=}} {{19-21=, }}
   func f5a(x: Int, y: Int) {}
 }

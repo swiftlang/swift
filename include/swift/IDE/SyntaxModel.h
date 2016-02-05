@@ -1,4 +1,4 @@
-//===--- SyntaxModel.h - Routines for IDE syntax model  -------------------===//
+//===--- SyntaxModel.h - Routines for IDE syntax model  ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

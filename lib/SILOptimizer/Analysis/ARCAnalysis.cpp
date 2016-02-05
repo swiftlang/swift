@@ -71,7 +71,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
     if (II.hasAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
-        if (!Op.get().getType().isTrivial(Mod)) {
+        if (!Op.get()->getType().isTrivial(Mod)) {
           return false;
         }
       }
@@ -83,7 +83,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   auto &BI = BInst->getBuiltinInfo();
   if (BI.isReadNone()) {
     for (auto &Op : BInst->getAllOperands()) {
-      if (!Op.get().getType().isTrivial(Mod)) {
+      if (!Op.get()->getType().isTrivial(Mod)) {
         return false;
       }
     }
@@ -147,7 +147,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   // safe.
   case ValueKind::UncheckedTrivialBitCastInst: {
     SILValue Op = cast<UncheckedTrivialBitCastInst>(Inst)->getOperand();
-    return Op.getType().isTrivial(Inst->getModule());
+    return Op->getType().isTrivial(Inst->getModule());
   }
 
   // Typed GEPs do not use pointers. The user of the typed GEP may but we will
@@ -240,18 +240,14 @@ bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
   // the object then return true.
   // Notice that we need to check all of the values of the object.
   if (isa<StoreInst>(User)) {
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-      if (AA->mayWriteToMemory(User, SILValue(Ptr.getDef(), i)))
-        return true;
-    }
+    if (AA->mayWriteToMemory(User, Ptr))
+      return true;
     return false;
   }
 
   if (isa<LoadInst>(User) ) {
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-      if (AA->mayReadFromMemory(User, SILValue(Ptr.getDef(), i)))
-        return true;
-    }
+    if (AA->mayReadFromMemory(User, Ptr))
+      return true;
     return false;
   }
 
@@ -435,9 +431,8 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
     if (!Params[i].isGuaranteed())
       continue;
     SILValue Op = FAS.getArgument(i);
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++)
-      if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
-        return true;
+    if (!AA->isNoAlias(Op, Ptr))
+      return true;
   }
 
   // Ok, we were able to prove that all arguments to the apply that were
@@ -566,7 +561,7 @@ static bool addLastUse(SILValue V, SILBasicBlock *BB,
                        ReleaseTracker &Tracker) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     for (auto &Op : I->getAllOperands())
-      if (Op.get().getDef() == V.getDef()) {
+      if (Op.get() == V) {
         Tracker.trackLastRelease(&*I);
         return true;
       }
@@ -593,7 +588,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
   // We'll treat this like a liveness problem where the value is the def. Each
   // block that has a use of the value has the value live-in unless it is the
   // block with the value.
-  for (auto *UI : V.getUses()) {
+  for (auto *UI : V->getUses()) {
     auto *User = UI->getUser();
     auto *BB = User->getParent();
 

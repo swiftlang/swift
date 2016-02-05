@@ -482,7 +482,7 @@ destructor can have arbitrary side-effects. Therefore, it is not valid to hoist
 the makeUnique in the code without proving that 'T's destructor cannot change
 the uniqueness state. This is trivial for trivial types but requires a more
 sophisticated analysis for class types (and in general cannot be disproved). In
-following example we can only hoist makeUnique if we can prove that  elt's, and
+following example we can only hoist makeUnique if we can prove that elt's, and
 elt2's destructor can't change the uniqueness state of the arrays.::
 
  for i in 0 ..< min(a.size, b.size) {

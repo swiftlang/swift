@@ -1,4 +1,4 @@
-//===--- OverloadChoice.cpp - A Choice from an Overload Set  ----*- C++ -*-===//
+//===--- OverloadChoice.cpp - A Choice from an Overload Set  --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

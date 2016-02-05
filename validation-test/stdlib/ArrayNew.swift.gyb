@@ -11,6 +11,7 @@
 
 import Darwin
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
 // workaround is needed to link all required libraries in case we compile
@@ -293,10 +294,10 @@ ArrayTestSuite.test("${array_type}/Mirror") {
 
     let expected =
       "▿ 4 elements\n" +
-      "  - [0]: 10\n" +
-      "  - [1]: 20\n" +
-      "  - [2]: 30\n" +
-      "  - [3]: 40\n"
+      "  - 10\n" +
+      "  - 20\n" +
+      "  - 30\n" +
+      "  - 40\n"
 
     expectEqual(expected, output)
   }
@@ -309,8 +310,8 @@ ArrayTestSuite.test("${array_type}/Mirror") {
 
     let expected =
       "▿ 2 elements\n" +
-      "  - [0]: 20\n" +
-      "  - [1]: 30\n"
+      "  - 20\n" +
+      "  - 30\n"
 
     expectEqual(expected, output)
   }

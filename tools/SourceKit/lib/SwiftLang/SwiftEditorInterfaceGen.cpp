@@ -287,7 +287,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   AnnotatingPrinter Printer(Info, OS);
   printSubmoduleInterface(Mod, SplitModuleName,
                           TraversalOptions,
-                          Printer, Options);
+                          Printer, Options, false);
 
   Info.Text = OS.str();
   return false;

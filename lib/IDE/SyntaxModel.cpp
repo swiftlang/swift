@@ -98,9 +98,20 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
+      case tok::pound_selector:
+      case tok::pound_file:
+      case tok::pound_column:
+      case tok::pound_function:
+      case tok::pound_dsohandle:
+        Kind = SyntaxNodeKind::Keyword;
+        break;
       case tok::pound_line:
-      case tok::pound_available: Kind =
-          SyntaxNodeKind::BuildConfigKeyword; break;
+        Kind = Tok.isAtStartOfLine() ? SyntaxNodeKind::BuildConfigKeyword :
+                                       SyntaxNodeKind::Keyword;
+        break;
+      case tok::pound_available:
+        Kind = SyntaxNodeKind::BuildConfigKeyword;
+        break;
       case tok::identifier:
         if (Tok.getText().startswith("<#"))
           Kind = SyntaxNodeKind::EditorPlaceholder;
@@ -115,7 +126,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         if (Tok.getText().startswith("///") ||
             (IsPlayground && Tok.getText().startswith("//:")))
           Kind = SyntaxNodeKind::DocCommentLine;
-        else if (Tok.getText().startswith("/**"))
+        else if (Tok.getText().startswith("/**") ||
+                 (IsPlayground && Tok.getText().startswith("/*:")))
           Kind = SyntaxNodeKind::DocCommentBlock;
         else if (Tok.getText().startswith("//"))
           Kind = SyntaxNodeKind::CommentLine;
@@ -996,7 +1008,7 @@ public:
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
         return { true, E };
       if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
-                              DRE->getName().getLength())))
+                              DRE->getName().getBaseName().getLength())))
         return { false, nullptr };
     }
     return { true, E };

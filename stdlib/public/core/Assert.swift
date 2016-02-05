@@ -31,12 +31,13 @@
 public func assert(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("assertion failed", message(), file, line)
+      _assertionFailed("assertion failed", message(), file, line,
+        flags: _fatalErrorFlags())
     }
   }
 }
@@ -61,12 +62,13 @@ public func assert(
 public func require(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("precondition failed", message(), file, line)
+      _assertionFailed("precondition failed", message(), file, line,
+        flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
@@ -95,10 +97,11 @@ public func require(
 @inline(__always)
 public func assertionFailure(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message(), file, line)
+    _assertionFailed("fatal error", message(), file, line,
+      flags: _fatalErrorFlags())
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -123,11 +126,12 @@ public func assertionFailure(
 @_transparent @noreturn
 public func requirementFailure(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message(), file, line)
+    _assertionFailed("fatal error", message(), file, line,
+      flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
     Builtin.int_trap()
   }
@@ -138,9 +142,10 @@ public func requirementFailure(
 @_transparent @noreturn
 public func fatalError(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
-  _assertionFailed("fatal error", message(), file, line)
+  _assertionFailed("fatal error", message(), file, line,
+    flags: _fatalErrorFlags())
 }
 
 /// Library precondition checks.
@@ -152,12 +157,13 @@ public func fatalError(
 @_transparent
 public func _require(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatalErrorMessage("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line,
+        flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
@@ -168,7 +174,7 @@ public func _require(
 @_transparent @noreturn
 public func _requirementFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__) {
+  file: StaticString = #file, line: UInt = #line) {
 
   _require(false, message, file:file, line: line)
 
@@ -181,12 +187,13 @@ public func _requirementFailure(
 @_transparent
 public func _overflowChecked<T>(
   args: (T, Bool),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _branchHint(error, false) {
-      _fatalErrorMessage("fatal error", "Overflow/underflow", file, line)
+      _fatalErrorMessage("fatal error", "Overflow/underflow", file, line,
+        flags: _fatalErrorFlags())
     }
   } else {
     Builtin.condfail(error._value)
@@ -205,12 +212,13 @@ public func _overflowChecked<T>(
 @_transparent
 public func _stdlibAssert(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatalErrorMessage("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line,
+        flags: _fatalErrorFlags())
     }
   }
 }
@@ -218,7 +226,7 @@ public func _stdlibAssert(
 @_transparent @noreturn
 public func _stdlibAssertionFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__) {
+  file: StaticString = #file, line: UInt = #line) {
   if _isDebugAssertConfiguration() {
     _require(false, message, file: file, line: line)
   }
@@ -234,11 +242,12 @@ public func _stdlibAssertionFailure(
 @_transparent
 public func _sanityCheck(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), true) {
-    _fatalErrorMessage("fatal error", message, file, line)
+    _fatalErrorMessage("fatal error", message, file, line,
+      flags: _fatalErrorFlags())
   }
 #endif
 }
@@ -246,7 +255,7 @@ public func _sanityCheck(
 @_transparent @noreturn
 public func _sanityCheckFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   _sanityCheck(false, message, file: file, line: line)
   _conditionallyUnreachable()

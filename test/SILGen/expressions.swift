@@ -426,7 +426,7 @@ func containers() -> ([Int], Dictionary<String, Int>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions7if_expr
-func if_expr(a: Bool, b: Bool, x: Int, y: Int, z : Int) -> Int {
+func if_expr(a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var a = a
   var b = b
   var x = x

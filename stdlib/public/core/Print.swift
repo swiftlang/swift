@@ -123,13 +123,13 @@ internal func _print<Target: OutputStream>(
 ) {
   var prefix = ""
   output._lock()
+  defer { output._unlock() }
   for item in items {
     output.write(prefix)
     _print_unlocked(item, &output)
     prefix = separator
   }
   output.write(terminator)
-  output._unlock()
 }
 
 @inline(never)
@@ -142,13 +142,13 @@ internal func _debugPrint<Target: OutputStream>(
 ) {
   var prefix = ""
   output._lock()
+  defer { output._unlock() }
   for item in items {
     output.write(prefix)
     _debugPrint_unlocked(item, &output)
     prefix = separator
   }
   output.write(terminator)
-  output._unlock()
 }
 
 //===----------------------------------------------------------------------===//

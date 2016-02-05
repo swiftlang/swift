@@ -1698,9 +1698,13 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_associatedtype:
   case tok::kw_var:
   case tok::pound_if:
-  case tok::pound_line:
   case tok::identifier:
     return true;
+  case tok::pound_line:
+    // #line at the start of the line is a directive, #line within a line is
+    // an expression.
+    return Tok.isAtStartOfLine();
+
   case tok::kw_try:
     // 'try' is not a valid way to start a decl, but we special-case 'try let'
     // and 'try var' for better recovery.
@@ -1798,7 +1802,8 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   if (IsTopLevel) {
     // Skip the rest of the file to prevent the parser from constructing the
     // AST for it.  Forward references are not allowed at the top level.
-    skipUntil(tok::eof);
+    while (Tok.isNot(tok::eof))
+      consumeToken();
   }
 }
 
@@ -1826,7 +1831,9 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                    Flags.toRaw(),
                    CurDeclContext, {BeginLoc, EndLoc},
                    BeginParserPosition.PreviousLoc);
-  skipUntil(tok::eof);
+
+  while (Tok.isNot(tok::eof))
+    consumeToken();
 }
 
 /// \brief Parse a single syntactic declaration and return a list of decl
@@ -2923,7 +2930,7 @@ createSetterAccessorArgument(SourceLoc nameLoc, Identifier name,
     name = P.Context.getIdentifier(implName);
   }
 
-  auto result = new (P.Context) ParamDecl(/*IsLet*/true, SourceLoc(),
+  auto result = new (P.Context) ParamDecl(/*IsLet*/true,SourceLoc(),SourceLoc(),
                                           Identifier(), nameLoc, name,
                                           Type(), P.CurDeclContext);
   if (isNameImplicit)
@@ -4050,9 +4057,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     Tok.setKind(tok::oper_prefix);
   }
   Identifier SimpleName;
+  Token NameTok = Tok;
   SourceLoc NameLoc = Tok.getLoc();
   Token NonglobalTok = Tok;
-  bool  NonglobalError = false;
+  bool NonglobalError = false;
 
   if (!(Flags & PD_AllowTopLevel) && 
       !(Flags & PD_InProtocol) &&
@@ -4097,6 +4105,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     auto Result = parseGenericParameters(LAngleLoc);
     GenericParams = Result.getPtrOrNull();
     GPHasCodeCompletion |= Result.hasCodeCompletion();
+
+    auto NameTokText = NameTok.getRawText();
+    markSplitToken(tok::identifier,
+                   NameTokText.substr(0, NameTokText.size() - 1));
+    markSplitToken(tok::oper_binary_unspaced,
+                   NameTokText.substr(NameTokText.size() - 1));
+
   } else {
     auto Result = maybeParseGenericParams();
     GenericParams = Result.getPtrOrNull();
@@ -4413,7 +4428,6 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
-    auto NextLoc = peekToken().getLoc();
     ParserResult<Expr> RawValueExpr;
     LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
@@ -4421,14 +4435,22 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       {
         CodeCompletionCallbacks::InEnumElementRawValueRAII
             InEnumElementRawValue(CodeCompletion);
-        RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+        if (!CurLocalContext) {
+          // A local context is needed for parsing closures. We want to parse
+          // them anyways for proper diagnosis.
+          LocalContext tempContext{};
+          CurLocalContext = &tempContext;
+          RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+          CurLocalContext = nullptr;
+        } else {
+          RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
+        }
       }
       if (RawValueExpr.hasCodeCompletion()) {
         Status.setHasCodeCompletion();
         return Status;
       }
       if (RawValueExpr.isNull()) {
-        diagnose(NextLoc, diag::nonliteral_enum_case_raw_value);
         Status.setIsParseError();
         return Status;
       }

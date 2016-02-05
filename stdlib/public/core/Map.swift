@@ -1,4 +1,4 @@
-//===--- Map.swift - Lazily map over a Sequence -----------*- swift -*-===//
+//===--- Map.swift - Lazily map over a SequenceType -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

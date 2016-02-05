@@ -156,7 +156,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     assert(components.empty() && "decl ref should be root element of expr");
     // Track the AST location of the component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(udre->getLoc(), udre->getName()));
+      new (C) SimpleIdentTypeRepr(udre->getLoc(),
+                                  udre->getName().getBaseName()));
     return true;
   }
   
@@ -168,7 +169,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 
     // Track the AST location of the new component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName()));
+      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName().getBaseName()));
     return true;
   }
   
@@ -405,11 +406,13 @@ public:
       subPattern = getSubExprPattern(arg);
     }
     
-    return new (TC.Context) EnumElementPattern(TypeLoc(), ume->getDotLoc(),
-                                               ume->getNameLoc(),
-                                               ume->getName(),
-                                               nullptr,
-                                               subPattern);
+    // FIXME: Compound names.
+    return new (TC.Context) EnumElementPattern(
+                              TypeLoc(), ume->getDotLoc(),
+                              ume->getNameLoc().getBaseNameLoc(),
+                              ume->getName().getBaseName(),
+                              nullptr,
+                              subPattern);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -431,16 +434,19 @@ public:
     if (!enumDecl)
       return nullptr;
 
+    // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName());
+      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName());
     
     // Build a TypeRepr from the head of the full path.
+    // FIXME: Compound names.
     TypeLoc loc(repr);
     loc.setType(ty);
     return new (TC.Context) EnumElementPattern(loc,
                                                ude->getDotLoc(),
-                                               ude->getNameLoc(),
-                                               ude->getName(),
+                                               ude->getNameLoc()
+                                                 .getBaseNameLoc(),
+                                               ude->getName().getBaseName(),
                                                referencedElement,
                                                nullptr);
   }
@@ -467,14 +473,15 @@ public:
     //
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC, ude->getName())) {
+        = lookupUnqualifiedEnumMemberElement(TC, DC,
+                                             ude->getName().getBaseName())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       TypeLoc loc = TypeLoc::withoutLoc(enumTy);
       
       return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
                                                  ude->getLoc(),
-                                                 ude->getName(),
+                                                 ude->getName().getBaseName(),
                                                  referencedElement,
                                                  nullptr);
     }
@@ -932,7 +939,8 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
   matchVar->setHasNonPatternBindingInit();
 
   // Form the cast $match as? T, which produces an optional.
-  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar, pattern->getLoc(),
+  Expr *matchRef = new (tc.Context) DeclRefExpr(matchVar,
+                                                DeclNameLoc(pattern->getLoc()),
                                                 /*Implicit=*/true);
   Expr *cast = new (tc.Context) ConditionalCheckedCastExpr(
                                   matchRef,

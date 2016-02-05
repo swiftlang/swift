@@ -453,6 +453,10 @@ public:
   /// than their underlying types.
   llvm::DenseMap<Type, Accessibility> TypeAccessibilityCache;
 
+  // Caches whether a given declaration is "as specialized" as another.
+  llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
+    specializedOverloadComparisonCache;
+  
   // We delay validation of C and Objective-C type-bridging functions in the
   // standard library until we encounter a declaration that requires one. This
   // flag is set to 'true' once the bridge functions have been checked.
@@ -511,6 +515,7 @@ private:
   Type UInt8Type;
   Type NSObjectType;
   Type NSErrorType;
+  Type ObjCSelectorType;
   Type ExceptionType;
 
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
@@ -585,6 +590,7 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getNSErrorType(DeclContext *dc);
+  Type getObjCSelectorType(DeclContext *dc);
   Type getExceptionType(DeclContext *dc, SourceLoc loc);
 
   /// \brief Try to resolve an IdentTypeRepr, returning either the referenced
@@ -630,12 +636,8 @@ public:
   void checkUnsupportedProtocolType(Stmt *stmt);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  /// We pass in a vector of nested GenericParamLists and a vector of
-  /// ArchetypeBuilders with the innermost GenericParamList in the beginning
-  /// of the vector.
-  bool handleSILGenericParams(SmallVectorImpl<ArchetypeBuilder *> &builders,
-                              SmallVectorImpl<GenericParamList *> &gps,
-                              DeclContext *DC);
+  GenericSignature *handleSILGenericParams(GenericParamList *genericParams,
+                                           DeclContext *DC);
 
   /// \brief Resolves a TypeRepr to a type.
   ///
@@ -949,7 +951,7 @@ public:
   /// parent generic parameter lists) according to the given resolver.
   bool checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
-                             DeclContext *parentDC,
+                             GenericSignature *parentSig,
                              bool adoptArchetypes = true,
                              GenericTypeResolver *resolver = nullptr);
 
@@ -969,17 +971,6 @@ public:
                              Type owner,
                              GenericSignature *genericSig,
                              ArrayRef<Type> genericArgs);
-
-  /// Given a type that was produced within the given generic declaration
-  /// context, produce the corresponding interface type.
-  ///
-  /// \param dc The declaration context in which the type was produced.
-  ///
-  /// \param type The type, which involves archetypes but not dependent types.
-  ///
-  /// \returns the type after mapping all archetypes to their corresponding
-  /// dependent types.
-  Type getInterfaceTypeFromInternalType(DeclContext *dc, Type type);
 
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;
@@ -1549,12 +1540,12 @@ public:
 
   /// \brief Build a type-checked reference to the given value.
   Expr *buildCheckedRefExpr(ValueDecl *D, DeclContext *UseDC,
-                            SourceLoc nameLoc, bool Implicit);
+                            DeclNameLoc nameLoc, bool Implicit);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
-                     SourceLoc NameLoc, bool Implicit,
+                     DeclNameLoc NameLoc, bool Implicit,
                      bool isSpecialized = false);
   /// @}
 
@@ -1627,18 +1618,19 @@ public:
 
   /// \brief Returns true if the availability of the witness
   /// is sufficient to safely conform to the requirement in the context
-  /// the provided conformance. On return, requiredRange holds the range
-  /// required for conformance.
-  bool isAvailabilitySafeForConformance(ValueDecl *witness,
-                                        ValueDecl *requirement,
-                                        NormalProtocolConformance *conformance,
-                                        VersionRange &requiredRange);
+  /// the provided conformance. On return, requiredAvailability holds th
+  /// availability levels required for conformance.
+  bool
+  isAvailabilitySafeForConformance(ValueDecl *witness,
+                                   ValueDecl *requirement,
+                                   NormalProtocolConformance *conformance,
+                                   AvailabilityContext &requiredAvailability);
 
   /// Returns an over-approximation of the range of operating system versions
   /// that could the passed-in location could be executing upon for
   /// the target platform.
-  VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
-                                                   const DeclContext *DC);
+  AvailabilityContext
+  overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///
@@ -1663,11 +1655,11 @@ public:
   /// reference DeclContext).
   /// If the declaration is available, return true.
   /// If the declaration is not available, return false and write the
-  /// declaration's available version range to the out parameter
-  /// OutAvailableRange.
+  /// declaration's availability info to the out parameter
+  /// \p OutAvailableRange.
   bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
                        const DeclContext *referenceDC,
-                       VersionRange &OutAvailableRange);
+                       AvailabilityContext &OutAvailableRange);
 
   /// Checks whether a declaration should be considered unavailable when
   /// referred to at the given location and, if so, returns the reason why the
@@ -1760,13 +1752,13 @@ public:
   /// initializer context, returns the implicit 'self' decl of the constructor.
   /// Otherwise, return nil.
   VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
-                                            UnresolvedConstructorExpr *ctorRef);
+                                                 UnresolvedDotExpr *ctorRef);
 
   /// When referencing a class initializer, check that the base expression is
   /// either a static metatype or that the initializer is 'required'.
   bool
   diagnoseInvalidDynamicConstructorReferences(Expr *base,
-                                              SourceLoc memberRefLoc,
+                                              DeclNameLoc memberRefLoc,
                                               AnyMetatypeType *metaTy,
                                               ConstructorDecl *ctorDecl,
                                               bool SuppressDiagnostics);

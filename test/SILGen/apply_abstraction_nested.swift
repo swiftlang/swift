@@ -4,8 +4,8 @@ infix operator ~> { precedence 255 associativity left }
 
 protocol P { }
 
-func bar<T:P>(inout _: T)() {}
-func baz<T:P>(inout _: T)(_:Int) {}
+func bar<T:P>(inout _: T) -> () -> () { return {_ in ()} }
+func baz<T:P>(inout _: T) -> (Int) -> () { return {_ in ()} }
 
 func ~> <T: P, Args, Result>(
   inout x: T,

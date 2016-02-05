@@ -823,7 +823,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
-  Optional<VersionRange> EnclosingAnnotatedRange;
+  Optional<AvailabilityContext> EnclosingAnnotatedRange;
   Decl *EnclosingDecl = getEnclosingDeclForDecl(D);
 
   while (EnclosingDecl) {
@@ -840,7 +840,8 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (!EnclosingDecl)
     return;
 
-  VersionRange AttrRange = VersionRange::allGTE(attr->Introduced.getValue());
+  AvailabilityContext AttrRange{
+      VersionRange::allGTE(attr->Introduced.getValue())};
 
   if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
     TC.diagnose(attr->getLocation(),

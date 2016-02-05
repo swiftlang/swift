@@ -92,11 +92,10 @@ func class_bound_existential_upcast(x: protocol<ClassBound,ClassBound2>)
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols41class_bound_to_unbound_existential_upcast
-func class_bound_to_unbound_existential_upcast(x: protocol<ClassBound,NotClassBound>) -> NotClassBound {
-  var x = x
+func class_bound_to_unbound_existential_upcast
+(x: protocol<ClassBound,NotClassBound>) -> NotClassBound {
   return x
-  // CHECK: [[X:%.*]] = load {{%.*}} : $*protocol<ClassBound, NotClassBound>
-  // CHECK: [[X_OPENED:%.*]] = open_existential_ref [[X]] : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
+  // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
   // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential_addr %0 : $*NotClassBound, [[OPENED_TYPE]]
   // CHECK: store [[X_OPENED]] to [[PAYLOAD_ADDR]]
 }

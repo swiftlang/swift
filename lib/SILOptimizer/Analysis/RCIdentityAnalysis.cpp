@@ -57,7 +57,7 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
   if (isRCIdentityPreservingCast(V->getKind()))
-    return cast<SILInstruction>(V.getDef())->getOperand(0);
+    return cast<SILInstruction>(V)->getOperand(0);
 
   // Then if we have a struct_extract that is extracting a non-trivial member
   // from a struct with no other non-trivial members, a ref count operation on
@@ -369,7 +369,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
 
   // At this point, we know that we have *some* NoPayloadEnums. If FirstIV is
   // not an enum, then we must bail. We do not try to analyze this case.
-  if (!FirstIV.getType().getEnumOrBoundGenericEnum())
+  if (!FirstIV->getType().getEnumOrBoundGenericEnum())
     return SILValue();
 
   // Now we know that FirstIV is an enum and that all payloaded enum cases after
@@ -499,7 +499,7 @@ void RCIdentityFunctionInfo::getRCUsers(
     SILValue V = Worklist.pop_back_val();
 
     // For each user of V...
-    for (auto *Op : V.getUses()) {
+    for (auto *Op : V->getUses()) {
       SILInstruction *User = Op->getUser();
 
       // If we have already visited this user, continue.
@@ -525,9 +525,7 @@ void RCIdentityFunctionInfo::getRCUsers(
       }
 
       // Otherwise, add all of User's uses to our list to continue searching.
-      for (unsigned i = 0, e = User->getNumTypes(); i != e; ++i) {
-        Worklist.push_back(SILValue(User, i));
-      }
+      Worklist.push_back(User);
     }
   }
 }

@@ -19,6 +19,8 @@
 #ifndef SWIFT_ABI_METADATAVALUES_H
 #define SWIFT_ABI_METADATAVALUES_H
 
+#include "swift/AST/Ownership.h"
+
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -117,10 +119,10 @@ enum class TypeMetadataRecordKind : unsigned {
   /// and classes could be emitted as UniqueDirectType.
   UniqueIndirectClass,
   
-  /// The conformance is for a generic type.
-  /// getGenericPattern() points to the generic metadata pattern used to
-  /// form instances of the type.
-  UniqueGenericPattern,
+  /// The conformance is for a generic or resilient type.
+  /// getNominalTypeDescriptor() points to the nominal type descriptor shared
+  /// by all metadata instantiations of this type.
+  UniqueNominalTypeDescriptor,
   
   /// The conformance is for a nongeneric class type.
   /// getDirectType() points to the unique class object.

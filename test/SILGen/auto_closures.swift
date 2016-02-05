@@ -5,7 +5,7 @@ var false_ = Bool()
 
 // CHECK-LABEL: sil hidden @_TF13auto_closures17call_auto_closure
 func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
-  // CHECK: [[RET:%.*]] = apply
+  // CHECK: [[RET:%.*]] = apply %0()
   // CHECK: return [[RET]]
   return x()
 }

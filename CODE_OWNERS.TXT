@@ -1,5 +1,5 @@
 This file is a list of the people responsible for ensuring that patches for a
-particular part of Swift are reviewed, either by themself or by someone else.
+particular part of Swift are reviewed, either by themselves or by someone else.
 They are also the gatekeepers for their part of Swift, with the final word on
 what goes in or not.
 

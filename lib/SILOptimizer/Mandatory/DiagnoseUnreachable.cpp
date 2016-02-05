@@ -171,9 +171,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     SILArgument *Arg = *AI;
 
     // We were able to fold, so all users should use the new folded value.
-    assert(Arg->getTypes().size() == 1 &&
-           "Currently, we only support single result instructions.");
-    SILValue(Arg).replaceAllUsesWith(Args[Idx]);
+    Arg->replaceAllUsesWith(Args[Idx]);
     NumBasicBlockArgsPropagated++;
   }
 
@@ -220,8 +218,15 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // contains user code (only if we are not within an inlined function or a
       // template instantiation).
       // FIXME: Do not report if we are within a template instantiation.
+      // FIXME: Checking for LabeledConditionalStmt is a hack; it's meant to
+      // catch cases where we have a #available or similar non-expression
+      // condition that was trivially true or false. In these cases we expect
+      // the unreachable block to be reachable on another platform and shouldn't
+      // emit any warnings about it; if this is not the case it's Sema's
+      // responsibility to warn about it.
       if (Loc.is<RegularLocation>() && State &&
-          !State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
+          !State->PossiblyUnreachableBlocks.count(UnreachableBlock) &&
+          !Loc.isASTNode<LabeledConditionalStmt>()) {
         // If this is the first time we see this unreachable block, store it
         // along with the folded branch info.
         State->PossiblyUnreachableBlocks.insert(UnreachableBlock);
@@ -404,7 +409,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
   for (auto *Use : Uses)
     if (auto *User = dyn_cast<SILInstruction>(Use->getUser()))
       if (User->getParent() != BB)
-        Use->set(SILUndef::get(Use->get().getType(), Mod));
+        Use->set(SILUndef::get(Use->get()->getType(), Mod));
 }
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {

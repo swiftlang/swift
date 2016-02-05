@@ -395,10 +395,6 @@ ERROR(expected_sil_colon_value_ref,none,
       "expected ':' before type in SIL value reference", ())
 ERROR(expected_sil_value_name,none,
       "expected SIL value name", ())
-ERROR(expected_sil_value_name_result_number,none,
-      "expected result number in SIL value name", ())
-ERROR(invalid_sil_value_name_result_number,none,
-      "invalid result number in SIL value", ())
 ERROR(expected_sil_type_kind,none,
       "expected SIL type to %0", (StringRef))
 ERROR(expected_sil_constant,none,
@@ -630,17 +626,19 @@ ERROR(expected_rparen_tuple_pattern_list,none,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,none,
       "'...' cannot be applied to a subpattern which is not explicitly typed", ())
-ERROR(non_func_decl_pattern_init,none,
-      "default argument is only permitted for a non-curried function parameter",())
-ERROR(var_not_allowed_in_pattern, none,
-      "Use of 'var' binding here is not allowed", ())
+ERROR(no_default_arg_closure,none,
+      "default arguments are not allowed in closures", ())
+ERROR(no_default_arg_subscript,none,
+      "default arguments are not allowed in subscripts", ())
+ERROR(no_default_arg_curried,none,
+      "default arguments are not allowed in curried parameter lists", ())
 WARNING(let_on_param_is_redundant, none,
       "'let' keyword is unnecessary; function parameters are immutable by default", (unsigned))
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
 ERROR(let_pattern_in_immutable_context,none,
-      "'let' pattern is already in an immutable context", ())
+      "'let' pattern cannot appear nested in an already immutable context", ())
 ERROR(inout_must_have_type,none,
       "'inout' arguments must have a type specified", ())
 ERROR(inout_must_appear_before_param,none,
@@ -649,6 +647,8 @@ ERROR(expected_rparen_parameter,PointsToFirstBadToken,
       "expected ')' in parameter", ())
 ERROR(expected_parameter_type,PointsToFirstBadToken,
       "expected parameter type following ':'", ())
+ERROR(expected_parameter_name,PointsToFirstBadToken,
+      "expected parameter name followed by ':'", ())
 ERROR(missing_parameter_type,PointsToFirstBadToken,
       "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
@@ -659,6 +659,8 @@ ERROR(parameter_inout_var_let,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
 
+ERROR(var_parameter_not_allowed,none,
+        "parameters may not have the 'var' specifier", ())
 WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
@@ -671,8 +673,8 @@ ERROR(parameter_operator_keyword_argument,none,
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
 
-WARNING(parameter_curry_syntax_removed,none,
-        "curried function declaration syntax will be removed in a future version of Swift; use a single parameter list", ())
+ERROR(parameter_curry_syntax_removed,none,
+      "curried function declaration syntax has been removed; use a single parameter list", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
@@ -696,6 +698,11 @@ ERROR(invalid_label_on_stmt,none,
 
 NOTE(discard_result_of_closure,none,
      "explicitly discard the result of the closure by assigning to '_'", ())
+
+WARNING(snake_case_deprecated,none,
+        "%0 is deprecated and will be removed in Swift 3, please use %1",
+        (StringRef, StringRef))
+
 
 // Assignment statement
 ERROR(expected_expr_assignment,none,
@@ -740,6 +747,9 @@ ERROR(expected_expr_conditional_letbinding,none,
 ERROR(expected_expr_conditional_letbinding_bool_conditions,none,
       "expected 'let' or 'var' in conditional; "
       "use '&&' to join boolean conditions", ())
+ERROR(expected_comma_stmtcondition,none,
+      "expected ',' joining parts of a multi-clause condition", ())
+
 ERROR(expected_expr_conditional_var,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
 ERROR(expected_expr_conditional_where,PointsToFirstBadToken,
@@ -953,6 +963,9 @@ ERROR(availability_query_outside_if_stmt_guard, none,
       "#available may only be used as condition of an 'if', 'guard'"
       " or 'while' statement", ())
 
+ERROR(empty_arg_label_underscore, none,
+      "an empty argument label is spelled with '_'", ())
+
 ERROR(expected_identifier_after_dot_expr,none,
       "expected identifier after '.' expression", ())
 
@@ -1012,6 +1025,14 @@ ERROR(expected_type_after_as,none,
 // Extra tokens in string interpolation like in " >> \( $0 } ) << "
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
+
+// Selector expressions.
+ERROR(expr_selector_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following '#selector'", ())
+ERROR(expr_selector_expected_expr,PointsToFirstBadToken,
+      "expected expression naming a method within '#selector(...)'", ())
+ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
+      "expected ')' to complete '#selector' expression", ())
 
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
@@ -1198,33 +1219,38 @@ ERROR(unsupported_build_config_binary_expression,none,
 ERROR(unsupported_build_config_unary_expression,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_target_config_expression,none,
-      "unexpected target configuration expression (expected 'os' or 'arch')",())
+      "unexpected target configuration expression (expected 'os', 'arch', or 'swift')",
+      ())
+ERROR(target_config_expected_one_argument,none,
+      "expected only one argument to target configuration expression",
+      ())
 ERROR(unsupported_target_config_runtime_argument,none,
       "unexpected argument for the '_runtime' target configuration, "
       "expected '_Native' or '_ObjC'", ())
 ERROR(unsupported_target_config_argument,none,
-      "unexpected target configuration expression argument: expected %0",
+      "unexpected target configuration argument: expected %0",
       (StringRef))
+ERROR(unexpected_version_comparison_operator,none,
+      "expected '>=' prefix operator on a version requirement",
+      ())
 ERROR(unsupported_config_conditional_expression_type,none,
       "unexpected configuration expression type", ())
 ERROR(unsupported_config_integer,none,
       "'%0' is not a valid configuration option, use '%1'",
       (StringRef, StringRef))
-ERROR(compiler_version_component_not_number,none,
-      "compiler version component is not a number", ())
+ERROR(version_component_not_number,none,
+      "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
 			"compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,none,
 			"the second version component is not used for comparison", ())
-ERROR(empty_compiler_version_component,none,
-			"found empty compiler version component", ())
+ERROR(empty_version_component,none,
+			"found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,
       "compiler version component out of range: must be in [0, %0]",
       (unsigned))
-ERROR(empty_compiler_version_string,none,
-      "compiler version requirement is empty", ())
-ERROR(cannot_combine_compiler_version,none,
-      "cannot combine _compiler_version with binary operators", ())
+ERROR(empty_version_string,none,
+      "version requirement is empty", ())
 WARNING(unknown_build_config,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))

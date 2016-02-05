@@ -32,7 +32,7 @@ func passClosure() {
   }
   
   takeClosure {
-    $0 = 42     // expected-error{{cannot assign to value: '$0' is a 'let' constant}}
+    $0 = 42     // expected-error{{cannot assign to value: '$0' is immutable}}
     return 42
   }
   
@@ -221,11 +221,13 @@ func test_mutability() {
 
 
 func test_arguments(a : Int,
-                    var b : Int, // expected-error {{Use of 'var' binding here is not allowed}} {{21-25=}}
-                    let c : Int) { // expected-warning {{'let' keyword is unnecessary; function parameters are immutable by default}} {{21-25=}}
+                    b : Int,
+                    let c : Int) {
+  var b = b
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
-  var b = 2  // ok.
+  b = 2  // ok.
   c = 3  // expected-error {{cannot assign to value: 'c' is a 'let' constant}}
+  _ = b
 }
 
 
@@ -310,18 +312,21 @@ protocol SubscriptNoGetter {
   subscript (i: Int) -> Int { get }
 }
 
-func testSubscriptNoGetter(iis: SubscriptNoGetter) {
+func testSubscriptNoGetter(let iis: SubscriptNoGetter) {
   var _: Int = iis[17]
 }
 
 func testSelectorStyleArguments1(x: Int, bar y: Int) {
   var x = x
   var y = y
-  x += 1; y += 1
+  x += 1
+  y += 1
+  _ = x
+  _ = y
 }
 
-func testSelectorStyleArguments2(x: Int,
-                                 bar y: Int) {
+func testSelectorStyleArguments2(let x: Int,
+                                 let bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
@@ -427,12 +432,7 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
 }
 
-
-
-func test_recovery_missing_name_1(: Int) {} // expected-error {{expected ',' separator}} {{35-35=,}} expected-error {{expected parameter type following ':'}}
-
-func test_recovery_missing_name_2(: Int) {} // expected-error {{expected ',' separator}} {{35-35=,}} expected-error {{expected parameter type following ':'}}
-
+func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} expected-error 2 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
 struct F {

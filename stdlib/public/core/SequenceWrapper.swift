@@ -21,7 +21,7 @@ protocol _SequenceWrapper {
   associatedtype Base : Sequence
   associatedtype Iterator : IteratorProtocol = Base.Iterator
   
-  var _base: Base {get}
+  var _base: Base { get }
 }
 
 extension _SequenceWrapper where
@@ -68,8 +68,8 @@ extension Sequence
   /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
-  public func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R? {
-    return _base._preprocessingPass { _ in preprocess(self) }
+  public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
+    return _base._preprocessingPass(preprocess)
   }
 
   /// Create a native array buffer containing the elements of `self`,

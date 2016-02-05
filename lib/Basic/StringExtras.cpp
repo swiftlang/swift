@@ -747,9 +747,13 @@ static StringRef omitNeedlessWords(StringRef name,
   return name;
 }
 
-/// A form of toLowercaseWord that also lowercases acronyms.
-static StringRef toLowercaseWordAndAcronym(StringRef string,
-                                           StringScratchSpace &scratch) {
+/// Whether the given word is a plural s
+static bool isPluralSuffix(StringRef word) {
+  return word == "s" || word == "es" || word == "ies";
+}
+
+StringRef camel_case::toLowercaseInitialisms(StringRef string,
+                                             StringScratchSpace &scratch) {
   if (string.empty())
     return string;
 
@@ -760,12 +764,15 @@ static StringRef toLowercaseWordAndAcronym(StringRef string,
   // Lowercase until we hit the an uppercase letter followed by a
   // non-uppercase letter.
   llvm::SmallString<32> scratchStr;
-  for (unsigned i = 0, n = string.size(); i != n; ++i) {
+  scratchStr.push_back(clang::toLowercase(string[0]));
+  for (unsigned i = 1, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
-      // If the next non-uppercase character was alphanumeric, we should
-      // still lowercase the character we're on.
-      if (!clang::isLetter(string[i+1])) {
+      // If the next non-uppercase character was not a letter, we seem
+      // to have a plural, we should still lowercase the character
+      // we're on.
+      if (!clang::isLetter(string[i+1]) ||
+          isPluralSuffix(camel_case::getFirstWord(string.substr(i+1)))) {
         scratchStr.push_back(clang::toLowercase(string[i]));
         ++i;
       }
@@ -795,14 +802,14 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   /// Local function that lowercases all of the base names and
   /// argument names before returning.
   auto lowercaseAcronymsForReturn = [&] {
-    StringRef newBaseName = toLowercaseWordAndAcronym(baseName, scratch);
+    StringRef newBaseName = toLowercaseInitialisms(baseName, scratch);
     if (baseName.data() != newBaseName.data()) {
       baseName = newBaseName;
       anyChanges = true;
     }
 
     for (StringRef &argName : argNames) {
-      StringRef newArgName = toLowercaseWordAndAcronym(argName, scratch);
+      StringRef newArgName = toLowercaseInitialisms(argName, scratch);
       if (argName.data() != newArgName.data()) {
         argName = newArgName;
         anyChanges = true;

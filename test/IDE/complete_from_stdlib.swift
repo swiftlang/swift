@@ -223,8 +223,7 @@ func testPostfixOperator1(x: Int) {
 // POSTFIX_RVALUE_INT-NOT: ++
 // POSTFIX_RVALUE_INT-NOT: --
 
-func testPostfixOperator2(x: Int) {
-  var x = x
+func testPostfixOperator2(var x: Int) {
   x#^POSTFIX_INT_2^#
 }
 // POSTFIX_LVALUE_INT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: ++[#Int#]; name=
@@ -248,8 +247,7 @@ func testInfixOperator1(x: Int) {
 // INFIX_INT-DAG-NOT: &&
 // INFIX_INT-DAG-NOT: +=
 // INFIX_INT: End completions
-func testInfixOperator2(x: Int) {
-  var x = x
+func testInfixOperator2(var x: Int) {
   x#^INFIX_INT_2^#
 }
 // INFIX_LVALUE_INT: Begin completions

@@ -77,12 +77,12 @@ public:
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
           SILValue V = LI->getOperand();
           // This is an address type, take it object type.
-          SILType Ty = V.getType().getObjectType();
+          SILType Ty = V->getType().getObjectType();
           ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           SILValue V = SI->getDest();
           // This is an address type, take it object type.
-          SILType Ty = V.getType().getObjectType();
+          SILType Ty = V->getType().getObjectType();
           ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else {
           // Not interested in these instructions yet.
@@ -101,7 +101,7 @@ public:
 
   void printTypeExpansionWithNewProjection(SILFunction &Fn) {
     SILModule *M = &Fn.getModule();
-    llvm::SmallVector<NewProjectionPath, 8> PPList;
+    llvm::SmallVector<Optional<NewProjectionPath>, 8> PPList;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
@@ -110,15 +110,13 @@ public:
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
           V = LI->getOperand();
           // This is an address type, take it object type.
-          Ty = V.getType().getObjectType();
-          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
-                                                               true);
+          Ty = V->getType().getObjectType();
+          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           V = SI->getDest();
           // This is an address type, take it object type.
-          Ty = V.getType().getObjectType();
-          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
-                                                               true);
+          Ty = V->getType().getObjectType();
+          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -126,7 +124,7 @@ public:
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &T : PPList) {
-          T.print(llvm::outs(), *M);
+          T.getValue().print(llvm::outs(), *M);
         }
         PPList.clear();
       }
@@ -147,12 +145,16 @@ public:
     for (auto &BB : Fn) {
       for (auto &II : BB) {
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
-          L.initialize(LI->getOperand());
+          SILValue Mem = LI->getOperand();
+          SILValue UO = getUnderlyingObject(Mem);
+          L.init(UO, NewProjectionPath::getProjectionPath(UO, Mem));
           if (!L.isValid())
             continue;
           LSLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
-          L.initialize(SI->getDest());
+          SILValue Mem = SI->getDest();
+          SILValue UO = getUnderlyingObject(Mem);
+          L.init(UO, NewProjectionPath::getProjectionPath(UO, Mem));
           if (!L.isValid())
             continue;
           LSLocation::expand(L, &Fn.getModule(), Locs, TE);
@@ -163,9 +165,8 @@ public:
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : Locs) {
-          Loc.print();
+          Loc.print(&Fn.getModule());
         }
-        L.reset();
         Locs.clear();
       }
     }
@@ -188,12 +189,16 @@ public:
         // Expand it first.
         //
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
-          L.initialize(LI->getOperand());
+          SILValue Mem = LI->getOperand();
+          SILValue UO = getUnderlyingObject(Mem);
+          L.init(UO, NewProjectionPath::getProjectionPath(UO, Mem));
           if (!L.isValid())
             continue;
           LSLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
-          L.initialize(SI->getDest());
+          SILValue Mem = SI->getDest();
+          SILValue UO = getUnderlyingObject(Mem);
+          L.init(UO, NewProjectionPath::getProjectionPath(UO, Mem));
           if (!L.isValid())
             continue;
           LSLocation::expand(L, &Fn.getModule(), Locs, TE);
@@ -204,16 +209,17 @@ public:
 
         // Try to reduce it.
         //
-        // Add into the set in reverse order, Reduction should not care
-        // about the order of the memory locations in the set.
-        for (auto I = Locs.rbegin(); I != Locs.rend(); ++I) {
+        // Reduction should not care about the order of the memory locations in
+        // the set.
+        for (auto I = Locs.begin(); I != Locs.end(); ++I) {
           SLocs.insert(*I);
         }
+
         // This should get the original (unexpanded) location back.
         LSLocation::reduce(L, &Fn.getModule(), SLocs, TE);
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : SLocs) {
-          Loc.print();
+          Loc.print(&Fn.getModule());
         }
         L.reset();
         Locs.clear();
@@ -233,11 +239,7 @@ public:
       llvm::outs() << "@" << Fn.getName() << "\n";
       switch (LSLocationKinds) {
         case MLKind::OnlyTypeExpansion:
-          if (UseNewProjection) {
-            printTypeExpansionWithNewProjection(Fn);
-          } else {
-            printTypeExpansion(Fn);
-          }
+          printTypeExpansionWithNewProjection(Fn);
           break;
         case MLKind::OnlyExpansion:
           printMemExpansion(Fn);

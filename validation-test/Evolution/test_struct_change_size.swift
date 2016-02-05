@@ -22,56 +22,65 @@
 import StdlibUnittest
 import struct_change_size
 
-var StructChangeSizeTest = TestSuite("StructChangeSize")
+var ClassChangeSizeTest = TestSuite("ClassChangeSize")
 
-StructChangeSizeTest.test("ChangeSize") {
-  var t = ChangeSize()
-
-  do {
-    expectEqual(t.value, 0)
-    t.value = 101
-    expectEqual(t.value, 101)
-  }
+func increment(inout c: ChangeSize) {
+  c.version += 1
 }
 
-StructChangeSizeTest.test("ChangeFieldOffsetsOfFixedLayout") {
-  var t = ChangeFieldOffsetsOfFixedLayout()
+ClassChangeSizeTest.test("ChangeFieldOffsetsOfFixedLayout") {
+  var t = ChangeFieldOffsetsOfFixedLayout(major: 7, minor: 5, patch: 3)
 
   do {
-    expectEqual(t.getTotal(), 0)
+    expectEqual(t.getVersion(), "7.5.3")
   }
 
   do {
-    t.v1.value = 12
-    expectEqual(t.getTotal(), 12)
-    t.v2.value = -24
-    expectEqual(t.getTotal(), -12)
+    t.minor.version = 1
+    t.patch.version = 2
+    expectEqual(t.getVersion(), "7.1.2")
+  }
+
+  do {
+    increment(&t.patch)
+    expectEqual(t.getVersion(), "7.1.3")
   }
 }
 
 struct ChangeFieldOffsetsOfMyFixedLayout {
-  var v1: ChangeSize = ChangeSize()
-  var v2: ChangeSize = ChangeSize()
+  init(major: Int32, minor: Int32, patch: Int32) {
+    self.major = ChangeSize(version: major)
+    self.minor = ChangeSize(version: minor)
+    self.patch = ChangeSize(version: patch)
+  }
 
-  func getTotal() -> Int32 {
-    return v1.value + v2.value
+  var major: ChangeSize
+  var minor: ChangeSize
+  var patch: ChangeSize
+
+  func getVersion() -> String {
+    return "\(major.version).\(minor.version).\(patch.version)"
   }
 }
 
-StructChangeSizeTest.test("ChangeFieldOffsetsOfMyFixedLayout") {
-  var t = ChangeFieldOffsetsOfMyFixedLayout()
+ClassChangeSizeTest.test("ChangeFieldOffsetsOfMyFixedLayout") {
+  var t = ChangeFieldOffsetsOfMyFixedLayout(major: 9, minor: 2, patch: 1)
 
   do {
-    expectEqual(t.getTotal(), 0)
+    expectEqual(t.getVersion(), "9.2.1")
   }
 
   do {
-    t.v1.value = 12
-    expectEqual(t.getTotal(), 12)
-    t.v2.value = -24
-    expectEqual(t.getTotal(), -12)
+    t.major.version = 7
+    t.minor.version = 6
+    t.patch.version = 1
+    expectEqual(t.getVersion(), "7.6.1")
+  }
+
+  do {
+    increment(&t.patch)
+    expectEqual(t.getVersion(), "7.6.2")
   }
 }
 
 runAllTests()
-

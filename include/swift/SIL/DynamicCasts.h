@@ -24,7 +24,6 @@ class CanType;
 class ModuleDecl;
 class SILBuilder;
 class SILLocation;
-class SILValue;
 class SILModule;
 class SILType;
 enum class CastConsumptionKind : unsigned char;

@@ -48,15 +48,6 @@ static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
   }
 }
 
-static void recoverFromBadSelectorArgument(Parser &P) {
-  while (P.Tok.isNot(tok::eof) && P.Tok.isNot(tok::r_paren) &&
-         P.Tok.isNot(tok::l_brace) && P.Tok.isNot(tok::r_brace) &&
-         !P.isStartOfStmt() && !P.isStartOfDecl()) {
-    P.skipSingle();
-  }
-  P.consumeIf(tok::r_paren);
-}
-
 void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
   assert(DC->isLocalContext());
   for (auto context : ParsedContexts) {
@@ -67,7 +58,8 @@ void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
 static ParserStatus parseDefaultArgument(Parser &P,
                                    Parser::DefaultArgumentInfo *defaultArgs,
                                    unsigned argIndex,
-                                   ExprHandle *&init) {
+                                   ExprHandle *&init,
+                                 Parser::ParameterContextKind paramContext) {
   SourceLoc equalLoc = P.consumeToken(tok::equal);
 
   // Enter a fresh default-argument context with a meaningless parent.
@@ -89,8 +81,31 @@ static ParserStatus parseDefaultArgument(Parser &P,
     defaultArgs->ParsedContexts.push_back(initDC);
   }
 
-  if (!defaultArgs) {
-    auto inFlight = P.diagnose(equalLoc, diag::non_func_decl_pattern_init);
+  Diag<> diagID = { DiagID() };
+  switch (paramContext) {
+  case Parser::ParameterContextKind::Function:
+  case Parser::ParameterContextKind::Operator:
+  case Parser::ParameterContextKind::Initializer:
+    break;
+  case Parser::ParameterContextKind::Closure:
+    diagID = diag::no_default_arg_closure;
+    break;
+  case Parser::ParameterContextKind::Subscript:
+    diagID = diag::no_default_arg_subscript;
+    break;
+  case Parser::ParameterContextKind::Curried:
+    diagID = diag::no_default_arg_curried;
+    break;
+  }
+  
+  assert(((diagID.ID != DiagID()) == !defaultArgs ||
+          // Sometimes curried method parameter lists get default arg info.
+          // Remove this when they go away.
+          paramContext == Parser::ParameterContextKind::Curried) &&
+         "Default arguments specified for an unexpected parameter list kind");
+  
+  if (diagID.ID != DiagID()) {
+    auto inFlight = P.diagnose(equalLoc, diagID);
     if (initR.isNonNull())
       inFlight.fixItRemove(SourceRange(equalLoc, initR.get()->getEndLoc()));
     return ParserStatus();
@@ -98,14 +113,11 @@ static ParserStatus parseDefaultArgument(Parser &P,
   
   defaultArgs->HasDefaultArgument = true;
 
-  if (initR.hasCodeCompletion()) {
-    recoverFromBadSelectorArgument(P);
+  if (initR.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
-  }
-  if (initR.isNull()) {
-    recoverFromBadSelectorArgument(P);
+
+  if (initR.isNull())
     return makeParserError();
-  }
 
   init = ExprHandle::get(P.Context, initR.get());
   return ParserStatus();
@@ -161,7 +173,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     ParserStatus status;
     SourceLoc StartLoc = Tok.getLoc();
 
-    unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
+    unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
     bool FoundCCToken;
@@ -180,15 +192,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::InOut;
     } else if (Tok.is(tok::kw_let)) {
-      diagnose(Tok.getLoc(), diag::let_on_param_is_redundant,
-               Tok.is(tok::kw_let)).fixItRemove(Tok.getLoc());
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::Let;
     } else if (Tok.is(tok::kw_var)) {
-      diagnose(Tok.getLoc(), diag::var_not_allowed_in_pattern)
+      diagnose(Tok.getLoc(), diag::var_parameter_not_allowed)
         .fixItRemove(Tok.getLoc());
       param.LetVarInOutLoc = consumeToken();
-      param.SpecifierKind = ParsedParameter::Let;
+      param.SpecifierKind = ParsedParameter::Var;
     }
 
     // Redundant specifiers are fairly common, recognize, reject, and recover
@@ -197,6 +207,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       diagnose(Tok, diag::parameter_inout_var_let)
         .fixItRemove(Tok.getLoc());
       consumeToken();
+      param.isInvalid = true;
     }
 
     if (startsParameterName(*this, isClosure)) {
@@ -232,12 +243,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       // (':' type)?
-      if (Tok.is(tok::colon)) {
-        param.ColonLoc = consumeToken();
-
+      if (consumeIf(tok::colon)) {
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
+
+        // If we didn't parse a type, then we already diagnosed that the type
+        // was invalid.  Remember that.
+        if (type.isParseError() && !type.hasCodeCompletion())
+          param.isInvalid = true;
+       
         // Only allow 'inout' before the parameter name.
         if (auto InOutTy = dyn_cast_or_null<InOutTypeRepr>(param.Type)) {
           SourceLoc InOutLoc = InOutTy->getInOutLoc();
@@ -249,47 +264,69 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
       }
     } else {
-      SourceLoc typeStartLoc = Tok.getLoc();
-      auto type = parseType(diag::expected_parameter_type, false);
-      status |= type;
-      param.Type = type.getPtrOrNull();
+      // Otherwise, we have invalid code.  Check to see if this looks like a
+      // type.  If so, diagnose it as a common error.
+      bool isBareType = false;
+      {
+        BacktrackingScope backtrack(*this);
+        isBareType = canParseType() && Tok.isAny(tok::comma, tok::r_paren,
+                                                 tok::equal);
+      }
 
-      // Unnamed parameters must be written as "_: Type".
-      if (param.Type) {
-        diagnose(typeStartLoc, diag::parameter_unnamed)
-          .fixItInsert(typeStartLoc, "_: ");
+      if (isBareType) {
+        // Otherwise, if this is a bare type, then the user forgot to name the
+        // parameter, e.g. "func foo(Int) {}"
+        SourceLoc typeStartLoc = Tok.getLoc();
+        auto type = parseType(diag::expected_parameter_type, false);
+        status |= type;
+        param.Type = type.getPtrOrNull();
+
+        // Unnamed parameters must be written as "_: Type".
+        if (param.Type) {
+          diagnose(typeStartLoc, diag::parameter_unnamed)
+            .fixItInsert(typeStartLoc, "_: ");
+        } else {
+          param.isInvalid = true;
+        }
+      } else {
+        // Otherwise, we're not sure what is going on, but this doesn't smell
+        // like a parameter.
+        diagnose(Tok, diag::expected_parameter_name);
+        param.isInvalid = true;
       }
     }
-
+                        
     // '...'?
-    if (Tok.isEllipsis()) {
+    if (Tok.isEllipsis())
       param.EllipsisLoc = consumeToken();
-    }
 
     // ('=' expr)?
     if (Tok.is(tok::equal)) {
-      param.EqualLoc = Tok.getLoc();
+      SourceLoc EqualLoc = Tok.getLoc();
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg);
+                                     param.DefaultArg, paramContext);
 
-      if (param.EllipsisLoc.isValid()) {
+      if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
         SourceRange defaultArgRange;
-        if (param.DefaultArg) {
-          if (auto init = param.DefaultArg->getExpr()) {
-            defaultArgRange = SourceRange(param.EllipsisLoc, init->getEndLoc());
-          }
-        }
+        if (auto init = param.DefaultArg->getExpr())
+          defaultArgRange = SourceRange(param.EllipsisLoc, init->getEndLoc());
 
-        diagnose(param.EqualLoc, diag::parameter_vararg_default)
+        diagnose(EqualLoc, diag::parameter_vararg_default)
           .highlight(param.EllipsisLoc)
           .fixItRemove(defaultArgRange);
+        param.isInvalid = true;
+        param.DefaultArg = nullptr;
       }
     }
 
-    // If we haven't made progress, don't add the param.
-    if (Tok.getLoc() == StartLoc)
+    // If we haven't made progress, don't add the parameter.
+    if (Tok.getLoc() == StartLoc) {
+      // If we took a default argument index for this parameter, but didn't add
+      // one, then give it back.
+      if (defaultArgs) defaultArgs->NextIndex--;
       return status;
+    }
 
     params.push_back(param);
     return status;
@@ -314,7 +351,8 @@ mapParsedParameters(Parser &parser,
   -> ParamDecl * {
     auto specifierKind = paramInfo.SpecifierKind;
     bool isLet = specifierKind == Parser::ParsedParameter::Let;
-    auto param = new (ctx) ParamDecl(isLet, argNameLoc, argName,
+    auto param = new (ctx) ParamDecl(isLet, paramInfo.LetVarInOutLoc,
+                                     argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
@@ -322,9 +360,8 @@ mapParsedParameters(Parser &parser,
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
 
-    // If we parsed a colon but have no type, then we already diagnosed this
-    // as a parse error.
-    if (paramInfo.ColonLoc.isValid() && !paramInfo.Type)
+    // If we diagnosed this parameter as a parse error, propagate to the decl.
+    if (paramInfo.isInvalid)
       param->setInvalid();
     
     // If a type was provided, create the type for the parameter.
@@ -439,15 +476,10 @@ mapParsedParameters(Parser &parser,
     }
 
     if (param.DefaultArg) {
-      if (!isFirstParameterClause) {
-        // Default arguments are only permitted on the first parameter clause.
-        parser.diagnose(param.EqualLoc, diag::non_func_decl_pattern_init)
-          .fixItRemove(SourceRange(param.EqualLoc,
-                                   param.DefaultArg->getExpr()->getEndLoc()));
-      } else {
-        result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
-        result->setDefaultValue(param.DefaultArg);
-      }
+      assert(isFirstParameterClause &&
+             "Default arguments are only permitted on the first param clause");
+      result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
+      result->setDefaultValue(param.DefaultArg);
     }
 
     elements.push_back(result);
@@ -520,7 +552,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
     paramContext = ParameterContextKind::Curried;
   }
 
-  // If the decl uses currying syntax, warn that that syntax is going away.
+  // If the decl uses currying syntax, complain that that syntax has gone away.
   if (BodyParams.size() - FirstBodyPatternIndex > 1) {
     SourceRange allPatternsRange(
       BodyParams[FirstBodyPatternIndex]->getStartLoc(),
@@ -758,44 +790,32 @@ ParserResult<Pattern> Parser::parsePattern() {
       consumeToken(tok::code_complete);
     }
     return nullptr;
-
+    
   case tok::kw_var:
   case tok::kw_let: {
-    bool isLetKeyword = Tok.is(tok::kw_let);
-    bool alwaysImmutable = InVarOrLetPattern == IVOLP_AlwaysImmutable;
-    bool implicitlyImmutable = InVarOrLetPattern == IVOLP_ImplicitlyImmutable;
+    bool isLet = Tok.is(tok::kw_let);
     SourceLoc varLoc = consumeToken();
-
+    
     // 'var' and 'let' patterns shouldn't nest.
     if (InVarOrLetPattern == IVOLP_InLet ||
         InVarOrLetPattern == IVOLP_InVar)
-      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLetKeyword));
-
-    if (isLetKeyword) {
-      // 'let' isn't valid inside an implicitly immutable or always
-      // immutable context.
-      if (alwaysImmutable || implicitlyImmutable)
-        diagnose(varLoc, diag::let_pattern_in_immutable_context)
-          .fixItRemove(varLoc);
-    } else {
-      // In an always immutable context, `var` is not allowed.
-      if (alwaysImmutable)
-        diagnose(varLoc, diag::var_not_allowed_in_pattern)
-          .fixItRemove(varLoc);
-    }
+      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
+    
+    // 'let' isn't valid inside an implicitly immutable context, but var is.
+    if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
+      diagnose(varLoc, diag::let_pattern_in_immutable_context);
     
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLetKeyword ? IVOLP_InLet : IVOLP_InVar);
+    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
     
     ParserResult<Pattern> subPattern = parsePattern();
     if (subPattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
     if (subPattern.isNull())
       return nullptr;
-    return makeParserResult(new (Context) VarPattern(varLoc,
-      isLetKeyword || alwaysImmutable,
-      subPattern.get()));
+    return makeParserResult(new (Context) VarPattern(varLoc, isLet,
+                                                     subPattern.get()));
   }
       
   default:
@@ -815,8 +835,8 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
   VarDecl *var;
   if (ArgumentIsParameter) {
-    var = new (Context) ParamDecl(isLet, loc, name, loc, name, Type(),
-                                  CurDeclContext);
+    var = new (Context) ParamDecl(isLet, SourceLoc(), loc, name, loc, name,
+                                  Type(), CurDeclContext);
   } else {
     var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
                                 loc, name, Type(), CurDeclContext);
@@ -983,10 +1003,6 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   // 'let' isn't valid inside an implicitly immutable context, but var is.
   if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
     diagnose(varLoc, diag::let_pattern_in_immutable_context);
-
-  if (!isLet && InVarOrLetPattern == IVOLP_AlwaysImmutable)
-    diagnose(varLoc, diag::var_not_allowed_in_pattern)
-      .fixItReplace(varLoc, "let");
 
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>

@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 import SwiftPrivate
 
 // Also import modules which are used by StdlibUnittest internally. This
@@ -80,7 +81,8 @@ Algorithm.test("min,max") {
 }
 
 Algorithm.test("sorted/strings")
-  .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
+  .xfail(.NativeRuntime("String comparison: ICU vs. Foundation " +
+    "https://bugs.swift.org/browse/SR-530"))
   .code {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
@@ -203,20 +205,20 @@ Algorithm.test("sorted/complexity") {
   // Check performance of sorting an array of repeating values.
   var comparisons_100 = 0
   ary = [Int](repeating: 0, count: 100)
-  ary.sort { comparisons_100++; return $0 < $1 }
+  ary.sort { comparisons_100 += 1; return $0 < $1 }
   var comparisons_1000 = 0
   ary = [Int](repeating: 0, count: 1000)
-  ary.sort { comparisons_1000++; return $0 < $1 }
+  ary.sort { comparisons_1000 += 1; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 
   // Try to construct 'bad' case for quicksort, on which the algorithm
   // goes quadratic.
   comparisons_100 = 0
   ary = makeQSortKiller(100)
-  ary.sort { comparisons_100++; return $0 < $1 }
+  ary.sort { comparisons_100 += 1; return $0 < $1 }
   comparisons_1000 = 0
   ary = makeQSortKiller(1000)
-  ary.sort { comparisons_1000++; return $0 < $1 }
+  ary.sort { comparisons_1000 += 1; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 }
 

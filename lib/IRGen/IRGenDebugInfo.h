@@ -216,7 +216,7 @@ private:
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
   llvm::DIScope *getOrCreateContext(DeclContext *DC);
-  llvm::MDNode *createInlinedAt(const SILDebugScope *Scope);
+  llvm::MDNode *createInlinedAt(const SILDebugScope *CallSite);
 
   llvm::DIFile *getOrCreateFile(const char *Filename);
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
@@ -271,35 +271,39 @@ private:
   TypeAliasDecl *getMetadataType();
 };
 
-/// \brief An RAII object that autorestores the debug location.
+/// An RAII object that autorestores the debug location.
 class AutoRestoreLocation {
   IRGenDebugInfo *DI;
+  IRBuilder &Builder;
+  llvm::DebugLoc SavedLocation;
+
 public:
-  AutoRestoreLocation(IRGenDebugInfo *DI) : DI(DI) {
+  AutoRestoreLocation(IRGenDebugInfo *DI, IRBuilder &Builder)
+      : DI(DI), Builder(Builder) {
     if (DI)
-      DI->pushLoc();
+      SavedLocation = Builder.getCurrentDebugLocation();
   }
 
-  /// \brief Autorestore everything back to normal.
+  /// Autorestore everything back to normal.
   ~AutoRestoreLocation() {
     if (DI)
-      DI->popLoc();
+      Builder.SetCurrentDebugLocation(SavedLocation);
   }
 };
 
-/// \brief An RAII object that temporarily switches to
-/// an artificial debug location that has a valid scope, but no line
-/// information. This is useful when emitting compiler-generated
-/// instructions (e.g., ARC-inserted calls to release()) that have no
-/// source location associated with them. The DWARF specification
-/// allows the compiler to use the special line number 0 to indicate
-/// code that cannot be attributed to any source location.
+/// An RAII object that temporarily switches to an artificial debug
+/// location that has a valid scope, but no line information. This is
+/// useful when emitting compiler-generated instructions (e.g.,
+/// ARC-inserted calls to release()) that have no source location
+/// associated with them. The DWARF specification allows the compiler
+/// to use the special line number 0 to indicate code that cannot be
+/// attributed to any source location.
 class ArtificialLocation : public AutoRestoreLocation {
 public:
-  /// \brief Set the current location to line 0, but within scope DS.
+  /// Set the current location to line 0, but within scope DS.
   ArtificialLocation(const SILDebugScope *DS, IRGenDebugInfo *DI,
                      IRBuilder &Builder)
-      : AutoRestoreLocation(DI) {
+      : AutoRestoreLocation(DI, Builder) {
     if (DI) {
       auto DL = llvm::DebugLoc::get(0, 0, DI->getOrCreateScope(DS));
       Builder.SetCurrentDebugLocation(DL);
@@ -307,13 +311,13 @@ public:
   }
 };
 
-/// \brief An RAII object that temporarily switches to an
-/// empty location. This is how the function prologue is represented.
+/// An RAII object that temporarily switches to an empty
+/// location. This is how the function prologue is represented.
 class PrologueLocation : public AutoRestoreLocation {
 public:
-  /// \brief Set the current location to an empty location.
+  /// Set the current location to an empty location.
   PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder)
-    : AutoRestoreLocation(DI) {
+      : AutoRestoreLocation(DI, Builder) {
     if (DI)
       DI->clearLoc(Builder);
   }

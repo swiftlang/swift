@@ -1,0 +1,3 @@
+[flake8]
+filename = *.py,build-script,gyb,line-directive,ns-html2rst,pre-commit-benchmark,recursive-lipo,submit-benchmark-results,update-checkout,viewcfg
+ignore = E101,E111,E128,E265,E302,E501,W191

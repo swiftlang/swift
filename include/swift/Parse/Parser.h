@@ -71,6 +71,7 @@ class Parser {
 
   bool IsInputIncomplete = false;
   SourceLoc DelayedDeclEnd;
+  std::vector<Token> SplitTokens;
 
 public:
   SourceManager &SourceMgr;
@@ -106,13 +107,8 @@ public:
     
     /// InVarOrLetPattern has this value when parsing a pattern in which bound
     /// variables are implicitly immutable, but allowed to be marked mutable by
-    /// using a 'var' pattern.
+    /// using a 'var' pattern.  This happens in for-each loop patterns.
     IVOLP_ImplicitlyImmutable,
-
-    /// InVarOrLetPattern has this value when parsing a pattern where variables
-    /// must always be immutable, so you cannot mark a pattern as mutable with
-    /// 'var'. This happens in for-each patterns.
-    IVOLP_AlwaysImmutable,
     
     /// When InVarOrLetPattern has this value, bound variables are mutable, and
     /// nested let/var patterns are not permitted. This happens when parsing a
@@ -154,6 +150,10 @@ public:
   bool allowTopLevelCode() const {
     return SF.isScriptMode();
   }
+
+  const std::vector<Token> &getSplitTokens() { return SplitTokens; }
+
+  void markSplitToken(tok Kind, StringRef Txt);
 
   /// Returns true if the parser reached EOF with incomplete source input, due
   /// for example, a missing right brace.
@@ -373,13 +373,17 @@ public:
   class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
+    bool Backtrack = true;
 
   public:
     BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
 
     ~BacktrackingScope() {
-      P.backtrackToPosition(PP);
+      if (Backtrack)
+        P.backtrackToPosition(PP);
     }
+
+    void cancelBacktrack() { Backtrack = false; }
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -934,16 +938,8 @@ public:
     /// \p SecondName is the name.
     SourceLoc SecondNameLoc;
 
-    /// The location of the ':', if present, indicating that a type is
-    /// provided.
-    SourceLoc ColonLoc;
-
     /// The location of the '...', if present.
     SourceLoc EllipsisLoc;
-
-    /// The location of the '=', if present, indicating that a default argument
-    /// is provided.
-    SourceLoc EqualLoc;
 
     /// The first name.
     Identifier FirstName;
@@ -956,6 +952,9 @@ public:
 
     /// The default argument for this parameter.
     ExprHandle *DefaultArg = nullptr;
+    
+    /// True if we emitted a parse error about this parameter.
+    bool isInvalid = false;
   };
 
   /// Describes the context in which the given parameter is being parsed.
@@ -1093,10 +1092,28 @@ public:
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
   Expr *parseExprStringLiteral();
-  
+
+  /// If the token is an escaped identifier being used as an argument
+  /// label, but doesn't need to be, diagnose it.
+  void diagnoseEscapedArgumentLabel(const Token &tok);
+
+  /// Parse an unqualified-decl-name.
+  ///
+  ///   unqualified-decl-name:
+  ///     identifier
+  ///     identifier '(' ((identifier | '_') ':') + ')'
+  ///
+  ///
+  /// \param allowInit Whether to allow 'init' for initializers.
+  /// \param loc Will be populated with the location of the name.
+  /// \param diag The diagnostic to emit if this is not a name.
+  DeclName parseUnqualifiedDeclName(bool allowInit, DeclNameLoc &loc,
+                                    const Diagnostic &diag);
+
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);

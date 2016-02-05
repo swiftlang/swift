@@ -30,7 +30,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
   // the metatype as its first argument, like a static function.
   Type metatype = ctor->getType()->castTo<AnyFunctionType>()->getInput();
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
+  auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$metatype"), SourceLoc(),
                                AC.getIdentifier("$metatype"), metatype,
                                ctor->getDeclContext());
@@ -52,7 +52,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     return tuple;
   } else {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
+    auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$implicit_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), ty, DC);
@@ -76,7 +76,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   SILValue resultSlot;
   if (selfTy.isAddressOnly(gen.SGM.M)) {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(),
+    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), selfTyCan,
@@ -300,7 +300,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       case OTK_ImplicitlyUnwrappedOptional:
         returnAddress = B.createInitEnumDataAddr(ctor, IndirectReturnAddress,
                  getASTContext().getOptionalSomeDecl(ctor->getFailability()),
-                                                 selfLV.getType());
+                                                 selfLV->getType());
         break;
       }
       
@@ -353,7 +353,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(),
+    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"),
@@ -453,7 +453,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // When using Objective-C allocation, convert the metatype
     // argument to an Objective-C metatype.
     if (useObjCAllocation) {
-      auto metaTy = allocArg.getType().castTo<MetatypeType>();
+      auto metaTy = allocArg->getType().castTo<MetatypeType>();
       metaTy = CanMetatypeType::get(metaTy.getInstanceType(),
                                     MetatypeRepresentation::ObjC);
       allocArg = B.createThickToObjCMetatype(Loc, allocArg,

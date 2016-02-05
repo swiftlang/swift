@@ -1,4 +1,4 @@
-//===--- Constraint.cpp - Constraint in the Type Checker --------*- C++ -*-===//
+//===--- Constraint.cpp - Constraint in the Type Checker ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

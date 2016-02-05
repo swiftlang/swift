@@ -1,4 +1,4 @@
-//===--- Punycode.cpp - Unicode to Punycode transcoding ---------*- C++ -*-===//
+//===--- Punycode.cpp - Unicode to Punycode transcoding -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

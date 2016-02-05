@@ -87,7 +87,7 @@ protocol AsExistentialB {
 }
 
 protocol AsExistentialAssocTypeA {
-  var delegate : AsExistentialAssocTypeB? { get } // expected-error 3{{protocol 'AsExistentialAssocTypeB' can only be used as a generic constraint because it has Self or associated type requirements}}
+  var delegate : AsExistentialAssocTypeB? { get } // expected-error {{protocol 'AsExistentialAssocTypeB' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 protocol AsExistentialAssocTypeB {
   func aMethod(object : AsExistentialAssocTypeA)
@@ -99,6 +99,26 @@ protocol AsExistentialAssocTypeAgainA {
   associatedtype Bar
 }
 protocol AsExistentialAssocTypeAgainB {
-  func aMethod(object : AsExistentialAssocTypeAgainA) // expected-error * {{protocol 'AsExistentialAssocTypeAgainA' can only be used as a generic constraint because it has Self or associated type requirements}}
+  func aMethod(object : AsExistentialAssocTypeAgainA) // expected-error {{protocol 'AsExistentialAssocTypeAgainA' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
+
+// SR-547
+protocol A {
+    associatedtype B1: B // expected-error{{type may not reference itself as a requirement}}
+    associatedtype C1: C
+    
+    mutating func addObserver(observer: B1, forProperty: C1)
+}
+
+protocol C {
+    
+}
+
+protocol B {
+    associatedtype BA: A // expected-error{{type may not reference itself as a requirement}}
+    associatedtype BC: C
+    
+    func observeChangeOfProperty(property: BC, observable: BA)
+}
+
 

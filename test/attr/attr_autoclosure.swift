@@ -12,7 +12,6 @@ func func2(@autoclosure fp : () -> Int) { func2(4)}
 
 func func3(@autoclosure fp fpx : () -> Int) {func3(fp: 0)}
 func func4(@autoclosure fp fp : () -> Int) {func4(fp: 0)}
-func func5(@autoclosure fp fp : () -> Int) {func5(fp: 0)}
 func func6(@autoclosure _: () -> Int) {func6(0)}
 
 // declattr and typeattr on the argument.
@@ -59,8 +58,7 @@ func overloadedEach<P: P2>(source: P, _ closure: () -> ()) {
 struct S : P2 {
   typealias Element = Int
   func each(@autoclosure closure: () -> ()) {
-    overloadedEach(self, closure) // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @autoclosure () -> ())'}}
- // expected-note @-1 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, () -> ()), (P, () -> ())}}
+    overloadedEach(self, closure) // expected-error {{invalid conversion from non-escaping function of type '@autoclosure () -> ()' to potentially escaping function type '() -> ()'}}
   }
 }
 

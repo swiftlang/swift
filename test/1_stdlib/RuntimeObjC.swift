@@ -8,6 +8,15 @@
 
 import Swift
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import Foundation
 import CoreGraphics
 import SwiftShims
@@ -456,6 +465,14 @@ Runtime.test("Generic class ObjC runtime names") {
                                                   GenericEnum<GenericEnum<Int>>>.self))
 }
 
+Runtime.test("typeByName") {
+  // Make sure we don't crash if we have foreign classes in the
+  // table -- those don't have NominalTypeDescriptors
+  print(CFArray.self)
+  expectTrue(_typeByName("a.SomeClass") == SomeClass.self)
+  expectTrue(_typeByName("DoesNotExist") == nil)
+}
+
 Runtime.test("casting AnyObject to class metatypes") {
   do {
     var ao: AnyObject = SomeClass.self
@@ -655,13 +672,13 @@ Reflection.test("Class/ObjectiveCBase/Default") {
     dump(value, &output)
 
     let expected =
-      "▿ a.SwiftFooMoreDerivedObjCClass #0\n" +
-      "  ▿ super: This is FooObjCClass\n" +
-      "    ▿ FooDerivedObjCClass: This is FooObjCClass\n" +
-      "      ▿ FooObjCClass: This is FooObjCClass\n" +
-      "        - NSObject: This is FooObjCClass\n" +
+      "▿ This is FooObjCClass #0\n" +
+      "  - super: FooMoreDerivedObjCClass\n" +
+      "    - super: FooDerivedObjCClass\n" +
+      "      - super: FooObjCClass\n" +
+      "        - super: NSObject\n" +
       "  - first: 123\n" +
-      "  - second: abc\n"
+      "  - second: \"abc\"\n"
 
     expectEqual(expected, output)
   }
@@ -678,9 +695,6 @@ Reflection.test("MetatypeMirror") {
     var output = ""
     dump(objcProtocolMetatype, &output)
     expectEqual(expectedSomeClass, output)
-
-    expectEqual(_reflect(concreteClassMetatype).objectIdentifier!,
-                _reflect(objcProtocolMetatype).objectIdentifier!)
                 
     let objcProtocolConcreteMetatype = SomeObjCProto.self
     let expectedObjCProtocolConcrete = "- a.SomeObjCProto #0\n"
@@ -698,24 +712,6 @@ Reflection.test("MetatypeMirror") {
     let objcDefinedProtoType = NSObjectProtocol.self
     expectEqual(String(objcDefinedProtoType), "NSObject")
   }
-}
-
-class DullClass {}
-Reflection.test("ObjectIdentity") {
-  // Check that the primitive _MirrorType implementation produces appropriately
-  // unique identifiers for class instances.
-
-  let x = DullClass()
-  let y = DullClass()
-  let o = NSObject()
-  let p = NSObject()
-
-  checkEquatable(
-    true, _reflect(o).objectIdentifier!, _reflect(o).objectIdentifier!)
-  checkEquatable(
-    false, _reflect(o).objectIdentifier!, _reflect(p).objectIdentifier!)
-  checkEquatable(
-    false, _reflect(o).objectIdentifier!, _reflect(y).objectIdentifier!)
 }
 
 Reflection.test("CGPoint") {
@@ -779,10 +775,10 @@ Reflection.test("UnsafeReference/not-nil") {
   dump(optionalURL, &output)
 
   let expected =
-    "▿ Swift.UnsafeReference<__ObjC.CFURL>\n" +
+    "▿ Optional(Swift.UnsafeReference<__ObjC.CFURL>(_value: http://llvm.org/))\n" +
     "  ▿ Some: Swift.UnsafeReference<__ObjC.CFURL>\n" +
-    "    ▿ _storage: http://llvm.org/ #0\n" +
-    "      - NSObject: http://llvm.org/\n"
+    "    - _value: http://llvm.org/ #0\n" +
+    "      - super: NSObject\n"
 
   expectEqual(expected, output)
 

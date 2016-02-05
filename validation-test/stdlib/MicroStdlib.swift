@@ -10,6 +10,10 @@
 // A bare-bones Swift standard library
 //
 
+public enum Optional<T> {
+  case Some(T), None
+}
+
 public typealias IntegerLiteralType = Int
 public typealias _MaxBuiltinIntegerType = Builtin.Int2048
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80

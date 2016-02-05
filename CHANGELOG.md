@@ -1,5 +1,13 @@
-Latest
-------
+
+Swift 3
+-------
+
+* Curried function syntax has been removed, and now produces a compile-time
+  error.
+
+
+Swift 2.2
+---------
 
 * Associated types in protocols can now be specified with a new 'associatedtype'
   declaration, to replace the use of 'typealias':
@@ -11,9 +19,17 @@ Latest
   The typealias keyword is still allowed (but deprecated and produces a warning)
   in Swift 2.2. This warning will become an error in Swift 3.
 
+* Curried function syntax has been deprecated, and is slated to be removed in 
+  Swift 3.
+
 * The ++ and -- operators have been deprecated, and are slated to be removed in
   Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
   types, and "x = x.successor()" on Index types.
+
+* New #file, #line, #column, and #function expressions have been introduced to
+  replace the existing __FILE__, __LINE__, __COLUMN__, and __FUNCTION__ symbols.
+  The __FILE__-style symbols have been deprecated, and will be removed in
+  Swift 3.
 
 * The operator identifier lexer grammar has been revised to simplify the rules
   for operators that start with a dot (".").  The new rule is that an operator
@@ -113,6 +129,57 @@ Latest
   rename the generated Objective-C declaration.
 
   **(rdar://problem/21930334)**
+
+* When referencing a function or initializer, one can provide the
+  complete name, including argument labels. For example:
+
+      let fn1 = someView.insertSubview(_:at:)
+      let fn2 = someView.insertSubview(_:aboveSubview:)
+
+      let buttonFactory = UIButton.init(type:)
+
+  For more information, see [SE-0021](https://github.com/apple/swift-evolution/blob/master/proposals/0021-generalized-naming.md).
+
+* There is a new build configuration function, `#if swift(>=x.y)`, which
+  tests if the current Swift language version is at least `x.y`. This
+  allows you to conditionally compile code for multiple language
+  versions in the same file, even with different syntax, by deactivating
+  parsing in inactive code blocks. For example:
+
+  ```swift
+  #if swift(>=2.2)
+    // Only this code will be parsed in Swift 3
+    func foo(x: Int) -> (y: Int) -> () {}
+  #else
+    // This code is ignored entirely.
+    func foo(x: Int)(y: Int) {}
+  #endif
+  ```
+
+  For more information, see [SE-0020](https://github.com/apple/swift-evolution/blob/master/proposals/0020-if-swift-version.md).
+
+* The Objective-C selector of a Swift method can now be determined
+  directly with the #selector expression, e.g.,:
+
+      let sel = #selector(insertSubview(_:aboveSubview:)) // sel has type Selector
+
+  Along with this change, the use of string literals as selectors has
+  been deprecated, e.g.,
+
+      let sel: Selector = "insertSubview:aboveSubview:"
+
+  Generally, such string literals should be replaced with uses of
+  `#selector`, and the compiler will provide Fix-Its that use
+  `#selector`. In cases where they is not possible (e.g., when referring
+  to the getter of a property), one can still directly construct
+  selectors, e.g.,:
+
+      let sel = Selector("propertyName")
+
+  Note that the compiler is now checking the string literals used to
+  construct Selectors to ensure that they are well-formed Objective-C
+  selectors and that there is an '@objc' method with that selector.
+
 
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------

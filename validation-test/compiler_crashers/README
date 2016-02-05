@@ -1,7 +1,7 @@
 These test cases under MIT License: 
 The MIT License (MIT)
 
-Copyright (c) 2014 practicalswift
+Copyright (c) 2014-2016 practicalswift
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,4 +24,4 @@ SOFTWARE.
 Repository: https://github.com/practicalswift/swift-compiler-crashes.git
 Web URL: https://github.com/practicalswift/swift-compiler-crashes
 
-Tests updated as of revision 50f86f4f26c78587dbc37ccff04ae95c8285beca
+Tests updated as of revision a98b6a75b8622dfc44dd56ddea633a9254ac7f1a

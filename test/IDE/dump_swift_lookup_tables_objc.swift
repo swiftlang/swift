@@ -4,6 +4,8 @@
 // REQUIRES: objc_interop
 
 // CHECK-LABEL: <<Foundation lookup table>>
+// CHECK:   NSTimeIntervalSince1970:
+// CHECK:     TU: Macro
 // CHECK: Categories:{{.*}}NSValue(NSValueCreation){{.*}}
 
 // CHECK-LABEL: <<ObjectiveC lookup table>>
@@ -32,10 +34,6 @@
 // CHECK-NEXT:     TU: SNCollision{{$}}
 // CHECK-NEXT:   SNCollisionProtocol:
 // CHECK-NEXT:     TU: SNCollision{{$}}
-// CHECK-NEXT:   SWIFT_ENUM:
-// CHECK-NEXT:     TU: Macro
-// CHECK-NEXT:   SWIFT_NAME:
-// CHECK-NEXT:     TU: Macro
 // CHECK-NEXT:   SomeClass:
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:
@@ -80,6 +78,10 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 
 // CHECK: Categories: SNSomeClass(), SNSomeClass(Category1)
+
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: <<Foundation lookup table>>
+// CHECK-OMIT-NEEDLESS-WORDS:   timeIntervalSince1970:
+// CHECK-OMIT-NEEDLESS-WORDS:     TU: Macro
 
 // CHECK-OMIT-NEEDLESS-WORDS: <<ObjectiveC lookup table>>
 // CHECK-OMIT-NEEDLESS-WORDS-NOT: lookup table

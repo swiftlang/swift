@@ -32,7 +32,7 @@ public protocol Indexable {
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(1)
-  var startIndex: Index {get}
+  var startIndex: Index { get }
 
   /// The collection's "past the end" position.
   ///
@@ -41,7 +41,7 @@ public protocol Indexable {
   /// `successor()`.
   ///
   /// - Complexity: O(1)
-  var endIndex: Index {get}
+  var endIndex: Index { get }
 
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
@@ -56,18 +56,18 @@ public protocol Indexable {
   /// Returns the element at the given `position`.
   ///
   /// - Complexity: O(1)
-  subscript(position: Index) -> _Element {get}
+  subscript(position: Index) -> _Element { get }
 }
 
 public protocol MutableIndexable {
   associatedtype Index : ForwardIndex
 
-  var startIndex: Index {get}
-  var endIndex: Index {get}
+  var startIndex: Index { get }
+  var endIndex: Index { get }
 
   associatedtype _Element
 
-  subscript(position: Index) -> _Element {get set}
+  subscript(position: Index) -> _Element { get set }
 }
 
 /// The iterator used for collections that don't specify one.
@@ -138,13 +138,13 @@ public protocol Collection : Indexable, Sequence {
   associatedtype SubSequence: Indexable, Sequence = Slice<Self>
 
   /// Returns the element at the given `position`.
-  subscript(position: Index) -> Iterator.Element {get}
+  subscript(position: Index) -> Iterator.Element { get }
 
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence {get}
+  subscript(bounds: Range<Index>) -> SubSequence { get }
 
   /// Returns `self[startIndex..<end]`
   ///
@@ -211,7 +211,7 @@ extension Collection where SubSequence == Self {
   /// If `!self.isEmpty`, remove the first element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(1)
   @warn_unused_result
   public mutating func popFirst() -> Iterator.Element? {
     guard !isEmpty else { return nil }
@@ -219,17 +219,19 @@ extension Collection where SubSequence == Self {
     self = self[startIndex.successor()..<endIndex]
     return element
   }
+}
 
+extension CollectionType where
+    SubSequence == Self, Index : BidirectionalIndexType {
   /// If `!self.isEmpty`, remove the last element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(1)
   @warn_unused_result
   public mutating func popLast() -> Iterator.Element? {
     guard !isEmpty else { return nil }
-    let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
-    let element = self[lastElementIndex]
-    self = self[startIndex..<lastElementIndex]
+    let element = last!
+    self = self[startIndex..<endIndex.predecessor()]
     return element
   }
 }
@@ -605,8 +607,8 @@ extension Sequence
 }
 
 extension Collection {
-  public func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R? {
-    return preprocess(self)
+  public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
+    return preprocess()
   }
 }
 

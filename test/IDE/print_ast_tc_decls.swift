@@ -126,11 +126,7 @@ struct d0100_FooStruct {
   func instanceFunc2(a: Int, inout b: Double) {}
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, inout b: Double){{$}}
 
-  func instanceFunc3(a: Int, b: Double) { 
-    var a = a
-    a = 1
-    _ = a
-  }
+  func instanceFunc3(a: Int, let b: Double) { var a = a; a = 1; _ = a }
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
 
   func instanceFuncWithDefaultArg1(a: Int = 0) {}
@@ -176,30 +172,6 @@ struct d0100_FooStruct {
     }
   }
 // PASS_COMMON-NEXT: {{^}}  subscript (i: Int, j: Int) -> Double { get }{{$}}
-
-  func curriedVoidFunc1()() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc1()(){{$}}
-
-  func curriedVoidFunc2()(a: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc2()(a: Int){{$}}
-
-  func curriedVoidFunc3(a: Int)() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc3(a: Int)(){{$}}
-
-  func curriedVoidFunc4(a: Int)(b: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedVoidFunc4(a: Int)(b: Int){{$}}
-
-  func curriedStringFunc1()() -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc1()() -> String{{$}}
-
-  func curriedStringFunc2()(a: Int) -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc2()(a: Int) -> String{{$}}
-
-  func curriedStringFunc3(a: Int)() -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc3(a: Int)() -> String{{$}}
-
-  func curriedStringFunc4(a: Int)(b: Int) -> String { return "" } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-// PASS_COMMON-NEXT: {{^}}  func curriedStringFunc4(a: Int)(b: Int) -> String{{$}}
 
   func bodyNameVoidFunc1(a: Int, b x: Float) {}
 // PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc1(a: Int, b x: Float){{$}}

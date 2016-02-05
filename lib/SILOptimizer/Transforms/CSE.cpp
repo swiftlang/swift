@@ -541,7 +541,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      SILValue(Inst, 0).replaceAllUsesWith(V);
+      Inst->replaceAllUsesWith(V);
       Inst->eraseFromParent();
       Changed = true;
       ++NumSimplify;
@@ -623,7 +623,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return !WMI->isVolatile();
   }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
-    return !EMI->getOperand().getType().isAddress();
+    return !EMI->getOperand()->getType().isAddress();
   }
   switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:

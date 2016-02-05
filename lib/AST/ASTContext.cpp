@@ -1210,6 +1210,7 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
   assert(Params.size() == 1);
   auto Param = Params[0];
   assert(Param->getArchetype() && "Not type-checked yet");
+  (void) Param;
   Substitution Subst(BGT->getGenericArgs()[0], {});
   auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
   auto arena = getArena(BGT->getRecursiveProperties());
@@ -2284,6 +2285,29 @@ Optional<KnownFoundationEntity> swift::getKnownFoundationEntity(StringRef name){
     .Default(None);
 }
 
+bool swift::nameConflictsWithStandardLibrary(KnownFoundationEntity entity) {
+  switch (entity) {
+  case KnownFoundationEntity::NSArray:
+  case KnownFoundationEntity::NSDictionary:
+  case KnownFoundationEntity::NSInteger:
+  case KnownFoundationEntity::NSRange:
+  case KnownFoundationEntity::NSSet:
+  case KnownFoundationEntity::NSString:
+    return true;
+
+  case KnownFoundationEntity::NSCopying:
+  case KnownFoundationEntity::NSError:
+  case KnownFoundationEntity::NSErrorPointer:
+  case KnownFoundationEntity::NSNumber:
+  case KnownFoundationEntity::NSObject:
+  case KnownFoundationEntity::NSStringEncoding:
+  case KnownFoundationEntity::NSUInteger:
+  case KnownFoundationEntity::NSURL:
+  case KnownFoundationEntity::NSZone:
+    return false;
+  }
+}
+
 StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
   StringRef objcName;
   switch (kind) {
@@ -2292,6 +2316,12 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
     break;
 #include "swift/AST/KnownFoundationEntities.def"
   }
+
+  // If we're omitting needless words and the name won't conflict with
+  // something in the standard library, strip the prefix off the Swift
+  // name.
+  if (LangOpts.OmitNeedlessWords && !nameConflictsWithStandardLibrary(kind))
+    return objcName.substr(2);
 
   return objcName;
 }

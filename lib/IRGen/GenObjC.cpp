@@ -292,12 +292,13 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
 
   // If not, create it.  This implicitly adds a trailing null.
   auto init = llvm::ConstantDataArray::getString(LLVMContext, selector);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::InternalLinkage,
+  auto global = new llvm::GlobalVariable(Module, init->getType(), false,
+                                         llvm::GlobalValue::PrivateLinkage,
                                          init,
                           llvm::Twine("\01L_selector_data(") + selector + ")");
   global->setSection("__TEXT,__objc_methname,cstring_literals");
   global->setAlignment(1);
+  addCompilerUsedGlobal(global);
 
   // Drill down to make an i8*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
@@ -323,16 +324,17 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   // choose something descriptive to make the IR readable.
   auto init = getAddrOfObjCMethodName(selector);
   auto global = new llvm::GlobalVariable(Module, init->getType(), false,
-                                         llvm::GlobalValue::InternalLinkage,
+                                         llvm::GlobalValue::PrivateLinkage,
                                          init,
                                 llvm::Twine("\01L_selector(") + selector + ")");
+  global->setExternallyInitialized(true);
   global->setAlignment(getPointerAlignment().getValue());
 
   // This section name is magical for the Darwin static and dynamic linkers.
   global->setSection("__DATA,__objc_selrefs,literal_pointers,no_dead_strip");
 
   // Make sure that this reference does not get optimized away.
-  addUsedGlobal(global);
+  addCompilerUsedGlobal(global);
 
   // Cache and return.
   entry = global;
@@ -341,7 +343,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
 
 /// Get or create an ObjC protocol record. Always returns an i8*. We lazily
 /// create ObjC protocol_t records for protocols, storing references to the
-/// record into the __objc_protolist and  and __objc_protorefs sections to be
+/// record into the __objc_protolist and __objc_protorefs sections to be
 /// fixed up by the runtime.
 ///
 /// It is not correct to use this value as a Protocol* reference directly. The
@@ -356,7 +358,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto,
 
 /// Get or create an ObjC protocol reference. Always returns an i8**. We lazily
 /// create ObjC protocol_t records for protocols, storing references to the
-/// record into the __objc_protolist and  and __objc_protorefs sections to be
+/// record into the __objc_protolist and __objc_protorefs sections to be
 /// fixed up by the runtime.
 llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                                ForDefinition_t forDefinition) {

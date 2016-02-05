@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level SILInstruction classes used for  SIL code.
+// This file defines the high-level SILInstruction classes used for SIL code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,13 +35,6 @@ using namespace Lowering;
 // Instruction-specific properties on SILValue
 //===----------------------------------------------------------------------===//
 
-Optional<SILLocation> SILValue::getLoc() const {
-  if (auto I = dyn_cast<SILInstruction>(*this)) {
-    return I->getLoc();
-  }
-  return None;
-}
-
 SILLocation SILInstruction::getLoc() const { return Location.getLocation(); }
 
 const SILDebugScope *SILInstruction::getDebugScope() const {
@@ -52,8 +45,8 @@ void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
   if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
 
-  assert(DS->InlinedCallSite || DS->SILFn == getFunction() &&
-         "scope of a non-inlined instruction points to different function");
+  assert(DS->getParentFunction() == getFunction() &&
+         "scope belongs to different function");
 
   Location = *B.getOrCreateDebugLocation(getLoc(), DS);
 }
@@ -172,7 +165,7 @@ void SILInstruction::replaceAllUsesWithUndef() {
   SILModule &Mod = getModule();
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get().getType(), Mod));
+    Op->set(SILUndef::get(Op->get()->getType(), Mod));
   }
 }
 

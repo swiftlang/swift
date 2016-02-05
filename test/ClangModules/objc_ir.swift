@@ -11,9 +11,9 @@ import objc_ext
 import TestProtocols
 import ObjCIRExtras
 
-// CHECK: @"\01L_selector_data(method:withFloat:)" = internal constant [18 x i8] c"method:withFloat:\00"
-// CHECK: @"\01L_selector_data(method:withDouble:)" = internal constant [19 x i8] c"method:withDouble:\00"
-// CHECK: @"\01L_selector_data(method:separateExtMethod:)" = internal constant [26 x i8] c"method:separateExtMethod:\00", section "__TEXT,__objc_methname,cstring_literals"
+// CHECK: @"\01L_selector_data(method:withFloat:)" = private global [18 x i8] c"method:withFloat:\00"
+// CHECK: @"\01L_selector_data(method:withDouble:)" = private global [19 x i8] c"method:withDouble:\00"
+// CHECK: @"\01L_selector_data(method:separateExtMethod:)" = private global [26 x i8] c"method:separateExtMethod:\00", section "__TEXT,__objc_methname,cstring_literals"
 
 // Instance method invocation
 // CHECK: define hidden void @_TF7objc_ir15instanceMethodsFCSo1BT_([[B]]*

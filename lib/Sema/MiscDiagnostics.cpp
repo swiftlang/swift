@@ -117,7 +117,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         MutatingMethod,
         SuperInit,
         SelfInit,
-        SuperMethod,
       };
       unsigned kind : 3;
     };
@@ -150,20 +149,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         InvalidPartialApplications.insert({ expr, {1, kind} });
         return;
       }
-
-      // Method references based in super cannot be partially applied,
-      // except for the implicit self parameter, unless the method is final,
-      // in which case a super_method instruction won't be used, just thunks
-      // leading to a function_ref.
-      if (auto call = dyn_cast<CallExpr>(expr))
-        if (auto dotSyntaxCall = dyn_cast<DotSyntaxCallExpr>(call->getFn()))
-          if (dotSyntaxCall->isSuper())
-            if (auto fnDeclRef = dyn_cast<DeclRefExpr>(dotSyntaxCall->getFn()))
-              if (auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl()))
-                InvalidPartialApplications.insert({
-                  dotSyntaxCall, {fn->getNaturalArgumentCount() - /*self*/ 1,
-                    PartialApplication::SuperMethod}
-                });
 
       auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
       if (!fnDeclRef)
@@ -452,8 +437,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<SelfApplyExpr>(ParentExpr) ||             // T.foo()  T()
             isa<UnresolvedDotExpr>(ParentExpr) ||
             isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
-            isa<UnresolvedConstructorExpr>(ParentExpr) ||
-            isa<UnresolvedSelectorExpr>(ParentExpr) ||
             isa<UnresolvedSpecializeExpr>(ParentExpr) ||
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
@@ -918,9 +901,11 @@ public:
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(OCDR->getDecl(), OCDR->getConstructorLoc());
+      diagAvailability(OCDR->getDecl(),
+                       OCDR->getConstructorLoc().getSourceRange());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(DMR->getMember().getDecl(), DMR->getNameLoc());
+      diagAvailability(DMR->getMember().getDecl(),
+                       DMR->getNameLoc().getSourceRange());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
@@ -983,7 +968,7 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagAvailability(D, E->getNameLoc()))
+    if (diagAvailability(D, E->getNameLoc().getSourceRange()))
       return;
 
     if (TC.getLangOpts().DisableAvailabilityChecking)
@@ -1841,6 +1826,365 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
 }
 
+static Optional<ObjCSelector>
+parseObjCSelector(ASTContext &ctx, StringRef string) {
+  // Find the first colon.
+  auto colonPos = string.find(':');
+
+  // If there is no colon, we have a nullary selector.
+  if (colonPos == StringRef::npos) {
+    if (string.empty() || !Lexer::isIdentifier(string)) return None;
+    return ObjCSelector(ctx, 0, { ctx.getIdentifier(string) });
+  }
+
+  SmallVector<Identifier, 2> pieces;
+  do {
+    // Check whether we have a valid selector piece.
+    auto piece = string.substr(0, colonPos);
+    if (piece.empty()) {
+      pieces.push_back(Identifier());
+    } else {
+      if (!Lexer::isIdentifier(piece)) return None;
+      pieces.push_back(ctx.getIdentifier(piece));
+    }
+
+    // Move to the next piece.
+    string = string.substr(colonPos+1);
+    colonPos = string.find(':');
+  } while (colonPos != StringRef::npos);
+
+  // If anything remains of the string, it's not a selector.
+  if (!string.empty()) return None;
+
+  return ObjCSelector(ctx, pieces.size(), pieces);
+}
+
+
+namespace {
+
+class ObjCSelectorWalker : public ASTWalker {
+  TypeChecker &TC;
+  const DeclContext *DC;
+  Type SelectorTy;
+
+  /// Determine whether a reference to the given method via its
+  /// enclosing class/protocol is ambiguous (and, therefore, needs to
+  /// be disambiguated with a coercion).
+  bool isSelectorReferenceAmbiguous(AbstractFunctionDecl *method) {
+    // Determine the name we would search for. If there are no
+    // argument names, our lookup will be based solely on the base
+    // name.
+    DeclName lookupName = method->getFullName();
+    if (lookupName.getArgumentNames().empty())
+      lookupName = lookupName.getBaseName();
+
+    // Look for members with the given name.
+    auto nominal =
+      method->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+    auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
+                                  nominal->getInterfaceType(), lookupName,
+                                  (defaultMemberLookupOptions |
+                                   NameLookupFlags::KnownPrivate));
+
+    // If we didn't find multiple methods, there is no ambiguity.
+    if (result.size() < 2) return false;
+
+    // If we found more than two methods, it's ambiguous.
+    if (result.size() > 2) return true;
+
+    // Dig out the methods.
+    auto firstMethod = dyn_cast<FuncDecl>(result[0].Decl);
+    auto secondMethod = dyn_cast<FuncDecl>(result[1].Decl);
+    if (!firstMethod || !secondMethod) return true;
+
+    // If one is a static/class method and the other is not...
+    if (firstMethod->isStatic() == secondMethod->isStatic()) return true;
+
+    // ... overload resolution will prefer the static method. Check
+    // that it has the correct selector. We don't even care that it's
+    // the same method we're asking for, just that it has the right
+    // selector.
+    FuncDecl *staticMethod =
+      firstMethod->isStatic() ? firstMethod : secondMethod;
+    return staticMethod->getObjCSelector() != method->getObjCSelector();
+  }
+
+public:
+  ObjCSelectorWalker(TypeChecker &tc, const DeclContext *dc, Type selectorTy)
+    : TC(tc), DC(dc), SelectorTy(selectorTy) { }
+
+  virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    // Only diagnose calls.
+    auto call = dyn_cast<CallExpr>(expr);
+    if (!call) return { true, expr };
+
+    // That produce Selectors.
+    if (!call->getType() || !call->getType()->isEqual(SelectorTy))
+      return { true, expr };
+
+    // Via a constructor.
+    ConstructorDecl *ctor = nullptr;
+    if (auto ctorRefCall = dyn_cast<ConstructorRefCallExpr>(call->getFn())) {
+      if (auto ctorRef = dyn_cast<DeclRefExpr>(ctorRefCall->getFn()))
+        ctor = dyn_cast<ConstructorDecl>(ctorRef->getDecl());
+      else if (auto otherCtorRef =
+                 dyn_cast<OtherConstructorDeclRefExpr>(ctorRefCall->getFn()))
+        ctor = otherCtorRef->getDecl();
+    }
+
+    if (!ctor) return { true, expr };
+
+    // Make sure the constructor is within Selector.
+    auto ctorContextType = ctor->getDeclContext()->getDeclaredTypeOfContext();
+    if (!ctorContextType || !ctorContextType->isEqual(SelectorTy))
+      return { true, expr };
+
+    auto argNames = ctor->getFullName().getArgumentNames();
+    if (argNames.size() != 1) return { true, expr };
+
+    // Is this the init(stringLiteral:) initializer or init(_:) initializer?
+    bool fromStringLiteral = false;
+    if (argNames[0] == TC.Context.Id_stringLiteral)
+      fromStringLiteral = true;
+    else if (!argNames[0].empty())
+      return { true, expr };
+
+    // Dig out the argument.
+    Expr *arg = call->getArg()->getSemanticsProvidingExpr();
+    if (auto tupleExpr = dyn_cast<TupleExpr>(arg)) {
+      if (tupleExpr->getNumElements() == 1 &&
+          tupleExpr->getElementName(0) == TC.Context.Id_stringLiteral)
+        arg = tupleExpr->getElement(0)->getSemanticsProvidingExpr();
+    }
+
+    // If the argument is a call, it might be to
+    // init(__builtinStringLiteral:byteSize:isASCII:). If so, dig
+    // through that.
+    if (auto argCall = dyn_cast<CallExpr>(arg)) {
+      if (auto ctorRefCall =
+            dyn_cast<ConstructorRefCallExpr>(argCall->getFn())) {
+        if (auto argCtor =
+              dyn_cast_or_null<ConstructorDecl>(ctorRefCall->getCalledValue())){
+          auto argArgumentNames = argCtor->getFullName().getArgumentNames();
+          if (argArgumentNames.size() == 3 &&
+              argArgumentNames[0] == TC.Context.Id_builtinStringLiteral) {
+            arg = argCall->getArg()->getSemanticsProvidingExpr();
+          }
+        }
+      }
+    }
+
+    // Check whether we have a string literal.
+    auto stringLiteral = dyn_cast<StringLiteralExpr>(arg);
+    if (!stringLiteral) return { true, expr };
+
+    /// Retrieve the parent expression that coerces to Selector, if
+    /// there is one.
+    auto getParentCoercion = [&]() -> CoerceExpr * {
+      auto parentExpr = Parent.getAsExpr();
+      if (!parentExpr) return nullptr;
+
+      auto coerce = dyn_cast<CoerceExpr>(parentExpr);
+      if (!coerce) return nullptr;
+
+      if (coerce->getType() && coerce->getType()->isEqual(SelectorTy))
+        return coerce;
+
+      return nullptr;
+    };
+
+    // Local function that adds the constructor syntax around string
+    // literals implicitly treated as a Selector.
+    auto addSelectorConstruction = [&](InFlightDiagnostic &diag) {
+      if (!fromStringLiteral) return;
+
+      // Introduce the beginning part of the Selector construction.
+      diag.fixItInsert(stringLiteral->getLoc(), "Selector(");
+
+      if (auto coerce = getParentCoercion()) {
+        // If the string literal was coerced to Selector, replace the
+        // coercion with the ")".
+        SourceLoc endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                      expr->getEndLoc());
+        diag.fixItReplace(SourceRange(endLoc, coerce->getEndLoc()), ")");
+      } else {
+        // Otherwise, just insert the closing ")".
+        diag.fixItInsertAfter(stringLiteral->getEndLoc(), ")");
+      }
+    };
+
+    // Try to parse the string literal as an Objective-C selector, and complain
+    // if it isn't one.
+    auto selector = parseObjCSelector(TC.Context, stringLiteral->getValue());
+    if (!selector) {
+      auto diag = TC.diagnose(stringLiteral->getLoc(),
+                              diag::selector_literal_invalid);
+      diag.highlight(stringLiteral->getSourceRange());
+      addSelectorConstruction(diag);
+      return { true, expr };
+    }
+
+    // Look for methods with this selector.
+    SmallVector<AbstractFunctionDecl *, 8> allMethods;
+    DC->lookupAllObjCMethods(*selector, allMethods);
+
+    // If we didn't find any methods, complain.
+    if (allMethods.empty()) {
+      auto diag =
+        TC.diagnose(stringLiteral->getLoc(), diag::selector_literal_undeclared,
+                    *selector);
+      addSelectorConstruction(diag);
+      return { true, expr };
+    }
+
+    // Separate out the accessor methods.
+    auto splitPoint =
+      std::stable_partition(allMethods.begin(), allMethods.end(),
+                            [](AbstractFunctionDecl *abstractFunc) -> bool {
+                              if (auto func = dyn_cast<FuncDecl>(abstractFunc))
+                                return !func->isAccessor();
+
+                              return true;
+                            });
+    ArrayRef<AbstractFunctionDecl *> methods(allMethods.begin(), splitPoint);
+    ArrayRef<AbstractFunctionDecl *> accessors(splitPoint, allMethods.end());
+
+    // Find the "best" method that has this selector, so we can report
+    // that.
+    AbstractFunctionDecl *bestMethod = nullptr;
+    for (auto method : methods) {
+      // If this is the first method, use it.
+      if (!bestMethod) {
+        bestMethod = method;
+        continue;
+      }
+
+      // If referencing the best method would produce an ambiguity and
+      // referencing the new method would not, we have a new "best".
+      if (isSelectorReferenceAmbiguous(bestMethod) &&
+          !isSelectorReferenceAmbiguous(method)) {
+        bestMethod = method;
+        continue;
+      }
+
+      // If this method is within a protocol...
+      if (auto proto =
+            method->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+        // If the best so far is not from a protocol, or is from a
+        // protocol that inherits this protocol, we have a new best.
+        auto bestProto = bestMethod->getDeclContext()
+          ->isProtocolOrProtocolExtensionContext();
+        if (!bestProto || bestProto->inheritsFrom(proto))
+          bestMethod = method;
+        continue;
+      }
+
+      // This method is from a class.
+      auto classDecl =
+        method->getDeclContext()->isClassOrClassExtensionContext();
+
+      // If the best method was from a protocol, keep it.
+      auto bestClassDecl =
+        bestMethod->getDeclContext()->isClassOrClassExtensionContext();
+      if (!bestClassDecl) continue;
+
+      // If the best method was from a subclass of the place where
+      // this method was declared, we have a new best.
+      while (auto superclassTy = bestClassDecl->getSuperclass()) {
+        auto superclassDecl = superclassTy->getClassOrBoundGenericClass();
+        if (!superclassDecl) break;
+
+        if (classDecl == superclassDecl) {
+          bestMethod = method;
+          break;
+        }
+
+        bestClassDecl = superclassDecl;
+      }
+    }
+
+    // If we have a best method, reference it.
+    if (bestMethod) {
+      // Form the replacement #selector expression.
+      SmallString<32> replacement;
+      {
+        llvm::raw_svector_ostream out(replacement);
+        auto nominal = bestMethod->getDeclContext()
+                         ->isNominalTypeOrNominalTypeExtensionContext();
+        auto name = bestMethod->getFullName();
+        out << "#selector(" << nominal->getName().str() << "."
+            << name.getBaseName().str();
+        auto argNames = name.getArgumentNames();
+
+        // Only print the parentheses if there are some argument
+        // names, because "()" would indicate a call.
+        if (argNames.size() > 0) {
+          out << "(";
+          for (auto argName : argNames) {
+            if (argName.empty()) out << "_";
+            else out << argName.str();
+            out << ":";
+          }
+          out << ")";
+        }
+
+        // If there will be an ambiguity when referring to the method,
+        // introduce a coercion to resolve it to the method we found.
+        if (isSelectorReferenceAmbiguous(bestMethod)) {
+          if (auto fnType =
+                bestMethod->getInterfaceType()->getAs<FunctionType>()) {
+            // For static/class members, drop the metatype argument.
+            if (bestMethod->isStatic())
+              fnType = fnType->getResult()->getAs<FunctionType>();
+
+            // Drop the argument labels.
+            // FIXME: They never should have been in the type anyway.
+            Type type = fnType->getUnlabeledType(TC.Context);
+
+            // Coerce to this type.
+            out << " as ";
+            type.print(out);
+          }
+        }
+
+        out << ")";
+      }
+
+      // Emit the diagnostic.
+      SourceRange replacementRange = expr->getSourceRange();
+      if (auto coerce = getParentCoercion())
+        replacementRange.End = coerce->getEndLoc();
+
+      TC.diagnose(expr->getLoc(),
+                  fromStringLiteral ? diag::selector_literal_deprecated_suggest
+                                    : diag::selector_construction_suggest)
+        .fixItReplace(replacementRange, replacement);
+      return { true, expr };
+    }
+
+    // If we couldn't pick a method to use for #selector, just wrap
+    // the string literal in Selector(...).
+    if (fromStringLiteral) {
+      auto diag = TC.diagnose(stringLiteral->getLoc(),
+                              diag::selector_literal_deprecated);
+      addSelectorConstruction(diag);
+      return { true, expr };
+    }
+
+    return { true, expr };
+  }
+
+};
+}
+
+static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
+                                        const Expr *expr) {
+  auto selectorTy = tc.getObjCSelectorType(const_cast<DeclContext *>(dc));
+  if (!selectorTy) return;
+
+  const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(tc, dc, selectorTy));
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -1854,6 +2198,8 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
   diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+  if (TC.Context.LangOpts.EnableObjCInterop)
+    diagDeprecatedObjCSelectors(TC, DC, E);
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
@@ -2198,22 +2544,6 @@ void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
     .fixItReplace(var->getLoc(), newName->str());
 }
 
-namespace {
-  struct CallEdit {
-    enum {
-      RemoveDefaultArg,
-      Rename,
-    } Kind;
-
-    // The source range affected by this change.
-    SourceRange Range;
-
-    // The replacement text, for a rename.
-    std::string Name;
-  };
-
-}
-
 /// Find the source ranges of extraneous default arguments within a
 /// call to the given function.
 static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
@@ -2488,5 +2818,5 @@ void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
   // Fix the name.
   auto name = var->getName();
   diagnose(memberRef->getNameLoc(), diag::omit_needless_words, name, *newName)
-    .fixItReplace(memberRef->getNameLoc(), newName->str());
+    .fixItReplace(memberRef->getNameLoc().getSourceRange(), newName->str());
 }

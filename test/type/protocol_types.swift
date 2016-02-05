@@ -53,7 +53,7 @@ protocol HasAssoc {
 }
 
 func testHasAssoc(x: Any) {
-  if let p = x as? HasAssoc { // expected-error 2{{protocol 'HasAssoc' can only be used as a generic constraint}}
+  if let p = x as? HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint}}
     p.foo() // don't crash here.
   }
 }
@@ -66,3 +66,17 @@ protocol InheritsAssoc : HasAssoc {
 func testInheritsAssoc(x: InheritsAssoc) { // expected-error {{protocol 'InheritsAssoc' can only be used as a generic constraint}}
   x.silverSpoon()
 }
+
+// SR-38
+var b: HasAssoc // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+
+// Further generic constraint error testing - typealias used inside statements
+protocol P {}
+typealias MoreHasAssoc = protocol<HasAssoc, P>
+func testHasMoreAssoc(x: Any) {
+  if let p = x as? MoreHasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint}}
+    p.foo() // don't crash here.
+  }
+}
+
+

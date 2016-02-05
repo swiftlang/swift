@@ -2109,22 +2109,6 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
-                                                        ArrayRef<Type> args) {
-  TypeSubstitutionMap map;
-  for (auto &param : getGenericParams().getNestedGenericParams()) {
-    map.insert(std::make_pair(param->getArchetype(), args.front()));
-    args = args.slice(1);
-  }
-  
-  assert(args.empty()
-         && "number of args did not match number of generic params");
-  
-  Type input = getInput().subst(module, map, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(module, map, SubstFlags::IgnoreMissing);
-  return FunctionType::get(input, result, getExtInfo());
-}
-
 TypeSubstitutionMap
 GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
   TypeSubstitutionMap map;
@@ -2138,16 +2122,6 @@ GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
   
   assert(Subs.empty() && "did not use all substitutions?!");
   return map;
-}
-
-FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
-                                                  ArrayRef<Substitution> subs) {
-  TypeSubstitutionMap map
-    = getGenericParams().getSubstitutionMap(subs);
-  
-  Type input = getInput().subst(module, map, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(module, map, SubstFlags::IgnoreMissing);
-  return FunctionType::get(input, result, getExtInfo());
 }
 
 FunctionType *
@@ -2360,7 +2334,8 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
   };
   
   return transform([&](Type type) -> Type {
-    assert(!isa<SILFunctionType>(type.getPointer()) &&
+    assert((options.contains(SubstFlags::AllowLoweredTypes) ||
+            !isa<SILFunctionType>(type.getPointer())) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
 
@@ -2421,7 +2396,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
   });
 }
 
-TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
+TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
 
   // Ignore lvalues in the base type.
   Type baseTy(getRValueType());
@@ -2512,7 +2487,7 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
 }
 
 Type TypeBase::getTypeOfMember(Module *module, Type memberType,
-                               DeclContext *memberDC) {
+                               const DeclContext *memberDC) {
   // If the member is not part of a type, there's nothing to substitute.
   if (!memberDC->isTypeContext())
     return memberType;

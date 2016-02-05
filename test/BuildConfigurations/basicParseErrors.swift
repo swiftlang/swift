@@ -8,7 +8,7 @@ var x = 0
 var y = 0
 #endif
 
-#if swift(FOO) // expected-error {{unexpected target configuration expression (expected 'os' or 'arch')}}
+#if foo(BAR) // expected-error {{unexpected target configuration expression (expected 'os', 'arch', or 'swift')}}
 var z = 0
 #endif
 
@@ -28,7 +28,7 @@ func h() {}
 #endif /* bbb */
 
 #if foo.bar() 
-      .baz() // expected-error {{unexpected target configuration expression (expected 'os' or 'arch')}}
+      .baz() // expected-error {{unexpected target configuration expression (expected 'os', 'arch', or 'swift')}}
 
 #endif
 

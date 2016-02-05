@@ -48,12 +48,12 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   ProjectExistentialBoxInst *SingleProjection = nullptr;
 
   // For each user U of the alloc_existential_box...
-  for (auto U : getNonDebugUses(*AEBI)) {
+  for (auto U : getNonDebugUses(AEBI)) {
 
     if (auto *PEBI = dyn_cast<ProjectExistentialBoxInst>(U->getUser())) {
       if (SingleProjection) return nullptr;
       SingleProjection = PEBI;
-      for (auto AddrUse : getNonDebugUses(*PEBI)) {
+      for (auto AddrUse : getNonDebugUses(PEBI)) {
         // Record stores into the box.
         if (auto *SI = dyn_cast<StoreInst>(AddrUse->getUser())) {
           // If this is not the only store into the box then bail out.
@@ -103,7 +103,7 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   //     ->
   //   %value = load %ptr
   //   switch_enum %value
-  SILType Ty = SEAI->getOperand().getType();
+  SILType Ty = SEAI->getOperand()->getType();
   if (!Ty.isLoadable(SEAI->getModule()))
     return nullptr;
 
@@ -146,7 +146,7 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   //     ->
   //   %value = load %ptr
   //   = select_enum %value
-  SILType Ty = SEAI->getEnumOperand().getType();
+  SILType Ty = SEAI->getEnumOperand()->getType();
   if (!Ty.isLoadable(SEAI->getModule()))
     return nullptr;
 
@@ -226,7 +226,7 @@ public:
     // anything other than the init_existential_addr/open_existential_addr
     // container.
 
-    for (auto *Op : getNonDebugUses(*ASI)) {
+    for (auto *Op : getNonDebugUses(ASI)) {
       visit(Op->getUser());
 
       // If we found a non-legal user, bail early.
@@ -266,7 +266,7 @@ public:
 
     // Make sure that the open_existential does not have any uses except
     // destroy_addr.
-    for (auto *Use : getNonDebugUses(*I)) {
+    for (auto *Use : getNonDebugUses(I)) {
       if (!isa<DestroyAddrInst>(Use->getUser())) {
         LegalUsers = false;
         return;
@@ -283,7 +283,7 @@ public:
     }
 
     // Copies into the alloc_stack live range are safe.
-    if (I->getDest().getDef() == ASI) {
+    if (I->getDest() == ASI) {
       HaveSeenCopyInto = true;
       return;
     }
@@ -312,7 +312,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI) {
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
-    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc);
+    IEI->replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
     for (auto UI = AS->use_begin(), UE = AS->use_end(); UI != UE;) {
@@ -330,7 +330,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
       auto *DS = cast<DeallocStackInst>(Op->getUser());
       Builder.setInsertionPoint(DS);
-      Builder.createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0));
+      Builder.createDeallocStack(DS->getLoc(), ConcAlloc);
       eraseInstFromFunction(*DS);
     }
 
@@ -352,7 +352,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     // no the alloc_stack.
     // Otherwise, just delete the copy_addr.
     if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
-      if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc().getDef() != AS) {
+      if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc() != AS) {
         Builder.setInsertionPoint(CopyAddr);
         Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc());
       }
@@ -399,7 +399,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Go through the loads uses and add any users that are projections to the
   // projection list.
   llvm::SmallVector<ProjInstPairTy, 8> Projections;
-  for (auto *UI : getNonDebugUses(*LI)) {
+  for (auto *UI : getNonDebugUses(LI)) {
     auto *User = UI->getUser();
 
     // If we have any non SEI, TEI instruction, don't do anything here.
@@ -426,7 +426,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     // If this projection is the same as the last projection we processed, just
     // replace all uses of the projection with the load we created previously.
     if (LastProj && Proj == *LastProj) {
-      replaceInstUsesWith(*Inst, LastNewLoad, 0);
+      replaceInstUsesWith(*Inst, LastNewLoad);
       eraseInstFromFunction(*Inst);
       continue;
     }
@@ -436,7 +436,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     auto I = Proj.createAddrProjection(Builder, LI->getLoc(), LI->getOperand());
     LastProj = &Proj;
     LastNewLoad = Builder.createLoad(LI->getLoc(), I.get());
-    replaceInstUsesWith(*Inst, LastNewLoad, 0);
+    replaceInstUsesWith(*Inst, LastNewLoad);
     eraseInstFromFunction(*Inst);
   }
 
@@ -446,12 +446,12 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 
 SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   SILValue Operand = RVI->getOperand();
-  SILType OperandTy = Operand.getType();
+  SILType OperandTy = Operand->getType();
 
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand().getType().isTrivial(EI->getModule()))
+        EI->getOperand()->getType().isTrivial(EI->getModule()))
       return eraseInstFromFunction(*RVI);
 
     // retain_value of an enum_inst where we know that it has a payload can be
@@ -479,13 +479,13 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
 
 SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   SILValue Operand = RVI->getOperand();
-  SILType OperandTy = Operand.getType();
+  SILType OperandTy = Operand->getType();
 
   // retain_value of an enum with a trivial payload or no-payload is a no-op +
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand().getType().isTrivial(RVI->getModule())) {
+        EI->getOperand()->getType().isTrivial(RVI->getModule())) {
       return eraseInstFromFunction(*RVI);
     }
 
@@ -643,10 +643,10 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // can't handle the payload case here due to the flow problems caused by the
   // dependency in between the enum and its data.
 
-  assert(IEAI->getOperand().getType().isAddress() && "Must be an address");
+  assert(IEAI->getOperand()->getType().isAddress() && "Must be an address");
   Builder.setCurrentDebugScope(IEAI->getDebugScope());
 
-  if (IEAI->getOperand().getType().isAddressOnly(IEAI->getModule())) {
+  if (IEAI->getOperand()->getType().isAddressOnly(IEAI->getModule())) {
     // Check for the following pattern inside the current basic block:
     // inject_enum_addr %payload_allocation, $EnumType.case1
     // ... no insns storing anything into %payload_allocation
@@ -689,7 +689,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       auto Result = SEAI->getCaseResult(InjectedEnumElement);
 
       // Replace select_enum_addr by the result
-      replaceInstUsesWith(*SEAI, Result.getDef());
+      replaceInstUsesWith(*SEAI, Result);
       return nullptr;
     }
 
@@ -763,7 +763,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   if (!IEAI->getElement()->hasArgumentType()) {
     EnumInst *E =
       Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
-                          IEAI->getOperand().getType().getObjectType());
+                          IEAI->getOperand()->getType().getObjectType());
     Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand());
     return eraseInstFromFunction(*IEAI);
   }
@@ -783,7 +783,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     if (SI) {
       // Find a Store whose destination is taken from an init_enum_data_addr
       // whose address is same allocation as our inject_enum_addr.
-      DataAddrInst = dyn_cast<InitEnumDataAddrInst>(SI->getDest().getDef());
+      DataAddrInst = dyn_cast<InitEnumDataAddrInst>(SI->getDest());
       if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand())
         break;
       SI = nullptr;
@@ -808,7 +808,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       for (auto &Opd : AI->getArgumentOperands()) {
         // Found an apply that initializes the enum. We can optimize this by
         // localizing the initialization to an alloc_stack and loading from it.
-        DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get().getDef());
+        DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
         if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
             Params[ArgIdx].getConvention() ==
                 ParameterConvention::Indirect_Out) {
@@ -832,7 +832,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     EnumInst *E =
       Builder.createEnum(DataAddrInst->getLoc(), SI->getSrc(),
                          DataAddrInst->getElement(),
-                         DataAddrInst->getOperand().getType().getObjectType());
+                         DataAddrInst->getOperand()->getType().getObjectType());
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
     // Cleanup.
     eraseInstFromFunction(*SI);
@@ -844,14 +844,13 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // Localize the address access.
   Builder.setInsertionPoint(AI);
   auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
-                                              EnumInitOperand->get().getType());
+                                              EnumInitOperand->get()->getType());
   EnumInitOperand->set(AllocStack);
   Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
-  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack),
-                0);
+  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(), AllocStack));
   EnumInst *E = Builder.createEnum(
       DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
-      DataAddrInst->getOperand().getType().getObjectType());
+      DataAddrInst->getOperand()->getType().getObjectType());
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
   Builder.createDeallocStack(DataAddrInst->getLoc(), AllocStack);
   eraseInstFromFunction(*DataAddrInst);
@@ -898,11 +897,11 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // thing to remember is that an enum is address only if any of its cases are
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
-  if (TEDAI->getOperand().getType().isAddressOnly(TEDAI->getModule()))
+  if (TEDAI->getOperand()->getType().isAddressOnly(TEDAI->getModule()))
     return nullptr;
 
   // For each user U of the take_enum_data_addr...
-  for (auto U : getNonDebugUses(*TEDAI))
+  for (auto U : getNonDebugUses(TEDAI))
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()))
       return nullptr;
@@ -917,7 +916,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // Go back through a second time now that we know all of our users are
   // loads. Perform the transformation on each load.
   SmallVector<LoadInst*, 4> ToRemove;
-  for (auto U : getNonDebugUses(*TEDAI)) {
+  for (auto U : getNonDebugUses(TEDAI)) {
     // Grab the load.
     LoadInst *L = cast<LoadInst>(U->getUser());
 
@@ -926,7 +925,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
     auto *D = Builder.createUncheckedEnumData(Loc, Ld, EnumElt, PayloadType);
 
     // Replace all uses of the old load with the data and erase the old load.
-    replaceInstUsesWith(*L, D, 0);
+    replaceInstUsesWith(*L, D);
     ToRemove.push_back(L);
   }
 
@@ -970,13 +969,13 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     // No bb args should be passed
     if (!CBI->getTrueArgs().empty() || !CBI->getFalseArgs().empty())
       return nullptr;
-    auto EnumOperandTy = SEI->getEnumOperand().getType();
+    auto EnumOperandTy = SEI->getEnumOperand()->getType();
     // Type should be loadable
     if (!EnumOperandTy.isLoadable(SEI->getModule()))
       return nullptr;
 
     // Result of the select_enum should be a boolean.
-    if (SEI->getType() != CBI->getCondition().getType())
+    if (SEI->getType() != CBI->getCondition()->getType())
       return nullptr;
 
     // If any of cond_br edges are critical edges, do not perform
@@ -1087,9 +1086,9 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
   Builder.setCurrentDebugScope(FLI->getDebugScope());
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
-    if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
+    if (FLI->getOperand()->getType().isLoadable(FLI->getModule())) {
       auto Load = Builder.createLoad(FLI->getLoc(), AI);
-      return Builder.createFixLifetime(FLI->getLoc(), SILValue(Load, 0));
+      return Builder.createFixLifetime(FLI->getLoc(), Load);
     }
   }
   return nullptr;

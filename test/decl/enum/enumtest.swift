@@ -99,7 +99,7 @@ func test3a(a: ZeroOneTwoThree) {
   test3a;  // expected-error {{unused function}}
   .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a   // expected-error {{unused function}}
-  (.Zero) // expected-error {{type of expression is ambiguous without more context}}
+  (.Zero) // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a(.Zero)
 }
 

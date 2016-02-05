@@ -1,4 +1,4 @@
-//===--- SILValueProjection.h ---------------------------------------------===//
+//===--- SILValueProjection.h -----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,22 +11,23 @@
 //===----------------------------------------------------------------------===//
 ///
 /// This file defines SILValueProjection, a class containing a SILValue base
-/// and a ProjectionPath. It is used as the base class for LSLocation and
+/// and a NewProjectionPath. It is used as the base class for LSLocation and
 /// LSValue.
 ///
 /// In the case of LSLocation, the base represents the base of the allocated
-/// objects and the ProjectionPath tells which field in the object the
+/// objects and the NewProjectionPath tells which field in the object the
 /// LSLocation represents.
 ///
-/// In the case of LSValue, the base represents the root of loaded or
-/// stored value it represents. And the ProjectionPath represents the field in
-/// the loaded/store value the LSValue represents.
+/// In the case of LSValue, the base represents the root of loaded or stored
+/// value it represents. And the NewProjectionPath represents the field in the
+/// loaded/store value the LSValue represents.
 ///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_VALUEPROJECTION_H
 #define SWIFT_SIL_VALUEPROJECTION_H
 
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
@@ -52,7 +53,7 @@ class LSValue;
 
 class SILValueProjection {
 public:
-  enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };
+  enum KeyKind : uint8_t { Empty = 0, Tombstone, Normal };
 
 protected:
   /// The base of the object.
@@ -60,79 +61,66 @@ protected:
   /// Empty key, tombstone key or normal key.
   KeyKind Kind;
   /// The path to reach the accessed field of the object.
-  Optional<ProjectionPath> Path;
+  Optional<NewProjectionPath> Path;
 
 public:
   /// Constructors.
-  SILValueProjection() : Base(), Kind(NormalKey) {}
+  SILValueProjection() : Base(), Kind(Normal) {}
   SILValueProjection(KeyKind Kind) : Base(), Kind(Kind) {}
-  SILValueProjection(SILValue B) : Base(B), Kind(NormalKey) {}
-  SILValueProjection(SILValue B, const ProjectionPath &P,
-                     KeyKind Kind = NormalKey)
-      : Base(B), Kind(Kind) {
-    ProjectionPath T;
-    T.append(P);
-    Path = std::move(T);
-  }
+  SILValueProjection(SILValue B) : Base(B), Kind(Normal) {}
+  SILValueProjection(SILValue B, const Optional<NewProjectionPath> &P,
+                     KeyKind Kind = Normal)
+      : Base(B), Kind(Kind), Path(P) {}
 
-  /// Destructors.
+  /// Virtual destructor.
   virtual ~SILValueProjection() {}
 
   /// Copy constructor.
   SILValueProjection(const SILValueProjection &RHS) {
     Base = RHS.Base;
-    Path.reset();
     Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
+    Path = RHS.Path;
   }
 
+  /// Assignment operator.
   SILValueProjection &operator=(const SILValueProjection &RHS) {
     Base = RHS.Base;
-    Path.reset();
     Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return *this;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
+    Path = RHS.Path;
     return *this;
   }
 
-  /// Getters and setters for SILValueProjection.
+  /// Getters for SILValueProjection.
   KeyKind getKind() const { return Kind; }
-  void setKind(KeyKind K) { Kind = K; }
   SILValue getBase() const { return Base; }
-  Optional<ProjectionPath> &getPath() { return Path; }
+  const Optional<NewProjectionPath> &getPath() const { return Path; }
 
   /// Reset the SILValueProjection, i.e. clear base and path.
   void reset() {
     Base = SILValue();
+    Kind = Normal;
     Path.reset();
-    Kind = NormalKey;
   }
 
   /// Returns whether the SILValueProjection has been initialized properly.
   virtual bool isValid() const { return Base && Path.hasValue(); }
 
-  /// Returns true if the LSValue has a non-empty projection path.
-  bool hasEmptyProjectionPath() const { return !Path.getValue().size(); }
+  /// Returns true if the SILValueProjection has a non-empty projection path.
+  bool hasEmptyNewProjectionPath() const { return !Path.getValue().size(); }
 
-  /// Return false if one projection path is a prefix of another. false
-  /// otherwise.
+  /// return true if that the two objects have the same base but access different
+  /// fields of the base object.
   bool hasNonEmptySymmetricPathDifference(const SILValueProjection &RHS) const {
-    const ProjectionPath &P = RHS.Path.getValue();
+    const NewProjectionPath &P = RHS.Path.getValue();
     return Path.getValue().hasNonEmptySymmetricDifference(P);
   }
 
-  /// Subtract the given path from the ProjectionPath.
-  void subtractPaths(Optional<ProjectionPath> &P) {
+  /// Subtract the given path from the NewProjectionPath.
+  void removePathPrefix(Optional<NewProjectionPath> &P) {
     if (!P.hasValue())
       return;
-    ProjectionPath::subtractPaths(Path.getValue(), P.getValue());
+    // Remove prefix does not modify the Path in-place.
+    Path = NewProjectionPath::removePrefix(Path.getValue(), P.getValue());
   }
 
   /// Return true if the RHS have identical projection paths.
@@ -154,6 +142,7 @@ public:
     // different.
     if (Path.getValue() != RHS.Path.getValue())
       return false;
+    // Otherwise, the 2 SILValueProjections are the same.
     return true;
   }
 
@@ -165,8 +154,8 @@ public:
     // If type is not the same, then SILValueProjections different.
     if (Kind != RHS.Kind)
       return false;
-    // Return true if this is a TombstoneKey or EmptyKey.
-    if (Kind == EmptyKey || Kind == TombstoneKey)
+    // Return true if this is a Tombstone or Empty.
+    if (Kind == Empty || Kind == Tombstone)
       return true;
     // If Base is different, then SILValueProjections different.
     if (Base != RHS.Base)
@@ -179,22 +168,24 @@ public:
     return true;
   }
 
-  /// Returns the hashcode for the location.
-  llvm::hash_code getHashCode() const {
-    llvm::hash_code HC = llvm::hash_combine(
-        Base.getDef(), Base.getResultNumber(), Base.getType());
-    if (!Path.hasValue())
-      return HC;
-    HC = llvm::hash_combine(HC, hash_value(Path.getValue()));
-    return HC;
-  }
+  /// Print the SILValueProjection.
+  virtual void print(SILModule *Mod); 
 
-  virtual void print() const;
-
-  /// Create a path of ValueProjection with the given VA and Path.
-  static SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
+  /// Create a path of AddrProjection or ValueProjection with the given VA
+  /// and Path.
+  static SILValue createExtract(SILValue VA,
+                                const Optional<NewProjectionPath> &Path,
                                 SILInstruction *Inst, bool IsValExt);
 };
+
+static inline llvm::hash_code hash_value(const SILValueProjection &S) {
+  const SILValue Base = S.getBase();
+  const Optional<NewProjectionPath> &Path = S.getPath();
+  llvm::hash_code HC = llvm::hash_combine(Base.getOpaqueValue());
+  if (!Path.hasValue())
+    return HC;
+  return llvm::hash_combine(HC, hash_value(Path.getValue()));
+}
 
 //===----------------------------------------------------------------------===//
 //                            Load Store Value
@@ -202,14 +193,9 @@ public:
 
 using LSLocationValueMap = llvm::DenseMap<LSLocation, LSValue>;
 using LSValueList = llvm::SmallVector<LSValue, 8>;
-using LSValueIndexMap = llvm::DenseMap<LSValue, unsigned>;
+using LSValueIndexMap = llvm::SmallDenseMap<LSValue, unsigned, 32>;
 using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 
-/// This class represents either a single SILValue or a covering of values that
-/// we can forward from via the introduction of a SILArgument. This enables us
-/// to treat the case of having one value or multiple values and load and store
-/// cases all at once abstractly and cleanly.
-///
 /// A LSValue is an abstraction of an object field value in program. It
 /// consists of a base that is the tracked SILValue, and a projection path to
 /// the represented field.
@@ -246,9 +232,9 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 ///   store %3 to %0 : $*A                            // id: %4
 /// }
 ///
-/// NOTE: LSValue can take 2 forms.
+/// LSValue can take 2 forms.
 ///
-/// 1. It can take a concrete value, i.e. with a valid Base and ProjectionPath.
+/// 1. It can take a concrete value, i.e. with a valid Base and NewProjectionPath.
 /// using the extract function, it can be materialized in IR.
 ///
 /// 2. It can represent a covering set of LSValues from all predecessor
@@ -260,9 +246,9 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 /// reduce will create the forwarding SILValue by merging them while
 /// creating as few value extraction and aggregation as possible.
 ///
-/// NOTE: ProjectionPath in LSValue could be replaced by the
-/// ProjectionPath in the LSLocation, but that would require we break the
-/// ProjectionPath into 2 parts, 1 for the Base to the accessed (aggregate) node
+/// NOTE: NewProjectionPath in LSValue could be replaced by the
+/// NewProjectionPath in the LSLocation, but that would require we break the
+/// NewProjectionPath into 2 parts, 1 for the Base to the accessed (aggregate) node
 /// and another 1 for the accessed (aggregate) node to the leaf node the
 /// LSLocation represents.
 ///
@@ -274,15 +260,15 @@ class LSValue : public SILValueProjection {
   /// If this is a covering value, we need to go to each predecessor to
   /// materialize the value.
   bool IsCoveringValue;
-
 public:
   /// Constructors.
   LSValue() : SILValueProjection(), IsCoveringValue(false) {}
-  LSValue(SILValue B) : SILValueProjection(B), IsCoveringValue(false) {}
-  LSValue(SILValue B, const ProjectionPath &P)
-      : SILValueProjection(B, P), IsCoveringValue(false) {}
+  LSValue(SILValue B, const NewProjectionPath &P)
+      : SILValueProjection(B, P), IsCoveringValue(false) {
+    assert(isValid() && "Trying to create invalid LSValue");
+  }
   LSValue(KeyKind Kind) : SILValueProjection(Kind), IsCoveringValue(false) {}
-  LSValue(bool CSVal) : SILValueProjection(NormalKey), IsCoveringValue(CSVal) {}
+  LSValue(bool CSVal) : SILValueProjection(Normal), IsCoveringValue(CSVal) {}
 
   /// Copy constructor.
   LSValue(const LSValue &RHS) : SILValueProjection(RHS) {
@@ -303,7 +289,6 @@ public:
       return true;
     if (IsCoveringValue != RHS.isCoveringValue())
       return false;
-
     return SILValueProjection::operator==(RHS);
   }
 
@@ -311,44 +296,34 @@ public:
   bool isValid() const {
     if (IsCoveringValue)
       return true;
-    return Base && Path.hasValue();
+    return SILValueProjection::isValid();
   }
 
   /// Take the last level projection off. Return the modified LSValue.
   LSValue &stripLastLevelProjection() {
-    Path.getValue().remove_front();
+    Path.getValue().pop_back();
     return *this;
   }
 
   /// Returns true if this LSValue is a covering value.
   bool isCoveringValue() const { return IsCoveringValue; }
-  /// Mark this LSValue as a covering value.
-  void setCoveringValue() {
-    Base = SILValue();
-    Path.reset();
-    IsCoveringValue = true;
-  }
 
   /// Materialize the SILValue that this LSValue represents.
   ///
   /// In the case where we have a single value this can be materialized by
   /// applying Path to the Base.
-  ///
-  /// In the case where we are handling a covering set, this is initially null
-  /// and when we insert the PHI node, this is set to the SILArgument which
-  /// represents the PHI node.
   SILValue materialize(SILInstruction *Inst) {
     if (IsCoveringValue)
       return SILValue();
     return SILValueProjection::createExtract(Base, Path, Inst, true);
   }
 
-  void print() const {
+  void print(SILModule *Mod) {
     if (IsCoveringValue) {
       llvm::outs() << "Covering Value";
       return;
     }
-    SILValueProjection::print();
+    SILValueProjection::print(Mod);
   }
 
   //============================//
@@ -369,7 +344,7 @@ public:
   ///
   /// TODO: we do not really need the llvm::DenseMap<LSLocation, LSValue> here
   /// we only need a map between the projection tree of a SILType and the value
-  /// each leaf node takes. This will be implemented once ProjectionPath memory
+  /// each leaf node takes. This will be implemented once NewProjectionPath memory
   /// cost is reduced and made copyable (its copy constructor is deleted at the
   /// moment).
   static SILValue reduce(LSLocation &Base, SILModule *Mod,
@@ -379,10 +354,10 @@ public:
 };
 
 static inline llvm::hash_code hash_value(const LSValue &V) {
+  llvm::hash_code HC = llvm::hash_combine(V.isCoveringValue());
   if (V.isCoveringValue())
-    return llvm::hash_combine(V.isCoveringValue());
-  return llvm::hash_combine(V.getBase().getDef(), V.getBase().getResultNumber(),
-                            V.getBase().getType());
+    return HC;
+  return llvm::hash_combine(HC, hash_value((SILValueProjection)V));
 }
 
 //===----------------------------------------------------------------------===//
@@ -391,7 +366,8 @@ static inline llvm::hash_code hash_value(const LSValue &V) {
 /// Type declarations.
 using LSLocationSet = llvm::DenseSet<LSLocation>;
 using LSLocationList = llvm::SmallVector<LSLocation, 8>;
-using LSLocationIndexMap = llvm::DenseMap<LSLocation, unsigned>;
+using LSLocationIndexMap = llvm::SmallDenseMap<LSLocation, unsigned, 32>;
+using LSLocationBaseMap = llvm::DenseMap<SILValue, LSLocation>;
 
 /// This class represents a field in an allocated object. It consists of a
 /// base that is the tracked SILValue, and a projection path to the
@@ -428,17 +404,23 @@ class LSLocation : public SILValueProjection {
 public:
   /// Constructors.
   LSLocation() {}
-  LSLocation(SILValue B) : SILValueProjection(B) { initialize(B); }
-  LSLocation(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
-      : SILValueProjection(B, P, Kind) {}
+  LSLocation(SILValue B, const Optional<NewProjectionPath> &P, KeyKind K = Normal)
+      : SILValueProjection(B, P, K) {}
   LSLocation(KeyKind Kind) : SILValueProjection(Kind) {}
-  /// Use the concatenation of the 2 ProjectionPaths as the Path.
-  LSLocation(SILValue B, const ProjectionPath &P1, const ProjectionPath &P2)
+  /// Use the concatenation of the 2 NewProjectionPaths as the Path.
+  LSLocation(SILValue B, const NewProjectionPath &BP, const NewProjectionPath &AP)
       : SILValueProjection(B) {
-    ProjectionPath T;
-    T.append(P1);
-    T.append(P2);
-    Path = std::move(T);
+    NewProjectionPath P((*Base).getType());
+    P.append(BP);
+    P.append(AP);
+    Path = P;
+  }
+
+  /// Initialize a location with a new set of base, projectionpath and kind.
+  void init(SILValue B, const Optional<NewProjectionPath> &P, KeyKind K= Normal) {
+    Base = B;
+    Path = P;
+    Kind = K;
   }
 
   /// Copy constructor.
@@ -451,17 +433,9 @@ public:
   }
 
   /// Returns the type of the object the LSLocation represents.
-  SILType getType() const {
-    // Base might be an address type, e.g. from alloc_stack of struct,
-    // enum or tuples.
-    if (Path.getValue().empty())
-      return Base.getType().getObjectType();
-    return Path.getValue().front().getType().getObjectType();
+  SILType getType(SILModule *M) {
+     return Path.getValue().getMostDerivedType(*M);
   }
-
-  /// Trace the given SILValue till the base of the accessed object. Also
-  /// construct the projection path to the field accessed.
-  void initialize(SILValue val);
 
   /// Get the first level locations based on this location's first level
   /// projection.
@@ -485,61 +459,47 @@ public:
   /// In SIL, we can have a store to an aggregate and loads from its individual
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields and process them separately.
-  static void expand(LSLocation &Base, SILModule *Mod, LSLocationList &Locs,
+  static void expand(LSLocation Base, SILModule *Mod, LSLocationList &Locs,
                      TypeExpansionAnalysis *TE);
 
   /// Given a set of locations derived from the same base, try to merge/reduce
   /// them into smallest number of LSLocations possible.
-  static void reduce(LSLocation &Base, SILModule *Mod, LSLocationSet &Locs,
+  static void reduce(LSLocation Base, SILModule *Mod, LSLocationSet &Locs,
                      TypeExpansionAnalysis *TE);
 
   /// Enumerate the given Mem LSLocation.
   static void enumerateLSLocation(SILModule *M, SILValue Mem,
                                   std::vector<LSLocation> &LSLocationVault,
                                   LSLocationIndexMap &LocToBit,
+                                  LSLocationBaseMap &BaseToLoc,
                                   TypeExpansionAnalysis *TE);
 
   /// Enumerate all the locations in the function.
   static void enumerateLSLocations(SILFunction &F,
                                    std::vector<LSLocation> &LSLocationVault,
                                    LSLocationIndexMap &LocToBit,
+                                   LSLocationBaseMap &BaseToLoc,
                                    TypeExpansionAnalysis *TE);
 };
 
 static inline llvm::hash_code hash_value(const LSLocation &L) {
-  return llvm::hash_combine(L.getBase().getDef(), L.getBase().getResultNumber(),
-                            L.getBase().getType());
+  return llvm::hash_combine(hash_value((SILValueProjection)L));
 }
 
 } // end swift namespace
 
-/// LSLocation is used in DenseMap, define functions required by DenseMap.
+/// LSLocation and LSValue are used in DenseMap.
 namespace llvm {
 using swift::SILValueProjection;
 using swift::LSLocation;
 using swift::LSValue;
 
-template <> struct DenseMapInfo<LSLocation> {
-  static inline LSLocation getEmptyKey() {
-    return LSLocation(SILValueProjection::EmptyKey);
-  }
-  static inline LSLocation getTombstoneKey() {
-    return LSLocation(SILValueProjection::TombstoneKey);
-  }
-  static inline unsigned getHashValue(const LSLocation &Loc) {
-    return hash_value(Loc);
-  }
-  static bool isEqual(const LSLocation &LHS, const LSLocation &RHS) {
-    return LHS == RHS;
-  }
-};
-
 template <> struct DenseMapInfo<LSValue> {
   static inline LSValue getEmptyKey() {
-    return LSValue(SILValueProjection::EmptyKey);
+    return LSValue(SILValueProjection::Empty);
   }
   static inline LSValue getTombstoneKey() {
-    return LSValue(SILValueProjection::TombstoneKey);
+    return LSValue(SILValueProjection::Tombstone);
   }
   static inline unsigned getHashValue(const LSValue &Val) {
     return hash_value(Val);
@@ -549,6 +509,21 @@ template <> struct DenseMapInfo<LSValue> {
   }
 };
 
+template <> struct DenseMapInfo<LSLocation> {
+  static inline LSLocation getEmptyKey() {
+    return LSLocation(SILValueProjection::Empty);
+  }
+  static inline LSLocation getTombstoneKey() {
+    return LSLocation(SILValueProjection::Tombstone);
+  }
+  static inline unsigned getHashValue(const LSLocation &Loc) {
+    return hash_value(Loc);
+  }
+  static bool isEqual(const LSLocation &LHS, const LSLocation &RHS) {
+    return LHS == RHS;
+  }
+};
+
 } // namespace llvm
 
-#endif // SWIFT_SIL_MEMLOCATION_H
+#endif // SWIFT_SIL_VALUEPROJECTION_H

@@ -1,4 +1,4 @@
-//===--- ConstantFolding.cpp - Utils for SIL constant folding ---*- C++ -*-===//
+//===--- ConstantFolding.cpp - Utils for SIL constant folding -------------===//
 //
 // This source file is part of the Swift.org open source project
 //

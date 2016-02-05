@@ -27,21 +27,15 @@ class C1 {
 
   @warn_unused_result(message="huzzah")
   static func f2() { }
-
-  @warn_unused_result
-  func curried1()()() { } // expected-warning {{curried function declaration syntax will be removed in a future version of Swift}}
 }
 
 func testMethodsNegative(c1: C1) {
   c1.f1 // expected-error{{expression resolves to an unused function}}
-  c1.curried1() // expected-error{{expression resolves to an unused function}}
-  c1.curried1()() // expected-error{{expression resolves to an unused function}}
 }
 
 func testMethodsPositive(c1: C1) {
   c1.f1() // expected-warning{{result of call to 'f1()' is unused}}
   C1.f2() // expected-warning{{result of call to 'f2()' is unused: huzzah}}
-  c1.curried1()()() // expected-warning{{result of call to 'curried1()' is unused}}
 }
 
 struct Inits1 {

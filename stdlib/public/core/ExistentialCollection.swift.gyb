@@ -1,4 +1,4 @@
-//===--- ExistentialCollection.swift.gyb ----------------------------------===//
+//===--- ExistentialCollection.swift.gyb ----------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@ import SwiftShims
 % traversals = ['Forward', 'Bidirectional', 'RandomAccess']
 
 @noreturn @inline(never)
-internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
+internal func _abstract(file: StaticString = #file, line: UInt = #line) {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
@@ -300,7 +300,7 @@ extension Any${Kind} {
 //===----------------------------------------------------------------------===//
 
 internal protocol _ForwardIndexBoxProtocol : class {
-  var typeID: ObjectIdentifier {get}
+  var typeID: ObjectIdentifier { get }
 
   @warn_unused_result
   func successor() -> _ForwardIndexBoxProtocol
@@ -552,7 +552,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
 public protocol AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `_underlyingCollectionID`.
-  var _underlyingCollectionID: ObjectIdentifier {get}
+  var _underlyingCollectionID: ObjectIdentifier { get }
 }
 
 /// Return true iff `lhs` and `rhs` store the same underlying collection.

@@ -567,7 +567,8 @@ namespace {
         case MappedTypeNameKind::DefineAndUse:
           break;
         case MappedTypeNameKind::DefineOnly:
-          mappedType = cast<TypeAliasDecl>(decl)->getUnderlyingType();
+          if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
+            mappedType = typealias->getUnderlyingType();
           break;
         }
 
@@ -1448,7 +1449,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
     auto bodyVar
       = createDeclWithClangNode<ParamDecl>(param,
                                      /*IsLet*/ true,
-                                     SourceLoc(), name,
+                                     SourceLoc(), SourceLoc(), name,
                                      importSourceLoc(param->getLocation()),
                                      bodyName, swiftParamTy, 
                                      ImportedHeaderUnit);
@@ -1466,10 +1467,10 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
     auto paramTy =  BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
       {SwiftContext.getAnyDecl()->getDeclaredType()});
     auto name = SwiftContext.getIdentifier("varargs");
-    auto param = new (SwiftContext) ParamDecl(true, SourceLoc(),
-                                                Identifier(),
-                                                SourceLoc(), name, paramTy,
-                                                ImportedHeaderUnit);
+    auto param = new (SwiftContext) ParamDecl(true, SourceLoc(), SourceLoc(),
+                                              Identifier(),
+                                              SourceLoc(), name, paramTy,
+                                              ImportedHeaderUnit);
 
     param->setVariadic();
     parameters.push_back(param);
@@ -1492,40 +1493,6 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
   return (decl->hasAttr<clang::CFReturnsRetainedAttr>() ||
           decl->hasAttr<clang::CFReturnsNotRetainedAttr>() ||
           decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
-}
-
-namespace {
-  struct ErrorImportInfo {
-    ForeignErrorConvention::Kind Kind;
-    ForeignErrorConvention::IsOwned_t IsOwned;
-    ForeignErrorConvention::IsReplaced_t ReplaceParamWithVoid;
-    unsigned ParamIndex;
-    CanType ParamType;
-    CanType OrigResultType;
-
-    ForeignErrorConvention asForeignErrorConvention() const {
-      assert(ParamType && "not fully initialized!");
-      using FEC = ForeignErrorConvention;
-      switch (Kind) {
-      case FEC::ZeroResult:
-        return FEC::getZeroResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
-                                  ParamType, OrigResultType);
-      case FEC::NonZeroResult:
-        return FEC::getNonZeroResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
-                                     ParamType, OrigResultType);
-      case FEC::ZeroPreservedResult:
-        return FEC::getZeroPreservedResult(ParamIndex, IsOwned,
-                                           ReplaceParamWithVoid, ParamType);
-      case FEC::NilResult:
-        return FEC::getNilResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
-                                 ParamType);
-      case FEC::NonNilError:
-        return FEC::getNonNilError(ParamIndex, IsOwned, ReplaceParamWithVoid,
-                                   ParamType);
-      }
-      llvm_unreachable("bad error convention");
-    }
-  };
 }
 
 /// Determine whether this is the name of an Objective-C collection
@@ -2127,7 +2094,7 @@ Type ClangImporter::Implementation::importMethodType(
     // It doesn't actually matter which DeclContext we use, so just
     // use the imported header unit.
     auto type = TupleType::getEmpty(SwiftContext);
-    auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true,
+    auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true, SourceLoc(),
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
                                             ImportedHeaderUnit);
@@ -2239,8 +2206,8 @@ Type ClangImporter::Implementation::importMethodType(
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
     auto bodyVar
-      = createDeclWithClangNode<ParamDecl>(param,
-                                     /*IsLet*/ true, SourceLoc(), name,
+      = createDeclWithClangNode<ParamDecl>(param, /*IsLet*/ true,
+                                     SourceLoc(), SourceLoc(), name,
                                      importSourceLoc(param->getLocation()),
                                      bodyName, swiftParamTy, 
                                      ImportedHeaderUnit);

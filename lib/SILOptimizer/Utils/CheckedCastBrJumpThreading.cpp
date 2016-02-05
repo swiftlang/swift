@@ -1,7 +1,9 @@
 #define DEBUG_TYPE "sil-simplify-cfg"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Allocator.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -13,127 +15,104 @@ namespace {
 /// This is a class implementing a dominator-based jump-threading
 /// for checked_cast_br [exact].
 class CheckedCastBrJumpThreading {
-  // The checked_cast_br instruction, which
-  // we try to jump-thread
-  CheckedCastBranchInst *CCBI;
   // Basic block of the current checked_cast_br instruction.
   SILBasicBlock *BB;
   // Condition used by the current checked_cast_br instruction.
   SILValue Condition;
-  // Success branch of the current checked_cast_br instruction.
-  SILBasicBlock *SuccessBB;
-  // Failure branch of the current checked_cast_br instruction.
-  SILBasicBlock *FailureBB;
 
-
-  // Current dominating checked_cast_br instruction.
-  CheckedCastBranchInst *DomCCBI;
-  // Basic block of the dominating checked_cast_br instruction.
-  SILBasicBlock *DomBB;
-  // Condition used by the dominating checked_cast_br instruction.
-  SILValue DomCondition;
-  // Success branch of the dominating checked_cast_br instruction.
-  SILBasicBlock *DomSuccessBB;
-  // Failure branch of the dominating checked_cast_br instruction.
-  SILBasicBlock *DomFailureBB;
-
-
-  // Current dominator tree node where we look for a dominating
-  // checked_cast_br instruction.
-  llvm::DomTreeNodeBase<SILBasicBlock> *Node;
   SILBasicBlock *ArgBB;
+
+  // The current function to be optimized.
+  SILFunction *Fn;
+
   // Dominator information to be used.
   DominanceInfo *DT;
-  // Basic block created as a landing BB for all failure predecessors.
-  SILBasicBlock *TargetFailureBB;
-  // Basic block created as a landing BB for all success predecessors.
-  SILBasicBlock *TargetSuccessBB;
 
-  // Cloner used to clone the BB to FailureSuccessBB.
-  Optional<BasicBlockCloner> FailureBBCloner;
-
-  // Cloner used to clone the BB to TargetSuccessBB.
-  Optional<BasicBlockCloner> SuccessBBCloner;
+  // List of predecessors.
+  typedef SmallVector<SILBasicBlock *, 8> PredList;
 
   // Predecessors reached only via a path along the
   // success branch of the dominating checked_cast_br.
-  SmallVector<SILBasicBlock *, 8> SuccessPreds;
+  PredList SuccessPreds;
 
   // Predecessors reached only via a path along the
   // failure branch of the dominating checked_cast_br.
-  SmallVector<SILBasicBlock *, 8> FailurePreds;
+  PredList FailurePreds;
 
   // All other predecessors, where the outcome of the
   // checked_cast_br along the path is not known.
-  SmallVector<SILBasicBlock *, 8> UnknownPreds;
+  unsigned numUnknownPreds = 0;
 
   // Basic blocks to be added to for reprocessing
   // after jump-threading is done.
   SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist;
 
-  bool areEquivalentConditionsAlongPaths();
-  bool areEquivalentConditionsAlongSomePaths();
-  bool handleArgBBIsEntryBlock(SILBasicBlock *ArgBB);
-  bool checkCloningConstraints();
-  void modifyCFGForUnknownPreds();
-  void modifyCFGForFailurePreds();
-  void modifyCFGForSuccessPreds();
-  void updateDominatorTree();
-  void updateSSA();
-  void addBlockToSimplifyCFGWorklist(SILBasicBlock *BB);
-  void addBlocksToWorklist();
+  // Information for transforming a single checked_cast_br.
+  // This is the output of the optimization's analysis phase.
+  struct Edit {
 
-  void classifyPredecessor(
-      SILBasicBlock *Pred,
-      SmallVectorImpl<SILBasicBlock *> &SuccessPreds,
-      SmallVectorImpl<SILBasicBlock *> &FailurePreds,
-      SmallVectorImpl<SILBasicBlock *> &UnknownPreds,
-      bool SuccessDominates,
-      bool FailureDominates);
+    // The block containing the checked_cast_br.
+    SILBasicBlock *CCBBlock;
+    // Copy of CheckedCastBrJumpThreading::SuccessPreds.
+    PredList SuccessPreds;
+    // Copy of CheckedCastBrJumpThreading::FailurePreds.
+    PredList FailurePreds;
+    // The argument of the dominating checked_cast_br's successor block.
+    SILValue SuccessArg;
+
+    bool InvertSuccess;
+
+    // True if CheckedCastBrJumpThreading::numUnknownPreds is not 0.
+    bool hasUnknownPreds;
+
+    Edit(SILBasicBlock *CCBBlock, bool InvertSuccess,
+         const PredList &SuccessPreds,
+         const PredList &FailurePreds,
+         bool hasUnknownPreds, SILValue SuccessArg) :
+      CCBBlock(CCBBlock), SuccessPreds(SuccessPreds), FailurePreds(FailurePreds),
+      SuccessArg(SuccessArg), InvertSuccess(InvertSuccess),
+      hasUnknownPreds(hasUnknownPreds) { }
+
+    void modifyCFGForUnknownPreds();
+    void modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner);
+    void modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner);
+  };
+
+  // Contains an entry for each checked_cast_br to be optimized.
+  llvm::SmallVector<Edit *, 8> Edits;
+
+  llvm::SpecificBumpPtrAllocator<Edit> EditAllocator;
+
+  // Keeps track of what blocks we change the terminator instruction.
+  llvm::SmallPtrSet<SILBasicBlock *, 16> BlocksToEdit;
+  // Keeps track of what blocks we clone.
+  llvm::SmallPtrSet<SILBasicBlock *, 16> BlocksToClone;
+
+  bool areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI);
+  bool areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
+                                             SILValue DomCondition);
+  bool handleArgBBIsEntryBlock(SILBasicBlock *ArgBB,
+                               CheckedCastBranchInst *DomCCBI);
+  bool checkCloningConstraints();
+
+  void classifyPredecessor( SILBasicBlock *Pred, bool SuccessDominates,
+                           bool FailureDominates);
 
   SILValue isArgValueEquivalentToCondition(SILValue Value,
                                SILBasicBlock *DomBB,
                                SILValue DomValue,
                                DominanceInfo *DT);
 
+  bool trySimplify(CheckedCastBranchInst *CCBI);
+
 public:
-  CheckedCastBrJumpThreading(DominanceInfo *DT,
-                             SmallVectorImpl<SILBasicBlock *> &BBs)
-      : DT(DT), BlocksForWorklist(BBs) { }
+  CheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
+                             SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist)
+      : Fn(Fn), DT(DT), BlocksForWorklist(BlocksForWorklist) { }
 
-  bool trySimplify(TermInst *Term);
-
-  ArrayRef<SILBasicBlock*> getBlocksForWorklist() {
-    return BlocksForWorklist;
-  }
+  void optimizeFunction();
 };
 } // end anonymous namespace
-
-/// Find a nearest common dominator for a given set of basic blocks.
-static DominanceInfoNode *findCommonDominator(ArrayRef<SILBasicBlock *> BBs,
-                                              DominanceInfo *DT) {
-  DominanceInfoNode *CommonDom = nullptr;
-  for (auto *BB : BBs) {
-    if (!CommonDom) {
-      CommonDom = DT->getNode(BB);
-    } else {
-      CommonDom = DT->getNode(
-          DT->findNearestCommonDominator(CommonDom->getBlock(), BB));
-    }
-  }
-  return CommonDom;
-}
-
-/// Find a nearest common dominator for all predecessors of
-/// a given basic block.
-static DominanceInfoNode *findCommonDominator(SILBasicBlock *BB,
-                                              DominanceInfo *DT) {
-  SmallVector<SILBasicBlock *, 8> Preds;
-  for (auto *Pred: BB->getPreds())
-    Preds.push_back(Pred);
-
-  return findCommonDominator(Preds, DT);
-}
 
 /// Estimate the cost of inlining a given basic block.
 static unsigned basicBlockInlineCost(SILBasicBlock *BB, unsigned Cutoff) {
@@ -157,53 +136,22 @@ static bool canDuplicateBlock(SILBasicBlock *BB) {
   return true;
 }
 
-void CheckedCastBrJumpThreading::addBlockToSimplifyCFGWorklist(SILBasicBlock *BB) {
-  BlocksForWorklist.push_back(BB);
-}
-
-/// Add affected blocks for re-processing by simplifyCFG
-void CheckedCastBrJumpThreading::addBlocksToWorklist() {
-  if (TargetFailureBB) {
-    if (!TargetFailureBB->pred_empty())
-      addBlockToSimplifyCFGWorklist(TargetFailureBB);
-  }
-
-  if (TargetSuccessBB) {
-    if (!TargetSuccessBB->pred_empty())
-      addBlockToSimplifyCFGWorklist(TargetSuccessBB);
-  }
-
-  if (!BB->pred_empty())
-    addBlockToSimplifyCFGWorklist(BB);
-}
-
 /// Classify a predecessor of a BB containing checked_cast_br as being
 /// reachable via success or failure branches of a dominating checked_cast_br
 /// or as unknown if it can be reached via success or failure branches
 /// at the same time.
 void CheckedCastBrJumpThreading::classifyPredecessor(
-    SILBasicBlock *Pred,
-    SmallVectorImpl<SILBasicBlock *> &SuccessPreds,
-    SmallVectorImpl<SILBasicBlock *> &FailurePreds,
-    SmallVectorImpl<SILBasicBlock *> &UnknownPreds,
-    bool SuccessDominates,
-    bool FailureDominates) {
-  if (SuccessDominates && FailureDominates) {
-    UnknownPreds.push_back(Pred);
+    SILBasicBlock *Pred, bool SuccessDominates, bool FailureDominates) {
+  if (SuccessDominates == FailureDominates) {
+    numUnknownPreds++;
     return;
   }
-
   if (SuccessDominates) {
     SuccessPreds.push_back(Pred);
     return;
   }
-
-  if (FailureDominates) {
-    FailurePreds.push_back(Pred);
-    return;
-  }
-
-  UnknownPreds.push_back(Pred);
+  assert(FailureDominates && "success and failure should be mutual exclusive");
+  FailurePreds.push_back(Pred);
 }
 
 /// Check if the root value for Value that comes
@@ -213,10 +161,10 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
     SILValue Value, SILBasicBlock *DomBB, SILValue DomValue,
     DominanceInfo *DT) {
   SmallPtrSet<ValueBase *, 16> SeenValues;
-  DomValue = DomValue.stripClassCasts();
+  DomValue = stripClassCasts(DomValue);
 
   while (true) {
-    Value = Value.stripClassCasts();
+    Value = stripClassCasts(Value);
     if (Value == DomValue)
       return Value;
 
@@ -226,7 +174,7 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       return SILValue();
 
     // Have we visited this BB already?
-    if (!SeenValues.insert(Value.getDef()).second)
+    if (!SeenValues.insert(Value).second)
       return SILValue();
 
     if (SeenValues.size() > 10)
@@ -241,18 +189,18 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       // Each incoming value should be either from a block
       // dominated by DomBB or it should be the value used in
       // condition in DomBB
-      Value = IncomingValue.stripClassCasts();
+      Value = stripClassCasts(IncomingValue);
       if (Value == DomValue)
         continue;
 
       // Values should be the same
       if (!Def)
-        Def = Value.getDef();
+        Def = Value;
 
-      if (Def != Value.getDef())
+      if (Def != Value)
         return SILValue();
 
-      if (!DT->dominates(DomBB, Value.getDef()->getParentBB()))
+      if (!DT->dominates(DomBB, Value->getParentBB()))
         return SILValue();
       // OK, this value is a potential candidate
     }
@@ -261,93 +209,19 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
   }
 }
 
-/// Update the SSA form after all changes.
-void CheckedCastBrJumpThreading::updateSSA() {
-  assert(!(SuccessBBCloner.hasValue() && FailureBBCloner.hasValue()) &&
-         "Both cloners cannot be used at the same time yet");
-
-  // Now update the SSA form.
-  if (!FailurePreds.empty() && FailureBBCloner.hasValue() &&
-      !SuccessBBCloner.hasValue())
-    updateSSAAfterCloning(*FailureBBCloner.getPointer(), TargetFailureBB, BB);
-
-  if (SuccessBBCloner.hasValue() && !FailureBBCloner.hasValue()) {
-    updateSSAAfterCloning(*SuccessBBCloner.getPointer(), TargetSuccessBB, BB);
-  }
-}
-
-/// Update the SSA form after all changes.
-void CheckedCastBrJumpThreading::updateDominatorTree() {
-  // Update the dominator tree.
-
-  // If BB was IDom of something, then PredCBBI becomes the IDOM
-  // of this after jump-threading.
-  auto *BBDomNode = DT->getNode(BB);
-  auto &Children = BBDomNode->getChildren();
-  if (Children.size() > 1) {
-    SmallVector<DominanceInfoNode *, 16> ChildrenCopy;
-    std::copy(Children.begin(), Children.end(),
-              std::back_inserter(ChildrenCopy));
-    for (auto *Child : ChildrenCopy) {
-      DT->changeImmediateDominator(Child, Node);
-    }
-  }
-
-  DominanceInfoNode *CommonDom;
-
-  // Find a common dominator for all unknown preds.
-  if (!UnknownPreds.empty()) {
-    // Find a new IDom for FailureBB
-    CommonDom = findCommonDominator(FailureBB, DT);
-    if (CommonDom)
-      DT->changeImmediateDominator(FailureBB, CommonDom->getBlock());
-
-    CommonDom = findCommonDominator(UnknownPreds, DT);
-    // This common dominator dominates the BB now.
-    if (CommonDom) {
-      DT->changeImmediateDominator(BB, CommonDom->getBlock());
-    }
-  }
-
-  // Find a common dominator for all failure preds.
-  CommonDom = findCommonDominator(FailurePreds, DT);
-  // This common dominator dominates the TargetFailureBB now.
-  if (CommonDom) {
-    DT->addNewBlock(TargetFailureBB, CommonDom->getBlock());
-    // Find a new IDom for FailureBB
-    CommonDom = findCommonDominator(FailureBB, DT);
-    if (CommonDom)
-      DT->changeImmediateDominator(FailureBB, CommonDom->getBlock());
-  }
-
-
-  // Find a common dominator for all success preds.
-  CommonDom = findCommonDominator(SuccessPreds, DT);
-  // This common dominator of all success preds dominates the BB now.
-  if (CommonDom) {
-    if (TargetSuccessBB) {
-      DT->addNewBlock(TargetSuccessBB, CommonDom->getBlock());
-    } else {
-      DT->changeImmediateDominator(BB, CommonDom->getBlock());
-    }
-    CommonDom = findCommonDominator(SuccessBB, DT);
-    if (CommonDom)
-      DT->changeImmediateDominator(SuccessBB, CommonDom->getBlock());
-  }
-  // End of dominator tree update.
-}
-
-void CheckedCastBrJumpThreading::modifyCFGForUnknownPreds() {
-  if (UnknownPreds.empty())
+void CheckedCastBrJumpThreading::Edit::modifyCFGForUnknownPreds() {
+  if (!hasUnknownPreds)
     return;
   // Check the FailureBB if it is a BB that contains a class_method
   // referring to the same value as a condition. This pattern is typical
   // for method chaining code like obj.method1().method2().etc()
-  SILInstruction *Inst = &*FailureBB->begin();
+  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
+  SILInstruction *Inst = &*CCBI->getFailureBB()->begin();
   if (ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(Inst)) {
-    if (CMI->getOperand() == Condition) {
+    if (CMI->getOperand() == stripClassCasts(CCBI->getOperand())) {
       // Replace checked_cast_br by branch to FailureBB.
-      SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
+      SILBuilder(CCBI->getParent()).createBranch(CCBI->getLoc(),
+                                                 CCBI->getFailureBB());
       CCBI->eraseFromParent();
     }
   }
@@ -355,82 +229,95 @@ void CheckedCastBrJumpThreading::modifyCFGForUnknownPreds() {
 
 /// Create a copy of the BB as a landing BB
 /// for all FailurePreds.
-void CheckedCastBrJumpThreading::modifyCFGForFailurePreds() {
+void CheckedCastBrJumpThreading::Edit::
+modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner) {
   if (FailurePreds.empty())
     return;
 
-  FailureBBCloner.emplace(BasicBlockCloner(BB));
-  FailureBBCloner->clone();
-  TargetFailureBB = FailureBBCloner->getDestBB();
+  assert(!Cloner.hasValue());
+  Cloner.emplace(BasicBlockCloner(CCBBlock));
+  Cloner->clone();
+  SILBasicBlock *TargetFailureBB = Cloner->getDestBB();
   auto *TI = TargetFailureBB->getTerminator();
   SILBuilderWithScope Builder(TI);
   // This BB copy branches to a FailureBB.
-  Builder.createBranch(TI->getLoc(), FailureBB);
+  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
+  Builder.createBranch(TI->getLoc(), CCBI->getFailureBB());
   TI->eraseFromParent();
+  splitIfCriticalEdge(CCBBlock, CCBI->getFailureBB());
 
   // Redirect all FailurePreds to the copy of BB.
   for (auto *Pred : FailurePreds) {
     TermInst *TI = Pred->getTerminator();
     // Replace branch to BB by branch to TargetFailureBB.
-    replaceBranchTarget(TI, BB, TargetFailureBB, /*PreserveArgs=*/true);
-    Pred = nullptr;
+    replaceBranchTarget(TI, CCBBlock, TargetFailureBB,
+    /*PreserveArgs=*/true);
   }
 }
 
 /// Create a copy of the BB or reuse BB as
 /// a landing basic block for all FailurePreds.
-void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
-  if (!UnknownPreds.empty()) {
+void CheckedCastBrJumpThreading::Edit::
+modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
+  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
+
+  if (InvertSuccess) {
+    SILBuilder B(CCBBlock);
+    B.createBranch(CCBI->getLoc(), CCBI->getFailureBB());
+    CCBI->eraseFromParent();
+    return;
+  }
+  if (hasUnknownPreds) {
     if (!SuccessPreds.empty()) {
       // Create a copy of the BB as a landing BB.
       // for all SuccessPreds.
-      SuccessBBCloner.emplace(BasicBlockCloner(BB));
-      SuccessBBCloner->clone();
-      TargetSuccessBB = SuccessBBCloner->getDestBB();
+      assert(!Cloner.hasValue());
+      Cloner.emplace(BasicBlockCloner(CCBBlock));
+      Cloner->clone();
+      SILBasicBlock *TargetSuccessBB = Cloner->getDestBB();
       auto *TI = TargetSuccessBB->getTerminator();
       SILBuilderWithScope Builder(TI);
-      SmallVector<SILValue, 8> SuccessBBArgs;
-      // Take argument value from the dominating BB.
-      SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
       // This BB copy branches to SuccessBB.
-      Builder.createBranch(TI->getLoc(), SuccessBB, SuccessBBArgs);
+      // Take argument value from the dominating BB.
+      Builder.createBranch(TI->getLoc(), CCBI->getSuccessBB(), {SuccessArg});
       TI->eraseFromParent();
+      splitIfCriticalEdge(CCBBlock, CCBI->getSuccessBB());
 
       // Redirect all SuccessPreds to the copy of BB.
       for (auto *Pred : SuccessPreds) {
         TermInst *TI = Pred->getTerminator();
         // Replace branch to BB by branch to TargetSuccessBB.
-        replaceBranchTarget(TI, BB, TargetSuccessBB, /*PreserveArgs=*/true);
-        SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
-        Pred = nullptr;
+        replaceBranchTarget(TI, CCBBlock, TargetSuccessBB, /*PreserveArgs=*/true);
       }
     }
-  } else {
-    // There are no predecessors where it is not clear
-    // if they are dominated by a success or failure branch
-    // of DomBB. Therefore, there is no need to clone
-    // the BB for SuccessPreds. Current BB can be re-used
-    // instead as their target.
-
-    // Add an unconditional jump at the end of the block.
-    SmallVector<SILValue, 1> SuccessBBArgs;
-    // Take argument value from the dominating BB
-    SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
-    SILBuilder(BB).createBranch(CCBI->getLoc(), SuccessBB, SuccessBBArgs);
-    CCBI->eraseFromParent();
+    return;
   }
+  // There are no predecessors where it is not clear
+  // if they are dominated by a success or failure branch
+  // of DomBB. Therefore, there is no need to clone
+  // the BB for SuccessPreds. Current BB can be re-used
+  // instead as their target.
+
+  // Add an unconditional jump at the end of the block.
+  // Take argument value from the dominating BB
+  SILBuilder(CCBBlock).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
+                              {SuccessArg});
+  CCBI->eraseFromParent();
 }
 
 /// Handle a special case, where ArgBB is the entry block.
-bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB) {
+bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB,
+                                                CheckedCastBranchInst *DomCCBI) {
   if (ArgBB->getPreds().begin() == ArgBB->getPreds().end()) {
     // It must be the entry block
     // See if it is reached over Success or Failure path.
-    bool SuccessDominates = DomSuccessBB == BB;
-    bool FailureDominates = DomFailureBB == BB;
+    bool SuccessDominates = DomCCBI->getSuccessBB() == BB;
+    bool FailureDominates = DomCCBI->getFailureBB() == BB;
 
-    classifyPredecessor(ArgBB, SuccessPreds, FailurePreds, UnknownPreds,
-                        SuccessDominates, FailureDominates);
+    if (BlocksToEdit.count(ArgBB) != 0)
+      return false;
+
+    classifyPredecessor(ArgBB, SuccessDominates, FailureDominates);
     return true;
   }
   return false;
@@ -469,12 +356,15 @@ bool CheckedCastBrJumpThreading::checkCloningConstraints() {
 /// To do it, try to back-propagate the Condition
 /// backwards and see if it is actually equivalent to DomCondition.
 /// along some of the paths.
-bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
+bool CheckedCastBrJumpThreading::
+areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
+                                      SILValue DomCondition) {
   auto *Arg = dyn_cast<SILArgument>(Condition);
   if (!Arg)
     return false;
 
   ArgBB = Arg->getParent();
+  SILBasicBlock *DomBB = DomCCBI->getParent();
   if (!DT->dominates(DomBB, ArgBB))
     return false;
 
@@ -488,7 +378,7 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
   // Check for each predecessor, if the incoming value coming from it
   // is equivalent to the DomCondition. If this is the case, it is
   // possible to try jump-threading along this path.
-  if (!handleArgBBIsEntryBlock(ArgBB)) {
+  if (!handleArgBBIsEntryBlock(ArgBB, DomCCBI)) {
     // ArgBB is not the entry block and has predecessors.
     unsigned idx = 0;
     for (auto *PredBB : ArgBB->getPreds()) {
@@ -497,7 +387,7 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
           IncomingValue, DomBB, DomCondition, DT);
 
       if (ReachingValue == SILValue()) {
-        UnknownPreds.push_back(PredBB);
+        numUnknownPreds++;
         idx++;
         continue;
       }
@@ -507,16 +397,17 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
       DEBUG(PredBB->print(llvm::dbgs()));
 
       // See if it is reached over Success or Failure path.
+      SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();
       bool SuccessDominates = DT->dominates(DomSuccessBB, PredBB) ||
                               DT->dominates(DomSuccessBB, BB) ||
                               DomSuccessBB == BB;
+      SILBasicBlock *DomFailureBB = DomCCBI->getFailureBB();
       bool FailureDominates = DT->dominates(DomFailureBB, PredBB) ||
                               DT->dominates(DomFailureBB, BB) ||
                               DomFailureBB == BB;
 
       classifyPredecessor(
-          PredBB, SuccessPreds, FailurePreds, UnknownPreds,
-          SuccessDominates, FailureDominates);
+          PredBB, SuccessDominates, FailureDominates);
       idx++;
     }
   } else {
@@ -537,9 +428,11 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
 }
 
 /// Check if conditions of CCBI and DomCCBI are equivalent along
-/// all or at least  some paths.
-bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongPaths() {
+/// all or at least some paths.
+bool CheckedCastBrJumpThreading::
+areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
   // Are conditions equivalent along all paths?
+  SILValue DomCondition = stripClassCasts(DomCCBI->getOperand());
   if (DomCondition == Condition) {
     // Conditions are exactly the same, without any restrictions.
     // They are equivalent along all paths.
@@ -549,50 +442,57 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongPaths() {
     for (auto *PredBB : BB->getPreds()) {
       // All predecessors should either unconditionally branch
       // to the current BB or be another checked_cast_br instruction.
-      if (!dyn_cast<CheckedCastBranchInst>(PredBB->getTerminator()) &&
-          !dyn_cast<BranchInst>(PredBB->getTerminator()))
+      if (!isa<CheckedCastBranchInst>(PredBB->getTerminator()) &&
+          !isa<BranchInst>(PredBB->getTerminator()))
         return false;
 
+      // We must avoid that we are going to change a block twice.
+      if (BlocksToEdit.count(PredBB) != 0)
+        return false;
+
+      // Don't allow critical edges from PredBB to BB. This ensures that
+      // splitAllCriticalEdges() will not invalidate our predecessor lists.
+      if (!BB->getSinglePredecessor() && !PredBB->getSingleSuccessor())
+        return false;
+
+      SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();
       bool SuccessDominates =
           DT->dominates(DomSuccessBB, PredBB) || DomSuccessBB == BB;
+      SILBasicBlock *DomFailureBB = DomCCBI->getFailureBB();
       bool FailureDominates =
           DT->dominates(DomFailureBB, PredBB) || DomFailureBB == BB;
 
-      classifyPredecessor(PredBB, SuccessPreds, FailurePreds, UnknownPreds,
-                          SuccessDominates, FailureDominates);
+      classifyPredecessor(PredBB, SuccessDominates, FailureDominates);
     }
     return true;
   }
 
   // Check if conditions are equivalent along a subset of reaching paths.
-  return areEquivalentConditionsAlongSomePaths();
+  return areEquivalentConditionsAlongSomePaths(DomCCBI, DomCondition);
 }
 
 /// Try performing a dominator-based jump-threading for
 /// checked_cast_br instructions.
-bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
-  CCBI = cast<CheckedCastBranchInst>(Term);
-  if (!CCBI)
-    return false;
-
+bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
   // Init information about the checked_cast_br we try to
   // jump-thread.
-  BB = Term->getParent();
-  Condition = Term->getOperand(0).stripClassCasts();
-  SuccessBB = CCBI->getSuccessBB();
-  FailureBB = CCBI->getFailureBB();
+  BB = CCBI->getParent();
+  if (BlocksToEdit.count(BB) != 0)
+    return false;
+
+  Condition = stripClassCasts(CCBI->getOperand());
 
   // Find a dominating checked_cast_br, which performs the same check.
-  for (Node = DT->getNode(BB)->getIDom(); Node; Node = Node->getIDom()) {
+  for (auto *Node = DT->getNode(BB)->getIDom(); Node; Node = Node->getIDom()) {
     // Get current dominating block.
-    DomBB = Node->getBlock();
+    SILBasicBlock *DomBB = Node->getBlock();
     auto *DomTerm = DomBB->getTerminator();
 
     if (!DomTerm->getNumOperands())
       continue;
 
     // Check that it is a dominating checked_cast_br.
-    DomCCBI = dyn_cast<CheckedCastBranchInst>(DomTerm);
+    auto *DomCCBI = dyn_cast<CheckedCastBranchInst>(DomTerm);
     if (!DomCCBI)
       continue;
 
@@ -605,7 +505,6 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
       if (DomCCBI->getCastType() != CCBI->getCastType())
         continue;
     }
-
 
     // Conservatively check that both checked_cast_br instructions
     // are either exact or non-exact. This is very conservative,
@@ -632,26 +531,22 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     if (DomCCBI->isExact() != CCBI->isExact())
       continue;
 
-    // Initialize state variables for the current round of checks
-    // based on the found dominating checked_cast_br.
-    DomSuccessBB = DomCCBI->getSuccessBB();
-    DomFailureBB = DomCCBI->getFailureBB();
-    DomCondition = DomTerm->getOperand(0).stripClassCasts();
+    // We need the block argument of the DomSuccessBB. If we are going to
+    // clone it for a previous checked_cast_br the argument will not dominate
+    // the blocks which it's used to dominate anymore.
+    if (BlocksToClone.count(DomCCBI->getSuccessBB()) != 0)
+      continue;
 
     // Init state variables for paths analysis
     SuccessPreds.clear();
     FailurePreds.clear();
-    UnknownPreds.clear();
+    numUnknownPreds = 0;
     ArgBB = nullptr;
-
-    // Init state variables for jump-threading transformation.
-    TargetFailureBB = nullptr;
-    TargetSuccessBB = nullptr;
 
     // Are conditions of CCBI and DomCCBI equivalent along (some) paths?
     // If this is the case, classify all incoming paths into SuccessPreds,
     // FailurePreds or UnknownPreds depending on how they reach CCBI.
-    if (!areEquivalentConditionsAlongPaths())
+    if (!areEquivalentConditionsAlongPaths(DomCCBI))
       continue;
 
     // Check if any jump-threading is required and possible.
@@ -661,18 +556,17 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     // If this check is reachable via success, failure and unknown
     // at the same time, then we don't know the outcome of the
     // dominating check. No jump-threading is possible in this case.
-    if (!SuccessPreds.empty() && !FailurePreds.empty() &&
-        !UnknownPreds.empty()) {
+    if (!SuccessPreds.empty() && !FailurePreds.empty() && numUnknownPreds > 0) {
       return false;
     }
 
     unsigned TotalPreds =
-        SuccessPreds.size() + FailurePreds.size() + UnknownPreds.size();
+        SuccessPreds.size() + FailurePreds.size() + numUnknownPreds;
 
     // We only need to clone the BB if not all of its
     // predecessors are in the same group.
     if (TotalPreds != SuccessPreds.size() &&
-        TotalPreds != UnknownPreds.size()) {
+        TotalPreds != numUnknownPreds) {
       // Check some cloning related constraints.
       if (!checkCloningConstraints())
         return false;
@@ -703,37 +597,25 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     // add its successors and predecessors
     // for re-processing.
     for (auto *B : BB->getPreds()) {
-      addBlockToSimplifyCFGWorklist(B);
+      BlocksForWorklist.push_back(B);
     }
-
     for (auto *B : BB->getSuccessorBlocks()) {
-      addBlockToSimplifyCFGWorklist(B);
+      BlocksForWorklist.push_back(B);
     }
+    // Remember the blocks we are going to change. So that we ignore them
+    // for upcoming checked_cast_br instructions.
+    BlocksToEdit.insert(BB);
+    BlocksToClone.insert(BB);
+    for (auto *B : SuccessPreds)
+      BlocksToEdit.insert(B);
+    for (auto *B : FailurePreds)
+      BlocksToEdit.insert(B);
 
-    // Create a copy of the BB as a landing BB
-    // for all FailurePreds.
-    modifyCFGForFailurePreds();
-
-    if (InvertSuccess) {
-      SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
-      CCBI->eraseFromParent();
-      SuccessPreds.clear();
-    } else {
-      // Create a copy of the BB or reuse BB as
-      // a landing basic block for all SuccessPreds.
-      modifyCFGForSuccessPreds();
-    }
-    // Handle unknown preds.
-    modifyCFGForUnknownPreds();
-
-    // Update the dominator tree after all changes.
-    updateDominatorTree();
-
-    // Update the SSA form after all changes.
-    updateSSA();
-
-    // Since a few BBs were changed now, add them for re-processing.
-    addBlocksToWorklist();
+    // Record what we want to change.
+    Edit *edit = new (EditAllocator.Allocate())
+      Edit(BB, InvertSuccess, SuccessPreds, FailurePreds, numUnknownPreds != 0,
+           DomCCBI->getSuccessBB()->getBBArg(0));
+    Edits.push_back(edit);
 
     return true;
   }
@@ -742,12 +624,63 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
   return false;
 }
 
+/// Optimize the checked_cast_br instructions in a function.
+void CheckedCastBrJumpThreading::optimizeFunction() {
+
+  // We separate the work in two phases: analyse and transform. This avoids
+  // re-calculating the dominator tree for each optimized checked_cast_br.
+
+  // First phase: analysis.
+  for (auto &BB : *Fn) {
+    // Ignore unreachable blocks.
+    if (!DT->getNode(&BB))
+      continue;
+
+    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(BB.getTerminator()))
+      trySimplify(CCBI);
+  }
+
+  assert(BlocksForWorklist.empty() == Edits.empty());
+
+  if (Edits.empty())
+    return;
+
+  // Second phase: transformation.
+  // Remove critical edges for the SSA-updater. We do this once and keep the
+  // CFG critical-edge free during our transformations.
+  splitAllCriticalEdges(*Fn, true, nullptr, nullptr);
+
+  for (Edit *edit : Edits) {
+    Optional<BasicBlockCloner> Cloner;
+
+    // Create a copy of the BB as a landing BB
+    // for all FailurePreds.
+    edit->modifyCFGForFailurePreds(Cloner);
+    // Create a copy of the BB or reuse BB as
+    // a landing basic block for all SuccessPreds.
+    edit->modifyCFGForSuccessPreds(Cloner);
+    // Handle unknown preds.
+    edit->modifyCFGForUnknownPreds();
+
+    if (Cloner.hasValue()) {
+      updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getDestBB(),
+                            edit->CCBBlock, false);
+
+      if (!Cloner->getDestBB()->pred_empty())
+        BlocksForWorklist.push_back(Cloner->getDestBB());
+    }
+    if (!edit->CCBBlock->pred_empty())
+      BlocksForWorklist.push_back(edit->CCBBlock);
+  }
+}
+
 namespace swift {
 
-bool tryCheckedCastBrJumpThreading(TermInst *Term, DominanceInfo *DT,
-                                   SmallVectorImpl<SILBasicBlock *> &BBs) {
-  CheckedCastBrJumpThreading CCBJumpThreading(DT, BBs);
-  return CCBJumpThreading.trySimplify(Term);
+bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
+                        SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist) {
+  CheckedCastBrJumpThreading CCBJumpThreading(Fn, DT, BlocksForWorklist);
+  CCBJumpThreading.optimizeFunction();
+  return !BlocksForWorklist.empty();
 }
 
 } // end namespace swift

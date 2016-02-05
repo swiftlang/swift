@@ -327,7 +327,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))
-    subOptions |= NL_ProtocolMembers;    
+    subOptions |= NL_ProtocolMembers;
+  if (options.contains(NameLookupFlags::IgnoreAccessibility))
+    subOptions |= NL_IgnoreAccessibility;
 
   if (!dc->lookupQualified(type, name, subOptions, this, decls))
     return result;

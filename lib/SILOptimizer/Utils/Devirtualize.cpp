@@ -1,4 +1,4 @@
-//===--- Devirtualize.cpp - Helper for devirtualizing apply -----*- C++ -*-===//
+//===--- Devirtualize.cpp - Helper for devirtualizing apply ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,6 +21,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Statistic.h"
@@ -60,7 +61,7 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
   Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
   if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
-    // Filter out any subclassses that do not inherit from this
+    // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto RemovedIt = std::remove_if(Subs.begin(), Subs.end(),
         [&ClassType, &M](ClassDecl *Sub){
@@ -224,7 +225,7 @@ static SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
                                                 ClassHierarchyAnalysis *CHA) {
 
   while (S) {
-    S = S.stripCasts();
+    S = stripCasts(S);
     if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S))
       return S;
 
@@ -347,7 +348,6 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   // Class F belongs to.
   CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
 
-  SILType FSelfSubstType;
   auto *Module = M.getSwiftModule();
 
   ArrayRef<Substitution> ClassSubs;
@@ -387,7 +387,7 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   auto AISubs = AI.getSubstitutions();
 
   CanSILFunctionType AIGenCalleeType =
-      AI.getCallee().getType().castTo<SILFunctionType>();
+      AI.getCallee()->getType().castTo<SILFunctionType>();
 
   CanType AISelfClass = AIGenCalleeType->getSelfParameter().getType();
 
@@ -535,7 +535,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
-  auto ClassOrMetatypeType = ClassOrMetatype.getType();
+  auto ClassOrMetatypeType = ClassOrMetatype->getType();
   auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
@@ -558,7 +558,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i)
     NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(), Args[i],
-                                                   Args[i].getType(),
+                                                   Args[i]->getType(),
                                                    ParamTypes[i]).getValue());
 
   // Add the self argument, upcasting if required because we're
@@ -590,7 +590,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   if (!isa<TryApplyInst>(AI)) {
     NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ResultTy,
                           Subs, NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
-    ResultValue = SILValue(NewAI.getInstruction(), 0);
+    ResultValue = NewAI.getInstruction();
   } else {
     auto *TAI = cast<TryApplyInst>(AI);
     // Create new normal and error BBs only if:
@@ -668,12 +668,12 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   //   casted into an appropriate type. This SILValue may be a BB arg, if it
   //   was a cast between optional types.
   // - the second one is the new apply site.
-  return std::make_pair(ResultValue.getDef(), NewAI);
+  return std::make_pair(ResultValue, NewAI);
 }
 
 DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
                                                    SILValue ClassInstance) {
-  if (!canDevirtualizeClassMethod(AI, ClassInstance.getType()))
+  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType()))
     return std::make_pair(nullptr, FullApplySite());
   return devirtualizeClassMethod(AI, ClassInstance);
 }
@@ -695,7 +695,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // Collect all the required substitutions.
   //
   // The complete set of substitutions may be different, e.g. because the found
-  // witness thunk F may have been created by a  specialization pass and have
+  // witness thunk F may have been created by a specialization pass and have
   // additional generic parameters.
   SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
   if (auto generics = AI.getOrigCalleeType()->getGenericSignature()) {
@@ -741,7 +741,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
     SILValue A = AI.getArgument(ArgN);
     auto ParamType = ParamTypes[ParamTypes.size() - AI.getNumArguments() + ArgN];
-    if (A.getType() != ParamType)
+    if (A->getType() != ParamType)
       A = B.createUpcast(AI.getLoc(), A, ParamType);
 
     Arguments.push_back(A);
@@ -830,8 +830,8 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI.getCallee())) {
     auto &M = AI.getModule();
-    auto Instance = CMI->getOperand().stripUpCasts();
-    auto ClassType = Instance.getType();
+    auto Instance = stripUpCasts(CMI->getOperand());
+    auto ClassType = Instance->getType();
     if (ClassType.is<MetatypeType>())
       ClassType = ClassType.getMetatypeInstanceType(M);
 

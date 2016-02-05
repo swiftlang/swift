@@ -188,15 +188,17 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
 class CodeCompletionOrganizer::Impl {
   std::unique_ptr<Group> rootGroup;
   CompletionKind completionKind;
+  bool completionHasExpectedTypes;
 
   void groupStemsRecursive(Group *group, bool recurseIntoNewGroups,
                            StringRef(getStem)(StringRef));
 
 public:
-  Impl(CompletionKind kind);
+  Impl(CompletionKind kind, bool hasExpectedTypes);
 
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
                                 StringRef filterText, Options options,
+                                const FilterRules &rules,
                                 Completion *&exactMatch);
 
   void sort(Options options);
@@ -248,8 +250,9 @@ public:
 //===----------------------------------------------------------------------===//
 
 CodeCompletionOrganizer::CodeCompletionOrganizer(const Options &options,
-                                                 CompletionKind kind)
-    : impl(*new Impl(kind)), options(options) {}
+                                                 CompletionKind kind,
+                                                 bool hasExpectedTypes)
+    : impl(*new Impl(kind, hasExpectedTypes)), options(options) {}
 CodeCompletionOrganizer::~CodeCompletionOrganizer() { delete &impl; }
 
 void CodeCompletionOrganizer::preSortCompletions(
@@ -271,8 +274,9 @@ void CodeCompletionOrganizer::preSortCompletions(
 
 void CodeCompletionOrganizer::addCompletionsWithFilter(
     ArrayRef<Completion *> completions, StringRef filterText,
-    Completion *&exactMatch) {
-  impl.addCompletionsWithFilter(completions, filterText, options, exactMatch);
+    const FilterRules &rules, Completion *&exactMatch) {
+  impl.addCompletionsWithFilter(completions, filterText, options, rules,
+                                exactMatch);
 }
 
 void CodeCompletionOrganizer::groupAndSort(const Options &options) {
@@ -381,8 +385,8 @@ static std::unique_ptr<Result> make_result(Completion *result) {
 // CodeCompletionOrganizer::Impl implementation
 //===----------------------------------------------------------------------===//
 
-CodeCompletionOrganizer::Impl::Impl(CompletionKind kind)
-    : completionKind(kind) {
+CodeCompletionOrganizer::Impl::Impl(CompletionKind kind, bool hasExpectedTypes)
+    : completionKind(kind), completionHasExpectedTypes(hasExpectedTypes) {
   assert(!rootGroup && "initialized twice");
   rootGroup = make_group("");
 }
@@ -425,9 +429,56 @@ static bool isHighPriorityKeyword(CodeCompletionKeywordKind kind) {
   }
 }
 
+bool FilterRules::hideCompletion(Completion *completion) const {
+
+  if (!completion->getName().empty()) {
+    auto I = hideByName.find(completion->getName());
+    if (I != hideByName.end())
+      return I->getValue();
+  }
+
+  switch (completion->getKind()) {
+  case Completion::Declaration:
+    break;
+  case Completion::Keyword: {
+    auto I = hideKeyword.find(completion->getKeywordKind());
+    if (I != hideKeyword.end())
+      return I->second;
+    if (hideAllKeywords)
+      return true;
+    break;
+  }
+  case Completion::Pattern: {
+    if (completion->hasCustomKind()) {
+      // FIXME: individual custom completions
+      if (hideCustomCompletions)
+        return true;
+    }
+    break;
+  }
+  case Completion::Literal: {
+    auto I = hideValueLiteral.find(completion->getLiteralKind());
+    if (I != hideValueLiteral.end())
+      return I->second;
+    if (hideAllValueLiterals)
+      return true;
+    break;
+  }
+  }
+
+  if (!completion->getModuleName().empty()) {
+    // FIXME: try each submodule chain starting from the most specific.
+    auto M = hideModule.find(completion->getModuleName());
+    if (M != hideModule.end())
+      return M->getValue();
+  }
+
+  return hideAll;
+}
+
 void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     ArrayRef<Completion *> completions, StringRef filterText, Options options,
-    Completion *&exactMatch) {
+    const FilterRules &rules, Completion *&exactMatch) {
   assert(rootGroup);
 
   auto &contents = rootGroup->contents;
@@ -439,6 +490,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         completionKind != CompletionKind::TypeSimpleBeginning &&
         completionKind != CompletionKind::PostfixExpr;
     for (Completion *completion : completions) {
+      if (rules.hideCompletion(completion))
+        continue;
+
       NameStyle style(completion->getName());
       bool hideUnderscore = options.hideUnderscores && style.leadingUnderscores;
       if (hideUnderscore && options.reallyHideAllUnderscores)
@@ -464,7 +518,8 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         }
         if (completion->getExpectedTypeRelation() >= Completion::Convertible ||
             (completion->getKind() == Completion::Literal &&
-             completionKind != CompletionKind::StmtOrExpr))
+             completionKind != CompletionKind::StmtOrExpr &&
+             !completionHasExpectedTypes))
           break;
 
         if (completion->getKind() == Completion::Keyword &&
@@ -488,6 +543,19 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   FuzzyStringMatcher pattern(filterText);
   pattern.normalize = true;
   for (Completion *completion : completions) {
+    if (rules.hideCompletion(completion))
+      continue;
+
+    // Hide literals other than the ones that are also keywords if they don't
+    // match the expected types.
+    if (completion->getKind() == Completion::Literal &&
+        completionHasExpectedTypes &&
+        completion->getExpectedTypeRelation() < Completion::Convertible &&
+        completion->getLiteralKind() !=
+            CodeCompletionLiteralKind::BooleanLiteral &&
+        completion->getLiteralKind() != CodeCompletionLiteralKind::NilLiteral)
+      continue;
+
     bool match = false;
     if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getName());
@@ -586,7 +654,7 @@ enum class ResultBucket {
 };
 } // end anonymous namespace
 
-static ResultBucket getResultBucket(Item &item) {
+static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes) {
   if (isa<Group>(item))
     return ResultBucket::Normal; // FIXME: take best contained result.
   auto *completion = cast<Result>(item).value;
@@ -600,7 +668,15 @@ static ResultBucket getResultBucket(Item &item) {
 
   switch (completion->getKind()) {
   case Completion::Literal:
-    return matchesType ? ResultBucket::LiteralTypeMatch : ResultBucket::Literal;
+    if (matchesType) {
+      return ResultBucket::LiteralTypeMatch;
+    } else if (!hasExpectedTypes) {
+      return ResultBucket::Literal;
+    } else {
+      // When we have type context, we still show literals that are keywords,
+      // but we treat them as keywords instead of literals for prioritization.
+      return ResultBucket::Normal;
+    }
   case Completion::Keyword:
     return isHighPriorityKeyword(completion->getKeywordKind())
                ? ResultBucket::HighPriorityKeyword
@@ -636,14 +712,14 @@ static int compareHighPriorityKeywords(Item &a_, Item &b_) {
 static int compareLiterals(Item &a_, Item &b_) {
   static CodeCompletionLiteralKind order[] = {
     CodeCompletionLiteralKind::IntegerLiteral,
-    CodeCompletionLiteralKind::FloatLiteral,
-    CodeCompletionLiteralKind::BooleanLiteral,
     CodeCompletionLiteralKind::StringLiteral,
+    CodeCompletionLiteralKind::BooleanLiteral,
+    CodeCompletionLiteralKind::ColorLiteral,
+    CodeCompletionLiteralKind::ImageLiteral,
     CodeCompletionLiteralKind::ArrayLiteral,
     CodeCompletionLiteralKind::DictionaryLiteral,
     CodeCompletionLiteralKind::Tuple,
     CodeCompletionLiteralKind::NilLiteral,
-    CodeCompletionLiteralKind::ColorLiteral,
   };
   auto size = sizeof(order) / sizeof(order[0]);
 
@@ -655,16 +731,97 @@ static int compareLiterals(Item &a_, Item &b_) {
 
   auto a = getIndex(a_);
   auto b = getIndex(b_);
-  return a < b ? -1 : (b < a ? 1 : 0);
+
+  if (a != b)
+    return a < b ? -1 : 1;
+
+  // Sort true before false instead of alphabetically.
+  if (cast<Result>(a_).value->getLiteralKind() == CodeCompletionLiteralKind::BooleanLiteral)
+    return a_.name > b_.name;
+
+  return 0;
 }
 
-static void sortRecursive(const Options &options, Group *group) {
+static bool isTopNonLiteralResult(Item &item, ResultBucket literalBucket) {
+  if (isa<Group>(item))
+    return true; // FIXME: should have a semantic context for groups.
+  auto *completion = cast<Result>(item).value;
+
+  switch (literalBucket) {
+  case ResultBucket::Literal:
+    return completion->getSemanticContext() <=
+           SemanticContextKind::CurrentNominal;
+  case ResultBucket::LiteralTypeMatch:
+    return completion->getExpectedTypeRelation() >= Completion::Convertible;
+  default:
+    llvm_unreachable("invalid literal bucket");
+  }
+}
+
+static void sortTopN(const Options &options, Group *group,
+                     bool hasExpectedTypes) {
+
+  auto &contents = group->contents;
+  if (contents.empty() || options.showTopNonLiteralResults == 0)
+    return;
+
+  auto best = getResultBucket(*contents[0], hasExpectedTypes);
+  if (best == ResultBucket::LiteralTypeMatch || best == ResultBucket::Literal) {
+
+    unsigned beginNewIndex = 0;
+    unsigned endNewIndex = 0;
+    for (unsigned i = 1; i < contents.size(); ++i) {
+      auto bucket = getResultBucket(*contents[i], hasExpectedTypes);
+      if (bucket < best) {
+        // This algorithm assumes we don't have both literal and
+        // literal-type-match at the start of the list.
+        assert(bucket != ResultBucket::Literal);
+        if (isTopNonLiteralResult(*contents[i], best)) {
+          beginNewIndex = i;
+          endNewIndex = beginNewIndex + 1;
+          for (; endNewIndex < contents.size() &&
+                 endNewIndex < beginNewIndex + options.showTopNonLiteralResults;
+               ++endNewIndex) {
+            if (!isTopNonLiteralResult(*contents[endNewIndex], best))
+              break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (!beginNewIndex)
+      return;
+
+    assert(endNewIndex > beginNewIndex && endNewIndex < contents.size());
+
+    // Temporarily copy the first result to temporary storage.
+    SmallVector<Item *, 16> firstResults;
+    for (unsigned i = 0; i < endNewIndex; ++i) {
+      firstResults.push_back(contents[i].release());
+    }
+
+    // Swap the literals with the next few results.
+    for (unsigned ci = 0, i = beginNewIndex; i < endNewIndex; ++i, ++ci) {
+      assert(ci < contents.size() && !contents[ci]);
+      contents[ci] = std::unique_ptr<Item>(firstResults[i]);
+    }
+    unsigned topN = endNewIndex - beginNewIndex;
+    for (unsigned ci = topN, i = 0; i < beginNewIndex; ++i, ++ci) {
+      assert(ci < contents.size() && !contents[ci]);
+      contents[ci] = std::unique_ptr<Item>(firstResults[i]);
+    }
+  }
+}
+
+static void sortRecursive(const Options &options, Group *group,
+                          bool hasExpectedTypes) {
   // Sort all of the subgroups first, and fill in the bucket for each result.
   auto &contents = group->contents;
   double best = -1.0;
   for (auto &item : contents) {
     if (Group *g = dyn_cast<Group>(item.get())) {
-      sortRecursive(options, g);
+      sortRecursive(options, g, hasExpectedTypes);
     } else {
       Result *r = cast<Result>(item.get());
       item->finalScore = combinedScore(options, item->matchScore, r->value);
@@ -686,40 +843,42 @@ static void sortRecursive(const Options &options, Group *group) {
     return;
   }
 
-  llvm::array_pod_sort(contents.begin(), contents.end(), [](const std::unique_ptr<Item> *a_, const std::unique_ptr<Item> *b_) {
-    Item &a = **a_;
-    Item &b = **b_;
+  std::sort(contents.begin(), contents.end(), [=](const std::unique_ptr<Item> &a_, const std::unique_ptr<Item> &b_) {
+    Item &a = *a_;
+    Item &b = *b_;
 
-    auto bucketA = getResultBucket(a);
-    auto bucketB = getResultBucket(b);
+    auto bucketA = getResultBucket(a, hasExpectedTypes);
+    auto bucketB = getResultBucket(b, hasExpectedTypes);
     if (bucketA < bucketB)
-      return 1;
+      return false;
     else if (bucketB < bucketA)
-      return -1;
+      return true;
 
     // Special internal orderings.
     switch (bucketA) {
     case ResultBucket::HighPriorityKeyword:
-      return compareHighPriorityKeywords(a, b);
+      return compareHighPriorityKeywords(a, b) < 0;
     case ResultBucket::Literal:
     case ResultBucket::LiteralTypeMatch:
-      return compareLiterals(a, b);
+      return compareLiterals(a, b) < 0;
     default:
       break;
     }
 
     // "Normal" order.
     if (a.finalScore < b.finalScore)
-      return 1;
+      return false;
     else if (b.finalScore < a.finalScore)
-      return -1;
+      return true;
 
-    return compareResultName(a, b);
+    return compareResultName(a, b) < 0;
   });
 }
 
 void CodeCompletionOrganizer::Impl::sort(Options options) {
-  sortRecursive(options, rootGroup.get());
+  sortRecursive(options, rootGroup.get(), completionHasExpectedTypes);
+  if (options.showTopNonLiteralResults != 0)
+    sortTopN(options, rootGroup.get(), completionHasExpectedTypes);
 }
 
 void CodeCompletionOrganizer::Impl::groupStemsRecursive(

@@ -175,27 +175,10 @@ Type DeclContext::getDeclaredTypeInContext() const {
 }
 
 Type DeclContext::getDeclaredInterfaceType() const {
-  switch (getContextKind()) {
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
-    return Type();
-
-  case DeclContextKind::ExtensionDecl:
-    // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-    if (auto nominal = getDeclaredTypeOfContext()->getAnyNominal())
-      return nominal->getDeclaredInterfaceType();
-    return Type();
-
-  case DeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(this)->getDeclaredInterfaceType();
-  }
-  llvm_unreachable("bad DeclContextKind");
+  // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
+  if (auto nominal = isNominalTypeOrNominalTypeExtensionContext())
+    return nominal->getDeclaredInterfaceType();
+  return Type();
 }
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {

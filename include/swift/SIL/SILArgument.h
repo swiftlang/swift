@@ -38,9 +38,6 @@ public:
               SILType Ty, const ValueDecl *D = nullptr)
       : SILArgument(&*ParentBB, Pos, Ty, D) {}
 
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
 

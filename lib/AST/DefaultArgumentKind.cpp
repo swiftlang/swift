@@ -25,30 +25,14 @@ StringRef swift::getDefaultArgumentSpelling(DefaultArgumentKind kind) {
   case DefaultArgumentKind::Normal:
   case DefaultArgumentKind::Inherited:
     return StringRef();
-
-  case DefaultArgumentKind::File:
-    return "__FILE__";
-
-  case DefaultArgumentKind::Line:
-    return "__LINE__";
-
-  case DefaultArgumentKind::Column:
-    return "__COLUMN__";
-
-  case DefaultArgumentKind::Function:
-    return "__FUNCTION__";
-
-  case DefaultArgumentKind::DSOHandle:
-    return "__DSO_HANDLE__";
-
-  case DefaultArgumentKind::Nil:
-    return "nil";
-
-  case DefaultArgumentKind::EmptyArray:
-    return "[]";
-
-  case DefaultArgumentKind::EmptyDictionary:
-    return "[:]";
+  case DefaultArgumentKind::File:      return "#file";
+  case DefaultArgumentKind::Line:      return "#line";
+  case DefaultArgumentKind::Column:    return "#column";
+  case DefaultArgumentKind::Function:  return "#function";
+  case DefaultArgumentKind::DSOHandle: return "#dsohandle";
+  case DefaultArgumentKind::Nil:       return "nil";
+  case DefaultArgumentKind::EmptyArray: return "[]";
+  case DefaultArgumentKind::EmptyDictionary: return "[:]";
   }
 }
 
@@ -59,7 +43,7 @@ DefaultArgumentKind swift::inferDefaultArgumentKind(Expr *expr) {
         if (auto ctor = dyn_cast<ConstructorDecl>(ctorRef->getDecl())) {
           auto ctorArg = call->getArg()->getSemanticsProvidingExpr();
 
-          // __FILE__, __LINE__, __COLUMN__, __FUNCTION__, __DSO_HANDLE__.
+          // #file, #line, #column, #function, #dsohandle.
           if (auto magic = dyn_cast<MagicIdentifierLiteralExpr>(ctorArg)) {
             switch (magic->getKind()) {
             case MagicIdentifierLiteralExpr::File:

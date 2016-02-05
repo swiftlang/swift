@@ -95,7 +95,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     if (needsArg) {
       returnValue = predBranch->getArgs()[0];
       // RAUW the old BB argument (if any) with the new value.
-      SILValue(*epilogBB->bbarg_begin(),0).replaceAllUsesWith(returnValue);
+      (*epilogBB->bbarg_begin())->replaceAllUsesWith(returnValue);
     }
 
     // If we are optimizing, we should use the return location from the single,

@@ -54,7 +54,7 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   // assignment with a store.  If it has non-trivial type and is an
   // initialization, we can also replace it with a store.
   if (isInitialization == IsInitialization ||
-      Inst->getDest().getType().isTrivial(Inst->getModule())) {
+      Inst->getDest()->getType().isTrivial(Inst->getModule())) {
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
   } else {
     // Otherwise, we need to replace the assignment with the full
@@ -1192,7 +1192,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     ClassMethodInst *CMI = nullptr;
     ApplyInst *AI = nullptr;
     SILInstruction *Release = nullptr;
-    for (auto UI : SILValue(UCI, 0).getUses()) {
+    for (auto UI : UCI->getUses()) {
       auto *User = UI->getUser();
       if (auto *TAI = dyn_cast<ApplyInst>(User)) {
         if (!AI) {
@@ -1656,7 +1656,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       Pointer = getOrCreateProjectBox(ABI);
 
     if (!consumed) {
-      if (Pointer.getType().isAddress())
+      if (Pointer->getType().isAddress())
         Pointer = B.createLoad(Loc, Pointer);
 
       auto MetatypeTy = CanMetatypeType::get(
@@ -1701,7 +1701,7 @@ void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
 
 /// processNonTrivialRelease - We handle two kinds of release instructions here:
 /// destroy_addr for alloc_stack's and strong_release/dealloc_box for
-/// alloc_box's.  By the  time that DI gets here, we've validated that all uses
+/// alloc_box's.  By the time that DI gets here, we've validated that all uses
 /// of the memory location are valid.  Unfortunately, the uses being valid
 /// doesn't mean that the memory is actually initialized on all paths leading to
 /// a release.  As such, we have to push the releases up the CFG to where the
@@ -1787,7 +1787,7 @@ static void updateControlVariable(SILLocation Loc,
                                   SILValue ControlVariable,
                                   Identifier &OrFn,
                                   SILBuilder &B) {
-  SILType IVType = ControlVariable.getType().getObjectType();
+  SILType IVType = ControlVariable->getType().getObjectType();
 
   // Get the integer constant.
   SILValue MaskVal = B.createIntegerLiteral(Loc, IVType, Bitmask);
@@ -1818,7 +1818,7 @@ static SILValue testControlVariable(SILLocation Loc,
     ControlVariable = B.createLoad(Loc, ControlVariableAddr);
 
   SILValue CondVal = ControlVariable;
-  CanBuiltinIntegerType IVType = CondVal.getType().castTo<BuiltinIntegerType>();
+  CanBuiltinIntegerType IVType = CondVal->getType().castTo<BuiltinIntegerType>();
 
   // If this memory object has multiple tuple elements, we need to make sure
   // to test the right one.
@@ -1828,18 +1828,18 @@ static SILValue testControlVariable(SILLocation Loc,
   // Shift the mask down to this element.
   if (Elt != 0) {
     if (!ShiftRightFn.get())
-      ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
+      ShiftRightFn = getBinaryFunction("lshr", CondVal->getType(),
                                        B.getASTContext());
-    SILValue Amt = B.createIntegerLiteral(Loc, CondVal.getType(), Elt);
+    SILValue Amt = B.createIntegerLiteral(Loc, CondVal->getType(), Elt);
     SILValue Args[] = { CondVal, Amt };
     
     CondVal = B.createBuiltin(Loc, ShiftRightFn,
-                              CondVal.getType(), {},
+                              CondVal->getType(), {},
                               Args);
   }
   
   if (!TruncateFn.get())
-    TruncateFn = getTruncateToI1Function(CondVal.getType(),
+    TruncateFn = getTruncateToI1Function(CondVal->getType(),
                                          B.getASTContext());
   return B.createBuiltin(Loc, TruncateFn,
                          SILType::getBuiltinIntegerType(1, B.getASTContext()),
@@ -2513,7 +2513,7 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
 
       // mark_uninitialized just becomes a noop, resolving to its operand.
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
-        SILValue(MUI, 0).replaceAllUsesWith(MUI->getOperand());
+        MUI->replaceAllUsesWith(MUI->getOperand());
         MUI->eraseFromParent();
         Changed = true;
         continue;

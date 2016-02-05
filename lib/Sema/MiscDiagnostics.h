@@ -1,4 +1,4 @@
-//===--- MiscDiagnostics.h - AST-Level Diagnostics ------------------------===//
+//===--- MiscDiagnostics.h - AST-Level Diagnostics --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

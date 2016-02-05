@@ -188,7 +188,7 @@ protected:
           MethodInfo *mi = getMethodInfo(funcDecl);
           ClassDecl *MethodCl = nullptr;
           if (MI->getNumOperands() == 1)
-            MethodCl = MI->getOperand(0)->getType(0).getClassOrBoundGenericClass();
+            MethodCl = MI->getOperand(0)->getType().getClassOrBoundGenericClass();
           ensureAlive(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());

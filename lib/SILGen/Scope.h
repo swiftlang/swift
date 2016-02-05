@@ -93,6 +93,17 @@ public:
   }
 };
 
+/// A scope that only exists in the debug info.
+class LLVM_LIBRARY_VISIBILITY DebugScope {
+  SILGenFunction &SGF;
+
+public:
+  explicit DebugScope(SILGenFunction &SGF, CleanupLocation Loc) : SGF(SGF) {
+    SGF.enterDebugScope(Loc);
+  }
+
+  ~DebugScope() { SGF.leaveDebugScope(); }
+};
 
 } // end namespace Lowering
 } // end namespace swift

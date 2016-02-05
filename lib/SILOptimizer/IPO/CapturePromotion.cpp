@@ -315,7 +315,7 @@ ClosureCloner::ClosureCloner(SILFunction *Orig, StringRef ClonedName,
                                        PromotableIndices),
                            *Orig, ContextSubs, ApplySubs),
     Orig(Orig), PromotableIndices(PromotableIndices) {
-  assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
+  assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
 
 /// Compute the SILParameterInfo list for the new cloned closure.
@@ -492,7 +492,6 @@ ClosureCloner::populateCloned() {
 void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end()) {
       getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -513,13 +512,12 @@ void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = BoxArgumentMap.find(A);
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
       // object type argument.
       SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second.getType());
+      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
       typeLowering.emitReleaseValue(B, Inst->getLoc(), I->second);
       return;
@@ -536,7 +534,6 @@ void
 ClosureCloner::visitStructElementAddrInst(StructElementAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end())
       return;
@@ -562,7 +559,6 @@ void
 ClosureCloner::visitLoadInst(LoadInst *Inst) {
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end()) {
       // Loads of the address argument get eliminated completely; the uses of
@@ -571,9 +567,7 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
       return;
     }
   } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Operand)) {
-    assert(Operand.getResultNumber() == 0);
     if (auto *A = dyn_cast<ProjectBoxInst>(SEAI->getOperand())) {
-      assert(SEAI->getOperand().getResultNumber() == 0);
       auto I = ProjectBoxArgumentMap.find(A);
       if (I != ProjectBoxArgumentMap.end()) {
         // Loads of a struct_element_addr of an argument get replaced with
@@ -738,7 +732,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
         return false;
 
       auto Callee = PAI->getCallee();
-      auto CalleeTy = Callee.getType().castTo<SILFunctionType>();
+      auto CalleeTy = Callee->getType().castTo<SILFunctionType>();
 
       // Bail if the signature has any dependent types as we do not
       // currently support these.
@@ -781,13 +775,13 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       SILValue Addr = PBI;
       // If the AllocBox is used by a mark_uninitialized, scan the MUI for
       // interesting uses.
-      if (Addr.hasOneUse()) {
-        SILInstruction *SingleAddrUser = Addr.use_begin()->getUser();
+      if (Addr->hasOneUse()) {
+        SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
         if (isa<MarkUninitializedInst>(SingleAddrUser))
           Addr = SILValue(SingleAddrUser);
       }
 
-      for (Operand *AddrOp : Addr.getUses()) {
+      for (Operand *AddrOp : Addr->getUses()) {
         if (!isNonescapingUse(AddrOp, Mutations))
           return false;
       }
@@ -885,7 +879,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  assert(FRI && PAI->getCallee().getResultNumber() == 0);
 
   // Clone the closure with the given promoted captures.
   SILFunction *ClonedFn = constructClonedFunction(PAI, FRI, PromotableIndices);
@@ -895,12 +888,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // closure.
   SILBuilderWithScope B(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
-  SILType FnTy = FnVal.getType();
+  SILType FnTy = FnVal->getType();
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   auto CalleePInfo =
-      PAI->getCallee().getType().castTo<SILFunctionType>()->getParameters();
+      PAI->getCallee()->getType().castTo<SILFunctionType>()->getParameters();
   auto PInfo = PAI->getType().castTo<SILFunctionType>()->getParameters();
   unsigned FirstIndex = PInfo.size();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
@@ -909,10 +902,10 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     unsigned Index = OpNo - 1 + FirstIndex;
     if (PromotableIndices.count(Index)) {
       SILValue BoxValue = PAI->getOperand(OpNo);
-      AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue.getDef());
+      AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue);
 
       SILParameterInfo CPInfo = CalleePInfo[Index];
-      assert(CPInfo.getSILType() == BoxValue.getType() &&
+      assert(CPInfo.getSILType() == BoxValue->getType() &&
              "SILType of parameter info does not match type of parameter");
       // Cleanup the captured argument.
       releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
@@ -938,7 +931,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       if (!Addr)
         Addr = getOrCreateProjectBox(ABI);
 
-      auto &typeLowering = M.getTypeLowering(Addr.getType());
+      auto &typeLowering = M.getTypeLowering(Addr->getType());
       Args.push_back(
         typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
       ++NumCapturesPromoted;
@@ -954,7 +947,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, SubstFnTy,
                                       PAI->getSubstitutions(), Args,
                                       PAI->getType());
-  SILValue(PAI, 0).replaceAllUsesWith(NewPAI);
+  PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {
     FRI->eraseFromParent();

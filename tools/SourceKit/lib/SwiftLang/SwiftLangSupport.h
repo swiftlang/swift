@@ -137,19 +137,26 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   CompletionSink sink;
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
+  bool completionHasExpectedTypes;
+  FilterRules filterRules;
   llvm::sys::Mutex mtx;
 
 public:
   SessionCache(CompletionSink &&sink,
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
-               std::vector<std::string> &&args, CompletionKind completionKind)
+               std::vector<std::string> &&args, CompletionKind completionKind,
+               bool hasExpectedTypes, FilterRules filterRules)
       : buffer(std::move(buffer)), args(std::move(args)), sink(std::move(sink)),
-        completionKind(completionKind) {}
+        completionKind(completionKind),
+        completionHasExpectedTypes(hasExpectedTypes),
+        filterRules(std::move(filterRules)) {}
   void setSortedCompletions(std::vector<Completion *> &&completions);
   ArrayRef<Completion *> getSortedCompletions();
   llvm::MemoryBuffer *getBuffer();
   ArrayRef<std::string> getCompilerArgs();
+  const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
+  bool getCompletionHasExpectedTypes();
 };
 typedef RefPtr<SessionCache> SessionCacheRef;
 
@@ -272,8 +279,8 @@ public:
                     ArrayRef<const char *> Args) override;
 
   void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
-                        unsigned offset,
-                        OptionsDictionary *options,
+                        unsigned offset, OptionsDictionary *options,
+                        ArrayRef<FilterRule> rawFilterRules,
                         GroupedCodeCompletionConsumer &consumer,
                         ArrayRef<const char *> args) override;
 

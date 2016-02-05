@@ -34,8 +34,8 @@ static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
     for (auto *Arg : BB.getBBArgs())
       Values.push_back(SILValue(Arg));
     for (auto &II : BB)
-      for (unsigned i = 0, e = II.getNumTypes(); i != e; ++i)
-        Values.push_back(SILValue(&II, i));
+      if (II.hasValue())
+        Values.push_back(&II);
   }
   return Values.size() > 1;
 }

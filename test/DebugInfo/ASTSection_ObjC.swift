@@ -11,7 +11,7 @@
 // RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
 
 // REQUIRES: executable_test
-// UNSUPPORTED: OS=linux-gnu
+// REQUIRES: objc_interop
 
 // CHECK: Loaded module ASTSection from
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}

@@ -39,6 +39,7 @@ struct Options {
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
   unsigned minFuzzyLength = 2;
+  unsigned showTopNonLiteralResults = 3;
 
   // Options for combining priorities. The defaults are chosen so that a fuzzy
   // match just breaks ties within a semantic context.  If semanticContextWeight
@@ -75,7 +76,8 @@ class CodeCompletionOrganizer {
   Impl &impl;
   const Options &options;
 public:
-  CodeCompletionOrganizer(const Options &options, CompletionKind kind);
+  CodeCompletionOrganizer(const Options &options, CompletionKind kind,
+                          bool hasExpectedTypes);
   ~CodeCompletionOrganizer();
 
   static void
@@ -86,7 +88,8 @@ public:
   ///
   /// Precondition: \p completions should be sorted with preSortCompletions().
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
-                                StringRef filterText, Completion *&exactMatch);
+                                StringRef filterText, const FilterRules &rules,
+                                Completion *&exactMatch);
 
   void groupAndSort(const Options &options);
 

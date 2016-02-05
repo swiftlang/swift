@@ -83,7 +83,7 @@ enum Bar<T, U> {
 
 func getF(x: Bar<Int, Int>) -> Int -> Int {
   switch x {
-  case .F(let f):
+  case .F(var f):
     return f
   }
 }

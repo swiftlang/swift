@@ -37,7 +37,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     # An array of tuples (start_code_point, end_code_point, value).
     property_value_ranges = []
 
-    property_values = [ None for i in range(0, 0x110000) ]
+    property_values = [None for i in range(0, 0x110000)]
 
     # Note: Numeric values should be consistent with
     # '_GraphemeClusterBreakPropertyValue' enum on the Swift side, and with
@@ -45,27 +45,27 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     # reason for either of those to differ, then this mapping can be overridden
     # after an instance of this class is created.
     numeric_value_table = {
-      'Other': 0,
-      'CR': 1,
-      'LF': 2,
-      'Control': 3,
-      'Extend': 4,
-      'Regional_Indicator': 5,
-      'Prepend': 6,
-      'SpacingMark': 7,
-      'L': 8,
-      'V': 9,
-      'T': 10,
-      'LV': 11,
-      'LVT': 12,
+        'Other': 0,
+        'CR': 1,
+        'LF': 2,
+        'Control': 3,
+        'Extend': 4,
+        'Regional_Indicator': 5,
+        'Prepend': 6,
+        'SpacingMark': 7,
+        'L': 8,
+        'V': 9,
+        'T': 10,
+        'LV': 11,
+        'LVT': 12,
     }
 
     def __init__(self, grapheme_break_property_file_name):
         # Build 'self.symbolic_values' -- an array that maps numeric property
         # values to symbolic values.
         self.symbolic_values = \
-            [ None ] * (max(self.numeric_value_table.values()) + 1)
-        for k,v in self.numeric_value_table.items():
+            [None] * (max(self.numeric_value_table.values()) + 1)
+        for k, v in self.numeric_value_table.items():
             self.symbolic_values[v] = k
 
         # Load the data file.
@@ -96,7 +96,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         for cp in range(0, 0x110000):
             self.property_values[cp] = self.get_default_value()
 
-        for start_code_point,end_code_point,value in self.property_value_ranges:
+        for start_code_point, end_code_point, value in self.property_value_ranges:
             for cp in range(start_code_point, end_code_point + 1):
                 self.property_values[cp] = value
 
@@ -253,7 +253,7 @@ class UnicodeTrieGenerator(object):
                 self.supp_data_offset_bits)
 
         # A mapping from BMP first-level index to BMP data block index.
-        self.BMP_lookup = [ i for i in range(0, 1 << self.BMP_first_level_index_bits) ]
+        self.BMP_lookup = [i for i in range(0, 1 << self.BMP_first_level_index_bits)]
 
         # An array of BMP data blocks.
         self.BMP_data = [
@@ -263,7 +263,7 @@ class UnicodeTrieGenerator(object):
 
         # A mapping from supp first-level index to an index of the second-level
         # lookup table.
-        self.supp_lookup1 = [ i for i in range(0, self.supp_first_level_index_max + 1) ]
+        self.supp_lookup1 = [i for i in range(0, self.supp_first_level_index_max + 1)]
 
         # An array of second-level lookup tables.  Each second-level lookup
         # table is a mapping from a supp second-level index to supp data block
@@ -387,17 +387,17 @@ class UnicodeTrieGenerator(object):
     def _int_to_LE_bytes(self, data, width):
         if width == 1:
             assert(data & ~0xff == 0)
-            return [ data ]
+            return [data]
         if width == 2:
             assert(data & ~0xffff == 0)
-            return [ data & 0xff, data & 0xff00 ]
+            return [data & 0xff, data & 0xff00]
         assert(False)
 
     def _int_list_to_LE_bytes(self, ints, width):
         return [
             byte
             for elt in ints
-            for byte in self._int_to_LE_bytes(elt, width) ]
+            for byte in self._int_to_LE_bytes(elt, width)]
 
     def serialize(self, unicode_property):
         self.BMP_lookup_bytes_per_entry = 1 if len(self.BMP_data) < 256 else 2
@@ -407,18 +407,18 @@ class UnicodeTrieGenerator(object):
         self.supp_lookup2_bytes_per_entry = 1 if len(self.supp_data) < 256 else 2
         self.supp_data_bytes_per_entry = 1
 
-        BMP_lookup_words = [ elt for elt in self.BMP_lookup ]
+        BMP_lookup_words = list(self.BMP_lookup)
         BMP_data_words = [
             unicode_property.to_numeric_value(elt)
             for block in self.BMP_data
-            for elt in block ]
+            for elt in block]
 
-        supp_lookup1_words = [ elt for elt in self.supp_lookup1 ]
-        supp_lookup2_words = [ elt for block in self.supp_lookup2 for elt in block ]
+        supp_lookup1_words = list(self.supp_lookup1)
+        supp_lookup2_words = [elt for block in self.supp_lookup2 for elt in block]
         supp_data_words = [
             unicode_property.to_numeric_value(elt)
             for block in self.supp_data
-            for elt in block ]
+            for elt in block]
 
         BMP_lookup_bytes = self._int_list_to_LE_bytes(
             BMP_lookup_words, self.BMP_lookup_bytes_per_entry)
@@ -463,17 +463,17 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
     # As in the referenced document, the rules are specified in order of
     # decreasing priority.
     rules = [
-      ( [ 'CR' ], 'no_boundary', [ 'LF' ] ),
-      ( [ 'Control', 'CR', 'LF' ], 'boundary', any_value ),
-      ( any_value, 'boundary', [ 'Control', 'CR', 'LF' ] ),
-      ( [ 'L' ], 'no_boundary', [ 'L', 'V', 'LV', 'LVT' ] ),
-      ( [ 'LV', 'V' ], 'no_boundary', [ 'V', 'T' ] ),
-      ( [ 'LVT', 'T' ], 'no_boundary', [ 'T' ] ),
-      ( [ 'Regional_Indicator' ], 'no_boundary', [ 'Regional_Indicator' ] ),
-      ( any_value, 'no_boundary', [ 'Extend' ] ),
-      ( any_value, 'no_boundary', [ 'SpacingMark' ] ),
-      ( [ 'Prepend' ], 'no_boundary', any_value ),
-      ( any_value, 'boundary', any_value ),
+        (['CR'], 'no_boundary', ['LF']),
+        (['Control', 'CR', 'LF'], 'boundary', any_value),
+        (any_value, 'boundary', ['Control', 'CR', 'LF']),
+        (['L'], 'no_boundary', ['L', 'V', 'LV', 'LVT']),
+        (['LV', 'V'], 'no_boundary', ['V', 'T']),
+        (['LVT', 'T'], 'no_boundary', ['T']),
+        (['Regional_Indicator'], 'no_boundary', ['Regional_Indicator']),
+        (any_value, 'no_boundary', ['Extend']),
+        (any_value, 'no_boundary', ['SpacingMark']),
+        (['Prepend'], 'no_boundary', any_value),
+        (any_value, 'boundary', any_value),
     ]
 
     # Expand the rules into a matrix.
@@ -483,7 +483,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
             dict.fromkeys(any_value, None)
 
     # Iterate over rules in the order of increasing priority.
-    for firstList,action,secondList in reversed(rules):
+    for firstList, action, secondList in reversed(rules):
         for first in firstList:
             for second in secondList:
                 rules_matrix[first][second] = action
@@ -497,13 +497,13 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
         row = rules_matrix[first]
 
         # Change strings into bits.
-        bits = [ row[second] == 'no_boundary'
-            for second in any_value ]
+        bits = [row[second] == 'no_boundary'
+            for second in any_value]
 
         # Pack bits into an integer.
-        packed = sum([ bits[i] * pow(2, i) for i in range(0, len(bits)) ])
+        packed = sum([bits[i] * pow(2, i) for i in range(0, len(bits))])
 
-        result += [ packed ]
+        result += [packed]
 
     return result
 
@@ -522,7 +522,7 @@ def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
         # Match a list of code points.
         for token in line.split(" "):
             if token == u"÷":
-                boundaries += [ curr_bytes ]
+                boundaries += [curr_bytes]
             elif token == u"×":
                 pass
             else:
@@ -536,17 +536,17 @@ def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
                 # and test separately that we handle ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
-                code_point = (b'\U%(cp)08x' % { b'cp': code_point }).decode('unicode_escape', 'strict')
+                code_point = (b'\U%(cp)08x' % {b'cp': code_point}).decode('unicode_escape', 'strict')
                 as_UTF8_bytes = bytearray(code_point.encode('utf8', 'strict'))
-                as_UTF8_escaped = ''.join(['\\x%(byte)02x' % { 'byte': byte } for byte in as_UTF8_bytes])
+                as_UTF8_escaped = ''.join(['\\x%(byte)02x' % {'byte': byte} for byte in as_UTF8_bytes])
                 test += as_UTF8_escaped
                 curr_bytes += len(as_UTF8_bytes)
 
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [ 0, 5, 8 ]))
-    assert(_convert_line(u'÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [ 0, 3 ]))
+    assert(_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [0, 5, 8]))
+    assert(_convert_line(u'÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [0, 3]))
 
     result = []
 
@@ -554,7 +554,7 @@ def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
         for line in f:
             test = _convert_line(line)
             if test:
-                result += [ test ]
+                result += [test]
 
     return result
 
@@ -573,7 +573,7 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file
         # Match a list of code points.
         for token in line.split(" "):
             if token == "÷":
-                boundaries += [ curr_code_points ]
+                boundaries += [curr_code_points]
             elif token == "×":
                 pass
             else:
@@ -587,14 +587,14 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file
                 # and test separately that we handle ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
-                test += [ code_point ]
+                test += [code_point]
                 curr_code_points += 1
 
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ([ 0x0903, 0x0308, 0xac01 ], [ 0, 2, 3 ]))
-    assert(_convert_line('÷ D800 ÷ # abc') == ([ 0x200b ], [ 0, 1 ]))
+    assert(_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ([0x0903, 0x0308, 0xac01], [0, 2, 3]))
+    assert(_convert_line('÷ D800 ÷ # abc') == ([0x200b], [0, 1]))
 
     result = []
 
@@ -602,6 +602,6 @@ def get_grapheme_cluster_break_tests_as_unicode_scalars(grapheme_break_test_file
         for line in f:
             test = _convert_line(line)
             if test:
-                result += [ test ]
+                result += [test]
 
     return result

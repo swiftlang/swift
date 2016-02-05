@@ -16,10 +16,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
 
 func freeFuncWithDefaultArgs1(
-    a: Int, b: Int = 42, file: String = __FILE__, line: Int = __LINE__,
-    column: Int = __COLUMN__, function: String = __FUNCTION__) {
+    a: Int, b: Int = 42, file: String = #file, line: Int = #line,
+    column: Int = #column, function: String = #function) {
 }
-func freeFuncWithDefaultArgs2(file file: String = __FILE__) {}
+func freeFuncWithDefaultArgs2(file file: String = #file) {}
 func freeFuncWithDefaultArgs3(a a: Int = 0) {}
 func freeFuncWithDefaultArgs4(a: Int, b: Int = 0, c: Int = 0) {}
 

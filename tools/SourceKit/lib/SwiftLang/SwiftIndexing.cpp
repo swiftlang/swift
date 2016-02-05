@@ -22,7 +22,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 // This is included only for createLazyResolver(). Move to different header ?
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/IDETypeChecking.h"
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"

@@ -1,41 +1,39 @@
-// XFAIL: *
-
 class Foo {
   func foo(Value1 : Int,
     Value2 : Int) {
-	}
+  }
 func bar(value1 : Int,
 value2 : Int,
-	      value3 : Int) {
-	}
-		func foo1(Value1 : Int,
-		Value2 : Int) {}
-		func foo3() {
-			foo(1,
-	2)
-		foo(2,
+        value3 : Int) {
+  }
+    func foo1(Value1 : Int,
+    Value2 : Int) {}
+    func foo3() {
+      foo(1,
+  2)
+    foo(2,
 3)
-		    foo(3,
+        foo(3,
 4)
-		}
-		func intGen() -> Int { return 0 }
-		func foo4() {
-			var a = [1,
-			2,
-						3,
-	1 + 2,
-					intGen()]
-		}
-		func foo5() {
-			var a = [1 : 1,
-						2 : 2,
-					3 + 2 : 3,
-				intGen() : intGen()]
+    }
+    func intGen() -> Int { return 0 }
+    func foo4() {
+      var a = [1,
+      2,
+            3,
+  1 + 2,
+          intGen()]
+    }
+    func foo5() {
+      var a = [1 : 1,
+            2 : 2,
+          3 + 2 : 3,
+        intGen() : intGen()]
         var b = (2,
                    3,
                      4,
                        5)
-		}
+    }
     func foo6<T1: Testable,
      T2: Testable,
            T3: Testable,
@@ -112,38 +110,38 @@ class Foo2 {
 //                        "value2 : Int,"
 // CHECK: key.sourcetext: "value3 : Int) {"
 
-//                        "		func foo1(Value1 : Int,"
-// CHECK: key.sourcetext: "		          Value2 : Int) {}"
+//                        "    func foo1(Value1 : Int,"
+// CHECK: key.sourcetext: "              Value2 : Int) {}"
 
-//                        "			foo(1,"
-// CHECK: key.sourcetext: "			    2)"
+//                        "      foo(1,"
+// CHECK: key.sourcetext: "          2)"
 
-//                        "		foo(2,"
-// CHECK: key.sourcetext: "		    3)"
+//                        "    foo(2,"
+// CHECK: key.sourcetext: "        3)"
 
-//                        "		    foo(3,"
-// CHECK: key.sourcetext: "		        4)"
+//                        "        foo(3,"
+// CHECK: key.sourcetext: "            4)"
 
-//                        "			var a = [1,"
-// CHECK: key.sourcetext: "			         2,"
+//                        "      var a = [1,"
+// CHECK: key.sourcetext: "               2,"
 
-//                        "			2,"
-// CHECK: key.sourcetext: "			3,"
+//                        "      2,"
+// CHECK: key.sourcetext: "      3,"
 
-//                        "						3,"
-// CHECK: key.sourcetext: "						1 + 2,"
+//                        "            3,"
+// CHECK: key.sourcetext: "            1 + 2,"
 
-//                        "	1 + 2,"
-// CHECK: key.sourcetext: "	intGen()]"
+//                        "  1 + 2,"
+// CHECK: key.sourcetext: "  intGen()]"
 
-//                        "			var a = [1 : 1,"
-// CHECK: key.sourcetext: "			         2 : 2,"
+//                        "      var a = [1 : 1,"
+// CHECK: key.sourcetext: "               2 : 2,"
 
-//                        "						2 : 2,"
-// CHECK: key.sourcetext: "						3 + 2 : 3,"
+//                        "            2 : 2,"
+// CHECK: key.sourcetext: "            3 + 2 : 3,"
 
-//                        "					3 + 2 : 3,"
-// CHECK: key.sourcetext: "					intGen() : intGen()]"
+//                        "          3 + 2 : 3,"
+// CHECK: key.sourcetext: "          intGen() : intGen()]"
 
 //                        "        var b = (2,"
 // CHECK: key.sourcetext: "                 3,"

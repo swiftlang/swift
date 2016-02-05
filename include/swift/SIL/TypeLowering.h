@@ -37,7 +37,6 @@ namespace swift {
   class SILBuilder;
   class SILLocation;
   class SILModule;
-  class SILValue;
   class ValueDecl;
 
 namespace Lowering {
@@ -366,11 +365,9 @@ struct SILConstantInfo {
   /// The formal type of the constant, still curried.  For a normal
   /// function, this is just its declared type; for a getter or
   /// setter, computing this can be more involved.
-  CanAnyFunctionType FormalType SIL_FUNCTION_TYPE_DEPRECATED;
   CanAnyFunctionType FormalInterfaceType;
 
   /// The uncurried and bridged type of the constant.
-  CanAnyFunctionType LoweredType SIL_FUNCTION_TYPE_DEPRECATED;
   CanAnyFunctionType LoweredInterfaceType;
 
   /// The SIL function type of the constant.
@@ -397,9 +394,7 @@ struct SILConstantInfo {
   }
 
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
-    return lhs.FormalType == rhs.FormalType &&
-           lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
-           lhs.LoweredType == rhs.LoweredType &&
+    return lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
            lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&
            lhs.SILFnType == rhs.SILFnType &&
            lhs.ContextGenericParams == rhs.ContextGenericParams &&
@@ -541,7 +536,6 @@ class TypeConverter {
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
   
-  CanAnyFunctionType makeConstantType(SILDeclRef constant);
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
   /// Get the context parameters for a constant. Returns a pair of the innermost
@@ -713,8 +707,6 @@ public:
   }
   
   /// Get a function type curried with its capture context.
-  CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                                 AnyFunctionRef closure);
   CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
                                               CanAnyFunctionType funcType,
                                               AnyFunctionRef closure);
@@ -783,16 +775,6 @@ public:
   /// interface to this function. There must be an active generic context.
   void popGenericContext(CanGenericSignature sig);
   
-  // Map a type involving context archetypes out of its context into a
-  // dependent type.
-  CanType getInterfaceTypeOutOfContext(CanType contextTy,
-                                    DeclContext *context) const;
-  
-  // Map a type involving context archetypes out of its context into a
-  // dependent type.
-  CanType getInterfaceTypeOutOfContext(CanType contextTy,
-                                    GenericParamList *contextParams) const;
-
   /// Known types for bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();

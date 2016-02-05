@@ -47,8 +47,11 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::pound_if:
-  case tok::pound_line:
     return true;
+
+  case tok::pound_line:
+    // #line at the start of a line is a directive, when within, it is an expr.
+    return Tok.isAtStartOfLine();
 
   case tok::kw_try: {
     // "try" cannot actually start any statements, but we parse it there for
@@ -819,7 +822,8 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
-  auto DRE = new (Context) DeclRefExpr(tempDecl, loc, /*Implicit*/true,
+  auto DRE = new (Context) DeclRefExpr(tempDecl, DeclNameLoc(loc),
+                                       /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
   auto args = TupleExpr::createEmpty(Context, loc, loc, true);
   auto call = new (Context) CallExpr(DRE, args, /*implicit*/true);
@@ -887,7 +891,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     }
   }
   if (parsingContext == GuardedPatternContext::Case &&
-      P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
+      P.Tok.isAny(tok::period_prefix, tok::period) &&
+      P.peekToken().is(tok::code_complete)) {
     setErrorResult();
     if (P.CodeCompletion) {
       P.consumeToken();
@@ -921,7 +926,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // matching pattern.
   if (patternResult.isNull()) {
     llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
-      T(P.InVarOrLetPattern, Parser::IVOLP_AlwaysImmutable);
+      T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
     patternResult = P.parseMatchingPattern(isExprBasic);
   }
 
@@ -1074,6 +1079,12 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
 }
 
 
+/// Return true if the specified token looks like the start of a clause in a
+/// stmt-condition.
+static bool isStartOfStmtConditionClause(const Token &Tok) {
+  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_case,tok::pound_available);
+}
+
 
 /// Parse the condition of an 'if' or 'while'.
 ///
@@ -1100,6 +1111,27 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
   SmallVector<StmtConditionElement, 4> result;
 
+  
+  // This little helper function is used to consume a separator comma if
+  // present, it returns false if it isn't there.  It also gracefully handles
+  // the case when the user used && instead of comma, since that is a common
+  // error.
+  auto consumeSeparatorComma = [&]() -> bool {
+    // If we have an "&&" token followed by a continuation of the statement
+    // condition, then fixit the "&&" to "," and keep going.
+    if (Tok.isAny(tok::oper_binary_spaced, tok::oper_binary_unspaced) &&
+        Tok.getText() == "&&") {
+      diagnose(Tok, diag::expected_comma_stmtcondition)
+        .fixItReplace(Tok.getLoc(), ",");
+      consumeToken();
+      return true;
+    }
+    
+    // Otherwise, if a comma exists consume it and succeed.
+    return consumeIf(tok::comma);
+  };
+  
+  
   if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
     auto PoundPos = consumeToken();
     auto CodeCompletionPos = consumeToken();
@@ -1122,14 +1154,14 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
     result.push_back({res.get()});
 
-    if (!consumeIf(tok::comma)) {
+    if (!consumeSeparatorComma()) {
       Condition = Context.AllocateCopy(result);
       return Status;
     }
   }
 
   // Parse the leading boolean condition if present.
-  if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case, tok::pound_available)) {
+  if (!isStartOfStmtConditionClause(Tok)) {
     ParserResult<Expr> CondExpr = parseExprBasic(ID);
     Status |= CondExpr;
     result.push_back(CondExpr.getPtrOrNull());
@@ -1137,15 +1169,16 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     // If there is a comma after the expression, parse a list of let/var
     // bindings.
     SourceLoc CommaLoc = Tok.getLoc();
-    if (!consumeIf(tok::comma)) {
+    
+    // If there is no comma then we're done.
+    if (!consumeSeparatorComma()) {
       Condition = Context.AllocateCopy(result);
       return Status;
     }
     
     // If a let-binding doesn't follow, diagnose the problem with a tailored
     // error message.
-    if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case,
-                  tok::pound_available)) {
+    if (!isStartOfStmtConditionClause(Tok)) {
       // If an { exists after the comma, assume it is a stray comma and this is
       // the start of the if/while body.  If a non-expression thing exists after
       // the comma, then we don't know what is going on.
@@ -1165,10 +1198,9 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         ParserResult<Expr> CondExpr = parseExprBasic(ID);
         Status |= CondExpr;
         result.push_back(CondExpr.getPtrOrNull());
-      } while (consumeIf(tok::comma) &&
-               Tok.isNot(tok::kw_var, tok::kw_let));
+      } while (consumeIf(tok::comma) && !isStartOfStmtConditionClause(Tok));
       
-      if (Tok.isNot(tok::kw_var, tok::kw_let)) {
+      if (!isStartOfStmtConditionClause(Tok)) {
         Condition = Context.AllocateCopy(result);
         return Status;
       }
@@ -1246,8 +1278,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       if (BindingKind == BK_Case) {
         // In our recursive parse, remember that we're in a matching pattern.
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-          T(InVarOrLetPattern, IVOLP_AlwaysImmutable);
-
+          T(InVarOrLetPattern, IVOLP_InMatchingPattern);
         ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
       } else if (BindingKind == BK_LetCase || BindingKind == BK_VarCase) {
         // Recover from the 'if let case' typo gracefully.
@@ -1265,14 +1296,9 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         }
       } else {
         // Otherwise, this is an implicit optional binding "if let".
-
-        // In our recursive parse, remember that we're in a var/let pattern.
-        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-          T(InVarOrLetPattern, IVOLP_AlwaysImmutable);
-
-        ThePattern = parseMatchingPatternAsLetOrVar(BindingKind == BK_Let,
-                                                    VarLoc,
-                                                    /*isExprBasic*/ true);
+        ThePattern =
+          parseMatchingPatternAsLetOrVar(BindingKind == BK_Let, VarLoc,
+                                         /*isExprBasic*/ true);
         // The let/var pattern is part of the statement.
         if (Pattern *P = ThePattern.getPtrOrNull())
           P->setImplicit();
@@ -1320,8 +1346,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       //    let x = foo(), y = bar()
       // Alternatively, this could be start of another clause, as in:
       //    let x = foo(), let y = bar()
-      if (peekToken().isAny(tok::kw_let, tok::kw_var, tok::kw_case,
-                            tok::pound_available))
+      if (isStartOfStmtConditionClause(peekToken()))
         break;
 
       // At this point, we know that the next thing should be a pattern to
@@ -1372,7 +1397,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       result.push_back(WhereExpr.get());
     }
 
-  } while (consumeIf(tok::comma));
+  } while (consumeSeparatorComma());
 
   Condition = Context.AllocateCopy(result);
   return Status;
@@ -1529,16 +1554,10 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     while (iOperand < numElements) {
       
       if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
-        auto name = UDREOp->getName().str();
+        auto name = UDREOp->getName().getBaseName().str();
 
         if (name.equals("||") || name.equals("&&")) {
           auto rhs = evaluateConfigConditionExpr(elements[iOperand]);
-
-          if (result.getKind() == ConfigExprKind::CompilerVersion
-              || rhs.getKind() == ConfigExprKind::CompilerVersion) {
-            diagnose(UDREOp->getLoc(), diag::cannot_combine_compiler_version);
-            return ConfigParserState::error();
-          }
 
           if (name.equals("||")) {
             result = result || rhs;
@@ -1567,7 +1586,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   
   // Evaluate a named reference expression.
   if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(configExpr)) {
-    auto name = UDRE->getName().str();
+    auto name = UDRE->getName().getBaseName().str();
     return ConfigParserState(Context.LangOpts.hasBuildConfigOption(name),
                              ConfigExprKind::DeclRef);
   }
@@ -1580,7 +1599,8 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   // Evaluate a negation (unary "!") expression.
   if (auto *PUE = dyn_cast<PrefixUnaryExpr>(configExpr)) {
     // If the PUE is not a negation expression, return false
-    auto name = cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().str();
+    auto name =
+      cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName().str();
     if (name != "!") {
       diagnose(PUE->getLoc(), diag::unsupported_build_config_unary_expression);
       return ConfigParserState::error();
@@ -1593,18 +1613,25 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   if (auto *CE = dyn_cast<CallExpr>(configExpr)) {
     // look up target config, and compare value
     auto fnNameExpr = dyn_cast<UnresolvedDeclRefExpr>(CE->getFn());
-    
+
     // Get the arg, which should be in a paren expression.
-    auto *PE = dyn_cast<ParenExpr>(CE->getArg());
-    if (!fnNameExpr || !PE) {
+    if (!fnNameExpr) {
       diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
       return ConfigParserState::error();
     }
 
-    auto fnName = fnNameExpr->getName().str();
+    auto fnName = fnNameExpr->getName().getBaseName().str();
+
+    auto *PE = dyn_cast<ParenExpr>(CE->getArg());
+    if (!PE) {
+      auto diag = diagnose(CE->getLoc(),
+                           diag::target_config_expected_one_argument);
+      return ConfigParserState::error();
+    }
 
     if (!fnName.equals("arch") && !fnName.equals("os") &&
         !fnName.equals("_runtime") &&
+        !fnName.equals("swift") &&
         !fnName.equals("_compiler_version")) {
       diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
       return ConfigParserState::error();
@@ -1613,7 +1640,7 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     if (fnName.equals("_compiler_version")) {
       if (auto SLE = dyn_cast<StringLiteralExpr>(PE->getSubExpr())) {
         if (SLE->getValue().empty()) {
-          diagnose(CE->getLoc(), diag::empty_compiler_version_string);
+          diagnose(CE->getLoc(), diag::empty_version_string);
           return ConfigParserState::error();
         }
         auto versionRequirement =
@@ -1629,11 +1656,49 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
                  "string literal");
         return ConfigParserState::error();
       }
+    } else if(fnName.equals("swift")) {
+      auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
+      if (!PUE) {
+        diagnose(PE->getSubExpr()->getLoc(),
+                 diag::unsupported_target_config_argument,
+                 "a unary comparison, such as '>=2.2'");
+        return ConfigParserState::error();
+      }
+
+      auto prefix = dyn_cast<UnresolvedDeclRefExpr>(PUE->getFn());
+      auto versionArg = PUE->getArg();
+      auto versionStartLoc = versionArg->getStartLoc();
+      auto endLoc = Lexer::getLocForEndOfToken(SourceMgr,
+                                               versionArg->getSourceRange().End);
+      CharSourceRange versionCharRange(SourceMgr, versionStartLoc,
+                                       endLoc);
+      auto versionString = SourceMgr.extractText(versionCharRange);
+
+      auto versionRequirement =
+        version::Version::parseVersionString(versionString,
+                                             versionStartLoc,
+                                             &Diags);
+
+      if (!versionRequirement.hasValue())
+        return ConfigParserState::error();
+
+      auto thisVersion = version::Version::getCurrentLanguageVersion();
+
+      if (!prefix->getName().getBaseName().str().equals(">=")) {
+        diagnose(PUE->getFn()->getLoc(),
+                 diag::unexpected_version_comparison_operator)
+          .fixItReplace(PUE->getFn()->getLoc(), ">=");
+        return ConfigParserState::error();
+      }
+
+      auto VersionNewEnough = thisVersion >= versionRequirement.getValue();
+      return ConfigParserState(VersionNewEnough,
+                               ConfigExprKind::LanguageVersion);
     } else {
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
         // tolerate extra parens).
-        auto argument = UDRE->getName().str();
+        auto argument = UDRE->getName().getBaseName().str();
 
         // Error for values that don't make sense if there's a clear definition
         // of the possible values (as there is for _runtime).
@@ -2279,10 +2344,9 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     // if desired by using a 'var' pattern.
     assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
            "for-each loops cannot exist inside other patterns");
-
-    InVarOrLetPattern = IVOLP_AlwaysImmutable;
+    InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
     pattern = parseTypedPattern();
-    assert(InVarOrLetPattern == IVOLP_AlwaysImmutable);
+    assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
     InVarOrLetPattern = IVOLP_NotInVarOrLet;
   }
   

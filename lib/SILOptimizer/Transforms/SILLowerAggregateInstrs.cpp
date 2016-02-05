@@ -74,7 +74,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   SILValue Source = CA->getSrc();
 
   // If we have an address only type don't do anything.
-  SILType SrcType = Source.getType();
+  SILType SrcType = Source->getType();
   if (SrcType.isAddressOnly(M))
     return false;
 
@@ -137,7 +137,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   SILValue Addr = DA->getOperand();
 
   // If we have an address only type, do nothing.
-  SILType Type = Addr.getType();
+  SILType Type = Addr->getType();
   if (Type.isAddressOnly(Module))
     return false;
 
@@ -156,14 +156,14 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 
 static bool expandReleaseValue(ReleaseValueInst *DV) {
   SILModule &Module = DV->getModule();
-  SILBuilderWithScope  Builder(DV);
+  SILBuilderWithScope Builder(DV);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.
   SILValue Value = DV->getOperand();
 
   // If we have an address only type, do nothing.
-  SILType Type = Value.getType();
+  SILType Type = Value->getType();
   assert(Type.isLoadable(Module) &&
          "release_value should never be called on a non-loadable type.");
 
@@ -186,7 +186,7 @@ static bool expandRetainValue(RetainValueInst *CV) {
   SILValue Value = CV->getOperand();
 
   // If we have an address only type, do nothing.
-  SILType Type = Value.getType();
+  SILType Type = Value->getType();
   assert(Type.isLoadable(Module) && "Copy Value can only be called on loadable "
          "types.");
 

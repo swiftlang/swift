@@ -24,7 +24,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 // This is included only for createLazyResolver(). Move to different header ?
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Config.h"
 
 #include "llvm/Support/MemoryBuffer.h"
@@ -666,7 +666,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
-  printModuleInterface(M, TraversalOptions, Printer, Options);
+  printModuleInterface(M, TraversalOptions, Printer, Options, false);
 
   Info.Text = OS.str();
   Info.TopEntities = std::move(Printer.TopEntities);

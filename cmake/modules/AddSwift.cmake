@@ -64,7 +64,7 @@ function(_add_variant_c_compile_link_flags
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
 
     if(analyze_code_coverage)
-      list(APPEND result "-fprofile-instr-generate=swift-%p.profraw"
+      list(APPEND result "-fprofile-instr-generate"
                          "-fcoverage-mapping")
     endif()
   endif()
@@ -111,7 +111,7 @@ function(_add_variant_c_compile_flags
   endif()
 
   if(analyze_code_coverage)
-    list(APPEND result "-fprofile-instr-generate=swift-%p.profraw"
+    list(APPEND result "-fprofile-instr-generate"
                        "-fcoverage-mapping")
   endif()
 
@@ -173,9 +173,15 @@ function(_add_variant_link_flags
       result)
 
   if("${sdk}" STREQUAL "LINUX")
-    list(APPEND result "-lpthread" "-ldl")
+    if("${arch}" STREQUAL "armv7")
+      list(APPEND result "-lpthread" "-ldl" "-Wl,-Bsymbolic")
+    elseif("${arch}" STREQUAL "armv6")
+      list(APPEND result "-lpthread" "-ldl" "-Wl,-Bsymbolic")
+    else()
+      list(APPEND result "-lpthread" "-ldl")
+    endif()
   elseif("${sdk}" STREQUAL "FREEBSD")
-    list(APPEND result "-lpthread")
+    list(APPEND result "-lpthread" "-Wl,-Bsymbolic")
   else()
     list(APPEND result "-lobjc")
   endif()
@@ -915,8 +921,12 @@ function(_add_swift_library_single target name)
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(install_name_dir "@rpath")
+
     if(SWIFTLIB_SINGLE_IS_STDLIB)
-      set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
+      # Always use @rpath for XCTest.
+      if(NOT "${module_name}" STREQUAL "XCTest")
+        set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
+      endif()
     endif()
 
     set_target_properties("${target}"
@@ -1541,6 +1551,11 @@ function(add_swift_library name)
           add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
               ${lipo_target}
               ${lipo_target_static})
+          if(NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest")
+            add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
+                ${lipo_target}
+                ${lipo_target_static})
+          endif()
         endforeach()
       endif()
     endforeach()

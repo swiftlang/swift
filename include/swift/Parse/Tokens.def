@@ -32,6 +32,13 @@
 #define STMT_KEYWORD(kw) KEYWORD(kw)
 #endif
 
+/// POUND_KEYWORD(kw)
+///   Every keyword in the #foo namespace.
+#ifndef POUND_KEYWORD
+#define POUND_KEYWORD(kw)
+#endif
+
+
 /// SIL_KEYWORD(kw)
 ///   Expands for every SIL keyword. These are only keywords when parsing SIL.
 #ifndef SIL_KEYWORD
@@ -155,9 +162,24 @@ PUNCTUATOR(question_infix,"?")    // if not left-bound
 PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
 PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 
+// Keywords in the # namespace.  "if" becomes "tok::pound_if".
+POUND_KEYWORD(if)
+POUND_KEYWORD(else)
+POUND_KEYWORD(elseif)
+POUND_KEYWORD(endif)
+POUND_KEYWORD(line)
+POUND_KEYWORD(available)
+POUND_KEYWORD(selector)
+
+POUND_KEYWORD(file)
+POUND_KEYWORD(column)
+POUND_KEYWORD(function)
+POUND_KEYWORD(dsohandle)
+
 
 #undef KEYWORD
 #undef DECL_KEYWORD
 #undef STMT_KEYWORD
 #undef SIL_KEYWORD
 #undef PUNCTUATOR
+#undef POUND_KEYWORD

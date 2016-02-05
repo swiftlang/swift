@@ -18,35 +18,35 @@ usage: nshtml2rst < NSString.html > NSString.rst
 
     # Treat <div class="declaration>...</div> as <pre>...</pre>
     html = re.sub(
-        r'<div\s+class="declaration">(.*?)</div>', 
-        r'<pre>\1</pre>', 
+        r'<div\s+class="declaration">(.*?)</div>',
+        r'<pre>\1</pre>',
         html, flags=re.MULTILINE | re.DOTALL)
 
     # Strip all attributes from <pre>...</pre> containing class="..."
     # The resulting classes confound ReST
     html = re.sub(
-        r'<pre\s[^>]*class=[^>]*>(.*?)</pre>', 
-        r'<pre>\1</pre>', 
+        r'<pre\s[^>]*class=[^>]*>(.*?)</pre>',
+        r'<pre>\1</pre>',
         html, flags=re.MULTILINE | re.DOTALL)
 
     # Remove links from <code>...</code>, which doesn't have a rendering in ReST
     html = re.sub(
-        r'<code>(.*?)<a[^>]*?>(.*?)</a>(.*?)</code>', 
-        r'<code>\1\2\3</code>', 
+        r'<code>(.*?)<a[^>]*?>(.*?)</a>(.*?)</code>',
+        r'<code>\1\2\3</code>',
         html, flags=re.MULTILINE | re.DOTALL)
 
     # Let pandoc do most of the hard work
     p = subprocess.Popen(
-        args=['pandoc', '--reference-links', '-f', 'html', '-t', 'rst']
-        , stdin=subprocess.PIPE
-        , stdout=subprocess.PIPE
+        args=['pandoc', '--reference-links', '-f', 'html', '-t', 'rst'],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE
     )
-    rst,stderr = p.communicate(html)
+    rst, stderr = p.communicate(html)
 
     # HACKETY HACK HACK: Our html documents apparently contain some
     # bogus heading level nesting.  Just fix up the one we know about
     # so that ReST doesn't complain later.
-    rst = re.sub("(^|\n)('+)($|\n)", 
+    rst = re.sub("(^|\n)('+)($|\n)",
                  lambda m: m.group(1) + len(m.group(2)) * '^' + m.group(3),
                  rst, flags=re.MULTILINE)
 

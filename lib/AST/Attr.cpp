@@ -310,6 +310,9 @@ void DeclAttribute::print(ASTPrinter &Printer,
     if (Attr->Obsoleted)
       Printer << ", obsoleted=" << Attr->Obsoleted.getValue().getAsString();
 
+    if (!Attr->Rename.empty())
+      Printer << ", renamed=\"" << Attr->Rename << "\"";
+
     // If there's no message, but this is specifically an imported
     // "unavailable in Swift" attribute, synthesize a message to look good in
     // the generated interface.

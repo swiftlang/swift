@@ -1,4 +1,4 @@
-//===--- ASTNode.cpp - Swift Language ASTs ----------------------*- C++ -*-===//
+//===--- ASTNode.cpp - Swift Language ASTs --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

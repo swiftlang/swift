@@ -20,7 +20,6 @@
 
 namespace swift {
 class SILModule;
-class SILValue;
 class SILInstruction;
 
 class DominanceAnalysis : public FunctionAnalysisBase<DominanceInfo> {

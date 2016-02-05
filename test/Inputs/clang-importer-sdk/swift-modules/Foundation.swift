@@ -221,6 +221,10 @@ extension NSError : ErrorProtocol {
   public var _code: Int { return code }
 }
 
+extension NSArray {
+  @objc(methodIntroducedInOverlay) public func introducedInOverlay() { }
+}
+
 @_silgen_name("swift_convertNSErrorToErrorProtocol")
 func _convertNSErrorToErrorProtocol(string: NSError?) -> ErrorProtocol
 

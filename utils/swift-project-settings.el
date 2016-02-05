@@ -198,7 +198,7 @@ Swift header should look like.
   ;; is non-empty, v1 all over again
   '(setq v2
          (replace-regexp-in-string "\\` +" ""
-          (if (and comment-end (> (length comment-end) 0)) comment-end  v1)))
+          (if (and comment-end (> (length comment-end) 0)) comment-end v1)))
   
   v1 "===--- "
   str & " " | -1

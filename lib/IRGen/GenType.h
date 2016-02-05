@@ -204,8 +204,8 @@ private:
     friend void TypeConverter::popGenericContext(CanGenericSignature signature);
     
 #ifndef NDEBUG
-    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *) const;
-    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *) const;
+    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
+    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
 #endif
   };
   Types_t Types;

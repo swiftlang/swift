@@ -292,7 +292,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   if (SILInstruction* I = dyn_cast<SILInstruction>(Value)) {
     auto II = InstructionMap.find(I);
     if (II != InstructionMap.end())
-      return SILValue(II->second, Value.getResultNumber());
+      return SILValue(II->second);
     llvm_unreachable("Unmapped instruction while cloning?");
   }
 
@@ -301,7 +301,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
     auto type = getOpType(U->getType());
     ValueBase *undef =
       (type == U->getType() ? U : SILUndef::get(type, Builder.getModule()));
-    return SILValue(undef, Value.getResultNumber());
+    return SILValue(undef);
   }
 
   llvm_unreachable("Unmapped value while cloning?");
@@ -1270,7 +1270,7 @@ SILCloner<ImplClass>::
 visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   // Create a new archetype for this opened existential type.
   CanType openedType = Inst->getType().getSwiftRValueType();
-  CanType exType = Inst->getOperand().getType().getSwiftRValueType();
+  CanType exType = Inst->getOperand()->getType().getSwiftRValueType();
   while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
     exType = exMetatype.getInstanceType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
@@ -1279,7 +1279,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   OpenedExistentialSubs[archetypeTy] 
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
-  if (!Inst->getOperand().getType().canUseExistentialRepresentation(
+  if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
           Inst->getModule(), ExistentialRepresentation::Class)) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createOpenExistentialMetatype(

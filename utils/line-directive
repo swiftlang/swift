@@ -21,8 +21,7 @@ import re
 import bisect
 import subprocess
 
-line_pattern = re.compile(
- r'^// ###line ([0-9]+) "([^"]+)"\s*')
+line_pattern = re.compile(r'^// ###line ([0-9]+) "([^"]+)"\s*')
 
 def _make_line_map(filename, stream=None):
     """
@@ -58,7 +57,7 @@ def fline_map(filename):
 def map_line(filename, line_num):
     assert(line_num > 0)
     map = fline_map(filename)
-    index = bisect.bisect_left(map, (line_num,'',0))
+    index = bisect.bisect_left(map, (line_num, '', 0))
     base = map[index - 1]
     return base[1], base[2] + (line_num - base[0] - 1)
 
@@ -72,11 +71,11 @@ def run():
 
         command = subprocess.Popen(
             sys.argv[dashes + 1:],
-            stderr = subprocess.STDOUT,
-            stdout = subprocess.PIPE,
-            universal_newlines = True
+            stderr=subprocess.STDOUT,
+            stdout=subprocess.PIPE,
+            universal_newlines=True
         )
-        
+
         error_pattern = re.compile(
             '^(' + '|'.join(re.escape(s) for s in sources) + '):([0-9]+):([0-9]+):(.*)')
 
@@ -85,7 +84,8 @@ def run():
 
         while True:
             line = command.stdout.readline()
-            if line == '': break
+            if line == '':
+                break
             l = line.rstrip('\n')
             m = error_pattern.match(l)
             if m:
@@ -93,12 +93,12 @@ def run():
                 line = '%s:%s:%s:%s\n' % (file, line_num, int(m.group(3)), m.group(4))
             else:
                 m = assertion_pattern.match(l)
-                if m: 
+                if m:
                     file, line_num = map_line(m.group(3), int(m.group(5)))
                     line = '%s%s %s%s%s%s\n' % (m.group(1), m.group(2), file, m.group(4), line_num, m.group(6))
             sys.stdout.write(line)
-        
+
         sys.exit(command.wait())
-        
+
 if __name__ == '__main__':
     run()

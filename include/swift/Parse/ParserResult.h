@@ -222,6 +222,7 @@ enum class ConfigExprKind {
   Error,
   OS,
   Arch,
+  LanguageVersion,
   CompilerVersion,
   Binary,
   Paren,
@@ -261,7 +262,9 @@ public:
   bool shouldParse() const {
     if (Kind == ConfigExprKind::Error)
       return true;
-    return ConditionActive || (Kind != ConfigExprKind::CompilerVersion);
+    return ConditionActive ||
+      (Kind != ConfigExprKind::CompilerVersion &&
+       Kind != ConfigExprKind::LanguageVersion);
   }
 
   static ConfigParserState error() {

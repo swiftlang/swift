@@ -8,6 +8,7 @@
 % import gyb
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 import SwiftPrivate
 
 // Also import modules which are used by StdlibUnittest internally. This
@@ -606,6 +607,42 @@ SequenceTypeTests.test("Set<T>.contains/CustomImplementation/${dispatch}") {
 }
 
 % end
+
+SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/staticDispatch") {
+  let start = 10
+  let end = 20
+  let range: Range<MinimalComparableIndexValue> =
+    MinimalComparableIndexValue(start)..<MinimalComparableIndexValue(end)
+  expectEqual(
+    1, MinimalComparableIndexValue.timesLessWasCalled.value)
+  let count = 30
+  for test in 0..<count {
+    expectEqual(
+      test >= start && test < end,
+      range.contains(MinimalComparableIndexValue(test)))
+  }
+  expectEqual(
+    51, MinimalComparableIndexValue.timesLessWasCalled.value)
+}
+
+SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/dispatch") {
+  let start = 10
+  let end = 20
+  let range: Range<MinimalComparableIndexValue> =
+    MinimalComparableIndexValue(start)..<MinimalComparableIndexValue(end)
+  expectEqual(
+    1, MinimalComparableIndexValue.timesLessWasCalled.value)
+  let count = 30
+  for test in 0..<count {
+    expectEqual(
+      test >= start && test < end,
+      LoggingCollection(range).contains(MinimalComparableIndexValue(test)))
+  }
+  // Dispatch through a protocol does not get the optimization because the
+  // custom contains method is not getting into the witness table.
+  expectEqual(
+    1, MinimalComparableIndexValue.timesLessWasCalled.value)
+}
 
 SequenceTypeTests.test("contains/Predicate") {
   for test in findTests {

@@ -30,7 +30,7 @@
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -652,14 +652,10 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-/// We pass in a vector of nested GenericParamLists and a vector of
-/// ArchetypeBuilders with the innermost GenericParamList in the beginning
-/// of the vector.
-bool swift::handleSILGenericParams(ASTContext &Ctx,
-              SmallVectorImpl<GenericParamList *> &gps,
-              DeclContext *DC,
-              SmallVectorImpl<ArchetypeBuilder *> &builders) {
-  return TypeChecker(Ctx).handleSILGenericParams(builders, gps, DC);
+GenericSignature *swift::handleSILGenericParams(ASTContext &Ctx,
+                                                GenericParamList *genericParams,
+                                                DeclContext *DC) {
+  return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
 bool swift::typeCheckCompletionDecl(Decl *D) {
@@ -940,13 +936,13 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    VersionRange DeclVersionRange =
+    AvailabilityContext DeclInfo =
         swift::AvailabilityInference::availableRange(D, TC.Context);
-    DeclVersionRange.intersectWith(getCurrentTRC()->getPotentialVersions());
-    
+    DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(TC.Context, D, getCurrentTRC(),
-                                             DeclVersionRange,
+                                             DeclInfo,
                                              refinementSourceRangeForDecl(D));
     
     // Record the TRC for this storage declaration so that
@@ -994,9 +990,17 @@ private:
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
-      if (storageDecl->hasAccessorFunctions()) {
+
+      // HACK: For synthesized trivial accessors we may have not a valid
+      // location for the end of the braces, so in that case we will fall back
+      // to using the range for the storage declaration. The right fix here is
+      // to update AbstractStorageDecl::addTrivialAccessors() to take brace
+      // locations and have callers of that method provide appropriate source
+      // locations.
+      SourceLoc BracesEnd = storageDecl->getBracesRange().End;
+      if (storageDecl->hasAccessorFunctions() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
-                           storageDecl->getBracesRange().End);
+                           BracesEnd);
       }
       
       // For a variable declaration (without accessors) we use the range of the
@@ -1048,8 +1052,8 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildIfStmtRefinementContext(IfStmt *IS) {
-    Optional<VersionRange> ThenRange;
-    Optional<VersionRange> ElseRange;
+    Optional<AvailabilityContext> ThenRange;
+    Optional<AvailabilityContext> ElseRange;
     std::tie(ThenRange, ElseRange) =
         buildStmtConditionRefinementContext(IS->getCond());
 
@@ -1094,7 +1098,7 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildWhileStmtRefinementContext(WhileStmt *WS) {
-    Optional<VersionRange> BodyRange =
+    Optional<AvailabilityContext> BodyRange =
         buildStmtConditionRefinementContext(WS->getCond()).first;
 
     if (BodyRange.hasValue()) {
@@ -1124,8 +1128,8 @@ private:
     // This is slightly tricky because, unlike our other control constructs,
     // the refined region is not lexically contained inside the construct
     // introducing the refinement context.
-    Optional<VersionRange> FallthroughRange;
-    Optional<VersionRange> ElseRange;
+    Optional<AvailabilityContext> FallthroughRange;
+    Optional<AvailabilityContext> ElseRange;
     std::tie(FallthroughRange, ElseRange) =
         buildStmtConditionRefinementContext(GS->getCond());
 
@@ -1158,7 +1162,7 @@ private:
   /// of optional version ranges, the first for the true branch and the second
   /// for the false branch. A value of None for a given branch indicates that
   /// the branch does not introduce a new refinement.
-  std::pair<Optional<VersionRange>, Optional<VersionRange>>
+  std::pair<Optional<AvailabilityContext>, Optional<AvailabilityContext>>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
 
     // Any refinement contexts introduced in the statement condition
@@ -1171,13 +1175,13 @@ private:
     unsigned NestedCount = 0;
 
     // Tracks the potential version range when the condition is false.
-    VersionRange FalseFlow = VersionRange::empty();
+    auto FalseFlow = AvailabilityContext::neverAvailable();
 
     TypeRefinementContext *StartingTRC = getCurrentTRC();
 
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
-      const VersionRange CurrentRange = CurrentTRC->getPotentialVersions();
+      AvailabilityContext CurrentInfo = CurrentTRC->getAvailabilityInfo();
 
       // If the element is not a condition, walk it in the current TRC.
       if (Element.getKind() != StmtConditionElement::CK_Availability) {
@@ -1186,7 +1190,7 @@ private:
         // potentially be false, so conservatively combine the version
         // range of the current context with the accumulated false flow
         // of all other conjuncts.
-        FalseFlow.unionWith(CurrentRange);
+        FalseFlow.unionWith(CurrentInfo);
 
         Element.walk(*this);
         continue;
@@ -1214,8 +1218,8 @@ private:
         continue;
       }
 
-      VersionRange Range = rangeForSpec(Spec);
-      Query->setAvailableRange(Range);
+      AvailabilityContext NewConstraint = contextForSpec(Spec);
+      Query->setAvailableRange(NewConstraint.getOSVersion());
 
       if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
         // The wildcard spec '*' represents the minimum deployment target, so
@@ -1230,7 +1234,7 @@ private:
       // If the version range for the current TRC is completely contained in
       // the range for the spec, then a version query can never be false, so the
       // spec is useless. If so, report this.
-      if (CurrentRange.isContainedIn(Range)) {
+      if (CurrentInfo.isContainedIn(NewConstraint)) {
         DiagnosticEngine &Diags = TC.Diags;
         if (CurrentTRC->getReason() == TypeRefinementContext::Reason::Root) {
           // Diagnose for checks that are useless because the minimum deployment
@@ -1262,27 +1266,27 @@ private:
       // context.
       // We could be more precise here if we enriched the lattice to include
       // ranges of the form [x, y).
-      FalseFlow.unionWith(CurrentRange);
+      FalseFlow.unionWith(CurrentInfo);
 
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          TC.Context, Query, LastElement, CurrentTRC, Range);
+          TC.Context, Query, LastElement, CurrentTRC, NewConstraint);
 
       pushContext(TRC, ParentTy());
       NestedCount++;
     }
 
 
-    Optional<VersionRange> FalseRefinement = None;
+    Optional<AvailabilityContext> FalseRefinement = None;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
-    assert(FalseFlow.isContainedIn(StartingTRC->getPotentialVersions()));
+    assert(FalseFlow.isContainedIn(StartingTRC->getAvailabilityInfo()));
 
     // If the starting version range is not completely contained in the
     // false flow version range then it must be the case that false flow range
     // is strictly smaller than the starting range (because the false flow
     // range *is* contained in the starting range), so we should introduce a
     // new refinement for the false flow.
-    if (!StartingTRC->getPotentialVersions().isContainedIn(FalseFlow)) {
+    if (!StartingTRC->getAvailabilityInfo().isContainedIn(FalseFlow)) {
       FalseRefinement = FalseFlow;
     }
 
@@ -1295,7 +1299,7 @@ private:
 
     assert(getCurrentTRC() == StartingTRC);
 
-    return std::make_pair(NestedTRC->getPotentialVersions(), FalseRefinement);
+    return std::make_pair(NestedTRC->getAvailabilityInfo(), FalseRefinement);
   }
 
   /// Return the best active spec for the target platform or nullptr if no
@@ -1326,14 +1330,14 @@ private:
     return FoundOtherSpec;
   }
 
-  /// Return the version range for the given availability spec.
-  VersionRange rangeForSpec(AvailabilitySpec *Spec) {
+  /// Return the availability context for the given spec.
+  AvailabilityContext contextForSpec(AvailabilitySpec *Spec) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
-      return VersionRange::allGTE(TC.getLangOpts().getMinPlatformVersion());
+      return AvailabilityContext::alwaysAvailable();
     }
 
     auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
-    return VersionRange::allGTE(VersionSpec->getVersion());
+    return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 
   virtual Expr *walkToExprPost(Expr *E) override {
@@ -1361,9 +1365,9 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
     // platform version.
-    auto VersionRange =
-        VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion());
-    RootTRC = TypeRefinementContext::createRoot(&SF, VersionRange);
+    AvailabilityContext MinPlatformReq{
+        VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion())};
+    RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
 
@@ -1386,9 +1390,9 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   return TRC;
 }
 
-VersionRange
-TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
-                                                 const DeclContext *DC) {
+AvailabilityContext
+TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
+                                                   const DeclContext *DC) {
   SourceFile *SF = DC->getParentSourceFile();
 
   // If our source location is invalid (this may be synthesized code), climb
@@ -1406,8 +1410,8 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
   // this will be a real problem.
 
   // We can assume we are running on at least the minimum deployment target.
-  VersionRange OverApproximateVersionRange =
-      VersionRange::allGTE(getLangOpts().getMinPlatformVersion());
+  AvailabilityContext OverApproximateContext{
+    VersionRange::allGTE(getLangOpts().getMinPlatformVersion())};
 
   while (DC && loc.isInvalid()) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
@@ -1416,11 +1420,11 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
 
     loc = D->getLoc();
 
-    Optional<VersionRange> Range =
+    Optional<AvailabilityContext> Info =
         AvailabilityInference::annotatedAvailableRange(D, Context);
 
-    if (Range.hasValue()) {
-      OverApproximateVersionRange.constrainWith(Range.getValue());
+    if (Info.hasValue()) {
+      OverApproximateContext.constrainWith(Info.getValue());
     }
 
     DC = D->getDeclContext();
@@ -1430,28 +1434,28 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
     TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
     TypeRefinementContext *TRC =
         rootTRC->findMostRefinedSubContext(loc, Context.SourceMgr);
-    OverApproximateVersionRange.constrainWith(TRC->getPotentialVersions());
+    OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
   }
 
-  return OverApproximateVersionRange;
+  return OverApproximateContext;
 }
 
 bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
                                   const DeclContext *referenceDC,
-                                  VersionRange &OutAvailableRange) {
+                                  AvailabilityContext &OutAvailableInfo) {
 
-  VersionRange safeRangeUnderApprox =
-      AvailabilityInference::availableRange(D, Context);
-  VersionRange runningOSOverApprox = overApproximateOSVersionsAtLocation(
-      referenceLoc, referenceDC);
-  
+  AvailabilityContext safeRangeUnderApprox{
+      AvailabilityInference::availableRange(D, Context)};
+  AvailabilityContext runningOSOverApprox =
+      overApproximateAvailabilityAtLocation(referenceLoc, referenceDC);
+
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation
   // of the versions on which the declaration is available. If this
   // containment cannot be guaranteed, we say the reference is
   // not available.
   if (!(runningOSOverApprox.isContainedIn(safeRangeUnderApprox))) {
-    OutAvailableRange = safeRangeUnderApprox;
+    OutAvailableInfo = safeRangeUnderApprox;
     return false;
   }
   
@@ -1471,13 +1475,14 @@ TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
     return None;
   }
 
-  VersionRange safeRangeUnderApprox = VersionRange::empty();
+  auto safeRangeUnderApprox = AvailabilityContext::neverAvailable();
   if (isDeclAvailable(D, referenceLoc, referenceDC, safeRangeUnderApprox)) {
     return None;
   }
 
   // safeRangeUnderApprox now holds the safe range.
-  return UnavailabilityReason::requiresVersionRange(safeRangeUnderApprox);
+  VersionRange version = safeRangeUnderApprox.getOSVersion();
+  return UnavailabilityReason::requiresVersionRange(version);
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
@@ -1796,7 +1801,7 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// declaration context containing the reference, make a best effort find up to
 /// three locations for potential fixits.
 ///
-/// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
+/// \param FoundVersionCheckNode Returns a node that can be wrapped in a
 /// if #available(...) { ... } version check to fix the unavailable reference,
 /// or None if such a node cannot be found.
 ///
@@ -2221,9 +2226,9 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
   }
 
   if (!Context.LangOpts.DisableAvailabilityChecking) {
-    VersionRange RunningOSVersions =
-    overApproximateOSVersionsAtLocation(ReferenceRange.Start, ReferenceDC);
-    if (RunningOSVersions.isEmpty()) {
+    AvailabilityContext RunningOSVersions =
+        overApproximateAvailabilityAtLocation(ReferenceRange.Start,ReferenceDC);
+    if (RunningOSVersions.isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.
@@ -2282,7 +2287,7 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName());
+  checkForForbiddenPrefix(E->getName().getBaseName());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

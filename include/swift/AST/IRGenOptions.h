@@ -130,6 +130,12 @@ public:
   unsigned HasValueNamesSetting : 1;
   unsigned ValueNames : 1;
 
+  /// Only strip the field names section from nominal type field metadata.
+  unsigned StripReflectionNames : 1;
+
+  /// Strip all nominal type field metadata.
+  unsigned StripReflectionMetadata : 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
@@ -140,15 +146,26 @@ public:
                    DisableFPElim(true), Playground(false),
                    EmitStackPromotionChecks(false), GenerateProfile(false),
                    EmbedMode(IRGenEmbedMode::None),
-                   HasValueNamesSetting(false), ValueNames(false)
+                   HasValueNamesSetting(false), ValueNames(false),
+                   StripReflectionNames(true), StripReflectionMetadata(true)
                    {}
-  
+
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {
     if (OutputFilenames.size() >= 1)
       return OutputFilenames.back();
     return StringRef();
+  }
+
+  // Get a hash of all options which influence the llvm compilation but are not
+  // reflected in the llvm module itself.
+  unsigned getLLVMCodeGenOptionsHash() {
+    unsigned Hash = 0;
+    Hash = (Hash << 1) | Optimize;
+    Hash = (Hash << 1) | DisableLLVMOptzns;
+    Hash = (Hash << 1) | DisableLLVMARCOpts;
+    return Hash;
   }
 };
 

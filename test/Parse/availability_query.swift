@@ -17,7 +17,7 @@ if !#available(OSX 10.52, *) { // expected-error {{#available may only be used a
 if let _ = Optional(5) where !#available(OSX 10.52, *) { // expected-error {{#available may only be used as condition}}
 }
 
-if #available(OSX 10.51, *) && #available(OSX 10.52, *) { // expected-error {{expected '{' after 'if' condition}} expected-error 3 {{}} expected-note {{}} {{57-57=_ = }}
+if #available(OSX 10.51, *) && #available(OSX 10.52, *) { // expected-error {{expected ',' joining parts of a multi-clause condition}} {{29-31=,}}
 }
 
 

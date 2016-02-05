@@ -69,7 +69,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
   if (auto *Ex0 = dyn_cast<StructExtractInst>(SI->getOperand(0))) {
     // Check that the constructed struct and the extracted struct are of the
     // same type.
-    if (SI->getType() != Ex0->getOperand().getType())
+    if (SI->getType() != Ex0->getOperand()->getType())
       return SILValue();
 
     // Check that all of the operands are extracts of the correct kind.
@@ -104,7 +104,7 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
   if (auto *Ex0 = dyn_cast<TupleExtractInst>(TI->getOperand(0))) {
     // Check that the constructed tuple and the extracted tuple are of the
     // same type.
-    if (TI->getType() != Ex0->getOperand().getType())
+    if (TI->getType() != Ex0->getOperand()->getType())
       return SILValue();
 
     // Check that all of the operands are extracts of the correct kind.
@@ -183,7 +183,7 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   // Same enum elements don't necessarily imply same enum types.
   // Enum types may be different if the enum is generic, e.g.
   // E<Int>.Case and E<Double>.Case.
-  SILType OriginalEnum = EnumOp.getType();
+  SILType OriginalEnum = EnumOp->getType();
   SILType NewEnum = EI->getType();
 
   if (OriginalEnum != NewEnum)
@@ -195,7 +195,7 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
 SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
 
   auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
-  if (EI && EI->getType() == SEI->getEnumOperand().getType()) {
+  if (EI && EI->getType() == SEI->getEnumOperand()->getType()) {
     // Simplify a select_enum on an enum instruction.
     //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
     //   %28 = integer_literal $Builtin.Int1, -1
@@ -242,7 +242,7 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
     auto Case = SEI->getUniqueCaseForDestination(EI->getParent());
 
     if (Case && Case.getPtrOrNull() == EI->getElement() &&
-        SEI->getOperand().getType() == EI->getType()) {
+        SEI->getOperand()->getType() == EI->getType()) {
       return SEI->getOperand();
     }
 
@@ -262,7 +262,7 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
     return SILValue();
 
   if (auto *SEI = dyn_cast<SwitchEnumInst>(Pred->getTerminator())) {
-    if (EI->getType() != SEI->getOperand().getType())
+    if (EI->getType() != SEI->getOperand()->getType())
       return SILValue();
 
     if (EI->getElement() == SEI->getUniqueCaseForDestination(BB).getPtrOrNull())
@@ -275,7 +275,7 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
 SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
   // (address_to_pointer (pointer_to_address x)) -> x
   if (auto *PTAI = dyn_cast<PointerToAddressInst>(ATPI->getOperand()))
-    if (PTAI->getType() == ATPI->getOperand().getType())
+    if (PTAI->getType() == ATPI->getOperand()->getType())
       return PTAI->getOperand();
 
   return SILValue();
@@ -284,7 +284,7 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   // (pointer_to_address (address_to_pointer x)) -> x
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
-    if (ATPI->getOperand().getType() == PTAI->getType())
+    if (ATPI->getOperand()->getType() == PTAI->getType())
       return ATPI->getOperand();
 
   return SILValue();
@@ -307,7 +307,7 @@ InstSimplifier::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
   if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
-    if (UCCI->getType() == upcast->getOperand().getType())
+    if (UCCI->getType() == upcast->getOperand()->getType())
       return upcast->getOperand();
 
   return SILValue();
@@ -318,21 +318,21 @@ InstSimplifier::
 visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
   // (unchecked-ref-cast Y->X (unchecked-ref-cast x X->Y)) -> x
   if (auto *ROPI = dyn_cast<UncheckedRefCastInst>(&*OPRI->getOperand()))
-    if (ROPI->getOperand().getType() == OPRI->getType())
+    if (ROPI->getOperand()->getType() == OPRI->getType())
       return ROPI->getOperand();
 
   // (unchecked-ref-cast Y->X (upcast x X->Y)) -> x
   if (auto *UI = dyn_cast<UpcastInst>(OPRI->getOperand()))
-    if (UI->getOperand().getType() == OPRI->getType())
+    if (UI->getOperand()->getType() == OPRI->getType())
       return UI->getOperand();
 
   // (unchecked-ref-cast Y->X (open_existential_ref x X->Y)) -> x
   if (auto *OER = dyn_cast<OpenExistentialRefInst>(OPRI->getOperand()))
-    if (OER->getOperand().getType() == OPRI->getType())
+    if (OER->getOperand()->getType() == OPRI->getType())
       return OER->getOperand();
 
   // (unchecked-ref-cast X->X x) -> x
-  if (OPRI->getOperand().getType() == OPRI->getType())
+  if (OPRI->getOperand()->getType() == OPRI->getType())
     return OPRI->getOperand();
 
   return SILValue();
@@ -343,11 +343,11 @@ InstSimplifier::
 visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI) {
   // (unchecked-addr-cast Y->X (unchecked-addr-cast x X->Y)) -> x
   if (auto *OtherUACI = dyn_cast<UncheckedAddrCastInst>(&*UACI->getOperand()))
-    if (OtherUACI->getOperand().getType() == UACI->getType())
+    if (OtherUACI->getOperand()->getType() == UACI->getType())
       return OtherUACI->getOperand();
 
   // (unchecked-addr-cast X->X x) -> x
-  if (UACI->getOperand().getType() == UACI->getType())
+  if (UACI->getOperand()->getType() == UACI->getType())
     return UACI->getOperand();
 
   return SILValue();
@@ -356,7 +356,7 @@ visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI) {
 SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   // (upcast Y->X (unchecked-ref-cast x X->Y)) -> x
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(UI->getOperand()))
-    if (URCI->getOperand().getType() == UI->getType())
+    if (URCI->getOperand()->getType() == UI->getType())
       return URCI->getOperand();
 
   return SILValue();
@@ -365,7 +365,7 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
 SILValue
 InstSimplifier::visitRefToUnownedInst(RefToUnownedInst *RUI) {
   if (auto *URI = dyn_cast<UnownedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand().getType() == RUI->getType())
+    if (URI->getOperand()->getType() == RUI->getType())
       return URI->getOperand();
 
   return SILValue();
@@ -374,7 +374,7 @@ InstSimplifier::visitRefToUnownedInst(RefToUnownedInst *RUI) {
 SILValue
 InstSimplifier::visitUnownedToRefInst(UnownedToRefInst *URI) {
   if (auto *RUI = dyn_cast<RefToUnownedInst>(URI->getOperand()))
-    if (RUI->getOperand().getType() == URI->getType())
+    if (RUI->getOperand()->getType() == URI->getType())
       return RUI->getOperand();
 
   return SILValue();
@@ -383,7 +383,7 @@ InstSimplifier::visitUnownedToRefInst(UnownedToRefInst *URI) {
 SILValue
 InstSimplifier::visitRefToUnmanagedInst(RefToUnmanagedInst *RUI) {
   if (auto *URI = dyn_cast<UnmanagedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand().getType() == RUI->getType())
+    if (URI->getOperand()->getType() == RUI->getType())
       return URI->getOperand();
 
   return SILValue();
@@ -392,7 +392,7 @@ InstSimplifier::visitRefToUnmanagedInst(RefToUnmanagedInst *RUI) {
 SILValue
 InstSimplifier::visitUnmanagedToRefInst(UnmanagedToRefInst *URI) {
   if (auto *RUI = dyn_cast<RefToUnmanagedInst>(URI->getOperand()))
-    if (RUI->getOperand().getType() == URI->getType())
+    if (RUI->getOperand()->getType() == URI->getType())
       return RUI->getOperand();
 
   return SILValue();
@@ -402,12 +402,12 @@ SILValue
 InstSimplifier::
 visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   // (unchecked_trivial_bit_cast X->X x) -> x
-  if (UTBCI->getOperand().getType() == UTBCI->getType())
+  if (UTBCI->getOperand()->getType() == UTBCI->getType())
     return UTBCI->getOperand();
 
   // (unchecked_trivial_bit_cast Y->X (unchecked_trivial_bit_cast X->Y x)) -> x
   if (auto *Op = dyn_cast<UncheckedTrivialBitCastInst>(UTBCI->getOperand()))
-    if (Op->getOperand().getType() == UTBCI->getType())
+    if (Op->getOperand()->getType() == UTBCI->getType())
       return Op->getOperand();
 
   return SILValue();
@@ -417,13 +417,13 @@ SILValue
 InstSimplifier::
 visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   // (unchecked_bitwise_cast X->X x) -> x
-  if (UBCI->getOperand().getType() == UBCI->getType())
+  if (UBCI->getOperand()->getType() == UBCI->getType())
     return UBCI->getOperand();
 
   // A round-trip cast implies X and Y have the same size:
   // (unchecked_bitwise_cast Y->X (unchecked_bitwise_cast X->Y x)) -> x
   if (auto *Op = dyn_cast<UncheckedBitwiseCastInst>(UBCI->getOperand()))
-    if (Op->getOperand().getType() == UBCI->getType())
+    if (Op->getOperand()->getType() == UBCI->getType())
       return Op->getOperand();
 
   return SILValue();
@@ -432,7 +432,7 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
 SILValue InstSimplifier::visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI) {
   // (thin_function_to_pointer (pointer_to_thin_function x)) -> x
   if (auto *PTTFI = dyn_cast<PointerToThinFunctionInst>(TFTPI->getOperand()))
-    if (PTTFI->getOperand().getType() == TFTPI->getType())
+    if (PTTFI->getOperand()->getType() == TFTPI->getType())
       return PTTFI->getOperand();
 
   return SILValue();
@@ -441,7 +441,7 @@ SILValue InstSimplifier::visitThinFunctionToPointerInst(ThinFunctionToPointerIns
 SILValue InstSimplifier::visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI) {
   // (pointer_to_thin_function (thin_function_to_pointer x)) -> x
   if (auto *TFTPI = dyn_cast<ThinFunctionToPointerInst>(PTTFI->getOperand()))
-    if (TFTPI->getOperand().getType() == PTTFI->getType())
+    if (TFTPI->getOperand()->getType() == PTTFI->getType())
       return TFTPI->getOperand();
 
   return SILValue();
@@ -479,7 +479,7 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
     // trunc(extOrBitCast(x)) -> x
     if (match(Op, m_ExtOrBitCast(m_SILValue(Result)))) {
       // Truncated back to the same bits we started with.
-      if (Result.getType() == BI->getType())
+      if (Result->getType() == BI->getType())
         return Result;
     }
 
@@ -489,7 +489,7 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
                      m_ExtOrBitCast(m_SILValue(Result))), 0))) {
       // If the top bit of Result is known to be 0, then
       // it is safe to replace the whole pattern by original bits of x
-      if (Result.getType() == BI->getType()) {
+      if (Result->getType() == BI->getType()) {
         if (auto signBit = computeSignBit(Result))
           if (!signBit.getValue())
             return Result;
@@ -513,11 +513,11 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
                                                m_SILValue(val2)))))) {
 
       if (val2 == val3)
-        return val1.getDef();
+        return val1;
       if (val1 == val3)
-        return val2.getDef();
+        return val2;
       if (val1 == val2)
-        return val3.getDef();
+        return val3;
     }
   }
   }
@@ -629,7 +629,7 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
     SILValue Result;
     // CheckedConversion(ExtOrBitCast(x)) -> x
     if (match(BI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
-      if (Result.getType() == BI->getType().getTupleElementType(0)) {
+      if (Result->getType() == BI->getType().getTupleElementType(0)) {
         assert (!computeSignBit(Result).getValue() && "Sign bit should be 0");
         return Result;
       }
@@ -643,7 +643,7 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
     SILValue Result;
     // CheckedTrunc(Ext(x)) -> x
     if (match(BI, m_CheckedTrunc(m_Ext(m_SILValue(Result)))))
-      if (Result.getType() == BI->getType().getTupleElementType(0))
+      if (Result->getType() == BI->getType().getTupleElementType(0))
         if (auto signBit = computeSignBit(Result))
           if (!signBit.getValue())
             return Result;

@@ -231,7 +231,7 @@ public:
   /// Otherwise, return nullptr.
   Decl *importDeclCached(const clang::NamedDecl *ClangDecl);
 
-  /// Returns true if it is expected that the macro is ignored.
+  // Returns true if it is expected that the macro is ignored.
   bool shouldIgnoreMacro(StringRef Name, const clang::MacroInfo *Macro);
 
   /// Returns the name of the given enum element as it would be imported into

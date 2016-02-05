@@ -324,6 +324,24 @@ public:
   /// list.
   ArrayRef<ArchetypeType *> getAllArchetypes();
   
+  /// Map an interface type to a contextual type.
+  static Type mapTypeIntoContext(DeclContext *dc, Type type,
+                                 LazyResolver *resolver = nullptr);
+
+  /// Map an interface type to a contextual type.
+  static Type mapTypeIntoContext(ModuleDecl *M,
+                                 GenericParamList *genericParams,
+                                 Type type,
+                                 LazyResolver *resolver = nullptr);
+
+  /// Map a contextual type to an interface type.
+  static Type mapTypeOutOfContext(DeclContext *dc, Type type);
+
+  /// Map a contextual type to an interface type.
+  static Type mapTypeOutOfContext(ModuleDecl *M,
+                                  GenericParamList *genericParams,
+                                  Type type);
+
   using SameTypeRequirement
     = std::pair<PotentialArchetype *,
                 PointerUnion<Type, PotentialArchetype*>>;
@@ -335,18 +353,6 @@ public:
   // FIXME: Compute the set of 'extra' witness tables needed to express this
   // requirement set.
 
-  /// Map the given type, which is based on an interface type and may therefore
-  /// be dependent, to a type based on the archetypes of the given declaration
-  /// context.
-  ///
-  /// \param dc The declaration context in which we should perform the mapping.
-  /// \param type The type to map into the given declaration context.
-  ///
-  /// \returns the mapped type, which will involve archetypes rather than
-  /// dependent types.
-  static Type mapTypeIntoContext(DeclContext *dc, Type type,
-                                 LazyResolver *resolver = nullptr);
-  
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
@@ -354,12 +360,6 @@ public:
 
   /// Dump all of the requirements to the given output stream.
   void dump(llvm::raw_ostream &out);
-
-  /// FIXME: Share the guts of our mapTypeIntoContext implementation with
-  static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericParamList *genericParams,
-                                 Type type,
-                                 LazyResolver *resolver = nullptr);
 
   // In SILFunction.cpp:
   

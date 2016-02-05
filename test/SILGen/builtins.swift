@@ -66,11 +66,11 @@ func move_gen<T>(x: Builtin.RawPointer) -> T {
 // CHECK-LABEL: sil hidden @_TF8builtins11destroy_pod
 func destroy_pod(x: Builtin.RawPointer) {
   var x = x
-  // CHECK: [[X:%[0-9]+]] = alloc_box
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box
   // CHECK-NOT: pointer_to_address
   // CHECK-NOT: destroy_addr
   // CHECK-NOT: release
-  // CHECK: release [[X]] : $@box
+  // CHECK: release [[XBOX]] : $@box
   // CHECK-NOT: release
   return Builtin.destroy(Builtin.Int64, x)
   // CHECK: return

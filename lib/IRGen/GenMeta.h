@@ -120,6 +120,12 @@ namespace irgen {
 
   /// Emit the metadata associated with the given enum declaration.
   void emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum);
+
+  /// Get what will be the index into the generic type argument array at the end
+  /// of a nominal type's metadata.
+  int32_t getIndexOfGenericArgument(IRGenModule &IGM,
+                                    NominalTypeDecl *decl,
+                                    ArchetypeType *archetype);
   
   /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to the parent type metadata.  There must be a
@@ -271,16 +277,16 @@ namespace irgen {
 
     /// There is no unique accessor function for the given type metadata, but
     /// one should be made automatically.
-    NonUniqueAccessor,
-
-    /// The given type metadata should be accessed directly.
-    Direct,
+    NonUniqueAccessor
   };
+
+  /// Is it basically trivial to access the given metadata?  If so, we don't
+  /// need a cache variable in its accessor.
+  bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type);
 
   /// Determine how the given type metadata should be accessed.
   MetadataAccessStrategy getTypeMetadataAccessStrategy(IRGenModule &IGM,
-                                                       CanType type,
-                                                       bool preferDirectAccess);
+                                                       CanType type);
   
   /// Return the address of a function that will return type metadata 
   /// for the given non-dependent type.

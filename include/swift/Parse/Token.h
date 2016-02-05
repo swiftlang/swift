@@ -38,16 +38,11 @@ enum class tok {
   floating_literal,
   string_literal,
   sil_local_name,      // %42 in SIL mode.
-  pound_if,
-  pound_else,
-  pound_elseif,
-  pound_endif,
-  pound_line,
-  pound_available,
   comment,
   
 #define KEYWORD(X) kw_ ## X,
 #define PUNCTUATOR(X, Y) X,
+#define POUND_KEYWORD(X) pound_ ## X,
 #include "swift/Parse/Tokens.def"
   
   NUM_TOKENS
@@ -261,6 +256,9 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
   }
 
+  StringRef getRawText() const {
+    return Text;
+  }
 
   StringRef getText() const {
     if (EscapedIdentifier) {

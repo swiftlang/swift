@@ -1,4 +1,4 @@
-//===- SerializedDiagnosticConsumer.cpp - Serialize Diagnostics -*- C++ -*-===//
+//===--- SerializedDiagnosticConsumer.cpp - Serialize Diagnostics ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -379,7 +379,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Category.
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Mapped Diag ID.
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Text size.
-  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // Diagnostc text.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // Diagnostic text.
   Abbrevs.set(RECORD_DIAG, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
 
   // Emit abbreviation for RECORD_CATEGORY.

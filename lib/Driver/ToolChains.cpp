@@ -980,7 +980,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(RuntimeLibPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
+    llvm::sys::path::append(LibProfile, "clang", "lib", "darwin");
 
     StringRef RT;
     if (Triple.isiOS()) {
@@ -988,13 +988,28 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
         RT = "tvos";
       else
         RT = "ios";
-    }
-    else if (Triple.isWatchOS())
+    } else if (Triple.isWatchOS()) {
       RT = "watchos";
-    else
+    } else {
+      assert(Triple.isMacOSX());
       RT = "osx";
-    llvm::sys::path::append(LibProfile, "lib", "darwin",
-                            "libclang_rt.profile_" + RT + ".a");
+    }
+
+    StringRef Sim;
+    if (tripleIsAnySimulator(Triple)) {
+      Sim = "sim";
+    }
+
+    llvm::sys::path::append(LibProfile,
+                            "libclang_rt.profile_" + RT + Sim + ".a");
+
+    // FIXME: Continue accepting the old path for simulator libraries for now.
+    if (!Sim.empty() && !llvm::sys::fs::exists(LibProfile)) {
+      llvm::sys::path::remove_filename(LibProfile);
+      llvm::sys::path::append(LibProfile,
+                              "libclang_rt.profile_" + RT + ".a");
+    }
+
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
   }
 
@@ -1094,6 +1109,12 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     break;
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
+    if (getTriple().getOS() == llvm::Triple::Linux) {
+      if (getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7 ||
+          getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v6) {
+        Arguments.push_back("-Wl,-Bsymbolic");
+      }
+    }
     break;
   }
 
@@ -1129,12 +1150,14 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-L");
   Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
 
+  Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
+
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(RuntimeLibPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
+    llvm::sys::path::append(LibProfile, "clang", "lib");
 
-    llvm::sys::path::append(LibProfile, "lib", getTriple().getOSName(),
+    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
                             Twine("libclang_rt.profile-") +
                               getTriple().getArchName() +
                               ".a");

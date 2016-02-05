@@ -197,13 +197,17 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.addRedundantLoadElimination();
-  PM.addDeadStoreElimination();
   PM.addCSE();
   PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();
 
   PM.addSILLinker();
 
+  // Run the devirtualizer, specializer, and inliner. If any of these
+  // makes a change we'll end up restarting the function passes on the
+  // current function (after optimizing any new callees).
+  PM.addDevirtualizer();
+  PM.addGenericSpecializer();
   switch (OpLevel) {
     case OptimizationLevelKind::HighLevel:
       // Does not inline functions with defined semantics.
@@ -251,8 +255,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Run two iterations of the high-level SSA passes.
   PM.setStageName("HighLevel");
-  PM.addDevirtualizer();
-  PM.addGenericSpecializer();
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   PM.runOneIteration();
   PM.runOneIteration();
@@ -322,6 +324,11 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Should be after FunctionSignatureOpts and before the last inliner.
   PM.addReleaseDevirtualizer();
 
+  // Run the devirtualizer, specializer, and inliner. If any of these
+  // makes a change we'll end up restarting the function passes on the
+  // current function (after optimizing any new callees).
+  PM.addDevirtualizer();
+  PM.addGenericSpecializer();
   PM.addLateInliner();
   AddSimplifyCFGSILCombine(PM);
   PM.addAllocBoxToStack();

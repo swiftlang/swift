@@ -24,7 +24,7 @@ def getLineStarts(s):
     starts = [0]
 
     for line in s.split('\n'):
-        starts.append(starts[-1] + len(line)+1)
+        starts.append(starts[-1] + len(line) + 1)
 
     starts[-1] -= 1
     return starts
@@ -35,12 +35,12 @@ def stripTrailingNL(s):
 
 def splitLines(s):
     """Split s into a list of lines, each of which has a trailing newline
-    
+
     If the lines are later concatenated, the result is s, possibly
     with a single appended newline.
     """
-    return [ l + '\n' for l in s.split('\n') ]
-    
+    return [l + '\n' for l in s.split('\n')]
+
 # text on a line up to the first '$$', '${', or '%%'
 literalText = r'(?: [^$\n%] | \$(?![${]) | %(?!%) )*'
 
@@ -59,12 +59,12 @@ tokenizeRE = re.compile(
 # %-lines and %{...}-blocks
     # \n? # absorb one preceding newline
     ^
-    (?: 
+    (?:
       (?P<gybLines>
-        (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | '''+linesClose+r''' ) .*
-        ( \n (?P=_indent) (?! '''+linesClose+r''' ) .* ) *
+        (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | ''' + linesClose + r''' ) .*
+        ( \n (?P=_indent) (?! ''' + linesClose + r''' ) .* ) *
       )
-      | (?P<gybLinesClose> [\ \t]* % [ \t]* '''+linesClose+r''' )
+      | (?P<gybLinesClose> [\ \t]* % [ \t]* ''' + linesClose + r''' )
       | [\ \t]* (?P<gybBlockOpen> %\{  )
         (?: [^}]| \} (?!%) )* \}%  # Absorb
     )
@@ -78,16 +78,15 @@ tokenizeRE = re.compile(
 | (?P<symbol>[$%]) (?P=symbol)
 
 # Literal text
-| (?P<literal> '''+literalText+r'''
-    (?: 
+| (?P<literal> ''' + literalText + r'''
+    (?:
       # newline that doesn't precede space+%
       (?: \n (?! [\ \t]* %[^%] ) )
-      '''+literalText+r'''
+      ''' + literalText + r'''
     )*
     \n?
   )
-'''
-, re.VERBOSE|re.MULTILINE)
+''', re.VERBOSE | re.MULTILINE)
 
 gybBlockClose = re.compile('\}%[ \t]*\n?')
 
@@ -124,12 +123,12 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
     the position of the error.
     """
     stream = StringIO(sourceText)
-    stream.seek( start )
+    stream.seek(start)
     nesting = 0
 
     try:
         for kind, text, tokenStart, tokenEnd, lineText \
-            in tokenize.generate_tokens(stream.readline):
+                in tokenize.generate_tokens(stream.readline):
 
             if text == '{':
                 nesting += 1
@@ -143,10 +142,10 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
         return tokenPosToIndex(errorPos, start, lineStarts)
 
     return len(sourceText)
-    
+
 def tokenizeTemplate(templateText):
     r"""Given the text of a template, returns an iterator over
-(tokenType,token,match) tuples.  
+(tokenType,token,match) tuples.
 
     **Note**: this is template syntax tokenization, not Python
     tokenization.
@@ -223,16 +222,17 @@ def tokenizeTemplate(templateText):
 
     while pos < end:
         m = tokenizeRE.match(templateText, pos, end)
-        
+
         # pull out the one matched key (ignoring internal patterns starting with _)
         ((kind, text), ) = (
-            (kind,text) for (kind,text) in m.groupdict().items() 
+            (kind, text) for (kind, text) in m.groupdict().items()
             if text is not None and kind[0] != '_')
-                
+
         if kind in ('literal', 'symbol'):
             if len(savedLiteral) == 0:
                 literalFirstMatch = m
-            savedLiteral.append(text) # literals and symbols get batched together
+            # literals and symbols get batched together
+            savedLiteral.append(text)
             pos = None
         else:
             # found a non-literal.  First yield any literal we've accumulated
@@ -243,13 +243,14 @@ def tokenizeTemplate(templateText):
             # Then yield the thing we found.  If we get a reply, it's
             # the place to resume tokenizing
             pos = yield kind, text, m
-        
+
         # If we were not sent a new position by our client, resume
         # tokenizing at the end of this match.
         if pos is None:
             pos = m.end(0)
         else:
-            yield # Client is not yet ready to process next token
+            # Client is not yet ready to process next token
+            yield
 
     if savedLiteral != []:
         yield 'literal', ''.join(savedLiteral), literalFirstMatch
@@ -302,20 +303,20 @@ def splitGybLines(sourceLines):
     >>> src[s[1]]
     '        print 1\n'
     """
-    lastTokenText,lastTokenKind = None,None
+    lastTokenText, lastTokenKind = None, None
     unmatchedIndents = []
 
     dedents = 0
     try:
         for tokenKind, tokenText, tokenStart, (tokenEndLine, tokenEndCol), lineText \
-            in tokenize.generate_tokens(lambda i = iter(sourceLines): next(i)):
+                in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
 
-            if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER): 
+            if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER):
                 continue
 
             if tokenText == '\n' and lastTokenText == ':':
                 unmatchedIndents.append(tokenEndLine)
-                
+
             # The tokenizer appends dedents at EOF; don't consider
             # those as matching indentations.  Instead just save them
             # up...
@@ -325,11 +326,12 @@ def splitGybLines(sourceLines):
             if tokenKind != tokenize.DEDENT and dedents > 0:
                 unmatchedIndents = unmatchedIndents[:-dedents]
                 dedents = 0
-                
-            lastTokenText,lastTokenKind = tokenText,tokenKind
+
+            lastTokenText, lastTokenKind = tokenText, tokenKind
 
     except tokenize.TokenError:
-        return [] # Let the later compile() call report the error
+        # Let the later compile() call report the error
+        return []
 
     if lastTokenText == ':':
         unmatchedIndents.append(len(sourceLines))
@@ -351,7 +353,7 @@ def codeStartsWithDedentKeyword(sourceLines):
     """
     tokenText = None
     for tokenKind, tokenText, _, _, _ \
-        in tokenize.generate_tokens(lambda i = iter(sourceLines): next(i)):
+            in tokenize.generate_tokens(lambda i=iter(sourceLines): next(i)):
 
         if tokenKind != tokenize.COMMENT and tokenText.strip() != '':
             break
@@ -381,11 +383,11 @@ class ParseContext:
 
     def posToLine(self, pos):
         return bisect(self.lineStarts, pos) - 1
-            
+
     def tokenGenerator(self, baseTokens):
         r""" Given an iterator over (kind, text, match) triples (see
         tokenizeTemplate above), return a refined iterator over
-        tokenKinds.  
+        tokenKinds.
 
         Among other adjustments to the elements found by baseTokens,
         this refined iterator tokenizes python code embedded in
@@ -456,11 +458,12 @@ class ParseContext:
         for self.tokenKind, self.tokenText, self.tokenMatch in baseTokens:
             kind = self.tokenKind
             self.codeText = None
-            
+
             # Do we need to close the current lines?
             self.closeLines = kind == 'gybLinesClose'
 
-            if kind.endswith('Open'): # %{...}% and ${...} constructs
+            # %{...}% and ${...} constructs
+            if kind.endswith('Open'):
 
                 # Tokenize text that follows as Python up to an unmatched '}'
                 codeStart = self.tokenMatch.end(kind)
@@ -479,22 +482,23 @@ class ParseContext:
                     nextPos = m2.end(0)
                 else:
                     assert kind == 'substitutionOpen'
-                    nextPos = closePos + 1 # skip past the closing '}'
+                    # skip past the closing '}'
+                    nextPos = closePos + 1
 
                 # Resume tokenizing after the end of the code.
                 baseTokens.send(nextPos)
 
             elif kind == 'gybLines':
-                
+
                 self.codeStartLine = self.posToLine(self.tokenMatch.start('gybLines'))
                 indentation = self.tokenMatch.group('_indent')
 
                 # Strip off the leading indentation and %-sign
                 sourceLines = re.split(
-                    '^' + re.escape(indentation), 
-                    self.tokenMatch.group('gybLines')+'\n', 
+                    '^' + re.escape(indentation),
+                    self.tokenMatch.group('gybLines') + '\n',
                     flags=re.MULTILINE)[1:]
-                
+
                 if codeStartsWithDedentKeyword(sourceLines):
                     self.closeLines = True
 
@@ -513,7 +517,6 @@ class ParseContext:
                     yield self.tokenKind
             else:
                 yield self.tokenKind
-
 
     def nextToken(self):
         """Move to the next token"""
@@ -534,7 +537,7 @@ class ExecutionContext:
     def appendText(self, text, file, line):
         # see if we need to inject a line marker
         if self.lineDirective:
-            if (file,line) != self.lastFileLine:
+            if (file, line) != self.lastFileLine:
                 # We can only insert the line directive at a line break
                 if len(self.resultText) == 0 \
                    or self.resultText[-1].endswith('\n'):
@@ -547,10 +550,10 @@ class ExecutionContext:
                     # and try again
                     self.appendText(text[i + 1:], file, line)
                     return
-                    
+
         self.resultText.append(text)
         self.lastFileLine = (file, line + text.count('\n'))
-        
+
 class ASTNode(object):
     """Abstract base class for template AST nodes"""
     def __init__(self):
@@ -559,7 +562,7 @@ class ASTNode(object):
     def execute(self, context):
         raise NotImplemented
 
-    def __str__(self, indent = ''):
+    def __str__(self, indent=''):
         raise NotImplemented
 
     def formatChildren(self, indent):
@@ -567,9 +570,9 @@ class ASTNode(object):
             return ' []'
 
         return '\n'.join(
-            ['', indent + '['] 
-            + [ x.__str__(indent + 4*' ') for x in self.children ]
-            + [indent + ']'])
+            ['', indent + '['] +
+            [x.__str__(indent + 4 * ' ') for x in self.children] +
+            [indent + ']'])
 
 
 class Block(ASTNode):
@@ -590,7 +593,7 @@ class Block(ASTNode):
         for x in self.children:
             x.execute(context)
 
-    def __str__(self, indent = ''):
+    def __str__(self, indent=''):
         return indent + 'Block:' + self.formatChildren(indent)
 
 class Literal(ASTNode):
@@ -605,9 +608,9 @@ class Literal(ASTNode):
     def execute(self, context):
         context.appendText(self.text, self.filename, self.startLineNumber)
 
-    def __str__(self, indent = ''):
+    def __str__(self, indent=''):
         return '\n'.join(
-            [indent + x for x in [ 'Literal:'] + stripTrailingNL(self.text).split('\n')])
+            [indent + x for x in ['Literal:'] + stripTrailingNL(self.text).split('\n')])
 
 class Code(ASTNode):
     """An AST node that is evaluated as Python"""
@@ -631,7 +634,7 @@ class Code(ASTNode):
         if context.tokenKind.startswith('substitution'):
             evalExec = 'eval'
             source, sourceLineCount = accumulateCode()
-            source = '('+source.strip()+')'
+            source = '(' + source.strip() + ')'
 
         else:
             while context.tokenKind == 'gybLinesOpen':
@@ -643,10 +646,10 @@ class Code(ASTNode):
 
             if context.tokenKind == 'gybLinesClose':
                 context.nextToken()
-        
+
         if context.tokenKind == 'gybLines':
             source, sourceLineCount = accumulateCode()
-            
+
             # Only handle a substitution as part of this code block if
             # we don't already have some %-lines.
         elif context.tokenKind == 'gybBlockOpen':
@@ -662,7 +665,7 @@ class Code(ASTNode):
     def execute(self, context):
         # Save __children__ from the local bindings
         saveChildren = context.localBindings.get('__children__')
-        # Execute the code with our __children__ in scope 
+        # Execute the code with our __children__ in scope
         context.localBindings['__children__'] = self.children
         result = eval(self.code, context.localBindings)
 
@@ -676,19 +679,19 @@ class Code(ASTNode):
         if result is not None and result != '':
             context.appendText(str(result), self.filename, self.startLineNumber)
 
-    def __str__(self, indent = ''):
+    def __str__(self, indent=''):
         sourceLines = re.sub(r'^\n', '', stripTrailingNL(self.source), flags=re.MULTILINE).split('\n')
         if len(sourceLines) == 1:
             s = indent + 'Code: {' + sourceLines[0] + '}'
         else:
             s = indent + 'Code:\n' + indent + '{\n' + '\n'.join(
-                indent + 4*' ' + l for l in sourceLines
+                indent + 4 * ' ' + l for l in sourceLines
             ) + '\n' + indent + '}'
         return s + self.formatChildren(indent)
 
-def parseTemplate(filename, text = None):
+def parseTemplate(filename, text=None):
     r"""Return an AST corresponding to the given template file.
-    
+
     If text is supplied, it is assumed to be the contents of the file,
     as a string.
 
@@ -975,15 +978,16 @@ Keyword arguments become local variable bindings in the execution context
     return ''.join(executionContext.resultText)
 
 def main():
-    import argparse, sys
+    import argparse
+    import sys
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description='Generate Your Boilerplate!', epilog='''    
+        description='Generate Your Boilerplate!', epilog='''
     A GYB template consists of the following elements:
 
       - Literal text which is inserted directly into the output
-    
+
       - %% or $$ in literal text, which insert literal '%' and '$'
         symbols respectively.
 
@@ -1011,7 +1015,7 @@ def main():
           - Hello -
         %{
              x = 42
-             def succ(a): 
+             def succ(a):
                  return a+1
         }%
 
@@ -1042,8 +1046,7 @@ def main():
     )
     parser.add_argument('-D', action='append', dest='defines', metavar='NAME=VALUE',
                     default=[],
-                    help='''Bindings to be set in the template's execution context'''
-                    )
+                    help='''Bindings to be set in the template's execution context''')
 
     parser.add_argument('file', type=argparse.FileType(), help='Path to GYB template file (defaults to stdin)', nargs='?', default=sys.stdin)
     parser.add_argument('-o', dest='target', type=argparse.FileType('w'), help='Output file (defaults to stdout)', default=sys.stdout)
@@ -1051,7 +1054,6 @@ def main():
     parser.add_argument('--verbose-test', action='store_true', default=False, help='Run a verbose self-test')
     parser.add_argument('--dump', action='store_true', default=False, help='Dump the parsed template to stdout')
     parser.add_argument('--line-directive', default='// ###line', help='Line directive prefix; empty => no line markers')
-    
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -1059,17 +1061,15 @@ def main():
         import doctest
         if doctest.testmod(verbose=args.verbose_test).failed:
             sys.exit(1)
-        
-    bindings = dict( x.split('=', 1) for x in args.defines )
+
+    bindings = dict(x.split('=', 1) for x in args.defines)
     ast = parseTemplate(args.file.name, args.file.read())
     if args.dump:
-        
         print(ast)
     # Allow the template to import .py files from its own directory
     sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
-    
+
     args.target.write(executeTemplate(ast, args.line_directive, **bindings))
 
 if __name__ == '__main__':
     main()
-    

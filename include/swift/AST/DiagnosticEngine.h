@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/DeclNameLoc.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 
 namespace swift {
@@ -421,7 +422,7 @@ namespace swift {
 
     /// \brief Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    Behavior determineBehavior(DiagID);
+    Behavior determineBehavior(DiagID id);
 
     bool hadAnyError() const { return anyErrorOccurred; }
     bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
@@ -559,6 +560,24 @@ namespace swift {
       return InFlightDiagnostic(*this);
     }
 
+    /// \brief Emit a diagnostic using a preformatted array of diagnostic
+    /// arguments.
+    ///
+    /// \param Loc The declaration name location to which the
+    /// diagnostic refers in the source code.
+    ///
+    /// \param ID The diagnostic ID.
+    ///
+    /// \param Args The preformatted set of diagnostic arguments. The caller
+    /// must ensure that the diagnostic arguments have the appropriate type.
+    ///
+    /// \returns An in-flight diagnostic, to which additional information can
+    /// be attached.
+    InFlightDiagnostic diagnose(DeclNameLoc Loc, DiagID ID, 
+                                ArrayRef<DiagnosticArgument> Args) {
+      return diagnose(Loc.getBaseNameLoc(), ID, Args);
+    }
+
     /// \brief Emit an already-constructed diagnostic at the given location.
     ///
     /// \param Loc The location to which the diagnostic refers in the source
@@ -591,6 +610,25 @@ namespace swift {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
       ActiveDiagnostic->setLoc(Loc);
+      return InFlightDiagnostic(*this);
+    }
+
+    /// \brief Emit a diagnostic with the given set of diagnostic arguments.
+    ///
+    /// \param Loc The declaration name location to which the
+    /// diagnostic refers in the source code.
+    ///
+    /// \param ID The diagnostic to be emitted.
+    ///
+    /// \param Args The diagnostic arguments, which will be converted to
+    /// the types expected by the diagnostic \p ID.
+    template<typename ...ArgTypes>
+    InFlightDiagnostic 
+    diagnose(DeclNameLoc Loc, Diag<ArgTypes...> ID,
+             typename detail::PassArgument<ArgTypes>::type... Args) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
+      ActiveDiagnostic->setLoc(Loc.getBaseNameLoc());
       return InFlightDiagnostic(*this);
     }
 

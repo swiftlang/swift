@@ -131,6 +131,11 @@ public:
   lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
 
+  /// Find all Objective-C methods with the given selector.
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
+
   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;

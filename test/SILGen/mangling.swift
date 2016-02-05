@@ -50,13 +50,6 @@ infix operator «+» {}
 // CHECK-LABEL: sil hidden @_TZF8manglingXoi7p_qcaDcFTSiSi_Si
 func «+»(a: Int, b: Int) -> Int { return a + b }
 
-// Curried function entry points mangle in terms of their original types, not
-// their uncurried private SIL types.
-// CHECK-LABEL: sil hidden @_TF8mangling7curriedfT1aSi_FT1bSS_T_ : $@convention(thin) (@owned String, Int) -> ()
-// CHECK-LABEL: sil shared @_TF8mangling7curriedFT1aSi_FT1bSS_T_ : $@convention(thin) (Int) -> @owned @callee_owned (@owned String) -> ()
-func curried(a a: Int)(b: String) {}
-_ = curried(a: 1)
-
 protocol Foo {}
 protocol Bar {}
 

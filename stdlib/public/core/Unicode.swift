@@ -695,7 +695,6 @@ public func transcode<
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stoppingOnError stopOnError: Bool
 ) -> Bool {
-
   var input = input
 
   // NB.  It is not possible to optimize this routine to a memcpy if

@@ -65,6 +65,10 @@ class SILPassManager {
   /// Set to true when a pass invalidates an analysis.
   bool CurrentPassHasInvalidated = false;
 
+  /// True if we need to stop running passes and restart again on the
+  /// same function.
+  bool RestartPipeline = false;
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
@@ -98,6 +102,13 @@ public:
            "Expected optimizable function definition!");
     FunctionWorklist.push_back(F);
   }
+
+
+  /// \brief Restart the function pass pipeline on the same function
+  /// that is currently being processed.
+  void restartWithCurrentFunction(SILTransform *T);
+  void clearRestartPipeline() { RestartPipeline = false; }
+  bool shouldRestartPipeline() { return RestartPipeline; }
 
   ///  \brief Broadcast the invalidation of the module to all analysis.
   void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
@@ -173,7 +184,8 @@ private:
   void runModulePass(SILModuleTransform *SMT);
 
   /// Run the passes in \p FuncTransforms on the function \p F.
-  void runPassesOnFunction(PassList FuncTransforms, SILFunction *F);
+  void runPassesOnFunction(PassList FuncTransforms, SILFunction *F,
+                           bool runToCompletion);
 
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution

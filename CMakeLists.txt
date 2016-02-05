@@ -28,6 +28,10 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
+option(SWIFT_SERIALIZE_STDLIB_UNITTEST
+    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
@@ -53,6 +57,11 @@ option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
+
+set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
+    "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
+set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
+    STRINGS FALSE "NOT-MERGED" "MERGED")
 
 set(SWIFT_VERSION "3.0" CACHE STRING
     "The user-visible version of the Swift compiler")
@@ -394,6 +403,11 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
     set(SWIFT_HOST_VARIANT_ARCH "x86_64")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+  # FIXME: This only matches ARMv6l (by far the most common variant).
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv6" "armv6-unknown-linux-gnueabihf")
+    set(SWIFT_HOST_VARIANT_ARCH "armv6")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv6")
   # FIXME: This only matches ARMv7l (by far the most common variant).
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
     configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv7" "armv7-unknown-linux-gnueabihf")

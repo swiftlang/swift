@@ -48,8 +48,8 @@ func rejectsAssertStringLiteral() {
 
 
 // <rdar://problem/22243469> QoI: Poor error message with throws, default arguments, & overloads
-func process(line: UInt = __LINE__, _ fn: () -> Void) {}
-func process(line: UInt = __LINE__) -> Int { return 0 }
+func process(line: UInt = #line, _ fn: () -> Void) {}
+func process(line: UInt = #line) -> Int { return 0 }
 func dangerous() throws {}
 
 func test() {
@@ -74,4 +74,9 @@ A().a(text:"sometext") // expected-error {{argument labels '(text:)' do not matc
 // <rdar://problem/22451001> QoI: incorrect diagnostic when argument to print has the wrong type
 func r22451001() -> AnyObject {}
 print(r22451001(5))  // expected-error {{argument passed to call that takes no arguments}}
+
+
+// SR-590 Passing two parameters to a function that takes one argument of type Any crashes the compiler
+func sr590(x: Any) {}
+sr590(3,4) // expected-error {{extra argument in call}}
 

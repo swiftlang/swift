@@ -1,5 +1,5 @@
 %# -*- mode: swift -*-
-//===--- NewArray.swift ---------------------------------------------------===//
+//===--- NewArray.swift.gyb -----------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -144,7 +144,7 @@ func test<
   checkEqual(x, y, false)
 
   func checkReallocations(
-    a: T, _ growthDescription: String, _ growBy1: (inout _: T) -> ()
+    a: T, _ growthDescription: String, _ growBy1: (inout _: T)->()
   ) {
     var a = a
     var reallocations = 0

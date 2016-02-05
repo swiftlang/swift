@@ -459,7 +459,7 @@ namespace {
     CanType FormalType;
     CastConsumptionKind Consumption;
 
-    bool isAddress() const { return Value.getType().isAddress(); }
+    bool isAddress() const { return Value->getType().isAddress(); }
     IsTake_t shouldTake() const {
       return shouldTakeOnSuccess(Consumption);
     }
@@ -482,13 +482,13 @@ namespace {
     }
     Source asScalarSource(SILValue value) const {
       assert(!isAddress());
-      assert(!value.getType().isAddress());
+      assert(!value->getType().isAddress());
       return { value, FormalType, CastConsumptionKind::TakeAlways };
     }
 
     Target() = default;
     Target(SILValue address, CanType formalType)
-      : Address(address), LoweredType(address.getType()),
+      : Address(address), LoweredType(address->getType()),
         FormalType(formalType) {
       assert(LoweredType.isAddress());
     }
@@ -529,7 +529,7 @@ namespace {
     }
 
     Source putOwnedScalar(SILValue scalar, Target target) {
-      assert(scalar.getType() == target.LoweredType.getObjectType());
+      assert(scalar->getType() == target.LoweredType.getObjectType());
       if (!target.isAddress())
         return target.asScalarSource(scalar);
 
@@ -542,7 +542,7 @@ namespace {
     Source emitSameType(Source source, Target target) {
       assert(source.FormalType == target.FormalType);
 
-      auto &srcTL = getTypeLowering(source.Value.getType());
+      auto &srcTL = getTypeLowering(source.Value->getType());
 
       // The destination always wants a +1 value, so make the source
       // +1 if it's a scalar.
@@ -592,7 +592,7 @@ namespace {
       // We should generate for it:
       // %openedSrcMetatype = open_existential srcMetatype
       // init_existential dstMetatype, %openedSrcMetatype
-      auto &srcTL = getTypeLowering(source.Value.getType());
+      auto &srcTL = getTypeLowering(source.Value->getType());
       SILValue value;
       if (source.isAddress()) {
         value = srcTL.emitLoadOfCopy(B, Loc, source.Value, source.shouldTake());
@@ -642,7 +642,7 @@ namespace {
         auto sourceSomeDecl = Ctx.getOptionalSomeDecl(sourceOptKind);
 
         SILType loweredSourceObjectType =
-          source.Value.getType().getEnumElementType(sourceSomeDecl, M);
+          source.Value->getType().getEnumElementType(sourceSomeDecl, M);
 
         // Form the target for the optional object.
         EmitSomeState state;
@@ -657,7 +657,7 @@ namespace {
           SILValue sourceAddr = source.Value;
           if (!source.shouldTake()) {
             sourceTemp = B.createAllocStack(Loc,
-                                       sourceAddr.getType().getObjectType());
+                                       sourceAddr->getType().getObjectType());
             sourceAddr = sourceTemp;
             B.createCopyAddr(Loc, source.Value, sourceAddr, IsNotTake,
                              IsInitialization);
@@ -743,7 +743,7 @@ namespace {
         B.createInjectEnumAddr(Loc, target.Address, state.SomeDecl);
         return target.asAddressSource();
       } else {
-        auto &srcTL = getTypeLowering(source.Value.getType());
+        auto &srcTL = getTypeLowering(source.Value->getType());
         auto sourceObject = getOwnedScalar(source, srcTL);
         auto source = B.createEnum(Loc, sourceObject, state.SomeDecl,
                                    target.LoweredType);
@@ -799,7 +799,7 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
   Target target(loweredTargetType, targetType);
   Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
   assert(!result.isAddress());
-  assert(result.Value.getType() == loweredTargetType);
+  assert(result.Value->getType() == loweredTargetType);
   assert(result.Consumption == CastConsumptionKind::TakeAlways);
   return result.Value;
 }
@@ -815,8 +815,8 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
   assert(classifyDynamicCast(M, sourceType, targetType)
            == DynamicCastFeasibility::WillSucceed);
 
-  assert(src.getType().isAddress());
-  assert(dest.getType().isAddress());
+  assert(src->getType().isAddress());
+  assert(dest->getType().isAddress());
 
   // Casts between the same types can be always handled here.
   // Casts from non-existentials into existentials and
@@ -824,11 +824,11 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
   // Casts between a value type and a class cannot be optimized.
   // Therefore generate a simple unconditional_checked_cast_aadr.
 
-  if (src.getType() != dest.getType())
-  if (src.getType().isAnyExistentialType() !=
-      dest.getType().isAnyExistentialType() ||
-      !(src.getType().getClassOrBoundGenericClass() &&
-       dest.getType().getClassOrBoundGenericClass())) {
+  if (src->getType() != dest->getType())
+  if (src->getType().isAnyExistentialType() !=
+      dest->getType().isAnyExistentialType() ||
+      !(src->getType().getClassOrBoundGenericClass() &&
+       dest->getType().getClassOrBoundGenericClass())) {
     // If there is an existing cast with the same arguments,
     // indicate we cannot improve it.
     if (existingCast) {
@@ -939,14 +939,14 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
   // We always need a different success block.
   SILBasicBlock *scalarSuccBB = B.splitBlockForFallthrough();
 
-  auto &srcTL = B.getModule().Types.getTypeLowering(src.getType());
+  auto &srcTL = B.getModule().Types.getTypeLowering(src->getType());
 
   // Always take; this works under an assumption that retaining the
   // result is equivalent to retaining the source.  That means that
   // these casts would not be appropriate for bridging-like conversions.
   SILValue srcValue = srcTL.emitLoadOfCopy(B, loc, src, IsTake);
 
-  SILType targetValueType = dest.getType().getObjectType();
+  SILType targetValueType = dest->getType().getObjectType();
   B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetValueType,
                             scalarSuccBB, scalarFailBB);
 

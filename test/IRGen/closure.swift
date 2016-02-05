@@ -11,7 +11,7 @@ func a(i i: Int) -> (Int) -> Int {
 }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @[[CLOSURE1:_TFF7closure1aFT1iSi_FSiSiU_FSiSi]](i64, i64)
+// CHECK: define linkonce_odr hidden i64 @_TFF7closure1aFT1iSi_FSiSiU_FSiSi(i64, i64)
 
 protocol Ordinable {
   func ord() -> Int
@@ -22,7 +22,7 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 }
 
 // -- partial_apply stub
-// CHECK: define internal i64 @_TPA_[[CLOSURE1]](i64, %swift.refcounted*) {{.*}} {
+// CHECK: define internal i64 @_TPA__TFF7closure1aFT1iSi_FSiSiU_FSiSi(i64, %swift.refcounted*)
 // CHECK: }
 
 // -- Closure entry point

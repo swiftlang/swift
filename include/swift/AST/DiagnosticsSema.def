@@ -55,7 +55,7 @@ NOTE(while_converting_subscript_index,none,
 //------------------------------------------------------------------------------
 
 ERROR(ambiguous_member_overload_set,none,
-      "ambiguous reference to member '%0'", (StringRef))
+      "ambiguous reference to member %0", (DeclName))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -76,9 +76,14 @@ NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
 
 ERROR(expected_argument_in_contextual_member,none,
-      "contextual member %0 expects argument of type %1", (Identifier, Type))
+      "contextual member %0 expects argument of type %1", (DeclName, Type))
+
+ERROR(expected_result_in_contextual_member,none,
+      "member %0 in %2 produces result of type %1, but context expects %2",
+      (DeclName, Type, Type))
+
 ERROR(unexpected_argument_in_contextual_member,none,
-      "contextual member %0 has no associated value", (Identifier))
+      "contextual member %0 has no associated value", (DeclName))
 
 ERROR(could_not_use_value_member,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
@@ -347,8 +352,38 @@ ERROR(noescape_functiontype_mismatch,none,
       "invalid conversion from non-escaping function of type %0 to "
       "potentially escaping function type %1", (Type, Type))
 
+// Selector expressions.
+ERROR(expr_selector_no_objc_runtime,none,
+      "'#selector' can only be used with the Objective-C runtime", ())
+ERROR(expr_selector_module_missing,none,
+      "import the 'ObjectiveC' module to use '#selector'", ())
+ERROR(expr_selector_no_declaration,none,
+      "argument of '#selector' does not refer to an initializer or method", ())
+ERROR(expr_selector_property,none,
+      "argument of '#selector' cannot refer to a property", ())
+ERROR(expr_selector_not_method_or_init,none,
+      "argument of '#selector' does not refer to a method or initializer", ())
+ERROR(expr_selector_not_objc,none,
+      "argument of '#selector' refers to %select{a method|an initializer}0 "
+      "that is not exposed to Objective-C",
+      (bool))
+NOTE(expr_selector_make_objc,none,
+     "add '@objc' to expose this %select{method|initializer}0 to Objective-C",
+     (bool))
 
-
+// Selectors-as-string-literals.
+WARNING(selector_literal_invalid,none,
+        "string literal is not a valid Objective-C selector", ())
+WARNING(selector_literal_undeclared,none,
+        "no method declared with Objective-C selector %0", (ObjCSelector))
+WARNING(selector_literal_deprecated,none,
+        "use of string literal for Objective-C selectors is deprecated; "
+        "use '#selector' or explicitly construct a 'Selector'", ())
+WARNING(selector_literal_deprecated_suggest,none,
+        "use of string literal for Objective-C selectors is deprecated; "
+        "use '#selector' instead", ())
+WARNING(selector_construction_suggest,none,
+        "use '#selector' instead of explicitly constructing a 'Selector'", ())
 
 ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
@@ -408,6 +443,12 @@ ERROR(serialization_target_too_new_repl,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
 
+ERROR(reserved_member_name,none,
+      "type member may not be named %0, since it would conflict with the"
+      " 'foo.%1' expression", (DeclName, StringRef))
+NOTE(backticks_to_escape,none,
+     "backticks can escape this name if it is important to use", ())
+
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
@@ -443,7 +484,7 @@ ERROR(unspaced_unary_operator,none,
 
 
 ERROR(use_unresolved_identifier,none,
-      "use of unresolved %select{identifier|operator}1 %0", (Identifier, bool))
+      "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
 ERROR(use_undeclared_type,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,none,
@@ -470,7 +511,7 @@ ERROR(use_non_type_value,none,
 NOTE(use_non_type_value_prev,none,
      "%0 declared here", (Identifier))
 ERROR(use_local_before_declaration,none,
-      "use of local variable %0 before its declaration", (Identifier))
+      "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,
       "protocol %0 can only be used as a generic constraint because it has "
       "Self or associated type requirements", (Identifier))
@@ -594,6 +635,8 @@ NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,
      "in initialization of parameter %0", (Identifier))
+
+
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
@@ -647,11 +690,10 @@ ERROR(argument_out_of_order_named_unnamed,none,
 
 ERROR(instance_member_use_on_type,none,
       "use of instance member %1 on type %0; "
-      "did you mean to use a value of type %0 instead?", (Type, Identifier))
+      "did you mean to use a value of type %0 instead?", (Type, DeclName))
 ERROR(instance_member_in_initializer,none,
       "cannot use instance member %0 within property initializer; "
-      "property initializers run before 'self' is available", (Identifier))
-
+      "property initializers run before 'self' is available", (DeclName))
 
 ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
@@ -670,6 +712,12 @@ ERROR(no_accessible_initializers,none,
       (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
+ERROR(unbound_generic_parameter_cast,none,
+      "generic parameter %0 could not be inferred in cast to %1", (Type, Type))
+NOTE(archetype_declared_in_type,none,
+     "%0 declared as parameter to type %1", (Type, Type))
+
+
 ERROR(string_index_not_integer,none,
       "String may not be indexed with %0, it has variable size elements",
       (Type))
@@ -1779,7 +1827,12 @@ ERROR(inout_expr_outside_of_call,none,
 
 ERROR(unresolved_member_no_inference,none,
       "reference to member %0 cannot be resolved without a contextual type",
-      (Identifier))
+      (DeclName))
+ERROR(unresolved_collection_literal,none,
+      "cannot infer type for empty collection literal without a "
+      "contextual type", ())
+ERROR(unresolved_nil_literal,none,
+      "'nil' requires a contextual type", ())
 
 ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without more context", ())
@@ -1872,8 +1925,7 @@ ERROR(partial_application_of_function_invalid,none,
         "function with 'inout' parameters|"
         "'mutating' method|"
         "'super.init' initializer chain|"
-        "'self.init' initializer delegation|"
-        "'super' method"
+        "'self.init' initializer delegation"
       "}0 is not allowed",
       (unsigned))
 

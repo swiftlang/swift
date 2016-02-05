@@ -124,7 +124,7 @@ sil @take_t : $@convention(thin) <T> (@in T) -> ()
 // CHECK-LABEL: define void @dyn_box_a
 sil @dyn_box_a : $@convention(thin) <T> () -> () {
 entry:
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV11typed_boxes3Dyn(%swift.type* %T)
   // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1

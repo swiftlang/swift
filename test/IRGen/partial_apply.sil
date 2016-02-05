@@ -505,8 +505,8 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 
 
 // CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure.28(%swift.refcounted*)
-// CHECK:  [[CTX:%.*]] = bitcast %swift.refcounted* %0 to %C13partial_apply4Base*
 // CHECK:  [[TYPE:%.*]] = call %swift.type* @_TMaC13partial_apply3Sub()
+// CHECK:  [[CTX:%.*]] = bitcast %swift.refcounted* %0 to %C13partial_apply4Base*
 // CHECK:  [[CALL:%.*]] = tail call %C13partial_apply4Base* @parametric_casting_closure(%C13partial_apply4Base* [[CTX]], %swift.type* [[TYPE]])
 // CHECK:  [[CAST:%.*]] = bitcast %C13partial_apply4Base* [[CALL]] to %C13partial_apply3Sub*
 // CHECK:  ret %C13partial_apply3Sub* [[CAST]]

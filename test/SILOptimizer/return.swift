@@ -129,8 +129,8 @@ func testUnreachableAfterNoReturnMethod() -> Int {
 
 func testCleanupCodeEmptyTuple(@autoclosure fn: () -> Bool = false,
           message: String = "",
-          file: String = __FILE__,
-          line: Int = __LINE__) {
+          file: String = #file,
+          line: Int = #line) {
   if true {
     exit()
   }

@@ -314,6 +314,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(Assign)
     NON_LVALUE_EXPR(DefaultValue)
     NON_LVALUE_EXPR(CodeCompletion)
+    NON_LVALUE_EXPR(ObjCSelector)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -487,6 +488,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::StringLiteral:
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
+  case ExprKind::ObjCSelector:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -502,7 +504,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::SuperRef:
   case ExprKind::Type:
   case ExprKind::OtherConstructorDeclRef:
-  case ExprKind::UnresolvedConstructor:
   case ExprKind::DotSyntaxBaseIgnored:
     return true;
 
@@ -525,7 +526,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::UnresolvedSpecialize:
   case ExprKind::UnresolvedMember:
   case ExprKind::UnresolvedDot:
-  case ExprKind::UnresolvedSelector:
     return true;
 
   case ExprKind::Sequence:
@@ -866,10 +866,10 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 }
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
-                             ConcreteDeclRef member, SourceRange nameRange,
+                             ConcreteDeclRef member, DeclNameLoc nameLoc,
                              bool Implicit, AccessSemantics semantics)
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameRange(nameRange) {
+    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
    
   MemberRefExprBits.Semantics = (unsigned) semantics;
   MemberRefExprBits.IsSuper = false;
@@ -1137,33 +1137,6 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
 }
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
-
-UnresolvedSelectorExpr::UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
-                                               DeclName name,
-                                               ArrayRef<ComponentLoc> components)
-  : Expr(ExprKind::UnresolvedSelector, /*implicit*/ false),
-    SubExpr(subExpr), DotLoc(dotLoc), Name(name)
-{
-  assert(name.getArgumentNames().size() + 1 == components.size() &&
-         "number of component locs does not match number of name components");
-  auto buf = getComponentsBuf();
-  std::uninitialized_copy(components.begin(), components.end(),
-                          buf.begin());
-}
-
-UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
-             Expr *subExpr, SourceLoc dotLoc,
-             DeclName name,
-             ArrayRef<ComponentLoc> components) {
-  assert(name.getArgumentNames().size() + 1 == components.size() &&
-         "number of component locs does not match number of name components");
-  
-  void *buf = C.Allocate(sizeof(UnresolvedSelectorExpr)
-                           + (name.getArgumentNames().size() + 1)
-                               * sizeof(ComponentLoc),
-                         alignof(UnresolvedSelectorExpr));
-  return ::new (buf) UnresolvedSelectorExpr(subExpr, dotLoc, name, components);
-}
 
 TypeExpr::TypeExpr(TypeLoc TyLoc)
   : Expr(ExprKind::Type, /*implicit*/false), Info(TyLoc) {

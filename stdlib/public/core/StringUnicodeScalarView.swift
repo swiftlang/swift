@@ -29,8 +29,7 @@ public func <(
 extension String {
   /// A collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value) that
   /// encode a `String` .
-  public struct UnicodeScalarView : Collection, _Reflectable,
-    CustomStringConvertible, CustomDebugStringConvertible {
+  public struct UnicodeScalarView : Collection, CustomStringConvertible, CustomDebugStringConvertible {
     internal init(_ _core: _StringCore) {
       self._core = _core
     }
@@ -208,12 +207,6 @@ extension String {
     @warn_unused_result
     public func iterator() -> Iterator {
       return Iterator(_core)
-    }
-
-    /// Returns a mirror that reflects `self`.
-    @warn_unused_result
-    public func _getMirror() -> _Mirror {
-      return _UnicodeScalarViewMirror(self)
     }
 
     public var description: String {
@@ -410,5 +403,19 @@ extension String.UnicodeScalarIndex {
       scalars[self].value)
 
     return segmenter.isBoundary(gcb0, gcb1)
+  }
+}
+
+// Reflection
+extension String.UnicodeScalarView : CustomReflectable {
+  /// Returns a mirror that reflects `self`.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: self)
+  }
+}
+
+extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .Text(description)
   }
 }

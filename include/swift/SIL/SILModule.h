@@ -45,7 +45,6 @@ namespace swift {
   class AnyFunctionType;
   class ASTContext;
   class FuncDecl;
-  class SILTypeList;
   class SILUndef;
   class SourceFile;
   class SerializedSILLoader;
@@ -98,7 +97,6 @@ private:
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
-  void *TypeListUniquing;
 
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
@@ -203,9 +201,6 @@ public:
   /// Send the invalidation message that \p V is being deleted to all
   /// registered handlers. The order of handlers is deterministic but arbitrary.
   void notifyDeleteHandlers(ValueBase *V);
-
-  /// \brief Get a uniqued pointer to a SIL type list.
-  SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
 
   /// \brief This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;

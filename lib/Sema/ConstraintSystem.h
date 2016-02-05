@@ -299,7 +299,6 @@ public:
     if (record)
       otherRep->getImpl().recordBinding(*record);
     otherRep->getImpl().ParentOrFixed = getTypeVariable();
-    assert(otherRep->getImpl().canBindToLValue() == canBindToLValue());
     if (!mustBeMaterializable() && otherRep->getImpl().mustBeMaterializable()) {
       if (record)
         recordBinding(*record);
@@ -815,7 +814,7 @@ struct MemberLookupResult {
   
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
-    /// Argment labels don't match.
+    /// Argument labels don't match.
     UR_LabelMismatch,
     
     /// This uses a type like Self it its signature that cannot be used on an
@@ -878,6 +877,7 @@ public:
   
   friend class Fix;
   friend class OverloadChoice;
+  friend class ConstraintGraph;
 
   class SolverScope;
 
@@ -1418,7 +1418,8 @@ public:
   /// representatives of their equivalence classes, and must be
   /// distinct.
   void mergeEquivalenceClasses(TypeVariableType *typeVar1,
-                               TypeVariableType *typeVar2);
+                               TypeVariableType *typeVar2,
+                               bool updateWorkList = true);
 
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
@@ -2231,80 +2232,6 @@ void simplifyLocator(Expr *&anchor,
                      Expr *&targetAnchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
-
-/// Describes the kind of entity to which a locator was resolved.
-enum class ResolvedLocatorKind : uint8_t {
-  /// The locator could not be resolved.
-  Unresolved,
-  /// The locator refers to a function.
-  Function,
-  /// The locator refers to a constructor.
-  Constructor,
-  /// The locator refers to a parameter of a function.
-  Parameter
-};
-
-/// The entity to which a locator resolved.
-class ResolvedLocator {
-  ResolvedLocatorKind kind;
-  ConcreteDeclRef decl;
-
-public:
-  ResolvedLocator() : kind(ResolvedLocatorKind::Unresolved) { }
-
-  enum ForFunction_t { ForFunction };
-  enum ForConstructor_t { ForConstructor };
-  enum ForVar_t { ForVar };
-  
-  ResolvedLocator(ForFunction_t, ConcreteDeclRef decl)
-    : kind(ResolvedLocatorKind::Function), decl(decl)
-  {
-    assert(isa<FuncDecl>(decl.getDecl()));
-  }
-
-  ResolvedLocator(ForConstructor_t, ConcreteDeclRef decl)
-    : kind(ResolvedLocatorKind::Constructor), decl(decl)
-  {
-    assert(isa<ConstructorDecl>(decl.getDecl()));
-  }
-
-  ResolvedLocator(ForVar_t, ConcreteDeclRef decl)
-    : kind(ResolvedLocatorKind::Parameter), decl(decl)
-  {
-    assert(isa<VarDecl>(decl.getDecl()));
-  }
-  
-  /// Determine the kind of entity to which the locator resolved.
-  ResolvedLocatorKind getKind() const { return kind; }
-
-  /// Retrieve the declaration to which the locator resolved.
-  ConcreteDeclRef getDecl() const { return decl; }
-
-  explicit operator bool() const {
-    return getKind() != ResolvedLocatorKind::Unresolved;
-  }
-};
-
-/// Resolve a locator to the specific declaration it references, if possible.
-///
-/// \param cs The constraint system in which the locator will be resolved.
-///
-/// \param locator The locator to resolve.
-///
-/// \param findOvlChoice A function that searches for the overload choice
-/// associated with the given locator, or an empty optional if there is no such
-/// overload.
-///
-/// \returns the entity to which the locator resolved.
-///
-/// FIXME: It would be more natural to express the result as a locator.
-ResolvedLocator resolveLocatorToDecl(
-                  ConstraintSystem &cs,
-                  ConstraintLocator *locator,
-                  std::function<Optional<SelectedOverload>(ConstraintLocator *)>
-                    findOvlChoice,
-                  std::function<ConcreteDeclRef(ValueDecl *decl,
-                                                Type openedType)> getConcreteDeclRef);
 
 } // end namespace constraints
 

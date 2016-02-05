@@ -282,10 +282,6 @@ detail used to implement resilient per-type metadata accessor functions.
 000000000001f1f0 T _swift_getFunctionTypeMetadata2
 000000000001f250 T _swift_getFunctionTypeMetadata3
 000000000001e940 T _swift_getGenericMetadata
-000000000001e9c0 T _swift_getGenericMetadata1
-000000000001ea60 T _swift_getGenericMetadata2
-000000000001eb00 T _swift_getGenericMetadata3
-000000000001eba0 T _swift_getGenericMetadata4
 0000000000022fd0 T _swift_getMetatypeMetadata
 000000000001ec50 T _swift_getObjCClassMetadata
 000000000001e6b0 T _swift_getResilientMetadata

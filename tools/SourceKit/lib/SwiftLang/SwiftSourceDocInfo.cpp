@@ -26,6 +26,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/Sema/IDETypeChecking.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
@@ -54,9 +55,36 @@ private:
   }
 };
 
-static void printAnnotatedDeclaration(const ValueDecl *VD, raw_ostream &OS) {
+static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {
+  if (Ty.isNull())
+    return Type();
+
+  // Find the nominal type decl related to VD.
+  NominalTypeDecl *NTD = VD->getDeclContext()->
+    isNominalTypeOrNominalTypeExtensionContext();
+  if (!NTD)
+    return Type();
+  Type Result;
+
+  // Walk the type tree to find the a sub-type who's convertible to the
+  // found nominal.
+  Ty.visit([&](Type T) {
+    if (!Result && (T->getAnyNominal() == NTD ||
+                    isConvertibleTo(T, NTD->getDeclaredType(),
+                                    VD->getDeclContext()))) {
+      Result = T;
+    }
+  });
+  return Result;
+}
+
+static void printAnnotatedDeclaration(const ValueDecl *VD, const Type Ty,
+                                      const Type BaseTy,
+                                      raw_ostream &OS) {
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  if (BaseTy)
+    PO.setArchetypeTransformForQuickHelp(BaseTy, VD->getDeclContext());
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -235,7 +263,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
     return true;
 
   SmallString<64> SS;
-
+  auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
   unsigned NameBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
@@ -267,7 +295,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned DeclBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    printAnnotatedDeclaration(VD, OS);
+    printAnnotatedDeclaration(VD, Ty, BaseType, OS);
   }
   unsigned DeclEnd = SS.size();
 
@@ -309,6 +337,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(OS);
+        if (BaseType)
+          PO.setArchetypeTransform(BaseType, VD->getDeclContext());
         RelatedDecl->print(Printer, PO);
       } else {
         llvm::SmallString<128> Buf;

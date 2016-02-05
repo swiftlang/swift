@@ -312,15 +312,16 @@ trailingclosure2(x: 5) { return 5 }
 
 func trailingclosure3(x x: Int, f: (() -> Int)!) {
   var f = f
-  _ = f
   f = nil
+  _ = f
 }
+
 trailingclosure3(x: 5) { return 5 }
 
 func trailingclosure4(f f: () -> Int) {}
 trailingclosure4 { 5 }
 
-func trailingClosure5<T>(file: String = __FILE__, line: UInt = __LINE__, expression: () -> T?) { }
+func trailingClosure5<T>(file: String = #file, line: UInt = #line, expression: () -> T?) { }
 func trailingClosure6<T>(value value: Int, expression: () -> T?) { }
 
 trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}

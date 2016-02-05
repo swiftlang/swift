@@ -13,13 +13,13 @@ import gizmo
 // CHECK: [[MYBLAMMO:%C4objc8MyBlammo]] = type
 // CHECK: [[TEST2:%C4objc5Test2]] = type
 // CHECK: [[OBJC:%objc_object]] = type
-// CHECK: [[GIZMO:%CSo5Gizmo]] = type
 // CHECK: [[ID:%V4objc2id]] = type <{ %Ps9AnyObject_ }>
+// CHECK: [[GIZMO:%CSo5Gizmo]] = type
 // CHECK: [[RECT:%VSC4Rect]] = type
 // CHECK: [[FLOAT:%Sf]] = type
 
-// CHECK: @"\01L_selector_data(bar)" = internal constant [4 x i8] c"bar\00", section "__TEXT,__objc_methname,cstring_literals", align 1
-// CHECK: @"\01L_selector(bar)" = internal global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
+// CHECK: @"\01L_selector_data(bar)" = private global [4 x i8] c"bar\00", section "__TEXT,__objc_methname,cstring_literals", align 1
+// CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
 // CHECK: @_TMnVSC4Rect = linkonce_odr hidden constant
 // CHECK: @_TMVSC4Rect = linkonce_odr hidden global

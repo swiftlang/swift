@@ -13,12 +13,11 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[TBOX]]
-  // CHECK-NEXT: strong_retain [[T]]
-  // CHECK-NEXT: store [[T]] to [[PB]] : $*T
+  // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
+  // CHECK: store [[T]] to [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int -> ()>
   // CHECK-NEXT: project_box [[OPT_BOX]]
-  // CHECK-NEXT: [[T:%[0-9]+]] = load [[PB]] : $*T
+  // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
   // CHECK-NEXT: alloc_stack $Optional<Int -> ()>
   // CHECK-NEXT: dynamic_method_br [[T]] : $T, #P1.method!1.foreign
@@ -30,12 +29,11 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[TBOX]]
-  // CHECK: strong_retain [[T]]
-  // CHECK-NEXT: store [[T]] to [[PB]] : $*T
+  // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
+  // CHECK: store [[T]] to [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: project_box [[OPT_BOX]]
-  // CHECK-NEXT: [[T:%[0-9]+]] = load [[PB]] : $*T
+  // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
   // CHECK-NEXT: alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[T]] : $T, #P1.prop!getter.1.foreign
@@ -47,12 +45,11 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[TBOX]]
-  // CHECK-NEXT: strong_retain [[T]]
-  // CHECK-NEXT: store [[T]] to [[PB]] : $*T
+  // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
+  // CHECK: store [[T]] to [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: project_box [[OPT_BOX]]
-  // CHECK-NEXT: [[T:%[0-9]+]] = load [[PB]] : $*T
+  // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
   // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiC
   // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int.Type

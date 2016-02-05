@@ -99,7 +99,7 @@ public func constructResilientEnumNoPayload() -> Medium {
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 25
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* %0, i32 2, %swift.type* [[METADATA]])
+// CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* %0, i32 0, %swift.type* [[METADATA]])
 
 // CHECK-NEXT: ret void
   return Medium.Paper
@@ -125,7 +125,7 @@ public func constructResilientEnumPayload(s: Size) -> Medium {
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT2]], i32 25
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* %0, i32 1, %swift.type* [[METADATA2]])
+// CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* %0, i32 -2, %swift.type* [[METADATA2]])
 
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
@@ -155,9 +155,9 @@ public func constructResilientEnumPayload(s: Size) -> Medium {
 // CHECK: [[TAG:%.*]] = call i32 %getEnumTag(%swift.opaque* [[ENUM_COPY]], %swift.type* [[METADATA]])
 
 // CHECK: switch i32 [[TAG]], label %[[DEFAULT_CASE:.*]] [
-// CHECK:   i32 0, label %[[PAMPHLET_CASE:.*]]
-// CHECK:   i32 2, label %[[PAPER_CASE:.*]]
-// CHECK:   i32 3, label %[[CANVAS_CASE:.*]]
+// CHECK:   i32 -1, label %[[PAMPHLET_CASE:.*]]
+// CHECK:   i32 0, label %[[PAPER_CASE:.*]]
+// CHECK:   i32 1, label %[[CANVAS_CASE:.*]]
 // CHECK: ]
 
 // CHECK: ; <label>:[[PAPER_CASE]]

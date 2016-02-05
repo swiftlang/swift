@@ -2,8 +2,8 @@
 
 func test15921520() {
     var x: Int = 0
-    func f<T>(x: T) {}
-    f(&x) // expected-error{{cannot invoke 'f' with an argument list of type '(inout Int)'}} expected-note{{expected an argument list of type '(T)'}}
+    func f<T>(x: T) {} // expected-note{{in call to function 'f'}}
+    f(&x) // expected-error{{generic parameter 'T' could not be inferred}}
 }
 
 func test20807269() {

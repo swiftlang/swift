@@ -241,7 +241,7 @@ macro(add_sourcekit_executable name)
 
       if(SWIFT_ANALYZE_CODE_COVERAGE)
         set_property(TARGET "${name}" APPEND_STRING PROPERTY
-            LINK_FLAGS " -fprofile-instr-generate=swift-%p.profraw -fcoverage-mapping")
+          LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
       endif()
     endif()
   endif()
@@ -388,7 +388,7 @@ macro(add_sourcekit_xpc_service name framework_target)
   endif()
 
   set(XPCSERVICE_NAME ${name})  
-  set(XPCSERVICE_IDENTIFIER "com.apple.${name}")  
+  set(XPCSERVICE_IDENTIFIER "${name}.${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
   configure_file(

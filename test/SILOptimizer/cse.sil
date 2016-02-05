@@ -523,7 +523,7 @@ sil @sil_string_different_encodings : $@convention(thin) () -> Builtin.Word {
   %0 = string_literal utf8 "help"
   %1 = string_literal utf16 "help"
   %2 = function_ref @helper : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
-  %3 = apply %2(%0#0, %1#0) : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+  %3 = apply %2(%0, %1) : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
   return %3 : $Builtin.Word
 }
 // CHECK:      [[T0:%.*]] = function_ref @helper

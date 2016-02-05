@@ -200,7 +200,12 @@ public:
     return ElementsWithNoPayload;
   }
 
+  /// Return a tag index in the range [0..NumElements].
   unsigned getTagIndex(EnumElementDecl *Case) const;
+
+  /// Return a tag index in the range
+  /// [-ElementsWithPayload..ElementsWithNoPayload-1].
+  int getResilientTagIndex(EnumElementDecl *Case) const;
 
   /// Map the given element to the appropriate index in the
   /// discriminator type.

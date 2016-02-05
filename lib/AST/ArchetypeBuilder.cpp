@@ -1061,11 +1061,22 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   auto markRecursive = [&](AssociatedTypeDecl *assocType,
                            ProtocolDecl *proto,
                            SourceLoc loc) {
-    if (!pa->isRecursive() && !assocType->isRecursive())
+    if (!pa->isRecursive() && !assocType->isRecursive()) {
       Diags.diagnose(assocType->getLoc(),
                      diag::recursive_requirement_reference);
-    assocType->setIsRecursive();
+        
+      // Mark all associatedtypes in this protocol as recursive (and error-type)
+      // to avoid later crashes dealing with this invalid protocol in other
+      // contexts.
+      auto containingProto = assocType->getDeclContext()->isProtocolOrProtocolExtensionContext();
+      for (auto member : containingProto->getMembers())
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
+          assocType->setIsRecursive();
+    }
     pa->setIsRecursive();
+
+    // Silence downstream errors referencing this associated type.
+    assocType->setInvalid();
 
     // FIXME: Drop this protocol.
     pa->addConformance(proto, RequirementSource(kind, loc), *this);
@@ -1801,6 +1812,31 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 
     return type;
   });
+}
+
+Type
+ArchetypeBuilder::mapTypeOutOfContext(DeclContext *dc, Type type) {
+  GenericParamList *genericParams = dc->getGenericParamsOfContext();
+  return mapTypeOutOfContext(dc->getParentModule(), genericParams, type);
+}
+
+Type ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
+                                           GenericParamList *genericParams,
+                                           Type type) {
+  // If the context is non-generic, we're done.
+  if (!genericParams)
+    return type;
+
+  // Capture the archetype -> interface type mapping.
+  TypeSubstitutionMap subs;
+  for (auto params = genericParams; params != nullptr;
+       params = params->getOuterParameters()) {
+    for (auto param : *params) {
+      subs[param->getArchetype()] = param->getDeclaredType();
+    }
+  }
+
+  return type.subst(M, subs, SubstFlags::AllowLoweredTypes);
 }
 
 bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,

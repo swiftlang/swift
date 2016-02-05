@@ -1,4 +1,4 @@
-//===--- Generics.cpp ---- Utilities for transforming generics --*- C++ -*-===//
+//===--- Generics.cpp ---- Utilities for transforming generics ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

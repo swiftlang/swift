@@ -801,7 +801,7 @@ extension String {
   /// - SeeAlso: `String.init<Subject>(Subject)`
   public init<Subject>(reflecting subject: Subject) {
     self.init()
-    debugPrint(subject, terminator: "", toStream: &self)
+    _debugPrint_unlocked(subject, &self)
   }
 }
 

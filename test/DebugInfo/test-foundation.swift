@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
-// RUN: FileCheck %s --check-prefix SANITY < %t.ll
 // RUN: FileCheck %s --check-prefix CHECK-HIDDEN < %t.ll
 // RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
 // RUN: FileCheck %s --check-prefix LOC-CHECK < %t.ll
@@ -7,22 +6,7 @@
 // RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix DWARF-CHECK
 // RUN: dwarfdump --verify %t.o
 
-// Make sure that there is no ret instruction without a !dbg annotation.
-// This ensures that we associate every function with a debug scope.
-//
-// Unfortunately we need to exclude available_externally functions
-// from this test; they are only there to help with optimizations and
-// are ignored from MC on, so we don't emit debug info for them.
-// FIXME: Come up with an invocation of clang-extract that can eliminate
-// available_externally functions, so we can retire this hackfest:
 // REQUIRES: OS=macosx
-// RUN: cat %t.ll | grep -E '^define .*(\@get_field_types)' | wc -l >%t.external_count
-// This test assumes that the '!' can only appear as part of a !dbg annotation.
-// RUN: cat %t.ll | grep -E '^ *ret [^!]+$' | count `cat %t.external_count`
-
-// Sanity check for the regex above.
-// SANITY: {{^ *ret }}
-// SANITY: !DICompileUnit(
 
 // CHECK-HIDDEN: @[[HIDDEN_GV:_TWVVSC.*]] = linkonce_odr hidden
 // CHECK-HIDDEN-NOT: !DIGlobalVariable({{.*}}[[HIDDEN_GV]]
@@ -85,7 +69,6 @@ public func date() {
 // Make sure we build some witness tables for enums.
 func useOptions(opt: NSURLBookmarkCreationOptions)
        -> NSURLBookmarkCreationOptions {
-  var opt = opt
   return [opt, opt]
 }
 

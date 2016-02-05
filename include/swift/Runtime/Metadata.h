@@ -532,11 +532,14 @@ typedef int getExtraInhabitantIndex(const OpaqueValue *src,
                                     const Metadata *self);
 
 /// Given a valid object of this enum type, extracts the tag value indicating
-/// which case of the enum is inhabited. The tag value can be used to index
-/// into the array returned by the NominalTypeDescriptor's GetCaseTypes
-/// function to get the payload type and check if the payload is indirect.
-typedef unsigned getEnumTag(const OpaqueValue *src,
-                            const Metadata *self);
+/// which case of the enum is inhabited. Returned values are in the range
+/// [-ElementsWithPayload..ElementsWithNoPayload-1].
+///
+/// The tag value can be used to index into the array returned by the
+/// NominalTypeDescriptor's GetCaseTypes function to get the payload type
+/// and check if the payload is indirect.
+typedef int getEnumTag(const OpaqueValue *src,
+                       const Metadata *self);
 
 /// Given a valid object of this enum type, destructively strips the tag
 /// bits, leaving behind a value of the inhabited case payload type.
@@ -548,9 +551,10 @@ typedef void destructiveProjectEnumData(OpaqueValue *src,
 /// Given a valid object of an enum case payload's type, destructively add
 /// the tag bits for the given case, leaving behind a fully-formed value of
 /// the enum type. If the enum case does not have a payload, the initial
-/// state of the value can be undefined.
+/// state of the value can be undefined. The given tag value must be in
+/// the range [-ElementsWithPayload..ElementsWithNoPayload-1].
 typedef void destructiveInjectEnumTag(OpaqueValue *src,
-                                      unsigned tag,
+                                      int tag,
                                       const Metadata *self);
 
 } // end namespace value_witness_types
@@ -1088,7 +1092,7 @@ public:
     getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
   }
 
-  unsigned vw_getEnumTag(const OpaqueValue *value) const {
+  int vw_getEnumTag(const OpaqueValue *value) const {
     return getValueWitnesses()->_asEVWT()->getEnumTag(value, this);
   }
   void vw_destructiveProjectEnumData(OpaqueValue *value) const {
@@ -1213,10 +1217,8 @@ struct EnumTypeDescriptor;
 /// Common information about all nominal types. For generic types, this
 /// descriptor is shared for all instantiations of the generic type.
 struct NominalTypeDescriptor {
-  /// The kind of nominal type descriptor.
-  NominalTypeKind Kind;
   /// The mangled name of the nominal type, with no generic parameters.
-  const char *Name;
+  RelativeDirectPointer<char> Name;
   
   /// The following fields are kind-dependent.
   union {
@@ -1236,12 +1238,12 @@ struct NominalTypeDescriptor {
       
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
-      const char *FieldNames;
+      RelativeDirectPointer<char, /*nullable*/ true> FieldNames;
       
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
-      const FieldType *(*GetFieldTypes)(const Metadata *Self);
+      RelativeDirectPointer<const FieldType * (const Metadata *)> GetFieldTypes;
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -1260,12 +1262,12 @@ struct NominalTypeDescriptor {
       
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
-      const char *FieldNames;
+      RelativeDirectPointer<char, /*nullable*/ true> FieldNames;
       
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
-      const FieldType *(*GetFieldTypes)(const Metadata *Self);
+      RelativeDirectPointer<const FieldType * (const Metadata *)> GetFieldTypes;
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -1283,11 +1285,11 @@ struct NominalTypeDescriptor {
       /// The names of the cases. A doubly-null-terminated list of strings,
       /// whose length is NumNonEmptyCases + NumEmptyCases. Cases are named in
       /// tag order, non-empty cases first, followed by empty cases.
-      const char *CaseNames;
+      RelativeDirectPointer<char, /*nullable*/ true> CaseNames;
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// CaseNames. Only types for payload cases are provided.
-      const FieldType *(*GetCaseTypes)(const Metadata *Self);
+      RelativeDirectPointer<const FieldType * (const Metadata *)> GetCaseTypes;
 
       uint32_t getNumPayloadCases() const {
         return NumPayloadCasesAndPayloadSizeOffset & 0x00FFFFFFU;
@@ -1308,10 +1310,20 @@ struct NominalTypeDescriptor {
     } Enum;
   };
   
+  RelativeDirectPointerIntPair<GenericMetadata, NominalTypeKind>
+    GenericMetadataPatternAndKind;
+
   /// A pointer to the generic metadata pattern that is used to instantiate
-  /// instances of this type. Null if the type is not generic.
-  GenericMetadata *GenericMetadataPattern;
-  
+  /// instances of this type. Zero if the type is not generic.
+  GenericMetadata *getGenericMetadataPattern() const {
+    return const_cast<GenericMetadata*>(
+                                    GenericMetadataPatternAndKind.getPointer());
+  }
+
+  NominalTypeKind getKind() const {
+    return GenericMetadataPatternAndKind.getInt();
+  }
+
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal
   /// type.
@@ -1515,7 +1527,7 @@ public:
   /// Get a pointer to the field type vector, if present, or null.
   const FieldType *getFieldTypes() const {
     assert(isTypeMetadata());
-    auto *getter = Description->Class.GetFieldTypes;
+    auto *getter = Description->Class.GetFieldTypes.get();
     if (!getter)
       return nullptr;
     
@@ -1693,7 +1705,7 @@ struct StructMetadata : public Metadata {
   
   /// Get a pointer to the field type vector, if present, or null.
   const FieldType *getFieldTypes() const {
-    auto *getter = Description->Struct.GetFieldTypes;
+    auto *getter = Description->Struct.GetFieldTypes.get();
     if (!getter)
       return nullptr;
     
@@ -2159,8 +2171,8 @@ private:
     /// A direct reference to the metadata.
     RelativeDirectPointer<Metadata> DirectType;
 
-    /// The generic metadata pattern for an unbound generic type.
-    RelativeDirectPointer<GenericMetadata> GenericPattern;
+    /// The nominal type descriptor for a resilient or generic type.
+    RelativeDirectPointer<NominalTypeDescriptor> TypeDescriptor;
   };
 
   /// Flags describing the type metadata record.
@@ -2182,19 +2194,19 @@ public:
       break;
         
     case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
     return DirectType;
   }
- 
-  const GenericMetadata *getGenericPattern() const {
+
+  const NominalTypeDescriptor *getNominalTypeDescriptor() const {
     switch (Flags.getTypeKind()) {
     case TypeMetadataRecordKind::Universal:
       return nullptr;
 
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
     case TypeMetadataRecordKind::UniqueDirectClass:
@@ -2204,12 +2216,28 @@ public:
       assert(false && "not generic metadata pattern");
     }
     
-    return GenericPattern;
+    return TypeDescriptor;
   }
-  
+
   /// Get the canonical metadata for the type referenced by this record, or
   /// return null if the record references a generic or universal type.
   const Metadata *getCanonicalTypeMetadata() const;
+};
+
+struct FieldRecord {
+private:
+  RelativeIndirectablePointer<const char> MangledTypeName;
+
+  RelativeIndirectablePointer<const char> FieldName;
+
+public:
+  const char *getMangledTypeName() const {
+    return MangledTypeName;
+  }
+
+  const char *getFieldName()  const {
+    return FieldName;
+  }
 };
 
 /// The structure of a protocol conformance record.
@@ -2235,9 +2263,9 @@ private:
     /// An indirect reference to the metadata.
     RelativeIndirectablePointer<const ClassMetadata *> IndirectClass;
     
-    /// The generic metadata pattern for a generic type which has instances that
-    /// conform to the protocol.
-    RelativeIndirectablePointer<GenericMetadata> GenericPattern;
+    /// The nominal type descriptor for a resilient or generic type which has
+    /// instances that conform to the protocol.
+    RelativeIndirectablePointer<NominalTypeDescriptor> TypeDescriptor;
   };
   
   
@@ -2282,7 +2310,7 @@ public:
         
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not direct type metadata");
     }
 
@@ -2299,7 +2327,7 @@ public:
         
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
     case TypeMetadataRecordKind::UniqueIndirectClass:
       assert(false && "not direct class object");
     }
@@ -2320,19 +2348,19 @@ public:
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not indirect class object");
     }
     
     return IndirectClass;
   }
   
-  const GenericMetadata *getGenericPattern() const {
+  const NominalTypeDescriptor *getNominalTypeDescriptor() const {
     switch (Flags.getTypeKind()) {
     case TypeMetadataRecordKind::Universal:
       return nullptr;
 
-    case TypeMetadataRecordKind::UniqueGenericPattern:
+    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
         
     case TypeMetadataRecordKind::UniqueDirectClass:
@@ -2342,7 +2370,7 @@ public:
       assert(false && "not generic metadata pattern");
     }
     
-    return GenericPattern;
+    return TypeDescriptor;
   }
   
   /// Get the directly-referenced static witness table.
@@ -2407,27 +2435,6 @@ swift_getResilientMetadata(GenericMetadata *pattern);
 extern "C" const Metadata *
 swift_getGenericMetadata(GenericMetadata *pattern,
                          const void *arguments);
-
-// Fast entry points for swift_getGenericMetadata with a small number of
-// template arguments.
-extern "C" const Metadata *
-swift_getGenericMetadata1(GenericMetadata *pattern,
-                          const void *arg0);
-extern "C" const Metadata *
-swift_getGenericMetadata2(GenericMetadata *pattern,
-                          const void *arg0,
-                          const void *arg1);
-extern "C" const Metadata *
-swift_getGenericMetadata3(GenericMetadata *pattern,
-                          const void *arg0,
-                          const void *arg1,
-                          const void *arg2);
-extern "C" const Metadata *
-swift_getGenericMetadata4(GenericMetadata *pattern,
-                          const void *arg0,
-                          const void *arg1,
-                          const void *arg2,
-                          const void *arg3);
 
 // Callback to allocate a generic class metadata object.
 extern "C" ClassMetadata *

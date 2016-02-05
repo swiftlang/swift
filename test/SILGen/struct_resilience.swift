@@ -131,3 +131,34 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
 // CHECK:         return
   return f(s)
 }
+
+// CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience25publicTransparentFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
+@_transparent public func publicTransparentFunction(s: MySize) -> Int {
+
+  // Since the body of a public transparent function might be inlined into
+  // other resilience domains, we have to use accessors
+
+// CHECK:         [[SELF:%.*]] = alloc_stack $MySize
+// CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
+
+// CHECK:         [[GETTER:%.*]] = function_ref @_TFV17struct_resilience6MySizeg1wSi
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
+// CHECK-NEXT:    destroy_addr [[SELF]]
+// CHECK-NEXT:    dealloc_stack [[SELF]]
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    return [[RESULT]]
+  return s.w
+}
+
+// CHECK-LABEL: sil hidden [transparent] @_TF17struct_resilience27internalTransparentFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
+@_transparent func internalTransparentFunction(s: MySize) -> Int {
+
+  // The body of an internal transparent function will not be inlined into
+  // other resilience domains, so we can access storage directly
+
+// CHECK:         [[W_ADDR:%.*]] = struct_element_addr %0 : $*MySize, #MySize.w
+// CHECK-NEXT:    [[RESULT:%.*]] = load [[W_ADDR]] : $*Int
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    return [[RESULT]]
+  return s.w
+}

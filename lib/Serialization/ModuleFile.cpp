@@ -1,4 +1,4 @@
-//===--- ModuleFile.cpp - Loading a serialized module -----------*- C++ -*-===//
+//===--- ModuleFile.cpp - Loading a serialized module ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -1405,6 +1405,25 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
     for (auto item : list)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
                          DeclVisibilityKind::DynamicLookup);
+  }
+}
+
+void ModuleFile::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) {
+  // If we don't have an Objective-C method table, there's nothing to do.
+  if (!ObjCMethods) return;
+
+  // Look for all methods in the module file with this selector.
+  auto known = ObjCMethods->find(selector);
+  if (known == ObjCMethods->end()) return;
+
+  auto found = *known;
+  for (const auto &result : found) {
+    // Deserialize the method and add it to the list.
+    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
+                      getDecl(std::get<2>(result))))
+      results.push_back(func);
   }
 }
 

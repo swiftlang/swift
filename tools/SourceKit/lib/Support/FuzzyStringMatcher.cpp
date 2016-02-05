@@ -35,7 +35,7 @@ FuzzyStringMatcher::FuzzyStringMatcher(StringRef pattern_)
   assert(pattern.size() == lowercasePattern.size());
 
   // FIXME: pull out the magic constants.
-  // This depends on the inner details of the matching algorithm and  will need
+  // This depends on the inner details of the matching algorithm and will need
   // to be updated if we substantially alter it.
   if (pattern.size() == 1) {
     maxScore = 3.0 +  // uppercase match

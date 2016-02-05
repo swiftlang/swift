@@ -74,7 +74,7 @@ class SILGlobalOpt {
 
   // Whether we see a "once" call to callees that we currently don't handle.
   bool UnhandledOnceCallee = false;
-  // Recored number of times a globalinit_func is called by "once".
+  // Record number of times a globalinit_func is called by "once".
   llvm::DenseMap<SILFunction*, unsigned> InitializerCount;
 public:
   SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA),
@@ -137,7 +137,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     DestBB->push_back(Cloned);
     SILClonerWithScopes<InstructionsCloner>::postProcess(Orig, Cloned);
-    AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+    AvailVals.push_back(std::make_pair(Orig, Cloned));
   }
 
   // Clone all instructions from Insns into DestBB
@@ -241,10 +241,16 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   Cloner.clone();
   GetterF->setInlined();
 
-  // Find the store instruction
+  // Find the store instruction and turn it into return.
+  // Remove the alloc_global instruction.
   auto BB = EntryBB;
   SILValue Val;
-  for (auto &I : *BB) {
+  for (auto II = BB->begin(), E = BB->end(); II != E;) {
+    auto &I = *II++;
+    if (isa<AllocGlobalInst>(&I)) {
+      I.eraseFromParent();
+      continue;
+    }
     if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
       Val = SI->getSrc();
       SILBuilderWithScope B(SI);
@@ -489,7 +495,13 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   auto BB = EntryBB;
   SILValue Val;
   SILInstruction *Store;
-  for (auto &I : *BB) {
+  for (auto II = BB->begin(), E = BB->end(); II != E;) {
+    auto &I = *II++;
+    if (isa<AllocGlobalInst>(&I)) {
+      I.eraseFromParent();
+      continue;
+    }
+
     if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
       Val = SI->getSrc();
       Store = SI;

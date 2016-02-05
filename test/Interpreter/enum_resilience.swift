@@ -9,7 +9,18 @@
 // RUN: %target-build-swift %s -Xlinker %t/resilient_struct.o -Xlinker %t/resilient_enum.o -I %t -L %t -o %t/main
 // RUN: %target-run %t/main
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import resilient_enum
 import resilient_struct
 

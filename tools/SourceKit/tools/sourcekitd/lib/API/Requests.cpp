@@ -95,6 +95,13 @@ static LazySKDUID KindExpr("source.lang.swift.expr");
 static LazySKDUID KindStmt("source.lang.swift.stmt");
 static LazySKDUID KindType("source.lang.swift.type");
 
+static LazySKDUID KindEverything("source.codecompletion.everything");
+static LazySKDUID KindModule("source.codecompletion.module");
+static LazySKDUID KindKeyword("source.codecompletion.keyword");
+static LazySKDUID KindLiteral("source.codecompletion.literal");
+static LazySKDUID KindCustom("source.codecompletion.custom");
+static LazySKDUID KindIdentifier("source.codecompletion.identifier");
+
 static UIdent DiagKindNote("source.diagnostic.severity.note");
 static UIdent DiagKindWarning("source.diagnostic.severity.warning");
 static UIdent DiagKindError("source.diagnostic.severity.error");
@@ -1306,10 +1313,73 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   ResponseBuilder RespBuilder;
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
-  if (optionsDict)
+  std::vector<FilterRule> filterRules;
+  if (optionsDict) {
     options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
+    bool failed = false;
+    optionsDict->dictionaryArrayApply(KeyFilterRules, [&](RequestDict dict) {
+      FilterRule rule;
+      auto kind = dict.getUID(KeyKind);
+      if (kind == KindEverything) {
+        rule.kind = FilterRule::Everything;
+      } else if (kind == KindModule) {
+        rule.kind = FilterRule::Module;
+      } else if (kind == KindKeyword) {
+        rule.kind = FilterRule::Keyword;
+      } else if (kind == KindLiteral) {
+        rule.kind = FilterRule::Literal;
+      } else if (kind == KindCustom) {
+        rule.kind = FilterRule::CustomCompletion;
+      } else if (kind == KindIdentifier) {
+        rule.kind = FilterRule::Identifier;
+      } else {
+        // Warning: unknown
+      }
+
+      int64_t hide;
+      if (dict.getInt64(KeyHide, hide, false)) {
+        failed = true;
+        CCC.failed("filter rule missing required key 'key.hide'");
+        return true;
+      }
+
+      rule.hide = hide;
+
+      switch (rule.kind) {
+      case FilterRule::Everything:
+        break;
+      case FilterRule::Module:
+      case FilterRule::Identifier: {
+        SmallVector<const char *, 8> names;
+        if (dict.getStringArray(KeyNames, names, false)) {
+          failed = true;
+          CCC.failed("filter rule missing required key 'key.names'");
+          return true;
+        }
+        rule.names.assign(names.begin(), names.end());
+        break;
+      }
+      case FilterRule::Keyword:
+      case FilterRule::Literal:
+      case FilterRule::CustomCompletion: {
+        SmallVector<sourcekitd_uid_t, 8> uids;
+        dict.getUIDArray(KeyUIDs, uids, true);
+        for (auto uid : uids)
+          rule.uids.push_back(UIdentFromSKDUID(uid));
+        break;
+      }
+      }
+
+      filterRules.push_back(std::move(rule));
+      return false; // continue
+    });
+
+    if (failed)
+      return CCC.createResponse();
+  }
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), CCC, Args);
+  Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), filterRules, CCC,
+                        Args);
   return CCC.createResponse();
 }
 
@@ -1754,7 +1824,7 @@ bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
   Node.set(KeyKind, Kind);
   Node.set(KeyOffset, Offset);
   Node.set(KeyLength, Length);
-  return  true;
+  return true;
 }
 
 bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {

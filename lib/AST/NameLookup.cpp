@@ -1091,9 +1091,6 @@ bool DeclContext::lookupQualified(Type type,
 
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
-    assert(!(options & NL_IgnoreAccessibility) &&
-           "accessibility always enforced for module-level lookup");
-
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
@@ -1373,4 +1370,22 @@ bool DeclContext::lookupQualified(Type type,
 
   // We're done. Report success/failure.
   return !decls.empty();
+}
+
+void DeclContext::lookupAllObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  // Collect all of the methods with this selector.
+  forAllVisibleModules(this, [&](Module::ImportedModule import) {
+    import.second->lookupObjCMethods(selector, results);
+  });
+
+  // Filter out duplicates.
+  llvm::SmallPtrSet<AbstractFunctionDecl *, 8> visited;
+  results.erase(
+    std::remove_if(results.begin(), results.end(),
+                   [&](AbstractFunctionDecl *func) -> bool {
+                     return !visited.insert(func).second;
+                   }),
+    results.end());
 }

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenModule.h"
+#include "SwiftTargetInfo.h"
 
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Constants.h"
@@ -23,11 +24,20 @@
 #include "llvm/IR/Type.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/ProfileData/InstrProf.h"
 
 using namespace swift;
 using namespace irgen;
 
 using llvm::coverage::CounterMappingRegion;
+
+static bool isMachO(IRGenModule &IGM) {
+  return SwiftTargetInfo::get(IGM).OutputObjectFormat == llvm::Triple::MachO;
+}
+
+static StringRef getCoverageSection(IRGenModule &IGM) {
+  return llvm::getInstrProfCoverageSectionName(isMachO(IGM));
+}
 
 void IRGenModule::emitCoverageMapping() {
   const auto &Mappings = SILMod->getCoverageMapList();
@@ -60,11 +70,19 @@ void IRGenModule::emitCoverageMapping() {
   size_t CurrentSize, PrevSize = FilenamesSize;
 
   // Now we need to build up the list of function records.
-  auto *Int32Ty = llvm::Type::getInt32Ty(LLVMContext);
-  auto *Int64Ty = llvm::Type::getInt64Ty(LLVMContext);
-  auto *Int8PtrTy = llvm::Type::getInt8PtrTy(LLVMContext);
-  auto *FunctionRecordTy = llvm::StructType::get(
-      LLVMContext, {Int8PtrTy, Int32Ty, Int32Ty, Int64Ty}, /*isPacked=*/true);
+  llvm::LLVMContext &Ctx = LLVMContext;
+  auto *Int32Ty = llvm::Type::getInt32Ty(Ctx);
+  auto *Int64Ty = llvm::Type::getInt64Ty(Ctx);
+  auto *Int8PtrTy = llvm::Type::getInt8PtrTy(Ctx);
+
+#define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) LLVMType,
+  llvm::Type *FunctionRecordTypes[] = {
+#include "llvm/ProfileData/InstrProfData.inc"
+  };
+
+  auto FunctionRecordTy =
+      llvm::StructType::get(Ctx, llvm::makeArrayRef(FunctionRecordTypes),
+                            /*isPacked=*/true);
 
   std::vector<llvm::Constant *> FunctionRecords;
   std::vector<CounterMappingRegion> Regions;
@@ -81,20 +99,17 @@ void IRGenModule::emitCoverageMapping() {
                                             Regions);
     W.write(OS);
 
-    auto *NameVal =
-        llvm::ConstantDataArray::getString(LLVMContext, M.getName(), true);
-    auto *NameVar =
-        new llvm::GlobalVariable(*getModule(), NameVal->getType(), true,
-                                 llvm::GlobalValue::LinkOnceAnyLinkage, NameVal,
-                                 "__llvm_profile_name_" + M.getName());
+    auto *NameVal = llvm::ConstantDataArray::getString(Ctx, M.getName(), false);
+    auto *NameVar = new llvm::GlobalVariable(
+        *getModule(), NameVal->getType(), true,
+        llvm::GlobalValue::LinkOnceAnyLinkage, NameVal,
+        llvm::getInstrProfNameVarPrefix() + M.getName());
 
     CurrentSize = OS.str().size();
     // Create a record for this function.
     llvm::Constant *FunctionRecordVals[] = {
         llvm::ConstantExpr::getBitCast(NameVar, Int8PtrTy),
-        // TODO: We're including the null to match the profile, but we should
-        // really skip the null in the profile instead.
-        llvm::ConstantInt::get(Int32Ty, M.getName().size() + 1),
+        llvm::ConstantInt::get(Int32Ty, M.getName().size()),
         llvm::ConstantInt::get(Int32Ty, CurrentSize - PrevSize),
         llvm::ConstantInt::get(Int64Ty, M.getHash())};
     FunctionRecords.push_back(llvm::ConstantStruct::get(
@@ -111,7 +126,7 @@ void IRGenModule::emitCoverageMapping() {
       OS << '\0';
   }
   auto *EncodedData =
-      llvm::ConstantDataArray::getString(LLVMContext, OS.str(), false);
+      llvm::ConstantDataArray::getString(Ctx, OS.str(), false);
 
   auto *RecordsTy =
       llvm::ArrayType::get(FunctionRecordTy, FunctionRecords.size());
@@ -119,19 +134,22 @@ void IRGenModule::emitCoverageMapping() {
 
   // Now we embed everything into a constant with a well-known name.
   auto *CovDataTy =
-      llvm::StructType::get(LLVMContext, {Int32Ty, Int32Ty, Int32Ty, Int32Ty,
-                                          RecordsTy, EncodedData->getType()});
+      llvm::StructType::get(Ctx, {Int32Ty, Int32Ty, Int32Ty, Int32Ty, RecordsTy,
+                                  EncodedData->getType()});
   llvm::Constant *TUDataVals[] = {
       llvm::ConstantInt::get(Int32Ty, FunctionRecords.size()),
       llvm::ConstantInt::get(Int32Ty, FilenamesSize),
       llvm::ConstantInt::get(Int32Ty, CoverageMappingSize),
       llvm::ConstantInt::get(Int32Ty, llvm::coverage::CoverageMappingVersion1),
-      RecordsVal, EncodedData};
+      RecordsVal,
+      EncodedData};
   auto CovDataVal =
       llvm::ConstantStruct::get(CovDataTy, makeArrayRef(TUDataVals));
   auto CovData = new llvm::GlobalVariable(
       *getModule(), CovDataTy, true, llvm::GlobalValue::InternalLinkage,
-      CovDataVal, "__llvm_coverage_mapping");
+      CovDataVal, llvm::getCoverageMappingVarName());
+  CovData->setSection(getCoverageSection(*this));
+  CovData->setAlignment(8);
 
   addUsedGlobal(CovData);
 }

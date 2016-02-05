@@ -542,6 +542,14 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
     if (argType->is<InOutType>()) {
       return ConstraintSystem::SolutionKind::Error;
     }
+    // If the param type is an empty existential composition, the function can
+    // only have one argument. Check if exactly one argument was passed to this
+    // function, otherwise we obviously have a mismatch
+    if (auto tupleArgType = argType->getAs<TupleType>()) {
+      if (tupleArgType->getNumElements() != 1) {
+        return ConstraintSystem::SolutionKind::Error;
+      }
+    }
     return ConstraintSystem::SolutionKind::Solved;
   }
 
@@ -691,7 +699,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       // If the names don't match, we may have a conflict.
       if (elt1.getName() != elt2.getName()) {
         // Same-type requirements require exact name matches.
-        if (kind == TypeMatchKind::SameType)
+        if (kind <= TypeMatchKind::SameType)
           return SolutionKind::Error;
 
         // For subtyping constraints, just make sure that this name isn't
@@ -1291,6 +1299,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           assignFixedType(typeVar1, type2);
         }
         return SolutionKind::Solved;
+      } else if (typeVar1 && typeVar2) {
+        auto rep1 = getRepresentative(typeVar1);
+        auto rep2 = getRepresentative(typeVar2);
+        if (rep1 == rep2) {
+          return SolutionKind::Solved;
+        }
       }
       return SolutionKind::Unsolved;
     }
@@ -1323,9 +1337,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       SWIFT_FALLTHROUGH;
 
+    case TypeMatchKind::Conversion:
+      if (typeVar1 && typeVar2) {
+        auto rep1 = getRepresentative(typeVar1);
+        auto rep2 = getRepresentative(typeVar2);
+        if (rep1 == rep2) {
+          // We already merged these two types, so this constraint is
+          // trivially solved.
+          return SolutionKind::Solved;
+        }
+      }
+      SWIFT_FALLTHROUGH;
+
     case TypeMatchKind::ConformsTo:
     case TypeMatchKind::Subtype:
-    case TypeMatchKind::Conversion:
     case TypeMatchKind::ExplicitConversion:
     case TypeMatchKind::ArgumentConversion:
     case TypeMatchKind::OperatorArgumentTupleConversion:
@@ -1670,8 +1695,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   if (concrete && kind >= TypeMatchKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
-    // T1 is convertible to T2 (by loading the value).
-    if (type1->is<LValueType>())
+    // T1 is convertible to T2 (by loading the value).  Note that we cannot get
+    // a value of inout type as an lvalue though.
+    if (type1->is<LValueType>() && !type2->is<InOutType>())
       conversionsOrFixes.push_back(
         ConversionRestrictionKind::LValueToRValue);
 
@@ -2784,6 +2810,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
+    
+    // If we're doing a lookup for diagnostics, include inaccessible members,
+    // the diagnostics machinery will sort it out.
+    if (includeInaccessibleMembers)
+      lookupOptions |= NameLookupFlags::IgnoreAccessibility;
+
     LookupResult ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
     if (!ctors)
       return result;    // No result.
@@ -2883,6 +2915,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
+    
+    // If we're doing a lookup for diagnostics, include inaccessible members,
+    // the diagnostics machinery will sort it out.
+    if (includeInaccessibleMembers)
+      lookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    
     auto lookup = TC.lookupMemberType(DC, baseObjTy, memberName.getBaseName(),
                                       lookupOptions);
     // Form the overload set.
@@ -3085,9 +3123,8 @@ retry_after_fail:
     // Ignore accessibility so we get candidates that might have been missed
     // before.
     lookupOptions |= NameLookupFlags::IgnoreAccessibility;
-    
-    if (isa<AbstractFunctionDecl>(DC))
-      lookupOptions |= NameLookupFlags::KnownPrivate;
+    // This is only used for diagnostics, so always use KnownPrivate.
+    lookupOptions |= NameLookupFlags::KnownPrivate;
     
     auto lookup = TC.lookupMember(DC, baseObjTy->getCanonicalType(),
                                   memberName, lookupOptions);
@@ -3225,7 +3262,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
   }
   
-  if (shouldAttemptFixes() && name.isSimpleName("allZeros") &&
+  if (shouldAttemptFixes() && name.isSimpleName(getASTContext().Id_allZeros) &&
       (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
     // Replace a reference to "X.allZeros" with a reference to X().
     // FIXME: This is temporary.

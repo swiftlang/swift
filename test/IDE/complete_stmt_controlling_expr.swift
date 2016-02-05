@@ -437,7 +437,7 @@ func testSwitchCaseWhereExprI1(fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (let i, 0) where #^SWITCH_CASE_WHERE_EXPR_I_1^#
+    case (var i, 0) where #^SWITCH_CASE_WHERE_EXPR_I_1^#
   }
 }
 
@@ -445,7 +445,7 @@ func testSwitchCaseWhereExprI2(fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (0, let i) where #^SWITCH_CASE_WHERE_EXPR_I_2^#
+    case (0, var i) where #^SWITCH_CASE_WHERE_EXPR_I_2^#
   }
 }
 
@@ -453,7 +453,7 @@ func testSwitchCaseWhereExprIJ1(fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (let i, let j) where #^SWITCH_CASE_WHERE_EXPR_I_J_1^#
+    case (var i, var j) where #^SWITCH_CASE_WHERE_EXPR_I_J_1^#
   }
 }
 

@@ -201,11 +201,12 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
     auto labelItem =
       CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
 
-    auto eltRef = new (C) DeclRefExpr(elt, SourceLoc(), /*implicit*/true);
+    auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
     auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
     
-    auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true,
+    auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/true,
                                        AccessSemantics::DirectToStorage);
 
     auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
@@ -232,7 +233,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                    dfltBody));
 
   auto rawDecl = initDecl->getParameterList(1)->get(0);
-  auto rawRef = new (C) DeclRefExpr(rawDecl, SourceLoc(), /*implicit*/true);
+  auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), rawRef,
                                        SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
@@ -268,7 +269,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
-  auto *rawDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(),
+  auto *rawDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),
                                     C.Id_rawValue, SourceLoc(),
                                     C.Id_rawValue, rawType, parentDC);
   rawDecl->setImplicit();

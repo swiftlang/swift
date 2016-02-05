@@ -29,7 +29,7 @@ func foo() {
 
 func test3(a: inout Int) {} // expected-error {{'inout' must appear before the parameter name}}{{12-12=inout }}{{15-21=}}
 
-super.init() // expected-error {{'super' cannot be used outside of class members}} expected-error {{initializers may only be declared within a type}}
+super.init() // expected-error {{'super' cannot be used outside of class members}}
 
 switch state { // expected-error {{use of unresolved identifier 'state'}}
   let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} \
@@ -46,7 +46,7 @@ func test4() {
 // rdar://problem/18507467
 func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}}
 // expected-error @-1 {{expected ',' separator}} {{20-20=,}}
-// expected-error @-2 {{expected parameter type following ':'}}
+// expected-error @-2 {{expected parameter name followed by ':'}}
 // expected-error @-3 {{expected ',' separator}}
 
 

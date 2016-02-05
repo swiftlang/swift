@@ -453,7 +453,7 @@ protected:
 /// The collected use points will be consulted during forward and backward
 /// copy propagation.
 bool CopyForwarding::collectUsers() {
-  for (auto UI : CurrentDef.getUses()) {
+  for (auto UI : CurrentDef->getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
       /// A call to materializeForSet exposes an address within the parent
@@ -531,7 +531,7 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
 
   // Gather a list of CopyDest users in this block.
   SmallPtrSet<SILInstruction*, 16> DestUserInsts;
-  for (auto UI : CopyDest.getUses()) {
+  for (auto UI : CopyDest->getUses()) {
     SILInstruction *UserInst = UI->getUser();
     if (UserInst != CopyInst && UI->getUser()->getParent() == BB)
       DestUserInsts.insert(UI->getUser());
@@ -588,7 +588,7 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
   SILValue CopyDest = Copy->getDest();
   DominanceInfo *DT = nullptr;
 
-  for (auto *Use : CopyDest.getUses()) {
+  for (auto *Use : CopyDest->getUses()) {
     auto *UserInst = Use->getUser();
     if (UserInst == Copy)
       continue;
@@ -648,7 +648,7 @@ static void replaceAllUsesExceptDealloc(AllocStackInst *ASI, ValueBase *RHS) {
       Uses.push_back(Use);
   }
   for (Operand *Use : Uses) {
-    Use->set(SILValue(RHS, Use->get().getResultNumber()));
+    Use->set(RHS);
   }
 }
 
@@ -799,13 +799,13 @@ findAddressRootAndUsers(ValueBase *Def,
                         SmallPtrSetImpl<SILInstruction*> &RootUserInsts) {
   if (isa<InitEnumDataAddrInst>(Def) || isa<InitExistentialAddrInst>(Def)) {
     SILValue InitRoot = cast<SILInstruction>(Def)->getOperand(0);
-    for (auto *Use : InitRoot.getUses()) {
+    for (auto *Use : InitRoot->getUses()) {
       auto *UserInst = Use->getUser();
       if (UserInst == Def)
         continue;
       RootUserInsts.insert(UserInst);
     }
-    return InitRoot.getDef();
+    return InitRoot;
   }
   return Def;
 }
@@ -817,7 +817,7 @@ bool CopyForwarding::backwardPropagateCopy(
   SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
 
   SILValue CopySrc = CopyInst->getSrc();
-  ValueBase *CopyDestDef = CopyInst->getDest().getDef();
+  ValueBase *CopyDestDef = CopyInst->getDest();
   SmallPtrSet<SILInstruction*, 8> RootUserInsts;
   ValueBase *CopyDestRoot = findAddressRootAndUsers(CopyDestDef, RootUserInsts);
 
@@ -1130,7 +1130,7 @@ static void performNRVO(CopyAddrInst *CopyInst) {
   DEBUG(llvm::dbgs() << "NRVO eliminates copy" << *CopyInst);
   ++NumCopyNRVO;
   replaceAllUsesExceptDealloc(cast<AllocStackInst>(CopyInst->getSrc()),
-                              CopyInst->getDest().getDef());
+                              CopyInst->getDest());
   assert(CopyInst->getSrc() == CopyInst->getDest() && "bad NRVO");
   CopyInst->eraseFromParent();
 }

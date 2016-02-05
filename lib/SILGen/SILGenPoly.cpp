@@ -472,7 +472,7 @@ static void explodeTuple(SILGenFunction &gen,
   // elements.
   SILValue tuple = managedTuple.forward(gen);
 
-  auto tupleSILType = tuple.getType();
+  auto tupleSILType = tuple->getType();
   auto tupleType = tupleSILType.castTo<TupleType>();
 
   out.reserve(tupleType->getNumElements());
@@ -553,7 +553,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     if (outputAddr) {
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
-      auto &outputEltTL = SGF.getTypeLowering(outputEltAddr.getType());
+      auto &outputEltTL = SGF.getTypeLowering(outputEltAddr->getType());
       assert(outputEltTL.isAddressOnly() == inputEltTL.isAddressOnly());
       auto cleanup =
         SGF.enterDormantTemporaryCleanup(outputEltAddr, outputEltTL);
@@ -623,7 +623,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
-    gen.getTypeLowering(paramValue.getType())
+    gen.getTypeLowering(paramValue->getType())
           .emitRetainValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
@@ -635,7 +635,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
     if (allowPlusZero) {
       return ManagedValue::forUnmanaged(paramValue);
     } else {
-      auto copy = gen.emitTemporaryAllocation(loc, paramValue.getType());
+      auto copy = gen.emitTemporaryAllocation(loc, paramValue->getType());
       gen.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
       return gen.emitManagedBufferWithCleanup(copy);
     }
@@ -1108,7 +1108,7 @@ namespace {
         llvm::errs() << "inout writeback in abstraction difference thunk "
                         "not yet implemented\n";
         llvm::errs() << "input value ";
-        input.getValue().dump();
+        input.getValue()->dump();
         llvm::errs() << "output type " << result.getSILType() << "\n";
         abort();
       }
@@ -1205,7 +1205,7 @@ static SILValue getThunkInnerResultAddr(SILGenFunction &gen,
     resultType = gen.F.mapTypeIntoContext(resultType);
     
     // Re-use the original result if possible.
-    if (outerResultAddr && outerResultAddr.getType() == resultType)
+    if (outerResultAddr && outerResultAddr->getType() == resultType)
       return outerResultAddr;
     else
       return gen.emitTemporaryAllocation(loc, resultType);
@@ -1433,21 +1433,28 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
-  auto &Types = SGM.M.Types;
+  auto *moduleDecl = SGM.M.getSwiftModule();
   for (auto &param : params) {
     interfaceParams.push_back(
-      SILParameterInfo(Types.getInterfaceTypeOutOfContext(param.getType(), generics),
-                       param.getConvention()));
+      SILParameterInfo(
+          ArchetypeBuilder::mapTypeOutOfContext(
+              moduleDecl, generics, param.getType())
+                ->getCanonicalType(),
+          param.getConvention()));
   }
   
   auto interfaceResult = SILResultInfo(
-    Types.getInterfaceTypeOutOfContext(expectedType->getResult().getType(), generics),
-    expectedType->getResult().getConvention());
+      ArchetypeBuilder::mapTypeOutOfContext(
+          moduleDecl, generics, expectedType->getResult().getType())
+              ->getCanonicalType(),
+      expectedType->getResult().getConvention());
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     interfaceErrorResult = SILResultInfo(
-      Types.getInterfaceTypeOutOfContext(expectedType->getErrorResult().getType(), generics),
+      ArchetypeBuilder::mapTypeOutOfContext(
+        moduleDecl, generics, expectedType->getErrorResult().getType())
+            ->getCanonicalType(),
       expectedType->getErrorResult().getConvention());
   }
   
@@ -1669,6 +1676,13 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
     F.setContextGenericParams(context);
     subs = getForwardingSubstitutions();
     fTy = fTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+
+    inputSubstType = cast<FunctionType>(
+        cast<GenericFunctionType>(inputSubstType)
+            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
+    outputSubstType = cast<FunctionType>(
+        cast<GenericFunctionType>(outputSubstType)
+            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
   }
 
   // Emit the indirect return and arguments.
@@ -1839,10 +1853,10 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
 
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
-  CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
+  CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredInterfaceType;
   if (!witnessSubs.empty()) {
     witnessSubstTy = cast<FunctionType>(
-      cast<PolymorphicFunctionType>(witnessSubstTy)
+      cast<GenericFunctionType>(witnessSubstTy)
         ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
         ->getCanonicalType());
   }
@@ -1852,17 +1866,19 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // abstraction pattern.
   auto reqtInfo = getConstantInfo(requirement);
 
-  // Ugh...
-  CanAnyFunctionType reqtSubstTy = reqtInfo.FormalType;
+  // FIXME: reqtSubstTy is already computed in SGM::emitProtocolWitness(),
+  // but its called witnessSubstIfaceTy there; the mapTypeIntoContext()
+  // calls should be pushed down into thunk emission.
+  CanAnyFunctionType reqtSubstTy = reqtInfo.LoweredInterfaceType;
   reqtSubstTy = cast<AnyFunctionType>(
-    cast<PolymorphicFunctionType>(reqtSubstTy)
-      ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
-                         conformance->getType())
+    cast<GenericFunctionType>(reqtSubstTy)
+      ->partialSubstGenericArgs(conformance->getDeclContext()->getParentModule(),
+                                conformance->getInterfaceType())
       ->getCanonicalType());
-  reqtSubstTy = SGM.Types.getLoweredASTFunctionType(reqtSubstTy,
-                                                    requirement.uncurryLevel,
-                                                    requirement);
-  CanType reqtSubstInputTy = reqtSubstTy.getInput();
+  CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())
+      ->getCanonicalType();
+  CanType reqtSubstResultTy = F.mapTypeIntoContext(reqtSubstTy.getResult())
+      ->getCanonicalType();
 
   AbstractionPattern reqtOrigTy(reqtInfo.LoweredInterfaceType);
   AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
@@ -1920,7 +1936,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                                 witness, isFree,
                                                 witnessParams, loc);
 
-  auto witnessFTy = witnessFnRef.getType().getAs<SILFunctionType>();
+  auto witnessFTy = witnessFnRef->getType().getAs<SILFunctionType>();
   
   if (!witnessSubs.empty())
     witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
@@ -1981,7 +1997,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                             AbstractionPattern(witnessSubstTy.getResult()), // XXX ugly
                                             witnessSubstTy.getResult(),
                                             reqtOrigTy.getFunctionResultType(),
-                                            reqtSubstTy.getResult(),
+                                            reqtSubstResultTy,
                                             witnessResultValue,
                                             witnessSubstResultAddr,
                                             reqtResultAddr);

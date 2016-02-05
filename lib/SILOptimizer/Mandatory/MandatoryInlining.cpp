@@ -60,7 +60,7 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
   // Add a retain of each non-address type capture argument, because it will be
   // consumed by the closure body.
   for (auto &CaptureArg : CaptureArgs)
-    if (!CaptureArg.getType().isAddress())
+    if (!CaptureArg->getType().isAddress())
       B.emitRetainValueOperation(Loc, CaptureArg);
 }
 
@@ -72,7 +72,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
     if (SILInstruction *I = dyn_cast<SILInstruction>(V))
-      if (I != CalleeValue.getDef() &&
+      if (I != CalleeValue &&
           isInstructionTriviallyDead(I))
         InstsToDelete.push_back(I);
   }
@@ -116,7 +116,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     // If we found a strong release, replace it with a strong release of the
     // source of the store and erase it.
     if (SRI) {
-      if (CalleeValue.isValid())
+      if (CalleeValue)
         SILBuilderWithScope(SRI)
             .emitStrongReleaseAndFold(SRI->getLoc(), CalleeValue);
       SRI->eraseFromParent();
@@ -126,13 +126,11 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     PBI->eraseFromParent();
     assert(ABI->use_empty());
     ABI->eraseFromParent();
-    if (!CalleeValue.isValid())
+    if (!CalleeValue)
       return;
   }
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
-
     SILValue Callee = PAI->getCallee();
     if (!tryDeleteDeadClosure(PAI))
       return;
@@ -140,7 +138,6 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
 
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     SILValue Callee = TTTFI->getCallee();
     if (!tryDeleteDeadClosure(TTTFI))
       return;
@@ -148,7 +145,6 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
 
   if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     if (!FRI->use_empty())
       return;
     FRI->eraseFromParent();
@@ -179,7 +175,6 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   SILValue CalleeValue = AI.getCallee();
 
   if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen
     auto *PBI = dyn_cast<ProjectBoxInst>(LI->getOperand());
@@ -206,7 +201,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
       // making any assumptions
       if (static_cast<SILInstruction*>(I) == LI)
         return nullptr;
-      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest().getDef() == PBI) {
+      if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest() == PBI) {
         // We found a store that we know dominates the load; now ensure there
         // are no other uses of the project_box except loads.
         for (Operand *PBIUse : PBI->getUses())
@@ -226,8 +221,6 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   // generated when using auto closures.
   if (PartialApplyInst *PAI =
         dyn_cast<PartialApplyInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
-
     for (const auto &Arg : PAI->getArguments()) {
       CaptureArgs.push_back(Arg);
       FullArgs.push_back(Arg);
@@ -238,7 +231,6 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
     PartialApply = PAI;
   } else if (ThinToThickFunctionInst *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
-    assert(CalleeValue.getResultNumber() == 0);
     CalleeValue = TTTFI->getOperand();
     IsThick = true;
   }

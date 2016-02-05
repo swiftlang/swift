@@ -20,6 +20,7 @@ namespace swift {
 class GenericParamList;
 class CanType;
 class ExtensionDecl;
+class NominalTypeDecl;
 class TypeBase;
 class DeclContext;
 class Type;
@@ -205,6 +206,8 @@ struct PrintOptions {
 
   std::shared_ptr<PrinterArchetypeTransformer> pTransformer;
 
+  NominalTypeDecl *SynthesizedTarget = nullptr;
+
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
     PrintOptions result;
@@ -246,7 +249,15 @@ struct PrintOptions {
     return result;
   }
 
-  static PrintOptions printTypeInterface(Type T, DeclContext *DC);
+  static PrintOptions printTypeInterface(Type T, const DeclContext *DC);
+
+  void setArchetypeTransform(Type T, const DeclContext *DC);
+
+  void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
+
+  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
+
+  void clearArchetypeTransformerForSynthesizedExtensions();
 
   /// Retrieve the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {

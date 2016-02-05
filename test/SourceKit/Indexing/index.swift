@@ -33,8 +33,7 @@ protocol Prot {
   func protMeth(a: Prot)
 }
 
-func foo(a: CC, b: E) {
-  var b = b
+func foo(a: CC, var b: E) {
   globV = 0
   a + a.instV
   a.meth()

@@ -89,14 +89,6 @@ public:
       add(UI->getUser());
   }
 
-  /// If only one result of an instruction has been simplified, add all of the
-  /// users of that result to the worklist since additional simplifications of
-  /// its users may have been exposed.
-  void addUsersToWorklist(ValueBase *I, unsigned Index) {
-    for (auto UI : SILValue(I, Index).getUses())
-      add(UI->getUser());
-  }
-
   /// Check that the worklist is empty and nuke the backing store for the map if
   /// it is large.
   void zap() {
@@ -161,11 +153,6 @@ public:
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
   SILInstruction *replaceInstUsesWith(SILInstruction &I, ValueBase *V);
-
-  /// This is meant to be used when one is attempting to replace only one of the
-  /// results of I with a result of V.
-  SILInstruction *replaceInstUsesWith(SILInstruction &I, ValueBase *V,
-                                      unsigned IIndex, unsigned VIndex=0);
 
   // Some instructions can never be "trivially dead" due to side effects or
   // producing a void value. In those cases, since we cannot rely on

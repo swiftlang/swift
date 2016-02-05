@@ -5,12 +5,21 @@
 
 // Currently it fails because a dylib cannot be found.
 // TODO: Re-enable this test when rdar://problem/24222804 is fixed
-// REQUIRES: FIXME
+// REQUIRES: OS=macosx
 
 // watchOS 2.0 does not have a public XCTest module.
 // XFAIL: OS=watchos
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import XCTest
 
 var XCTestTestSuite = TestSuite("XCTest")

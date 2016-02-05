@@ -405,7 +405,6 @@ private:
     auto paramLists = AFD->getParameterLists();
     assert(paramLists.size() == 2 && "not an ObjC-compatible method");
 
-    llvm::SmallString<128> selectorBuf;
     ArrayRef<Identifier> selectorPieces
       = AFD->getObjCSelector().getSelectorPieces();
     
