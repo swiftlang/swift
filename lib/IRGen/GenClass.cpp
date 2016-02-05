@@ -18,7 +18,7 @@
 
 #include "swift/ABI/Class.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"

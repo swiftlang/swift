@@ -14,7 +14,7 @@
 #define SWIFT_PRINTASOBJC_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 
 namespace swift {
   class ModuleDecl;

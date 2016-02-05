@@ -18,7 +18,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Defer.h"

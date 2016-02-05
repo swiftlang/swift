@@ -69,7 +69,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
