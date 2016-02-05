@@ -148,6 +148,16 @@ DependentMemberTypeRef *DependentMemberTypeRef::create(ReflectionContext &RC,
   return new (Mem) DependentMemberTypeRef(Member, Base);
 }
 
+AssociatedTypeRef::AssociatedTypeRef(StringRef Name)
+  : TypeRef(TypeRefKind::Associated), Name(Name) {}
+
+AssociatedTypeRef *AssociatedTypeRef:: create(ReflectionContext &RC,
+                                              StringRef Name) {
+  void *Mem = RC.allocate(sizeof(AssociatedTypeRef),
+                          alignof(AssociatedTypeRef));
+  return new (Mem) AssociatedTypeRef(RC.allocateCopy(Name));
+}
+
 void TypeRef::dump() const {
   dump(llvm::errs());
 }
@@ -229,7 +239,7 @@ TypeRef *reflection::decodeDemangleNode(ReflectionContext &RC,
     return DependentMemberTypeRef::create(RC, member, base);
   }
   case NodeKind::DependentAssociatedTypeRef:
-    return decodeDemangleNode(RC, Node->getChild(0));
+    return AssociatedTypeRef::create(RC, Node->getText());
   default:
     llvm_unreachable("Can't decode demangle node of this type");
   }

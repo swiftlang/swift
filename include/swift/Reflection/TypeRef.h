@@ -333,6 +333,23 @@ public:
   }
 };
 
+class AssociatedTypeRef : public TypeRef {
+  StringRef Name;
+
+  AssociatedTypeRef(StringRef Name);
+
+public:
+  static AssociatedTypeRef *create(ReflectionContext &RC, StringRef Name);
+
+  StringRef getName() const {
+    return Name;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::Associated;
+  }
+};
+
 template <typename ImplClass, typename RetTy = void, typename... Args>
 class TypeRefVisitor {
 public:
@@ -455,8 +472,14 @@ public:
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     printHeader("dependent-member");
-    printRec(DM->getMember());
     printRec(DM->getBase());
+    printRec(DM->getMember());
+    OS << ')';
+  }
+
+  void visitAssociatedTypeRef(const AssociatedTypeRef *AT) {
+    printHeader("associated-type");
+    printField("name", AT->getName());
     OS << ')';
   }
 };
