@@ -3277,12 +3277,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
   
-  auto ArgTys = substFTI->getParameterSILTypes();
-
   switch (Opcode) {
   default: llvm_unreachable("Unexpected case");
   case ValueKind::ApplyInst : {
-    if (ArgTys.size() != ArgNames.size()) {
+    if (substFTI->getNumSILArguments() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to have the same number of arg names as arg types");
       return true;
@@ -3290,16 +3288,18 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
-    for (auto &ArgName : ArgNames)
-      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc, B));
+    for (auto &ArgName : ArgNames) {
+      SILType expectedTy = substFTI->getSILArgumentType(ArgNo++);
+      Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
+    }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
-                              substFTI->getResult().getSILType(),
+                              substFTI->getSILResult(),
                               subs, Args, IsNonThrowingApply);
     break;
   }
   case ValueKind::PartialApplyInst: {
-    if (ArgTys.size() < ArgNames.size()) {
+    if (substFTI->getParameters().size() < ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "have the right argument types");
       return true;
@@ -3308,9 +3308,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
     SmallVector<SILValue, 4> Args;
-    unsigned ArgNo = ArgTys.size() - ArgNames.size();
-    for (auto &ArgName : ArgNames)
-      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc, B));
+    unsigned ArgNo = substFTI->getNumSILArguments() - ArgNames.size();
+    for (auto &ArgName : ArgNames) {
+      SILType expectedTy = substFTI->getSILArgumentType(ArgNo++);
+      Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
+    }
 
     SILType closureTy =
       SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs);
@@ -3332,7 +3334,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
                               diag::expected_sil_block_name))
       return true;
 
-    if (ArgTys.size() != ArgNames.size()) {
+    if (substFTI->getNumSILArguments() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to have the same number of arg names as arg types");
       return true;
@@ -3340,8 +3342,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     
     unsigned argNo = 0;
     SmallVector<SILValue, 4> args;
-    for (auto &argName : ArgNames)
-      args.push_back(getLocalValue(argName, ArgTys[argNo++], InstLoc, B));
+    for (auto &argName : ArgNames) {
+      SILType expectedTy = substFTI->getSILArgumentType(argNo++);
+      args.push_back(getLocalValue(argName, expectedTy, InstLoc, B));
+    }
 
     SILBasicBlock *normalBB = getBBForReference(normalBBName, normalBBLoc);
     SILBasicBlock *errorBB = getBBForReference(errorBBName, errorBBLoc);

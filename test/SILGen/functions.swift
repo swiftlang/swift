@@ -324,9 +324,9 @@ func standalone_generic<T>(x: T, y: T) -> T { return x }
 
 // CHECK-LABEL: sil hidden @_TF9functions14return_genericFT_FT1xBi64_1yBi64__Bi64_
 func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
-  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Builtin.Int64>()
-  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out Builtin.Int64, @in Builtin.Int64, @in Builtin.Int64) -> ()) -> Builtin.Int64
+  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in Builtin.Int64, @in Builtin.Int64) -> @out Builtin.Int64) -> Builtin.Int64
   // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic
@@ -335,9 +335,9 @@ func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
 // CHECK-LABEL: sil hidden @_TF9functions20return_generic_tuple{{.*}}
 func return_generic_tuple()
 -> (x: (Builtin.Int64, Builtin.Int64), y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
-  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<(Builtin.Int64, Builtin.Int64)>()
-  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> ()) -> (Builtin.Int64, Builtin.Int64)
+  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> @out (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64)
   // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic

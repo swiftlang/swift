@@ -8,7 +8,7 @@ import Swift
 class AClass {}
 sil @f_in : $@convention(thin) <T> (@in T) -> ()
 sil @f_in_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
-sil @f_out : $@convention(thin) <T> (@out T) -> ()
+sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_owned : $@convention(thin) <T> (@owned T) -> ()
 
 protocol P {
@@ -19,7 +19,7 @@ protocol P {
 // CHECK-LABEL: nrvo
 // CHECK-NOT: copy_addr
 // CHECK: return
-sil hidden @nrvo : $@convention(thin) <T where T : P> (@out T, Bool) -> () {
+sil hidden @nrvo : $@convention(thin) <T where T : P> (Bool) -> @out T {
 bb0(%0 : $*T, %1 : $Bool):
   %2 = alloc_stack $T, var, name "ro"                 // users: %9, %15, %17, %19
   debug_value_addr %0 : $*T
@@ -29,18 +29,18 @@ bb0(%0 : $*T, %1 : $Bool):
 
 bb1:                                              // Preds: bb0
   %5 = metatype $@thick T.Type                    // user: %9
-  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> () // user: %9
+  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
   %7 = integer_literal $Builtin.Int32, 10          // user: %8
   %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
-  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> ()
+  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
   br bb3                                          // id: %10
 
 bb2:                                              // Preds: bb0
   %11 = metatype $@thick T.Type                   // user: %15
-  %12 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> () // user: %15
+  %12 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %15
   %13 = integer_literal $Builtin.Int32, 1          // user: %14
   %14 = struct $Int32 (%13 : $Builtin.Int32)         // user: %15
-  %15 = apply %12<T>(%2, %14, %11) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> ()
+  %15 = apply %12<T>(%2, %14, %11) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
   br bb3                                          // id: %16
 
 bb3:                                              // Preds: bb1 bb2
@@ -56,17 +56,17 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-LABEL: dont_assert_nrvo
 // CHECK: return
 
-sil hidden @dont_assert_nrvo : $@convention(thin) <T where T : P> (@out T, Bool) -> () {
+sil hidden @dont_assert_nrvo : $@convention(thin) <T where T : P> (Bool) -> @out T {
 bb0(%0 : $*T, %1 : $Bool):
   %2 = alloc_stack $T, var, name "ro"                 // users: %9, %15, %17, %19
   debug_value_addr %0 : $*T
   debug_value_addr %2 : $*T
   %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
   %5 = metatype $@thick T.Type                    // user: %9
-  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> () // user: %9
+  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
   %7 = integer_literal $Builtin.Int32, 10          // user: %8
   %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
-  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> ()
+  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
   br bb3(%0 : $*T)
 
 bb3(%10 : $*T):                                              // Preds: bb1 bb2
@@ -125,8 +125,8 @@ sil hidden @forward_noinit : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T
   %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   copy_addr %0 to %l1 : $*T
   debug_value_addr %l1 : $*T
   debug_value_addr %0 : $*T
@@ -164,8 +164,8 @@ sil hidden @forward_takenoinit : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T
   %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   copy_addr [take] %0 to %l1 : $*T
   %f2 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c2 = apply %f2<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
@@ -180,11 +180,11 @@ bb0(%0 : $*T):
 //CHECK-NOT: copy_addr
 //CHECK-NOT: destroy_addr
 //CHECK: return
-sil hidden @backward_init : $@convention(thin) <T> (@out T) -> () {
+sil hidden @backward_init : $@convention(thin) <T> () -> @out T {
 bb0(%0 : $*T):
   %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   debug_value_addr %0 : $*T
   debug_value_addr %l1 : $*T
   copy_addr %l1 to [initialization] %0 : $*T
@@ -198,14 +198,14 @@ bb0(%0 : $*T):
 
 //CHECK-LABEL: dont_assert_backward_init
 //CHECK: return
-sil hidden @dont_assert_backward_init : $@convention(thin) <T> (@out T) -> () {
+sil hidden @dont_assert_backward_init : $@convention(thin) <T> () -> @out T {
 bb0(%0 : $*T):
   %l1 = alloc_stack $T
 br bb1(%0: $*T)
 
 bb1(%1 : $*T):
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   debug_value_addr %0 : $*T
   debug_value_addr %l1 : $*T
   copy_addr %l1 to [initialization] %0 : $*T
@@ -220,12 +220,12 @@ bb1(%1 : $*T):
 //CHECK: copy_addr
 //CHECK: destroy_addr
 //CHECK: return
-sil hidden @backward_noinit : $@convention(thin) <T> (@out T) -> () {
+sil hidden @backward_noinit : $@convention(thin) <T> () -> @out T {
 bb0(%0 : $*T):
   %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c1 = apply %f1<T>(%0) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c2 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c1 = apply %f1<T>(%0) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c2 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   copy_addr %l1 to %0 : $*T
   destroy_addr %l1 : $*T
   dealloc_stack %l1 : $*T
@@ -238,11 +238,11 @@ bb0(%0 : $*T):
 //CHECK-NOT: copy_addr
 //CHECK-NOT: destroy_addr
 //CHECK: return
-sil hidden @backward_takeinit : $@convention(thin) <T> (@out T) -> () {
+sil hidden @backward_takeinit : $@convention(thin) <T> () -> @out T {
 bb0(%0 : $*T):
   %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   debug_value_addr %0 : $*T
   debug_value_addr %l1 : $*T
   copy_addr [take] %l1 to [initialization] %0 : $*T
@@ -257,12 +257,12 @@ bb0(%0 : $*T):
 //CHECK: copy_addr
 //CHECK-NOT: destroy_addr
 //CHECK: return
-sil hidden @backward_takenoinit : $@convention(thin) <T> (@out T) -> () {
+sil hidden @backward_takenoinit : $@convention(thin) <T> () -> @out T {
 bb0(%0 : $*T):
   %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c1 = apply %f1<T>(%0) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
-  %c2 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c1 = apply %f1<T>(%0) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %c2 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   copy_addr [take] %l1 to %0 : $*T
   dealloc_stack %l1 : $*T
   %t = tuple ()
@@ -296,21 +296,21 @@ enum A<T> {
   init(_ val: T)
 }
 
-sil [transparent] @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin) <T> (@out A<T>, @in T, @thin A<T>.Type) -> ()
+sil [transparent] @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin) <T> (@in T, @thin A<T>.Type) -> @out A<T>
 
 //CHECK-LABEL: enuminit
 //CHECK-NOT: copy_addr
 //CHECK: return
-sil @enuminit : $@convention(thin) <T> (@out A<T>, @in T, @thin A<T>.Type) -> () {
+sil @enuminit : $@convention(thin) <T> (@in T, @thin A<T>.Type) -> @out A<T> {
 bb0(%0 : $*A<T>, %1 : $*T, %2 : $@thin A<T>.Type):
   %3 = alloc_stack $A<T>, var, name "sf"             // users: %10, %14, %16
   // function_ref enuminit.A.Val <A>(enuminit.A<A>.Type)(A) -> enuminit.A<A>
-  %4 = function_ref @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin) <τ_0_0> (@out A<τ_0_0>, @in τ_0_0, @thin A<τ_0_0>.Type) -> () // user: %9
+  %4 = function_ref @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin A<τ_0_0>.Type) -> @out A<τ_0_0> // user: %9
   %5 = metatype $@thin A<T>.Type                  // user: %9
   %6 = alloc_stack $T                             // users: %7, %9, %12
   copy_addr %1 to [initialization] %6 : $*T     // id: %7
   %8 = alloc_stack $A<T>                          // users: %9, %10, %11
-  %9 = apply %4<T>(%8, %6, %5) : $@convention(thin) <τ_0_0> (@out A<τ_0_0>, @in τ_0_0, @thin A<τ_0_0>.Type) -> ()
+  %9 = apply %4<T>(%8, %6, %5) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin A<τ_0_0>.Type) -> @out A<τ_0_0>
   copy_addr [take] %8 to [initialization] %3 : $*A<T> // id: %10
   dealloc_stack %8 : $*A<T>      // id: %11
   dealloc_stack %6 : $*T         // id: %12
@@ -324,18 +324,18 @@ bb0(%0 : $*A<T>, %1 : $*T, %2 : $@thin A<T>.Type):
 //CHECK-LABEL: make_addronly
 //CHECK-NOT: copy_addr
 //CHECK: return
-sil hidden @make_addronly : $@convention(thin) <T> (@out T) -> () {
+sil hidden @make_addronly : $@convention(thin) <T> () -> @out T {
 bb0(%0 : $*T):
   %1 = alloc_stack $T, let, name "t"                   // users: %3, %4, %5
-  %2 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> () // user: %3
-  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %2 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0 // user: %3
+  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   copy_addr [take] %1 to [initialization] %0 : $*T // id: %4
   dealloc_stack %1 : $*T         // id: %5
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7
 }
 
-sil @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
+sil @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 
 sil @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
 
@@ -364,9 +364,9 @@ bb0(%0 : $*AnyObject):
 
   %l0 = alloc_stack $Optional<AnyObject>
   // function_ref Swift.Optional.Some <A>(Swift.Optional<A>.Type)(A) -> Swift.Optional<A>
-  %f0 = function_ref @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
+  %f0 = function_ref @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
   %t0 = metatype $@thin Optional<AnyObject>.Type
-  %i0 = apply %f0<AnyObject>(%l0, %0, %t0) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
+  %i0 = apply %f0<AnyObject>(%l0, %0, %t0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 
   %g1 = alloc_stack $GeneratorOfOne<AnyObject> // 850
   %s1 = struct_element_addr %g1 : $*GeneratorOfOne<AnyObject>, #GeneratorOfOne.elements
@@ -427,8 +427,8 @@ bb0:
   %v0 = alloc_stack $Optional<AClass>
   %v1 = alloc_stack $Optional<AClass>
 
-  %f0 = function_ref @f_out : $@convention(thin) <A> (@out A) -> ()
-  %c0 = apply %f0<AClass?>(%v0) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %f0 = function_ref @f_out : $@convention(thin) <A> () -> @out A
+  %c0 = apply %f0<AClass?>(%v0) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
 
   copy_addr %v0 to [initialization] %v1 : $*Optional<AClass>
 
@@ -529,7 +529,7 @@ bb3:
 //CHECK-NOT: copy_addr
 //CHECK-NOT: destroy_addr
 //CHECK: return
-sil hidden @test_in_guaranteed : $@convention(thin) <T> (@out T, @in T) -> () {
+sil hidden @test_in_guaranteed : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %l1 = alloc_stack $T
   copy_addr %1 to [initialization] %l1 : $*T
@@ -546,7 +546,7 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK: unchecked_ref_cast_addr
 // CHECK-NOT: copy_addr
 // CHECK: return
-sil hidden @forward_unchecked_ref_cast_addr : $@convention(thin) (@out AClass, @in AnyObject) -> () {
+sil hidden @forward_unchecked_ref_cast_addr : $@convention(thin) (@in AnyObject) -> @out AClass {
 bb0(%0 : $*AClass, %1 : $*AnyObject):
   %3 = alloc_stack $AnyObject                     // user: %10
   %4 = alloc_stack $AnyObject                     // user: %9
@@ -567,7 +567,7 @@ sil @element_use : $@convention(thin)  (@inout P) -> ()
 // CHECK: %[[TMP:.*]] = init_enum_data_addr %0 : $*Optional<P>
 // CHECK: copy_addr %1 to [initialization] %[[TMP]]
 // CHECK-NOT: copy_addr
-sil @backward_propagate_enum_init : $@convention(thin) (@out Optional<P>, @inout P) -> () {
+sil @backward_propagate_enum_init : $@convention(thin) (@inout P) -> @out Optional<P> {
 bb0(%0 : $*Optional<P>, %1 : $*P):
   %2 = alloc_stack $P
   copy_addr %1 to [initialization] %2 : $*P
@@ -587,7 +587,7 @@ bb0(%0 : $*Optional<P>, %1 : $*P):
 // CHECK: %[[TMP:.*]] = init_existential_addr %0 : $*P, $T
 // CHECK: copy_addr %1 to [initialization] %[[TMP]] : $*T
 // CHECK-NOT: copy_addr
-sil @backward_propagate_exi_init : $@convention(thin) <T where T : P>(@out P, @inout T) -> () {
+sil @backward_propagate_exi_init : $@convention(thin) <T where T : P>(@inout T) -> @out P {
 bb0(%0 : $*P, %1 : $*T):
   %2 = alloc_stack $T
   copy_addr %1 to [initialization] %2 : $*T

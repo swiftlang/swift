@@ -2344,8 +2344,10 @@ ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
 ERROR(sil_function_ellipsis,PointsToFirstBadToken,
       "SIL function types cannot be variadic", ())
-ERROR(sil_function_label,PointsToFirstBadToken,
+ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
+ERROR(sil_function_output_label,PointsToFirstBadToken,
+      "SIL function types cannot have labeled results", ())
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))

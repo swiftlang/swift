@@ -97,10 +97,10 @@ static bool isIdentifiedSourceValue(SILValue Def) {
       return false;
     // Check that the argument is passed as an in type. This means there are
     // no aliases accessible within this function scope.
-    ParameterConvention Conv =  Arg->getParameterInfo().getConvention();
+    SILArgumentConvention Conv =  Arg->getArgumentConvention();
     switch (Conv) {
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
       return true;
     default:
       DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
@@ -125,10 +125,10 @@ static bool isIdentifiedDestValue(SILValue Def) {
       return false;
     // Check that the argument is passed as an out type. This means there are
     // no aliases accessible within this function scope.
-    ParameterConvention Conv =  Arg->getParameterInfo().getConvention();
+    SILArgumentConvention Conv =  Arg->getArgumentConvention();
     switch (Conv) {
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_Out:
       return true;
     default:
       DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
@@ -145,20 +145,17 @@ static bool isIdentifiedDestValue(SILValue Def) {
 /// indirectly via Address.
 ///
 /// Set Oper to the Apply operand that passes Address.
-static ParameterConvention getAddressArgConvention(ApplyInst *Apply,
-                                                   SILValue Address,
-                                                   Operand *&Oper) {
+static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
+                                                     SILValue Address,
+                                                     Operand *&Oper) {
   Oper = nullptr;
-  ParameterConvention Conv;
-  auto Params = Apply->getSubstCalleeType()->getParameters();
+  SILArgumentConvention Conv;
   auto Args = Apply->getArgumentOperands();
-  for (unsigned ArgIdx = 0, ArgE = Params.size(); ArgIdx != ArgE; ++ArgIdx) {
+  for (auto ArgIdx : indices(Args)) {
     if (Args[ArgIdx].get() != Address)
       continue;
 
-    Conv = Params[ArgIdx].getConvention();
-    assert(isIndirectParameter(Conv) && "Address not passed as an indirection");
-
+    Conv = Apply->getArgumentConvention(ArgIdx);
     assert(!Oper && "Address can only be passed once as an indirection.");
     Oper = &Args[ArgIdx];
 #ifndef NDEBUG
@@ -208,14 +205,12 @@ public:
 
   bool visitApplyInst(ApplyInst *Apply) {
     switch (getAddressArgConvention(Apply, Address, Oper)) {
-    case ParameterConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In:
       return true;
-    case ParameterConvention::Indirect_In_Guaranteed:
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
       return false;
-    case ParameterConvention::Indirect_Out:
-      llvm_unreachable("copy_addr not released before reinitialization");
     default:
       llvm_unreachable("unexpected calling convention for copy_addr user");
     }
@@ -305,13 +300,13 @@ public:
 
   bool visitApplyInst(ApplyInst *Apply) {
     switch (getAddressArgConvention(Apply, Address, Oper)) {
-    case ParameterConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_Out:
       return true;
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-    case ParameterConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
       return false;
-    case ParameterConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In:
       llvm_unreachable("copy_addr src destroyed without reinitialization");
     default:
       llvm_unreachable("unexpected calling convention for copy_addr user");
@@ -464,10 +459,10 @@ bool CopyForwarding::collectUsers() {
       /// object. However, we can rely on a subsequent mark_dependent
       /// instruction to take that object as an operand, causing it to escape
       /// for the purpose of this analysis.
-      auto Params = Apply->getSubstCalleeType()->getParameters();
-      (void)Params;
-      assert(Params[UI->getOperandNumber() - Apply->getArgumentOperandNumber()]
-             .isIndirect() && "copy_addr location should be passed indirect");
+      assert(isIndirectConvention(
+                Apply->getSubstCalleeType()->getSILArgumentConvention(
+                    UI->getOperandNumber() - Apply->getArgumentOperandNumber()))
+             && "copy_addr location should be passed indirect");
       SrcUserInsts.insert(Apply);
       continue;
     }
@@ -1109,11 +1104,7 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   if (!OutArg)
     return false;
 
-  if (!OutArg->isFunctionArg())
-    return false;
-
-  auto ArgConv = OutArg->getParameterInfo().getConvention();
-  if (ArgConv != ParameterConvention::Indirect_Out)
+  if (!OutArg->isFunctionArg() || !OutArg->isIndirectResult())
     return false;
 
   SILBasicBlock *BB = CopyInst->getParent();

@@ -37,7 +37,7 @@ sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWritercfMS0_FT_S0_ : $@convention(method) (@owned ArrayClassReaderWriter) -> @owned ArrayClassReaderWriter
 sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWriterCfMS0_FT_S0_ : $@convention(thin) (@thick ArrayClassReaderWriter.Type) -> @owned ArrayClassReaderWriter
 sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWriter4readfS0_FSiSi : $@convention(method) (Int32, @guaranteed ArrayClassReaderWriter) -> Int32
-sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_CuRq_S1__fMq_FT_q_ : $@convention(witness_method) (@out ArrayClassReaderWriter, @thick ArrayClassReaderWriter.Type) -> ()
+sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_CuRq_S1__fMq_FT_q_ : $@convention(witness_method) (@thick ArrayClassReaderWriter.Type) -> @out ArrayClassReaderWriter
 sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi : $@convention(witness_method) (Int32, @in_guaranteed ArrayClassReaderWriter) -> Int32
 sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_5writeuRq_S1__fRq_FTSi5valueSi_T_ : $@convention(witness_method) (Int32, Int32, @inout ArrayClassReaderWriter) -> ()
 
@@ -182,8 +182,8 @@ bb0:
   %8 = struct $X (%7 : $Int64)
   store %8 to %3 : $*X
   destroy_addr %2 : $*P
-  %f = function_ref @write_p : $@convention(thin) (@out P) -> ()
-  %a = apply %f(%2) : $@convention(thin) (@out P) -> ()
+  %f = function_ref @write_p : $@convention(thin) () -> @out P
+  %a = apply %f(%2) : $@convention(thin) () -> @out P
   %10 = open_existential_addr %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
   %11 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo!1, %10 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %12 = apply %11<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
@@ -215,7 +215,7 @@ bb0:
   return %12 : $Int64
 }
 
-sil @write_p : $@convention(thin) (@out P) -> ()
+sil @write_p : $@convention(thin) () -> @out P
 
 sil @read_p : $@convention(thin) (@in P) -> ()
 

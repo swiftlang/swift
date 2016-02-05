@@ -2306,17 +2306,13 @@ sil [noinline] @takeBB : $@convention(thin) (@owned BB) -> @owned BB
 // Check that we don't crash on this.
 // The compiler should be able to cast between the labeled and unlabeled return tuple types.
 // CHECK-LABEL: @try_apply_with_convert_function_returning_casted_unlabeled_tuple
-// CHECK: apply {{%[0-9]+}}
-// Proper tuple is created by deconstructing the old one and creating a new one using its elements.
-// CHECK: tuple_extract
-// CHECK: tuple_extract
-// CHECK: tuple
-// CHECK: return
+// CHECK: [[T0:%.*]] = apply {{%[0-9]+}}
+// CHECK: return [[T0]]
 sil @try_apply_with_convert_function_returning_casted_unlabeled_tuple: $@convention(thin) () -> (Int32, Int32) {
 bb0:
-  %3 = function_ref @returnLabeledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
-  %6 = convert_function %3 : $@convention(thin) () -> (first: Int32, second: Int32) to $@convention(thin) () -> ((Int32, Int32), @error ErrorType)
-  try_apply %6() : $@convention(thin) () -> ((Int32, Int32), @error ErrorType), normal bb1, error bb2
+  %3 = function_ref @returnLabeledTuple : $@convention(thin) () -> (Int32, Int32)
+  %6 = convert_function %3 : $@convention(thin) () -> (Int32, Int32) to $@convention(thin) () -> (Int32, Int32, @error ErrorType)
+  try_apply %6() : $@convention(thin) () -> (Int32, Int32, @error ErrorType), normal bb1, error bb2
  
 bb1(%8 : $(Int32, Int32)):
   return %8 : $(Int32, Int32)
@@ -2337,14 +2333,14 @@ bb2(%10 : $ErrorType):
 // CHECK: tuple_extract
 // CHECK: tuple
 // CHECK: return
-sil @try_apply_with_convert_function_returning_casted_labeled_tuple: $@convention(thin) () -> (first: Int32, second: Int32) {
+sil @try_apply_with_convert_function_returning_casted_labeled_tuple: $@convention(thin) () -> (Int32, Int32) {
 bb0:
   %3 = function_ref @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
-  %6 = convert_function %3 : $@convention(thin) () -> (Int32, Int32) to $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorType)
-  try_apply %6() : $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorType), normal bb1, error bb2
+  %6 = convert_function %3 : $@convention(thin) () -> (Int32, Int32) to $@convention(thin) () -> (Int32, Int32, @error ErrorType)
+  try_apply %6() : $@convention(thin) () -> (Int32, Int32, @error ErrorType), normal bb1, error bb2
  
-bb1(%8 : $(first: Int32, second: Int32)):
-  return %8 : $(first: Int32, second: Int32)
+bb1(%8 : $(Int32, Int32)):
+  return %8 : $(Int32, Int32)
 
 bb2(%10 : $ErrorType):
   // Prevent that the conversion is done because the error block is empty and unreachable.
@@ -2353,7 +2349,7 @@ bb2(%10 : $ErrorType):
   unreachable
 }
 
-sil [noinline] @returnLabeledTuple: $@convention(thin) () -> (first: Int32, second: Int32)
+sil [noinline] @returnLabeledTuple: $@convention(thin) () -> (Int32, Int32)
 sil [noinline] @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
 
 public class AAA {
@@ -2441,8 +2437,8 @@ struct CAB<A> {
 }
 
 sil @CABIdentityGetter : $@convention(thin) <τ_0_0> (UBP<τ_0_0>) -> UP<()>
-sil @CABwithUnsafeBufferPointer : $@convention(method) <τ_0_0><τ_1_0> (@out τ_1_0, @owned @callee_owned (@out τ_1_0, UBP<τ_0_0>) -> @error ErrorType, @guaranteed CAB<τ_0_0>) -> @error ErrorType
-sil @thunk_helper : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> @error ErrorType
+sil @CABwithUnsafeBufferPointer : $@convention(method) <τ_0_0><τ_1_0> (@owned @callee_owned (UBP<τ_0_0>) -> (@out τ_1_0, @error ErrorType), @guaranteed CAB<τ_0_0>) -> (@out τ_1_0, @error ErrorType)
+sil @thunk_helper : $@convention(thin) <τ_0_0> (UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> (@out UP<()>, @error ErrorType)
 
 // CHECK-LABEL: sil @check_parameters_casting_with_generics
 // CHECK-NOT: try_apply
@@ -2451,18 +2447,18 @@ sil @thunk_helper : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owne
 sil @check_parameters_casting_with_generics : $@convention(method) <Element> (@guaranteed CAB<Element>) -> UP<()> {
 bb0(%0 : $CAB<Element>):
   // function_ref Swift._ContiguousArrayBuffer.withUnsafeBufferPointer <A><B> (CAB<A>)((Swift.UBP<A>) throws -> B) throws -> B
-  %2 = function_ref @CABwithUnsafeBufferPointer : $@convention(method) <τ_0_0><τ_1_0> (@out τ_1_0, @owned @callee_owned (@out τ_1_0, UBP<τ_0_0>) -> @error ErrorType, @guaranteed CAB<τ_0_0>) -> @error ErrorType
+  %2 = function_ref @CABwithUnsafeBufferPointer : $@convention(method) <τ_0_0><τ_1_0> (@owned @callee_owned (UBP<τ_0_0>) -> (@out τ_1_0, @error ErrorType), @guaranteed CAB<τ_0_0>) -> (@out τ_1_0, @error ErrorType)
   // function_ref Swift._ContiguousArrayBuffer.(identity.getter : UP<()>).(closure #1)
   %3 = function_ref @CABIdentityGetter : $@convention(thin) <τ_0_0> (UBP<τ_0_0>) -> UP<()>
   %4 = partial_apply %3<Element>() : $@convention(thin) <τ_0_0> (UBP<τ_0_0>) -> UP<()>
   %5 = convert_function %4 : $@callee_owned (UBP<Element>) -> UP<()> to $@callee_owned (UBP<Element>) -> (UP<()>, @error ErrorType)
   // function_ref reabstraction thunk helper <A> from @callee_owned (@unowned UBP<A>) -> (@unowned UP<()>, @error @owned Swift.ErrorType) to @callee_owned (@unowned UBP<A>) -> (@out UP<()>, @error @owned Swift.ErrorType)
-  %6 = function_ref @thunk_helper : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> @error ErrorType
-  %7 = partial_apply %6<Element>(%5) : $@convention(thin) <τ_0_0> (@out UP<()>, UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> @error ErrorType
+  %6 = function_ref @thunk_helper : $@convention(thin) <τ_0_0> (UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> (@out UP<()>, @error ErrorType)
+  %7 = partial_apply %6<Element>(%5) : $@convention(thin) <τ_0_0> (UBP<τ_0_0>, @owned @callee_owned (UBP<τ_0_0>) -> (UP<()>, @error ErrorType)) -> (@out UP<()>, @error ErrorType)
   %8 = alloc_stack $UP<()>
   %9 = unchecked_addr_cast %8 : $*UP<()> to $*UP<()>
-  %10 = convert_function %7 : $@callee_owned (@out UP<()>, UBP<Element>) -> @error ErrorType to $@callee_owned (@out UP<()>, UBP<Element>) -> @error ErrorType
-  try_apply %2<Element, UP<()>>(%8, %7, %0) : $@convention(method) <τ_0_0><τ_1_0> (@out τ_1_0, @owned @callee_owned (@out τ_1_0, UBP<τ_0_0>) -> @error ErrorType, @guaranteed CAB<τ_0_0>) -> @error ErrorType, normal bb1, error bb2
+  %10 = convert_function %7 : $@callee_owned (UBP<Element>) -> (@out UP<()>, @error ErrorType) to $@callee_owned (UBP<Element>) -> (@out UP<()>, @error ErrorType)
+  try_apply %2<Element, UP<()>>(%8, %7, %0) : $@convention(method) <τ_0_0><τ_1_0> (@owned @callee_owned (UBP<τ_0_0>) -> (@out τ_1_0, @error ErrorType), @guaranteed CAB<τ_0_0>) -> (@out τ_1_0, @error ErrorType), normal bb1, error bb2
 
 bb1(%12 : $()):
   %13 = load %8 : $*UP<()>

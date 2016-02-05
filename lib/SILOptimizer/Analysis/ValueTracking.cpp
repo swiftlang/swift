@@ -29,7 +29,7 @@ bool swift::isNotAliasingArgument(SILValue V,
   if (!Arg || !Arg->isFunctionArg())
     return false;
 
-  return isNotAliasedIndirectParameter(Arg->getParameterInfo().getConvention(),
+  return isNotAliasedIndirectParameter(Arg->getArgumentConvention(),
                                        isInoutAliasing);
 }
 

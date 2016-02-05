@@ -5,14 +5,14 @@ import Swift
 var zero = 0
 
 // <rdar://problem/15921334>
-// CHECK-LABEL: sil hidden @_TF8closures46return_local_generic_function_without_captures{{.*}} : $@convention(thin) <A, R> () -> @owned @callee_owned (@out R, @in A) -> () {
+// CHECK-LABEL: sil hidden @_TF8closures46return_local_generic_function_without_captures{{.*}} : $@convention(thin) <A, R> () -> @owned @callee_owned (@in A) -> @out R {
 func return_local_generic_function_without_captures<A, R>() -> A -> R {
   func f(_: A) -> R {
     Builtin.int_trap()
   }
-  // CHECK:  [[FN:%.*]] = function_ref @_TFF8closures46return_local_generic_function_without_captures{{.*}} : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0) -> ()
-  // CHECK:  [[FN_WITH_GENERIC_PARAMS:%.*]] = partial_apply [[FN]]<A, R>() : $@convention(thin) <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0) -> ()
-  // CHECK:  return [[FN_WITH_GENERIC_PARAMS]] : $@callee_owned (@out R, @in A) -> ()
+  // CHECK:  [[FN:%.*]] = function_ref @_TFF8closures46return_local_generic_function_without_captures{{.*}} : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @out τ_0_1
+  // CHECK:  [[FN_WITH_GENERIC_PARAMS:%.*]] = partial_apply [[FN]]<A, R>() : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @out τ_0_1
+  // CHECK:  return [[FN_WITH_GENERIC_PARAMS]] : $@callee_owned (@in A) -> @out R
   return f
 }
 

@@ -317,7 +317,7 @@ static void copyOrInitValuesInto(Initialization *init,
     // We take the first value.
     ManagedValue result = values[0];
     values = values.slice(1);
-    init->copyOrInitValueInto(result, isInit, loc, gen);
+    init->copyOrInitValueInto(gen, loc, result, isInit);
     init->finishInitialization(gen);
     return;
   }
@@ -335,10 +335,9 @@ static void copyOrInitValuesInto(Initialization *init,
   
   // If we can satisfy the tuple type by breaking up the aggregate
   // initialization, do so.
-  if (!implodeTuple && init->canSplitIntoSubelementAddresses()) {
+  if (!implodeTuple && init->canSplitIntoTupleElements()) {
     SmallVector<InitializationPtr, 4> subInitBuf;
-    auto subInits = init->getSubInitializationsForTuple(gen, type,
-                                                        subInitBuf, loc);
+    auto subInits = init->splitIntoTupleElements(gen, loc, type, subInitBuf);
     
     assert(subInits.size() == tupleType->getNumElements() &&
            "initialization does not match tuple?!");
@@ -346,6 +345,8 @@ static void copyOrInitValuesInto(Initialization *init,
     for (unsigned i = 0, e = subInits.size(); i < e; ++i)
       copyOrInitValuesInto<KIND>(subInits[i].get(), values,
                                  tupleType.getElementType(i), loc, gen);
+
+    init->finishInitialization(gen);
     return;
   }
   
@@ -357,8 +358,8 @@ static void copyOrInitValuesInto(Initialization *init,
   // This will have just used up the first values in the list, pop them off.
   values = values.slice(getRValueSize(type));
   
-  init->copyOrInitValueInto(ManagedValue::forUnmanaged(scalar), isInit, loc,
-                            gen);
+  init->copyOrInitValueInto(gen, loc, ManagedValue::forUnmanaged(scalar),
+                            isInit);
   init->finishInitialization(gen);
 }
 
@@ -453,19 +454,48 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &gen,
   return gen.emitConversionFromSemanticValue(l, result, storageType);
 }
 
-void RValue::forwardInto(SILGenFunction &gen, Initialization *I,
-                         SILLocation loc) && {
+void RValue::forwardInto(SILGenFunction &gen, SILLocation loc, 
+                         Initialization *I) && {
   assert(isComplete() && "rvalue is not complete");
-  
   ArrayRef<ManagedValue> elts = values;
   copyOrInitValuesInto<ImplodeKind::Forward>(I, elts, type, loc, gen);
 }
 
-void RValue::copyInto(SILGenFunction &gen, Initialization *I,
-                      SILLocation loc) const & {
+void RValue::copyInto(SILGenFunction &gen, SILLocation loc,
+                      Initialization *I) const & {
   assert(isComplete() && "rvalue is not complete");
   ArrayRef<ManagedValue> elts = values;
   copyOrInitValuesInto<ImplodeKind::Copy>(I, elts, type, loc, gen);
+}
+
+static void assignRecursive(SILGenFunction &gen, SILLocation loc,
+                            CanType type, ArrayRef<ManagedValue> &srcValues,
+                            SILValue destAddr) {
+  // Recurse into tuples.
+  if (auto srcTupleType = dyn_cast<TupleType>(type)) {
+    assert(destAddr->getType().castTo<TupleType>()->getNumElements()
+             == srcTupleType->getNumElements());
+    for (auto eltIndex : indices(srcTupleType.getElementTypes())) {
+      auto eltDestAddr = gen.B.createTupleElementAddr(loc, destAddr, eltIndex);
+      assignRecursive(gen, loc, srcTupleType.getElementType(eltIndex),
+                      srcValues, eltDestAddr);
+    }
+    return;
+  }
+
+  // Otherwise, pull the front value off the list.
+  auto srcValue = srcValues.front();
+  srcValues = srcValues.slice(1);
+
+  srcValue.assignInto(gen, loc, destAddr);
+}
+
+void RValue::assignInto(SILGenFunction &gen, SILLocation loc,
+                        SILValue destAddr) && {
+  assert(isComplete() && "rvalue is not complete");
+  ArrayRef<ManagedValue> srcValues = values;
+  assignRecursive(gen, loc, type, srcValues, destAddr);
+  assert(srcValues.empty() && "didn't claim all elements!");
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &gen, SILLocation l) && {
@@ -579,6 +609,6 @@ ManagedValue RValue::materialize(SILGenFunction &gen, SILLocation loc) && {
 
   // Otherwise, emit to a temporary.
   auto temp = gen.emitTemporary(loc, paramTL);
-  std::move(*this).forwardInto(gen, temp.get(), loc);
+  std::move(*this).forwardInto(gen, loc, temp.get());
   return temp->getManagedAddress();
 }

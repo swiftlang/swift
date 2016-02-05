@@ -64,7 +64,7 @@ protocol Abstractable {
 extension Derived : Abstractable {}
 // CHECK: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m14storedFunction
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
-// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
+// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $@callee_owned () -> Int
@@ -74,10 +74,10 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[RESULT:%.*]] = load [[TEMP]]
 // CHECK-NEXT: strong_retain [[RESULT]]
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> Int) -> ()
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
 // CHECK-NEXT: store [[T1]] to [[RESULT_ADDR]]
-// CHECK-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> () to $Builtin.RawPointer
+// CHECK-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TTWC17materializeForSet7DerivedS_12AbstractableS_FFCS_4Basem14storedFunctionFT_SiU_XfTBpRBBRS2_XMTS2__T_
 // CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Derived, @thick Derived.Type) -> ()>, #Optional.Some!enumelt.1, [[T0]]
@@ -90,10 +90,10 @@ extension Derived : Abstractable {}
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
-// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
-// CHECK-NEXT: [[VALUE:%.*]] = load [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> ()
+// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned () -> @out Int
+// CHECK-NEXT: [[VALUE:%.*]] = load [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned (@out Int) -> ()) -> Int
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // CHECK-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!setter.1 : (Base) -> (() -> Int) -> ()
 // CHECK-NEXT: apply [[FN]]([[NEWVALUE]], [[SELF]])
@@ -102,17 +102,17 @@ extension Derived : Abstractable {}
 
 // CHECK: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m19finalStoredFunction
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
-// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
+// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
 // CHECK-NEXT: [[RESULT:%.*]] = load [[ADDR]]
 // CHECK-NEXT: strong_retain [[RESULT]]
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> Int) -> ()
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
 // CHECK-NEXT: store [[T1]] to [[RESULT_ADDR]]
-// CHECK-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> () to $Builtin.RawPointer
+// CHECK-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TTWC17materializeForSet7DerivedS_12AbstractableS_FFCS_4Basem19finalStoredFunctionFT_SiU_XfTBpRBBRS2_XMTS2__T_
 // CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Derived, @thick Derived.Type) -> ()>, #Optional.Some!enumelt.1, [[T0]]
@@ -123,10 +123,10 @@ extension Derived : Abstractable {}
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
-// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
-// CHECK-NEXT: [[VALUE:%.*]] = load [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> ()
+// CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned () -> @out Int
+// CHECK-NEXT: [[VALUE:%.*]] = load [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned (@out Int) -> ()) -> Int
+// CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned () -> @out Int) -> Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // CHECK-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
 // CHECK-NEXT: assign [[NEWVALUE]] to [[ADDR]]

@@ -584,6 +584,18 @@ public:
     return begin()->getBBArgs();
   }
 
+  ArrayRef<SILArgument *> getIndirectResults() const {
+    assert(!empty() && "Cannot get arguments of a function without a body");
+    return begin()->getBBArgs().slice(0,
+                            getLoweredFunctionType()->getNumIndirectResults());
+  }
+
+  ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
+    assert(!empty() && "Cannot get arguments of a function without a body");
+    return begin()->getBBArgs().slice(
+                            getLoweredFunctionType()->getNumIndirectResults());
+  }
+
   const SILArgument *getSelfArgument() const {
     assert(hasSelfParam() && "This method can only be called if the "
                              "SILFunction has a self parameter");

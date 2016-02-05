@@ -233,8 +233,8 @@ public:
   /// Get the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue base, SGFContext c) && = 0;
+  virtual RValue get(SILGenFunction &gen, SILLocation loc,
+                     ManagedValue base, SGFContext c) && = 0;
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
   /// the same dynamic PathComponent type as the receiver) to see if they are
@@ -293,21 +293,21 @@ public:
     // no useful writeback diagnostics at this point
   }
 
-  ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                   ManagedValue base, SGFContext c) && override;
+  RValue get(SILGenFunction &gen, SILLocation loc,
+             ManagedValue base, SGFContext c) && override;
 
   void set(SILGenFunction &gen, SILLocation loc,
            RValue &&value, ManagedValue base) && override;
 
   /// Transform from the original pattern.
-  virtual ManagedValue translate(SILGenFunction &gen, SILLocation loc,
-                                 ManagedValue value,
-                                 SGFContext ctx = SGFContext()) && = 0;
+  virtual RValue translate(SILGenFunction &gen, SILLocation loc,
+                           RValue &&value,
+                           SGFContext ctx = SGFContext()) && = 0;
 
   /// Transform into the original pattern.
-  virtual ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
-                                   ManagedValue value,
-                                   SGFContext ctx = SGFContext()) && = 0;
+  virtual RValue untranslate(SILGenFunction &gen, SILLocation loc,
+                             RValue &&value,
+                             SGFContext ctx = SGFContext()) && = 0;
   
 };
 

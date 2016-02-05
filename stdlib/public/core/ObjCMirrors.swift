@@ -16,7 +16,7 @@ import SwiftShims
 @_silgen_name("swift_ObjCMirror_count") 
 func _getObjCCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_ObjCMirror_subscript") 
-func _getObjCChild(_: Int, _: _MagicMirrorData) -> (String, _MirrorType)
+func _getObjCChild<T>(_: Int, _: _MagicMirrorData) -> (T, _MirrorType)
 
 func _getObjCSummary(data: _MagicMirrorData) -> String {
   let theDescription = _swift_stdlib_objcDebugDescription(data._loadValue())

@@ -1136,7 +1136,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       // different places.
       switch (conv) {
       case ParameterConvention::Indirect_In: return 'i';
-      case ParameterConvention::Indirect_Out: return 'i';
       case ParameterConvention::Indirect_Inout: return 'l';
       case ParameterConvention::Indirect_InoutAliasable: return 'L';
       case ParameterConvention::Indirect_In_Guaranteed: return 'G';
@@ -1149,6 +1148,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     };
     auto mangleResultConvention = [](ResultConvention conv) {
       switch (conv) {
+      case ResultConvention::Indirect: return 'i';
       case ResultConvention::Owned: return 'o';
       case ResultConvention::Unowned: return 'd';
       case ResultConvention::UnownedInnerPointer: return 'D';
@@ -1193,24 +1193,20 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     }
     Buffer << '_';
 
-    auto mangleParameter = [&](SILParameterInfo param) {
+    // Mangle the parameters.
+    for (auto param : fn->getParameters()) {
       Buffer << mangleParameterConvention(param.getConvention());
       mangleType(param.getType(), 0);
-    };
-
-    for (auto param : fn->getParametersWithoutIndirectResult()) {
-      mangleParameter(param);
     }
     Buffer << '_';
 
-    if (fn->hasIndirectResult()) {
-      mangleParameter(fn->getIndirectResult());
-    } else {
-      auto result = fn->getResult();
+    // Mangle the results.
+    for (auto result : fn->getAllResults()) {
       Buffer << mangleResultConvention(result.getConvention());
       mangleType(result.getType(), 0);
     }
     
+    // Mangle the error result if present.
     if (fn->hasErrorResult()) {
       auto error = fn->getErrorResult();
       Buffer << 'z' << mangleResultConvention(error.getConvention());

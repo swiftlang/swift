@@ -169,7 +169,7 @@ void CapturePropagationCloner::cloneBlocks(
   // arguments are now propagated through the partial apply.
   assert(!IsCloningConstant && "incorrect mode");
   unsigned ParamIdx = 0;
-  for (unsigned NewParamEnd = CloneFTy->getParameters().size();
+  for (unsigned NewParamEnd = CloneFTy->getNumSILArguments();
        ParamIdx != NewParamEnd; ++ParamIdx) {
 
     SILArgument *Arg = OrigEntryBB->getBBArg(ParamIdx);

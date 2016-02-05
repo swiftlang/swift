@@ -292,7 +292,6 @@ class InOutDeshadowing : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction &F = *getFunction();
-    SILBasicBlock &EntryBlock = F.front();
 
     // For each function, find any inout arguments and try to optimize each of
     // them.
@@ -304,7 +303,7 @@ class InOutDeshadowing : public SILFunctionTransform {
 
       DEBUG(llvm::dbgs()<< "  " << F.getName() << ": argument #"<< arg << "\n");
 
-      if (processInOutValue(EntryBlock.getBBArgs()[arg]))
+      if (processInOutValue(F.getArgumentsWithoutIndirectResults()[arg]))
         ++NumShadowsRemoved;
       else {
         ++NumShadowsKept;

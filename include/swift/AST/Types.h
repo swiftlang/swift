@@ -63,6 +63,7 @@ namespace swift {
   class ValueDecl;
   class ModuleDecl;
   class ProtocolConformance;
+  enum class SILArgumentConvention : uint8_t;
   class Substitution;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
@@ -189,10 +190,15 @@ public:
     Bits |= other.Bits;
     return *this;
   }
-  /// Add any properties in the right-hand set to this set.
+  /// Restrict this to only the properties in the right-hand set.
   RecursiveTypeProperties &operator&=(RecursiveTypeProperties other) {
     Bits &= other.Bits;
     return *this;
+  }
+
+  /// Remove the HasTypeParameter property from this set.
+  void removeHasTypeParameter() {
+    Bits &= ~HasTypeParameter;
   }
 
   /// Test for a particular property in this set.
@@ -271,8 +277,9 @@ protected:
     unsigned ExtInfo : 16;
     unsigned CalleeConvention : 3;
     unsigned HasErrorResult : 1;
+    unsigned HasCombinedResults : 1;
   };
-  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16+4 };
+  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16+5 };
   static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct AnyMetatypeTypeBitfields {
@@ -2488,12 +2495,6 @@ enum class ParameterConvention {
   /// convention used by mutable captures in @noescape closures.
   Indirect_InoutAliasable,
 
-  /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an uninitialized object in memory.  The callee is responsible for
-  /// leaving an initialized object at this address.  The callee may assume that
-  /// the address does not alias any valid object.
-  Indirect_Out,
-
   /// This argument is passed directly.  Its type is non-trivial, and the callee
   /// is responsible for destroying it.
   Direct_Owned,
@@ -2512,12 +2513,12 @@ enum class ParameterConvention {
   /// guarantees its validity for the entirety of the call.
   Direct_Guaranteed,
 };
+
 inline bool isIndirectParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In_Guaranteed:
     return true;
 
@@ -2537,7 +2538,6 @@ inline bool isConsumedParameter(ParameterConvention conv) {
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_Out:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -2545,42 +2545,6 @@ inline bool isConsumedParameter(ParameterConvention conv) {
     return false;
   }
   llvm_unreachable("bad convention kind");
-}
-
-enum class InoutAliasingAssumption {
-  /// Assume that an inout indirect parameter may alias other objects.
-  /// This is the safe assumption an optimizations should make if it may break
-  /// memory safety in case the inout aliasing rule is violation.
-  Aliasing,
-
-  /// Assume that an inout indirect parameter cannot alias other objects.
-  /// Optimizations should only use this if they can guarantee that they will
-  /// not break memory safety even if the inout aliasing rule is violated.
-  NotAliasing
-};
-
-/// Returns true if \p conv is a not-aliasing indirect parameter.
-/// The \p isInoutAliasing specifies what to assume about the inout convention.
-/// See InoutAliasingAssumption.
-inline bool isNotAliasedIndirectParameter(ParameterConvention conv,
-                                     InoutAliasingAssumption isInoutAliasing) {
-  switch (conv) {
-  case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_Out:
-  case ParameterConvention::Indirect_In_Guaranteed:
-    return true;
-
-  case ParameterConvention::Indirect_Inout:
-    return isInoutAliasing == InoutAliasingAssumption::NotAliasing;
-
-  case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Direct_Unowned:
-  case ParameterConvention::Direct_Guaranteed:
-  case ParameterConvention::Direct_Owned:
-  case ParameterConvention::Direct_Deallocating:
-    return false;
-  }
-  llvm_unreachable("covered switch isn't covered?!");
 }
 
 /// Returns true if conv is a guaranteed parameter. This may look unnecessary
@@ -2594,7 +2558,6 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
@@ -2612,7 +2575,6 @@ inline bool isDeallocatingParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -2653,9 +2615,6 @@ public:
   bool isIndirectMutating() const {
     return getConvention() == ParameterConvention::Indirect_Inout
         || getConvention() == ParameterConvention::Indirect_InoutAliasable;
-  }
-  bool isIndirectResult() const {
-    return getConvention() == ParameterConvention::Indirect_Out;
   }
 
   /// True if this parameter is consumed by the callee, either
@@ -2717,9 +2676,14 @@ public:
   }
 };
 
-/// Conventions for returning values.  All return values at this
-/// level are direct.
+/// Conventions for returning values.
 enum class ResultConvention {
+  /// This result is returned indirectly, i.e. by passing the address
+  /// of an uninitialized object in memory.  The callee is responsible
+  /// for leaving an initialized object at this address.  The callee
+  /// may assume that the address does not alias any valid object.
+  Indirect,
+
   /// The caller is responsible for destroying this return value.
   /// Its type is non-trivial.
   Owned,
@@ -2742,12 +2706,11 @@ enum class ResultConvention {
   Autoreleased,
 };
 
-/// A direct result type and the rules for returning it.
-///
-/// Indirect results require an implicit address parameter and are
-/// therefore represented with a kind of SILParameterInfo.  For now, a
-/// function with an indirect result will always have a SILResultInfo
-/// with the empty tuple type '()'.
+inline bool isIndirectResult(ResultConvention convention) {
+  return convention == ResultConvention::Indirect;
+}
+
+/// A result type and the rules for returning it.
 class SILResultInfo {
   llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
 public:
@@ -2768,6 +2731,13 @@ public:
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithType(CanType type) const {
     return SILResultInfo(type, getConvention());
+  }
+
+  bool isIndirect() const {
+    return isIndirectResult(getConvention());
+  }
+  bool isDirect() const {
+    return !isIndirectResult(getConvention());
   }
 
   /// Transform this SILResultInfo by applying the user-provided
@@ -2935,26 +2905,76 @@ public:
 
 private:
   unsigned NumParameters;
+  unsigned NumDirectResults : 16;
+  unsigned NumIndirectResults : 16;
+
+  // The layout of a SILFunctionType in memory is:
+  //   SILFunctionType
+  //   SILParameterInfo[NumParameters]
+  //   SILResultInfo[NumDirectResults + NumIndirectResults]
+  //   SILResultInfo[NumDirectResults]?   // if hasCombinedResults()
+  //   SILResultInfo[NumIndirectResults]? // if hasCombinedResults()
+  //   SILResultInfo?                     // if hasErrorResult()
+  //   CanType?                           // if NumDirectResults > 1
 
   CanGenericSignature GenericSig;
 
-  /// TODO: Permit an arbitrary number of results.
-  SILResultInfo InterfaceResult;
+  bool hasCombinedResults() const {
+    return SILFunctionTypeBits.HasCombinedResults;
+  }
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     return {getTrailingObjects<SILParameterInfo>(), NumParameters};
   }
 
+  MutableArrayRef<SILResultInfo> getMutableAllResults() {
+    auto ptr = reinterpret_cast<SILResultInfo*>(getMutableParameters().end());
+    return MutableArrayRef<SILResultInfo>(ptr, getNumAllResults());
+  }
+
+  MutableArrayRef<SILResultInfo> getMutableDirectResults() {
+    assert(hasCombinedResults());
+    auto ptr = getMutableAllResults().end();
+    return MutableArrayRef<SILResultInfo>(ptr, NumDirectResults);
+  }
+
+  MutableArrayRef<SILResultInfo> getMutableIndirectResults() {
+    assert(hasCombinedResults());
+    auto ptr = getMutableDirectResults().end();
+    return MutableArrayRef<SILResultInfo>(ptr, NumIndirectResults);
+  }
+
+  SILResultInfo *getEndOfNormalResults() {
+    if (!hasCombinedResults()) {
+      return getMutableAllResults().end();
+    } else {
+      return getMutableIndirectResults().end();
+    }
+  }
+
   SILResultInfo &getMutableErrorResult() {
     assert(hasErrorResult());
-    return *getTrailingObjects<SILResultInfo>();
+    return *getEndOfNormalResults();
+  }
+
+  bool hasSILResultCache() const {
+    return NumDirectResults > 1;
+  }
+
+  CanType &getMutableSILResultCache() const {
+    assert(hasSILResultCache());
+    auto ptr = const_cast<SILFunctionType*>(this)->getEndOfNormalResults()
+                 + size_t(hasErrorResult());
+    return *reinterpret_cast<CanType*>(ptr);
   }
 
   SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
                   ParameterConvention calleeConvention,
-                  ArrayRef<SILParameterInfo> interfaceParams,
-                  SILResultInfo interfaceResult,
-                  Optional<SILResultInfo> interfaceErrorResult,
+                  ArrayRef<SILParameterInfo> params,
+                  ArrayRef<SILResultInfo> allResults,
+                  ArrayRef<SILResultInfo> directResults,
+                  ArrayRef<SILResultInfo> indirectResults,
+                  Optional<SILResultInfo> errorResult,
                   const ASTContext &ctx,
                   RecursiveTypeProperties properties);
 
@@ -2965,12 +2985,35 @@ public:
                                 ExtInfo ext,
                                 ParameterConvention calleeConvention,
                                 ArrayRef<SILParameterInfo> interfaceParams,
-                                SILResultInfo interfaceResult,
+                                ArrayRef<SILResultInfo> interfaceResults,
                                 Optional<SILResultInfo> interfaceErrorResult,
                                 const ASTContext &ctx);
 
-  // in SILType.h
-  SILType getSILResult() const;
+  /// Get the result type of an apply that calls this function.
+  SILType getSILResult();
+
+  /// Get the total number of arguments for a full apply in SIL of
+  /// this function type.  This is also the total number of SILArguments
+  /// in the entry block.
+  unsigned getNumSILArguments() const {
+    return NumIndirectResults + NumParameters;
+  }
+
+  /// Return the SIL argument convention of apply/entry argument at
+  /// the given index.
+  SILArgumentConvention getSILArgumentConvention(unsigned index) const;
+
+  /// Return the SIL type of the apply/entry argument at the given index.
+  SILType getSILArgumentType(unsigned index) const;
+
+  /// Given that this function type uses a C-language convention, return
+  /// its semantic result type.
+  ///
+  /// C functions represented in SIL are always in one of three cases:
+  ///   - no results at all; this corresponds to a void result type;
+  ///   - a single direct result and no indirect results; or
+  ///   - a single indirect result and no direct results.
+  SILType getCSemanticResult();
 
   /// Return the convention under which the callee is passed, if this
   /// is a thick non-block callee.
@@ -2981,8 +3024,53 @@ public:
     return getCalleeConvention() == ParameterConvention::Direct_Owned;
   }
 
-  SILResultInfo getResult() const {
-    return InterfaceResult;
+  /// Return the array of all results.  This may contain inter-mingled
+  /// direct and indirect results.
+  ArrayRef<SILResultInfo> getAllResults() const {
+    return const_cast<SILFunctionType*>(this)->getMutableAllResults();
+  }
+  unsigned getNumAllResults() const {
+    return NumDirectResults + NumIndirectResults;
+  }
+
+  /// Given that this function type has exactly one result, return it.
+  /// This is a common situation when working with a function with a known
+  /// signature.  It is *not* safe to assume that C functions satisfy
+  /// this, because void functions have zero results.
+  SILResultInfo getSingleResult() const {
+    assert(getNumAllResults() == 1);
+    return getAllResults()[0];
+  }
+
+  /// Return the array of direct results.
+  ArrayRef<SILResultInfo> getDirectResults() const {
+    if (!NumDirectResults) {
+      return {};
+    } else if (hasCombinedResults()) {
+      return const_cast<SILFunctionType*>(this)->getMutableDirectResults();
+    } else {
+      return getAllResults();
+    }
+  }
+  unsigned getNumDirectResults() const {
+    return NumDirectResults;
+  }
+
+  /// Return the array of indirect results.
+  ArrayRef<SILResultInfo> getIndirectResults() const {
+    if (!NumIndirectResults) {
+      return {};
+    } else if (hasCombinedResults()) {
+      return const_cast<SILFunctionType*>(this)->getMutableIndirectResults();
+    } else {
+      return getAllResults();
+    }
+  }
+  unsigned getNumIndirectResults() const {
+    return NumIndirectResults;
+  }
+  bool hasIndirectResults() const {
+    return NumIndirectResults != 0;
   }
 
   /// Does this function have a blessed Swift-native error result?
@@ -3004,34 +3092,10 @@ public:
     return const_cast<SILFunctionType*>(this)->getMutableParameters();
   }
 
-  bool hasIndirectResult() const {
-    return !getParameters().empty()
-      && getParameters()[0].isIndirectResult();
-  }
-  SILParameterInfo getIndirectResult() const {
-    assert(hasIndirectResult());
-    return getParameters()[0];
-  }
-
   /// Returns the 'self' parameter, assuming that this is the type of
   /// a method.
   SILParameterInfo getSelfParameter() const {
     return getParameters().back();
-  }
-
-  /// Returns the SILType of the semantic result of this function: the
-  /// indirect result type, if there is one, otherwise the direct result.
-  ///
-  /// In SILType.h.
-  SILType getSemanticResultSILType() const;
-
-  /// Get the parameters, ignoring any indirect-result parameter.
-  ArrayRef<SILParameterInfo>
-  getParametersWithoutIndirectResult() const {
-    auto params = getParameters();
-    if (hasIndirectResult())
-      params = params.slice(1);
-    return params;
   }
 
   using ParameterSILTypeArrayRef
@@ -3040,11 +3104,6 @@ public:
     return ParameterSILTypeArrayRef(getParameters());
   }
   
-  ParameterSILTypeArrayRef
-  getParameterSILTypesWithoutIndirectResult() const {
-    return ParameterSILTypeArrayRef(getParametersWithoutIndirectResult());
-  }
-
   bool isPolymorphic() const { return GenericSig != nullptr; }
   CanGenericSignature getGenericSignature() const { return GenericSig; }
 
@@ -3074,14 +3133,14 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),
-            getParameters(), getResult(), getOptionalErrorResult());
+            getParameters(), getAllResults(), getOptionalErrorResult());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *genericSig,
                       ExtInfo info,
                       ParameterConvention calleeConvention,
                       ArrayRef<SILParameterInfo> params,
-                      SILResultInfo result,
+                      ArrayRef<SILResultInfo> result,
                       Optional<SILResultInfo> errorResult);
 
   // Implement isa/cast/dyncast/etc.

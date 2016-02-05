@@ -30,7 +30,6 @@ namespace swift {
   class SILFunction;
 
 namespace irgen {
-  class AbstractCallee;
   class Address;
   class Explosion;
   class CallEmission;

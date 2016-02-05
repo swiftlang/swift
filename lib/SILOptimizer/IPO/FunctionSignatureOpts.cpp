@@ -135,14 +135,14 @@ struct ArgumentDescriptor {
   /// The original index of this argument.
   unsigned Index;
 
-  /// The original parameter info of this argument.
-  SILParameterInfo ParameterInfo;
-
   /// The original decl of this Argument.
   const ValueDecl *Decl;
 
   /// Was this parameter originally dead?
   bool IsDead;
+
+  /// Is this parameter an indirect result?
+  bool IsIndirectResult;
 
   /// If non-null, this is the release in the return block of the callee, which
   /// is associated with this parameter if it is @owned. If the parameter is not
@@ -166,9 +166,10 @@ struct ArgumentDescriptor {
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
   ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
-      : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
-        Decl(A->getDecl()), IsDead(false), CalleeRelease(),
-        CalleeReleaseInThrowBlock(),
+      : Arg(A), Index(A->getIndex()),
+        Decl(A->getDecl()), IsDead(false),
+        IsIndirectResult(A->isIndirectResult()),
+        CalleeRelease(), CalleeReleaseInThrowBlock(),
         ProjTree(A->getModule(), BPA, A->getType()) {
     ProjTree.computeUsesAndLiveness(A);
   }
@@ -178,8 +179,8 @@ struct ArgumentDescriptor {
   ArgumentDescriptor &operator=(const ArgumentDescriptor &) = delete;
   ArgumentDescriptor &operator=(ArgumentDescriptor &&) = default;
 
-  /// \returns true if this argument's ParameterConvention is P.
-  bool hasConvention(ParameterConvention P) const {
+  /// \returns true if this argument's convention is P.
+  bool hasConvention(SILArgumentConvention P) const {
     return Arg->hasConvention(P);
   }
 
@@ -207,7 +208,7 @@ struct ArgumentDescriptor {
                                  unsigned ArgOffset);
 
   bool canOptimizeLiveArg() const {
-    return ParameterInfo.getSILType().isObject();
+    return Arg->getType().isObject();
   }
 
   /// Return true if it's both legal and a good idea to explode this argument.
@@ -228,8 +229,8 @@ struct ArgumentDescriptor {
 };
 
 /// A structure that maintains all of the information about a specific
-/// SILArgument that we are tracking.
-struct ReturnValueDescriptor {
+/// direct result that we are tracking.
+struct ResultDescriptor {
   /// The original parameter info of this argument.
   SILResultInfo ResultInfo;
 
@@ -245,13 +246,13 @@ struct ReturnValueDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ReturnValueDescriptor() {};
-  ReturnValueDescriptor(SILResultInfo RI) : ResultInfo(RI), CalleeRetain() {}
+  ResultDescriptor() {};
+  ResultDescriptor(SILResultInfo RI) : ResultInfo(RI), CalleeRetain() {}
 
-  ReturnValueDescriptor(const ReturnValueDescriptor &) = delete;
-  ReturnValueDescriptor(ReturnValueDescriptor &&) = default;
-  ReturnValueDescriptor &operator=(const ReturnValueDescriptor &) = delete;
-  ReturnValueDescriptor &operator=(ReturnValueDescriptor &&) = default;
+  ResultDescriptor(const ResultDescriptor &) = delete;
+  ResultDescriptor(ResultDescriptor &&) = default;
+  ResultDescriptor &operator=(const ResultDescriptor &) = delete;
+  ResultDescriptor &operator=(ResultDescriptor &&) = default;
 
   /// \returns true if this argument's ParameterConvention is P.
   bool hasConvention(ResultConvention R) const {
@@ -269,6 +270,14 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
     DEBUG(llvm::dbgs() << "            Dead!\n");
     return;
   }
+
+  // If we have an indirect result, bail.
+  if (IsIndirectResult) {
+    DEBUG(llvm::dbgs() << "            Indirect result.\n");
+    return;
+  }
+
+  auto ParameterInfo = Arg->getKnownParameterInfo();
 
   // If this argument is live, but we cannot optimize it.
   if (!canOptimizeLiveArg()) {
@@ -478,9 +487,9 @@ class SignatureAnalyzer {
   /// an argument that we will use during our optimization.
   llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
 
-  /// Keep a "view" of precompiled information on the return value which we will
-  /// use during our optimization.
-  ReturnValueDescriptor ReturnDesc;
+  /// Keep a "view" of precompiled information on the direct results
+  /// which we will use during our optimization.
+  llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
 
   llvm::BumpPtrAllocator &Allocator;
 
@@ -499,7 +508,7 @@ public:
 
   bool shouldModifySelfArgument() const { return ShouldModifySelfArgument; }
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
-  ReturnValueDescriptor &getReturnValueDesc() { return ReturnDesc; }
+  MutableArrayRef<ResultDescriptor> getResultDescList() {return ResultDescList;}
   MutableArrayRef<ArgumentDescriptor> getArgDescList() { return ArgDescList; }
   SILFunction *getAnalyzedFunction() const { return F; }
 
@@ -535,8 +544,8 @@ public:
     return Analyzer.getArgDescList();
   }
 
-  ReturnValueDescriptor &getReturnValueDesc() {
-    return Analyzer.getReturnValueDesc();
+  MutableArrayRef<ResultDescriptor> getResultDescList() {
+    return Analyzer.getResultDescList();
   }
 
   /// Create a new empty function with the optimized signature found by this
@@ -557,7 +566,7 @@ private:
 /// it returns false.
 bool SignatureAnalyzer::analyze() {
   // For now ignore functions with indirect results.
-  if (F->getLoweredFunctionType()->hasIndirectResult())
+  if (F->getLoweredFunctionType()->hasIndirectResults())
     return false;
 
   ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
@@ -589,7 +598,7 @@ bool SignatureAnalyzer::analyze() {
 
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
-    if (A.hasConvention(ParameterConvention::Direct_Owned)) {
+    if (A.hasConvention(SILArgumentConvention::Direct_Owned)) {
       auto Releases = ArgToReturnReleaseMap.getReleasesForArgument(A.Arg);
       if (!Releases.empty()) {
 
@@ -630,8 +639,14 @@ bool SignatureAnalyzer::analyze() {
   }
 
   // Analyze return result information.
-  ReturnValueDescriptor RI(F->getLoweredFunctionType()->getResult());
-  if (RI.hasConvention(ResultConvention::Owned)) {
+  auto DirectResults = F->getLoweredFunctionType()->getDirectResults();
+  for (SILResultInfo DirectResult : DirectResults) {
+    ResultDescList.emplace_back(DirectResult);
+  }
+  // For now, only do anyting if there's a single direct result.
+  if (DirectResults.size() == 1 &&
+      ResultDescList[0].hasConvention(ResultConvention::Owned)) {
+    auto &RI = ResultDescList[0];
     // We have an @owned return value, find the epilogue retains now.
     ConsumedReturnValueToEpilogueRetainMatcher RVToReturnRetainMap(RCIA, AA, F);
     auto Retains = RVToReturnRetainMap.getEpilogueRetains();
@@ -640,7 +655,6 @@ bool SignatureAnalyzer::analyze() {
     if (!Retains.empty()) {
       RI.CalleeRetain = Retains;
       ShouldOptimize = true;
-      ReturnDesc = std::move(RI);
       ++NumOwnedConvertedToGuaranteedReturnValue;
     }
   }
@@ -678,7 +692,9 @@ std::string SignatureAnalyzer::getOptimizedName() const {
   }
 
   // Handle return value's change.
-  if (!ReturnDesc.CalleeRetain.empty())
+  // FIXME: handle multiple direct results here
+  if (ResultDescList.size() == 1 &&
+      !ResultDescList[0].CalleeRetain.empty())
     FSSM.setReturnValueOwnedToUnowned();
 
   FSSM.mangle();
@@ -705,16 +721,27 @@ CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
     ArgDesc.computeOptimizedInterfaceParams(InterfaceParams);
   }
 
-  SILResultInfo InterfaceResult = FTy->getResult();
+  // ResultDescs only covers the direct results; we currently can't ever
+  // change an indirect result.  Piece the modified direct result information
+  // back into the all-results list.
+  llvm::SmallVector<SILResultInfo, 8> InterfaceResults;
+  auto ResultDescs = getResultDescList();
+  for (SILResultInfo InterfaceResult : FTy->getAllResults()) {
+    if (InterfaceResult.isDirect()) {
+      auto &RV = ResultDescs[0];
+      ResultDescs = ResultDescs.slice(0);
+      if (!RV.CalleeRetain.empty()) {
+        InterfaceResults.push_back(SILResultInfo(InterfaceResult.getType(),
+                                                 ResultConvention::Unowned));
+        continue;
+      }
+    }
+
+    InterfaceResults.push_back(InterfaceResult);
+  }
+
   auto InterfaceErrorResult = FTy->getOptionalErrorResult();
   auto ExtInfo = FTy->getExtInfo();
-
-  // Get the new return value type if necessary.
-  ReturnValueDescriptor &RV = getReturnValueDesc();
-  if (!RV.CalleeRetain.empty()) {
-    InterfaceResult = SILResultInfo(InterfaceResult.getType(),
-                                    ResultConvention::Unowned);
-  }
 
   // Don't use a method representation if we modified self.
   if (Analyzer.shouldModifySelfArgument())
@@ -722,7 +749,7 @@ CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
 
   return SILFunctionType::get(FTy->getGenericSignature(), ExtInfo,
                               FTy->getCalleeConvention(), InterfaceParams,
-                              InterfaceResult, InterfaceErrorResult, Ctx);
+                              InterfaceResults, InterfaceErrorResult, Ctx);
 }
 
 SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
@@ -750,6 +777,23 @@ SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
       NewF->addSemanticsAttr(Attr);
 
   return NewF;
+}
+
+static void addRetainsForConvertedDirectResults(SILBuilder &Builder,
+                                                SILLocation Loc,
+                                                SILValue ReturnValue,
+                                     ArrayRef<ResultDescriptor> DirectResults) {
+  for (auto I : indices(DirectResults)) {
+    auto &RV = DirectResults[I];
+    if (RV.CalleeRetain.empty()) continue;
+
+    // Extract the return value if necessary.
+    SILValue SpecificResultValue = ReturnValue;
+    if (DirectResults.size() != 1)
+      SpecificResultValue = Builder.createTupleExtract(Loc, ReturnValue, I);
+
+    Builder.createRetainValue(Loc, SpecificResultValue);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -822,10 +866,8 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
 
     // If we have converted the return value from @owned to @guaranteed,
     // insert a retain_value at the callsite.
-    ReturnValueDescriptor &RV = Optimizer.getReturnValueDesc();
-    if (!RV.CalleeRetain.empty()) {
-      Builder.createRetainValue(Loc, ReturnValue);
-    }
+    addRetainsForConvertedDirectResults(Builder, Loc, ReturnValue,
+                                        Optimizer.getResultDescList());
       
     // Erase the old apply and its callee.
     recursivelyDeleteTriviallyDeadInstructions(AI, true,
@@ -896,10 +938,8 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   }
 
   // Handle @owned to @unowned return value conversion.
-  ReturnValueDescriptor &RD = Optimizer.getReturnValueDesc();
-  if (!RD.CalleeRetain.empty()) {
-    Builder.createRetainValue(Loc, ReturnValue);
-  }
+  addRetainsForConvertedDirectResults(Builder, Loc, ReturnValue,
+                                      Optimizer.getResultDescList());
 
   // Function that are marked as @NoReturn must be followed by an 'unreachable'
   // instruction.
@@ -945,7 +985,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // Otherwise generate the thunk body just in case.
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgDescs) {
-    ThunkBody->createBBArg(ArgDesc.ParameterInfo.getSILType(), ArgDesc.Decl);
+    ThunkBody->createBBArg(ArgDesc.Arg->getType(), ArgDesc.Decl);
   }
   createThunkBody(ThunkBody, NewF, Optimizer);
 
@@ -1015,9 +1055,10 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   // And remove all callee retains that we found and made redundant via owned
   // to unowned conversion.
-  ReturnValueDescriptor &RD = Optimizer.getReturnValueDesc();
-  for (auto &X : RD.CalleeRetain) {
-    X->eraseFromParent();
+  for (ResultDescriptor &RD : Optimizer.getResultDescList()) {
+    for (auto &X : RD.CalleeRetain) {
+      X->eraseFromParent();
+    }
   }
 
   // Rewrite all apply insts calling F to call NewF. Update each call site as

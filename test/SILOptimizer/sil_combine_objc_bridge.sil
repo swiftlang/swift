@@ -184,7 +184,7 @@ bb0(%0 : $AnNSArray):
 // CHECK: upcast %{{.*}} : $NSArray to $NSObject
 // CHECK: store
 // CHECK: return
-sil shared @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@out NSObject, @in Array<String>) -> () {
+sil shared @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Array<String>) -> @out NSObject {
 bb0(%0 : $*NSObject, %1 : $*Array<String>):
   %2 = alloc_stack $Array<String>
   copy_addr %1 to [initialization] %2 : $*Array<String>

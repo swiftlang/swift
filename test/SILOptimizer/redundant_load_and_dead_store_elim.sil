@@ -45,7 +45,7 @@ struct D {
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_a : $@convention(thin) (@in A) -> ()
-sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
+sil @escaped_a_ptr : $@convention(thin) () -> @out A
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 

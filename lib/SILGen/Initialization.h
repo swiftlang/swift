@@ -18,26 +18,55 @@
 #ifndef SWIFT_LOWERING_INITIALIZATION_H
 #define SWIFT_LOWERING_INITIALIZATION_H
 
-#include "RValue.h"
+#include "ManagedValue.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <memory>
 
 namespace swift {
 namespace Lowering {
-  class ManagedValue;
   class SILGenFunction;
 
 class Initialization;
 using InitializationPtr = std::unique_ptr<Initialization>;
   
-/// Initialization - Abstract base class for initialization buffers. An
-/// initialization represents an uninitialized buffer or a tuple of
-/// uninitialized buffers that must be initialized with the result of an
-/// expression, such as in a var declaration or return statement. An
-/// initialization may also have partial cleanups that should be disabled and
-/// replaced when the buffer is initialized; for instance, a freshly allocated
-/// box with an uninitialized value must be deallocated with `dealloc_ref`, but
-/// once the box is fully initialized, both the box and the contained value can
-/// be cleaned up together with `release`.
+/// An abstract class for consuming a value.  This is used for initializing
+/// variables, although that is not the only way it is used.
+///
+/// Implementations of this interface deal with the details of managing
+/// cleanups for the received value, as well as potentially managing partial
+/// cleanups of components of the value during the operation.
+///
+/// For example, during the initialization of a boxed local variable, it
+/// is invalid to release the box, because that will attempt to destroy
+/// the uninitialized value.  Instead, a cleanup to deallocate the box
+/// (with `dealloc_ref`) must be active; once initialization is complete,
+/// that cleanup (and any separate cleanup on the boxed value) must be
+/// deactivated, and a cleanup to release the box can be enabled instead.
+///
+/// This interface supports four ways to receive the initializing value:
+///
+///   - If getAddressForInPlaceInitialization() returns non-null, the
+///     initializing value may be created directly in that location.
+///     It is legal to call getAddressForInPlaceInitialization()
+///     multiple times.
+///
+///   - If canSplitIntoTupleElements() returns true, getTupleElements may
+///     be called.  It is not legal to call getTupleElements multiple times.
+///     Once getTupleElements has been called, the returned initializations
+///     must be completely initialized (including calling
+///     finishInitialization) before finishInitialization is called on the
+///     outer initialization.
+///
+///   - copyOrInitValueInto may be called.
+///
+/// In all of these cases, finishInitialization must be called after
+/// initialization is complete.
+///
+/// Alternatively, some "initializers" may call finishUninitialized if there
+/// was no immediate initializer.  This is generally not possibly when the
+/// Initialization is used merely as the destination for expression emission;
+/// an Initialization subclass only need implement this when the subclass
+/// might be used for an irrefutable pattern lacking an initializer.
 ///
 /// FIXME: provide a reset() operation to support multiple
 /// initialization paths.
@@ -72,43 +101,53 @@ public:
   }
   
   /// Return true if we can get the addresses of elements with the
-  /// 'getSubInitializationsForTuple' method.  Subclasses can override this to
+  /// 'splitIntoTupleElements' method.  Subclasses can override this to
   /// enable this behavior.
-  virtual bool canSplitIntoSubelementAddresses() const {
+  virtual bool canSplitIntoTupleElements() const {
     return false;
   }
 
-  /// If this initialization represents an aggregation of sub-initializations,
-  /// return the sub-initializations. If it represents a single
-  /// initialization of tuple type, explode it into initializations for each
-  /// individual tuple element. In either case, once all the sub-initializations
-  /// have been initialized and finalized with finishInitialization,
-  /// finishInitialization must then be called on this aggregate initialization.
+  /// Break this initialization (which expects a value of tuple type)
+  /// into component sub-initializations for the elements.  This
+  /// only destructures a single level of tuple.
+  ///
+  /// Once this method is called, the caller must ensure the complete
+  /// initialization of the result initializations, including calling
+  /// finishInitialization on them.  It is still necessary to call
+  /// finishInitialization on the tuple initialization after this is done.
   ///
   /// \param buf - If new Initializations need to be created, their ownership
-  /// is given to this vector.
-  /// \param Loc The location with which the single initialization should be
-  ///        associated.
+  ///   is given to this vector.  The caller should not otherwise interact
+  ///   with these initializations.
+  /// \param loc The location for any instructions required to split the
+  ///   initialization.
   virtual MutableArrayRef<InitializationPtr>
-  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                SmallVectorImpl<InitializationPtr> &buf,
-                                SILLocation Loc) {
-    llvm_unreachable("Must implement if canSplitIntoSubelementAddresses"
+  splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
+                         SmallVectorImpl<InitializationPtr> &buf) {
+    llvm_unreachable("Must implement if canSplitIntoTupleElements "
                      "returns true");
   }
   
-  /// Perform post-initialization bookkeeping for this initialization.
-  virtual void finishInitialization(SILGenFunction &gen) {}
-
-  
-  /// When emitting an exploded RValue into an initialization, this method is
-  /// called once per scalar value in the explosion.
+  /// Initialize this with the given value.  This should be an operation
+  /// of last resort: it is generally better to split tuples or evaluate
+  /// in-place when the initialization supports that.
   ///
   /// If this is an *copy* of the rvalue into this initialization then isInit is
   /// false.  If it is an *initialization* of the memory in the initialization,
   /// then isInit is true.
-  virtual void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                                   SILLocation loc, SILGenFunction &gen) = 0;
+  virtual void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+                                   ManagedValue explodedElement,
+                                   bool isInit) = 0;
+
+  /// Perform post-initialization bookkeeping for this initialization.
+  virtual void finishInitialization(SILGenFunction &gen) {}
+
+  /// Perform post-initialization bookkeeping for this initialization,
+  /// given that it wasn't actually initialized.
+  virtual void finishUninitialized(SILGenFunction &gen) {
+    llvm_unreachable("Initialization subclass does not support being left "
+                     "uninitialized");
+  }
 
 private:
   Initialization(const Initialization &) = delete;
@@ -120,6 +159,7 @@ private:
 /// Abstract base class for single-buffer initializations.  These are
 /// initializations that have an addressable memory object to be stored into.
 class SingleBufferInitialization : public Initialization {
+  llvm::TinyPtrVector<CleanupHandle::AsPointer> SplitCleanups;
 public:
   SingleBufferInitialization() {}
   
@@ -132,28 +172,34 @@ public:
     return getAddress();
   }
   
-  bool canSplitIntoSubelementAddresses() const override {
+  bool canSplitIntoTupleElements() const override {
     return true;
   }
   
   MutableArrayRef<InitializationPtr>
-  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                SmallVectorImpl<InitializationPtr> &buf,
-                                SILLocation Loc) override;
+  splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
+                         SmallVectorImpl<InitializationPtr> &buf) override;
 
-
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &gen) override {
-    copyOrInitValueIntoSingleBuffer(explodedElement, isInit, getAddress(),
-                                    loc, gen);
+  void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
+    copyOrInitValueIntoSingleBuffer(gen, loc, value, isInit, getAddress());
   }
+
+  /// Overriders must call this.
+  void finishInitialization(SILGenFunction &gen) override;
   
   /// Emit the exploded element into a buffer at the specified address.
-  static void copyOrInitValueIntoSingleBuffer(ManagedValue explodedElement,
-                                              bool isInit,
-                                              SILValue BufferAddress,
+  static void copyOrInitValueIntoSingleBuffer(SILGenFunction &gen,
                                               SILLocation loc,
-                                              SILGenFunction &gen);
+                                              ManagedValue value,
+                                              bool isInit,
+                                              SILValue bufferAddress);
+
+  static MutableArrayRef<InitializationPtr>
+  splitSingleBufferIntoTupleElements(SILGenFunction &gen, SILLocation loc,
+                                     CanType type, SILValue bufferAddress,
+                                     SmallVectorImpl<InitializationPtr> &buf,
+                       TinyPtrVector<CleanupHandle::AsPointer> &splitCleanups);
 };
   
 /// This is an initialization for a specific address in memory.
@@ -168,6 +214,8 @@ public:
   SILValue getAddressOrNull() const override {
     return address;
   }
+
+  void finishUninitialized(SILGenFunction &gen) override {}
 };
 
 /// Abstract base class for single-buffer initializations.
@@ -179,6 +227,10 @@ public:
     : Addr(addr), Cleanup(cleanup) {}
 
   void finishInitialization(SILGenFunction &gen) override;
+
+  void finishUninitialized(SILGenFunction &gen) override {
+    TemporaryInitialization::finishInitialization(gen);
+  }
 
   SILValue getAddressOrNull() const override {
     return Addr;
@@ -214,24 +266,27 @@ public:
       return SILValue();
   }
     
-  bool canSplitIntoSubelementAddresses() const override {
+  bool canSplitIntoTupleElements() const override {
     return true;
   }
     
   MutableArrayRef<InitializationPtr>
-  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                SmallVectorImpl<InitializationPtr> &buf,
-                                SILLocation Loc) override {
+  splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
+                         SmallVectorImpl<InitializationPtr> &buf) override {
     return SubInitializations;
   }
-    
-  void finishInitialization(SILGenFunction &gen) override {
-    for (auto &sub : SubInitializations)
-      sub->finishInitialization(gen);
-  }
-    
-  void copyOrInitValueInto(ManagedValue valueMV, bool isInit, SILLocation loc,
-                           SILGenFunction &SGF) override;
+
+  void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+                           ManagedValue valueMV, bool isInit) override;
+
+  // We don't need to do anything in finishInitialization.  There are two
+  // ways to initialize a TupleInitialization:
+  //   - splitting the initialization, in which case the initializer is
+  //     responsible for finishing the sub-initializations itself, or
+  //   - calling copyOrInitValueInto, which immediately finishes all
+  //     of the sub-initializations.
+
+  void finishUninitialized(SILGenFunction &gen) override;
 };
 
 } // end namespace Lowering

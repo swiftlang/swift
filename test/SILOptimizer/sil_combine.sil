@@ -797,17 +797,17 @@ bb0(%0 : $Builtin.Int32):
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[APPLIED]]
   %3 = thin_to_thick_function %2 : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 to $@callee_owned (Builtin.Int32) -> Builtin.Int32
   // CHECK: [[REABSTRACT:%.*]] = function_ref @reabstract
-  %4 = function_ref @reabstract : $@convention(thin) (@out Builtin.Int32, Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> ()
+  %4 = function_ref @reabstract : $@convention(thin) (Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> @out Builtin.Int32
   // CHECK-NOT: partial_apply
-  %5 = partial_apply %4(%3) : $@convention(thin) (@out Builtin.Int32, Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> ()
+  %5 = partial_apply %4(%3) : $@convention(thin) (Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> @out Builtin.Int32
   // CHECK: [[TMP:%.*]] = alloc_stack $Builtin.Int32
   %6 = alloc_stack $Builtin.Int32
   // CHECK-NOT: strong_retain
-  strong_retain %5 : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
+  strong_retain %5 : $@callee_owned (Builtin.Int32) -> @out Builtin.Int32
   // CHECK: apply [[REABSTRACT]]([[TMP]], %0, [[THICK]])
-  %8 = apply %5(%6, %0) : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
+  %8 = apply %5(%6, %0) : $@callee_owned (Builtin.Int32) -> @out Builtin.Int32
   // CHECK-NOT: strong_release
-  strong_release %5 : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
+  strong_release %5 : $@callee_owned (Builtin.Int32) -> @out Builtin.Int32
   // CHECK-NOT: tuple
   %10 = tuple ()
   // CHECK: [[RESULT:%.*]] = load [[TMP]]
@@ -819,7 +819,7 @@ bb0(%0 : $Builtin.Int32):
 }
 
 // CHECK-LABEL: sil shared [transparent] @reabstract
-sil shared [transparent] @reabstract : $@convention(thin) (@out Builtin.Int32, Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> () {
+sil shared [transparent] @reabstract : $@convention(thin) (Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> @out Builtin.Int32 {
 bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32, %2 : $@callee_owned (Builtin.Int32) -> Builtin.Int32):
   %3 = apply %2(%1) : $@callee_owned (Builtin.Int32) -> Builtin.Int32
   store %3 to %0 : $*Builtin.Int32
@@ -1021,7 +1021,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return
-sil @no_enum_promotion_of_non_concrete_types : $@convention(thin) <T> (@out FakeOptional<T>, @inout T, Builtin.Int1) -> () {
+sil @no_enum_promotion_of_non_concrete_types : $@convention(thin) <T> (@inout T, Builtin.Int1) -> @out FakeOptional<T> {
 bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
   %3 = alloc_stack $FakeOptional<T>
   inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.None!enumelt
@@ -1475,7 +1475,7 @@ bb0(%0 : $Builtin.RawPointer):
   return %28 : $Builtin.Word
 }
 
-sil @generic_call_with_indirect_result : $@convention(thin) <T> (@out T, @in T) -> ()
+sil @generic_call_with_indirect_result : $@convention(thin) <T> (@in T) -> @out T
 sil @generic_call_without_indirect_result : $@convention(thin) <T> (@in T) -> Bool
 sil @generic_call_with_direct_result : $@convention(thin) <T> (T) -> T
 
@@ -1483,12 +1483,12 @@ sil @generic_call_with_direct_result : $@convention(thin) <T> (T) -> T
 // CHECK-NOT: partial_apply
 sil @generic_partial_apply : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @generic_call_with_indirect_result : $@convention(thin) <τ_0_0> ( @out τ_0_0, @in τ_0_0) -> ()
+  %0 = function_ref @generic_call_with_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %1 = function_ref @generic_call_without_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
-  %2 = partial_apply %0<Builtin.Int32>() : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+  %2 = partial_apply %0<Builtin.Int32>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %3 = alloc_stack $Builtin.Int32
   %4 = alloc_stack $Builtin.Int32
-  %5 = apply %2(%3, %4) : $@callee_owned (@out Builtin.Int32, @in Builtin.Int32) -> ()
+  %5 = apply %2(%3, %4) : $@callee_owned (@in Builtin.Int32) -> @out Builtin.Int32
   %6 = partial_apply %1<Builtin.Int32>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
   %7 = apply %6(%3) : $@callee_owned (@in Builtin.Int32) -> Bool
   %8 = integer_literal $Builtin.Int32, 0
@@ -2615,8 +2615,8 @@ bb3(%19 : $Double):                               // Preds: bb1 bb2
   return %19 : $Double                            // id: %20
 }
 
-sil [reabstraction_thunk] @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
-sil [reabstraction_thunk] @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
+sil [reabstraction_thunk] @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@in String, @owned @callee_owned (@owned String) -> Bool) -> @out Bool
+sil [reabstraction_thunk] @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@in String) -> @out Bool) -> Bool
 
 // CHECK-LABEL: sil @remove_identity_reabstraction_thunks
 // CHECK:  [[STK:%.*]] = alloc_stack $@callee_owned (@owned String) -> Bool
@@ -2630,12 +2630,12 @@ sil @remove_identity_reabstraction_thunks : $@convention(thin) (@owned @callee_o
 bb0(%0 : $@callee_owned (@owned String) -> Bool):
   %1 = alloc_stack $@callee_owned (@owned String) -> Bool
   // function_ref reabstraction thunk helper from @callee_owned (@owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String) -> (@out Swift.Bool)
-  %2 = function_ref @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
-  %3 = partial_apply %2(%0) : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
-  debug_value %3 : $@callee_owned (@out Bool, @in String) -> ()
+  %2 = function_ref @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@in String, @owned @callee_owned (@owned String) -> Bool) -> @out Bool
+  %3 = partial_apply %2(%0) : $@convention(thin) (@in String, @owned @callee_owned (@owned String) -> Bool) -> @out Bool
+  debug_value %3 : $@callee_owned (@in String) -> @out Bool
   // function_ref reabstraction thunk helper from @callee_owned (@in Swift.String) -> (@out Swift.Bool) to @callee_owned (@owned Swift.String) -> (@unowned Swift.Bool)
-  %4 = function_ref @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
-  %5 = partial_apply %4(%3) : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
+  %4 = function_ref @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@in String) -> @out Bool) -> Bool
+  %5 = partial_apply %4(%3) : $@convention(thin) (@owned String, @owned @callee_owned (@in String) -> @out Bool) -> Bool
   store %5 to %1 : $*@callee_owned (@owned String) -> Bool
   %6 = load %1 : $*@callee_owned (@owned String) -> Bool
   strong_release %6 : $@callee_owned (@owned String) -> Bool
@@ -2883,7 +2883,7 @@ bb0(%0 : $B):
   return %7 : $FakeOptional<B>
 }
 
-sil @init_enum : $@convention(thin) (@out B) -> ()
+sil @init_enum : $@convention(thin) () -> @out B
 
 
 // Localize the initialization of the enum payload to enable mem2reg for the enum.
@@ -2901,8 +2901,8 @@ sil @enum_promotion_case4 : $@convention(thin) () -> @owned FakeOptional<B> {
 bb0:
   %2 = alloc_stack $FakeOptional<B>
   %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
-  %4 = function_ref @init_enum : $@convention(thin) (@out B) -> ()
-  %5 = apply %4(%3) : $@convention(thin) (@out B) -> ()
+  %4 = function_ref @init_enum : $@convention(thin) () -> @out B
+  %5 = apply %4(%3) : $@convention(thin) () -> @out B
   inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>

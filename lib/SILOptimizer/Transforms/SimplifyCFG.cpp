@@ -1844,8 +1844,6 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
           TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
     }
 
-    auto OrigParamTypes = OrigFnTy->getParameterSILTypes();
-    auto TargetParamTypes = TargetFnTy->getParameterSILTypes();
     unsigned numArgs = TAI->getNumArguments();
 
     // First check if it is possible to convert all arguments.
@@ -1854,8 +1852,8 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     // sure that we don't crash.
     for (unsigned i = 0; i < numArgs; ++i) {
       if (!canCastValueToABICompatibleType(TAI->getModule(),
-                                           OrigParamTypes[i],
-                                           TargetParamTypes[i])) {
+                                           OrigFnTy->getSILArgumentType(i),
+                                           TargetFnTy->getSILArgumentType(i))) {
         return false;
       }
     }
@@ -1865,12 +1863,13 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
       auto Arg = TAI->getArgument(i);
       // Cast argument if required.
       Arg = castValueToABICompatibleType(&Builder, TAI->getLoc(), Arg,
-                                         OrigParamTypes[i],
-                                         TargetParamTypes[i]).getValue();
+                                         OrigFnTy->getSILArgumentType(i),
+                                         TargetFnTy->getSILArgumentType(i))
+        .getValue();
       Args.push_back(Arg);
     }
 
-    assert (CalleeFnTy->getParameters().size() == Args.size() &&
+    assert (CalleeFnTy->getNumSILArguments() == Args.size() &&
             "The number of arguments should match");
 
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,

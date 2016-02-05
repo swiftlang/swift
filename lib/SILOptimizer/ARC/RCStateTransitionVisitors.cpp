@@ -219,7 +219,7 @@ TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntranceArgument(SILArgument *Arg) {
   DEBUG(llvm::dbgs() << "VISITING ENTRANCE ARGUMENT: " << *Arg);
 
-  if (!Arg->hasConvention(ParameterConvention::Direct_Owned)) {
+  if (!Arg->hasConvention(SILArgumentConvention::Direct_Owned)) {
     DEBUG(llvm::dbgs() << "    Not owned! Bailing!\n");
     return DataflowResult();
   }
@@ -240,8 +240,14 @@ visitStrongEntranceApply(ApplyInst *AI) {
 
   // We should have checked earlier that AI has an owned result value. To
   // prevent mistakes, assert that here.
-  assert(AI->hasResultConvention(ResultConvention::Owned) &&
-         "Expected AI to be Owned here");
+#ifndef NDEBUG
+  bool hasOwnedResult = false;
+  for (auto result : AI->getSubstCalleeType()->getDirectResults()) {
+    if (result.getConvention() == ResultConvention::Owned)
+      hasOwnedResult = true;
+  }
+  assert(hasOwnedResult && "Expected AI to be Owned here");
+#endif
 
   // Otherwise, return a dataflow result containing a +1.
   DEBUG(llvm::dbgs() << "    Initializing state.\n");

@@ -481,7 +481,7 @@ bb4(%20 : $ErrorType):
 }
 
 
-sil [transparent] [fragile] @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <T> (@out Optional<T>, @thin Optional<T>.Type) -> ()
+sil [transparent] [fragile] @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <T> (@thin Optional<T>.Type) -> @out Optional<T>
 
 
 // Check that -specdevirt can devirtualize it

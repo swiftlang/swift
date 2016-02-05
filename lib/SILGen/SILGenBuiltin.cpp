@@ -245,10 +245,9 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
                                                assignType.getAddressType());
   
   // Build the value to be assigned, reconstructing tuples if needed.
-  ManagedValue src = RValue(args.slice(0, args.size() - 1), assignFormalType)
-    .getAsSingleValue(gen, loc);
+  RValue src(args.slice(0, args.size() - 1), assignFormalType);
   
-  src.assignInto(gen, loc, addr);
+  std::move(src).assignInto(gen, loc, addr);
 
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }

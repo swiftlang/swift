@@ -65,6 +65,7 @@ namespace clang {
   class Type;
   namespace CodeGen {
     class CodeGenABITypes;
+    class CGFunctionInfo;
   }
 }
 using clang::CodeGen::CodeGenABITypes;
@@ -111,6 +112,7 @@ namespace irgen {
   class EnumImplStrategy;
   class ExplosionSchema;
   class FixedTypeInfo;
+  class ForeignFunctionInfo;
   class FormalType;
   class IRGenDebugInfo;
   class IRGenFunction;
@@ -763,7 +765,9 @@ public:
   void addNominalTypeDecl(const NominalTypeDecl *Decl);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
-                                      llvm::AttributeSet &attrs);
+                                      llvm::AttributeSet &attrs,
+                                      ForeignFunctionInfo *foreignInfo=nullptr);
+  ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
   llvm::Constant *getSize(Size size);
 

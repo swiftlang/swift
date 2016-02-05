@@ -802,15 +802,13 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     //  store %1 to %nopayload_addr
     //
     if ((AI = dyn_cast<ApplyInst>(&*II))) {
-      auto Params = AI->getSubstCalleeType()->getParameters();
       unsigned ArgIdx = 0;
       for (auto &Opd : AI->getArgumentOperands()) {
         // Found an apply that initializes the enum. We can optimize this by
         // localizing the initialization to an alloc_stack and loading from it.
         DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
         if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
-            Params[ArgIdx].getConvention() ==
-                ParameterConvention::Indirect_Out) {
+            ArgIdx < AI->getSubstCalleeType()->getNumIndirectResults()) {
           EnumInitOperand = &Opd;
           break;
         }

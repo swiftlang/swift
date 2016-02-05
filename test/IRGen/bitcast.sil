@@ -117,7 +117,7 @@ bb0(%0 : $Int, %1 : $Int):
 // CHECK-LABEL: define{{( protected)?}} void @unchecked_ref_cast_addr
 // CHECK-i386: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* %{{.*}}, %swift.type* %T, %swift.type* %U, i32 7)
 // CHECK-x86_64: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* %{{.*}}, %swift.type* %T, %swift.type* %U, i64 7)
-sil @unchecked_ref_cast_addr : $@convention(thin) <T, U> (@out U, @in T) -> () {
+sil @unchecked_ref_cast_addr : $@convention(thin) <T, U> (@in T) -> @out U {
 bb0(%0 : $*U, %1 : $*T):
   %a = alloc_stack $T
   copy_addr %1 to [initialization] %a : $*T

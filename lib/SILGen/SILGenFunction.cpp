@@ -537,9 +537,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    if (r->getType() != F.getLoweredFunctionType()->getResult().getSILType())
-      r = B.createStruct(mainClass,
-                       F.getLoweredFunctionType()->getResult().getSILType(), r);
+    auto rType = F.getLoweredFunctionType()->getSingleResult().getSILType();
+    if (r->getType() != rType)
+      r = B.createStruct(mainClass, rType, r);
 
     B.createReturn(mainClass, r);
     return;
@@ -581,9 +581,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argc->getType(), {}, args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    if (r->getType() != F.getLoweredFunctionType()->getResult().getSILType())
-      r = B.createStruct(mainClass,
-                       F.getLoweredFunctionType()->getResult().getSILType(), r);
+    auto rType = F.getLoweredFunctionType()->getSingleResult().getSILType();
+    if (r->getType() != rType)
+      r = B.createStruct(mainClass, rType, r);
     B.createReturn(mainClass, r);
     return;
   }
@@ -725,7 +725,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
                                          curriedArgs, subs);
   SILType resultTy
     = SGM.getConstantType(from).castTo<SILFunctionType>()
-         ->getResult().getSILType();
+         ->getSingleResult().getSILType();
   resultTy = F.mapTypeIntoContext(resultTy);
   auto toTy = toFn->getType();
 

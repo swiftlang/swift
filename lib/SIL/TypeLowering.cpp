@@ -2255,7 +2255,7 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 
-  if (fnTy1->hasIndirectResult() != fnTy2->hasIndirectResult())
+  if (fnTy1->getNumAllResults() != fnTy2->getNumAllResults())
     return ABIDifference::NeedsThunk;
 
   // If we don't have a context but the other type does, we'll return
@@ -2264,14 +2264,17 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
       fnTy1->getCalleeConvention() != fnTy2->getCalleeConvention())
     return ABIDifference::NeedsThunk;
 
-  auto result1 = fnTy1->getResult(), result2 = fnTy2->getResult();
-  
-  if (result1.getConvention() != result2.getConvention())
-    return ABIDifference::NeedsThunk;
+  for (unsigned i : indices(fnTy1->getAllResults())) {
+    auto result1 = fnTy1->getAllResults()[i];
+    auto result2 = fnTy2->getAllResults()[i];
 
-  if (checkForABIDifferences(result1.getType(), result2.getType())
-        != ABIDifference::Trivial)
-    return ABIDifference::NeedsThunk;
+    if (result1.getConvention() != result2.getConvention())
+      return ABIDifference::NeedsThunk;
+
+    if (checkForABIDifferences(result1.getType(), result2.getType())
+          != ABIDifference::Trivial)
+      return ABIDifference::NeedsThunk;
+  }
 
   // If one type does not have an error result, we can still trivially cast
   // (casting away an error result is only safe if the function never throws,
@@ -2295,8 +2298,7 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
 
     // Parameters are contravariant and our relation is not symmetric, so
     // make sure to flip the relation around.
-    if (!param1.isIndirectResult())
-      std::swap(param1, param2);
+    std::swap(param1, param2);
 
     if (checkForABIDifferences(param1.getType(), param2.getType())
           != ABIDifference::Trivial)

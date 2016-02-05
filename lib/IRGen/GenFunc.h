@@ -37,6 +37,7 @@ namespace irgen {
   class Address;
   class Alignment;
   class Explosion;
+  class ForeignFunctionInfo;
   class IRGenFunction;
   class LoadableTypeInfo;
   class TypeInfo;
@@ -58,16 +59,6 @@ namespace irgen {
                                       CanSILFunctionType outType,
                                       Explosion &out);
   
-  /// Does an ObjC method or C function with the given signature
-  /// require an sret indirect result?
-  llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,
-                                                    CanSILFunctionType fnType);
-  
-  /// Add function attributes to an attribute set for an indirect return
-  /// argument.
-  void addIndirectReturnAttributes(IRGenModule &IGM,
-                                   llvm::AttributeSet &attrs);
-
   /// Add function attributes to an attribute set for a byval argument.
   void addByvalArgumentAttributes(IRGenModule &IGM,
                                   llvm::AttributeSet &attrs,
@@ -95,7 +86,8 @@ namespace irgen {
                        Address storage,
                        CanSILBlockStorageType blockTy,
                        llvm::Function *invokeFunction,
-                       CanSILFunctionType invokeTy);
+                       CanSILFunctionType invokeTy,
+                       ForeignFunctionInfo foreignInfo);
 
   /// Can a series of values be simply pairwise coerced to (or from) an
   /// explosion schema, or do they need to traffic through memory?

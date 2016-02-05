@@ -38,7 +38,6 @@ namespace swift {
   enum class SpecialProtocol : uint8_t;
   
 namespace irgen {
-  class AbstractCallee;
   class Callee;
   class Explosion;
   class FieldTypeInfo;
@@ -213,10 +212,6 @@ namespace irgen {
                                                 llvm::Value *object,
                                                 SILType objectType,
                                                 bool suppressCast = false);
-
-  /// Derive the abstract callee for a virtual call to the given method.
-  AbstractCallee getAbstractVirtualCallee(IRGenFunction &IGF,
-                                          FuncDecl *method);
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.

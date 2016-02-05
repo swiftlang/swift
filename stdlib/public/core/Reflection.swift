@@ -367,8 +367,11 @@ internal struct _TupleMirror : _MirrorType {
     @_silgen_name("swift_TupleMirror_count")get
   }
   subscript(i: Int) -> (String, _MirrorType) {
-    @_silgen_name("swift_TupleMirror_subscript")get
+    return _subscript_get(i)
   }
+  @_silgen_name("swift_TupleMirror_subscript")
+  func _subscript_get<T>(i: Int) -> (T, _MirrorType)
+
   var summary: String { return "(\(count) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .Tuple }
@@ -384,8 +387,10 @@ struct _StructMirror : _MirrorType {
     @_silgen_name("swift_StructMirror_count")get
   }
   subscript(i: Int) -> (String, _MirrorType) {
-    @_silgen_name("swift_StructMirror_subscript")get
+    return _subscript_get(i)
   }
+  @_silgen_name("swift_StructMirror_subscript")
+  func _subscript_get<T>(i: Int) -> (T, _MirrorType)
 
   var summary: String {
     return _typeName(valueType)
@@ -407,8 +412,11 @@ struct _EnumMirror : _MirrorType {
     @_silgen_name("swift_EnumMirror_caseName")get
   }
   subscript(i: Int) -> (String, _MirrorType) {
-    @_silgen_name("swift_EnumMirror_subscript")get
+    return _subscript_get(i)
   }
+  @_silgen_name("swift_EnumMirror_subscript")
+  func _subscript_get<T>(i: Int) -> (T, _MirrorType)
+
   var summary: String {
     let maybeCaseName = String.fromCString(self.caseName)
     let typeName = _typeName(valueType)
@@ -425,9 +433,17 @@ struct _EnumMirror : _MirrorType {
 @_silgen_name("swift_ClassMirror_count")
 func _getClassCount(_: _MagicMirrorData) -> Int
 
+// Like the other swift_*Mirror_subscript functions declared here and
+// elsewhere, this is implemented in the runtime.  The Swift CC would
+// normally require the String to be returned directly and the _MirrorType
+// indirectly.  However, Clang isn't currently capable of doing that
+// reliably because the size of String exceeds the normal direct-return
+// ABI rules on most platforms.  Therefore, we make this function generic,
+// which has the disadvantage of passing the String type metadata as an
+// extra argument, but does force the string to be returned indirectly.
 @warn_unused_result
 @_silgen_name("swift_ClassMirror_subscript")
-func _getClassChild(_: Int, _: _MagicMirrorData) -> (String, _MirrorType)
+func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _MirrorType)
 
 #if _runtime(_ObjC)
 @warn_unused_result

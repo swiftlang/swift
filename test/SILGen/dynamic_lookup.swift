@@ -72,7 +72,7 @@ func opt_to_class(obj: AnyObject) {
   // CHECK-NEXT: strong_retain [[OBJ_SELF]]
   // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK-NEXT: [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL:%[0-9]+]]
-  // CHECK:      [[THUNKFN:%.*]] = function_ref @{{.*}} : $@convention(thin) (@out (), @in (), @owned @callee_owned () -> ()) -> ()
+  // CHECK:      [[THUNKFN:%.*]] = function_ref @{{.*}} : $@convention(thin) (@in (), @owned @callee_owned () -> ()) -> @out ()
   // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [[THUNKFN]]([[PARTIAL]])
   // CHECK-NEXT: store [[THUNK]] to [[THUNK_PAYLOAD]]
   // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}Some

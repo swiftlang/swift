@@ -4273,17 +4273,6 @@ namespace {
   END_METADATA_SEARCHER()
 }
 
-/// Provide the abstract parameters for virtual calls to the given method.
-AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
-                                               FuncDecl *method) {
-  // TODO: maybe use better versions in the v-table sometimes?
-  ResilienceExpansion bestExplosion = ResilienceExpansion::Minimal;
-  unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
-
-  return AbstractCallee(SILFunctionTypeRepresentation::Method, bestExplosion,
-                        naturalUncurry, naturalUncurry, ExtraData::None);
-}
-
 /// Load the correct virtual function for the given class method.
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,

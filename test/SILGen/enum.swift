@@ -104,7 +104,7 @@ func AddressOnly_cases(s: S) {
 // CHECK-LABEL: sil shared [transparent] @_TFOs11AddressOnly4mereFMS_FPs1P_S_
 // CHECK:       [[FN:%.*]] = function_ref @_TFOs11AddressOnly4merefMS_FPs1P_S_
 // CHECK-NEXT:  [[METHOD:%.*]] = partial_apply [[FN]](%0)
-// CHECK-NEXT:  return [[METHOD]] : $@callee_owned (@out AddressOnly, @in P) -> ()
+// CHECK-NEXT:  return [[METHOD]] : $@callee_owned (@in P) -> @out AddressOnly
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil shared [transparent] @_TFOs11AddressOnly4merefMS_FPs1P_S_

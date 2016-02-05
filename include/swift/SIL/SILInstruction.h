@@ -700,13 +700,6 @@ public:
     return SubstCalleeType;
   }
 
-  SILResultInfo getSubstCalleeResultInfo() const {
-    return getSubstCalleeType()->getResult();
-  }
-  bool hasResultConvention(ResultConvention Conv) const {
-    return getSubstCalleeResultInfo().getConvention() == Conv;
-  }
-
   bool isCalleeThin() const {
     auto Rep = getSubstCalleeType()->getRepresentation();
     return Rep == FunctionType::Representation::Thin;
@@ -839,6 +832,10 @@ public:
     return OperandValueArrayRef(opsWithoutSelf);
   }
 
+  SILArgumentConvention getArgumentConvention(unsigned index) const {
+    return getSubstCalleeType()->getSILArgumentConvention(index);
+  }
+
   Substitution getSelfSubstitution() const {
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
@@ -855,8 +852,11 @@ public:
     return getSubstitutions().slice(1);
   }
 
-  bool hasIndirectResult() const {
-    return getSubstCalleeType()->hasIndirectResult();
+  bool hasIndirectResults() const {
+    return getSubstCalleeType()->hasIndirectResults();
+  }
+  unsigned getNumIndirectResults() const {
+    return getSubstCalleeType()->getNumIndirectResults();
   }
 
   bool hasSelfArgument() const {
@@ -868,15 +868,12 @@ public:
     return C == ParameterConvention::Direct_Guaranteed;
   }
 
-  SILValue getIndirectResult() const {
-    assert(hasIndirectResult() && "apply inst does not have indirect result!");
-    return getArguments().front();
+  OperandValueArrayRef getIndirectResults() const {
+    return getArguments().slice(0, getNumIndirectResults());
   }
 
-  OperandValueArrayRef getArgumentsWithoutIndirectResult() const {
-    if (hasIndirectResult())
-      return getArguments().slice(1);
-    return getArguments();
+  OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
+    return getArguments().slice(getNumIndirectResults());
   }
 
   bool hasSemantics(StringRef semanticsString) const {
@@ -4365,7 +4362,7 @@ public:
 
   /// Return the type.
   SILType getType() const {
-    FOREACH_IMPL_RETURN(getSubstCalleeType()->getResult().getSILType());
+    FOREACH_IMPL_RETURN(getSubstCalleeType()->getSILResult());
   }
 
   /// Get the type of the callee without the applied substitutions.
@@ -4525,19 +4522,24 @@ public:
     return (classof(inst) ? FullApplySite(inst) : FullApplySite());
   }
 
-  bool hasIndirectResult() const {
-    return getSubstCalleeType()->hasIndirectResult();
+  bool hasIndirectResults() const {
+    return getSubstCalleeType()->hasIndirectResults();
   }
 
-  SILValue getIndirectResult() const {
-    assert(hasIndirectResult() && "apply inst does not have indirect result!");
-    return getArguments().front();
+  unsigned getNumIndirectResults() const {
+    return getSubstCalleeType()->getNumIndirectResults();
   }
 
-  OperandValueArrayRef getArgumentsWithoutIndirectResult() const {
-    if (hasIndirectResult())
-      return getArguments().slice(1);
-    return getArguments();
+  OperandValueArrayRef getIndirectResults() const {
+    return getArguments().slice(0, getNumIndirectResults());
+  }
+
+  OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
+    return getArguments().slice(getNumIndirectResults());
+  }
+
+  SILArgumentConvention getArgumentConvention(unsigned index) const {
+    return getSubstCalleeType()->getSILArgumentConvention(index);
   }
 
   static FullApplySite getFromOpaqueValue(void *p) {

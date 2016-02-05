@@ -29,6 +29,12 @@ namespace llvm {
   class PointerType;
 }
 
+namespace clang {
+  namespace CodeGen {
+    class CGFunctionInfo;    
+  }
+}
+
 namespace swift {
   class Substitution;
 
@@ -36,59 +42,9 @@ namespace irgen {
   class Callee;
   class IRGenFunction;
 
-  /// Abstract information about how we can emit a call.
-  class AbstractCallee {
-    /// The best explosion level available for the call.
-    unsigned ExplosionLevel : 1;
-
-    /// The kind of extra data this call receives.
-    unsigned Data : 2;
-
-    /// The abstract calling convention.
-    unsigned Convention : 4;
-
-    /// The min uncurrying level available for the function.
-    unsigned MinUncurryLevel : 2;
-
-    /// The max uncurrying level available for the function.
-    unsigned MaxUncurryLevel : 9;
-
+  class ForeignFunctionInfo {
   public:
-    AbstractCallee(SILFunctionTypeRepresentation convention,
-                   ResilienceExpansion level,
-                   unsigned minUncurry, unsigned maxUncurry, ExtraData data)
-      : ExplosionLevel(unsigned(level)), Data(unsigned(data)),
-        Convention(unsigned(convention)),
-        MinUncurryLevel(minUncurry), MaxUncurryLevel(maxUncurry) {}
-
-    static AbstractCallee forIndirect() {
-      return AbstractCallee(SILFunctionTypeRepresentation::Thin,
-                            ResilienceExpansion::Minimal,
-                            /*min uncurry*/ 0, /*max uncurry*/ 0,
-                            ExtraData::Retainable);
-    }
-
-    SILFunctionTypeRepresentation getRepresentation() const {
-      return SILFunctionTypeRepresentation(Convention);
-    }
-
-    /// Returns the best explosion level at which we can emit this
-    /// call.  We assume that we can call it at lower levels.
-    ResilienceExpansion getBestExplosionLevel() const {
-      return ResilienceExpansion(ExplosionLevel);
-    }
-
-    /// Whether the function requires a data pointer.
-    bool needsDataPointer() const { return getExtraData() != ExtraData::None; }
-
-    /// Whether the function requires a data pointer.
-    ExtraData getExtraData() const { return ExtraData(Data); }
-
-    /// The maximum uncurrying level at which the function can be called.
-    unsigned getMaxUncurryLevel() const { return MaxUncurryLevel; }
-
-    /// The minimum uncurrying level at which the function can be called.
-    unsigned getMinUncurryLevel() const { return MinUncurryLevel; }
+    const clang::CodeGen::CGFunctionInfo *ClangInfo = nullptr;
   };
 
   class Callee {
@@ -97,6 +53,9 @@ namespace irgen {
 
     /// The substituted result type of the function being called.
     CanSILFunctionType SubstFnType;
+
+    /// The clang information for the function being called, if applicable.
+    ForeignFunctionInfo ForeignInfo;
 
     /// The pointer to the actual function.
     llvm::Value *FnPtr;
@@ -112,35 +71,16 @@ namespace irgen {
   public:
     Callee() = default;
 
-    /// Prepare a callee for a known freestanding function that
-    /// requires no data pointer.
-    static Callee forFreestandingFunction(CanSILFunctionType origFnType,
-                                          CanSILFunctionType substFnType,
-                                          ArrayRef<Substitution> subs,
-                                          llvm::Constant *fn) {
-      return forKnownFunction(origFnType, substFnType, subs,
-                              fn, nullptr);
-    }
-
-    /// Prepare a callee for a known instance method.  Methods never
-    /// require a data pointer.  The formal type here should
-    /// include the 'self' clause.
-    static Callee forMethod(CanSILFunctionType origFnType,
-                            CanSILFunctionType substFnType,
-                            ArrayRef<Substitution> subs,
-                            llvm::Constant *fn) {
-      return forKnownFunction(origFnType, substFnType, subs,
-                              fn, nullptr);
-    }
-
     /// Prepare a callee for a known function with a known data pointer.
     static Callee forKnownFunction(CanSILFunctionType origFnType,
                                    CanSILFunctionType substFnType,
                                    ArrayRef<Substitution> subs,
-                                   llvm::Value *fn, llvm::Value *data) {
+                                   llvm::Value *fn, llvm::Value *data,
+                                   ForeignFunctionInfo foreignInfo) {
       // Invariant on the function pointer.
-      assert(cast<llvm::PointerType>(fn->getType())
-               ->getElementType()->isFunctionTy());
+      assert(fn->getType()->getPointerElementType()->isFunctionTy());
+      assert((foreignInfo.ClangInfo != nullptr) ==
+             (origFnType->getLanguage() == SILFunctionLanguage::C));
 
       Callee result;
       result.OrigFnType = origFnType;
@@ -148,6 +88,7 @@ namespace irgen {
       result.FnPtr = fn;
       result.DataPtr = data;
       result.Substitutions = subs;
+      result.ForeignInfo = foreignInfo;
       return result;
     }
     
@@ -165,6 +106,10 @@ namespace irgen {
 
     llvm::FunctionType *getLLVMFunctionType() {
       return cast<llvm::FunctionType>(FnPtr->getType()->getPointerElementType());
+    }
+
+    const ForeignFunctionInfo &getForeignInfo() const {
+      return ForeignInfo;
     }
 
     /// Return the function pointer as an i8*.

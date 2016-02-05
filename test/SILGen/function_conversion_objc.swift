@@ -60,7 +60,7 @@ func funcToBlock(x: () -> ()) -> @convention(block) () -> () {
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc11blockToFuncFbT_T_FT_T_ : $@convention(thin) (@owned @convention(block) () -> ()) -> @owned @callee_owned () -> ()
 // CHECK:         [[COPIED:%.*]] = copy_block %0
-// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
+// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb___XFo___
 // CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED]])
 // CHECK:         return [[FUNC]]
 func blockToFunc(x: @convention(block) () -> ()) -> () -> () {
@@ -69,7 +69,7 @@ func blockToFunc(x: @convention(block) () -> ()) -> () -> () {
 
 // ==== Representation change + function type conversion
 
-// CHECK-LABEL: sil hidden @_TF24function_conversion_objc22blockToFuncExistentialFbT_SiFT_P_ : $@convention(thin) (@owned @convention(block) () -> Int) -> @owned @callee_owned (@out protocol<>) -> ()
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc22blockToFuncExistentialFbT_SiFT_P_ : $@convention(thin) (@owned @convention(block) () -> Int) -> @owned @callee_owned () -> @out protocol<>
 // CHECK:         function_ref @_TTRXFdCb__dSi_XFo__dSi_
 // CHECK:         partial_apply
 // CHECK:         function_ref @_TTRXFo__dSi_XFo__iP__
@@ -81,7 +81,7 @@ func blockToFuncExistential(x: @convention(block) () -> Int) -> () -> Any {
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb__dSi_XFo__dSi_ : $@convention(thin) (@owned @convention(block) () -> Int) -> Int
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@out protocol<>, @owned @callee_owned () -> Int) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out protocol<>
 
 // C function pointer conversions
 

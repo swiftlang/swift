@@ -752,6 +752,10 @@ public:
   /// abstraction pattern for its input type.
   AbstractionPattern getFunctionInputType() const;
 
+  /// Given that the value being abstracted is optional, return the
+  /// abstraction pattern for its object type.
+  AbstractionPattern getAnyOptionalObjectType() const;
+
   /// If this pattern refers to a reference storage type, look through
   /// it.
   AbstractionPattern getReferenceStorageReferentType() const;

@@ -107,8 +107,8 @@ func funge(inout x x: Fungible) {}
 funge(x: &addressOnly)
 // CHECK: [[FUNGE:%.*]] = function_ref @_TF9writeback5fungeFT1xRPS_8Fungible__T_ : $@convention(thin) (@inout Fungible) -> ()
 // CHECK: [[TEMP:%.*]] = alloc_stack $Fungible
-// CHECK: [[GET:%.*]] = function_ref @_TF9writebackg11addressOnlyPS_8Fungible_ : $@convention(thin) (@out Fungible) -> ()
-// CHECK: apply [[GET]]([[TEMP]]) : $@convention(thin) (@out Fungible) -> ()
+// CHECK: [[GET:%.*]] = function_ref @_TF9writebackg11addressOnlyPS_8Fungible_ : $@convention(thin) () -> @out Fungible
+// CHECK: apply [[GET]]([[TEMP]]) : $@convention(thin) () -> @out Fungible
 // CHECK: apply [[FUNGE]]([[TEMP]]) : $@convention(thin) (@inout Fungible) -> ()
 // CHECK: [[SET:%.*]] = function_ref @_TF9writebacks11addressOnlyPS_8Fungible_ : $@convention(thin) (@in Fungible) -> ()
 // CHECK: apply [[SET]]([[TEMP]]) : $@convention(thin) (@in Fungible) -> ()
@@ -138,7 +138,7 @@ func test_generic<Runce: Runcible>(inout runce runce: Runce, anse: Runce.Frob.An
 
 // We should *not* write back when referencing decls or members as rvalues.
 // <rdar://problem/16530235>
-// CHECK-LABEL: sil hidden @_TF9writeback15loadAddressOnlyFT_PS_8Fungible_ : $@convention(thin) (@out Fungible) -> () {
+// CHECK-LABEL: sil hidden @_TF9writeback15loadAddressOnlyFT_PS_8Fungible_ : $@convention(thin) () -> @out Fungible {
 func loadAddressOnly() -> Fungible {
   // CHECK:       function_ref writeback.addressOnly.getter
   // CHECK-NOT:   function_ref writeback.addressOnly.setter

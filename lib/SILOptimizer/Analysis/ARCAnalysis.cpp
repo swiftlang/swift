@@ -648,7 +648,7 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
     if (!Arg || !Arg->isFunctionArg() ||
-        !Arg->hasConvention(ParameterConvention::Direct_Owned))
+        !Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       break;
 
     // Ok, we have a release on a SILArgument that is direct owned. Attempt to

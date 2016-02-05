@@ -3231,7 +3231,6 @@ public:
       // Closures do not have destructors.
       llvm_unreachable("callee convention cannot be deallocating");
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_Out:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -3247,35 +3246,35 @@ public:
       printGenericSignature(sig->getGenericParams(), sig->getRequirements());
       Printer << " ";
     }
+
     Printer << "(";
     bool first = true;
     for (auto param : T->getParameters()) {
-      if (first) {
-        first = false;
-      } else {
-        Printer << ", ";
-      }
+      Printer.printSeparator(first, ", ");
       param.print(Printer, Options);
     }
     Printer << ") -> ";
 
+    unsigned totalResults =
+      T->getNumAllResults() + unsigned(T->hasErrorResult());
+
+    if (totalResults != 1) Printer << "(";
+
+    first = true;
+    for (auto result : T->getAllResults()) {
+      Printer.printSeparator(first, ", ");
+      result.print(Printer, Options);
+    }
+
     if (T->hasErrorResult()) {
       // The error result is implicitly @owned; don't print that.
       assert(T->getErrorResult().getConvention() == ResultConvention::Owned);
-
-      if (T->getResult().getType()->isVoid()) {
-        Printer << "@error ";
-        T->getErrorResult().getType().print(Printer, Options);
-      } else {
-        Printer << "(";
-        T->getResult().print(Printer, Options);
-        Printer << ", @error ";
-        T->getErrorResult().getType().print(Printer, Options);
-        Printer << ")";
-      }
-    } else {
-      T->getResult().print(Printer, Options);
+      Printer.printSeparator(first, ", ");
+      Printer << "@error ";
+      T->getErrorResult().getType().print(Printer, Options);
     }
+
+    if (totalResults != 1) Printer << ")";
   }
   
   void visitSILBlockStorageType(SILBlockStorageType *T) {
@@ -3472,7 +3471,6 @@ std::string GenericSignature::getAsString() const {
 static StringRef getStringForParameterConvention(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In: return "@in ";
-  case ParameterConvention::Indirect_Out: return "@out ";
   case ParameterConvention::Indirect_In_Guaranteed:  return "@in_guaranteed ";
   case ParameterConvention::Indirect_Inout: return "@inout ";
   case ParameterConvention::Indirect_InoutAliasable: return "@inout_aliasable ";
@@ -3524,6 +3522,7 @@ void SILParameterInfo::print(ASTPrinter &Printer,
 
 static StringRef getStringForResultConvention(ResultConvention conv) {
   switch (conv) {
+  case ResultConvention::Indirect: return "@out ";
   case ResultConvention::Owned: return "@owned ";
   case ResultConvention::Unowned: return "";
   case ResultConvention::UnownedInnerPointer: return "@unowned_inner_pointer ";

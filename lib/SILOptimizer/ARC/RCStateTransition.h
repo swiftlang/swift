@@ -103,7 +103,7 @@ public:
 
   RCStateTransition(SILArgument *A)
       : EndPoint(A), Kind(RCStateTransitionKind::StrongEntrance) {
-    assert(A->hasConvention(ParameterConvention::Direct_Owned) &&
+    assert(A->hasConvention(SILArgumentConvention::Direct_Owned) &&
            "Expected owned argument");
   }
 

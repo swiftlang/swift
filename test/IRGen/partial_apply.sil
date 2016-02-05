@@ -205,7 +205,7 @@ entry(%x : $Int):
   return %p : $@callee_owned Int -> Int
 }
 
-sil public_external @generic_captured_and_open_param : $@convention(thin) <T> (@out T, @in T, @inout T) -> ()
+sil public_external @generic_captured_and_open_param : $@convention(thin) <T> (@in T, @inout T) -> @out T
 
 // CHECK-LABEL: define {{.*}} @partial_apply_open_generic_capture({{.*}} %swift.type* %T) {{.*}} {
 // CHECK:         store %swift.type* %T
@@ -214,11 +214,11 @@ sil public_external @generic_captured_and_open_param : $@convention(thin) <T> (@
 // CHECK:       define {{.*}} [[PARTIAL_APPLY_STUB]]
 // CHECK:         [[T:%.*]] = load %swift.type*, %swift.type**
 // CHECK:         tail call void @generic_captured_and_open_param({{.*}} %swift.type* [[T]])
-sil @partial_apply_open_generic_capture : $@convention(thin) <T> (@inout T) -> @callee_owned (@out T, @in T) -> () {
+sil @partial_apply_open_generic_capture : $@convention(thin) <T> (@inout T) -> @callee_owned (@in T) -> @out T {
 entry(%a : $*T):
-  %f = function_ref @generic_captured_and_open_param : $@convention(thin) <U> (@out U, @in U, @inout U) -> ()
-  %p = partial_apply %f<T>(%a) : $@convention(thin) <U> (@out U, @in U, @inout U) -> ()
-  return %p : $@callee_owned (@out T, @in T) -> ()
+  %f = function_ref @generic_captured_and_open_param : $@convention(thin) <U> (@in U, @inout U) -> @out U
+  %p = partial_apply %f<T>(%a) : $@convention(thin) <U> (@in U, @inout U) -> @out U
+  return %p : $@callee_owned (@in T) -> @out T
 }
 
 /*****************************************************************************/
@@ -453,22 +453,22 @@ bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
   return %p : $@callee_owned () -> ()
 }
 
-sil public_external @captured_dependent_out_param : $@convention(thin) <A> (@out A, @in A) -> ()
+sil public_external @captured_dependent_out_param : $@convention(thin) <A> (@in A) -> @out A
 
-sil @partial_apply_with_out_param : $@convention(thin) <T> (@in T) -> @callee_owned (@out T) -> () {
+sil @partial_apply_with_out_param : $@convention(thin) <T> (@in T) -> @callee_owned () -> @out T {
 bb0(%x : $*T):
-  %f = function_ref @captured_dependent_out_param : $@convention(thin) <B> (@out B, @in B) -> ()
-  %p = partial_apply %f<T>(%x) : $@convention(thin) <C> (@out C, @in C) -> ()
-  return %p : $@callee_owned (@out T) -> ()
+  %f = function_ref @captured_dependent_out_param : $@convention(thin) <B> (@in B) -> @out B
+  %p = partial_apply %f<T>(%x) : $@convention(thin) <C> (@in C) -> @out C
+  return %p : $@callee_owned () -> @out T
 }
 
 // CHECK-LABEL: define internal void @_TPA_captured_dependent_out_param(%swift.opaque* noalias nocapture sret, %swift.refcounted*) {{.*}} {
 // CHECK:         call void @captured_dependent_out_param(%swift.opaque* noalias nocapture sret
 
-sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @callee_owned (@out T, Int32) -> ()) -> @callee_owned (@out T) -> () {
-bb0(%x : $Int32, %f : $@callee_owned (@out T, Int32) -> ()):
-  %p = partial_apply %f(%x) : $@callee_owned (@out T, Int32) -> ()
-  return %p : $@callee_owned (@out T) -> ()
+sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @callee_owned (Int32) -> @out T) -> @callee_owned () -> @out T {
+bb0(%x : $Int32, %f : $@callee_owned (Int32) -> @out T):
+  %p = partial_apply %f(%x) : $@callee_owned (Int32) -> @out T
+  return %p : $@callee_owned () -> @out T
 }
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_dynamic_with_out_param

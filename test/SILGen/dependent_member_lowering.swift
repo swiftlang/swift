@@ -16,6 +16,6 @@ struct Bar<T>: P {
   typealias A = Int -> T
 
   func f(t: Int -> T) {}
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV25dependent_member_lowering3Barx_S_1PS_FS1_1{{.*}} : $@convention(witness_method) <T> (@in @callee_owned (@out T, @in Int) -> (), @in_guaranteed Bar<T>) -> ()
-  // CHECK:       bb0(%0 : $*@callee_owned (@out T, @in Int) -> (), %1 : $*Bar<T>):
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV25dependent_member_lowering3Barx_S_1PS_FS1_1{{.*}} : $@convention(witness_method) <T> (@in @callee_owned (@in Int) -> @out T, @in_guaranteed Bar<T>) -> ()
+  // CHECK:       bb0(%0 : $*@callee_owned (@in Int) -> @out T, %1 : $*Bar<T>):
 }

@@ -154,16 +154,17 @@ func convOptionalAddrOnly(a1: AddrOnly? -> AddrOnly) {
   let _: AddrOnly! -> AddrOnly? = a1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSqS0___iGSqS0___ : $@convention(thin) (@out Optional<AddrOnly>, @in Optional<AddrOnly>, @owned @callee_owned (@out AddrOnly, @in Optional<AddrOnly>) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSqS0___iGSqS0___ : $@convention(thin) (@in Optional<AddrOnly>, @owned @callee_owned (@in Optional<AddrOnly>) -> @out AddrOnly) -> @out Optional<AddrOnly>
 // CHECK:         alloc_stack $AddrOnly
 // CHECK-NEXT:    apply %2(%3, %1)
 // CHECK-NEXT:    init_enum_data_addr %0 : $*Optional<AddrOnly>
 // CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}} : $*AddrOnly
 // CHECK-NEXT:    inject_enum_addr %0 : $*Optional<AddrOnly>
+// CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    dealloc_stack {{.*}} : $*AddrOnly
 // CHECK-NEXT:    return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSQS0___iGSqS0___ : $@convention(thin) (@out Optional<AddrOnly>, @in ImplicitlyUnwrappedOptional<AddrOnly>, @owned @callee_owned (@out AddrOnly, @in Optional<AddrOnly>) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSQS0___iGSqS0___ : $@convention(thin) (@in ImplicitlyUnwrappedOptional<AddrOnly>, @owned @callee_owned (@in Optional<AddrOnly>) -> @out AddrOnly) -> @out Optional<AddrOnly>
 // CHECK:         alloc_stack $Optional<AddrOnly>
 // CHECK-NEXT:    unchecked_addr_cast %1 : $*ImplicitlyUnwrappedOptional<AddrOnly> to $*Optional<AddrOnly>
 // CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Optional<AddrOnly>
@@ -172,6 +173,7 @@ func convOptionalAddrOnly(a1: AddrOnly? -> AddrOnly) {
 // CHECK-NEXT:    init_enum_data_addr %0 : $*Optional<AddrOnly>
 // CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}} : $*AddrOnly
 // CHECK-NEXT:    inject_enum_addr %0 : $*Optional<AddrOnly>
+// CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    dealloc_stack {{.*}} : $*AddrOnly
 // CHECK-NEXT:    dealloc_stack {{.*}} : $*Optional<AddrOnly>
 // CHECK-NEXT:    return
@@ -203,7 +205,7 @@ func convExistentialTrivial(t2: Q -> Trivial, t3: Q? -> Trivial) {
   let _: P -> P = t2
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_dS1__iPS_1P__ : $@convention(thin) (@out P, Trivial, @owned @callee_owned (@in Q) -> Trivial) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_dS1__iPS_1P__ : $@convention(thin) (Trivial, @owned @callee_owned (@in Q) -> Trivial) -> @out P
 // CHECK:         alloc_stack $Q
 // CHECK-NEXT:    init_existential_addr
 // CHECK-NEXT:    store
@@ -229,7 +231,7 @@ func convExistentialTrivial(t2: Q -> Trivial, t3: Q? -> Trivial) {
 // CHECK:         store
 // CHECK:         return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_iPS_1P__iPS2___ : $@convention(thin) (@out P, @in P, @owned @callee_owned (@in Q) -> Trivial) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_iPS_1P__iPS2___ : $@convention(thin) (@in P, @owned @callee_owned (@in Q) -> Trivial) -> @out P
 // CHECK:         alloc_stack $Q
 // CHECK-NEXT:    open_existential_addr %1 : $*P
 // CHECK-NEXT:    init_existential_addr %3 : $*Q
@@ -345,7 +347,7 @@ func convFuncExistential(f1: Any -> Int -> Int) {
   let _: (Int -> Int) -> Any = f1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__ : $@convention(thin) (@out protocol<>, @owned @callee_owned (Int) -> Int, @owned @callee_owned (@in protocol<>) -> @owned @callee_owned (Int) -> Int) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__ : $@convention(thin) (@owned @callee_owned (Int) -> Int, @owned @callee_owned (@in protocol<>) -> @owned @callee_owned (Int) -> Int) -> @out protocol<>
 // CHECK:         alloc_stack $protocol<>
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    partial_apply
@@ -355,10 +357,10 @@ func convFuncExistential(f1: Any -> Int -> Int) {
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    partial_apply
 // CHECK-NEXT:    init_existential_addr %0 : $*protocol<>, $Int -> Int
-// CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_owned (@out Int, @in Int) -> ()
+// CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_owned (@in Int) -> @out Int
 // CHECK:         return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSi_XFo_iSi_iSi_ : $@convention(thin) (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSi_XFo_iSi_iSi_ : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Int) -> @out Int
 // CHECK:         load %1 : $*Int
 // CHECK-NEXT:    apply %2(%3)
 // CHECK-NEXT:    store {{.*}} to %0
@@ -368,12 +370,12 @@ func convFuncExistential(f1: Any -> Int -> Int) {
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion29convClassBoundArchetypeUpcast
 func convClassBoundArchetypeUpcast<T : Parent>(f1: Parent -> (T, Trivial)) {
-// CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_oS0__oTxVS_7Trivial__XFo_ox_oTS0_GSqS1____
+// CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_oS0__oxdVS_7Trivial_XFo_ox_oS0_dGSqS1___
 // CHECK:         partial_apply
   let _: T -> (Parent, Trivial?) = f1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxC19function_conversion6ParentrXFo_oS0__oTxVS_7Trivial__XFo_ox_oTS0_GSqS1____ : $@convention(thin) <T where T : Parent> (@owned T, @owned @callee_owned (@owned Parent) -> @owned (T, Trivial)) -> @owned (Parent, Optional<Trivial>)
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxC19function_conversion6ParentrXFo_oS0__oxdVS_7Trivial_XFo_ox_oS0_dGSqS1___ : $@convention(thin) <T where T : Parent> (@owned T, @owned @callee_owned (@owned Parent) -> (@owned T, Trivial)) -> (@owned Parent, Optional<Trivial>)
 // CHECK:         upcast %0 : $T to $Parent
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    tuple_extract
@@ -385,12 +387,12 @@ func convClassBoundArchetypeUpcast<T : Parent>(f1: Parent -> (T, Trivial)) {
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion37convClassBoundMetatypeArchetypeUpcast
 func convClassBoundMetatypeArchetypeUpcast<T : Parent>(f1: Parent.Type -> (T.Type, Trivial)) {
-// CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_dXMTS0__dTXMTxVS_7Trivial__XFo_dXMTx_dTXMTS0_GSqS1____
+// CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_dXMTS0__dXMTxdVS_7Trivial_XFo_dXMTx_dXMTS0_dGSqS1___
 // CHECK:         partial_apply
   let _: T.Type -> (Parent.Type, Trivial?) = f1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxC19function_conversion6ParentrXFo_dXMTS0__dTXMTxVS_7Trivial__XFo_dXMTx_dTXMTS0_GSqS1____ : $@convention(thin) <T where T : Parent> (@thick T.Type, @owned @callee_owned (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxC19function_conversion6ParentrXFo_dXMTS0__dXMTxdVS_7Trivial_XFo_dXMTx_dXMTS0_dGSqS1___ : $@convention(thin) <T where T : Parent> (@thick T.Type, @owned @callee_owned (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
 // CHECK:         upcast %0 : $@thick T.Type to $@thick Parent.Type
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    tuple_extract
@@ -403,13 +405,13 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(f1: Parent.Type -> (T.Typ
 // ==== Make sure we destructure one-element tuples
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion15convTupleScalarFTFPS_1Q_T_2f2FT6parentPS0___T_2f3FT5tupleGSqTSiSi___T__T_
-// CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q__dT__XFo_iPS_1P__dT__
-// CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q__dT__XFo_iPS_1P__dT__
-// CHECK:         function_ref @_TTRXFo_dGSqTSiSi___dT__XFo_dSidSi_dT__
+// CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q___XFo_iPS_1P___
+// CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q___XFo_iPS_1P___
+// CHECK:         function_ref @_TTRXFo_dGSqTSiSi____XFo_dSidSi__
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q__dT__XFo_iPS_1P__dT__ : $@convention(thin) (@in P, @owned @callee_owned (@in Q) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q___XFo_iPS_1P___ : $@convention(thin) (@in P, @owned @callee_owned (@in Q) -> ()) -> ()
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqTSiSi___dT__XFo_dSidSi_dT__ : $@convention(thin) (Int, Int, @owned @callee_owned (Optional<(Int, Int)>) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqTSiSi____XFo_dSidSi__ : $@convention(thin) (Int, Int, @owned @callee_owned (Optional<(Int, Int)>) -> ()) -> ()
 
 func convTupleScalar(f1: Q -> (),
                      f2: (parent: Q) -> (),
@@ -420,9 +422,9 @@ func convTupleScalar(f1: Q -> (),
 }
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion21convTupleScalarOpaqueurFFt4argsGSax__T_GSqFt4argsGSax__T__
-// CHECK:         function_ref @_TTRGrXFo_oGSax__dT__XFo_it4argsGSax___iT__
+// CHECK:         function_ref @_TTRGrXFo_oGSax___XFo_it4argsGSax___iT__
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_oGSax__dT__XFo_it4argsGSax___iT__ : $@convention(thin) <T> (@out (), @in (args: T...), @owned @callee_owned (@owned Array<T>) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_oGSax___XFo_it4argsGSax___iT__ : $@convention(thin) <T> (@in (args: T...), @owned @callee_owned (@owned Array<T>) -> ()) -> @out ()
 
 func convTupleScalarOpaque<T>(f: (args: T...) -> ()) -> ((args: T...) -> ())? {
   return f

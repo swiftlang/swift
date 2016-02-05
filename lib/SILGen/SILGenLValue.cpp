@@ -196,19 +196,12 @@ static ManagedValue emitGetIntoTemporary(SILGenFunction &gen,
     gen.emitTemporary(loc, gen.getTypeLowering(component.getTypeOfRValue()));
 
   // Emit a 'get' into the temporary.
-  ManagedValue value =
+  RValue value =
     std::move(component).get(gen, loc, base, SGFContext(temporaryInit.get()));
 
+  // Force the value into the temporary if necessary.
   if (!value.isInContext()) {
-    if (value.getType().getSwiftRValueType()
-          != temporaryInit->getAddress()->getType().getSwiftRValueType()) {
-      value = gen.emitSubstToOrigValue(loc, value,
-                                       component.getOrigFormalType(),
-                                       component.getSubstFormalType());
-    }
-
-    value.forwardInto(gen, loc, temporaryInit->getAddress());
-    temporaryInit->finishInitialization(gen);
+    std::move(value).forwardInto(gen, loc, temporaryInit.get());
   }
 
   return temporaryInit->getManagedAddress();
@@ -970,8 +963,8 @@ namespace {
       gen.B.emitBlock(contBB, loc);
     }
     
-    ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) && override {
+    RValue get(SILGenFunction &gen, SILLocation loc,
+               ManagedValue base, SGFContext c) && override {
       SILDeclRef getter = gen.getGetterDeclRef(decl, IsDirectAccessorUse);
 
       auto args =
@@ -1094,8 +1087,8 @@ namespace {
       llvm_unreachable("called clone on pseudo-component");
     }
 
-    ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) && override {
+    RValue get(SILGenFunction &gen, SILLocation loc,
+               ManagedValue base, SGFContext c) && override {
       llvm_unreachable("called get on a pseudo-component");
     }
     void set(SILGenFunction &gen, SILLocation loc,
@@ -1203,27 +1196,26 @@ namespace {
   };
 } // end anonymous namespace.
 
-ManagedValue
+RValue
 TranslationPathComponent::get(SILGenFunction &gen, SILLocation loc,
                               ManagedValue base, SGFContext c) && {
   // Load the original value.
-  ManagedValue baseVal = gen.emitLoad(loc, base.getValue(),
-                                      gen.getTypeLowering(base.getType()),
-                                      SGFContext(),
-                                      IsNotTake);
+  RValue baseVal(gen, loc, getSubstFormalType(),
+           gen.emitLoad(loc, base.getValue(),
+                        gen.getTypeLowering(base.getType()),
+                        SGFContext(), IsNotTake));
 
   // Map the base value to its substituted representation.
-  return std::move(*this).translate(gen, loc, baseVal, c);
+  return std::move(*this).translate(gen, loc, std::move(baseVal), c);
 }
 
 void TranslationPathComponent::set(SILGenFunction &gen, SILLocation loc,
                                    RValue &&value, ManagedValue base) && {
   // Map the value to the original pattern.
-  ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
-  mv = std::move(*this).untranslate(gen, loc, mv);
+  RValue newValue = std::move(*this).untranslate(gen, loc, std::move(value));
 
   // Store to the base.
-  mv.assignInto(gen, loc, base.getValue());
+  std::move(newValue).assignInto(gen, loc, base.getValue());
 }
 
 namespace {
@@ -1231,26 +1223,26 @@ namespace {
   /// substituted type in a concrete context.
   class OrigToSubstComponent : public TranslationPathComponent {
     AbstractionPattern OrigType;
-    
+
   public:
     OrigToSubstComponent(AbstractionPattern origType,
                          CanType substFormalType,
                          SILType loweredSubstType)
       : TranslationPathComponent({ AbstractionPattern(substFormalType),
                                    substFormalType, loweredSubstType },
-                             OrigToSubstKind),
+                                 OrigToSubstKind),
         OrigType(origType)
     {}
 
-    ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
-                             ManagedValue mv, SGFContext c) && override {
-      return gen.emitSubstToOrigValue(loc, mv, OrigType,
+    RValue untranslate(SILGenFunction &gen, SILLocation loc,
+                       RValue &&rv, SGFContext c) && override {
+      return gen.emitSubstToOrigValue(loc, std::move(rv), OrigType,
                                       getSubstFormalType(), c);
     }
 
-    ManagedValue translate(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue mv, SGFContext c) && override {
-      return gen.emitOrigToSubstValue(loc, mv, OrigType,
+    RValue translate(SILGenFunction &gen, SILLocation loc,
+                     RValue &&rv, SGFContext c) && override {
+      return gen.emitOrigToSubstValue(loc, std::move(rv), OrigType,
                                       getSubstFormalType(), c);
     }
 
@@ -1264,7 +1256,7 @@ namespace {
 
     void print(raw_ostream &OS) const override {
       OS << "OrigToSubstComponent("
-         << OrigType << ", "
+         << getOrigFormalType() << ", "
          << getSubstFormalType() << ", "
          << getTypeOfRValue() << ")\n";
     }
@@ -1281,15 +1273,15 @@ namespace {
                              SubstToOrigKind)
     {}
 
-    ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
-                             ManagedValue mv, SGFContext c) && override {
-      return gen.emitOrigToSubstValue(loc, mv, getOrigFormalType(),
+    RValue untranslate(SILGenFunction &gen, SILLocation loc,
+                       RValue &&rv, SGFContext c) && override {
+      return gen.emitOrigToSubstValue(loc, std::move(rv), getOrigFormalType(),
                                       getSubstFormalType(), c);
     }
 
-    ManagedValue translate(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue mv, SGFContext c) && override {
-      return gen.emitSubstToOrigValue(loc, mv, getOrigFormalType(),
+    RValue translate(SILGenFunction &gen, SILLocation loc,
+                     RValue &&rv, SGFContext c) && override {
+      return gen.emitSubstToOrigValue(loc, std::move(rv), getOrigFormalType(),
                                       getSubstFormalType(), c);
     }
     
@@ -1328,15 +1320,15 @@ namespace {
       // no useful writeback diagnostics at this point
     }
 
-    ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) && override {
+    RValue get(SILGenFunction &gen, SILLocation loc,
+               ManagedValue base, SGFContext c) && override {
       assert(base && "ownership component must not be root of lvalue path");
       auto &TL = gen.getTypeLowering(getTypeOfRValue());
 
       // Load the original value.
       ManagedValue result = gen.emitLoad(loc, base.getValue(), TL,
                                          SGFContext(), IsNotTake);
-      return result;
+      return RValue(gen, loc, getSubstFormalType(), result);
     }
 
     void set(SILGenFunction &gen, SILLocation loc,
@@ -1663,14 +1655,12 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
 
   assert(gen.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
 
-  auto &entry = gen.OpaqueValues[e];
-  assert((!entry.isConsumable || !entry.hasBeenConsumed) &&
-         "consumable opaque value already consumed");
-  entry.hasBeenConsumed = true;
+  auto &entry = gen.OpaqueValues.find(e)->second;
+  assert(!entry.HasBeenConsumed && "opaque value already consumed");
+  entry.HasBeenConsumed = true;
 
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue::forUnmanaged(entry.value),
-                         getValueTypeData(gen, e));
+  lv.add<ValueComponent>(entry.Value.borrow(), getValueTypeData(gen, e));
   return lv;
 }
 
@@ -2349,9 +2339,8 @@ static PathComponent &&drillToLastComponent(SILGenFunction &SGF,
   return std::move(**(lv.end() - 1));
 }
 
-ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
-                                              SGFContext C,
-                                              bool isGuaranteedValid) {
+RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
+                                        SGFContext C, bool isGuaranteedValid) {
   // Any writebacks should be scoped to after the load.
   WritebackScope scope(*this);
 
@@ -2363,9 +2352,10 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   if (component.isPhysical()) {
     addr = std::move(component.asPhysical())
              .offset(*this, loc, addr, AccessKind::Read);
-    return emitLoad(loc, addr.getValue(),
-                    getTypeLowering(src.getTypeOfRValue()), C, IsNotTake,
-                    isGuaranteedValid);
+    return RValue(*this, loc, src.getSubstFormalType(),
+                  emitLoad(loc, addr.getValue(),
+                           getTypeLowering(src.getTypeOfRValue()), C, IsNotTake,
+                           isGuaranteedValid));
   }
 
   // If the last component is logical, just emit a get.
@@ -2391,19 +2381,12 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
   // Peephole: instead of materializing and then assigning into a
   // translation component, untransform the value first.
   if (dest.isLastComponentTranslation()) {
-    // Implode to a single value.
-    auto srcFormalType = src.getType();
-    ManagedValue srcValue = std::move(src).getAsSingleValue(*this, loc);
-
     // Repeatedly reverse translation components.
     do {
-      srcValue = std::move(dest.getLastTranslationComponent())
-                   .untranslate(*this, loc, srcValue);
+      src = std::move(dest.getLastTranslationComponent())
+                   .untranslate(*this, loc, std::move(src));
       dest.dropLastTranslationComponent();
     } while (dest.isLastComponentTranslation());
-
-    // Explode to an r-value.
-    src = RValue(*this, loc, srcFormalType, srcValue);
   }
   
   // Resolve all components up to the last, keeping track of value-type logical
@@ -2419,8 +2402,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
       std::move(component.asPhysical()).offset(*this, loc, destAddr,
                                                AccessKind::Write);
     
-    std::move(src).getAsSingleValue(*this, loc)
-      .assignInto(*this, loc, finalDestAddr.getValue());
+    std::move(src).assignInto(*this, loc, finalDestAddr.getValue());
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
   }
@@ -2434,8 +2416,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   auto skipPeephole = [&]{
     auto loaded = emitLoadOfLValue(loc, std::move(src), SGFContext(dest));
     if (!loaded.isInContext())
-      RValue(*this, loc, src.getSubstFormalType(), loaded)
-        .forwardInto(*this, dest, loc);
+      std::move(loaded).forwardInto(*this, loc, dest);
   };
   
   // If the source is a physical lvalue, the destination is a single address,
@@ -2460,9 +2441,8 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
                                               LValue &&src,
                                               LValue &&dest) {
   auto skipPeephole = [&]{
-    ManagedValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
-    emitAssignToLValue(loc, RValue(*this, loc, src.getSubstFormalType(),
-                                   loaded), std::move(dest));
+    RValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
+    emitAssignToLValue(loc, std::move(loaded), std::move(dest));
   };
   
   // Only perform the peephole if both operands are physical and there's no

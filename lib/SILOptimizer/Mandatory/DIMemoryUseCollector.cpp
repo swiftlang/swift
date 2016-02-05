@@ -704,6 +704,19 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       auto FTI = Apply->getSubstCalleeType();
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
+      // If this is an out-parameter, it is like a store.
+      unsigned NumIndirectResults = FTI->getNumIndirectResults();
+      if (ArgumentNumber < NumIndirectResults) {
+        assert(!InStructSubElement && "We're initializing sub-members?");
+        addElementUses(BaseEltNo, PointeeType, User,
+                       DIUseKind::Initialization);
+        continue;
+
+      // Otherwise, adjust the argument index.      
+      } else {
+        ArgumentNumber -= NumIndirectResults;
+      }
+
       auto ParamConvention = FTI->getParameters()[ArgumentNumber]
         .getConvention();
 
@@ -718,13 +731,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
-        continue;
-
-      // If this is an out-parameter, it is like a store.
-      case ParameterConvention::Indirect_Out:
-        assert(!InStructSubElement && "We're initializing sub-members?");
-        addElementUses(BaseEltNo, PointeeType, User,
-                       DIUseKind::Initialization);
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.

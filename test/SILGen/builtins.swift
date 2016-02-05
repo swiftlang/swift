@@ -121,7 +121,10 @@ func assign_tuple(x: (Builtin.Int64, Builtin.NativeObject),
   var x = x
   var y = y
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*(Builtin.Int64, Builtin.NativeObject)
-  // CHECK: assign {{%.*}} to [[ADDR]]
+  // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
+  // CHECK: assign {{%.*}} to [[T0]]
+  // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
+  // CHECK: assign {{%.*}} to [[T0]]
   // CHECK: release 
   Builtin.assign(x, y)
 }
@@ -449,7 +452,7 @@ func autorelease(o: O) {
   Builtin.unreachable()
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFTCS_1C1xBw_TBwCS_1DGSqS0__S0__ : $@convention(thin) (@owned C, Builtin.Word) -> @owned (Builtin.Word, D, Optional<C>, C)
+// CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFTCS_1C1xBw_TBwCS_1DGSqS0__S0__ : $@convention(thin) (@owned C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
 // CHECK:       bb0(%0 : $C, %1 : $Builtin.Word):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value

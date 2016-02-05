@@ -203,8 +203,9 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
       if (!ASC.mayHaveBridgedObjectElementType()) {
         SelfEffects.Reads = true;
         SelfEffects.Releases |= !ASC.hasGuaranteedSelf();
-        if (((ApplyInst *)ASC)->getOrigCalleeType()->hasIndirectResult())
-          FE.ParamEffects[0].Writes = true;
+        for (auto i : indices(((ApplyInst *)ASC)->getOrigCalleeType()
+                                                ->getIndirectResults()))
+          FE.ParamEffects[i].Writes = true;
         return true;
       }
       return false;

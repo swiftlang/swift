@@ -299,7 +299,7 @@ formal type.  For example, consider the following generic type:
 would normally lower to the type ``@callee_owned () -> Int``, i.e.
 returning its result directly.  But if that type is properly lowered
 with the pattern of its unsubstituted type ``() -> T``, it becomes
-``@callee_owned (@out Int) -> ()``.
+``@callee_owned () -> @out Int``.
 
 When a type is lowered using the abstraction pattern of an
 unrestricted type, it is lowered as if the pattern were replaced with
@@ -312,14 +312,14 @@ lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
 lowering it with the pattern ``U -> V``; the result is that ``g.fn``
 has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ().
+  @callee_owned () -> @owned @callee_owned (@in (Int,Int)) -> @out Float.
 
 As another example, suppose that ``h`` has type
 ``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
 nor ``@inout Int`` are potential results of substitution because they
 aren't materializable, so ``h.fn`` has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in Int, @inout Int)
+  @callee_owned () -> @owned @callee_owned (@in Int, @inout Int) -> @out Float
 
 This system has the property that abstraction patterns are preserved
 through repeated substitutions.  That is, you can consider a lowered
@@ -417,11 +417,10 @@ number of ways:
   - Otherwise, the context value is treated as an unowned direct
     parameter.
 
-- A SIL function type declares the conventions for its parameters,
-  including any implicit out-parameters.  The parameters are written
-  as an unlabelled tuple; the elements of that tuple must be legal SIL
-  types, optionally decorated with one of the following convention
-  attributes.
+- A SIL function type declares the conventions for its parameters.
+  The parameters are written as an unlabelled tuple; the elements of that
+  tuple must be legal SIL types, optionally decorated with one of the
+  following convention attributes.
 
   The value of an indirect parameter has type ``*T``; the value of a
   direct parameter has type ``T``.
@@ -450,11 +449,6 @@ number of ways:
     aliases however can be assumed to be well-typed and well-ordered; ill-typed
     accesses and data races to the parameter are still undefined.
 
-  - An ``@out`` parameter is indirect.  The address must be of an
-    uninitialized object; the function is responsible for initializing
-    a value there.  If there is an ``@out`` parameter, it must be
-    the first parameter, and the direct result must be ``()``.
-
   - An ``@owned`` parameter is an owned direct parameter.
 
   - A ``@guaranteed`` parameter is a guaranteed direct parameter.
@@ -465,12 +459,35 @@ number of ways:
 
   - Otherwise, the parameter is an unowned direct parameter.
 
-- A SIL function type declares the convention for its direct result.
-  The result must be a legal SIL type.
+- A SIL function type declares the conventions for its results.
+  The results are written as an unlabelled tuple; the elements of that
+  tuple must be legal SIL types, optionally decoarted with one of the
+  following convention attributes.  Indirect and direct results may
+  be interleaved.
+
+  Indirect results correspond to implicit arguments of type ``*T`` in
+  function entry blocks and in the arguments to ``apply`` and ``try_apply``
+  instructions.  These arguments appear in the order in which they appear
+  in the result list, always before any parameters.
+
+  Direct results correspond to direct return values of type ``T``.  A 
+  SIL function type has a ``return type`` derived from its direct results
+  in the following way: when there is a single direct result, the return
+  type is the type of that result; otherwise, it is the tuple type of the
+  types of all the direct results, in the order they appear in the results
+  list.  The return type is the type of the operand of ``return``
+  instructions, the type of ``apply`` instructions, and the type of
+  the normal result of ``try_apply`` instructions.
+
+  - An ``@out`` result is indirect.  The address must be of an
+    uninitialized object.  The function is required to leave an
+    initialized value there unless it terminates with a ``throw``
+    instruction or it has a non-Swift calling convention.
 
   - An ``@owned`` result is an owned direct result.
 
   - An ``@autoreleased`` result is an autoreleased direct result.
+    If there is an autoreleased result, it must be the only direct result.
 
   - Otherwise, the parameter is an unowned direct result.
 

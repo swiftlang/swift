@@ -923,7 +923,7 @@ bb0(%0 : $X, %1 : $Builtin.Word):
 // CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: 
 // CHECK-NEXT:  End
-sil @test_address_to_pointer : $@convention(thin) (@out X, @owned X) -> () {
+sil @test_address_to_pointer : $@convention(thin) (@owned X) -> @out X {
 bb0(%0 : $*X, %1 : $X):
   %2 = address_to_pointer %0 : $*X to $Builtin.RawPointer
   %3 = pointer_to_address %2 : $Builtin.RawPointer to $*X
@@ -947,7 +947,7 @@ bb0(%0 : $AnyObject):
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: %1
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: 
 // CHECK-NEXT:  End
-sil @test_unchecked_ref_cast_addr : $@convention(thin) <T, U> (@out U, @in T, @thick U.Type) -> () {
+sil @test_unchecked_ref_cast_addr : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
 bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   unchecked_ref_cast_addr T in %1 : $*T to U in %0 : $*U
   %5 = tuple ()
@@ -1058,15 +1058,15 @@ bb0(%0 : $Array<X>):
 // CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
 // CHECK-NEXT:    Con %1.2 Esc: A, Succ: 
 // CHECK-NEXT:  End
-sil @arraysemantics_get_element : $@convention(thin) (@out X, Array<X>) -> () {
+sil @arraysemantics_get_element : $@convention(thin) (Array<X>) -> @out X {
 bb0(%io : $*X, %1 : $Array<X>):
   %il = integer_literal $Builtin.Int32, 0
   %i = struct $Int32(%il : $Builtin.Int32)
   %bl = integer_literal $Builtin.Int1, 0
   %b = struct $Bool (%bl : $Builtin.Int1)
 
-  %f = function_ref @get_element : $@convention(method) (@out X, Int32, Bool, @guaranteed Array<X>) -> ()
-  %a = apply %f(%io, %i, %b, %1) : $@convention(method) (@out X, Int32, Bool, @guaranteed Array<X>) -> ()
+  %f = function_ref @get_element : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> @out X
+  %a = apply %f(%io, %i, %b, %1) : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> @out X
 
   %r = tuple()
   return %r : $()
@@ -1130,7 +1130,7 @@ bb0(%0 : $Array<X>):
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
 sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()
-sil [_semantics "array.get_element"] @get_element : $@convention(method) (@out X, Int32, Bool, @guaranteed Array<X>) -> ()
+sil [_semantics "array.get_element"] @get_element : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> @out X
 sil [_semantics "array.make_mutable"] @make_mutable : $@convention(method) (@inout Array<X>) -> ()
 sil [_semantics "array.get_element_address"] @get_element_address : $@convention(method) (Int32, @guaranteed Array<X>) -> UnsafeMutablePointer<X>
 sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32

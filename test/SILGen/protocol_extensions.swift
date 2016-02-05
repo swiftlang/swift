@@ -99,11 +99,11 @@ func inout_func(inout n: Int) {}
 // CHECK: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
 func testD(m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box $D
+  // CHECK: [[RESULT:%.*]] = project_box [[D2]]
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelf{{.*}}
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
   // CHECK: store [[D]] to [[DCOPY]] : $*D
-  // CHECK: [[RESULT:%[0-9]+]] = alloc_stack $D
-  // CHECK: apply [[FN]]<D>([[RESULT]], [[DCOPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FN]]<D>([[RESULT]], [[DCOPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
   var d2: D = d.returnsSelf()
 
   // CHECK: metatype $@thick D.Type
@@ -528,7 +528,7 @@ func testExistentials2(p1: P1) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[PB]] : $*P1, $@opened([[UUID2:".*"]]) P1
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelf{{.*}}
-  // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
   var p1a: P1 = p1.returnsSelf()
 }
 
@@ -589,8 +589,8 @@ func testLogicalExistentialSetters(hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
   // CHECK-NEXT: [[HASP1_COPY:%[0-9]+]] = alloc_stack $HasAP1
   // CHECK-NEXT: copy_addr [[PBHASP1]] to [initialization] [[HASP1_COPY]] : $*HasAP1
-  // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1g6someP1PS_2P1_ : $@convention(method) (@out P1, @in_guaranteed HasAP1) -> ()
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], %8) : $@convention(method) (@out P1, @in_guaranteed HasAP1) -> ()
+  // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1g6someP1PS_2P1_ : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], %8) : $@convention(method) (@in_guaranteed HasAP1) -> @out P1
   // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr [[P1_COPY]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1s5prop2Sb : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
@@ -682,10 +682,10 @@ protocol InitRequirement {
 }
 
 extension InitRequirement {
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}} : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}} : $@convention(thin) <Self where Self : InitRequirement> (@owned D, @thick Self.Type) -> @out Self
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
-  // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@out τ_0_0, @owned C, @thick τ_0_0.Type) -> ()
+  // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
   // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_UP]], [[SELF_TYPE]])
     self.init(c: d)

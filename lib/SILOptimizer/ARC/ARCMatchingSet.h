@@ -110,8 +110,8 @@ public:
     // flag so we know that it is always known safe.
     if (auto *A = dyn_cast<SILArgument>(MatchSet.Ptr)) {
       if (A->isFunctionArg()) {
-        auto C = A->getParameterInfo().getConvention();
-        PtrIsGuaranteedArg = C == ParameterConvention::Direct_Guaranteed;
+        auto C = A->getArgumentConvention();
+        PtrIsGuaranteedArg = C == SILArgumentConvention::Direct_Guaranteed;
       }
     }
     NewIncrements.push_back(Inst);

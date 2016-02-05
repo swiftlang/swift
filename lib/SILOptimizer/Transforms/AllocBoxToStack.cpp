@@ -193,8 +193,8 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
 
       // apply instructions do not capture the pointer when it is passed
       // indirectly
-      if (apply->getSubstCalleeType()
-          ->getParameters()[UI->getOperandNumber()-1].isIndirect())
+      if (isIndirectConvention(
+            apply->getArgumentConvention(UI->getOperandNumber()-1)))
         continue;
 
       // Optionally drill down into an apply to see if the operand is
@@ -241,27 +241,24 @@ static size_t getParameterIndexForOperand(Operand *O) {
   assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
          "Expected apply or partial_apply!");
 
-  CanSILFunctionType Type;
-  size_t ArgCount;
-  if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
-    Type = Apply->getSubstCalleeType();
-    ArgCount = Apply->getArguments().size();
-    assert(Type->getParameters().size() == ArgCount &&
-           "Expected all arguments to be supplied!");
-  } else {
-    auto *PartialApply = cast<PartialApplyInst>(O->getUser());
-    Type = PartialApply->getSubstCalleeType();
-    ArgCount = PartialApply->getArguments().size();
-  }
-
-  size_t ParamCount = Type->getParameters().size();
-  assert(ParamCount >= ArgCount && "Expected fewer arguments to function!");
-
   auto OperandIndex = O->getOperandNumber();
   assert(OperandIndex != 0 && "Operand cannot be the applied function!");
 
   // The applied function is the first operand.
-  auto ParamIndex = (ParamCount - ArgCount) + OperandIndex - 1;
+  auto ParamIndex = OperandIndex - 1;
+
+  if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
+    assert(Apply->getSubstCalleeType()->getNumSILArguments() ==
+             Apply->getArguments().size() &&
+           "Expected all arguments to be supplied!");
+    (void) Apply;
+  } else {
+    auto *PartialApply = cast<PartialApplyInst>(O->getUser());
+    auto FnType = PartialApply->getSubstCalleeType();
+    auto ArgCount = PartialApply->getArguments().size();
+    assert(ArgCount <= FnType->getParameters().size());
+    ParamIndex += (FnType->getNumSILArguments() - ArgCount);
+  }
 
   return ParamIndex;
 }
@@ -535,7 +532,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig,
 
   // Generate a new parameter list with deleted parameters removed.
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
-  unsigned Index = 0;
+  unsigned Index = OrigFTI->getNumIndirectResults();
   for (auto &param : OrigFTI->getParameters()) {
     if (std::count(PromotedParamIndices.begin(), PromotedParamIndices.end(),
                    Index)) {
@@ -557,7 +554,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig,
                          OrigFTI->getExtInfo(),
                          OrigFTI->getCalleeConvention(),
                          ClonedInterfaceArgTys,
-                         OrigFTI->getResult(),
+                         OrigFTI->getAllResults(),
                          OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 

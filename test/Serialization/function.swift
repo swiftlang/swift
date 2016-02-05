@@ -55,7 +55,7 @@ optional(x: .Some(23))
 optional(x: .None)
 
 
-// SIL:   [[MAKE_PAIR:%.+]] = function_ref @_TF8def_func8makePair{{.*}} : $@convention(thin) <τ_0_0, τ_0_1> (@out (τ_0_0, τ_0_1), @in τ_0_0, @in τ_0_1) -> ()
+// SIL:   [[MAKE_PAIR:%.+]] = function_ref @_TF8def_func8makePair{{.*}} : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> (@out τ_0_0, @out τ_0_1)
 // SIL:   {{%.+}} = apply [[MAKE_PAIR]]<Int, Double>({{%.+}}, {{%.+}})
 
 var pair : (Int, Double) = makePair(a: 1, b: 2.5)
@@ -113,7 +113,7 @@ do {
   try throws2(1)
 } catch _ {}
 // SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error ErrorType
-// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType
+// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorType)
 
 // LLVM: }
 

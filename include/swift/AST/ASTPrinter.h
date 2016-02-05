@@ -87,6 +87,14 @@ public:
 
   // Helper functions.
 
+  void printSeparator(bool &first, StringRef separator) {
+    if (first) {
+      first = false;
+    } else {
+      printTextImpl(separator);
+    }
+  }
+
   ASTPrinter &operator<<(StringRef Text) {
     printTextImpl(Text);
     return *this;

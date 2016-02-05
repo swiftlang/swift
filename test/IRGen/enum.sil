@@ -1242,7 +1242,7 @@ end:
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_inject_x(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
 // CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
-sil @dynamic_single_payload_inject_x : $<T> (@out DynamicSinglePayload<T>, @in T) -> () {
+sil @dynamic_single_payload_inject_x : $<T> (@in T) -> @out DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
   inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.x!enumelt.1
   %v = tuple ()
@@ -1252,7 +1252,7 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
 // CHECK: define{{( protected)?}} void @dynamic_single_payload_inject_y(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
 // CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
-sil @dynamic_single_payload_inject_y : $<T> (@out DynamicSinglePayload<T>) -> () {
+sil @dynamic_single_payload_inject_y : $<T> () -> @out DynamicSinglePayload<T> {
 entry(%r : $*DynamicSinglePayload<T>):
   inject_enum_addr %r : $*DynamicSinglePayload<T>, #DynamicSinglePayload.y!enumelt
   %v = tuple ()

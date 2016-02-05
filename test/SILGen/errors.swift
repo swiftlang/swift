@@ -31,7 +31,7 @@ func dont_make_a_cat() throws -> Cat {
   throw HomeworkError.TooHard
 }
 
-// CHECK: sil hidden @_TF6errors11dont_return{{.*}} : $@convention(thin) <T> (@out T, @in T) -> @error ErrorType {
+// CHECK: sil hidden @_TF6errors11dont_return{{.*}} : $@convention(thin) <T> (@in T) -> (@out T, @error ErrorType) {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
 // CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $ErrorType
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
@@ -70,7 +70,7 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK-NEXT: [[ARG_TEMP:%.*]] = alloc_stack $Cat
 // CHECK-NEXT: store [[T0]] to [[ARG_TEMP]]
 // CHECK-NEXT: [[RET_TEMP:%.*]] = alloc_stack $Cat
-// CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]], [[ARG_TEMP]]) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType, normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
+// CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]], [[ARG_TEMP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorType), normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
 // CHECK:    [[DR_NORMAL]]({{%.*}} : $()):
 // CHECK-NEXT: [[T0:%.*]] = load [[RET_TEMP]] : $*Cat
 // CHECK-NEXT: dealloc_stack [[RET_TEMP]]
@@ -210,6 +210,7 @@ protocol Doomed {
 // CHECK:      [[T0:%.*]] = function_ref @_TFV6errors12DoomedStruct5check{{.*}} : $@convention(method) (DoomedStruct) -> @error ErrorType
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
+// CHECK:      [[T0:%.*]] = tuple ()
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : $ErrorType):
@@ -227,6 +228,7 @@ struct DoomedStruct : Doomed {
 // CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> () , $@convention(method) (@guaranteed DoomedClass) -> @error ErrorType
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
+// CHECK:      [[T0:%.*]] = tuple ()
 // CHECK:      strong_release [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T0]] : $()
@@ -245,6 +247,7 @@ class DoomedClass : Doomed {
 // CHECK:      [[SELF:%.*]] = load [[TEMP]] : $*HappyStruct
 // CHECK:      [[T0:%.*]] = function_ref @_TFV6errors11HappyStruct5check{{.*}} : $@convention(method) (HappyStruct) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
+// CHECK:      [[T1:%.*]] = tuple ()
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T1]] : $()
 struct HappyStruct : Doomed {
@@ -257,6 +260,7 @@ struct HappyStruct : Doomed {
 // CHECK:      [[SELF:%.*]] = load [[TEMP]] : $*HappyClass
 // CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> () , $@convention(method) (@guaranteed HappyClass) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
+// CHECK:      [[T1:%.*]] = tuple ()
 // CHECK:      strong_release [[SELF]] : $HappyClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T1]] : $()
@@ -270,7 +274,7 @@ func create<T>(fn: () throws -> T) throws -> T {
 func testThunk(fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSizoPs9ErrorType__XFo__iSizoPS___ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error ErrorType)) -> @error ErrorType
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSizoPs9ErrorType__XFo__iSizoPS___ : $@convention(thin) (@owned @callee_owned () -> (Int, @error ErrorType)) -> (@out Int, @error ErrorType)
 // CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error ErrorType)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : $Int):
@@ -492,8 +496,8 @@ func supportFirstStructure<B: Buildable>(inout b: B) throws {
 // CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.firstStructure!materializeForSet.1 :
 // CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]], [[BASE:%[0-9]*]])
 // CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
-// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*B.Structure
 // CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
+// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*B.Structure
 // CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
 // CHECK: try_apply [[SUPPORT]]<B.Structure>([[T4]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
@@ -523,8 +527,8 @@ func supportStructure<B: Buildable>(inout b: B, name: String) throws {
 // CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
 // CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]], [[INDEX]], [[BASE:%[0-9]*]])
 // CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
-// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*B.Structure
 // CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
+// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*B.Structure
 // CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
 // CHECK: try_apply [[SUPPORT]]<B.Structure>([[T4]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
@@ -738,7 +742,7 @@ func testOptionalTryVar() {
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
 // CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
-// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.Some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
@@ -768,7 +772,7 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
 // CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
-// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.Some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T

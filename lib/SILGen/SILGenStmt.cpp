@@ -242,25 +242,133 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   }
 }
 
+namespace {
+  class StoreResultInitialization : public Initialization {
+    SILValue &Storage;
+    SmallVectorImpl<CleanupHandle> &Cleanups;
+  public:
+    StoreResultInitialization(SILValue &storage,
+                              SmallVectorImpl<CleanupHandle> &cleanups)
+      : Storage(storage), Cleanups(cleanups) {}
+
+    SILValue getAddressOrNull() const override { return SILValue(); }
+    void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+                             ManagedValue value, bool isInit) override {
+      Storage = value.getValue();
+      auto cleanup = value.getCleanup();
+      if (cleanup.isValid()) Cleanups.push_back(cleanup);
+    }
+  };
+}
+
+static InitializationPtr
+prepareIndirectResultInit(SILGenFunction &gen, CanType resultType,
+                          ArrayRef<SILResultInfo> &allResults,
+                          MutableArrayRef<SILValue> &directResults,
+                          ArrayRef<SILArgument*> &indirectResultAddrs,
+                          SmallVectorImpl<CleanupHandle> &cleanups) {
+  // Recursively decompose tuple types.
+  if (auto resultTupleType = dyn_cast<TupleType>(resultType)) {
+    auto tupleInit = new TupleInitialization();
+    tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
+
+    for (auto resultEltType : resultTupleType.getElementTypes()) {
+      auto eltInit = prepareIndirectResultInit(gen, resultEltType, allResults,
+                                               directResults,
+                                               indirectResultAddrs, cleanups);
+      tupleInit->SubInitializations.push_back(std::move(eltInit));
+    }
+
+    return InitializationPtr(tupleInit);
+  }
+
+  // Okay, pull the next result off the list of results.
+  auto result = allResults[0];
+  allResults = allResults.slice(1);
+
+  // If it's indirect, we should be emitting into an argument.
+  if (result.isIndirect()) {
+    // Pull off the next indirect result argument.
+    SILValue addr = indirectResultAddrs.front();
+    indirectResultAddrs = indirectResultAddrs.slice(1);
+
+    // Create an initialization which will initialize it.
+    auto &resultTL = gen.getTypeLowering(addr->getType());
+    auto temporary = gen.useBufferAsTemporary(addr, resultTL);
+
+    // Remember the cleanup that will be activated.
+    auto cleanup = temporary->getInitializedCleanup();
+    if (cleanup.isValid())
+      cleanups.push_back(cleanup);
+
+    return InitializationPtr(temporary.release());
+  }
+
+  // Otherwise, make an Initialization that stores the value in the
+  // next element of the directResults array.
+  auto init = new StoreResultInitialization(directResults[0], cleanups);
+  directResults = directResults.slice(1);
+  return InitializationPtr(init);
+}
+
+/// Prepare an Initialization that will initialize the result of the
+/// current function.
+///
+/// \param directResultsBuffer - will be filled with the direct
+///   components of the result
+/// \param cleanups - will be filled (after initialization completes)
+///   with all the active cleanups managing the result values
+static std::unique_ptr<Initialization>
+prepareIndirectResultInit(SILGenFunction &gen, CanType formalResultType,
+                          SmallVectorImpl<SILValue> &directResultsBuffer,
+                          SmallVectorImpl<CleanupHandle> &cleanups) {
+  auto fnType = gen.F.getLoweredFunctionType();
+
+  // Make space in the direct-results array for all the entries we need.
+  directResultsBuffer.append(fnType->getNumDirectResults(), SILValue());
+
+  ArrayRef<SILResultInfo> allResults = fnType->getAllResults();
+  MutableArrayRef<SILValue> directResults = directResultsBuffer;
+  ArrayRef<SILArgument*> indirectResultAddrs = gen.F.getIndirectResults();
+
+  auto init = prepareIndirectResultInit(gen, formalResultType, allResults,
+                                        directResults, indirectResultAddrs,
+                                        cleanups);
+
+  assert(allResults.empty());
+  assert(directResults.empty());
+  assert(indirectResultAddrs.empty());
+
+  return init;
+}
+
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
-  SILValue result;
-  if (IndirectReturnAddress) {
+  SmallVector<SILValue, 4> directResults;
+
+  if (F.getLoweredFunctionType()->hasIndirectResults()) {
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups, CleanupLocation(ret));
-    InitializationPtr returnInit(
-                       new KnownAddressInitialization(IndirectReturnAddress));
-    emitExprInto(ret, returnInit.get());
+
+    // Build an initialization which recursively destructures the tuple.
+    SmallVector<CleanupHandle, 4> resultCleanups;
+    InitializationPtr resultInit =
+      prepareIndirectResultInit(*this, ret->getType()->getCanonicalType(),
+                                directResults, resultCleanups);
+
+    // Emit the result expression into the initialization.
+    emitExprInto(ret, resultInit.get());
+
+    // Deactivate all the cleanups for the result values.
+    for (auto cleanup : resultCleanups) {
+      Cleanups.forwardCleanup(cleanup);
+    }
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
-    RValue resultRValue = emitRValue(ret);
-    if (!resultRValue.getType()->isVoid()) {
-      result = std::move(resultRValue).forwardAsSingleValue(*this, ret);
-    }
+    emitRValue(ret).forwardAll(*this, directResults);
   }
-  Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc,
-                                 result ? result : ArrayRef<SILValue>{});
+  Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc, directResults);
 }
 
 void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
@@ -712,9 +820,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // allocations in the subexpression are immediately released.
   if (optTL.isAddressOnly()) {
     Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
-    InitializationPtr nextInit(new KnownAddressInitialization(nextBufOrValue));
+    auto nextInit = SGF.useBufferAsTemporary(nextBufOrValue, optTL);
     SGF.emitExprInto(S->getGeneratorNext(), nextInit.get());
-    nextInit->finishInitialization(SGF);
+    nextInit->getManagedAddress().forward(SGF);
   } else {
     Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
     nextBufOrValue =
@@ -754,8 +862,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
                                             SGFContext(initLoopVars.get()));
       if (!val.isInContext())
         RValue(SGF, S, optTy.getAnyOptionalObjectType(), val)
-          .forwardInto(SGF, initLoopVars.get(), S);
-
+          .forwardInto(SGF, S, initLoopVars.get());
 
       // Now that the pattern has been initialized, check any where condition.
       // If it fails, loop around as if 'continue' happened.

@@ -838,16 +838,16 @@ class C {
 }
 
 // CHECK-LABEL: sil [noinline] @callThrowing
-sil [noinline] @callThrowing : $@convention(method) <T> (@out T, @in T, @owned @callee_owned (@out T) -> @error ErrorType, @guaranteed C) -> () {
-bb0(%0 : $*T, %1 : $*T, %2 : $@callee_owned (@out T) -> @error ErrorType, %3 : $C):
-  strong_retain %2 : $@callee_owned (@out T) -> @error ErrorType
-  try_apply %2(%0) : $@callee_owned (@out T) -> @error ErrorType, normal bb1, error bb4
+sil [noinline] @callThrowing : $@convention(method) <T> (@in T, @owned @callee_owned () -> (@out T, @error ErrorType), @guaranteed C) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $@callee_owned () -> (@out T, @error ErrorType), %3 : $C):
+  strong_retain %2 : $@callee_owned () -> (@out T, @error ErrorType)
+  try_apply %2(%0) : $@callee_owned () -> (@out T, @error ErrorType), normal bb1, error bb4
 
 bb1(%6 : $()):
   br bb2
 
 bb2:
-  strong_release %2 : $@callee_owned (@out T) -> @error ErrorType
+  strong_release %2 : $@callee_owned () -> (@out T, @error ErrorType)
   destroy_addr %1 : $*T
   %10 = tuple ()
   return %10 : $()
@@ -871,11 +871,11 @@ bb0(%0 : $C):
   store %2 to %3 : $*Int32
   %5 = function_ref @theClosure : $@convention(thin) () -> (Int32, @error ErrorType)
   %6 = thin_to_thick_function %5 : $@convention(thin) () -> (Int32, @error ErrorType) to $@callee_owned () -> (Int32, @error ErrorType)
-  %7 = function_ref @reabstractionThunk : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorType)) -> @error ErrorType
-  %8 = partial_apply %7(%6) : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorType)) -> @error ErrorType
+  %7 = function_ref @reabstractionThunk : $@convention(thin) (@owned @callee_owned () -> (Int32, @error ErrorType)) -> (@out Int32, @error ErrorType)
+  %8 = partial_apply %7(%6) : $@convention(thin) (@owned @callee_owned () -> (Int32, @error ErrorType)) -> (@out Int32, @error ErrorType)
   %9 = alloc_stack $Int32
-  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned @callee_owned (@out τ_0_0) -> @error ErrorType, @guaranteed C) -> ()
-  %11 = apply %10<Int32>(%9, %3, %8, %0) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned @callee_owned (@out τ_0_0) -> @error ErrorType, @guaranteed C) -> ()
+  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error ErrorType), @guaranteed C) -> @out τ_0_0
+  %11 = apply %10<Int32>(%9, %3, %8, %0) : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error ErrorType), @guaranteed C) -> @out τ_0_0
   %12 = load %9 : $*Int32
   dealloc_stack %9 : $*Int32
   dealloc_stack %3 : $*Int32
@@ -894,7 +894,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil [transparent] [reabstraction_thunk] @reabstractionThunk
-sil [transparent] [reabstraction_thunk] @reabstractionThunk : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorType)) -> @error ErrorType {
+sil [transparent] [reabstraction_thunk] @reabstractionThunk : $@convention(thin) (@owned @callee_owned () -> (Int32, @error ErrorType)) -> (@out Int32, @error ErrorType) {
 bb0(%0 : $*Int32, %1 : $@callee_owned () -> (Int32, @error ErrorType)):
   try_apply %1() : $@callee_owned () -> (Int32, @error ErrorType), normal bb1, error bb2
 

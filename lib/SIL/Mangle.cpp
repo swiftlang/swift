@@ -71,7 +71,8 @@ FunctionSignatureSpecializationMangler::
 FunctionSignatureSpecializationMangler(SpecializationPass P, Mangler &M,
                                        SILFunction *F)
   : SpecializationMangler(SpecializationKind::FunctionSignature, P, M, F) {
-  for (unsigned i : indices(F->getLoweredFunctionType()->getParameters())) {
+  for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();
+       i != e; ++i) {
     (void)i;
     Args.push_back({ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});
   }

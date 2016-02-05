@@ -1859,7 +1859,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     for (auto elt : tuple->getElements()) {
       if (auto named = dyn_cast<NamedTypeRepr>(elt)) {
-        TC.diagnose(named->getNameLoc(), diag::sil_function_label);
+        TC.diagnose(named->getNameLoc(), diag::sil_function_input_label);
         elt = named->getTypeRepr();
       }
 
@@ -1880,22 +1880,13 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       hasError = true;
   }
 
-  SILResultInfo result;
+  SmallVector<SILResultInfo, 4> results;
   Optional<SILResultInfo> errorResult;
   {
-    // For now, resolveSILResults only returns a single ordinary result.
     // FIXME: Deal with unsatisfied dependencies.
-    SmallVector<SILResultInfo, 1> ordinaryResults;
     if (resolveSILResults(repr->getResultTypeRepr(), options,
-                          ordinaryResults, errorResult)) {
+                          results, errorResult)) {
       hasError = true;
-    } else {
-      if (ordinaryResults.empty()) {
-        result = SILResultInfo(TupleType::getEmpty(TC.Context),
-                               ResultConvention::Unowned);
-      } else {
-        result = ordinaryResults.front();
-      }
     }
   }
 
@@ -1908,7 +1899,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // FIXME: Remap the parsed context types to interface types.
   CanGenericSignature genericSig;
   SmallVector<SILParameterInfo, 4> interfaceParams;
-  SILResultInfo interfaceResult;
+  SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
   if (auto *genericParams = repr->getGenericParams()) {
     genericSig = repr->getGenericSignature()->getCanonicalSignature();
@@ -1918,9 +1909,12 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
           M, genericParams, param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
-    auto transResultType = ArchetypeBuilder::mapTypeOutOfContext(
-        M, genericParams, result.getType())->getCanonicalType();
-    interfaceResult = result.getWithType(transResultType);
+    for (auto &result : results) {
+      auto transResultType =
+        ArchetypeBuilder::mapTypeOutOfContext(
+          M, genericParams, result.getType())->getCanonicalType();
+      interfaceResults.push_back(result.getWithType(transResultType));
+    }
 
     if (errorResult) {
       auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
@@ -1930,12 +1924,12 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   } else {
     interfaceParams = params;
-    interfaceResult = result;
+    interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
   return SILFunctionType::get(genericSig, extInfo,
                               callee,
-                              interfaceParams, interfaceResult,
+                              interfaceParams, interfaceResults,
                               interfaceErrorResult,
                               Context);
 }
@@ -1964,7 +1958,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_in_guaranteed,
              ParameterConvention::Indirect_In_Guaranteed);
     checkFor(TypeAttrKind::TAK_in, ParameterConvention::Indirect_In);
-    checkFor(TypeAttrKind::TAK_out, ParameterConvention::Indirect_Out);
     checkFor(TypeAttrKind::TAK_inout, ParameterConvention::Indirect_Inout);
     checkFor(TypeAttrKind::TAK_inout_aliasable,
              ParameterConvention::Indirect_InoutAliasable);
@@ -2017,6 +2010,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
       attrs.clearAttribute(tak);
       convention = attrConv;
     };
+    checkFor(TypeAttrKind::TAK_out, ResultConvention::Indirect);
     checkFor(TypeAttrKind::TAK_owned, ResultConvention::Owned);
     checkFor(TypeAttrKind::TAK_unowned_inner_pointer,
              ResultConvention::UnownedInnerPointer);
@@ -2034,14 +2028,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   assert(!isErrorResult || convention == ResultConvention::Owned);
   SILResultInfo resolvedResult(type->getCanonicalType(), convention);
 
-  // TODO: we want to generalize this to allow multiple normal results.
-  // But for now, just allow one.
   if (!isErrorResult) {
-    if (!ordinaryResults.empty()) {
-      TC.diagnose(repr->getStartLoc(), diag::sil_function_multiple_results);
-      return true;
-    }
-
     ordinaryResults.push_back(resolvedResult);
     return false;
   }
@@ -2061,39 +2048,23 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   return false;
 }
 
-static bool hasElementWithSILResultAttribute(TupleTypeRepr *tuple) {
-  for (auto elt : tuple->getElements()) {
-    if (auto attrRepr = dyn_cast<AttributedTypeRepr>(elt)) {
-      const TypeAttributes &attrs = attrRepr->getAttrs();
-      if (attrs.has(TypeAttrKind::TAK_owned) ||
-          attrs.has(TypeAttrKind::TAK_unowned_inner_pointer) ||
-          attrs.has(TypeAttrKind::TAK_autoreleased) ||
-          attrs.has(TypeAttrKind::TAK_error)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                      TypeResolutionOptions options,
                                 SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                 Optional<SILResultInfo> &errorResult) {
-
-  // When we generalize SIL to handle multiple normal results, we
-  // should always split up a tuple (a single level deep only).  Until
-  // then, we need to recognize when the tuple elements don't use any
-  // SIL result attributes and keep it as a single result.
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
-    if (hasElementWithSILResultAttribute(tuple)) {
-      bool hadError = false;
-      for (auto elt : tuple->getElements()) {
-        if (resolveSingleSILResult(elt, options, ordinaryResults, errorResult))
-          hadError = true;
+    bool hadError = false;
+    for (auto elt : tuple->getElements()) {
+      if (auto named = dyn_cast<NamedTypeRepr>(elt)) {
+        TC.diagnose(named->getNameLoc(), diag::sil_function_output_label);
+        // Recover by just ignoring the label.
+        elt = named->getTypeRepr();
       }
-      return hadError;
+
+      if (resolveSingleSILResult(elt, options, ordinaryResults, errorResult))
+        hadError = true;
     }
+    return hadError;
   }
 
   return resolveSingleSILResult(repr, options, ordinaryResults, errorResult);
