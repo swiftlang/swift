@@ -51,7 +51,7 @@ def collect_submodules(common_args, module):
     my_args = ['-module-print-submodules', '-module-to-print=%s' % (module)]
     (exitcode, out, err) = run_command(common_args + my_args)
     if exitcode != 0:
-        print('error: submodule collection failed with error %d' %(exitcode))
+        print('error: submodule collection failed with error %d' % (exitcode))
         return ()
 
     # Find all of the submodule imports.
@@ -63,7 +63,7 @@ def collect_submodules(common_args, module):
             submodules.add(match.group(1))
 
     return sorted(list(submodules))
-    
+
 def main():
     source_filename = 'omit-needless-words.swift'
     parser = create_parser()
@@ -97,7 +97,7 @@ def main():
 
     cmd = swift_ide_test_cmd + ['-module-to-print=%s' % (args.module)]
     output_command_result_to_file(cmd, output_file)
-    
+
     # Dump each submodule.
     for submodule in submodules:
         output_file = '%s/%s/%s.swift' % (output_dir, args.module, submodule)
