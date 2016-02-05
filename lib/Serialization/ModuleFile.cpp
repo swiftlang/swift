@@ -596,6 +596,7 @@ public:
       new (&Comments[i]) SingleRawComment(RawText, StartColumn);
     }
     result.Raw = RawComment(Comments);
+    result.Group = endian::readNext<uint32_t, little, unaligned>(data);
     return result;
   }
 };
@@ -611,6 +612,21 @@ ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
     SerializedDeclCommentTable::Create(base + tableOffset,
                                        base + sizeof(uint32_t), base,
                                        DeclCommentTableInfo(*this)));
+}
+
+std::unique_ptr<ModuleFile::GroupNameTable>
+ModuleFile::readGroupTable(ArrayRef<uint64_t> Fields, StringRef BlobData) {
+  std::unique_ptr<ModuleFile::GroupNameTable> pMap(
+    new ModuleFile::GroupNameTable);
+  auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
+  unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
+  for (unsigned I = 0; I < GroupCount; I ++) {
+    auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
+    auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
+    Data += RawSize;
+    (*pMap)[I] = RawText;
+  }
+  return std::move(pMap);
 }
 
 bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
@@ -641,6 +657,9 @@ bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
       switch (kind) {
       case comment_block::DECL_COMMENTS:
         DeclCommentTable = readDeclCommentTable(scratch, blobData);
+        break;
+      case comment_block::GROUP_NAMES:
+        GroupNamesMap = readGroupTable(scratch, blobData);
         break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
@@ -1511,6 +1530,23 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
   }
 
   return getCommentForDeclByUSR(USRBuffer.str());
+}
+
+Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) {
+  if(GroupNamesMap || GroupNamesMap->count(Id) == 0)
+    return None;
+  auto Group = (*GroupNamesMap)[Id];
+  if (Group.empty())
+    return None;
+  return Group;
+}
+
+Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) {
+  auto Triple = getCommentForDecl(D);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return getGroupNameById(Triple.getValue().Group);
 }
 
 Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {

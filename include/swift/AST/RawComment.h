@@ -72,6 +72,7 @@ struct RawComment {
 struct BriefAndRawComment {
   StringRef Brief;
   RawComment Raw;
+  uint32_t Group;
 };
 
 } // namespace swift
