@@ -25,6 +25,9 @@ unacceptable cost or force widespread opting-out of abstraction. We intend to
 mitigate this primarily by designing the language and its implementation to
 minimize unnecessary and unintended abstraction:
 
+* Avoiding unnecessary language guarantees and taking advantage of that
+  flexibility to limit load-time costs.
+
 * Within the domain that defines an entity, all the details of its
   implementation are available.
 
@@ -35,10 +38,9 @@ minimize unnecessary and unintended abstraction:
   independently desirable to reduce accidental API surface area, but happens to
   also interact well with the performance design.
 
-* Avoiding unnecessary language guarantees and taking advantage of that
-  flexibility to limit load-time costs.
-
-We also intend to provide tools to detect inadvertent changes in interfaces.
+This last point is a specific case of a general tenet of Swift: **the default
+behavior is safe**. Where possible, choices made when an entity is first
+published should not limit its evolution in the future.
 
 .. contents:: :local:
 
