@@ -439,7 +439,7 @@ class Foo {
 // armv7k-watchos: define internal %struct.One @makeOne(float %f, float %s)
 
 // rdar://17631440 - Expand direct arguments that are coerced to aggregates.
-// x86_64-macosx: define float @_TF8abitypes13testInlineAggFVSC6MyRectSf(%VSC6MyRect* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// x86_64-macosx: define{{( protected)?}} float @_TF8abitypes13testInlineAggFVSC6MyRectSf(%VSC6MyRect* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // x86_64-macosx: [[COERCED:%.*]] = alloca %VSC6MyRect, align 4
 // x86_64-macosx: store float %
 // x86_64-macosx: store float %

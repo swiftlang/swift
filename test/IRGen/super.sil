@@ -51,7 +51,7 @@ bb0(%0 : $ChildToResilientParent):
 }
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
-// CHECK-LABEL: define void @_TFC5super22ChildToResilientParent6methodfT_T_(%C5super22ChildToResilientParent*)
+// CHECK-LABEL: define{{( protected)?}} void @_TFC5super22ChildToResilientParent6methodfT_T_(%C5super22ChildToResilientParent*)
 // CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class22ResilientOutsideParent()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%C15resilient_class22ResilientOutsideParent*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%C15resilient_class22ResilientOutsideParent*)*, void (%C15resilient_class22ResilientOutsideParent*)** [[OPAQUE_SUPER_METADATA]]
@@ -70,7 +70,7 @@ bb0(%0 : $@thick ChildToResilientParent.Type):
 }
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
-// CHECK-LABEL: define void @_TZFC5super22ChildToResilientParent11classMethodfT_T_(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} void @_TZFC5super22ChildToResilientParent11classMethodfT_T_(%swift.type*)
 // CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class22ResilientOutsideParent()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
@@ -97,7 +97,7 @@ bb0(%0 : $ChildToFixedParent):
   return %7 : $()
 }
 
-// CHECK-LABEL: define void @_TFC5super18ChildToFixedParent6methodfT_T_(%C5super18ChildToFixedParent*)
+// CHECK-LABEL: define{{( protected)?}} void @_TFC5super18ChildToFixedParent6methodfT_T_(%C5super18ChildToFixedParent*)
 // CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class13OutsideParent()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%C15resilient_class13OutsideParent*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%C15resilient_class13OutsideParent*)*, void (%C15resilient_class13OutsideParent*)** [[OPAQUE_SUPER_METADATA]]
@@ -117,7 +117,7 @@ bb0(%0 : $@thick ChildToFixedParent.Type):
 }
 
 // ChildToFixedParent is in our resilience domain - load super metadata directly.
-// CHECK-LABEL: define void @_TZFC5super18ChildToFixedParent11classMethodfT_T_(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} void @_TZFC5super18ChildToFixedParent11classMethodfT_T_(%swift.type*)
 // CHECK: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class13OutsideParent()
 // CHECK: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
 // CHECK: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
@@ -139,7 +139,7 @@ bb0(%0 : $ResilientOutsideChild):
 }
 
 // Extending a resilient class - load super metadata indirectly.
-// CHECK-LABEL: define void @_TFE5superC15resilient_class21ResilientOutsideChild15callSuperMethodfT_T_(%C15resilient_class21ResilientOutsideChild*)
+// CHECK-LABEL: define{{( protected)?}} void @_TFE5superC15resilient_class21ResilientOutsideChild15callSuperMethodfT_T_(%C15resilient_class21ResilientOutsideChild*)
 // CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class21ResilientOutsideChild()
 // CHECK: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
@@ -162,7 +162,7 @@ bb0(%0 : $@thick ResilientOutsideChild.Type):
 }
 
 // Extending a resilient class - load super metadata indirectly.
-// CHECK-LABEL: define void @_TZFE5superC15resilient_class21ResilientOutsideChild20callSuperClassMethodfT_T_(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} void @_TZFE5superC15resilient_class21ResilientOutsideChild20callSuperClassMethodfT_T_(%swift.type*)
 // CHECK: [[METADATA:%[0-9]+]] = call %swift.type* @_TMaC15resilient_class21ResilientOutsideChild()
 // CHECK: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1

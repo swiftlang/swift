@@ -6,7 +6,7 @@ target triple = "x86_64-apple-macosx10.9"
 %swift.type = type { i64 }
 %objc_object = type opaque
 
-; CHECK-LABEL: define void @promote_buffer()
+; CHECK-LABEL: define{{( protected)?}} void @promote_buffer()
 ; CHECK: [[B:%.+]] = alloca i8, i32 48, align 8
 ; CHECK: [[M:%.+]] = call %swift.type* @get_buffer_metadata()
 ; CHECK: [[BC:%.+]] = bitcast i8* [[B]] to %objc_object*
@@ -22,7 +22,7 @@ entry:
   ret void
 }
 
-; CHECK-LABEL: define void @dont_promote_buffer_exceeding_limit()
+; CHECK-LABEL: define{{( protected)?}} void @dont_promote_buffer_exceeding_limit()
 ; CHECK: [[M:%.+]] = call %swift.type* @get_buffer_metadata()
 ; CHECK: call %objc_object* @swift_bufferAllocate(%swift.type* [[M]], i64 48, i64 7)
 ; CHECK-NEXT: ret void

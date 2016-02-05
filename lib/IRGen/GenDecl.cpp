@@ -1190,29 +1190,45 @@ getIRLinkage(IRGenModule &IGM,
 #define RESULT(LINKAGE, VISIBILITY)        \
 { llvm::GlobalValue::LINKAGE##Linkage, \
 llvm::GlobalValue::VISIBILITY##Visibility }
+  // Public visibility depends on the target object format.
   
+  llvm::GlobalValue::VisibilityTypes PublicDefinitionVisibility;
+  switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::ELF:
+    // Use protected visibility for public symbols we define.
+    // ld.so doesn't support relative relocations at load time, which interferes
+    // with our metadata formats.
+    PublicDefinitionVisibility = llvm::GlobalValue::ProtectedVisibility;
+    break;
+  default:
+    // Default visibility should suffice for other object formats.
+    PublicDefinitionVisibility = llvm::GlobalValue::DefaultVisibility;
+    break;
+  }
+
   if (isFragile) {
     // Fragile functions/globals must be visible from outside, regardless of
     // their accessibility. If a caller is also fragile and inlined into another
     // module it must be able to access this (not-inlined) function/global.
     switch (linkage) {
-      case SILLinkage::Hidden:
-      case SILLinkage::Private:
-        linkage = SILLinkage::Public;
-        break;
+    case SILLinkage::Hidden:
+    case SILLinkage::Private:
+      linkage = SILLinkage::Public;
+      break;
 
-      case SILLinkage::Public:
-      case SILLinkage::Shared:
-      case SILLinkage::HiddenExternal:
-      case SILLinkage::PrivateExternal:
-      case SILLinkage::PublicExternal:
-      case SILLinkage::SharedExternal:
-        break;
+    case SILLinkage::Public:
+    case SILLinkage::Shared:
+    case SILLinkage::HiddenExternal:
+    case SILLinkage::PrivateExternal:
+    case SILLinkage::PublicExternal:
+    case SILLinkage::SharedExternal:
+      break;
     }
   }
   
   switch (linkage) {
-  case SILLinkage::Public: return RESULT(External, Default);
+  case SILLinkage::Public:
+    return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility};
   case SILLinkage::Shared:
   case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
   case SILLinkage::Hidden: return RESULT(External, Hidden);
@@ -1266,8 +1282,7 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   // Exclude "main", because it should naturally be used, and because adding it
   // to llvm.used leaves a dangling use when the REPL attempts to discard
   // intermediate mains.
-  if (linkage.first == llvm::GlobalValue::ExternalLinkage &&
-      linkage.second == llvm::GlobalValue::DefaultVisibility &&
+  if (LinkInfo::isUsed(linkage.first, linkage.second) &&
       global->getName() != SWIFT_ENTRY_POINT_FUNCTION) {
     IGM.addUsedGlobal(global);
   }
@@ -1336,9 +1351,7 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   // Exclude "main", because it should naturally be used, and because adding it
   // to llvm.used leaves a dangling use when the REPL attempts to discard
   // intermediate mains.
-  if (ForDefinition &&
-      Linkage == llvm::GlobalValue::ExternalLinkage &&
-      Visibility == llvm::GlobalValue::DefaultVisibility &&
+  if (isUsed() &&
       getName() != SWIFT_ENTRY_POINT_FUNCTION) {
     IGM.addUsedGlobal(fn);
   }
@@ -1346,12 +1359,13 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   return fn;
 }
 
-bool LinkInfo::isUsed() const {
+bool LinkInfo::isUsed(llvm::GlobalValue::LinkageTypes Linkage,
+                      llvm::GlobalValue::VisibilityTypes Visibility) {
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
-  return ForDefinition &&
-      Linkage == llvm::GlobalValue::ExternalLinkage &&
-      Visibility == llvm::GlobalValue::DefaultVisibility;
+  return Linkage == llvm::GlobalValue::ExternalLinkage &&
+    (Visibility == llvm::GlobalValue::DefaultVisibility ||
+     Visibility == llvm::GlobalValue::ProtectedVisibility);
 }
 
 /// Get or create an LLVM global variable with these linkage rules.

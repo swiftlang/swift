@@ -18,19 +18,19 @@ protocol C : class { func c() }
 protocol AB : A, B { func ab() }
 protocol ABO : A, B, O { func abo() }
 
-// CHECK: @_TMp17protocol_metadata1A = constant %swift.protocol {
+// CHECK: @_TMp17protocol_metadata1A = {{(protected )?}}constant %swift.protocol {
 // -- size 72
 // -- flags: 1 = Swift | 2 = Not Class-Constrained | 4 = Needs Witness Table
 // CHECK:   i32 72, i32 7,
 // CHECK:   i16 0, i16 0
 // CHECK: }
 
-// CHECK: @_TMp17protocol_metadata1B = constant %swift.protocol {
+// CHECK: @_TMp17protocol_metadata1B = {{(protected )?}}constant %swift.protocol {
 // CHECK:   i32 72, i32 7,
 // CHECK:   i16 0, i16 0
 // CHECK: }
 
-// CHECK: @_TMp17protocol_metadata1C = constant %swift.protocol {
+// CHECK: @_TMp17protocol_metadata1C = {{(protected )?}}constant %swift.protocol {
 // -- flags: 1 = Swift | 4 = Needs Witness Table
 // CHECK:   i32 72, i32 5,
 // CHECK:   i16 0, i16 0
@@ -62,7 +62,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1A,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1B
 // CHECK: }
-// CHECK: @_TMp17protocol_metadata2AB = constant %swift.protocol { 
+// CHECK: @_TMp17protocol_metadata2AB = {{(protected )?}}constant %swift.protocol { 
 // CHECK:   [[AB_INHERITED]]
 // CHECK:   i32 72, i32 7,
 // CHECK:   i16 0, i16 0

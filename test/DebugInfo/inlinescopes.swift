@@ -5,7 +5,7 @@
 // RUN: FileCheck %s < %t.ll
 // RUN: FileCheck %s -check-prefix=TRANSPARENT-CHECK < %t.ll
 
-// CHECK: define{{( signext)?}} i32 @main
+// CHECK: define{{( protected)?( signext)?}} i32 @main
 // CHECK: tail call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %[[C:.*]], i64 %[[C]]), !dbg ![[MULSCOPE:.*]]
 // CHECK-DAG: ![[TOPLEVEL:.*]] = !DIFile(filename: "inlinescopes.swift"
 

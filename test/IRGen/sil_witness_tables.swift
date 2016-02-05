@@ -73,7 +73,7 @@ func externalErasure(c c: ExternalConformer) -> ExternalP {
 
 // FIXME: why do these have different linkages?
 
-// CHECK-LABEL: define %swift.type* @_TMaV18sil_witness_tables14AssocConformer()
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV18sil_witness_tables14AssocConformer()
 // CHECK:         ret %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @_TMfV18sil_witness_tables14AssocConformer, i32 0, i32 1) to %swift.type*)
 
 // CHECK-LABEL: define hidden i8** @_TWaV18sil_witness_tables9ConformerS_1PS_()

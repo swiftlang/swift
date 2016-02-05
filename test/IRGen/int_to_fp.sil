@@ -7,7 +7,7 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: define float @test_large
+// CHECK-LABEL: define{{( protected)?}} float @test_large
 // CHECK: %1 = trunc i2048 %0 to i64
 // CHECK: %2 = sitofp i64 %1 to float
 // CHECK: ret float %2
@@ -17,7 +17,7 @@ bb0(%0 : $Builtin.Int2048):
   return %2 : $Builtin.FPIEEE32
 }
 
-// CHECK-LABEL: define float @test_small
+// CHECK-LABEL: define{{( protected)?}} float @test_small
 // CHECK: %1 = sext i32 %0 to i64
 // CHECK: %2 = sitofp i64 %1 to float
 // CHECK: ret float %2
