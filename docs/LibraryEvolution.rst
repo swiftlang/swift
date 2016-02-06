@@ -44,10 +44,7 @@ published should not limit its evolution in the future.
 
 .. contents:: :local:
 
-.. warning:: **This document is still in draft stages.** Large additions and
-  restructuring are still planned, including:
-
-  * A discussion of back-dating, and how it usually is not allowed.
+.. warning:: **This document is still in draft stages.**
 
 Introduction
 ============
@@ -1151,6 +1148,32 @@ removes one of the primary reasons to make something inlineable: to allow
 efficient access to a type while still protecting its invariants.
 
 
+"Backdating"
+============
+
+*Backdating* refers to releasing a new version of a library that contains
+changes, but pretending those changes were made in a previous version of the
+library. For example, you might want to release version 1.2 of the "Magician"
+library, but pretend that the "SpellIncantation" struct was fixed-contents
+since its introduction in version 1.0.
+
+**This is not safe.**
+
+Backdating the availability a versioned entity that was previously non-public
+is clearly not safe: older versions of the library will not expose the entity
+as part of their ABI. What may be less obvious is that the fragility attributes
+likewise are not safe to backdate, even if you know the attributes could have
+been added in the past. To give one example, the presence of ``@closed`` or
+``@fixed_contents`` may affect the layout and calling conventions for an enum
+or struct.
+
+As the sole exception, it is safe to backdate ``@inlineable`` on a top-level
+function, a method, a subscript, or a struct or enum initializer. As usual, a
+library author may not assume that a client will actually inline the call. It
+is not safe to backdate ``@inlineable`` for a top-level binding, a property, or
+a class initializer.
+
+
 Optimization
 ============
 
@@ -1326,10 +1349,9 @@ for verification. Important cases include but are not limited to:
 - Incompatible modifications to versioned entities, such as added protocol
   conformances lacking versioning information.
 
-- Unsafely-backdated "fragile" attributes as discussed in the `Giving Up
-  Flexibility`_ section.
+- Unsafe `backdating <#backdating>`_.
 
-- Unsafe modifications to entities marked with the "fragile" attributes, such as
+- Unsafe modifications to entities marked with fragility attributes, such as
   adding a stored property to a ``@fixed_contents`` struct.
 
 
