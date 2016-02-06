@@ -248,6 +248,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   SILPassManager PM(&Module, "PreSpecialize");
 
+  // Get rid of apparently dead functions as soon as possible so that
+  // we do not spend time optimizing them.
+  PM.addDeadFunctionElimination();
   // Start by cloning functions from stdlib.
   PM.addSILLinker();
   PM.run();
