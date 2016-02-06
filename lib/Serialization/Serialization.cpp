@@ -3902,6 +3902,8 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
       writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
       comment_block::GroupNamesLayout GroupNames(S.Out);
+
+      // FIXME: Multi-file compilation may cause group id collision.
       writeGroupNames(GroupNames, GroupContext.getOrderedGroupNames());
     }
   }
