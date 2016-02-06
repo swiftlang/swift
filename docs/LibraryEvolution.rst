@@ -46,6 +46,7 @@ published should not limit its evolution in the future.
 
 .. warning:: **This document is still in draft stages.**
 
+
 Introduction
 ============
 
@@ -62,13 +63,24 @@ This document will frequently refer to a *library* which vends public APIs, and
 a single *client* that uses them. The same principles apply even when multiple
 libraries and multiple clients are involved.
 
-This model is not of interest to libraries that are bundled with their clients
-(distribution via source, static library, or embedded/sandboxed dynamic
-library). Because a client always uses a particular version of such a library,
-there is no need to worry about backwards- or forwards-compatibility. Just as
-developers with a single app target are not forced to think about access
-control, anyone writing a bundled library should not be required to use any of
-the annotations described below in order to achieve full performance.
+This model is largely not of interest to libraries that are bundled with their
+clients (distribution via source, static library, or embedded/sandboxed dynamic
+library, as used by the `Swift Package Manager`_). Because a client always uses
+a particular version of such a library, there is no need to worry about
+backwards- or forwards-compatibility. Just as developers with a single app
+target are not forced to think about access control, anyone writing a bundled
+library should not be required to use any of the annotations described below in
+order to achieve full performance.
+
+.. _Swift Package Manager: https://swift.org/package-manager/
+
+.. note::
+
+    This model may, however, be useful for library authors that want to
+    preserve *source* compatibility, and it is hoped that the tool for
+    `Checking Binary Compatibility`_ described below will also be useful for
+    this purpose. Additionally, we may decide to use some of these annotations
+    as performance hints for *non-*\ optimized builds.
 
 The term "resilience" comes from the occasional use of "fragile" to describe
 certain constructs that have very strict binary compatibility rules. For
@@ -82,10 +94,10 @@ Using Versioned API
 ===================
 
 References to a versioned API must always be guarded with the appropriate
-availability checks. This means that any client entities that rely on having
-certain APIs from a library must themselves be restricted to contexts in which
-those APIs are available. This is accomplished using ``@available`` as well,
-by specifying the name of the client library along with the required version::
+availability checks. This means that any client entities that rely on certain
+APIs from a library must themselves be restricted to contexts in which those
+APIs are available. This is accomplished using the ``@available`` attribute, by
+specifying the name of the client library along with the required version::
 
     // Client code
     @available(Magician 1.5)
@@ -117,7 +129,7 @@ Declaring Library Version Dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Swift 2's availability model includes the notion of a *minimum deployment
-target,* the version of an OS that can be assumed present for the program being
+target,* the version of an OS that must be present for the program being
 compiled to run at all. For example, a program compiled with a minimum
 deployment target of iOS 9.2 will not launch on iOS 9.0.
 
@@ -172,8 +184,9 @@ In addition to versioned entities, there are also attributes that are safe to
 add to declarations when releasing a new version of a library. In most cases,
 clients can only take advantage of the attributes when using the new release of
 the library, and therefore the attributes also need to record the version in
-which they were introduced. If the version is omitted, it is assumed to be the
-version of the declaration to which the attribute is attached.
+which they were introduced; these are called *versioned attributes.* If the
+version is omitted, it is assumed to be the version of the declaration to which
+the attribute is attached.
 
 The syntax for marking an entity as versioned has not yet been decided, but the
 rest of this document will use syntax #1 described below.
@@ -276,7 +289,7 @@ No other changes are permitted; the following are particularly of note:
 - A versioned function may not change its external parameter names (labels).
 - A versioned function may not add, remove, or reorder parameters, whether or
   not they have default values.
-- A versioned function that throws may not become non-throwing.
+- A versioned function that throws may not become non-throwing or vice versa.
 - ``@noreturn`` may not be removed from a function.
 - The ``@noescape`` attribute may not be added to or removed from a parameter.
   It is not a `versioned attribute` and so there is no way to guarantee that it
@@ -348,20 +361,18 @@ polar representation::
       public init(x: Double, y: Double) { … }
     }
 
-and the ``x`` and ``y`` properties have now disappeared. To avoid this, we have
-the following restrictions on the bodies of inlineable functions:
+and the ``x`` and ``y`` properties have now disappeared. To avoid this, the bodies of inlineable functions have the following restrictions:
 
-- **They may not define any local types** (other than typealiases).
+- They may not define any local types (other than typealiases).
 
-- **They must not reference any** ``private`` **entities,** except for local
-  functions declared within the inlineable function itself.
+- They must not reference any ``private`` entities, except for local functions
+  declared within the inlineable function itself.
 
-- **They must not reference any** ``internal`` **entities except for those that
-  have been** `versioned`_. See below for a discussion of versioning internal
-  API.
+- They must not reference any ``internal`` entities except for those that have
+  been `versioned`_. See below for a discussion of versioning internal API.
 
-- **They must not reference any entities less available than the function
-  itself.**
+- They must not reference any entities from the current module introduced
+  after the function was made inlineable.
 
 .. _versioned: #versioning-internal-api
 
@@ -369,12 +380,6 @@ An inlineable function is still emitted into its own module's binary. This
 makes it possible to take an existing function and make it inlineable, as long
 as the current body makes sense when deploying against an earlier version of
 the library.
-
-If the body of an inlineable function is used in any way by a client module
-(say, to determine that it does not read any global variables), that module
-must take care to emit and use its own copy of the function. This is because
-analysis of the function body may not apply to the version of the function
-currently in the library.
 
 Default parameter value expressions are subject to the same restrictions as
 inlineable functions, because they are implemented as inlineable functions.
@@ -402,7 +407,7 @@ changes are permitted:
 - Adding (but not removing) a public setter to a computed variable.
 - Adding or removing a non-public, non-versioned setter.
 - Changing from a stored variable to a computed variable, or vice versa, as
-  long as a previously-versioned setter is not removed.
+  long as a previously versioned setter is not removed.
 - Changing the body of an accessor.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
@@ -461,7 +466,8 @@ clients to access them more efficiently. This restricts changes a fair amount:
 - Adding or removing ``weak`` is forbidden.
 - Adding or removing ``unowned`` is forbidden.
 - Adding or removing ``@NSCopying`` to/from a variable is permitted but
-  discouraged for the same reason.
+  discouraged for the same reason; like accessors, existing clients may use the
+  new behavior, or the behavior from when they were compiled, or a mix of both.
 
 .. admonition:: TODO
 
@@ -564,7 +570,7 @@ stored subscripts. This means that the following changes are permitted:
 Like properties, subscripts can be marked ``@inlineable``, which restricts the
 set of changes:
 
-- Adding versioned setter is still permitted.
+- Adding a versioned setter is still permitted.
 - Adding or removing a non-public, non-versioned setter is still permitted.
 - Changing the body of an accessor is permitted but discouraged; existing
   clients may use the new implementations, or they may use the implementations
@@ -578,7 +584,7 @@ New Conformances
 ----------------
 
 If a conformance is added to a type in version 1.1 of a library, it's important
-that it isn't accessed in version 1.0. This is obvious if the protocol itself
+that it isn't accessed in version 1.0. This is implied if the protocol itself
 was introduced in version 1.1, but needs special handling if both the protocol
 and the type were available earlier. In this case, the conformance *itself*
 needs to be labeled as being introduced in version 1.1, so that the compiler
@@ -620,8 +626,9 @@ Fixed-Contents Structs
 To opt out of this flexibility, a struct may be marked ``@fixed_contents``.
 This promises that no stored properties will be added to or removed from the
 struct, even ``private`` or ``internal`` ones. Additionally, all versioned
-stored properties in a ``@fixed_contents`` struct are implicitly declared
-``@inlineable`` (as described above for top-level variables). In effect:
+instance stored properties in a ``@fixed_contents`` struct are implicitly
+declared ``@inlineable`` (as described above for top-level variables). In
+effect:
 
 - Reordering all members, including stored properties, is still permitted.
 - Adding new stored instance properties (public or non-public) is not permitted.
@@ -649,9 +656,20 @@ generic parameters and members of tuples.
     This name is intentionally awful to encourage us to come up with a better
     one.
 
+While adding or removing stored properties is forbidden, existing properties may
+still be modified in limited ways:
+
+- An existing non-versioned ``internal`` property may be made ``private``, or
+  vice versa.
+- A non-versioned ``internal`` property may be versioned (see `Versioning
+  Internal Declarations`_).
+- A versioned ``internal`` property may be made ``public`` (without changing
+  its version).
+
 An initializer of a fixed-contents struct may be declared ``@inlineable`` even
 if it does not delegate to another initializer, as long as the ``@inlineable``
-attribute is not introduced earlier than the ``@fixed_contents`` attribute.
+attribute is not introduced earlier than the ``@fixed_contents`` attribute and
+the struct has no non-versioned stored properties.
 
 A ``@fixed_contents`` struct is *not* guaranteed to use the same layout as a C
 struct with a similar "shape". If such a struct is necessary, it should be
@@ -718,6 +736,9 @@ accommodate new values. More specifically, the following changes are permitted:
     Non-public cases in public enums don't exist at the moment, but they *can*
     be useful, and they require essentially the same implementation work as
     cases added in future versions of a library.
+
+Adding or removing the ``@objc`` attribute from an enum is not permitted; this
+affects the enum's memory representation and is not backwards-compatible.
 
 
 Initializers
@@ -861,7 +882,7 @@ Finally, classes allow the following changes that do not apply to structs:
 
 .. admonition:: TODO
 
-    The latter is very tricky to get right. We've seen it happen a few times in
+    This last is very tricky to get right. We've seen it happen a few times in
     Apple's SDKs, but at least one of them, `NSCollectionViewItem`_ becoming a
     subclass of NSViewController instead of the root class NSObject, doesn't
     strictly follow the rules. While NSViewController was introduced in the
@@ -912,7 +933,9 @@ a convenience initializer into a designated initializer or vice versa.
 Similarly, new ``required`` initializers may not be added to a
 publicly-subclassable class, including marking an existing initializer
 ``required``; there is no way to guarantee their presence on existing
-subclasses.
+subclasses. This also limits adding a conformance to a protocol with an
+initializer requirement if the corresponding initializer is not already
+``required``.
 
 All of the modifications permitted for top-level functions are also permitted
 for class initializers. Convenience initializers may be marked ``@inlineable``,
@@ -962,7 +985,7 @@ Variable properties (those declared with ``var``) allow the following changes:
   property in a non-publicly-subclassable class.
 - Adding or removing a non-public, non-versioned setter.
 - Changing from a stored property to a computed property, or vice versa, as
-  long as a previously-versioned setter is not removed.
+  long as a previously versioned setter is not removed.
 - Changing the body of an accessor.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
@@ -1033,11 +1056,11 @@ The following changes are permitted:
 - Adding new extensions and removing empty extensions.
 - Moving a member from one extension to another within the same module, as long
   as both extensions have the exact same constraints.
-- Moving a member from an extension to the declaration of the base type,
-  provided that the declaration is in the same module. The reverse is permitted
-  for all members except stored properties, although note that moving all
-  initializers out of a type declaration may cause a new one to be implicitly
-  synthesized.
+- Moving a member from an unconstrained extension to the declaration of the
+  base type, provided that the declaration is in the same module. The reverse
+  is permitted for all members except stored properties, although note that
+  moving all initializers out of a type declaration may cause a new one to be
+  implicitly synthesized.
 
 Adding, removing, reordering, and modifying members follow the same rules as
 the base type; see the sections on structs, enums, and classes above.
@@ -1113,7 +1136,7 @@ guarantees. Therefore, all of these attributes are informally referred to as
 Given that these attributes share several characteristics, we could consider
 converging on a single common attribute, say ``@fixed``, ``@inline``, or
 ``@fragile``. However, this may be problematic if the same declaration has
-multiple kinds of flexibility, as in the description of classes above.
+multiple kinds of flexibility.
 
 
 Versioning Internal Declarations
@@ -1143,7 +1166,8 @@ assumed that new overrides may eventually appear from outside the module unless
 the member is marked ``final`` or the class is not publicly subclassable.
 
 Non-public conformances are never considered versioned, even if both the
-conforming type and the protocol are versioned.
+conforming type and the protocol are versioned. A conformance is considered
+public if and only if both the conforming type and protocol are public.
 
 Entities declared ``private`` may not be versioned; the mangled name of such an
 entity includes an identifier based on the containing file, which means moving
@@ -1184,17 +1208,17 @@ been added in the past. To give one example, the presence of ``@closed`` or
 or struct.
 
 As the sole exception, it is safe to backdate ``@inlineable`` on a top-level
-function, a method, a subscript, or a struct or enum initializer. As usual, a
-library author may not assume that a client will actually inline the call. It
-is not safe to backdate ``@inlineable`` for a top-level binding, a property, or
-a class initializer.
+function, a method, a subscript, or a struct or enum initializer. It is not
+safe to backdate ``@inlineable`` for a top-level binding, a property, or a
+class initializer. As usual, a library author may not assume that a client will
+actually inline the call.
 
 .. note::
 
-    If we add an "SPI" feature, such that the use of public entities is limited
-    to certain clients, it *will* be safe to change the set of clients, or
-    remove the restriction altogether. In fact, in such cases the library
-    author is *required* to *not* change the availability info that was
+    If we add an "SPI" feature, such that the use of specific public entities
+    is limited to certain clients, it *will* be safe to change the set of
+    clients, or remove the restriction altogether. In fact, in such cases the
+    library author is *required* to *not* change the availability info that was
     originally presented for the limited set of clients, since as mentioned
     above this may affect how those existing clients use the entities declared
     in the library.
@@ -1249,15 +1273,23 @@ outside the current module, since once it's inlined it will be.
 
 For inlineable code, the availability context is exactly the same as the
 equivalent non-inlineable code except that the assumed version of the
-containing library is the version attached to the ``@inlineable`` attribute.
-Code within this context must be treated as if the containing library were just
-a normal dependency.
+containing library is the version attached to the ``@inlineable`` attribute,
+and any `library version dependencies
+<#declaring-library-version-dependencies>`_ or minimum deployment target must
+be specified explicitly using ``@available``. Code within this context must be
+treated as if the containing library were just a normal dependency.
 
 A versioned inlineable function still has an exported symbol in the library
 binary, which may be used when the function is referenced from a client rather
 than called. This version of the function is not subject to the same
 restrictions as the version that may be inlined, and so it may be desirable to
 compile a function twice: once for inlining, once for maximum performance.
+
+If the body of an inlineable function is used in any way by a client module
+(say, to determine that it does not read any global variables), that module
+must take care to emit and use its own copy of the function. This is because
+analysis of the function body may not apply to the version of the function
+currently in the library.
 
 
 Local Availability Contexts
@@ -1366,7 +1398,7 @@ Checking Binary Compatibility
 =============================
 
 With this many manual controls, it's important that library owners be able to
-check their work. Therefore, we intend to ship a tool that can compare two
+check their work. Therefore, we intend to build a tool that can compare two
 versions of a library's public interface, and present any suspect differences
 for verification. Important cases include but are not limited to:
 
