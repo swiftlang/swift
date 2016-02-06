@@ -46,13 +46,13 @@ BoundGenericTypeRef::BoundGenericTypeRef(StringRef MangledName,
   : TypeRef(TypeRefKind::BoundGeneric), MangledName(MangledName),
     NumGenericParams(GenericParams.size()) {
     std::uninitialized_copy(GenericParams.begin(), GenericParams.end(),
-                            getGenericParameterBuffer());
+                            getTrailingObjects<TypeRef *>());
   }
 
 BoundGenericTypeRef *BoundGenericTypeRef::create(ReflectionContext &RC,
   StringRef MangledName, ArrayRef<TypeRef *> GenericParams) {
-  void *Mem = RC.allocate(sizeof(BoundGenericTypeRef) + GenericParams.size()
-                          * sizeof(TypeRef *), alignof(BoundGenericTypeRef));
+  void *Mem = RC.allocate(totalSizeToAlloc<TypeRef *>(GenericParams.size()),
+                          alignof(BoundGenericTypeRef));
   return new (Mem) BoundGenericTypeRef(RC.allocateCopy(MangledName),
                                        GenericParams);
 }
@@ -60,13 +60,13 @@ BoundGenericTypeRef *BoundGenericTypeRef::create(ReflectionContext &RC,
 TupleTypeRef::TupleTypeRef(ArrayRef<TypeRef *> Elements)
   : TypeRef(TypeRefKind::Tuple), NumElements(Elements.size()) {
     std::uninitialized_copy(Elements.begin(), Elements.end(),
-                            getElementBuffer());
+                            getTrailingObjects<TypeRef *>());
 }
 
 TupleTypeRef *TupleTypeRef::create(swift::reflection::ReflectionContext &RC,
   ArrayRef<swift::reflection::TypeRef *> Elements) {
-  void *Mem = RC.allocate(sizeof(TupleTypeRef) + Elements.size()
-                          * sizeof(TypeRef *), alignof(TupleTypeRef));
+  void *Mem = RC.allocate(totalSizeToAlloc<TypeRef *>(Elements.size()),
+                          alignof(TupleTypeRef));
   return new (Mem) TupleTypeRef(Elements);
 }
 
@@ -93,14 +93,13 @@ ProtocolTypeRef *ProtocolTypeRef::create(ReflectionContext &RC,
 ProtocolCompositionTypeRef::ProtocolCompositionTypeRef(
   ArrayRef<TypeRef *> Protocols) : TypeRef(TypeRefKind::ProtocolComposition) {
   std::uninitialized_copy(Protocols.begin(), Protocols.end(),
-                          getProtocolBuffer());
+                          getTrailingObjects<TypeRef *>());
 }
 
 ProtocolCompositionTypeRef *
 ProtocolCompositionTypeRef::create(ReflectionContext &RC,
                                    ArrayRef<TypeRef *> Protocols) {
-  void *Mem = RC.allocate(sizeof(ProtocolCompositionTypeRef) + Protocols.size()
-                          * sizeof(TypeRef *),
+  void *Mem = RC.allocate(totalSizeToAlloc<TypeRef *>(Protocols.size()),
                           alignof(ProtocolCompositionTypeRef));
   return new (Mem) ProtocolCompositionTypeRef(Protocols);
 }
