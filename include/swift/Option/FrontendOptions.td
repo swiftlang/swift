@@ -311,7 +311,7 @@ def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
 
 def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Compile the library with resilient interfaces for all "
-            "public declarations">;
+   HelpText<"Compile the module to export resilient interfaces for all "
+            "public declarations by default">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
