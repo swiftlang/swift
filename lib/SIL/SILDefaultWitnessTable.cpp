@@ -70,18 +70,23 @@ SILDefaultWitnessTable(SILModule &M,
                        const ProtocolDecl *Protocol,
                        unsigned MinimumWitnessTableSizeInWords,
                        ArrayRef<Entry> entries)
-  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries() {
+  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries(),
+    IsDeclaration(true) {
 
   convertToDefinition(MinimumWitnessTableSizeInWords, entries);
 }
 
 SILDefaultWitnessTable::SILDefaultWitnessTable(SILModule &M,
                                                const ProtocolDecl *Protocol)
-  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries() {}
+  : Mod(M), Protocol(Protocol), MinimumWitnessTableSizeInWords(0), Entries(),
+    IsDeclaration(true) {}
 
 void SILDefaultWitnessTable::
 convertToDefinition(unsigned MinimumWitnessTableSizeInWords,
                     ArrayRef<Entry> entries) {
+  assert(IsDeclaration);
+  IsDeclaration = false;
+
   this->MinimumWitnessTableSizeInWords = MinimumWitnessTableSizeInWords;
 
   void *buf = Mod.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
