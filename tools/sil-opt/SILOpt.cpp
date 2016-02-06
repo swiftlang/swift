@@ -296,10 +296,6 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  // Run the SIL verifier after parsing, so that we verify the module
-  // even if no optimization passes are being run.
-  CI.getSILModule()->verify();
-
   // If we're in verify mode, install a custom diagnostic handling for
   // SourceMgr.
   if (VerifyMode)
