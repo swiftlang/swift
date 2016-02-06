@@ -355,7 +355,9 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
     // We can match the suffix of the type so long as everything preceding the
     // match is neither a lowercase letter nor a '_'. This ignores type
     // prefixes for acronyms, e.g., the 'NS' in 'NSURL'.
-    if (typeWord.endswith(nameWord)) {
+    if (typeWord.endswith(nameWord) ||
+        (typeWord.endswith_lower(nameWord) && 
+         !clang::isLowercase(typeWord[typeWord.size()-nameWord.size()]))) {
       // Check that everything preceding the match is neither a lowercase letter
       // nor a '_'.
       for (unsigned i = 0, n = nameWord.size(); i != n; ++i) {
@@ -367,7 +369,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
 
     // We can match a prefix so long as everything following the match is
     // a number.
-    if (camel_case::startsWithIgnoreFirstCase(typeWord, nameWord)) {
+    if (typeWord.startswith_lower(nameWord)) {
       for (unsigned i = nameWord.size(), n = typeWord.size(); i != n; ++i) {
         if (!clang::isDigit(typeWord[i])) return false;
       }
@@ -379,7 +381,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
   }
 
   // Check for an exact match.
-  return camel_case::sameWordIgnoreFirstCase(nameWord, typeWord);
+  return nameWord.equals_lower(typeWord);
 }
 
 /// Match the beginning of the name to the given type name.
@@ -519,7 +521,6 @@ static StringRef omitNeedlessWords(StringRef name,
     nameWordRevIterEnd = nameWords.rend();
   auto typeWordRevIter = typeWords.rbegin(),
     typeWordRevIterEnd = typeWords.rend();
-
 
   bool anyMatches = false;
   auto matched = [&] {
