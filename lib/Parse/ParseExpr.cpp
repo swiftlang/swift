@@ -998,17 +998,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
 
   case tok::l_square_lit: // [#Color(...)#], [#Image(...)#]
-    // If this is actually a collection literal starting with '[#', handle it
-    // as such.
-    if (isCollectionLiteralStartingWithLSquareLit()) {
-      // Split the token into two.
-      SourceLoc LSquareLoc = consumeStartingCharacterOfCurrentToken();
-
-      // Consume the '[' token.
-      Result = parseExprCollection(LSquareLoc);
-      break;
-    }
-
     Result = parseExprObjectLiteral();
     break;
 
@@ -2183,17 +2172,6 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                         /*Implicit=*/false));
 }
 
-bool Parser::isCollectionLiteralStartingWithLSquareLit() {
-  BacktrackingScope backtracking(*this);
-  (void)consumeToken(tok::l_square_lit);
-  if (!consumeIf(tok::identifier)) return false;
-
-  // Skip over a parenthesized argument, if present.
-  if (Tok.is(tok::l_paren)) skipSingle();
-
-  return Tok.isNot(tok::r_square_lit);
-}
-
 /// \brief Parse an object literal expression.
 ///
 /// expr-literal:
@@ -2286,14 +2264,9 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
 ///     expr-array
 ///     expr-dictionary
 //      lsquare-starting ']'
-ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
-  // If the caller didn't already consume the '[', do so now.
-  if (LSquareLoc.isInvalid())
-    LSquareLoc = consumeToken(tok::l_square);
-
-  Parser::StructureMarkerRAII ParsingCollection(
-                                *this, LSquareLoc,
-                                StructureMarkerKind::OpenSquare);
+ParserResult<Expr> Parser::parseExprCollection() {
+  Parser::StructureMarkerRAII ParsingCollection(*this, Tok);
+  SourceLoc LSquareLoc = consumeToken(tok::l_square);
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
