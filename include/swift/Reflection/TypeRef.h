@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TrailingObjects.h"
 
 class NodePointer;
 
@@ -40,7 +41,7 @@ enum class TypeRefKind {
 #undef TYPEREF
 };
 
-class TypeRef {
+class alignas(void *) TypeRef {
   TypeRefKind Kind;
 
 public:
@@ -54,9 +55,8 @@ public:
   void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
 };
 
-class BuiltinTypeRef : public TypeRef {
+class BuiltinTypeRef final : public TypeRef {
   StringRef MangledName;
-
   BuiltinTypeRef(StringRef MangledName);
 
 public:
@@ -71,9 +71,8 @@ public:
   }
 };
 
-class NominalTypeRef : public TypeRef {
+class NominalTypeRef final : public TypeRef {
   StringRef MangledName;
-
   NominalTypeRef(StringRef MangledName);
 public:
   static NominalTypeRef *create(ReflectionContext &RC, StringRef MangledName);
@@ -87,17 +86,12 @@ public:
   }
 };
 
-class BoundGenericTypeRef : public TypeRef {
+class BoundGenericTypeRef final
+  : public TypeRef,
+    private llvm::TrailingObjects<BoundGenericTypeRef, TypeRef *> {
+  friend class llvm::TrailingObjects<BoundGenericTypeRef, TypeRef *>;
   StringRef MangledName;
   uint32_t NumGenericParams;
-
-  TypeRef **getGenericParameterBuffer() {
-    return reinterpret_cast<TypeRef**>(this + 1);
-  }
-
-  const TypeRef * const *getGenericParameterBuffer() const {
-    return reinterpret_cast<const TypeRef * const *>(this + 1);
-  }
 
   BoundGenericTypeRef(StringRef MangledName,
                       ArrayRef<TypeRef *> GenericParams);
@@ -112,12 +106,11 @@ public:
   }
 
   ArrayRef<TypeRef *> getGenericParams() {
-    return ArrayRef<TypeRef *>(getGenericParameterBuffer(), NumGenericParams);
+    return { getTrailingObjects<TypeRef *>(), NumGenericParams };
   };
 
   ArrayRef<const TypeRef *> getGenericParams() const {
-    return ArrayRef<const TypeRef *>(getGenericParameterBuffer(),
-                                     NumGenericParams);
+    return { getTrailingObjects<TypeRef *>(), NumGenericParams };
   }
 
   static bool classof(const TypeRef *TR) {
@@ -125,16 +118,11 @@ public:
   }
 };
 
-class TupleTypeRef : public TypeRef {
+class TupleTypeRef final
+  : public TypeRef,
+    private llvm::TrailingObjects<TupleTypeRef, TypeRef *> {
+  friend class llvm::TrailingObjects<TupleTypeRef, TypeRef *>;
   uint32_t NumElements;
-
-  TypeRef **getElementBuffer() {
-    return reinterpret_cast<TypeRef**>(this + 1);
-  }
-
-  const TypeRef * const *getElementBuffer() const {
-    return reinterpret_cast<const TypeRef * const *>(this + 1);
-  }
 
   TupleTypeRef(ArrayRef<TypeRef *> Elements);
 
@@ -143,11 +131,11 @@ public:
                               ArrayRef<TypeRef *> Elements);
 
   ArrayRef<TypeRef *> getElements() {
-    return ArrayRef<TypeRef *>(getElementBuffer(), NumElements);
+    return { getTrailingObjects<TypeRef *>(), NumElements };
   };
 
   ArrayRef<const TypeRef *> getElements() const {
-    return ArrayRef<const TypeRef *>(getElementBuffer(), NumElements);
+    return { getTrailingObjects<TypeRef *>(), NumElements };
   }
 
   static bool classof(const TypeRef *TR) {
@@ -155,7 +143,7 @@ public:
   }
 };
 
-class FunctionTypeRef : public TypeRef {
+class FunctionTypeRef final : public TypeRef {
   TypeRef *Input;
   TypeRef *Result;
 
@@ -185,7 +173,7 @@ public:
   }
 };
 
-class ProtocolTypeRef : public TypeRef {
+class ProtocolTypeRef final : public TypeRef {
   StringRef ModuleName;
   StringRef Name;
 
@@ -208,29 +196,24 @@ public:
   }
 };
 
-class ProtocolCompositionTypeRef : public TypeRef {
+class ProtocolCompositionTypeRef final
+  : public TypeRef,
+    private llvm::TrailingObjects<ProtocolCompositionTypeRef, TypeRef *>{
+  friend class llvm::TrailingObjects<ProtocolCompositionTypeRef, TypeRef *>;
   uint32_t NumProtocols;
 
   ProtocolCompositionTypeRef(ArrayRef<TypeRef *> Protocols);
-
-  TypeRef **getProtocolBuffer() {
-    return reinterpret_cast<TypeRef **>(this + 1);
-  }
-
-  const TypeRef * const *getProtocolBuffer() const {
-    return reinterpret_cast<const TypeRef * const *>(this + 1);
-  }
 
 public:
   static ProtocolCompositionTypeRef *create(ReflectionContext &RC,
                                      ArrayRef<TypeRef *> Protocols);
 
   ArrayRef<TypeRef *>getProtocols() {
-    return ArrayRef<TypeRef *>(getProtocolBuffer(), NumProtocols);
+    return { getTrailingObjects<TypeRef *>(), NumProtocols };
   }
 
   ArrayRef<const TypeRef *> getProtocols() const {
-    return ArrayRef<const TypeRef *>(getProtocolBuffer(), NumProtocols);
+    return { getTrailingObjects<TypeRef *>(), NumProtocols };
   }
 
   static bool classof(const TypeRef *TR) {
@@ -238,7 +221,7 @@ public:
   }
 };
 
-class MetatypeTypeRef : public TypeRef {
+class MetatypeTypeRef final : public TypeRef {
   TypeRef *InstanceType;
 
   MetatypeTypeRef(TypeRef *InstanceType);
@@ -259,7 +242,7 @@ public:
   }
 };
 
-class ExistentialMetatypeTypeRef : public TypeRef {
+class ExistentialMetatypeTypeRef final : public TypeRef {
   TypeRef *InstanceType;
 
   ExistentialMetatypeTypeRef(TypeRef *InstanceType);
@@ -280,7 +263,7 @@ public:
   }
 };
 
-class GenericTypeParameterTypeRef : public TypeRef {
+class GenericTypeParameterTypeRef final : public TypeRef {
   const uint32_t Index;
   const uint32_t Depth;
 
@@ -303,7 +286,7 @@ public:
   }
 };
 
-class DependentMemberTypeRef : public TypeRef {
+class DependentMemberTypeRef final : public TypeRef {
   TypeRef *Member;
   TypeRef *Base;
 
@@ -333,7 +316,7 @@ public:
   }
 };
 
-class AssociatedTypeRef : public TypeRef {
+class AssociatedTypeRef final : public TypeRef {
   StringRef Name;
 
   AssociatedTypeRef(StringRef Name);
