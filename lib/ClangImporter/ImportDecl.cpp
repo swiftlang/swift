@@ -1214,7 +1214,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setBodyResultType(stringTy);
   getterDecl->setAccessibility(Accessibility::Public);
 
-  auto ret = new (swiftCtx) ReturnStmt(noLoc, {domainDeclRef});
+  auto ret = new (swiftCtx) ReturnStmt(noLoc, domainDeclRef);
   getterDecl->setBody(
       BraceStmt::create(swiftCtx, noLoc, {ret}, noLoc, isImplicit));
   importer.registerExternalDecl(getterDecl);
