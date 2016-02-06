@@ -47,8 +47,11 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::pound_if:
-  case tok::pound_line:
     return true;
+
+  case tok::pound_line:
+    // #line at the start of a line is a directive, when within, it is an expr.
+    return Tok.isAtStartOfLine();
 
   case tok::kw_try: {
     // "try" cannot actually start any statements, but we parse it there for

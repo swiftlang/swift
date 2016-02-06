@@ -29,7 +29,7 @@ public struct SubscriptRangeTest {
   public init(
     expected: [Int], collection: [Int], bounds: Range<Int>,
     count: Int,
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.expected = expected.map(OpaqueValue.init)
     self.collection = collection.map(OpaqueValue.init)
@@ -47,7 +47,7 @@ public struct PrefixThroughTest {
 
   init(
     collection: [Int], position: Int, expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection
     self.position = position
@@ -64,7 +64,7 @@ public struct PrefixUpToTest {
 
   public init(
     collection: [Int], end: Int, expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection
     self.end = end
@@ -81,7 +81,7 @@ internal struct RemoveFirstNTest {
 
   init(
     collection: [Int], numberToRemove: Int, expectedCollection: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection
     self.numberToRemove = numberToRemove
@@ -98,7 +98,7 @@ public struct SuffixFromTest {
 
   init(
     collection: [Int], start: Int, expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.collection = collection
     self.start = start
@@ -303,10 +303,10 @@ extension TestSuite {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addSequenceTests(
       testNamePrefix,
@@ -840,10 +840,10 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
     outOfBoundsSubscriptOffset: Int = 1
   ) {
     var testNamePrefix = testNamePrefix
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addForwardCollectionTests(
       testNamePrefix,
@@ -1189,10 +1189,10 @@ self.test("\(testNamePrefix).suffix/semantics") {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(__FUNCTION__) {
+    if checksAdded.value.contains(#function) {
       return
     }
-    checksAdded.value.insert(__FUNCTION__)
+    checksAdded.value.insert(#function)
 
     addBidirectionalCollectionTests(
       testNamePrefix,

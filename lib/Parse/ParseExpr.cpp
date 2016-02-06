@@ -715,19 +715,24 @@ static bool isStartOfGetSetAccessor(Parser &P) {
          P.Tok.isContextualKeyword("willSet");
 }
 
-/// Map magic literal tokens such as __FILE__ to their
+/// Map magic literal tokens such as #file to their
 /// MagicIdentifierLiteralExpr kind.
 MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
   switch (Kind) {
   case tok::kw___COLUMN__:
+  case tok::pound_column:
     return MagicIdentifierLiteralExpr::Kind::Column;
   case tok::kw___FILE__:
+  case tok::pound_file:
     return MagicIdentifierLiteralExpr::Kind::File;
   case tok::kw___FUNCTION__:
+  case tok::pound_function:
     return MagicIdentifierLiteralExpr::Kind::Function;
   case tok::kw___LINE__:
+  case tok::pound_line:
     return MagicIdentifierLiteralExpr::Kind::Line;
   case tok::kw___DSO_HANDLE__:
+  case tok::pound_dsohandle:
     return MagicIdentifierLiteralExpr::Kind::DSOHandle;
 
   default:
@@ -744,11 +749,11 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
 ///     nil
 ///     true
 ///     false
-///     '__FILE__'
-///     '__LINE__'
-///     '__COLUMN__'
-///     '__FUNCTION__'
-///     '__DSO_HANDLE__'
+///     #file
+///     #line
+///     #column
+///     #function
+///     #dsohandle
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -844,12 +849,32 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                new (Context) BooleanLiteralExpr(isTrue, consumeToken()));
     break;
   }
-    
+
   case tok::kw___FILE__:
   case tok::kw___LINE__:
   case tok::kw___COLUMN__:
   case tok::kw___FUNCTION__:
   case tok::kw___DSO_HANDLE__: {
+    StringRef replacement = "";
+    switch (Tok.getKind()) {
+    default: llvm_unreachable("can't get here");
+    case tok::kw___FILE__: replacement = "#file"; break;
+    case tok::kw___LINE__: replacement = "#line"; break;
+    case tok::kw___COLUMN__: replacement = "#column"; break;
+    case tok::kw___FUNCTION__:  replacement = "#function"; break;
+    case tok::kw___DSO_HANDLE__: replacement = "#dsohandle"; break;
+    }
+
+    diagnose(Tok.getLoc(), diag::snake_case_deprecated,
+             Tok.getText(), replacement)
+      .fixItReplace(Tok.getLoc(), replacement);
+    SWIFT_FALLTHROUGH;
+  }
+  case tok::pound_column:
+  case tok::pound_file:
+  case tok::pound_function:
+  case tok::pound_line:
+  case tok::pound_dsohandle: {
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
     Result = makeParserResult(

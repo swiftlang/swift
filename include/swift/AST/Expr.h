@@ -760,7 +760,7 @@ public:
   }
 };
   
-/// MagicIdentifierLiteralExpr - A magic identifier like __FILE__ which expands
+/// MagicIdentifierLiteralExpr - A magic identifier like #file which expands
 /// out to a literal at SILGen time.
 class MagicIdentifierLiteralExpr : public LiteralExpr {
 public:
