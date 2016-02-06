@@ -910,7 +910,7 @@ Neither top-level nor member typealiases are versioned.
 A Unifying Theme
 ~~~~~~~~~~~~~~~~
 
-So far this proposal has talked about ways to give up flexibility for several
+So far this document has talked about ways to give up flexibility for several
 different kinds of declarations: ``@inlineable`` for functions,
 ``@fixed_contents`` for structs, etc. Each of these has a different set of
 constraints it enforces on the library author and promises it makes to clients.
@@ -1099,7 +1099,7 @@ also in the collection---that is, it should treat all entities as if marked
 with the appropriate fragility attributes. Modules in this sort of collection
 are said to be in the same *resilience domain.*
 
-Exactly how resilience domains are specified is not covered by this proposal,
+Exactly how resilience domains are specified is not covered by this document,
 and indeed they are an additive feature. One possibility is that a library's
 resilience domain defaults to the name of the module, but can be overridden. If
 a client has the same resilience domain name as a library it is using, it may
@@ -1151,8 +1151,8 @@ simple checker tool:
   in addition to *consuming* it.
 
 - Occasionally a library owner may want to override the inferred versions. This
-  can be accomplished by providing explicit versioning information, as in the
-  proposal.
+  can be accomplished by providing explicit versioning information, as
+  described above.
 
 - Bugs in the tool manifest as bugs in client programs.
 
