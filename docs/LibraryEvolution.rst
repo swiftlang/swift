@@ -48,7 +48,6 @@ published should not limit its evolution in the future.
   restructuring are still planned, including:
 
   * A discussion of back-dating, and how it usually is not allowed.
-  * A revisal of the discussion on fixed-layout classes.
   * A brief discussion of "deployment files", which represent distribution groupings that are themselves versioned. (For example, OS X 10.10.3 contains Foundation version 1153.20.) Deployment files are likely to provide a concrete implementation of "resilience domains".
 
 Introduction
@@ -832,9 +831,14 @@ are permitted. In particular:
 Possible Restrictions on Classes
 --------------------------------
 
-In addition to ``final``, it may be useful to restrict the size of a class
-instance (like a struct's ``@fixed_contents``) or the number of overridable
-members in its virtual dispatch table. These annotations have not been designed.
+In addition to ``final``, it may be useful to restrict the stored properties of
+a class instance, like `Fixed-Contents Structs`_. However, there are open
+questions about how this would actually work, and the compiler still wouldn't
+be able to make much use of the information, because classes from other
+libraries must almost always be allocated on the heap.
+
+The design of this annotation is not covered by this document. As a purely
+additive feature, it can be added to the model at any time.
 
 
 Extensions
