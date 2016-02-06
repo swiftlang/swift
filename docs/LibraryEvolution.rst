@@ -513,14 +513,67 @@ layout.
     accessors of a property are fine, but those that provide new entry points
     are trickier.
 
-Like top-level constants, it is *not* safe to change a ``let`` property into a
-variable or vice versa. Properties declared with ``let`` are assumed not to
-change for the entire lifetime of the program once they have been initialized.
-
 It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
 or accessor within a struct. These modifiers are not `versioned attributes
 <versioned attribute>` and as such there is no safety guarantee for a client
 deploying against an earlier version of the library.
+
+
+Methods and Initializers
+------------------------
+
+For the most part struct methods and initializers are treated exactly like top-level functions. They permit all of the same modifications and can also
+be marked ``@inlineable``, with the same restrictions.
+
+Initializers declared outside of the struct's module must always delegate to
+another initializer, since new properties may be added between library releases.
+
+
+Properties
+----------
+
+Struct properties behave largely the same as top-level bindings. They permit
+all of the same modifications, and also allow adding or removing an initial
+value entirely.
+
+Struct properties can also be marked ``@inlineable``, with the same
+restrictions as for top-level bindings. An inlineable stored property may not
+become computed, but the offset of its storage within the struct is not
+necessarily fixed.
+
+.. note::
+
+    One possible layout algorithm would put all inlineable struct constants at
+    the start of the struct, sorted by availability, so that the offset *could*
+    be fixed. This would have to be balanced against other goals for struct
+    layout.
+
+Like top-level constants, it is *not* safe to change a ``let`` property into a
+variable or vice versa. Properties declared with ``let`` are assumed not to
+change for the entire lifetime of the program once they have been initialized.
+
+
+Subscripts
+----------
+
+Subscripts behave largely the same as properties, except that there are no
+stored subscripts. This means that the following changes are permitted:
+
+- Adding (but not removing) a public setter.
+- Adding or removing a non-public, non-versioned setter.
+- Changing the body of an accessor.
+
+Like properties, subscripts can be marked ``@inlineable``, which restricts the
+set of changes:
+
+- Adding versioned setter is still permitted.
+- Adding or removing a non-public, non-versioned setter is still permitted.
+- Changing the body of an accessor is permitted but discouraged; existing
+  clients may use the new implementations, or they may use the implementations
+  from the time they were compiled, or a mix of both.
+
+Any inlineable accessors must follow the rules for `inlineable functions`_,
+as described above.
 
 
 New Conformances
@@ -665,6 +718,13 @@ accommodate new values. More specifically, the following changes are permitted:
     cases added in future versions of a library.
 
 
+Enum Members
+------------
+
+The rules for enum initializers, methods, and subscripts are identical to those
+for struct members.
+
+
 Closed Enums
 ------------
 
@@ -716,6 +776,13 @@ There are very few safe changes to make to protocols:
   unconstrained default implementation.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
+- Changing *internal* parameter names of function and subscript requirements
+  is permitted.
+- Reordering generic requirements is permitted (but not the generic parameters
+  themselves).
+- The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
+  be added to a function requirement without any additional versioning
+  information.
 
 All other changes to the protocol itself are forbidden, including:
 
@@ -796,11 +863,6 @@ Finally, classes allow the following changes that do not apply to structs:
 Other than those detailed above, no other changes to a class or its members
 are permitted. In particular:
 
-- New designated initializers may not be added to a publicly-subclassable
-  class. This would change the inheritance of convenience initializers, which
-  existing subclasses may depend on.
-- New ``required`` initializers may not be added to a publicly-subclassable
-  class. There is no way to guarantee their presence on existing subclasses.
 - ``final`` may not be added to *or* removed from a class or any of its members.
   The presence of ``final`` enables optimization; its absence means there may
   be subclasses/overrides that would be broken by the change.
@@ -825,6 +887,115 @@ are permitted. In particular:
     The ``@NSManaged`` attribute as it is in Swift 2 exposes implementation
     details to clients in a bad way. We need to fix this.
     rdar://problem/20829214
+
+
+Initializers
+------------
+
+New designated initializers may not be added to a publicly-subclassable class.
+This would change the inheritance of convenience initializers, which existing
+subclasses may depend on. A publicly-subclassable class also may not change
+a convenience initializer into a designated initializer or vice versa.
+
+Similarly, new ``required`` initializers may not be added to a
+publicly-subclassable class, including marking an existing initializer
+``required``; there is no way to guarantee their presence on existing
+subclasses.
+
+All of the modifications permitted for top-level functions are also permitted
+for class initializers. This includes being marked ``@inlineable``, with the
+same restrictions.
+
+
+Methods
+-------
+
+Both class and instance methods allow all of the modifications permitted for
+top-level functions, but the potential for overrides complicates things a little. They allow the following changes:
+
+- Changing the body of the method.
+- Changing *internal* parameter names (i.e. the names used within the method
+  body, not the labels that are part of the method's full name).
+- Reordering generic requirements (but not the generic parameters themselves).
+- Adding a default value to a parameter.
+- Changing or removing a default value is permitted but discouraged; it may
+  break or change the meaning of existing source code.
+- The ``@noreturn`` attribute may be added to a public method only if it is
+  ``final`` or the class is not publicly subclassable. ``@noreturn`` is a
+  `versioned attribute`.
+- The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
+  be added to a method without any additional versioning information.
+
+Class and instance methods may be marked ``@inlineable``, with the same
+restrictions as struct methods. ``dynamic`` methods may not be marked
+``@inlineable``.
+
+If an inlineable method is overridden, the overriding method does not need to
+also be inlineable. Clients may only inline a method when they can devirtualize
+the call. (This does permit speculative devirtualization.)
+
+Any method that overrides a ``@noreturn`` method must also be marked
+``@noreturn``.
+
+
+Properties
+----------
+
+Class and instance properties allow *most* of the modifications permitted for
+struct properties, but the potential for overrides complicates things a little.
+Variable properties (those declared with ``var``) allow the following changes:
+
+- Adding (but not removing) a computed setter to a ``final`` property or a
+  property in a non-publicly-subclassable class.
+- Adding or removing a non-public, non-versioned setter.
+- Changing from a stored property to a computed property, or vice versa, as
+  long as a previously-versioned setter is not removed.
+- Changing the body of an accessor.
+- Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
+  an existing variable. This is effectively the same as modifying the body of a
+  setter.
+- Adding, removing, or changing the initial value of a stored variable.
+- Adding or removing ``weak`` from a variable with ``Optional`` type.
+- Adding or removing ``unowned`` from a variable.
+- Adding or removing ``@NSCopying`` to/from a variable.
+
+Adding a public setter to a computed property that may be overridden is
+permitted but discouraged; any existing overrides will not know what to do with
+the setter and will likely not behave correctly.
+
+Constant properties (those declared with ``let``) still permit changing their
+value, as well as adding or removing an initial value entirely.
+
+Both variable and constant properties (on both instances and classes) may be
+marked ``@inlineable``. This behaves as described for struct properties.
+``dynamic`` properties may not be marked ``@inlineable``.
+
+If an inlineable property is overridden, the overriding property does not need
+to also be inlineable. Clients may only inline a property access when they can
+devirtualize it. (This does permit speculative devirtualization.)
+
+
+Subscripts
+----------
+
+Subscripts behave much like properties; they inherit the rules of their struct
+counterparts with a few small changes:
+
+- Adding (but not removing) a public setter to a ``final`` subscript or a
+  subscript in a non-publicly-subclassable class.
+- Adding or removing a non-public, non-versioned setter.
+- Changing the body of an accessor.
+
+Adding a public setter to a subscript that may be overridden is permitted but
+discouraged; any existing overrides will not know what to do with the setter
+and will likely not behave correctly.
+
+Class subscripts may be marked ``@inlineable``, which behaves as described for
+struct subscripts. ``dynamic`` subscripts may not be marked ``@inlineable``.
+
+If an inlineable subscript is overridden, the overriding subscript does not need
+to also be inlineable. Clients may only inline a subscript access when they can
+devirtualize it. (This does permit speculative devirtualization.)
 
 
 Possible Restrictions on Classes
@@ -872,6 +1043,14 @@ following changes are permitted:
 - Reordering members.
 - Removing any non-public, non-versioned member.
 - Changing the body of any methods, initializers, or accessors.
+
+.. admonition:: TODO
+
+    How does "adding any new member" square with the restrictions on adding
+    initializers to classes? Are they inherently convenience initializers?
+
+    What about everything else? New members in protocols can result in new
+    overrideable members in classes. How does that work?
 
 
 Operators
