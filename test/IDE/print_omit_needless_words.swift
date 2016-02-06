@@ -43,7 +43,7 @@
 // Note: Pointer-to-struct name matching; "with" splits the first
 // piece, then the "with" is dropped.
 //
-// CHECK-FOUNDATION: func copy(zone _: Zone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copyWith(_: Zone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(_: Copying) -> AnyObject?
@@ -74,7 +74,7 @@
 // CHECK-FOUNDATION: var isMakingHoney: Bool
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethod(deprecatedOptions _: DeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethodWith(_: DeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
@@ -106,7 +106,7 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Not splitting on "With".
-// CHECK-FOUNDATION: func urlWithAddedString(_: String) -> URL?
+// CHECK-FOUNDATION: func urlWith(addedString _: String) -> URL?
 
 // Note: CalendarUnits is not a set of "Options".
 // CHECK-FOUNDATION: class func forCalendarUnits(_: CalendarUnit) -> String!
@@ -118,11 +118,11 @@
 // CHECK-FOUNDATION: var withHTTPS: URL { get }
 
 // Note: usingBlock -> body
-// CHECK-FOUNDATION: func enumerateObjectsUsing(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(options _: EnumerationOptions = [], usingBlock: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], usingBlock: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(block _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomethingWith(_: Copying)
@@ -131,13 +131,13 @@
 // CHECK-FOUNDATION: func doSomethingElseWith(_: protocol<Copying, ObjectProtocol>)
 
 // Note: Function type -> "Function".
-// CHECK-FOUNDATION: func sortUsing(_: @convention(c) (AnyObject, AnyObject) -> Int)
+// CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
 
 // Note: Plural: NSArray without type arguments -> "Objects".
 // CHECK-FOUNDATION: func remove(_: [AnyObject])
 
 // Note: Skipping "Type" suffix.
-// CHECK-FOUNDATION: func doSomethingWith(_: UnderlyingType)
+// CHECK-FOUNDATION: func doSomething(_: UnderlyingType)
 
 // Don't introduce default arguments for lone parameters to setters.
 // CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: EnumerationOptions)
@@ -228,9 +228,9 @@
 // beginning and the end of a property.
 // CHECK-APPKIT: var flattening: NSBezierPath { get }
 
-// CHECK-APPKIT: func dismissAnimated(_: Bool)
+// CHECK-APPKIT: func dismiss(animated _: Bool)
 
-// CHECK-APPKIT: func shouldCollapseAutoExpandedItemsForDeposited(_: Bool) -> Bool
+// CHECK-APPKIT: func shouldCollapseAutoExpandedItemsFor(deposited _: Bool) -> Bool
 
 // Introducing argument labels and pruning the base name.
 // CHECK-APPKIT: func rectForCancelButtonWhenCentered(_: Bool)
@@ -254,6 +254,7 @@
 
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpTo(_: URL)
 // CHECK-OMIT-NEEDLESS-WORDS: func objectIsCompatibleWith(_: AnyObject) -> Bool
-// CHECK-OMIT-NEEDLESS-WORDS: func insetByX(_: Int, y: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x _: Int, y: Int)
+
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

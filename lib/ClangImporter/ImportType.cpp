@@ -1741,11 +1741,11 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
 
   // Block pointers.
   if (type->getAs<clang::BlockPointerType>())
-    return "Block";
+    return OmissionTypeName("Block", OmissionTypeFlags::Function);
 
   // Function pointers.
   if (type->isFunctionType())
-    return "Function";
+    return OmissionTypeName("Function", OmissionTypeFlags::Function);
 
   return StringRef();
 }
