@@ -248,6 +248,17 @@ public:
   NullablePtr<SILInstruction>
   createAddressProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const;
 
+  NullablePtr<SILInstruction>
+  createProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
+    if (Base->getType().isAddress()) {
+      return createAddressProjection(B, Loc, Base);
+    } else if (Base->getType().isObject()) {
+      return createObjectProjection(B, Loc, Base);
+    } else {
+      llvm_unreachable("Unsupported SILValueCategory");
+    }
+  }
+
   /// Apply this projection to \p BaseType and return the relevant subfield's
   /// SILType if BaseField has less subtypes than projection's offset.
   SILType getType(SILType BaseType, SILModule &M) const {
@@ -415,6 +426,17 @@ public:
     }
   }
 
+  /// Form an aggregate of type BaseType using the SILValue Values. Returns the
+  /// aggregate on success if this is a case we handle or an empty SILValue
+  /// otherwise.
+  ///
+  /// This can be used with getFirstLevelProjections to project out/reform
+  /// values. We do not need to use the original projections here since to build
+  /// aggregate instructions the order is the only important thing.
+  static NullablePtr<SILInstruction>
+  createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
+                                     SILType BaseType,
+                                     llvm::SmallVectorImpl<SILValue> &Values);
 private:
   /// Convenience method for getting the underlying index. Assumes that this
   /// projection is valid. Otherwise it asserts.

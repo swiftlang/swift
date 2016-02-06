@@ -1532,7 +1532,21 @@ ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
   } while (!Worklist.empty());
 }
 
+NullablePtr<SILInstruction>
+NewProjection::
+createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
+                                   SILType BaseType,
+                                   llvm::SmallVectorImpl<SILValue> &Values) {
+  if (BaseType.getStructOrBoundGenericStruct()) {
+    return B.createStruct(Loc, BaseType, Values);
+  }
 
+  if (BaseType.is<TupleType>()) {
+    return B.createTuple(Loc, BaseType, Values);
+  }
+
+  return nullptr;
+}
 
 //===----------------------------------------------------------------------===//
 //                             ProjectionTreeNode
