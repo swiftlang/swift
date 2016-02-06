@@ -1160,13 +1160,14 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+  bool isCollectionLiteralStartingWithLSquareLit();
   ParserResult<Expr> parseExprObjectLiteral();
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
                                            = Identifier(),
                                          SourceLoc firstSelectorPieceLoc
                                            = SourceLoc());
-  ParserResult<Expr> parseExprCollection();
+  ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);
 
