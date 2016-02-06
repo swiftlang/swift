@@ -14,8 +14,8 @@ func dropDefaultedNil(array: NSArray, sel: Selector,
 }
 
 func dropDefaultedOptionSet(array: NSArray) {
-  array.enumerateObjectsWithOptions([]) { obj, idx, stop in print("foo") } // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(options:usingBlock:)'}}{{9-36=enumerateObjects}}{{36-40=}}
-  array.enumerateObjectsWithOptions([], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(options:usingBlock:)'}}{{9-36=enumerateObjects}}{{37-41=}}
+  array.enumerateObjectsWithOptions([]) { obj, idx, stop in print("foo") } // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(_:usingBlock:)'}}{{9-36=enumerateObjects}}{{36-40=}}
+  array.enumerateObjectsWithOptions([], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(_:usingBlock:)'}}{{9-36=enumerateObjects}}{{37-41=}}
   array.enumerateObjectsWhileOrderingPizza(true, withOptions: [], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{call to 'enumerateObjectsWhileOrderingPizza(_:withOptions:usingBlock:)' has extraneous arguments that could use defaults}}{{48-65=}}
 }
 
