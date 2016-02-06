@@ -25,6 +25,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -330,11 +331,15 @@ public:
       SGM.visit(member);
     }
 
+    if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
+      if (!protocol->hasFixedLayout())
+        SGM.emitDefaultWitnessTable(protocol);
+
+      return;
+    }
+
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
-    if (isa<ProtocolDecl>(theType))
-      return;
-
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::All,
                                nullptr, /*sorted=*/true)) {
@@ -503,3 +508,52 @@ void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
 }
 
+namespace {
+
+/// Emit a default witness table for a resilient protocol definition.
+struct SILGenDefaultWitnessTable
+    : public SILWitnessVisitor<SILGenDefaultWitnessTable> {
+
+  unsigned MinimumWitnessCount;
+  SmallVector<SILDefaultWitnessTable::Entry, 8> DefaultWitnesses;
+
+  SILGenDefaultWitnessTable() : MinimumWitnessCount(0) {}
+
+  void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+    MinimumWitnessCount++;
+  }
+
+  void addMethod(FuncDecl *func) {
+    MinimumWitnessCount++;
+  }
+
+  void addConstructor(ConstructorDecl *ctor) {
+    MinimumWitnessCount++;
+  }
+
+  void addAssociatedType(AssociatedTypeDecl *ty,
+                         ArrayRef<ProtocolDecl *> protos) {
+    MinimumWitnessCount++;
+
+    for (auto *protocol : protos) {
+      // Only reference the witness if the protocol requires it.
+      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+        continue;
+
+      MinimumWitnessCount++;
+    }
+  }
+};
+
+}
+
+void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
+  SILDefaultWitnessTable *defaultWitnesses =
+      M.createDefaultWitnessTableDeclaration(protocol);
+
+  SILGenDefaultWitnessTable builder;
+  builder.visitProtocolDecl(protocol);
+
+  defaultWitnesses->convertToDefinition(builder.MinimumWitnessCount,
+                                        builder.DefaultWitnesses);
+}

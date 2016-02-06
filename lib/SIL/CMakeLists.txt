@@ -10,6 +10,7 @@ add_swift_library(swiftSIL
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILCoverageMap.cpp
+  SILDefaultWitnessTable.cpp
   SILFunction.cpp
   SILFunctionType.cpp
   SILGlobalVariable.cpp

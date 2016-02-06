@@ -3107,6 +3107,33 @@ void SILWitnessTable::verify(const SILModule &M) const {
 #endif
 }
 
+/// Verify that a default witness table follows invariants.
+void SILDefaultWitnessTable::verify(const SILModule &M) const {
+#ifndef NDEBUG
+  assert(!isDeclaration() &&
+         "Default witness table declarations should not exist.");
+  assert(!getProtocol()->hasFixedLayout() &&
+         "Default witness table declarations for fixed-layout protocols should "
+         "not exist.");
+  assert(getProtocol()->getParentModule() == M.getSwiftModule() &&
+         "Default witness table declarations must appear in the same "
+         "module as their protocol.");
+
+  // All default witness tables have public conformances, thus default
+  // witness tables should not reference SILFunctions without
+  // public/public_external linkage.
+  for (const Entry &E : getEntries()) {
+    SILFunction *F = E.getWitness();
+    assert(!isLessVisibleThan(F->getLinkage(), SILLinkage::Public) &&
+           "Default witness tables should not reference internal "
+           "or private functions.");
+    assert(F->getLoweredFunctionType()->getRepresentation() ==
+           SILFunctionTypeRepresentation::WitnessMethod &&
+           "Default witnesses must have witness_method representation.");
+  }
+#endif
+}
+
 /// Verify that a global variable follows invariants.
 void SILGlobalVariable::verify() const {
 #ifndef NDEBUG
@@ -3163,6 +3190,19 @@ void SILModule::verify() const {
     if (!wtableConformances.insert(conformance).second) {
       llvm::errs() << "Witness table redefined: ";
       conformance->printName(llvm::errs());
+      assert(false && "triggering standard assertion failure routine");
+    }
+    wt.verify(*this);
+  }
+
+  // Check all default witness tables.
+  DEBUG(llvm::dbgs() << "*** Checking default witness tables for duplicates ***\n");
+  llvm::DenseSet<const ProtocolDecl *> defaultWitnessTables;
+  for (const SILDefaultWitnessTable &wt : getDefaultWitnessTables()) {
+    DEBUG(llvm::dbgs() << "Default Witness Table:\n"; wt.dump());
+    if (!defaultWitnessTables.insert(wt.getProtocol()).second) {
+      llvm::errs() << "Default witness table redefined: ";
+      wt.dump();
       assert(false && "triggering standard assertion failure routine");
     }
     wt.verify(*this);

@@ -203,6 +203,8 @@ private:
   SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
                   NormalProtocolConformance *Conformance);
 
+  void addWitnessTable();
+
 public:
   /// Create a new SILWitnessTable definition with the given entries.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,

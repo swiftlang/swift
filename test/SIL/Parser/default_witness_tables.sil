@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt %s -module-name=witness_tables -enable-resilience | %target-sil-opt -module-name=witness_tables -enable-resilience | FileCheck %s
+
+sil_stage raw
+
+public protocol Proto {}
+
+public protocol ResilientProtocol {
+  associatedtype T : Proto
+  func noDefaultA()
+  func noDefaultB()
+  func defaultC()
+  func defaultD()
+}
+
+// CHECK-LABEL: sil @defaultC : $@convention(witness_method) <`Self` where `Self` : ResilientProtocol, `Self`.T : Proto> (@in_guaranteed `Self`) -> ()
+sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: sil @defaultD : $@convention(witness_method) <`Self` where `Self` : ResilientProtocol, `Self`.T : Proto> (@in_guaranteed `Self`) -> ()
+sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: sil_default_witness_table ResilientProtocol 4 {
+// CHECK: #ResilientProtocol.defaultC!1: @defaultC
+// CHECK: #ResilientProtocol.defaultD!1: @defaultD
+// CHECK: }
+
+sil_default_witness_table ResilientProtocol 4 {
+  method #ResilientProtocol.defaultC!1: @defaultC
+  method #ResilientProtocol.defaultD!1: @defaultD
+}

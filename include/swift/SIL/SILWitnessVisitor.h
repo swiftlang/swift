@@ -37,6 +37,12 @@ namespace swift {
 /// variables, there should be separate callbacks for adding a
 /// getter/setter pair, for just adding a getter, and for adding a
 /// physical projection (if we decide to support that).
+///
+/// You must override the following methods:
+/// - addOutOfLineBaseProtocol()
+/// - addMethod()
+/// - addConstructor()
+/// - addAssociatedType()
 
 template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }

@@ -1800,6 +1800,31 @@ printSILWitnessTables(llvm::raw_ostream &OS, bool Verbose,
 }
 
 static void
+printSILDefaultWitnessTables(llvm::raw_ostream &OS, bool Verbose,
+                             bool ShouldSort,
+                        const SILModule::DefaultWitnessTableListType &WTables) {
+  if (!ShouldSort) {
+    for (const SILDefaultWitnessTable &wt : WTables)
+      wt.print(OS, Verbose);
+    return;
+  }
+
+  std::vector<const SILDefaultWitnessTable *> witnesstables;
+  witnesstables.reserve(WTables.size());
+  for (const SILDefaultWitnessTable &wt : WTables)
+    witnesstables.push_back(&wt);
+  std::sort(witnesstables.begin(), witnesstables.end(),
+    [] (const SILDefaultWitnessTable *w1,
+        const SILDefaultWitnessTable *w2) -> bool {
+      return w1->getProtocol()->getName()
+          .compare(w2->getProtocol()->getName()) == -1;
+    }
+  );
+  for (const SILDefaultWitnessTable *wt : witnesstables)
+    wt->print(OS, Verbose);
+}
+
+static void
 printSILCoverageMaps(llvm::raw_ostream &OS, bool Verbose, bool ShouldSort,
                      const SILModule::CoverageMapListType &CoverageMaps) {
   if (!ShouldSort) {
@@ -1868,6 +1893,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   printSILFunctions(OS, Verbose, ShouldSort, getFunctionList());
   printSILVTables(OS, Verbose, ShouldSort, getVTableList());
   printSILWitnessTables(OS, Verbose, ShouldSort, getWitnessTableList());
+  printSILDefaultWitnessTables(OS, Verbose, ShouldSort, getDefaultWitnessTableList());
   printSILCoverageMaps(OS, Verbose, ShouldSort, getCoverageMapList());
   
   OS << "\n\n";
@@ -1974,6 +2000,30 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 }
 
 void SILWitnessTable::dump() const {
+  print(llvm::errs());
+}
+
+void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
+  // sil_default_witness_table <Protocol> <MinSize>
+  OS << "sil_default_witness_table"
+     << " " << getProtocol()->getName()
+     << " " << getMinimumWitnessTableSize() << " {\n";
+  
+  for (auto &witness : getEntries()) {
+    // method #declref: @function
+    OS << "  method ";
+    witness.getRequirement().print(OS);
+    OS << ": ";
+    witness.getWitness()->printName(OS);
+    OS << "\t// "
+       << demangleSymbolAsString(witness.getWitness()->getName());
+    OS << '\n';
+  }
+  
+  OS << "}\n\n";
+}
+
+void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
 

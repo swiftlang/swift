@@ -122,10 +122,7 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
   // Extract the base NormalProtocolConformance.
   NormalProtocolConformance *NormalC = C->getRootNormalConformance();
 
-  SILWitnessTable *WT = SILWitnessTable::create(*this,
-                                                linkage,
-                                                NormalC);
-  return WT;
+  return SILWitnessTable::create(*this, linkage, NormalC);
 }
 
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
@@ -214,6 +211,34 @@ lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
 
   // If we fail, just return the declaration.
   return {wT, Subs};
+}
+
+SILDefaultWitnessTable *
+SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol) {
+  // Note: we only ever look up default witness tables in the translation unit
+  // that is currently being compiled, since they SILGen gnerates them when it
+  // visits the protocol declaration, and IRGen emits them when emitting the
+  // protocol descriptor metadata for the protocol.
+
+  auto found = DefaultWitnessTableMap.find(Protocol);
+  if (found == DefaultWitnessTableMap.end()) {
+    assert(Protocol->hasFixedLayout() &&
+           "Resilient protocol must have a default witness table");
+    return nullptr;
+  }
+
+  assert(!Protocol->hasFixedLayout() &&
+         "Fixed-layout protocol cannot have a default witness table");
+
+  return found->second;
+}
+
+SILDefaultWitnessTable *
+SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol) {
+  assert(!Protocol->hasFixedLayout() &&
+         "Fixed-layout protocol cannot have a default witness table");
+
+  return SILDefaultWitnessTable::create(*this, Protocol);
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
