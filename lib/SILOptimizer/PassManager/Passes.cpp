@@ -250,9 +250,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Start by cloning functions from stdlib.
   PM.addSILLinker();
-  // Get rid of apparently dead functions as soon as possible so that
-  // we do not spend time optimizing them.
-  PM.addDeadFunctionElimination();
   PM.run();
   PM.resetAndRemoveTransformations();
 
