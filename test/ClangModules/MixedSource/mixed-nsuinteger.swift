@@ -17,8 +17,8 @@ var userTypedObj = NSUIntTest()
 // Check that the NSUInteger comes across as UInt from user Obj C modules. 
 var ur: UInt = userTypedObj.myCustomMethodThatOperatesOnNSUIntegers(ui)
 
-userTypedObj.IntProp = ui
-userTypedObj.TypedefProp = ui
+userTypedObj.intProp = ui
+userTypedObj.typedefProp = ui
 ur = testFunction(ui)
 testFunctionInsideMacro(ui)
 

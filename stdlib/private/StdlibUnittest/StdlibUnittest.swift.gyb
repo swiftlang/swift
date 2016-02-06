@@ -2468,7 +2468,7 @@ public func expectEqualsUnordered<
     Actual : Sequence,
     T : Comparable
     where
-    Expected.Iterator.Element == Actual.Iterator.Element,
+    Actual.Iterator.Element == (key: T, value: T),
     Expected.Iterator.Element == (T, T)
 >(
     expected: Expected, _ actual: Actual, ${TRACE}
@@ -2478,9 +2478,9 @@ public func expectEqualsUnordered<
   }
 
   let x: [(T, T)] = Array(expected).sorted(comparePairLess)
-  let y: [(T, T)] = Array(actual).sorted(comparePairLess)
+  let y: [(T, T)] = Array(actual.map{($0.0, $0.1)}).sorted(comparePairLess)
 
-  func comparePairEquals(lhs: (T, T), rhs: (T, T)) -> Bool {
+  func comparePairEquals(lhs: (T, T), rhs: (key: T, value: T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
 

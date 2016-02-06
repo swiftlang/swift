@@ -42,7 +42,7 @@ print(o.respondsTo("setBlackHoleWithHawkingRadiation:"))
 
 // Test #selector for referring to methods.
 // CHECK: true
-print(o.respondsToSelector(#selector(NSObject.frob)))
+print(o.respondsTo(#selector(NSObject.frob)))
 
 // CHECK: I've been frobbed!
 o.frob()

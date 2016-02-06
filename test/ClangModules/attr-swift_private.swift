@@ -106,11 +106,15 @@ _ = NSOptions.__PrivA
 _ = NSOptions.B
 
 func makeSureAnyObject(_: AnyObject) {}
-func testCF(a: __PrivCFTypeRef, b: __PrivCFSubRef, c: __PrivInt) {
-  // expected-warning@-1{{'__PrivCFTypeRef' is deprecated: renamed to '__PrivCFType'}}
-  // expected-note@-2{{use '__PrivCFType' instead}}
-  // expected-warning@-3{{__PrivCFSubRef' is deprecated: renamed to '__PrivCFSub'}}
-  // expected-note@-4{{use '__PrivCFSub' instead}}
+
+#if !IRGEN
+func testUnavailableRefs() {
+  var x: __PrivCFTypeRef // expected-error {{'__PrivCFTypeRef' is unavailable in Swift}}
+  var y: __PrivCFSubRef // expected-error {{'__PrivCFSubRef' is unavailable in Swift}}
+}
+#endif
+
+func testCF(a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN

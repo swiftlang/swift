@@ -275,7 +275,7 @@ UnsafePointerTestSuite.test("customMirror") {
   // is greater than Int.max
   let reallyBigInt: UInt = UInt(Int.max) + 1
   let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)
-  let mirror = ptr.customMirror()
+  let mirror = ptr.customMirror
   expectEqual(1, mirror.children.count)
 #if arch(i386) || arch(arm)
   expectEqual("18446744071562067968", String(mirror.children.first!.1))
@@ -291,7 +291,7 @@ UnsafePointerTestSuite.test("customPlaygroundQuickLook") {
   // the raw value is greater than Int.max
   let reallyBigInt: UInt = UInt(Int.max) + 1
   let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)
-  if case let .Text(desc) = ptr.customPlaygroundQuickLook() {
+  if case let .Text(desc) = ptr.customPlaygroundQuickLook {
 #if arch(i386) || arch(arm)
     expectEqual("UnsafePointer(0xFFFFFFFF80000000)", desc)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
@@ -307,7 +307,7 @@ UnsafePointerTestSuite.test("customPlaygroundQuickLook") {
 UnsafeMutablePointerTestSuite.test("customMirror") {
   let reallyBigInt: UInt = UInt(Int.max) + 1
   let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)
-  let mirror = ptr.customMirror()
+  let mirror = ptr.customMirror
   expectEqual(1, mirror.children.count)
 #if arch(i386) || arch(arm)
   expectEqual("18446744071562067968", String(mirror.children.first!.1))
@@ -322,7 +322,7 @@ UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
   let reallyBigInt: UInt = UInt(Int.max) + 1
   let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)
   let isProperDisposition : Bool
-  if case let .Text(desc) = ptr.customPlaygroundQuickLook() {
+  if case let .Text(desc) = ptr.customPlaygroundQuickLook {
 #if arch(i386) || arch(arm)
     expectEqual("UnsafeMutablePointer(0xFFFFFFFF80000000)", desc)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)

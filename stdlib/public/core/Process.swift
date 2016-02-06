@@ -16,8 +16,10 @@ public enum Process {
   internal static func _computeArguments() -> [String] {
     var result: [String] = []
     for i in 0..<Int(argc) {
+      let arg = unsafeArgv[i]
       result.append(
-       String(cString: unsafeArgv[i]))
+       arg == nil ? "" : String(cString: arg)
+      )
     }
     return result 
   }

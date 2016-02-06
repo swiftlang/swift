@@ -291,7 +291,7 @@ class DeducePropertyParams {
 // SR-69
 struct A {}
 func foo() {
-    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'SequenceType'}}
+    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'Sequence'}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}

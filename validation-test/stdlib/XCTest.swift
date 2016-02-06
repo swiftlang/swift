@@ -29,6 +29,11 @@ var XCTestTestSuite = TestSuite("XCTest")
 //       as dynamic. Objective-C XCTest uses runtime introspection to
 //       instantiate an NSInvocation with the given selector.
 
+
+func execute(run: () -> ()) {
+  run()
+}
+
 XCTestTestSuite.test("exceptions") {
   class ExceptionTestCase: XCTestCase {
     dynamic func test_raises() {
@@ -37,7 +42,7 @@ XCTestTestSuite.test("exceptions") {
   }
 
   let testCase = ExceptionTestCase(selector: "test_raises")
-  testCase.runTest()
+  execute(testCase.run)
   let testRun = testCase.testRun!
 
   expectEqual(1, testRun.testCaseCount)
@@ -62,7 +67,7 @@ XCTestTestSuite.test("XCTAssertEqual/Array<T>") {
   }
 
   let passingTestCase = AssertEqualArrayTestCase(selector: "test_whenArraysAreEqual_passes")
-  passingTestCase.runTest()
+  execute(passingTestCase.run)
   let passingTestRun = passingTestCase.testRun!
   expectEqual(1, passingTestRun.testCaseCount)
   expectEqual(1, passingTestRun.executionCount)
@@ -72,7 +77,7 @@ XCTestTestSuite.test("XCTAssertEqual/Array<T>") {
   expectTrue(passingTestRun.hasSucceeded)
 
   let failingTestCase = AssertEqualArrayTestCase(selector: "test_whenArraysAreNotEqual_fails")
-  failingTestCase.runTest()
+  execute(failingTestCase.run)
   let failingTestRun = failingTestCase.testRun!
   expectEqual(1, failingTestRun.testCaseCount)
   expectEqual(1, failingTestRun.executionCount)
@@ -96,7 +101,7 @@ XCTestTestSuite.test("XCTAssertEqual/Dictionary<T, U>") {
   }
 
   let passingTestCase = AssertEqualDictionaryTestCase(selector: "test_whenDictionariesAreEqual_passes")
-  passingTestCase.runTest()
+  execute(passingTestCase.run)
   let passingTestRun = passingTestCase.testRun!
   expectEqual(1, passingTestRun.testCaseCount)
   expectEqual(1, passingTestRun.executionCount)
@@ -106,7 +111,7 @@ XCTestTestSuite.test("XCTAssertEqual/Dictionary<T, U>") {
   expectTrue(passingTestRun.hasSucceeded)
 
   let failingTestCase = AssertEqualDictionaryTestCase(selector: "test_whenDictionariesAreNotEqual_fails")
-  failingTestCase.runTest()
+  execute(failingTestCase.run)
   let failingTestRun = failingTestCase.testRun!
   expectEqual(1, failingTestRun.testCaseCount)
   expectEqual(1, failingTestRun.executionCount)

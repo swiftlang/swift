@@ -24,4 +24,4 @@ acceptBridgeableNSError(E2.A)
 }
 
 acceptBridgeableNSError(E3.A)
-// expected-error@-1{{argument type 'E3' does not conform to expected type '_ObjectiveCBridgeableErrorType'}}
+// expected-error@-1{{argument type 'E3' does not conform to expected type '_ObjectiveCBridgeableErrorProtocol'}}

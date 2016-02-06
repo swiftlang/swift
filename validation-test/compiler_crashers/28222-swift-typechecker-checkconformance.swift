@@ -5,4 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-var _{struct B<a:CollectionType{var _={struct B<a{enum B{case
+var _{struct B<a:Collection{var _={struct B<a{enum B{case

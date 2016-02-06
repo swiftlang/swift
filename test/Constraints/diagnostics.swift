@@ -80,7 +80,7 @@ struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'SequenceType'}}
+for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'Sequence'}}
 }
 
 // Generic as part of function/tuple types
@@ -651,16 +651,16 @@ func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}
 // expected-note @-1 {{in call to function 'safeAssign'}}
 let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
 
-
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
-func foo() -> [Int] {
-  return Array <Int> (count: 1) { // expected-error {{cannot invoke initializer for type 'Array<Int>' with an argument list of type '(count: Int, () -> _)'}}
+struct Radar21692808<Element> {
+  init(count: Int, value: Element) {}
+}
+func radar21692808() -> Radar21692808<Int> {
+  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, () -> _)'}}
     // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
     return 1
   }
 }
-
-
 
 // <rdar://problem/17557899> - This shouldn't suggest calling with ().
 func someOtherFunction() {}

@@ -9,7 +9,7 @@
 
 import library
 
-extension NuclearMeltdown : ErrorType {}
+extension NuclearMeltdown : ErrorProtocol {}
 
 // Dummy statement
 _ = ()

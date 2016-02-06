@@ -309,7 +309,7 @@ class FooUnavailableMembers : FooClassBase {
 
 class FooCFType {
 }
-@available(*, deprecated, renamed="FooCFType")
+@available(*, unavailable, renamed="FooCFType", message="Not available in Swift")
 typealias FooCFTypeRef = FooCFType
 @available(*, unavailable, message="Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)

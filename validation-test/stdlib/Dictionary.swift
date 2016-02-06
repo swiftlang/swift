@@ -2873,13 +2873,13 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
   let d = getRoundtripBridgedNSDictionary()
   let enumerator = d.keyEnumerator()
 
-  var pairs = Array<(Int, Int)>()
+  var pairs = Array<(key: Int, value: Int)>()
   while let key = enumerator.nextObject() {
     let value: AnyObject = d.objectFor(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
-  expectEqualsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ])
+  expectEqualsUnordered([ (10, 1010), (20, 1020), (30, 1030) ], pairs)
 }
 
 //===---
@@ -3866,7 +3866,7 @@ DictionaryTestSuite.test("popFirst") {
       2020: 2020,
       3030: 3030,
     ]
-    let expected = Array(d)
+    let expected = Array(d.map{($0.0, $0.1)})
     while let element = d.popFirst() {
       popped.append(element)
     }

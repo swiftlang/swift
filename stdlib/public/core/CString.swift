@@ -56,7 +56,7 @@ extension String {
   @warn_unused_result
   public static func decodeCString<Encoding : UnicodeCodec>(
     cString: UnsafePointer<Encoding.CodeUnit>,
-    `as` encoding: Encoding.Type, // FIXME: unbacktick `at` whenever allowed
+    as encoding: Encoding.Type,
     repairingInvalidCodeUnits isReparing: Bool = true)
       -> (result: String, repairsMade: Bool)? {
 

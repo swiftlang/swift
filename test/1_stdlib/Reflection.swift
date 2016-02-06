@@ -149,7 +149,7 @@ print("second verse same as the first:")
 dump(barrable)
 
 // CHECK-NEXT: Logical: true
-switch true.customPlaygroundQuickLook() {
+switch true.customPlaygroundQuickLook {
   case .Logical(let x): print("Logical: \(x)")
   default: print("wrong quicklook type")
 }
@@ -158,7 +158,8 @@ switch true.customPlaygroundQuickLook() {
 // CHECK-NEXT:   Some: "Hello world"
 dump(Optional<String>("Hello world"))
 // CHECK-NEXT: - nil
-dump(Optional<String>())
+let noneString: String? = nil
+dump(noneString)
 
 let intArray = [1,2,3,4,5]
 // CHECK-NEXT: 5 elements

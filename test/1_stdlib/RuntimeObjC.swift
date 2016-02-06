@@ -775,9 +775,9 @@ Reflection.test("UnsafeReference/not-nil") {
   dump(optionalURL, &output)
 
   let expected =
-    "▿ Optional(Swift.UnsafeReference<__ObjC.CFURL>(_value: http://llvm.org/))\n" +
+    "▿ Optional(Swift.UnsafeReference<__ObjC.CFURL>(_storage: http://llvm.org/))\n" +
     "  ▿ Some: Swift.UnsafeReference<__ObjC.CFURL>\n" +
-    "    - _value: http://llvm.org/ #0\n" +
+    "    - _storage: http://llvm.org/ #0\n" +
     "      - super: NSObject\n"
 
   expectEqual(expected, output)

@@ -425,7 +425,7 @@ public class NonObjCClass { }
 
   weak var weakProto: MyProtocol?
   weak var weakCF: CFTypeRef?
-  weak var weakCFString: CFStringRef?
+  weak var weakCFString: CFString?
 
   typealias CFTypeRefAlias = CFTypeRef
 
@@ -433,7 +433,7 @@ public class NonObjCClass { }
   var strongCFAlias: CFTypeRefAlias?
 
   var anyCF: CFAliasForType?
-  var anyCF2: CFAliasForTypeRef?
+  var anyCF2: CFAliasForType?
 
   @IBOutlet weak var outlet: AnyObject!
   @IBOutlet var typedOutlet: Properties!

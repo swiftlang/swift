@@ -53,13 +53,13 @@ class Subclass : NSObject {
 // CHECK-SELECTOR_ARG: Keyword/ExprSpecific:               #selector({#@objc method#}); name=#selector(@objc method)
 
 // CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal:      {{.?}}init; name=init
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}performSelector(_:withObject:); name=performSelector(_:withObject:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}performSelector(_:withObject:); name=performSelector(_:withObject:)
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}perform(_:withObject:); name=perform(_:withObject:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:withObject:); name=perform(_:withObject:)
 // CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
 // CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}description; name=description
 // CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}isEqual(_:); name=isEqual(_:)
 // CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)
 
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}performSelector(_:withObject:); name=performSelector(_:withObject:)
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:withObject:); name=perform(_:withObject:)
 // CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
 // CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)

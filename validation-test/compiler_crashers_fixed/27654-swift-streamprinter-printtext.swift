@@ -10,6 +10,6 @@ enum S<T{
 struct A{
 struct B
 class B
-class d:SequenceType
+class d:Sequence
 init(){
 let a=B

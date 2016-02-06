@@ -1393,27 +1393,27 @@ Reflection.test("StaticString/Mirror") {
   }
 }
 
-Reflection.test("DictionaryGenerator/Mirror") {
+Reflection.test("DictionaryIterator/Mirror") {
   let d: [MinimalHashableValue : OpaqueValue<Int>] =
     [ MinimalHashableValue(0) : OpaqueValue(0) ]
 
   var output = ""
-  dump(d.generate(), &output)
+  dump(d.iterator(), &output)
 
   let expected =
-    "- Swift.DictionaryGenerator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
+    "- Swift.DictionaryIterator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
 
   expectEqual(expected, output)
 }
 
-Reflection.test("SetGenerator/Mirror") {
+Reflection.test("SetIterator/Mirror") {
   let s: Set<MinimalHashableValue> = [ MinimalHashableValue(0)]
 
   var output = ""
-  dump(s.generate(), &output)
+  dump(s.iterator(), &output)
 
   let expected =
-    "- Swift.SetGenerator<StdlibUnittest.MinimalHashableValue>\n"
+    "- Swift.SetIterator<StdlibUnittest.MinimalHashableValue>\n"
 
   expectEqual(expected, output)
 }
