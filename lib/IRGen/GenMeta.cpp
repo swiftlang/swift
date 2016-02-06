@@ -4900,15 +4900,17 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
 }
 
 namespace {
-  class ProtocolDescriptorBuilder {
-    IRGenModule &IGM;
-    ProtocolDecl *Protocol;
+  const unsigned NumProtocolDescriptorFields = 12;
 
-    SmallVector<llvm::Constant*, 8> Fields;
+  class ProtocolDescriptorBuilder : public ConstantBuilder<> {
+    ProtocolDecl *Protocol;
+    SILDefaultWitnessTable *DefaultWitnesses;
 
   public:
-    ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *protocol)
-      : IGM(IGM), Protocol(protocol) {}
+    ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *protocol,
+                              SILDefaultWitnessTable *defaultWitnesses)
+      : ConstantBuilder(IGM), Protocol(protocol),
+        DefaultWitnesses(defaultWitnesses) {}
 
     void layout() {
       addObjCCompatibilityIsa();
@@ -4917,16 +4919,13 @@ namespace {
       addObjCCompatibilityTables();
       addSize();
       addFlags();
+      addDefaultWitnessTable();
     }
 
-    llvm::Constant *null() {
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-    }
-    
     void addObjCCompatibilityIsa() {
       // The ObjC runtime will drop a reference to its magic Protocol class
       // here.
-      Fields.push_back(null());
+      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
     
     void addName() {
@@ -4940,14 +4939,14 @@ namespace {
         Protocol->getDeclaredType()->getCanonicalType());
       name.mangle(mangling);
       auto global = IGM.getAddrOfGlobalString(mangling);
-      Fields.push_back(global);
+      addWord(global);
     }
     
     void addInherited() {
       // If there are no inherited protocols, produce null.
       auto inherited = Protocol->getInheritedProtocols(nullptr);
       if (inherited.empty()) {
-        Fields.push_back(null());
+        addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
         return;
       }
       
@@ -4957,7 +4956,8 @@ namespace {
       inheritedDescriptors.push_back(IGM.getSize(Size(inherited.size())));
       
       for (ProtocolDecl *p : inherited) {
-        auto descriptor = IGM.getAddrOfProtocolDescriptor(p, NotForDefinition);
+        auto descriptor = IGM.getAddrOfProtocolDescriptor(p, NotForDefinition,
+                                                          nullptr);
         inheritedDescriptors.push_back(descriptor);
       }
       
@@ -4970,27 +4970,26 @@ namespace {
       
       llvm::Constant *inheritedVarPtr
         = llvm::ConstantExpr::getBitCast(inheritedVar, IGM.Int8PtrTy);
-      Fields.push_back(inheritedVarPtr);
+      addWord(inheritedVarPtr);
     }
     
     void addObjCCompatibilityTables() {
       // Required instance methods
-      Fields.push_back(null());
+      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
       // Required class methods
-      Fields.push_back(null());
+      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
       // Optional instance methods
-      Fields.push_back(null());
+      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
       // Optional class methods
-      Fields.push_back(null());
+      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
       // Properties
-      Fields.push_back(null());
+      addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
     
     void addSize() {
       // The number of fields so far in words, plus 4 bytes for size and
       // 4 bytes for flags.
-      unsigned sz = (Fields.size() * IGM.getPointerSize()).getValue() + 4 + 4;
-      Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, sz));
+      addConstantInt32(getNextOffset().getValue() + 4 + 4);
     }
     
     void addFlags() {
@@ -5002,14 +5001,31 @@ namespace {
         .withDispatchStrategy(
                 Lowering::TypeConverter::getProtocolDispatchStrategy(Protocol))
         .withSpecialProtocol(getSpecialProtocolID(Protocol));
-      
-      Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
-                                              flags.getIntValue()));
+
+      if (DefaultWitnesses)
+        flags = flags.withResilient(true);
+
+      addConstantInt32(flags.getIntValue());
+    }
+
+    void addDefaultWitnessTable() {
+      // The runtime ignores these fields if the IsResilient flag is not set.
+      if (DefaultWitnesses) {
+        addConstantInt16(DefaultWitnesses->getMinimumWitnessTableSize());
+        addConstantInt16(DefaultWitnesses->getDefaultWitnessTableSize());
+
+        for (auto entry : DefaultWitnesses->getEntries()) {
+          addWord(IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition));
+        }
+      } else {
+        addConstantInt16(0);
+        addConstantInt16(0);
+      }
     }
 
     llvm::Constant *getInit() {
-      return llvm::ConstantStruct::get(IGM.ProtocolDescriptorStructTy,
-                                       Fields);
+      return getInitWithSuggestedType(NumProtocolDescriptorFields,
+                                      IGM.ProtocolDescriptorStructTy);
     }
   };
 } // end anonymous namespace
@@ -5034,13 +5050,15 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
     getObjCProtocolGlobalVars(protocol);
     return;
   }
-  
-  ProtocolDescriptorBuilder builder(*this, protocol);
-  builder.layout();
-  auto init = builder.getInit();
 
+  auto *defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
+  ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
+  builder.layout();
+
+  auto init = builder.getInit();
   auto var = cast<llvm::GlobalVariable>(
-                       getAddrOfProtocolDescriptor(protocol, ForDefinition));
+                       getAddrOfProtocolDescriptor(protocol, ForDefinition,
+                                                   init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
 }
@@ -5055,7 +5073,8 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
                                               ProtocolDecl *protocol) {
   if (!protocol->isObjC())
-    return IGF.IGM.getAddrOfProtocolDescriptor(protocol, NotForDefinition);
+    return IGF.IGM.getAddrOfProtocolDescriptor(protocol, NotForDefinition,
+                                               nullptr);
   
   auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol, NotForDefinition);
   llvm::Value *val

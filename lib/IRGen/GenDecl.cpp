@@ -2519,14 +2519,14 @@ llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
 }
 
 llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
-                                                ForDefinition_t forDefinition) {
+                                                ForDefinition_t forDefinition,
+                                                llvm::Type *definitionType) {
   if (D->isObjC())
     return getAddrOfObjCProtocolRecord(D, forDefinition);
-  
+
   auto entity = LinkEntity::forProtocolDescriptor(D);
-  auto ty = ProtocolDescriptorStructTy;
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(),
-                               forDefinition, ty, DebugTypeInfo());
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definitionType,
+                               ProtocolDescriptorStructTy, DebugTypeInfo());
 }
 
 /// Fetch the declaration of the ivar initializer for the given class.

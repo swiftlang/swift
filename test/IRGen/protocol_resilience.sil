@@ -1,0 +1,70 @@
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public protocol Proto {}
+
+// Protocol is public -- needs resilient witness table
+public protocol ResilientProtocol {
+  associatedtype T : Proto
+  func noDefaultA()
+  func noDefaultB()
+  func defaultC()
+  func defaultD()
+}
+
+sil_default_witness_table Proto 0 {}
+
+// For now, we cannot emit the body of a witness_method function where Self is abstract.
+
+sil public_external @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol, Self.T : Proto> (@in_guaranteed Self) -> ()
+sil public_external @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol, Self.T : Proto> (@in_guaranteed Self) -> ()
+
+/*
+sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol, Self.T : Proto> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol, Self.T : Proto> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+*/
+
+sil_default_witness_table ResilientProtocol 4 {
+  method #ResilientProtocol.defaultC!1: @defaultC
+  method #ResilientProtocol.defaultD!1: @defaultD
+}
+
+// Protocol is not public -- doesn't need default witness table
+protocol InternalProtocol {
+  func f()
+}
+
+// CHECK: @_TMp19protocol_resilience5Proto = constant %swift.protocol {
+// CHECK-SAME:   i32 1031,
+// CHECK-SAME:   i16 0,
+// CHECK-SAME:   i16 0
+// CHECK-SAME: }
+
+// CHECK: @_TMp19protocol_resilience17ResilientProtocol = constant <{{.*}}> <{
+// CHECK-SAME:   i32 1031,
+// CHECK-SAME:   i16 4,
+// CHECK-SAME:   i16 2,
+// CHECK-SAME:   void (%swift.opaque*, %swift.type*)* @defaultC,
+// CHECK-SAME:   void (%swift.opaque*, %swift.type*)* @defaultD  
+// CHECK-SAME: }>
+
+// CHECK: @_TMp19protocol_resilience16InternalProtocol = constant %swift.protocol {
+// CHECK-SAME:   i32 7,
+// CHECK-SAME:   i16 0,
+// CHECK-SAME:   i16 0
+// CHECK-SAME: }

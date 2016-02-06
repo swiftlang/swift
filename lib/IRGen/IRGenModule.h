@@ -796,7 +796,8 @@ public:
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                         llvm::Type *definitionType);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
-                                              ForDefinition_t forDefinition);
+                                              ForDefinition_t forDefinition,
+                                              llvm::Type *definitionType);
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D,

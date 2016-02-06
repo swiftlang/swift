@@ -21,16 +21,19 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: @_TMp17protocol_metadata1A = constant %swift.protocol {
 // -- size 72
 // -- flags: 1 = Swift | 2 = Not Class-Constrained | 4 = Needs Witness Table
-// CHECK:   i32 72, i32 7
+// CHECK:   i32 72, i32 7,
+// CHECK:   i16 0, i16 0
 // CHECK: }
 
 // CHECK: @_TMp17protocol_metadata1B = constant %swift.protocol {
-// CHECK:   i32 72, i32 7
+// CHECK:   i32 72, i32 7,
+// CHECK:   i16 0, i16 0
 // CHECK: }
 
 // CHECK: @_TMp17protocol_metadata1C = constant %swift.protocol {
 // -- flags: 1 = Swift | 4 = Needs Witness Table
-// CHECK:   i32 72, i32 5
+// CHECK:   i32 72, i32 5,
+// CHECK:   i16 0, i16 0
 // CHECK: }
 
 // -- @objc protocol O uses ObjC symbol mangling and layout
@@ -38,6 +41,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
 // -- flags: 1 = Swift
 // CHECK:   i32 80, i32 1
+// CHECK: }
 // CHECK: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
 // CHECK: }
 
@@ -45,9 +49,10 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, { [4 x i8*] }* } {
 // CHECK:   @_PROTOCOL_INSTANCE_METHODS_OPT__TtP17protocol_metadata3OPT_,
 // CHECK:   @_PROTOCOL_CLASS_METHODS_OPT__TtP17protocol_metadata3OPT_,
-// CHECK:   i32 80, i32 1
-// CHECK:   @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata3OPT_
 // -- flags: 1 = Swift
+// CHECK:   i32 80, i32 1
+// CHECK: }
+// CHECK: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata3OPT_
 // CHECK: }
 
 // -- inheritance lists for refined protocols
@@ -59,7 +64,8 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: }
 // CHECK: @_TMp17protocol_metadata2AB = constant %swift.protocol { 
 // CHECK:   [[AB_INHERITED]]
-// CHECK:   i32 72, i32 7
+// CHECK:   i32 72, i32 7,
+// CHECK:   i16 0, i16 0
 // CHECK: }
 
 // CHECK: [[ABO_INHERITED:@.*]] = private constant { {{.*}}* } {
