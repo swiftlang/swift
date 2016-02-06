@@ -519,11 +519,12 @@ deploying against an earlier version of the library.
 Methods and Initializers
 ------------------------
 
-For the most part struct methods and initializers are treated exactly like top-level functions. They permit all of the same modifications and can also
-be marked ``@inlineable``, with the same restrictions.
-
-Initializers declared outside of the struct's module must always delegate to
-another initializer, since new properties may be added between library releases.
+For the most part struct methods and initializers are treated exactly like
+top-level functions. They permit all of the same modifications and can also be
+marked ``@inlineable``, with the same restrictions. Inlineable initializers
+must always delegate to another initializer, since new properties may be added
+between new releases. For the same reason, initializers declared outside of the
+struct's module must always delegate to another initializer.
 
 
 Properties
@@ -648,6 +649,10 @@ generic parameters and members of tuples.
     This name is intentionally awful to encourage us to come up with a better
     one.
 
+An initializer of a fixed-contents struct may be declared ``@inlineable`` even
+if it does not delegate to another initializer, as long as the ``@inlineable``
+attribute is not introduced earlier than the ``@fixed_contents`` attribute.
+
 A ``@fixed_contents`` struct is *not* guaranteed to use the same layout as a C
 struct with a similar "shape". If such a struct is necessary, it should be
 defined in a C header and imported into Swift.
@@ -715,11 +720,21 @@ accommodate new values. More specifically, the following changes are permitted:
     cases added in future versions of a library.
 
 
-Enum Members
+Initializers
 ------------
 
-The rules for enum initializers, methods, and subscripts are identical to those
-for struct members.
+For the most part enum initializers are treated exactly like top-level
+functions. They permit all of the same modifications and can also be marked
+``@inlineable``, with the same restrictions. Unlike struct initializers, enum
+initializers do not always need to delegate to another initializer, even if
+they are ``@inlineable`` or declared in a separate module.
+
+
+Methods and Subscripts
+----------------------
+
+The rules for enum methods and subscripts are identical to those for struct
+members.
 
 
 Closed Enums
@@ -900,8 +915,9 @@ publicly-subclassable class, including marking an existing initializer
 subclasses.
 
 All of the modifications permitted for top-level functions are also permitted
-for class initializers. This includes being marked ``@inlineable``, with the
-same restrictions.
+for class initializers. Convenience initializers may be marked ``@inlineable``,
+with the same restrictions as top-level functions; designated initializers may
+not.
 
 
 Methods
