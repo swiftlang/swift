@@ -626,7 +626,7 @@ ModuleFile::readGroupTable(ArrayRef<uint64_t> Fields, StringRef BlobData) {
     Data += RawSize;
     (*pMap)[I] = RawText;
   }
-  return std::move(pMap);
+  return pMap;
 }
 
 bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
