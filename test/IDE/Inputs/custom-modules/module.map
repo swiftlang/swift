@@ -1,0 +1,4 @@
+module OmitNeedlessWords {
+  export *
+  header "OmitNeedlessWords.h"
+}
