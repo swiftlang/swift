@@ -1189,6 +1189,16 @@ library author may not assume that a client will actually inline the call. It
 is not safe to backdate ``@inlineable`` for a top-level binding, a property, or
 a class initializer.
 
+.. note::
+
+    If we add an "SPI" feature, such that the use of public entities is limited
+    to certain clients, it *will* be safe to change the set of clients, or
+    remove the restriction altogether. In fact, in such cases the library
+    author is *required* to *not* change the availability info that was
+    originally presented for the limited set of clients, since as mentioned
+    above this may affect how those existing clients use the entities declared
+    in the library.
+
 
 Optimization
 ============
