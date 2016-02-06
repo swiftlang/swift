@@ -48,7 +48,6 @@ published should not limit its evolution in the future.
   restructuring are still planned, including:
 
   * A discussion of back-dating, and how it usually is not allowed.
-  * A brief discussion of "deployment files", which represent distribution groupings that are themselves versioned. (For example, OS X 10.10.3 contains Foundation version 1153.20.) Deployment files are likely to provide a concrete implementation of "resilience domains".
 
 Introduction
 ============
@@ -1106,6 +1105,35 @@ a client has the same resilience domain name as a library it is using, it may
 assume that version of the library will be present at runtime.
 
 
+Deployments
+~~~~~~~~~~~
+
+Related to the concept of a resilience domain is a *deployment.* While a
+resilience domain allows related libraries to be compiled more efficiently,
+a deployment groups related libraries together to present semantic version
+information to clients. The simplest example of this might be an OS release:
+OS X 10.10.0 contains Foundation version 1151.16 and AppKit version 1343. A
+deployment thus acts as a "virtual dependency": clients that depend on
+OS X 10.10 can rely on the presence of both of the library versions above.
+
+The use of deployments allows clients to only have to think about aggregate
+dependencies, instead of listing every library they might depend on. It also
+allows library authors to build `many versions of a library`__ within a larger
+release cycle, as well as allowing a vendor to bundle together many libraries
+with uncoordinated release schedules and release them as a logical unit.
+
+__ https://developer.apple.com/library/ios/documentation/Cocoa/Reference/Foundation/Miscellaneous/Foundation_Constants/index.html#//apple_ref/doc/constant_group/Foundation_Framework_Version_Numbers
+
+There are lots of details to figure out here, including how to distribute this
+information. In particular, just like libraries publish the history of their
+own APIs, a deployment must publish the history of their included library
+versions, i.e. not just that OS X 10.10 contains Foundation 1151.16 and AppKit
+1343, but also that OS X 10.9 contains Foundation 1056 and AppKit 1265, and that
+OS X 10.8 contains Foundation 945.0 and AppKit 1187, and so on, back to the
+earliest version of the deployment that is supported.
+
+
+
 Checking Binary Compatibility
 =============================
 
@@ -1163,7 +1191,7 @@ part of this initial model. It is something we may decide to add in the future.
 Summary
 =======
 
-When possible, Swift gives library developers freedom to evolve their code
+When possible, Swift gives library authors freedom to evolve their code
 without breaking binary compatibility. This has implications for both the
 semantics and performance of client code, and so library owners also have tools
 to waive the ability to make certain future changes. The language guarantees
