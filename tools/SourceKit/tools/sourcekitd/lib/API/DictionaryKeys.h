@@ -26,6 +26,7 @@ extern SourceKit::UIdent KeyOffset;
 extern SourceKit::UIdent KeySourceFile;
 extern SourceKit::UIdent KeySourceText;
 extern SourceKit::UIdent KeyModuleName;
+extern SourceKit::UIdent KeyGroupName;
 extern SourceKit::UIdent KeyNotification;
 extern SourceKit::UIdent KeyKeyword;
 extern SourceKit::UIdent KeyName;

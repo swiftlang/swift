@@ -1112,6 +1112,8 @@ static void reportCursorInfo(StringRef Filename,
       Elem.set(KeyAnnotatedDecl, Info.AnnotatedDeclaration);
     if (!Info.ModuleName.empty())
       Elem.set(KeyModuleName, Info.ModuleName);
+    if (!Info.GroupName.empty())
+      Elem.set(KeyGroupName, Info.GroupName);
     if (!Info.ModuleInterfaceName.empty())
       Elem.set(KeyModuleInterfaceName, Info.ModuleInterfaceName);
     if (Info.DeclarationLoc.hasValue()) {

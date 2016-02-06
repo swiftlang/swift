@@ -34,6 +34,7 @@ var x: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: Int.Type
 // CHECK1-NEXT: Swift{{$}}
+// CHECK1-NEXT: <Group>FixedPoint</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
 // CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps17SignedIntegerType">SignedIntegerType</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>

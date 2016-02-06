@@ -138,6 +138,8 @@ public:
 
   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D) const override;
 
+  Optional<StringRef> getGroupNameForDecl(const Decl *D) const override;
+
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void

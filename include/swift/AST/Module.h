@@ -670,6 +670,11 @@ public:
     return None;
   }
 
+  virtual Optional<StringRef>
+  getGroupNameForDecl(const Decl *D) const {
+    return None;
+  }
+
   /// Returns an implementation-defined "discriminator" for \p D, which
   /// distinguishes \p D from other declarations in the same module with the
   /// same name.

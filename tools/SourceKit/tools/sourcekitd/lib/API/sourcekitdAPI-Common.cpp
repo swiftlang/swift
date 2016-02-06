@@ -39,6 +39,7 @@ UIdent sourcekitd::KeyOffset("key.offset");
 UIdent sourcekitd::KeySourceFile("key.sourcefile");
 UIdent sourcekitd::KeySourceText("key.sourcetext");
 UIdent sourcekitd::KeyModuleName("key.modulename");
+UIdent sourcekitd::KeyGroupName("key.groupname");
 UIdent sourcekitd::KeyNotification("key.notification");
 UIdent sourcekitd::KeyKeyword("key.keyword");
 UIdent sourcekitd::KeyName("key.name");

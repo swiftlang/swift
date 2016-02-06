@@ -810,6 +810,8 @@ public:
   /// \returns the unparsed comment attached to this declaration.
   RawComment getRawComment() const;
 
+  Optional<StringRef> getGroupName() const;
+
   /// \returns the brief comment attached to this declaration.
   StringRef getBriefComment() const;
 

@@ -1533,7 +1533,7 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
 }
 
 Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) {
-  if(GroupNamesMap || GroupNamesMap->count(Id) == 0)
+  if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
     return None;
   auto Group = (*GroupNamesMap)[Id];
   if (Group.empty())

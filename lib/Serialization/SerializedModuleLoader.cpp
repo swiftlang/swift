@@ -489,6 +489,11 @@ SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
 
+Optional<StringRef>
+SerializedASTFile::getGroupNameForDecl(const Decl *D) const {
+  return File.getGroupNameForDecl(D);
+}
+
 void
 SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);

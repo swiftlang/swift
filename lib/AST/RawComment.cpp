@@ -161,6 +161,18 @@ RawComment Decl::getRawComment() const {
   return RawComment();
 }
 
+Optional<StringRef> Decl::getGroupName() const {
+
+  // We can only get group information from deserialized module files.
+  if (auto *Unit =
+      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    if (auto Op = Unit->getGroupNameForDecl(this)) {
+      return Op;
+    }
+  }
+  return None;
+}
+
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
                                      const Decl *D) {
   PrettyStackTraceDecl StackTrace("extracting brief comment for", D);

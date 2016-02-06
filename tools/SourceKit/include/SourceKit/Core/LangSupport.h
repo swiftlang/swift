@@ -274,6 +274,7 @@ struct CursorInfo {
   StringRef TypeName;
   StringRef DocComment;
   StringRef TypeInterface;
+  StringRef GroupName;
   /// Annotated XML pretty printed declaration.
   StringRef AnnotatedDeclaration;
   /// Non-empty if the symbol was imported from a clang module.
