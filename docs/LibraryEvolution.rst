@@ -1050,7 +1050,7 @@ following changes are permitted:
     initializers to classes? Are they inherently convenience initializers?
 
     What about everything else? New members in protocols can result in new
-    overrideable members in classes. How does that work?
+    overridable members in classes. How does that work?
 
 
 Operators
