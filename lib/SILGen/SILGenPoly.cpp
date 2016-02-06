@@ -1271,7 +1271,8 @@ static SILValue getThunkResult(SILGenFunction &gen,
       // If we emitted directly, there's nothing more to do.
       // Let the caller claim the result.
       assert(inputResultSubstType == outputResultSubstType);
-      innerResult.forwardCleanup(gen);
+      if (!innerResultTL.isTrivial())
+        innerResult.forwardCleanup(gen);
       innerResult = {};
     } else {
       // Otherwise we'll have to copy over.
@@ -1759,39 +1760,38 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
   return false;
 }
 
-static SILValue getWitnessFunctionRef(SILGenFunction &gen,
-                                      ProtocolConformance *conformance,
-                                      SILDeclRef witness,
-                                      bool isFree,
-                                   SmallVectorImpl<ManagedValue> &witnessParams,
-                                   SILLocation loc) {
-  SILGenModule &SGM = gen.SGM;
-  
+enum class WitnessDispatchKind {
+  Static,
+  Dynamic,
+  Class
+};
+
+static WitnessDispatchKind
+getWitnessDispatchKind(ProtocolConformance *conformance,
+                       SILDeclRef witness,
+                       bool isFree) {
   // Free functions are always statically dispatched...
   if (isFree)
-    return gen.emitGlobalFunctionRef(loc, witness);
+    return WitnessDispatchKind::Static;
 
   // If we have a non-class, non-objc method or a class, objc method that is
   // final, we do not dynamic dispatch.
   ClassDecl *C = conformance->getType()->getClassOrBoundGenericClass();
   if (!C)
-    return gen.emitGlobalFunctionRef(loc, witness);
+    return WitnessDispatchKind::Static;
 
-  bool isFinal = C->isFinal();
-  bool isExtension = false;
-
-  isFinal |= witness.getDecl()->isFinal();
-  if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
-    isFinal |= fnDecl->hasForcedStaticDispatch();
-    
-  if (DeclContext *dc = witness.getDecl()->getDeclContext())
-    isExtension = isa<ExtensionDecl>(dc);
+  auto *decl = witness.getDecl();
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (witness.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
-    return gen.emitDynamicMethodRef(loc, witness,
-                                    SGM.Types.getConstantInfo(witness));
-  
+  if (decl->getAttrs().hasAttribute<DynamicAttr>())
+    return WitnessDispatchKind::Dynamic;
+
+  bool isFinal = (decl->isFinal() || C->isFinal());
+  if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
+    isFinal |= fnDecl->hasForcedStaticDispatch();
+
+  bool isExtension = isa<ExtensionDecl>(decl->getDeclContext());
+
   // If we have a final method or a method from an extension that is not
   // objective c, emit a static reference.
   // A natively ObjC method witness referenced this way will end up going
@@ -1799,13 +1799,44 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
   // bridging just like we want.
   if (isFinal || isExtension || witness.isForeignToNativeThunk()
       // Hack--We emit a static thunk for ObjC allocating constructors.
-      || (witness.getDecl()->hasClangNode()
-          && witness.kind == SILDeclRef::Kind::Allocator))
-    return gen.emitGlobalFunctionRef(loc, witness);
+      || (decl->hasClangNode() && witness.kind == SILDeclRef::Kind::Allocator))
+    return WitnessDispatchKind::Static;
 
   // Otherwise emit a class method.
-  SILValue selfPtr = witnessParams.back().getValue();
-  return gen.B.createClassMethod(loc, selfPtr, witness);
+  return WitnessDispatchKind::Class;
+}
+
+static CanSILFunctionType
+getWitnessFunctionType(SILGenModule &SGM,
+                       SILDeclRef witness,
+                       WitnessDispatchKind witnessKind) {
+  switch (witnessKind) {
+  case WitnessDispatchKind::Static:
+  case WitnessDispatchKind::Dynamic:
+    return SGM.Types.getConstantInfo(witness).SILFnType;
+  case WitnessDispatchKind::Class:
+    return SGM.Types.getConstantOverrideType(witness);
+  }
+}
+
+static SILValue
+getWitnessFunctionRef(SILGenFunction &gen,
+                      SILDeclRef witness,
+                      WitnessDispatchKind witnessKind,
+                      SmallVectorImpl<ManagedValue> &witnessParams,
+                      SILLocation loc) {
+  SILGenModule &SGM = gen.SGM;
+
+  switch (witnessKind) {
+  case WitnessDispatchKind::Static:
+    return gen.emitGlobalFunctionRef(loc, witness);
+  case WitnessDispatchKind::Dynamic:
+    return gen.emitDynamicMethodRef(loc, witness,
+                                    SGM.Types.getConstantInfo(witness));
+  case WitnessDispatchKind::Class:
+    SILValue selfPtr = witnessParams.back().getValue();
+    return gen.B.createClassMethod(loc, selfPtr, witness);
+  }
 }
 
 static CanType dropLastElement(CanType type) {
@@ -1818,6 +1849,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                          SILDeclRef witness,
                                          ArrayRef<Substitution> witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
+  auto witnessKind = getWitnessDispatchKind(conformance, witness, isFree);
+
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -1920,86 +1953,48 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     }
   }
 
-  TranslateArguments(*this, loc,
-                     origParams, witnessParams,
-                     witnessSubstFTy->getParametersWithoutIndirectResult())
-    .translate(reqtOrigInputTy,
-               reqtSubstInputTy,
-               AbstractionPattern(witnessSubstInputTy),
-               witnessSubstInputTy);
-
-  // Create an indirect result buffer if needed.
-  SILValue witnessSubstResultAddr
-    = getThunkInnerResultAddr(*this, loc, witnessSubstFTy, reqtResultAddr);
-  
-  SILValue witnessFnRef = getWitnessFunctionRef(*this, conformance,
-                                                witness, isFree,
-                                                witnessParams, loc);
-
-  auto witnessFTy = witnessFnRef->getType().getAs<SILFunctionType>();
-  
+  auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
   if (!witnessSubs.empty())
     witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
                                               witnessSubs);
 
-  auto witnessSILTy = SILType::getPrimitiveObjectType(witnessFTy);
-
-  // If the witness is generic, re-abstract to its original signature.
-  // TODO: Implement some sort of "abstraction path" mechanism to efficiently
-  // compose these two abstraction changes.
-  // Invoke the witness function calling a class method if we have a class and
-  // calling the static function otherwise.
-  // TODO: Collect forwarding substitutions from outer context of method.
-
-  auto witnessResultAddr = witnessSubstResultAddr;
-  AbstractionPattern witnessOrigTy(witnessInfo.LoweredInterfaceType);
-  if (witnessFTy != witnessSubstFTy) {
-    SmallVector<ManagedValue, 8> genParams;
-    TranslateArguments(*this, loc,
-                       witnessParams, genParams,
-                       witnessFTy->getParametersWithoutIndirectResult())
-      .translate(AbstractionPattern(witnessSubstInputTy),
-                 witnessSubstInputTy,
-                 witnessOrigTy.getFunctionInputType(),
-                 witnessSubstInputTy);
-    witnessParams = std::move(genParams);
-    
-    witnessResultAddr
-      = getThunkInnerResultAddr(*this, loc, witnessFTy, witnessSubstResultAddr);
-  }
+  // Create an indirect result buffer if needed.
+  SILValue witnessResultAddr
+    = getThunkInnerResultAddr(*this, loc, witnessFTy, reqtResultAddr);
   
+  AbstractionPattern witnessOrigTy(witnessInfo.LoweredInterfaceType);
+  TranslateArguments(*this, loc,
+                     origParams, witnessParams,
+                     witnessFTy->getParametersWithoutIndirectResult())
+    .translate(reqtOrigInputTy,
+               reqtSubstInputTy,
+               witnessOrigTy.getFunctionInputType(),
+               witnessSubstInputTy);
+
+  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness, witnessKind,
+                                                witnessParams, loc);
+
   // Collect the arguments.
   SmallVector<SILValue, 8> args;
   if (witnessResultAddr)
     args.push_back(witnessResultAddr);
   forwardFunctionArguments(*this, loc, witnessFTy, witnessParams, args);
   
+  auto witnessSILTy = SILType::getPrimitiveObjectType(witnessFTy);
   SILValue witnessResultValue =
     emitApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs, args);
 
   // Reabstract the result value:
   
-  // If the witness is generic, reabstract to the concrete witness signature.
-  if (witnessFTy != witnessSubstFTy) {
-    witnessResultValue = getThunkResult(*this, loc,
-                                        witnessFTy,
-                                        witnessOrigTy.getFunctionResultType(),
-                                        witnessSubstTy.getResult(),
-                                        AbstractionPattern(witnessSubstTy.getResult()), // XXX ugly
-                                        witnessSubstTy.getResult(),
-                                        witnessResultValue,
-                                        witnessResultAddr,
-                                        witnessSubstResultAddr);
-  }
   // Reabstract to the original requirement signature.
   SILValue reqtResultValue = getThunkResult(*this, loc,
-                                            witnessSubstFTy,
-                                            AbstractionPattern(witnessSubstTy.getResult()), // XXX ugly
+                                            witnessFTy,
+                                            witnessOrigTy.getFunctionResultType(),
                                             witnessSubstTy.getResult(),
                                             reqtOrigTy.getFunctionResultType(),
                                             reqtSubstResultTy,
                                             witnessResultValue,
-                                            witnessSubstResultAddr,
+                                            witnessResultAddr,
                                             reqtResultAddr);
 
   scope.pop();
