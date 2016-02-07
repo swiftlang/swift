@@ -224,8 +224,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       return true;
 
     auto seqI = seq->begin(), seqE = seq->end();
-    // FIXME: operator== is not implemented.
-    if (!(seqI != seqE))
+    if (seqI == seqE)
       return true;
 
     auto *secondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
@@ -236,8 +235,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       return true;
 
     ++seqI;
-    // FIXME: operator== is not implemented.
-    if (!(seqI != seqE))
+    if (seqI == seqE)
       return true;
 
     auto *nanosecondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
