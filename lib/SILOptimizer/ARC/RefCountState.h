@@ -338,7 +338,7 @@ public:
   /// Initialize the state given the consumed argument Arg.
   void initWithArg(SILArgument *Arg);
 
-  /// Initiailize this RefCountState with an instruction which introduces a new
+  /// Initialize this RefCountState with an instruction which introduces a new
   /// ref count at +1.
   void initWithEntranceInst(SILInstruction *I, SILValue RCIdentity);
 
