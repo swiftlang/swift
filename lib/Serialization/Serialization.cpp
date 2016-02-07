@@ -3475,28 +3475,39 @@ public:
 } // end unnamed namespace
 
 class DeclGroupNameContext {
-  const bool Enable;
-  const std::string NullGroupName = "";
+  struct GroupNameCollector {
+    const std::string NullGroupName = "";
+    const bool Enable;
+    GroupNameCollector(bool Enable) : Enable(Enable) {}
+    virtual ~GroupNameCollector() = default;
+    virtual StringRef getGroupNameInternal(const ValueDecl *VD) = 0;
+    StringRef getGroupName(const ValueDecl *VD) {
+      return Enable ? getGroupNameInternal(VD) : StringRef(NullGroupName);
+    };
+  };
+
+  // FIXME: Implement better name collectors.
+  struct GroupNameCollectorFromFileName : public GroupNameCollector {
+    GroupNameCollectorFromFileName(bool Enable) : GroupNameCollector(Enable) {}
+    StringRef getGroupNameInternal(const ValueDecl *VD) override {
+      auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
+      if (!PathOp.hasValue())
+        return NullGroupName;
+      return llvm::sys::path::stem(StringRef(VD->getASTContext().SourceMgr.
+        getIdentifierForBuffer(PathOp.getValue())));
+    }
+  };
+
   llvm::MapVector<StringRef, unsigned> Map;
   std::vector<StringRef> ViewBuffer;
-
-  StringRef getDeclGroupName(const ValueDecl *VD) {
-    if (!Enable)
-      return NullGroupName;
-    auto PathOp = VD-> getDeclContext()->getParentSourceFile()->getBufferID();
-    if (!PathOp.hasValue())
-      return NullGroupName;
-    // FIXME: Collect group name from better places.
-    StringRef FullPath(VD->getASTContext().SourceMgr.
-      getIdentifierForBuffer(PathOp.getValue()));
-    return llvm::sys::path::stem(FullPath);
-  }
+  std::unique_ptr<GroupNameCollector> pNameCollector;
 
 public:
-  DeclGroupNameContext(bool Enable) : Enable(Enable) {}
+  DeclGroupNameContext(bool Enable) :
+    pNameCollector(new GroupNameCollectorFromFileName(Enable)) {}
   uint32_t getGroupSequence(const ValueDecl *VD) {
-    return Map.insert(std::make_pair(getDeclGroupName(VD), Map.size())).
-      first->second;
+    return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
+                                     Map.size())).first->second;
   }
 
   ArrayRef<StringRef> getOrderedGroupNames() {
