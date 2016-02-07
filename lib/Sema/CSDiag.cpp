@@ -1121,9 +1121,8 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         continue;
       
       // FIXME: Right now, a "matching" overload is one with a parameter whose
-      // type is identical to the argument type, or substitutable via
-      // rudimentary handling of functions with a single archetype in one or
-      // more parameters.
+      // type is identical to the argument type, or substitutable via handling
+      // of functions with a single archetype in one or more parameters.
       // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?
 
@@ -1151,13 +1150,9 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
             if (nonSubstitutableArgs == 0)
               continue;
             ++nonSubstitutableArgs;
-            // Fallthrough, this is nonsubstitutable, so mismatches as well.
+            mismatchesAreNearMisses = false;
           } else {
-            if (nonSubstitutableArgs == 0) {
-              paramType = matchingArgType;
-              // Fallthrough as mismatched arg, comparing nearness to archetype
-              // bound type.
-            } else if (nonSubstitutableArgs == 1) {
+            if (nonSubstitutableArgs == 1) {
               // If we have only one nonSubstitutableArg so far, then this different
               // type might be the one that we should be substituting for instead.
               // Note that failureInfo is already set correctly for that case.
@@ -1167,23 +1162,37 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
                 continue;
               }
             }
+            
+            // This substitution doesn't match a previous substitution. Set up the nearMiss
+            // and failureInfo.paramType with the expected substitution inserted.
+            // (Note that this transform assumes only a single archetype.)
+            mismatchesAreNearMisses &= argumentMismatchIsNearMiss(substitution, matchingArgType);
+            paramType = paramType.transform(([&](Type type) -> Type {
+              if (type->is<SubstitutableType>())
+                return matchingArgType;
+              return type;
+            }));
           }
         } else {
           matchingArgType = substitution;
           singleArchetype = archetype;
 
-          if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
+          if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC))
             continue;
-          }
+          
+          if (auto argOptType = argType->getOptionalObjectType())
+            mismatchesAreNearMisses &= CS->TC.isSubstitutableFor(argOptType, archetype, CS->DC);
+          else
+            mismatchesAreNearMisses = false;
           ++nonSubstitutableArgs;
         }
+      } else {
+        // Keep track of whether this argument was a near miss or not.
+        mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
       }
       
       ++mismatchingArgs;
-      
-      // Keep track of whether this argument was a near miss or not.
-      mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
-      
+
       failureInfo.argumentNumber = argNo;
       failureInfo.parameterType = paramType;
       if (paramType->hasTypeParameter())
@@ -1196,7 +1205,8 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
-  if (candArgs[0].Ty->is<InOutType>() && !actualArgs[0].Ty->isLValueType())
+  Type firstArg = actualArgs[0].Ty;
+  if (candArgs[0].Ty->is<InOutType>() && !(firstArg->isLValueType() || firstArg->is<InOutType>()))
     return { CC_NonLValueInOut, {}};
   
   // If we have exactly one argument mismatching, classify it specially, so that
@@ -1588,14 +1598,28 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
 
   for (unsigned i = 0, c = archetypes.size(); i < c; i++) {
     auto archetype = archetypes[i];
-    auto argType = substitutions[i];
+    auto substitution = substitutions[i];
     
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
+
+    // Check for optional near miss.
+    if (auto argOptType = substitution->getOptionalObjectType()) {
+      if (CS->TC.isSubstitutableFor(argOptType, archetype, CS->DC)) {
+        CS->TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional, argType);
+        foundFailure = true;
+        continue;
+      }
+    }
     
     for (auto proto : archetype->getConformsTo()) {
-      if (!CS->TC.conformsToProtocol(argType, proto, CS->DC, ConformanceCheckOptions(TR_InExpression))) {
-        CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
-                        argType, proto->getDeclaredType());
+      if (!CS->TC.conformsToProtocol(substitution, proto, CS->DC, ConformanceCheckOptions(TR_InExpression))) {
+        if (substitution->isEqual(argType)) {
+          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
+                          substitution, proto->getDeclaredType());
+        } else {
+          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_partial_argument_value_protocol,
+                          argType, substitution, proto->getDeclaredType());
+        }
         foundFailure = true;
       }
     }
@@ -1647,7 +1671,11 @@ enum TCCFlags {
   /// Re-type-check the given subexpression even if the expression has already
   /// been checked already.  The client is asserting that infinite recursion is
   /// not possible because it has relaxed a constraint on the system.
-  TCC_ForceRecheck = 0x02
+  TCC_ForceRecheck = 0x02,
+    
+  /// tell typeCheckExpression that it is ok to produce an ambiguous result,
+  /// it can just fill in holes with UnresolvedType and we'll deal with it.
+  TCC_AllowUnresolvedTypeVariables = 0x04
 };
 
 typedef OptionSet<TCCFlags> TCCOptions;
@@ -1716,7 +1744,8 @@ public:
 
   /// Special magic to handle inout exprs and tuples in argument lists.
   Expr *typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
-                                        const CalleeCandidateInfo &candidates);
+                                        const CalleeCandidateInfo &candidates,
+                                            TCCOptions options = TCCOptions());
 
   /// Diagnose common failures due to applications of an argument list to an
   /// ApplyExpr or SubscriptExpr.
@@ -2781,7 +2810,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // If there is no contextual type available, tell typeCheckExpression that it
   // is ok to produce an ambiguous result, it can just fill in holes with
   // UnresolvedType and we'll deal with it.
-  if (!convertType)
+  if (!convertType || options.contains(TCC_AllowUnresolvedTypeVariables))
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
@@ -3169,7 +3198,8 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 /// Special magic to handle inout exprs and tuples in argument lists.
 Expr *FailureDiagnosis::
 typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
-                                    const CalleeCandidateInfo &candidates) {
+                                    const CalleeCandidateInfo &candidates,
+                                    TCCOptions options) {
   // Grab one of the candidates (if present) and get its input list to help
   // identify operators that have implicit inout arguments.
   Type exampleInputType;
@@ -3203,7 +3233,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   if (!TE) {
     // If the argument isn't a tuple, it is some scalar value for a
     // single-argument call.
-    TCCOptions options;
     if (exampleInputType && exampleInputType->is<InOutType>())
       options |= TCC_AllowLValue;
 
@@ -3276,7 +3305,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
         unsigned inArgNo = sources[i];
         auto actualType = argTypeTT->getElementType(i);
 
-        TCCOptions options;
         if (actualType->is<InOutType>())
           options |= TCC_AllowLValue;
 
@@ -3341,7 +3369,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     exampleInputTuple = exampleInputType->getAs<TupleType>();
 
   for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-    TCCOptions options;
     if (exampleInputTuple && i < exampleInputTuple->getNumElements() &&
         exampleInputTuple->getElementType(i)->is<InOutType>())
       options |= TCC_AllowLValue;
@@ -3761,17 +3788,16 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
       badArgExpr = argExpr;
     }
 
+    // It could be that the argument doesn't conform to an archetype.
+    if (CCI.diagnoseGenericParameterErrors(badArgExpr))
+      return true;
+    
     // Re-type-check the argument with the expected type of the candidate set.
     // This should produce a specific and tailored diagnostic saying that the
     // type mismatches with expectations.
     Type paramType = CCI.failedArgument.parameterType;
     if (!typeCheckChildIndependently(badArgExpr, paramType,
                                      CTP_CallArgument, options))
-      return true;
-
-    // If that fails, it could be that the argument doesn't conform to an
-    // archetype.
-    if (CCI.diagnoseGenericParameterErrors(badArgExpr))
       return true;
   }
   
@@ -4059,8 +4085,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
-  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(),
-                                                     argType, calleeInfo);
+  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(), argType,
+                                                     calleeInfo,
+                                                     TCC_AllowUnresolvedTypeVariables);
   if (!argExpr)
     return true; // already diagnosed.
 
@@ -4069,6 +4096,14 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr))
     return true;
 
+  // Force recheck of the arg expression because we allowed unresolved types
+  // before, and that turned out not to help, and now we want any diagnoses
+  // from disallowing them.
+  argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(), argType,
+                                                calleeInfo, TCC_ForceRecheck);
+  if (!argExpr)
+    return true; // already diagnosed.
+  
   // Diagnose some simple and common errors.
   if (calleeInfo.diagnoseSimpleErrors(callExpr->getLoc()))
     return true;
