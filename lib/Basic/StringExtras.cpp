@@ -920,6 +920,7 @@ static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
 /// Split the base name, if it makes sense.
 static bool splitBaseName(StringRef &baseName, StringRef &argName,
                           const OmissionTypeName &paramType,
+                          StringRef paramName,
                           StringScratchSpace &scratch) {
   // If there is already an argument label, do nothing.
   if (!argName.empty()) return false;
@@ -931,6 +932,16 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
     argName = "animated";
     return true;
   }
+
+  // Don't split anything that starts with "set".
+  if (camel_case::getFirstWord(baseName) == "set")
+    return false;
+
+  // Don't split a method that looks like an action (with a "sender"
+  // of type AnyObject).
+  if (paramName == "sender" &&
+      camel_case::getLastWord(paramType.Name) == "Object")
+    return false;
 
   // Try splitting after the last preposition.
   if (splitBaseNameAfterLastPreposition(baseName, argName, paramType, scratch))
@@ -1013,7 +1024,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // If needed, split the base name.
   if (!argNames.empty() &&
-      splitBaseName(baseName, argNames[0], paramTypes[0], scratch))
+      splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName,
+                    scratch))
     anyChanges = true;
 
   // Omit needless words based on parameter types.
