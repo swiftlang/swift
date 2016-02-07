@@ -9,3 +9,4 @@
 // RUN: %check-in-clang -Wno-documentation %t/comments.h
 
 // REQUIRES: objc_interop
+// REQUIRES: no_asan

@@ -1,6 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=T1 | FileCheck %s -check-prefix=T1
 
 // REQUIRES: objc_interop
+// REQUIRES: no_asan
 
 // FIXME: iOS has no Cocoa.framework
 // REQUIRES: OS=macosx
