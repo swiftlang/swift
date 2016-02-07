@@ -184,6 +184,66 @@ static inline bool isCastNewProjectionKind(NewProjectionKind Kind) {
   }
 }
 
+/// Given a SIL value, capture its element index and the value of the aggregate
+/// that immediately contains it.
+///
+/// This lightweight utility maps a SIL address projection to an index.
+struct NewProjectionIndex {
+  SILValue Aggregate;
+  unsigned Index;
+
+  explicit NewProjectionIndex(SILValue V) :Index(~0U) {
+    switch (V->getKind()) {
+    default:
+      break;
+    case ValueKind::IndexAddrInst: {
+      IndexAddrInst *IA = cast<IndexAddrInst>(V);
+      if (getIntegerIndex(IA->getIndex(), Index))
+        Aggregate = IA->getBase();
+      break;
+    }
+    case ValueKind::StructElementAddrInst: {
+      StructElementAddrInst *SEA = cast<StructElementAddrInst>(V);
+      Index = SEA->getFieldNo();
+      Aggregate = SEA->getOperand();
+      break;
+    }
+    case ValueKind::RefElementAddrInst: {
+      RefElementAddrInst *REA = cast<RefElementAddrInst>(V);
+      Index = REA->getFieldNo();
+      Aggregate = REA->getOperand();
+      break;
+    }
+    case ValueKind::ProjectBoxInst: {
+      ProjectBoxInst *PBI = cast<ProjectBoxInst>(V);
+      // A box has only a single payload.
+      Index = 0;
+      Aggregate = PBI->getOperand();
+      break;
+    }
+    case ValueKind::TupleElementAddrInst: {
+      TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
+      Index = TEA->getFieldNo();
+      Aggregate = TEA->getOperand();
+      break;
+    }
+    case ValueKind::StructExtractInst: {
+      StructExtractInst *SEA = cast<StructExtractInst>(V);
+      Index = SEA->getFieldNo();
+      Aggregate = SEA->getOperand();
+      break;
+    }
+    case ValueKind::TupleExtractInst: {
+      TupleExtractInst *TEA = cast<TupleExtractInst>(V);
+      Index = TEA->getFieldNo();
+      Aggregate = TEA->getOperand();
+      break;
+    }
+    }
+  }
+  bool isValid() const { return (bool)Aggregate; }
+};
+
 /// An abstract representation of the index of a subtype of an aggregate
 /// type. This is a value type.
 ///
