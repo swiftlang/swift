@@ -3477,7 +3477,7 @@ public:
 class DeclGroupNameContext {
   const bool Enable;
   const std::string NullGroupName = "";
-  llvm::StringMap<unsigned> Map;
+  llvm::MapVector<StringRef, unsigned> Map;
   std::vector<StringRef> ViewBuffer;
 
   StringRef getDeclGroupName(const ValueDecl *VD) {
@@ -3495,22 +3495,15 @@ class DeclGroupNameContext {
 public:
   DeclGroupNameContext(bool Enable) : Enable(Enable) {}
   uint32_t getGroupSequence(const ValueDecl *VD) {
-    auto Name = getDeclGroupName(VD);
-    if (Map.count(Name) == 0) {
-      Map[Name] = Map.size();
-    }
-    return Map[Name];
+    return Map.insert(std::make_pair(getDeclGroupName(VD), Map.size())).
+      first->second;
   }
 
   ArrayRef<StringRef> getOrderedGroupNames() {
     ViewBuffer.clear();
     for(auto It = Map.begin(); It != Map.end(); ++ It) {
-      ViewBuffer.push_back(It->first());
+      ViewBuffer.push_back(It->first);
     }
-    std::sort(ViewBuffer.begin(), ViewBuffer.end(),
-              [&](StringRef L, StringRef R) {
-                return Map[L] < Map[R];
-              });
     return llvm::makeArrayRef(ViewBuffer);
   }
 };
