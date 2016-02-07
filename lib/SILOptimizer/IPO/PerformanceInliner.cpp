@@ -132,12 +132,12 @@ namespace {
     // Returns the base address, i.e. the first address which is not a
     // projection.
     SILValue scanProjections(SILValue addr,
-                             SmallVectorImpl<Projection> *Result = nullptr);
+                             SmallVectorImpl<NewProjection> *Result = nullptr);
     
     // Get the stored value for a load. The loadInst can be either a real load
     // or a copy_addr.
     SILValue getStoredValue(SILInstruction *loadInst,
-                            ProjectionPath &projStack);
+                            NewProjectionPath &projStack);
 
     // Gets the parameter in the caller for a function argument.
     SILValue getParam(SILValue value) {
@@ -162,7 +162,7 @@ namespace {
     }
     
     // Gets the estimated definition of a value.
-    SILInstruction *getDef(SILValue val, ProjectionPath &projStack);
+    SILInstruction *getDef(SILValue val, NewProjectionPath &projStack);
 
     // Gets the estimated integer constant result of a builtin.
     IntConst getBuiltinConst(BuiltinInst *BI, int depth);
@@ -191,7 +191,7 @@ namespace {
     
     // Gets the estimated definition of a value.
     SILInstruction *getDef(SILValue val) {
-      ProjectionPath projStack;
+      NewProjectionPath projStack(val->getType());
       return getDef(val, projStack);
     }
     
@@ -287,13 +287,12 @@ void ConstantTracker::trackInst(SILInstruction *inst) {
 }
 
 SILValue ConstantTracker::scanProjections(SILValue addr,
-                                          SmallVectorImpl<Projection> *Result) {
+                                      SmallVectorImpl<NewProjection> *Result) {
   for (;;) {
-    if (Projection::isAddrProjection(addr)) {
+    if (NewProjection::isAddressProjection(addr)) {
       SILInstruction *I = cast<SILInstruction>(addr);
       if (Result) {
-        Optional<Projection> P = Projection::addressProjectionForInstruction(I);
-        Result->push_back(P.getValue());
+        Result->push_back(NewProjection(I));
       }
       addr = I->getOperand(0);
       continue;
@@ -309,7 +308,7 @@ SILValue ConstantTracker::scanProjections(SILValue addr,
 }
 
 SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
-                                  ProjectionPath &projStack) {
+                                         NewProjectionPath &projStack) {
   SILInstruction *store = links[loadInst];
   if (!store && callerTracker)
     store = callerTracker->links[loadInst];
@@ -318,18 +317,18 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
   assert(isa<LoadInst>(loadInst) || isa<CopyAddrInst>(loadInst));
 
   // Push the address projections of the load onto the stack.
-  SmallVector<Projection, 4> loadProjections;
+  SmallVector<NewProjection, 4> loadProjections;
   scanProjections(loadInst->getOperand(0), &loadProjections);
-  for (const Projection &proj : loadProjections) {
+  for (const NewProjection &proj : loadProjections) {
     projStack.push_back(proj);
   }
   
   //  Pop the address projections of the store from the stack.
-  SmallVector<Projection, 4> storeProjections;
+  SmallVector<NewProjection, 4> storeProjections;
   scanProjections(store->getOperand(1), &storeProjections);
   for (auto iter = storeProjections.rbegin(); iter != storeProjections.rend();
        ++iter) {
-    const Projection &proj = *iter;
+    const NewProjection &proj = *iter;
     // The corresponding load-projection must match the store-projection.
     if (projStack.empty() || projStack.back() != proj)
       return SILValue();
@@ -346,23 +345,23 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
 }
 
 // Get the aggregate member based on the top of the projection stack.
-static SILValue getMember(SILInstruction *inst, ProjectionPath &projStack) {
+static SILValue getMember(SILInstruction *inst, NewProjectionPath &projStack) {
   if (!projStack.empty()) {
-    const Projection &proj = projStack.back();
+    const NewProjection &proj = projStack.back();
     return proj.getOperandForAggregate(inst);
   }
   return SILValue();
 }
 
 SILInstruction *ConstantTracker::getDef(SILValue val,
-                                          ProjectionPath &projStack) {
+                                        NewProjectionPath &projStack) {
   
   // Track the value up the dominator tree.
   for (;;) {
     if (SILInstruction *inst = dyn_cast<SILInstruction>(val)) {
-      if (auto proj = Projection::valueProjectionForInstruction(inst)) {
+      if (NewProjection::isObjectProjection(inst)) {
         // Extract a member from a struct/tuple/enum.
-        projStack.push_back(proj.getValue());
+        projStack.push_back(NewProjection(inst));
         val = inst->getOperand(0);
         continue;
       } else if (SILValue member = getMember(inst, projStack)) {

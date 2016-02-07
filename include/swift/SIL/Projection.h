@@ -342,6 +342,11 @@ public:
     return !(*this == Other);
   }
 
+  /// Returns the operand of a struct, tuple or enum instruction which is
+  /// associated with this projection. Returns an invalid SILValue if \p I is
+  /// not a matching aggregate instruction.
+  SILValue getOperandForAggregate(SILInstruction *I) const;
+
   /// Convenience method for getting the raw underlying kind.
   NewProjectionKind getKind() const { return *Value.getKind(); }
 
@@ -372,6 +377,7 @@ public:
       return false;
     case ValueKind::StructExtractInst:
     case ValueKind::TupleExtractInst:
+    case ValueKind::UncheckedEnumDataInst:
       return true;
     }
   }

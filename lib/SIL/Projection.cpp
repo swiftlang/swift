@@ -1548,6 +1548,39 @@ createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
   return nullptr;
 }
 
+SILValue NewProjection::getOperandForAggregate(SILInstruction *I) const {
+  switch (getKind()) {
+    case NewProjectionKind::Struct:
+      if (isa<StructInst>(I))
+        return I->getOperand(getIndex());
+      break;
+    case NewProjectionKind::Tuple:
+      if (isa<TupleInst>(I))
+        return I->getOperand(getIndex());
+      break;
+    case NewProjectionKind::Index:
+      break;
+    case NewProjectionKind::Enum:
+      if (EnumInst *EI = dyn_cast<EnumInst>(I)) {
+        if (EI->getElement() == getEnumElementDecl(I->getType())) {
+          assert(EI->hasOperand() && "expected data operand");
+          return EI->getOperand();
+        }
+      }
+      break;
+    case NewProjectionKind::Class:
+    case NewProjectionKind::Box:
+    case NewProjectionKind::Upcast:
+    case NewProjectionKind::RefCast:
+    case NewProjectionKind::BitwiseCast:
+      // There is no SIL instruction to create a class or box by aggregating
+      // values.
+      break;
+  }
+  return SILValue();
+}
+
+
 //===----------------------------------------------------------------------===//
 //                             ProjectionTreeNode
 //===----------------------------------------------------------------------===//
