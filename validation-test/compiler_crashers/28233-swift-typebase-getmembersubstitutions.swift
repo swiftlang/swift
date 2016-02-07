@@ -1,3 +1,4 @@
+// DUPLICATE-OF: 01766-swift-typechecker-validatedecl.swift
 // RUN: not --crash %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
