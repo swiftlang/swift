@@ -471,7 +471,7 @@ public:
   SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
   unsigned getUnownedExtraInhabitantCount(ReferenceCounting style);
   APInt getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
-                                       ReferenceCounting syle);
+                                       ReferenceCounting style);
   APInt getUnownedExtraInhabitantMask(ReferenceCounting style);
 
   llvm::Type *getFixedBufferTy();
