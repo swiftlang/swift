@@ -1924,18 +1924,20 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
 
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
+  auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  if (!witnessSubs.empty())
+    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
+                                              witnessSubs);
+
   SmallVector<ManagedValue, 8> witnessParams;
-  auto witnessSubstSILTy
-    = SGM.Types.getLoweredType(witnessSubstTy);
-  auto witnessSubstFTy = witnessSubstSILTy.castTo<SILFunctionType>();
-  
+
   if (!isFree) {
     // If the requirement has a self parameter passed as an indirect +0 value,
     // and the witness takes it as a non-inout value, we must load and retain
     // the self pointer coming in.  This happens when class witnesses implement
     // non-mutating protocol requirements.
     auto reqConvention = thunkTy->getSelfParameter().getConvention();
-    auto witnessConvention =witnessSubstFTy->getSelfParameter().getConvention();
+    auto witnessConvention = witnessFTy->getSelfParameter().getConvention();
     
     bool inoutDifference;
     
@@ -1952,11 +1954,6 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                            IsNotTake);
     }
   }
-
-  auto witnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
-  if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
-                                              witnessSubs);
 
   // Create an indirect result buffer if needed.
   SILValue witnessResultAddr
