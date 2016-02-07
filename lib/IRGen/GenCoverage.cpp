@@ -25,7 +25,6 @@
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/ProfileData/InstrProf.h"
 
 using namespace swift;
 using namespace irgen;
