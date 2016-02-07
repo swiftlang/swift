@@ -161,10 +161,10 @@ public:
   NodeTy Sentinel;
 
   /// This value stores the last node that we searched. This is useful for
-  /// accelerating the search of the same value again and again.
+  /// accelerating the search of the same key again and again.
   std::atomic<NodeTy *> LastSearch;
 
-  /// Search for a node with key value \p. If the node does not exist then
+  /// Search for a node by key \p Key. If the node does not exist then
   /// allocate a new bucket and add it to the tree.
   ConcurrentList<ValueTy> &findOrAllocateNode(KeyTy Key) {
     // Try looking at the last node we searched.
