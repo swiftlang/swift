@@ -552,7 +552,7 @@ void TopDownRefCountState::initWithArg(SILArgument *Arg) {
   InsertPts.clear();
 }
 
-/// Initiailize this RefCountState with an instruction which introduces a new
+/// Initialize this RefCountState with an instruction which introduces a new
 /// ref count at +1.
 void
 TopDownRefCountState::initWithEntranceInst(SILInstruction *I,
