@@ -148,7 +148,7 @@ if __name__ == '__main__':
     file1 = sys.argv[1]
     if len(sys.argv) < 3:
         scores, runs, nums = getScores(file1)
-        keys = [f for f in set(scores.keys())]
+        keys = list(set(scores.keys()))
         keys.sort()
         for key in keys:
             printBestScores(key, scores[key])
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
     if VERBOSE: print scores1; print scores2
 
-    keys = [f for f in set(scores1.keys() + scores2.keys())]
+    keys = list(set(scores1.keys() + scores2.keys()))
     keys.sort()
     if VERBOSE:
         print "comparing ", file1, "vs", file2, "=",
