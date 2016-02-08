@@ -2248,7 +2248,8 @@ WARNING(no_throw_in_do_with_catch,none,
 //------------------------------------------------------------------------------
 
 ERROR(unsupported_recursive_type,none,
-      "recursive value type %0 is not allowed", (Type))
+      "value type %0 cannot have a stored property that references itself",
+      (Type))
 
 ERROR(recursive_enum_not_indirect,none,
       "recursive enum %0 is not marked 'indirect'", (Type))

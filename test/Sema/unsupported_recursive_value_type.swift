@@ -1,19 +1,19 @@
 // RUN: %target-parse-verify-swift
 
-struct SelfRecursiveStruct { // expected-error{{recursive value type}}
+struct SelfRecursiveStruct { // expected-error{{value type 'SelfRecursiveStruct' cannot have a stored property that references itself}}
   let a: SelfRecursiveStruct
 }
 
-struct OptionallyRecursiveStruct { // expected-error{{recursive value type}}
+struct OptionallyRecursiveStruct { // expected-error{{value type 'OptionallyRecursiveStruct' cannot have a stored property that references itself}}
   let a: OptionallyRecursiveStruct?
 
   init() { a = OptionallyRecursiveStruct() }
 }
 
-struct IndirectlyRecursiveStruct1 { // expected-error{{recursive value type}}
+struct IndirectlyRecursiveStruct1 { // expected-error{{value type 'IndirectlyRecursiveStruct1' cannot have a stored property that references itself}}
   let a: IndirectlyRecursiveStruct2
 }
-struct IndirectlyRecursiveStruct2 { // expected-error{{recursive value type}}
+struct IndirectlyRecursiveStruct2 { // expected-error{{value type 'IndirectlyRecursiveStruct2' cannot have a stored property that references itself}}
   let a: IndirectlyRecursiveStruct1
 }
 
@@ -37,11 +37,11 @@ enum RecursiveByGenericSubstitutionEnum<T> {
   case A(T)
 }
 
-struct RecursiveByBeingInTupleStruct { // expected-error{{recursive value type 'RecursiveByBeingInTupleStruct' is not allowed}}
+struct RecursiveByBeingInTupleStruct { // expected-error{{value type 'RecursiveByBeingInTupleStruct' cannot have a stored property that references itself}}
   let a: (Int, RecursiveByBeingInTupleStruct)
 }
 
-struct OptionallySelfRecursiveStruct { // expected-error{{ecursive value type 'OptionallySelfRecursiveStruct' is not allowed}}
+struct OptionallySelfRecursiveStruct { // expected-error{{value type 'OptionallySelfRecursiveStruct' cannot have a stored property that references itself}}
   let a: Optional<OptionallyRecursiveStruct>
 }
 
@@ -51,7 +51,7 @@ enum OptionallySelfRecursiveEnum { // expected-error{{recursive enum 'Optionally
 
 // self-recursive struct with self as member's type argement, a proper name would
 // be too long.
-struct X<T> { // expected-error{{recursive value type 'X<T>' is not allowed}}
+struct X<T> { // expected-error{{value type 'X<T>' cannot have a stored property that references itself}}
   let s: X<X>
 }
 
@@ -62,17 +62,17 @@ enum Y<T> { // expected-error{{recursive enum 'Y<T>' is not marked 'indirect'}}
 }
 
 // ultra super nest-acular type
-struct Z<T, U> { // expected-error{{recursive value type 'Z<T, U>' is not allowed}}
+struct Z<T, U> { // expected-error{{value type 'Z<T, U>' cannot have a stored property that references itself}}
     let a: Z<Optional<Z<Z<Z, Z>, X<Z>>>, (Int, Z)>
 }
 
-struct RecursiveByGenericSubstitutionStruct { // expected-error{{recursive value type}}
+struct RecursiveByGenericSubstitutionStruct { // expected-error{{value type 'RecursiveByGenericSubstitutionStruct' cannot have a stored property that references itself}}
   let a: RecursiveByGenericSubstitutionEnum<RecursiveByGenericSubstitutionStruct>
 }
 
-struct RecursiveWithLocal { // expected-error{{recursive value type 'RecursiveWithLocal' is not allowed}}
+struct RecursiveWithLocal { // expected-error{{value type 'RecursiveWithLocal' cannot have a stored property that references itself}}
   init(t: Local) { self.t = t }
-  struct Local { // expected-error{{recursive value type 'RecursiveWithLocal.Local' is not allowed}}
+  struct Local { // expected-error{{value type 'RecursiveWithLocal.Local'}}
     init(s: RecursiveWithLocal) { self.s = s }
     var s: RecursiveWithLocal
   }
@@ -120,6 +120,6 @@ struct NoStorage : Holdable {
     typealias Holding = Bad
 }
 
-struct Bad { // expected-error{{recursive value type 'Bad' is not allowed}}
+struct Bad { // expected-error{{value type 'Bad' cannot have a stored property that references itself}}
     var s: Holder<NoStorage>
 }
