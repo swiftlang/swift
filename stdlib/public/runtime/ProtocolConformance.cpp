@@ -392,23 +392,23 @@ recur_inside_cache_lock:
 
     // Check if the type-protocol entry exists in the cache entry that we found.
     while (auto *Value = C.Cache.findValueByKey(hash)) {
-      if (!Value->matches(type, protocol)) {
-        // If we have a collision increase the hash value by one and try again.
-        hash++;
-        continue;
+      if (Value->matches(type, protocol)) {
+        if (Value->isSuccessful())
+          return std::make_pair(Value->getWitnessTable(), true);
+
+        if (type == origType)
+          foundEntry = Value;
+
+        // If we got a cached negative response, check the generation number.
+        if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
+          // We found an entry with a negative value.
+          return std::make_pair(nullptr, true);
+        }
       }
 
-      if (Value->isSuccessful())
-        return std::make_pair(Value->getWitnessTable(), true);
-
-      if (type == origType)
-        foundEntry = Value;
-
-      // If we got a cached negative response, check the generation number.
-      if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
-        // We found an entry with a negative value.
-        return std::make_pair(nullptr, true);
-      }
+      // The entry that we fetched does not match our key due to a collission.
+      // If we have a collision increase the hash value by one and try again.
+      hash++;
     }
   }
 
@@ -422,17 +422,16 @@ recur_inside_cache_lock:
     size_t hash = hashTypeProtocolPair(description, protocol);
 
     while (auto *Value = C.Cache.findValueByKey(hash)) {
-      if (!Value->matches(description, protocol)) {
-        // If we have a collision increase the hash value by one and try again.
-        hash++;
-        continue;
+      if (Value->matches(description, protocol)) {
+        if (Value->isSuccessful())
+          return std::make_pair(Value->getWitnessTable(), true);
+
+        // We don't try to cache negative responses for generic
+        // patterns.
       }
 
-      if (Value->isSuccessful())
-        return std::make_pair(Value->getWitnessTable(), true);
-
-      // We don't try to cache negative responses for generic
-      // patterns.
+      // If we have a collision increase the hash value by one and try again.
+      hash++;
     }
   }
 
@@ -526,9 +525,8 @@ recur:
 
     // Hash and lookup the type-protocol pair in the cache.
     size_t hash = hashTypeProtocolPair(type, protocol);
-
-    auto E = ConformanceCacheEntry::createFailure(
-               type, protocol, C.SectionsToScan.size());
+    auto E = ConformanceCacheEntry::createFailure(type, protocol,
+                                                  C.SectionsToScan.size());
 
     while (!C.Cache.tryToAllocateNewNode(hash, E)) {
       // If we have a collision increase the hash value by one and try again.
