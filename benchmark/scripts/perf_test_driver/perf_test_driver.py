@@ -53,18 +53,26 @@ class Result(object):
         """Rather than modifying the extra data dict, just return it as a no-op"""
         return d
 
+    def print_data(self, max_test_len):
+        fmt = '{:<%d}{:}' % (max_test_len + 5)
+        print(fmt.format(self.get_name(), self.get_result()))
+
 def _unwrap_self(args):
     return type(args[0]).process_input(*args)
 
-class BenchmarkDriver(object):
+PerfTestDriver_OptLevels = ['Onone', 'O', 'Ounchecked']
 
-    OptLevels = ['Onone', 'O', 'Ounchecked']
+class PerfTestDriver(object):
 
-    def __init__(self, binary_dir, xfail_list, enable_parallel=False):
-        self.targets = [(os.path.join(binary_dir, 'Benchmark_%s' % o), o) for o in BenchmarkDriver.OptLevels]
+    def __init__(self, binary_dir, xfail_list, enable_parallel=False, opt_levels=PerfTestDriver_OptLevels):
+        self.targets = [(os.path.join(binary_dir, 'PerfTests_%s' % o), o) for o in opt_levels]
         self.xfail_list = xfail_list
         self.enable_parallel = enable_parallel
         self.data = None
+
+    def print_data_header(self, max_test_len):
+        fmt = '{:<%d}{:}' % (max_test_len + 5)
+        print(fmt.format('Name', 'Result'))
 
     def prepare_input(self, name, opt_level):
         raise RuntimeError("Abstract method")
@@ -72,9 +80,12 @@ class BenchmarkDriver(object):
     def process_input(self, data):
         raise RuntimeError("Abstract method")
 
-    def run_for_opt_level(self, binary, opt_level):
+    def run_for_opt_level(self, binary, opt_level, test_filter):
         print("testing driver at path: %s" % binary)
         names = [n.strip() for n in subprocess.check_output([binary, "--list"]).split()[2:]]
+        if test_filter:
+            regex = re.compile(test_filter)
+            names = [n for n in names if regex.match(n)]
 
         def prepare_input_wrapper(name):
             x = {'opt': opt_level, 'path': binary, 'test_name': name}
@@ -101,15 +112,14 @@ class BenchmarkDriver(object):
 
     def print_data(self, data, max_test_len):
         print("Results:")
-        fmt = '{:<%d}{:}' % (max_test_len + 5)
+        self.print_data_header(max_test_len)
         for d in data:
             for r in d['result']:
-                print(fmt.format(r.get_name(), r.get_result()))
+                r.print_data(max_test_len)
 
-    def run(self):
-        self.data = [self.run_for_opt_level(binary, opt_level) for binary, opt_level in self.targets]
+    def run(self, test_filter=None):
+        self.data = [self.run_for_opt_level(binary, opt_level, test_filter) for binary, opt_level in self.targets]
         max_test_len = reduce(max, [d['max_test_len']for d in self.data])
         has_failure = reduce(max, [d['has_failure']for d in self.data])
         self.print_data(self.data, max_test_len)
         return not has_failure
-
