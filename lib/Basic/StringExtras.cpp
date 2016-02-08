@@ -876,19 +876,35 @@ static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
       wordConflictsAfterPreposition(*std::prev(nameWordRevIter), preposition))
     return false;
 
-  // If the preposition is "with" and the base name starts with a
-  // verb, assume "with" is a separator and remove it.
-  if (endOfBaseName > 4 &&
-      camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
-      !wordPairsWithWith(*std::next(nameWordRevIter)) &&
-      getPartOfSpeech(camel_case::getFirstWord(baseName)) == PartOfSpeech::Verb)
-    endOfBaseName -= 4;
+  // Determine whether we should drop the preposition.
+  bool dropPreposition = false;
+
+  // If the first parameter has a default, drop the preposition.
+  if (paramType.hasDefaultArgument()) {
+    dropPreposition = true;
+
+    // If the preposition is "with" and the base name starts with a
+    // verb, assume "with" is a separator and remove it.
+  } else if (endOfBaseName > 4 &&
+             camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
+             !wordPairsWithWith(*std::next(nameWordRevIter)) &&
+             getPartOfSpeech(camel_case::getFirstWord(baseName))
+               == PartOfSpeech::Verb) {
+    dropPreposition = true;
 
   // If the preposition is "using" and the parameter is a function or
   // block, assume "using" is a separator and remove it.
-  if (endOfBaseName > 5 && paramType.isFunction() &&
-      camel_case::sameWordIgnoreFirstCase(preposition, "using"))
-    endOfBaseName -= 5;
+  } else if (endOfBaseName > 5 && paramType.isFunction() &&
+             camel_case::sameWordIgnoreFirstCase(preposition, "using")) {
+    dropPreposition = true;
+  }
+
+  // If we're supposed to drop the preposition, do so.
+  if (dropPreposition) {
+    endOfBaseName -= preposition.size();
+
+    if (endOfBaseName == 0) return false;
+  }
 
   // If the base name is vacuous and there are two or fewer words in
   // the base name, don't split.

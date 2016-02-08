@@ -74,7 +74,7 @@
 // CHECK-FOUNDATION: var isMakingHoney: Bool
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethodWith(_: DeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethod(_: DeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
