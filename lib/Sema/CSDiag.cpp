@@ -3736,6 +3736,15 @@ static bool callArgHasTrailingClosure(Expr *E) {
   return false;
 }
 
+/// Return true if this function name is a comparison operator.  This is a
+/// simple heuristic used to guide comparison related diagnostics.
+static bool isNameOfStandardComparisonOperator(StringRef opName) {
+  return opName == "=="  || opName == "!=" ||
+         opName == "===" || opName == "!==" ||
+         opName == "<"   || opName == ">" ||
+         opName == "<="  || opName == ">=";
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
@@ -3862,7 +3871,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                      CTP_CallArgument, options))
       return true;
 
-    // If that fails, it could be that the argument doesn't conform to an archetype.
+    // If that fails, it could be that the argument doesn't conform to an
+    // archetype.
     if (calleeInfo.diagnoseGenericParameterErrors(badArgExpr))
       return true;
   }
@@ -3932,10 +3942,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // diagnostic.
     if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
         !isUnresolvedOrTypeVarType(lhsType)) {
-      if (overloadName == "=="  || overloadName == "!=" ||
-          overloadName == "===" || overloadName == "!==" ||
-          overloadName == "<"   || overloadName == ">" ||
-          overloadName == "<="  || overloadName == ">=") {
+      if (isNameOfStandardComparisonOperator(overloadName)) {
         diagnose(callExpr->getLoc(), diag::comparison_with_nil_illegal, lhsType)
           .highlight(lhsExpr->getSourceRange());
         return true;
