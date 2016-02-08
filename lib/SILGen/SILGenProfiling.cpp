@@ -673,14 +673,12 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
 
   SILLocation Loc = getLocation(Node);
   SILValue Args[] = {
-      // TODO: In C++ we give this string linkage that matches the functions, so
-      // that it's uniqued appropriately across TUs.
+      // The intrinsic must refer to the function profiling name var, which is
+      // inaccessible during SILGen. Rely on irgen to rewrite the function name.
       Builder.createStringLiteral(Loc, StringRef(CurrentFuncName),
                                   StringLiteralInst::Encoding::UTF8),
       Builder.createIntegerLiteral(Loc, Int64Ty, FunctionHash),
       Builder.createIntegerLiteral(Loc, Int32Ty, NumRegionCounters),
-      // TODO: Should we take care to emit only one copy of each of the above
-      // three literals per function?
       Builder.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
   Builder.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                         SGM.Types.getEmptyTupleType(), {}, Args);

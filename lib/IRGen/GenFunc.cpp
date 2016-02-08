@@ -85,11 +85,13 @@
 #include "clang/AST/RecordLayout.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/CallSite.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -1725,6 +1727,36 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
+
+  // Calls to the int_instrprof_increment intrinsic are emitted during SILGen.
+  // At that stage, the function name GV used by the profiling pass is hidden.
+  // Fix the intrinsic call here by pointing it to the correct GV.
+  if (IID == llvm::Intrinsic::instrprof_increment) {
+    // Extract the function name.
+    auto *NameGEP = cast<llvm::User>(args.claimNext());
+    auto *NameGV = cast<llvm::GlobalVariable>(NameGEP->getOperand(0));
+    auto *NameC = NameGV->getInitializer();
+    StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
+
+    // Find the existing function name pointer.
+    std::string NameValue = llvm::getInstrProfNameVarPrefix();
+    NameValue += Name;
+    StringRef ProfName = StringRef(NameValue).rtrim(StringRef("\0", 1));
+    auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(ProfName);
+    assert(FuncNamePtr && "No function name pointer for counter update");
+
+    // Create a GEP into the function name.
+    llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
+    auto *FuncName = llvm::GetElementPtrInst::CreateInBounds(
+        FuncNamePtr, makeArrayRef(Indices), "", IGF.Builder.GetInsertBlock());
+
+    // Replace the placeholder value with the new GEP.
+    Explosion replacement;
+    replacement.add(FuncName);
+    replacement.add(args.claimAll());
+    args = std::move(replacement);
+  }
+
   if (IID != llvm::Intrinsic::not_intrinsic) {
     SmallVector<llvm::Type*, 4> ArgTys;
     for (auto T : IInfo.Types)
