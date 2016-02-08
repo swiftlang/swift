@@ -1,4 +1,4 @@
-//===--- Visibility.h - Visibility macros for runtime exports -------------===//
+//===--- Visibility.h - Visibility macros for runtime exports ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
