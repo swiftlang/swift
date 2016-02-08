@@ -187,23 +187,26 @@ public:
   /// and profile.
   __attribute__ ((noinline))
   const Entry *addMetadataEntry(EntryRef<Entry> key,
-                                ConcurrentList<EntryPair> &Bucket,
                                 llvm::function_ref<Entry *()> entryBuilder) {
     // Hold a lock to prevent the modification of the cache by multiple threads.
     std::unique_lock<std::mutex> ConstructionGuard(*Lock);
+    size_t hash = key.hash();
 
     // Some other thread may have setup the value we are about to construct
     // while we were asleep so do a search before constructing a new value.
-    for (auto &A : Bucket) {
-      if (A.Key == key) return A.Value;
+    while (EntryPair *MappedValue = Map->findValueByKey(hash)) {
+      if (MappedValue->Key == key) return MappedValue->Value;
+
+      // Implement a closed hash table. If we have a hash collision increase
+      // the hash value by one and try again.
+      hash++;
     }
 
     // Build the new cache entry.
     // For some cache types this call may re-entrantly perform additional
-    // cache lookups.
-    // Notice that the entry is completely constructed before it is inserted
-    // into the map, and that only one entry can be constructed at once
-    // because of the lock above.
+    // cache lookups. Notice that the entry is completely constructed before it
+    // is inserted into the map, and that only one entry can be constructed at
+    // once because of the lock above.
     Entry *entry = entryBuilder();
     assert(entry);
 
@@ -214,7 +217,16 @@ public:
     auto newKey = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
     assert(key == newKey);
 
-    Bucket.push_front(EntryPair(newKey, entry));
+    // Construct a new entry.
+    auto E = EntryPair(newKey, entry);
+
+    // Some other thread may have setup the value we are about to construct
+    // while we were asleep so do a search before constructing a new value.
+    while (!Map->tryToAllocateNewNode(hash, E)) {
+      // Implement a closed hash table. If we have a hash collision increase
+      // the hash value by one and try again.
+      hash++;
+    }
 
 #if SWIFT_DEBUG_RUNTIME
     printf("%s(%p): created %p\n",
@@ -246,14 +258,15 @@ public:
 
     // Look for an existing entry.
     // Find the bucket for the metadata entry.
-    ConcurrentList<EntryPair> &Bucket = Map->findOrAllocateNode(hash);
-    // Scan the bucket and return the value if we found the key.
-    for (auto &A : Bucket) {
-      if (A.Key == key) return A.Value;
+    while (EntryPair *MappedValue = Map->findValueByKey(hash)) {
+      if (MappedValue->Key == key) return MappedValue->Value;
+      // Implement a closed hash table. If we have a hash collision increase
+      // the hash value by one and try again.
+      hash++;
     }
 
     // We did not find a key so we will need to create one and store it.
-    return addMetadataEntry(key, Bucket, entryBuilder);
+    return addMetadataEntry(key, entryBuilder);
   }
 };
 
