@@ -238,6 +238,11 @@ protected:
         DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() << "\n");
         ensureAlive(&F);
       }
+
+      if (!F.shouldOptimize()) {
+        DEBUG(llvm::dbgs() << "  anchor a no optimization function: " << F.getName() << "\n");
+        ensureAlive(&F);
+      }
     }
 
     for (SILGlobalVariable &G : Module->getSILGlobalList()) {

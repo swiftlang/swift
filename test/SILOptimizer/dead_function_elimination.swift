@@ -144,6 +144,11 @@ public func callTest() {
 	testProtocols(Adopt())
 }
 
+@_semantics("optimize.sil.never") // make sure not eliminated 
+internal func donotEliminate() {
+  return
+}
+
 // CHECK-NOT: sil {{.*}}inCycleA
 // CHECK-NOT: sil {{.*}}inCycleB
 // CHECK-NOT: sil {{.*}}deadMethod
@@ -155,6 +160,8 @@ public func callTest() {
 // CHECK-TESTING: sil {{.*}}deadMethod
 // CHECK-TESTING: sil {{.*}}publicClassMethod
 // CHECK-TESTING: sil {{.*}}deadWitness
+
+// CHECK-LABEL: @_TF25dead_function_elimination14donotEliminateFT_T_
 
 // CHECK-LABEL: sil_vtable Base
 // CHECK: aliveMethod
