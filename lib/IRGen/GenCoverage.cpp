@@ -31,6 +31,10 @@ using namespace irgen;
 
 using llvm::coverage::CounterMappingRegion;
 
+// This is disabled for some reason.
+#define DISABLE_COVERAGE_MAPPING
+
+#ifndef DISABLE_COVERAGE_MAPPING
 static bool isMachO(IRGenModule &IGM) {
   return SwiftTargetInfo::get(IGM).OutputObjectFormat == llvm::Triple::MachO;
 }
@@ -38,9 +42,10 @@ static bool isMachO(IRGenModule &IGM) {
 static StringRef getCoverageSection(IRGenModule &IGM) {
   return llvm::getInstrProfCoverageSectionName(isMachO(IGM));
 }
+#endif
 
 void IRGenModule::emitCoverageMapping() {
-#if 1
+#ifdef DISABLE_COVERAGE_MAPPING
   return;
 #else
   const auto &Mappings = SILMod->getCoverageMapList();
