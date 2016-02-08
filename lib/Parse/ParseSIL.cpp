@@ -1582,7 +1582,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Ask the lexer to interpret the entire string as a literal segment.
     SmallVector<char, 128> stringBuffer;
     StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
-    ResultVal = B.createStringLiteral(InstLoc, string, encoding);
+    ResultVal =
+        B.createStringLiteralWithNullTerminator(InstLoc, string, encoding);
     P.consumeToken(tok::string_literal);
     break;
   }

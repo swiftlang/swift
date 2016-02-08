@@ -805,7 +805,8 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
   }
 
   // The string literal provides the data.
-  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
+  StringLiteralInst *string =
+      SGF.B.createStringLiteralWithNullTerminator(E, Str, instEncoding);
   CanType ty = E->getType()->getCanonicalType();
 
   // The length is lowered as an integer_literal.
@@ -1973,9 +1974,8 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
     e->getMethod()->getObjCSelector().getString(selectorScratch);
 
   // Create an Objective-C selector string literal.
-  auto selectorLiteral =
-    SGF.B.createStringLiteral(e, selectorString,
-                              StringLiteralInst::Encoding::ObjCSelector);
+  auto selectorLiteral = SGF.B.createStringLiteralWithNullTerminator(
+      e, selectorString, StringLiteralInst::Encoding::ObjCSelector);
 
   // Create the pointer struct from the raw pointer.
   SILType loweredPtrTy = SGF.getLoweredType(selectorMemberTy);

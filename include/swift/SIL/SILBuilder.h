@@ -400,6 +400,24 @@ public:
         createSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
   }
 
+  StringLiteralInst *
+  createStringLiteralWithNullTerminator(SILLocation Loc, StringRef text,
+                                        StringLiteralInst::Encoding encoding) {
+    llvm::SmallString<256> Out;
+    return insert(StringLiteralInst::create(
+        createSILDebugLocation(Loc), Twine(text).toNullTerminatedStringRef(Out),
+        encoding, F));
+  }
+
+  StringLiteralInst *
+  createStringLiteralWithNullTerminator(SILLocation Loc, const Twine &text,
+                                        StringLiteralInst::Encoding encoding) {
+    SmallVector<char, 256> Out;
+    return insert(StringLiteralInst::create(createSILDebugLocation(Loc),
+                                            text.toNullTerminatedStringRef(Out),
+                                            encoding, F));
+  }
+
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {
     return insert(new (F.getModule())
                       LoadInst(createSILDebugLocation(Loc), LV));
