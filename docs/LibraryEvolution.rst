@@ -807,6 +807,7 @@ There are very few safe changes to make to protocols:
 
 - A new non-type requirement may be added to a protocol, as long as it has an
   unconstrained default implementation.
+- A new associated type may be added to a protocol, as long as it has a default.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 - Changing *internal* parameter names of function and subscript requirements
@@ -826,10 +827,16 @@ Protocol extensions may be more freely modified; `see below`__.
 
 __ #protocol-extensions
 
-.. admonition:: TODO
+.. note::
 
-    It would also be nice to be able to add new associated types with default
-    values, but that seems trickier to implement.
+    Allowing the addition of associated types means implementing some form of
+    "generalized existentials", so that existing existential values (values
+    with protocol type) continue to work even if a protocol gets its first
+    associated type. Until we have that feature implemented, it is only safe to
+    add an associated type to a protocol that already has associated types, or
+    uses ``Self`` in a non-return position (i.e. one that currently cannot be
+    used as the type of a value).
+
 
 Classes
 ~~~~~~~
@@ -1470,6 +1477,7 @@ document that affect language semantics:
 - (planned) Making classes "sealed" by default
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) Default implementations in protocols
+- (planned) Generalized existentials (values of protocol type)
 - (planned) Open and closed enums
 - (planned) Syntax for declaring "versioned" entities and their features
 - (planned) Syntax for declaring inlineable code
