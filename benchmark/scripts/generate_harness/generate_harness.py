@@ -32,7 +32,7 @@ ignored_run_funcs = ["Ackermann", "Fibonacci"]
 
 template_loader = jinja2.FileSystemLoader(searchpath="/")
 template_env = jinja2.Environment(loader=template_loader, trim_blocks=True,
-                                                          lstrip_blocks=True)
+                                  lstrip_blocks=True)
 
 if __name__ == '__main__':
     # CMakeList single-source
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         def __init__(self, path):
             self.name = os.path.basename(path)
             self.files = [x for x in os.listdir(path)
-                            if x.endswith('.swift')]
+                          if x.endswith('.swift')]
     if os.path.isdir(multi_source_dir):
         multisource_benches = [
             multi_source_bench(os.path.join(multi_source_dir, x))
@@ -62,6 +62,7 @@ if __name__ == '__main__':
         content = open(filepath).read()
         matches = re.findall(r'func run_(.*?)\(', content)
         return filter(lambda x: x not in ignored_run_funcs, matches)
+
     def find_run_funcs(dirs):
         ret_run_funcs = []
         for d in dirs:
@@ -71,9 +72,9 @@ if __name__ == '__main__':
                     ret_run_funcs.extend(run_funcs)
         return ret_run_funcs
     run_funcs = sorted(
-            [(x, x)
-             for x in find_run_funcs([single_source_dir, multi_source_dir])],
-            key=lambda x: x[0]
+        [(x, x)
+         for x in find_run_funcs([single_source_dir, multi_source_dir])],
+        key=lambda x: x[0]
     )
 
     # Replace originals with files generated from templates
@@ -87,4 +88,3 @@ if __name__ == '__main__':
                             imports=imports,
                             run_funcs=run_funcs)
         )
-

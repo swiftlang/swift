@@ -30,11 +30,11 @@ DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 def parse_results(res, optset):
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
-    SCORERE = re.compile(r"(\d+),[ \t]*(\w+)," + \
-                         ",".join([r"[ \t]*([\d.]+)"]*7))
+    SCORERE = re.compile(r"(\d+),[ \t]*(\w+)," +
+                         ",".join([r"[ \t]*([\d.]+)"] * 7))
     # The Totals line would be parsed like this.
-    TOTALRE = re.compile(r"()(Totals)," + \
-                         ",".join([r"[ \t]*([\d.]+)"]*7))
+    TOTALRE = re.compile(r"()(Totals)," +
+                         ",".join([r"[ \t]*([\d.]+)"] * 7))
     KEYGROUP = 2
     VALGROUP = 4
     MEMGROUP = 9
@@ -51,14 +51,14 @@ def parse_results(res, optset):
         test = {}
         test['Data'] = [testresult]
         test['Info'] = {}
-        test['Name'] = "nts.swift/"+optset+"."+testname+".exec"
+        test['Name'] = "nts.swift/" + optset + "." + testname + ".exec"
         tests.append(test)
         if testname != 'Totals':
             mem_testresult = int(m.group(MEMGROUP))
             mem_test = {}
             mem_test['Data'] = [mem_testresult]
             mem_test['Info'] = {}
-            mem_test['Name'] = "nts.swift/mem_maxrss."+optset+"."+testname+".mem"
+            mem_test['Name'] = "nts.swift/mem_maxrss." + optset + "." + testname + ".mem"
             tests.append(mem_test)
     return tests
 
@@ -85,7 +85,7 @@ def instrument_test(driver_path, test, num_samples):
         )
         peak_memory = re.match('\s*(\d+)\s*maximum resident set size',
                                test_output_raw.split('\n')[-15]).group(1)
-        test_outputs.append(test_output_raw.split()[1].split(',') + \
+        test_outputs.append(test_output_raw.split()[1].split(',') +
                             [peak_memory])
 
     # Average sample results
@@ -102,7 +102,7 @@ def instrument_test(driver_path, test, num_samples):
         for i in range(AVG_START_INDEX, len(test_output)):
             avg_test_output[i] += int(test_output[i])
     for i in range(AVG_START_INDEX, len(avg_test_output)):
-        avg_test_output[i] = int(round(avg_test_output[i] / \
+        avg_test_output[i] = int(round(avg_test_output[i] /
                                        float(len(test_outputs))))
     avg_test_output[NUM_SAMPLES_INDEX] = num_samples
     avg_test_output[MIN_INDEX] = min(test_outputs,
@@ -152,8 +152,8 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     only run tests included in it."""
     (total_tests, total_min, total_max, total_mean) = (0, 0, 0, 0)
     output = []
-    headings = ['#', 'TEST','SAMPLES','MIN(μs)','MAX(μs)','MEAN(μs)','SD(μs)',
-                'MEDIAN(μs)','MAX_RSS(B)']
+    headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
+                'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
     line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
     if verbose and log_directory:
         print line_format.format(*headings)
@@ -182,7 +182,7 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     totals_output = '\n\n' + ','.join(totals)
     if verbose:
         if log_directory:
-            print line_format.format(*(['']+totals))
+            print line_format.format(*([''] + totals))
         else:
             print totals_output[1:]
     formatted_output += totals_output
@@ -204,7 +204,7 @@ def submit(args):
     print "\nRunning benchmarks..."
     for optset in args.optimization:
         print "Opt level:\t", optset
-        file = os.path.join(args.tests, "Benchmark_"+optset)
+        file = os.path.join(args.tests, "Benchmark_" + optset)
         try:
             res = run_benchmarks(file, benchmarks=args.benchmark,
                     num_samples=args.iterations)
@@ -227,7 +227,7 @@ def submit(args):
 
 def run(args):
     optset = args.optimization
-    file = os.path.join(args.tests, "Benchmark_"+optset)
+    file = os.path.join(args.tests, "Benchmark_" + optset)
     run_benchmarks(file, benchmarks=args.benchmarks,
             num_samples=args.iterations, verbose=True,
             log_directory=args.output_dir,
@@ -260,10 +260,9 @@ def compare(args):
     recent_logs = {}
     for branch_dir in [current_branch_dir, master_branch_dir]:
         for opt in ['O', 'Onone']:
-            recent_logs[os.path.basename(branch_dir) + '_'  + opt] = \
-                    sorted(glob.glob(os.path.join(branch_dir,
-                        'Benchmark_' + opt + '-*.log')), key=os.path.getctime,
-                        reverse=True)
+            recent_logs[os.path.basename(branch_dir) + '_' + opt] = sorted(
+                glob.glob(os.path.join(branch_dir, 'Benchmark_' + opt + '-*.log')),
+                key=os.path.getctime, reverse=True)
 
     if current_branch == 'master':
         if len(recent_logs['master_O']) > 1 and \
@@ -323,7 +322,7 @@ def main():
     submit_parser = subparsers.add_parser('submit',
             help='run benchmarks and submit results to LNT')
     submit_parser.add_argument('-t', '--tests',
-            help='directory containing Benchmark_O{,none,unchecked} ' + \
+            help='directory containing Benchmark_O{,none,unchecked} ' +
                  '(default: DRIVER_DIR)',
             default=DRIVER_DIR)
     submit_parser.add_argument('-m', '--machine', required=True,
@@ -345,7 +344,7 @@ def main():
     run_parser = subparsers.add_parser('run',
             help='run benchmarks and output results to stdout')
     run_parser.add_argument('-t', '--tests',
-            help='directory containing Benchmark_O{,none,unchecked} ' + \
+            help='directory containing Benchmark_O{,none,unchecked} ' +
                  '(default: DRIVER_DIR)',
             default=DRIVER_DIR)
     run_parser.add_argument('-i', '--iterations',

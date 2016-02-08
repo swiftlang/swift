@@ -13,7 +13,6 @@
 # ===----------------------------------------------------------------------===//
 
 import os
-import sys
 import subprocess
 import multiprocessing
 import re
@@ -85,7 +84,7 @@ class BenchmarkDriver(object):
         results = None
         if self.enable_parallel:
             p = multiprocessing.Pool()
-            z = zip([self]*len(prepared_input), prepared_input)
+            z = zip([self] * len(prepared_input), prepared_input)
             results = p.map(_unwrap_self, z)
         else:
             results = map(self.process_input, prepared_input)
@@ -112,4 +111,3 @@ class BenchmarkDriver(object):
         has_failure = reduce(max, [d['has_failure']for d in self.data])
         self.print_data(self.data, max_test_len)
         return not has_failure
-
