@@ -1759,8 +1759,8 @@ bool NominalTypeDecl::hasFixedLayout() const {
   if (hasClangNode())
     return true;
 
-  // @objc enums always have a fixed layout.
-  if (isa<EnumDecl>(this) && isObjC())
+  // @objc enums and protocols always have a fixed layout.
+  if ((isa<EnumDecl>(this) || isa<ProtocolDecl>(this)) && isObjC())
     return true;
 
   // Otherwise, access via indirect "resilient" interfaces.
