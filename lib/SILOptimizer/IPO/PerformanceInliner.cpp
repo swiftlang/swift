@@ -222,13 +222,6 @@ namespace {
     /// global_init attributes.
     InlineSelection WhatToInline;
 
-
-    /// A set of pairs of function names. This set records a successful
-    /// inlining operations and is used to prevent infinite inlining of
-    /// recursive functions. The pair (A, B) records inlining of function
-    /// B into A.
-    llvm::DenseSet<std::pair<StringRef, StringRef>> InlinedFunctions;
-
     SILFunction *getEligibleFunction(FullApplySite AI);
 
     bool isProfitableToInline(FullApplySite AI, unsigned loopDepthOfAI,
@@ -243,13 +236,6 @@ namespace {
     void collectAppliesToInline(SILFunction *Caller,
                                 SmallVectorImpl<FullApplySite> &Applies,
                                 DominanceAnalysis *DA, SILLoopAnalysis *LA);
-
-    /// This method is responsible for breaking recursive cycles
-    /// in the inliner (some of which are only exposed via devirtualization).
-    /// \return true if the function \p Callee was previously inlined into
-    /// \p Caller and the inliner needs to reject this inlining request.
-    bool hasInliningCycle(SILFunction *Caller, SILFunction *Callee);
-
 
   public:
     SILPerformanceInliner(int threshold, InlineSelection WhatToInline)
@@ -505,23 +491,6 @@ IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
 //                           Performance Inliner
 //===----------------------------------------------------------------------===//
 
-bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
-                                                SILFunction *Callee) {
-  // Reject simple recursions.
-  if (Caller == Callee) return true;
-
-  StringRef CallerName = Caller->getName();
-  StringRef CalleeName = Callee->getName();
-
-  bool InlinedBefore =
-      InlinedFunctions.count(std::make_pair(CallerName, CalleeName));
-
-  // If the Callee was inlined into the Caller in previous inlining iterations
-  // then
-  // we need to reject this inlining request to prevent a cycle.
-  return InlinedBefore;
-}
-
 // Return true if the callee has self-recursive calls.
 static bool calleeIsSelfRecursive(SILFunction *Callee) {
   for (auto &BB : *Callee)
@@ -601,8 +570,8 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   SILFunction *Caller = AI.getFunction();
 
-  // Detect inlining cycles.
-  if (hasInliningCycle(Caller, Callee)) {
+  // Detect self-recursive calls.
+  if (Caller == Callee) {
     DEBUG(llvm::dbgs() << "        FAIL: Detected a recursion inlining " <<
           Callee->getName() << ".\n");
     return nullptr;
@@ -902,12 +871,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   if (!Caller->shouldOptimize())
     return false;
 
-  // Construct a log of all of the names of the functions that we've inlined
-  // in the current iteration.
-  SmallVector<StringRef, 16> InlinedFunctionNames;
-  StringRef CallerName = Caller->getName();
-
-  DEBUG(llvm::dbgs() << "Visiting Function: " << CallerName << "\n");
+  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
   // First step: collect all the functions we want to inline.  We
   // don't change anything yet so that the dominator information
@@ -942,9 +906,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                        SILInliner::InlineKind::PerformanceInline, ContextSubs,
                        AI.getSubstitutions());
 
-    // Record the name of the inlined function (for cycle detection).
-    InlinedFunctionNames.push_back(Callee->getName());
-
     auto Success = Inliner.inlineFunction(AI, Args);
     (void) Success;
     // We've already determined we should be able to inline this, so
@@ -956,12 +917,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     DA->invalidate(Caller, SILAnalysis::InvalidationKind::Everything);
     NumFunctionsInlined++;
   }
-
-  // Record the names of the functions that we inlined.
-  // We'll use this list to detect cycles in future iterations of
-  // the inliner.
-  for (auto CalleeName : InlinedFunctionNames)
-    InlinedFunctions.insert(std::make_pair(CallerName, CalleeName));
 
   DEBUG(llvm::dbgs() << "\n");
   return true;
