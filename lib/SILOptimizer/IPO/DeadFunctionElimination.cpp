@@ -339,6 +339,18 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           ensureAlive(mi, nullptr, nullptr);
       }
     }
+
+    // Check default witness methods.
+    for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
+      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+        SILFunction *F = entry.getWitness();
+        auto *fd = cast<AbstractFunctionDecl>(entry.getRequirement().getDecl());
+
+        MethodInfo *mi = getMethodInfo(fd);
+        addImplementingFunction(mi, F, nullptr);
+        ensureAlive(mi, nullptr, nullptr);
+      }
+    }
   }
 
   /// Removes all dead methods from vtables and witness tables.
