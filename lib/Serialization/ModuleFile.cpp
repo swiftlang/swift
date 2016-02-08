@@ -1219,19 +1219,21 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isHeader())
         continue;
 
-      StringRef ModulePath, ScopePath;
-      std::tie(ModulePath, ScopePath) = Dep.RawPath.split('\0');
+      StringRef ModulePathStr = Dep.RawPath;
+      StringRef ScopePath;
+      if (Dep.isScoped())
+        std::tie(ModulePathStr, ScopePath) = ModulePathStr.rsplit('\0');
 
-      auto ModuleID = Ctx.getIdentifier(ModulePath);
-      assert(!ModuleID.empty() &&
-             "invalid module name (submodules not yet supported)");
+      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1> AccessPath;
+      while (!ModulePathStr.empty()) {
+        StringRef NextComponent;
+        std::tie(NextComponent, ModulePathStr) = ModulePathStr.split('\0');
+        AccessPath.push_back({Ctx.getIdentifier(NextComponent), SourceLoc()});
+      }
 
-      if (ModuleID == Ctx.StdlibModuleName)
+      if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
-          AccessPath;
-      AccessPath.push_back({ ModuleID, SourceLoc() });
       Module *M = Ctx.getModule(AccessPath);
 
       auto Kind = ImportKind::Module;
@@ -1245,10 +1247,15 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           // about the import kind, we cannot do better.
           Kind = ImportKind::Func;
         } else {
+          // Lookup the decl in the top-level module.
+          Module *TopLevelModule = M;
+          if (AccessPath.size() > 1)
+            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().first);
+
           SmallVector<ValueDecl *, 8> Decls;
-          M->lookupQualified(ModuleType::get(M), ScopeID,
-                             NL_QualifiedDefault | NL_KnownNoDependency,
-                             nullptr, Decls);
+          TopLevelModule->lookupQualified(
+              ModuleType::get(TopLevelModule), ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");
