@@ -2176,12 +2176,15 @@ auto ClangImporter::Implementation::importFullName(
   // Perform automatic name transformations.
 
   // Enumeration constants may have common prefixes stripped.
+  bool strippedPrefix = false;
   if (isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
     StringRef removePrefix =
-        getEnumConstantNamePrefix(enumDecl, &clangSema.getPreprocessor());
-    if (baseName.startswith(removePrefix))
+      getEnumConstantNamePrefix(enumDecl, &clangSema.getPreprocessor());
+    if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
       baseName = baseName.substr(removePrefix.size());
+      strippedPrefix = true;
+    }
   }
 
   auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
@@ -2319,6 +2322,31 @@ auto ClangImporter::Implementation::importFullName(
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
   if (OmitNeedlessWords) {
+    // Check whether the module in which the declaration resides has a
+    // module prefix. If so, strip that prefix off when present.
+    if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
+        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
+      // Find the original declaration, from which we can determine
+      // the owning module.
+      const clang::Decl *owningD = D->getCanonicalDecl();
+      if (auto def = getDefinitionForClangTypeDecl(D)) {
+        if (*def)
+          owningD = *def;
+      }
+
+      std::string moduleName;
+      if (auto module = owningD->getImportedOwningModule())
+        moduleName = module->getTopLevelModuleName();
+      else
+        moduleName = owningD->getASTContext().getLangOpts().CurrentModule;
+      if (unsigned prefixLen = stripModulePrefixLength(ModulePrefixes,
+                                                       moduleName, baseName)) {
+        // Strip off the prefix.
+        baseName = baseName.substr(prefixLen);
+        strippedPrefix = true;
+      }
+    }
+
     // Objective-C properties.
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(D->getDeclContext());
@@ -2362,35 +2390,12 @@ auto ClangImporter::Implementation::importFullName(
         omitNeedlessWordsScratch);
     }
 
-    // Check whether the module in which the declaration resides has a
-    // module prefix. If so, strip that prefix off when present.
-    if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
-        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
-      // Find the original declaration, from which we can determine
-      // the owning module.
-      const clang::Decl *owningD = D->getCanonicalDecl();
-      if (auto def = getDefinitionForClangTypeDecl(D)) {
-        if (*def)
-          owningD = *def;
-      }
-
-      std::string moduleName;
-      if (auto module = owningD->getImportedOwningModule())
-        moduleName = module->getTopLevelModuleName();
-      else
-        moduleName = owningD->getASTContext().getLangOpts().CurrentModule;
-      if (unsigned prefixLen = stripModulePrefixLength(ModulePrefixes,
-                                                       moduleName, baseName)) {
-        // Strip off the prefix.
-        baseName = baseName.substr(prefixLen);
-
-        // If the result is a value, lowercase it.
-        if (isa<clang::ValueDecl>(D) && shouldLowercaseValueName(baseName)) {
-          baseName =
-            camel_case::toLowercaseInitialisms(baseName,
-                                               omitNeedlessWordsScratch);
-        }
-      }
+    // If the result is a value, lowercase it.
+    if (strippedPrefix && isa<clang::ValueDecl>(D) &&
+        shouldLowercaseValueName(baseName)) {
+      baseName =
+        camel_case::toLowercaseInitialisms(baseName,
+                                           omitNeedlessWordsScratch);
     }
   }
 

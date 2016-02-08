@@ -79,6 +79,13 @@
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
 
+// Note: lowercasing enum constants.
+// CHECK-FOUNDATION: enum ByteCountFormatterCountStyle : Int {
+// CHECK-FOUNDATION: case file
+// CHECK-FOUNDATION-NEXT: case memory
+// CHECK-FOUNDATION-NEXT: case decimal
+// CHECK-FOUNDATION-NEXT: case binary
+
 // Note: Make sure NSURL works in various places
 // CHECK-FOUNDATION: open(_: URL!, completionHandler: ((Bool) -> Void)!)
 
@@ -116,6 +123,11 @@
 
 // Note: <property type><preposition> --> <preposition>.
 // CHECK-FOUNDATION: var withHTTPS: URL { get }
+
+// Note: lowercasing option set values
+// CHECK-FOUNDATION: struct EnumerationOptions
+// CHECK-FOUNDATION: static var concurrent: EnumerationOptions
+// CHECK-FOUNDATION: static var reverse: EnumerationOptions
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
@@ -209,6 +221,9 @@
 // Note: NSDictionary default arguments for "options"
 // CHECK-APPKIT: func drawAnywhereIn(_: NSView?, options: [Object : AnyObject] = [:])
 // CHECK-APPKIT: func drawAnywhere(options _: [Object : AnyObject] = [:])
+
+// Note: no lowercasing of initialisms when there might be a prefix.
+// CHECK-CORECOOLING: func CFBottom() ->
 
 // Note: "Ref" variants are unavailable.
 // CHECK-CORECOOLING: @available(*, unavailable, renamed="CCPowerSupply", message="Not available in Swift")
