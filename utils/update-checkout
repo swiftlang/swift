@@ -104,8 +104,6 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"), branch)
 
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"), branch)
-    update_working_copy(
-        os.path.join(SWIFT_SOURCE_ROOT, "swift", "benchmark", "PerfTestSuite"), branch)
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "SourceKit"), branch)
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "cmark"), branch)
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"), branch)

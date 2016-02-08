@@ -15,79 +15,25 @@ list(APPEND CMAKE_MODULE_PATH
 include(add-swift-benchmark-suite)
 
 set(SWIFT_BENCH_MODULES
-    Ackermann
-    AngryPhonebook
-    Array2D
-    ArrayAppend
-    ArrayInClass
-    ArrayLiteral
-    ArrayOfGenericPOD
-    ArrayOfGenericRef
-    ArrayOfPOD
-    ArrayOfRef
-    ArraySubscript
-    BitCount
-    ByteSwap
-    Calculator
-    CaptureProp
-    Chars
-    ClassArrayGetter
-    DeadArray
-    DictionaryBridge
-    DictionaryLiteral
-    DictionaryRemove
-    DictionarySwap
-    DictTest
-    DictTest2
-    DictTest3
-    ErrorHandling
-    Fibonacci
-    GlobalClass
-    Hanoi
-    Hash
-    Histogram
-    Join
-    LinkedList
-    MapReduce
-    Memset
-    MonteCarloE
-    MonteCarloPi
-    NopDeinit
-    NSDictionaryCastToSwift
-    NSError
-    NSStringConversion
-    ObjectAllocation
-    OpenClose
-    Phonebook
-    PolymorphicCalls
-    PopFront
-    PopFrontGeneric
-    Prims
-    ProtocolDispatch
-    RangeAssignment
-    RC4
-    RecursiveOwnedParameter
-    RGBHistogram
-    SetTests
-    SevenBoom
-    Sim2DArray
-    SortLettersInPlace
-    SortStrings
-    StrComplexWalk
-    StringBuilder
-    StringInterpolation
-    StringTests
-    StringWalk
-    StrToInt
-    SuperChars
-    TwoSum
-    Walsh
-    XorLoop
+{% for test in tests %}
+    {{ test }}
+{% endfor %}
 )
 
 set(SWIFT_MULTISOURCE_BENCHES
+{% for multisource_bench in multisource_benches %}
+    {{ multisource_bench.name }}
+{% endfor %}
 )
 
+{% for multisource_bench in multisource_benches %}
+set({{ multisource_bench.name }}_sources
+    {% for file in multisource_bench.files %}
+    {{ multisource_bench.name }}/{{ file }}
+    {% endfor %}
+)
+
+{% endfor %}
 
 set(BENCH_DRIVER_LIBRARY_MODULES
     DriverUtils

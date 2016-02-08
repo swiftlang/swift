@@ -120,6 +120,7 @@ KNOWN_SETTINGS=(
     skip-build-xctest           ""               "set to skip building xctest"
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
+    skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -139,6 +140,7 @@ KNOWN_SETTINGS=(
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
     skip-test-validation        ""               "set to skip validation test suite"
+    skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     xcode-ide-only              ""               "set to configure Xcode project for IDE use only, not building"
@@ -151,7 +153,6 @@ KNOWN_SETTINGS=(
     build-swift-sdk-overlay     "1"              "set to 1 to build the Swift SDK overlay"
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
-    build-swift-perf-testsuite  "0"              "set to 1 to build perf test suite"
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
@@ -557,6 +558,7 @@ if [[ "${SKIP_BUILD}" ]]; then
     SKIP_BUILD_XCTEST=1
     SKIP_BUILD_FOUNDATION=1
     SKIP_BUILD_LIBDISPATCH=1
+    SKIP_BUILD_BENCHMARKS=1
 fi
 
 if [[ "${SKIP_IOS}" ]] ; then
@@ -729,7 +731,7 @@ function not() {
 
 function true_false() {
     case "$1" in
-        false | FALSE | 0)
+        false | FALSE | 0 | "")
             echo "FALSE"
             ;;
         true | TRUE | 1)
@@ -932,13 +934,15 @@ if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
 fi
 
 SWIFT_STDLIB_TARGETS=()
-SWIFT_PERFTEST_TARGETS=()
+SWIFT_BENCHMARK_TARGETS=()
+SWIFT_RUN_BENCHMARK_TARGETS=()
 SWIFT_TEST_TARGETS=()
 for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     build_for_this_target=1
-    perftest_this_target=
     test_this_target=1
     test_host_only=
+    build_benchmark_this_target=
+    test_benchmark_this_target=
     case ${deployment_target} in
         linux-*)
             build_for_this_target=1
@@ -950,17 +954,18 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         macosx-*)
             build_for_this_target=$(not ${SKIP_BUILD_OSX})
-            perftest_this_target=$(not ${SKIP_BUILD_OSX})
             test_this_target=$(not ${SKIP_TEST_OSX})
+            build_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
+            test_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
             ;;
         iphoneos-*)
             build_for_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-            perftest_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
             if [[ ! "${SKIP_TEST_IOS_HOST}" ]] ; then
                 test_host_only=1
             else
                 test_this_target=
             fi
+            build_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
             ;;
         iphonesimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
@@ -968,12 +973,12 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         appletvos-*)
             build_for_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-            perftest_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
             if [[ ! "${SKIP_TEST_TVOS_HOST}" ]] ; then
                 test_host_only=1
             else
                 test_this_target=
             fi
+            build_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
             ;;
         appletvsimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_TVOS_SIMULATOR})
@@ -981,12 +986,12 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         watchos-*)
             build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-            perftest_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
             if [[ ! "${SKIP_TEST_WATCHOS_HOST}" ]] ; then
                 test_host_only=1
             else
                 test_this_target=
             fi
+            build_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
             ;;
         watchsimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_SIMULATOR})
@@ -1011,9 +1016,13 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             fi
         fi
     fi
-    if [[ "${perftest_this_target}" ]] ; then
-        SWIFT_PERFTEST_TARGETS=(
-            "${SWIFT_PERFTEST_TARGETS[@]}" "swift-perftest-${deployment_target}")
+    if [[ "${build_benchmark_this_target}" ]] ; then
+        SWIFT_BENCHMARK_TARGETS=(
+            "${SWIFT_BENCHMARK_TARGETS[@]}" "swift-benchmark-${deployment_target}")
+        if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
+          SWIFT_RUN_BENCHMARK_TARGETS=(
+              "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" "check-swift-benchmark-${deployment_target}")
+        fi
     fi
     if [[ "${test_this_target}" ]] ; then
         if [[ -n "${test_host_only}" ]] ; then
@@ -1040,6 +1049,11 @@ done
 echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
 if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
     echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+fi
+if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
+   [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]] &&
+   ! [[ "${SKIP_TEST_BENCHMARK}" ]]; then
+    echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
 fi
 echo
 
@@ -1591,7 +1605,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                         -DLLVM_MAIN_SRC_DIR:PATH="${LLVM_SOURCE_DIR}"
                     )
                 else
-                    build_perf_testsuite_this_time=$(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
+                    build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
                     build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
                 fi
 
@@ -1665,11 +1679,10 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                         -DSWIFT_EXEC:STRING="${native_swift_tools_path}/swiftc"
                     )
                     build_targets=("${build_targets[@]}"
-                                   "${SWIFT_PERFTEST_TARGETS[@]}")
+                                   "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
-
             lldb)
                 if [ ! -d "${LLDB_SOURCE_DIR}" ]; then
                     echo "error: lldb not found in ${LLDB_SOURCE_DIR}"
@@ -1946,16 +1959,26 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 continue # We don't test LLVM
                 ;;
             swift)
-                if [[ "${SKIP_TEST_SWIFT}" ]]; then
-                    continue
+                executable_target=
+                results_targets=
+                if ! [[ "${SKIP_TEST_SWIFT}" ]]; then
+                    executable_target=SwiftUnitTests
+                    results_targets=("${SWIFT_TEST_TARGETS[@]}")
+                    if [[ "${STRESS_TEST_SOURCEKIT}" ]]; then
+                        results_targets=(
+                            "${results_targets[@]}"
+                            stress-SourceKit
+                        )
+                    fi
                 fi
-                executable_target=SwiftUnitTests
-                results_targets=("${SWIFT_TEST_TARGETS[@]}")
-                if [[ "${STRESS_TEST_SOURCEKIT}" ]]; then
+                if ! [[ "${SKIP_TEST_BENCHMARKS}" ]]; then
                     results_targets=(
                         "${results_targets[@]}"
-                        stress-SourceKit
+                        "${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
                     )
+                fi
+                if [[ -z "${results_targets[@]}" ]]; then
+                    continue
                 fi
                 ;;
             lldb)
@@ -2073,22 +2096,24 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
 
         echo "--- Running tests for ${product} ---"
         for target in "${results_targets[@]}"; do
-            echo "--- ${target} ---"
-            trap "tests_busted ${product} '(${target})'" ERR
-            if [[ "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
-                # Ninja buffers command output to avoid scrambling the output
-                # of parallel jobs, which is awesome... except that it
-                # interferes with the progress meter when testing.  Instead of
-                # executing ninja directly, have it dump the commands it would
-                # run, strip Ninja's progress prefix with sed, and tell the
-                # shell to execute that.
-                sh -c "set -x && $("${build_cmd[@]}" -n -v ${target} | sed -e 's/[^]]*] //')"
-            else
-                set -x
-                "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
-                { set +x; } 2>/dev/null
+            if [[ "${target}" != "" ]]; then
+                echo "--- ${target} ---"
+                trap "tests_busted ${product} '(${target})'" ERR
+                if [[ "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
+                    # Ninja buffers command output to avoid scrambling the output
+                    # of parallel jobs, which is awesome... except that it
+                    # interferes with the progress meter when testing.  Instead of
+                    # executing ninja directly, have it dump the commands it would
+                    # run, strip Ninja's progress prefix with sed, and tell the
+                    # shell to execute that.
+                    sh -c "set -x && $("${build_cmd[@]}" -n -v ${target} | sed -e 's/[^]]*] //')"
+                else
+                    set -x
+                    "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
+                    { set +x; } 2>/dev/null
+                fi
+                echo "-- ${target} finished --"
             fi
-            echo "-- ${target} finished --"
         done
 
         trap - ERR
