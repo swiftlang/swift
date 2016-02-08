@@ -24,12 +24,6 @@ func printError(err: TestError) {
   }
 }
 
-// FIXME: If I remove the constraint on _BridgedNSError, then the test will
-// fail, as NSError will no longer bridge to TestError
-func forceConformance<T : _BridgedNSError>(a: T) -> T {
-  return a
-}
-
 func testError() {
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
@@ -37,7 +31,7 @@ func testError() {
     // CHECK: TestError: TEOne
 
   do {
-    throw forceConformance(TestError.TETwo)
+    throw TestError.TETwo
   } catch let error as TestError {
     printError(error)
     // CHECK-NEXT: TestError: TETwo
