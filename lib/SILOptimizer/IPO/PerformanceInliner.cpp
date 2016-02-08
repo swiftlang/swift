@@ -914,7 +914,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 
-    DA->invalidate(Caller, SILAnalysis::InvalidationKind::Everything);
     NumFunctionsInlined++;
   }
 
