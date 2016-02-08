@@ -2247,6 +2247,13 @@ WARNING(no_throw_in_do_with_catch,none,
 // Type Check Types
 //------------------------------------------------------------------------------
 
+ERROR(unsupported_recursive_type,none,
+      "value type %0 cannot have a stored property that references itself",
+      (Type))
+
+ERROR(recursive_enum_not_indirect,none,
+      "recursive enum %0 is not marked 'indirect'", (Type))
+
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"

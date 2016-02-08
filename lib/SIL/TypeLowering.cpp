@@ -1339,20 +1339,7 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
   // Try to complain about a nominal type.
   auto nomTy = k.SubstType.getAnyNominal();
   assert(nomTy && "non-nominal types should not be recursive");
-  
-  if (RecursiveNominalTypes.insert(nomTy).second) {
-    auto &diags = M.getASTContext().Diags;
-    if (auto *ED = dyn_cast<EnumDecl>(nomTy)) {
-      diags.diagnose(ED->getStartLoc(),
-                     diag::recursive_enum_not_indirect,
-                     nomTy->getDeclaredTypeInContext())
-      .fixItInsert(ED->getStartLoc(), "indirect ");
-    } else {
-      diags.diagnose(nomTy->getLoc(),
-                     diag::unsupported_recursive_type,
-                     nomTy->getDeclaredTypeInContext());
-    }
-  }
+
   auto result = new (*this, k.isDependent()) RecursiveErrorTypeLowering(
                             SILType::getPrimitiveAddressType(k.SubstType));
   found->second = result;

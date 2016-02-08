@@ -1124,6 +1124,12 @@ public:
   bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
                                   Type convertType = Type());
 
+  /// \brief Type check whether the given type declaration includes members of
+  /// unsupported recursive value types.
+  ///
+  /// \param decl The declaration to be type-checked. This process will not
+  /// modify the declaration.
+  void checkDeclCircularity(NominalTypeDecl *decl);
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
