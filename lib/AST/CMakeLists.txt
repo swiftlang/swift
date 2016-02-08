@@ -73,7 +73,8 @@ add_swift_library(swiftAST
   )
 
 if(NOT SWIFT_BUILT_STANDALONE)
-  add_dependencies(swiftAST intrinsics_gen)
+  get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
+  add_dependencies(swiftAST intrinsics_gen ${CLANG_TABLEGEN_TARGETS})
 endif()
 
 set(swift_ast_verifier_flag)
