@@ -88,3 +88,8 @@ struct _Prespecialize {
     return count
   }
 }
+
+public func _swift_forcePrespecializations() {
+  _Prespecialize._specializeArrays()
+  _Prespecialize._specializeRanges()
+}
