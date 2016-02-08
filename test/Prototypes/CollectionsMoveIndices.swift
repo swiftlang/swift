@@ -355,11 +355,8 @@ extension MyForwardCollectionType {
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-/*
     let start = advance(startIndex, by: numericCast(n), limit: endIndex)
-    return self[start..<endIndex]
-*/
-    fatalError()
+    return self[start..<*endIndex]
   }
 
   @warn_unused_result
@@ -1362,6 +1359,68 @@ NewCollection.test("popFirst") {
   expectOptionalEqual(2, s.popFirst())
   expectOptionalEqual(3, s.popFirst())
   expectEmpty(s.popFirst())
+}
+
+NewCollection.test("dropFirst") {
+  do {
+    let c = MySimplestForwardCollection([] as Array<Int>)
+    let s = c.dropFirst(3)
+    expectEqualSequence([], OldSequence(s))
+  }
+  do {
+    let c = MySimplestForwardCollection([10, 20, 30, 40, 50])
+    let s = c.dropFirst(3)
+    expectEqualSequence([40, 50], OldSequence(s))
+  }
+}
+
+NewCollection.test("dropLast") {
+  do {
+    let c = MySimplestForwardCollection([] as Array<Int>)
+    let s = c.dropLast(3)
+    expectEqualSequence([], OldSequence(s))
+  }
+  do {
+    let c = MySimplestForwardCollection([10, 20, 30, 40, 50])
+    let s = c.dropLast(3)
+    expectEqualSequence([10, 20], OldSequence(s))
+  }
+}
+
+NewCollection.test("prefix") {
+  do {
+    let c = MySimplestForwardCollection([] as Array<Int>)
+    let s = c.prefix(3)
+    expectEqualSequence([], OldSequence(s))
+  }
+  do {
+    let c = MySimplestForwardCollection([10, 20, 30, 40, 50])
+    let s = c.prefix(3)
+    expectEqualSequence([10, 20, 30], OldSequence(s))
+  }
+  do {
+    let c = MySimplestForwardCollection([10, 20, 30, 40, 50])
+    let s = c.prefix(Int.max)
+    expectEqualSequence([10, 20, 30, 40, 50], OldSequence(s))
+  }
+}
+
+NewCollection.test("suffix") {
+  do {
+    let c = MySimplestForwardCollection([] as Array<Int>)
+    let s = c.suffix(3)
+    expectEqualSequence([], OldSequence(s))
+  }
+  do {
+    let c = MySimplestForwardCollection([10, 20, 30, 40, 50])
+    let s = c.suffix(3)
+    expectEqualSequence([30, 40, 50], OldSequence(s))
+  }
+  do {
+    let c = MySimplestForwardCollection([10, 20, 30, 40, 50])
+    let s = c.suffix(Int.max)
+    expectEqualSequence([10, 20, 30, 40, 50], OldSequence(s))
+  }
 }
 
 NewCollection.test("RangeLiterals") {
