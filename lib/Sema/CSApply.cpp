@@ -299,6 +299,20 @@ namespace {
     bool SkipClosures;
 
   private:
+    /// Recognize used conformances from an imported type when we must emit
+    /// the witness table.
+    ///
+    /// This arises in _BridgedNSError, where we wouldn't otherwise pull in
+    /// the witness table, causing dynamic casts to perform incorrectly.
+    void checkForImportedUsedConformances(Type toType) {
+      if (auto bridgedNSErrorProtocol = cs.getASTContext().getProtocol(
+              KnownProtocolKind::BridgedNSError)) {
+        // Force it as "Used", if it conforms
+        cs.getTypeChecker().conformsToProtocol(toType, bridgedNSErrorProtocol,
+                                               dc, ConformanceCheckFlags::Used);
+      }
+    }
+
     /// \brief Coerce the given tuple to another tuple type.
     ///
     /// \param expr The expression we're converting.
@@ -2784,6 +2798,7 @@ namespace {
       if (!sub)
         return nullptr;
       
+      checkForImportedUsedConformances(toType);
       expr->setSubExpr(sub);
 
       // Set the type we checked against.
@@ -2995,6 +3010,7 @@ namespace {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      checkForImportedUsedConformances(toType);
 
       // Determine whether we performed a coercion or downcast.
       if (cs.shouldAttemptFixes()) {
@@ -3026,6 +3042,7 @@ namespace {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      checkForImportedUsedConformances(toType);
 
       // The subexpression is always an rvalue.
       auto &tc = cs.getTypeChecker();
@@ -3098,6 +3115,7 @@ namespace {
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      checkForImportedUsedConformances(toType);
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // The subexpression is always an rvalue.
