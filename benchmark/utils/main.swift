@@ -85,6 +85,7 @@ import StringInterpolation
 import StringTests
 import StringWalk
 import SuperChars
+import TypeFlood
 import TwoSum
 import Walsh
 import XorLoop
@@ -162,6 +163,7 @@ precommitTests = [
   "StringWalk": run_StringWalk,
   "StringWithCString": run_StringWithCString,
   "SuperChars": run_SuperChars,
+  "TypeFlood": run_TypeFlood,
   "TwoSum": run_TwoSum,
   "Walsh": run_Walsh,
   "XorLoop": run_XorLoop,

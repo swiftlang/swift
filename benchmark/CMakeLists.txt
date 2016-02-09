@@ -80,6 +80,7 @@ set(SWIFT_BENCH_MODULES
     StringWalk
     StrToInt
     SuperChars
+    TypeFlood
     TwoSum
     Walsh
     XorLoop
