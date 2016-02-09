@@ -136,3 +136,6 @@ struct TypeReferencedOnlyByPrivateSubscript {}
 
 protocol ProtoReferencedOnlyInGeneric {}
 protocol ProtoReferencedOnlyInPrivateGeneric {}
+
+struct TypeReferencedOnlyByPrivateVar {}
+struct TypeReferencedOnlyByPrivateClassVar {}

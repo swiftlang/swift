@@ -331,6 +331,15 @@ func genericTest<T: ProtoReferencedOnlyInGeneric>(_: T) {}
 // CHECK-DAG: !private "ProtoReferencedOnlyInPrivateGeneric"
 private func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
 
+struct PrivateStoredProperty {
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateVar"
+  private var value: TypeReferencedOnlyByPrivateVar
+}
+class PrivateStoredPropertyRef {
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateClassVar"
+  private var value: TypeReferencedOnlyByPrivateClassVar?
+}
+
 struct Sentinel1 {}
 
 private protocol ExtensionProto {}
