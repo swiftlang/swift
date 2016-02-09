@@ -1353,19 +1353,11 @@ private:
                            SILValue Value);
 
 
-  void
-  createChildren(ProjectionTree &Tree,
-                 llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist);
+  void createNextLevelChildren(ProjectionTree &Tree);
 
-  void
-  createChildrenForStruct(ProjectionTree &Tree,
-                          llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
-                          StructDecl *SD);
+  void createNextLevelChildrenForStruct(ProjectionTree &Tree, StructDecl *SD);
 
-  void
-  createChildrenForTuple(ProjectionTree &Tree,
-                         llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
-                         TupleType *TT);
+  void createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT);
 };
 
 class ProjectionTree {

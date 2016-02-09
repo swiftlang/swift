@@ -1652,6 +1652,11 @@ processUsersOfValue(ProjectionTree &Tree,
 
     assert(User->hasValue() && "Projections should have a value");
 
+    // we have a projection to the next level children, create the next
+    // level children nodes lazily.
+    if (!Initialized)
+      createNextLevelChildren(Tree);
+
     // Look up the Node for this projection add {User, ChildNode} to the
     // worklist.
     //
@@ -1676,9 +1681,7 @@ processUsersOfValue(ProjectionTree &Tree,
 
 void
 ProjectionTreeNode::
-createChildrenForStruct(ProjectionTree &Tree,
-                        llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
-                        StructDecl *SD) {
+createNextLevelChildrenForStruct(ProjectionTree &Tree, StructDecl *SD) {
   SILModule &Mod = Tree.getModule();
   unsigned ChildIndex = 0;
   SILType Ty = getType();
@@ -1687,39 +1690,36 @@ createChildrenForStruct(ProjectionTree &Tree,
     SILType NodeTy = Ty.getFieldType(VD, Mod);
     auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
     DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
-    DEBUG(llvm::dbgs() << "            Projection: " << Node->getProjection().getValue().getGeneralizedIndex() << "\n");
+    DEBUG(llvm::dbgs() << "            Projection: " 
+          << Node->getProjection().getValue().getGeneralizedIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
     assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
            "Child not matched to its projection in parent!");
     assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
-    Worklist.push_back(Node);
   }
 }
 
 void
 ProjectionTreeNode::
-createChildrenForTuple(ProjectionTree &Tree,
-                       llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
-                       TupleType *TT) {
+createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT) {
   SILType Ty = getType();
   for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
     assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
     SILType NodeTy = Ty.getTupleElementType(i);
     auto *Node = Tree.createChildForTuple(this, NodeTy, i);
     DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
-    DEBUG(llvm::dbgs() << "            Projection: " << Node->getProjection().getValue().getGeneralizedIndex() << "\n");
+    DEBUG(llvm::dbgs() << "            Projection: "
+          << Node->getProjection().getValue().getGeneralizedIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
     assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
            "Child not matched to its projection in parent!");
     assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
-    Worklist.push_back(Node);
   }
 }
 
 void
 ProjectionTreeNode::
-createChildren(ProjectionTree &Tree,
-               llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist) {
+createNextLevelChildren(ProjectionTree &Tree) {
   DEBUG(llvm::dbgs() << "    Creating children for: " << getType() << "\n");
   if (Initialized) {
     DEBUG(llvm::dbgs() << "        Already initialized! bailing!\n");
@@ -1737,7 +1737,7 @@ createChildren(ProjectionTree &Tree,
 
   if (auto *SD = Ty.getStructOrBoundGenericStruct()) {
     DEBUG(llvm::dbgs() << "        Found a struct!\n");
-    createChildrenForStruct(Tree, Worklist, SD);
+    createNextLevelChildrenForStruct(Tree, SD);
     return;
   }
 
@@ -1749,7 +1749,7 @@ createChildren(ProjectionTree &Tree,
   }
 
   DEBUG(llvm::dbgs() << "        Found a tuple.");
-  createChildrenForTuple(Tree, Worklist, TT);
+  createNextLevelChildrenForTuple(Tree, TT);
 }
 
 SILInstruction *
@@ -1781,26 +1781,7 @@ ProjectionTree::ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA,
   // Create the root node of the tree with our base type.
   createRoot(BaseTy);
 
-  // Initialize the worklist with the root node.
-  llvm::SmallVector<ProjectionTreeNode *, 8> Worklist;
-  Worklist.push_back(getRoot());
-
-  // Then until the worklist is empty...
-  while (!Worklist.empty()) {
-    DEBUG(llvm::dbgs() << "Current Worklist:\n");
-    DEBUG(for (auto *N : Worklist) {
-        llvm::dbgs() << "    " << N->getType() << "\n";
-    });
-
-    // Pop off the top of the list.
-    ProjectionTreeNode *Node = Worklist.pop_back_val();
-
-    DEBUG(llvm::dbgs() << "Visiting: " << Node->getType() << "\n");
-
-    // Initialize the worklist and its children, adding them to the worklist as
-    // we create them.
-    Node->createChildren(*this, Worklist);
-  }
+  // Create the rest of the type tree lazily based on uses.
 }
 
 ProjectionTree::~ProjectionTree() {
