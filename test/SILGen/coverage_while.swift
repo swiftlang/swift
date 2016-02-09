@@ -54,4 +54,53 @@ func foo() -> Int32 {
   return x
 }
 
+// rdar://problem/24572268
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_while.goo
+// CHECK: [[@LINE+1]]:12 -> {{[0-9]+}}:2 : [[BAR:[0-9]+]]
+func goo() {
+  var x : Int32 = 0
+
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+2]]:4 : [[RWS1:[0-9]+]]
+    x += 1
+  } while x < 10 // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:17 : [[RWS1]]
+
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+6]]:4 : [[RWS2:[0-9]+]]
+    x += 1
+    if (x % 2 == 0) { // CHECK-DAG: [[@LINE]]:21 -> [[@LINE+2]]:6 : [[CONT1:[0-9]+]]
+      continue
+    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+2]]:4 : ([[RWS2]] - [[CONT1]])
+    x += 1
+  } while x < 20 // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:17 : [[RWS2]]
+
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+6]]:4 : [[RWS3:[0-9]+]]
+    x += 1
+    if (x % 2 == 0) { // CHECK-DAG: [[@LINE]]:21 -> [[@LINE+2]]:6 : [[BRK1:[0-9]+]]
+      break
+    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+2]]:4 : ([[RWS3]] - [[BRK1]])
+    x += 1
+  } while x < 30 // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:17 : ([[RWS3]] - [[BRK1]])
+
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+10]]:4 : [[RWS4:[0-9]+]]
+    x += 1
+    if (x % 2 == 0) { // CHECK-DAG: [[@LINE]]:21 -> [[@LINE+2]]:6 : [[CONT2:[0-9]+]]
+      continue
+    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+6]]:4 : ([[RWS4]] - [[CONT2]])
+    x += 1
+    if (x % 7 == 0) { // CHECK-DAG: [[@LINE]]:21 -> [[@LINE+2]]:6 : [[BRK2:[0-9]+]]
+      break
+    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+2]]:4 : (([[RWS4]] - [[CONT2]]) - [[BRK2]])
+    x += 1
+  } while x < 40 // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:17 : ([[RWS4]] - [[BRK2]])
+
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+1]]:4 : [[RWS5:[0-9]+]]
+  } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : [[RWS5]]
+
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+4]]:4 : [[RWS6:[0-9]+]]
+    repeat { // CHECK-DAG: [[@LINE]]:12 -> [[@LINE+2]]:6 : [[RWS7:[0-9]+]]
+      return
+    } while false // CHECK-DAG: [[@LINE]]:13 -> [[@LINE]]:18 : [[RWS7]]
+  } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : [[RWS6]]
+}
+
 foo()
+goo()
