@@ -20,6 +20,8 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/CommandLine.h"
 
+#include <iostream>
+
 using llvm::dyn_cast;
 using llvm::StringRef;
 using namespace llvm::object;
@@ -59,7 +61,7 @@ Architecture("arch", llvm::cl::desc("Architecture to inspect in the binary"),
 
 static void guardError(std::error_code error) {
   if (!error) return;
-  llvm::errs() << "swift-reflection-test error: " << error.message() << "\n";
+  std::cerr << "swift-reflection-test error: " << error.message() << "\n";
   exit(EXIT_FAILURE);
 }
 
@@ -88,7 +90,22 @@ getReflectionSectionRef(const Binary *binaryFile, StringRef arch) {
   return SectionRef();
 }
 
-static int doDumpReflectionSection(StringRef BinaryFilename, StringRef arch) {
+struct FileSectionReader final : public ReflectionReader {
+  const ReflectionSection Section;
+
+  FileSectionReader(const ReflectionSection Section) : Section(Section) {}
+
+  size_t read(void *dst, void *src, size_t count) const override {
+    memmove(dst, src, count);
+    return count;
+  }
+
+  std::vector<const ReflectionSection> getSections() const override {
+    return { Section };
+  }
+};
+
+static int doDumpReflectionSection(std::string BinaryFilename, StringRef arch) {
   auto binaryOrError = llvm::object::createBinary(BinaryFilename);
   guardError(binaryOrError.getError());
 
@@ -97,8 +114,8 @@ static int doDumpReflectionSection(StringRef BinaryFilename, StringRef arch) {
   auto reflectionSectionRef = getReflectionSectionRef(binary, arch);
 
   if (reflectionSectionRef.getObject() == nullptr) {
-    llvm::errs() << BinaryFilename;
-    llvm::errs() << " doesn't have a swift3_reflect section!\n";
+    std::cerr << BinaryFilename;
+    std::cerr << " doesn't have a swift3_reflect section!\n";
     return EXIT_FAILURE;
   }
 
@@ -106,36 +123,14 @@ static int doDumpReflectionSection(StringRef BinaryFilename, StringRef arch) {
   reflectionSectionRef.getContents(sectionContents);
 
   const ReflectionSection section {
-    BinaryFilename,
+    BinaryFilename.c_str(),
     reinterpret_cast<const void *>(sectionContents.begin()),
     reinterpret_cast<const void *>(sectionContents.end())
   };
 
-  ReflectionContext RC;
-
-  for (const auto &descriptor : section) {
-    auto typeName = demangleTypeAsString(descriptor.getMangledTypeName());
-    auto mangledTypeName = descriptor.getMangledTypeName();
-    auto demangleTree = demangleTypeAsNode(mangledTypeName);
-    auto TR = decodeDemangleNode(RC, demangleTree);
-    llvm::outs() << typeName << '\n';
-    for (size_t i = 0; i < typeName.size(); ++i)
-      llvm::outs() << '=';
-    llvm::outs() << '\n';
-
-    TR->dump(llvm::outs());
-    llvm::outs() << "\n";
-
-    for (auto &field : descriptor.getFieldRecords()) {
-      auto fieldDemangleTree = demangleTypeAsNode(field.getMangledTypeName());
-      auto fieldTR = decodeDemangleNode(RC, fieldDemangleTree);
-      auto fieldName = field.getFieldName();
-      llvm::outs() << "- " << fieldName << ":\n";
-
-      fieldTR->dump(llvm::outs());
-      llvm::outs() << "\n";
-    }
-  }
+  FileSectionReader Reader(section);
+  ReflectionContext RC(Reader);
+  RC.dumpSections(std::cout);
 
   return EXIT_SUCCESS;
 }

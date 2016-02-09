@@ -18,32 +18,52 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#include "swift/Reflection/TypeRef.h"
 #include "swift/Runtime/Metadata.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Allocator.h"
+
+#include <iostream>
 
 class NodePointer;
 
 namespace swift {
 namespace reflection {
 
-class TypeRef;
-
-using llvm::ArrayRef;
-using llvm::StringRef;
-
 class FieldRecord {
   const RelativeDirectPointer<const char> MangledTypeName;
   const RelativeDirectPointer<const char> FieldName;
 
 public:
-  StringRef getMangledTypeName() const {
+  std::string getMangledTypeName() const {
     return MangledTypeName.get();
   }
 
-  StringRef getFieldName()  const {
+  std::string getFieldName()  const {
     return FieldName.get();
+  }
+};
+
+struct FieldRecordIterator {
+  const FieldRecord *Cur;
+  const FieldRecord * const End;
+
+  FieldRecordIterator(const FieldRecord *Cur, const FieldRecord * const End)
+    : Cur(Cur), End(End) {}
+
+  const FieldRecord &operator*() const {
+    return *Cur;
+  }
+
+  FieldRecordIterator &operator++() {
+    ++Cur;
+    return *this;
+  }
+
+  bool operator==(const FieldRecordIterator &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(const FieldRecordIterator &other) const {
+    return !(*this == other);
   }
 };
 
@@ -58,12 +78,21 @@ public:
   const uint32_t NumFields;
   const uint32_t FieldRecordSize;
 
-  const ArrayRef<FieldRecord> getFieldRecords() const {
-    auto Begin = reinterpret_cast<const FieldRecord *>(this + 1);
-    return ArrayRef<FieldRecord>(Begin, NumFields);
+  using const_iterator = FieldRecordIterator;
+
+  const_iterator begin() const {
+    auto Begin = getFieldRecordBuffer();
+    auto End = Begin + NumFields;
+    return const_iterator { Begin, End };
   }
 
-  const char *getMangledTypeName() const {
+  const_iterator end() const {
+    auto Begin = getFieldRecordBuffer();
+    auto End = Begin + NumFields;
+    return const_iterator { End, End };
+  }
+
+  std::string getMangledTypeName() const {
     return MangledTypeName.get();
   }
 };
@@ -104,7 +133,7 @@ class ReflectionSection {
   const void * const End;
 
 public:
-  ReflectionSection(const std::string ImageFilename, const void * const Begin,
+  ReflectionSection(const char *ImageFilename, const void * const Begin,
                     const void * const End)
     : ImageFilename(ImageFilename), Begin(Begin), End(End) {}
 
@@ -116,7 +145,7 @@ public:
     return const_iterator(End, End);
   }
 
-  const std::string &getImageFilename() const {
+  const std::string getImageFilename() const {
     return ImageFilename;
   }
 };
@@ -129,32 +158,36 @@ public:
 };
 
 class ReflectionContext {
-  llvm::BumpPtrAllocator Allocator;
-
+  ReflectionReader &Reader;
 public:
-  void *allocate(size_t Bytes, size_t Alignment) {
-    return Allocator.Allocate(Bytes, Alignment);
-  }
+  ReflectionContext(ReflectionReader &Reader) : Reader(Reader) {}
 
-  template <typename T, typename It>
-  T *allocateCopy(It Begin, It End) {
-    T *Result = static_cast<T *>(allocate(sizeof(T) * (End - Begin),
-                                          alignof(T)));
-    for (size_t i = 0; Begin != End; ++Begin, ++i)
-      new (Result + i) T(*Begin);
-    return Result;
-  }
+  void dumpSections(std::ostream &OS) const {
+    for (const auto &section : Reader.getSections()) {
+      for (const auto &descriptor : section) {
+        auto mangledTypeName = descriptor.getMangledTypeName();
+        auto typeName = Demangle::demangleTypeAsString(mangledTypeName);
+        auto demangleTree = Demangle::demangleTypeAsNode(mangledTypeName);
+        auto TR = decodeDemangleNode(demangleTree);
+        OS << typeName << '\n';
+        for (size_t i = 0; i < typeName.size(); ++i)
+          OS << '=';
+        OS << '\n';
+        TR->dump(OS);
+        std::cout << std::endl;
 
-  template <typename T>
-  llvm::MutableArrayRef<T> allocateCopy(llvm::ArrayRef<T> Array) {
-    return llvm::MutableArrayRef<T>(allocateCopy<T>(Array.begin(), Array.end()),
-                              Array.size());
-  }
+        for (auto &field : descriptor) {
+          auto fieldDemangleTree = Demangle::demangleTypeAsNode(
+              field.getMangledTypeName());
+          auto fieldTR = decodeDemangleNode(fieldDemangleTree);
+          auto fieldName = field.getFieldName();
 
-  llvm::StringRef allocateCopy(llvm::StringRef Str) {
-    llvm::ArrayRef<char> Result =
-    allocateCopy(llvm::makeArrayRef(Str.data(), Str.size()));
-    return llvm::StringRef(Result.data(), Result.size());
+          OS << "- " << fieldName << ":\n";
+          fieldTR->dump(OS);
+          OS << std::endl;
+        }
+      }
+    }
   }
 };
 
