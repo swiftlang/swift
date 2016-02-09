@@ -2003,6 +2003,20 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
+  if (origCalleeType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    auto genericSig = origCalleeType->getGenericSignature();
+    assert(genericSig &&
+           "witness_method calls must retain their generic signature");
+    auto selfType = genericSig->getGenericParams()[0];
+    assert(selfType->getDepth() == 0 && selfType->getIndex() == 0 &&
+           "first generic parameter must be protocol Self type");
+    auto conformsTo = genericSig->getConformsTo(
+        selfType, *IGM.SILMod->getSwiftModule());
+    assert(conformsTo.size() == 1 &&
+           "Self type must conform to exactly one protocol");
+  }
+
   Explosion llArgs;    
   CallEmission emission =
     getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
