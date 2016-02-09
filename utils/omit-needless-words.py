@@ -63,7 +63,34 @@ def collect_submodules(common_args, module):
             submodules.add(match.group(1))
 
     return sorted(list(submodules))
-    
+
+# Dump the API for the given module.
+def dump_module_api(cmd, extra_dump_args, output_dir, module, quiet):
+    # Collect the submodules
+    submodules = collect_submodules(cmd, module)
+
+    # Dump the top-level module
+    subprocess.call(['mkdir', '-p', ('%s/%s' % (output_dir, module))])
+    output_file = '%s/%s/%s.swift' % (output_dir, module, module)
+    if not quiet:
+        print('Writing %s...' % output_file)
+
+    top_level_cmd = cmd + extra_dump_args + ['-module-to-print=%s' % (module)]
+    output_command_result_to_file(top_level_cmd, output_file)
+
+    # Dump each submodule.
+    for submodule in submodules:
+        output_file = '%s/%s/%s.swift' % (output_dir, module, submodule)
+        if not quiet:
+            print('Writing %s...' % output_file)
+
+        full_submodule = '%s.%s' % (module, submodule)
+        submodule_cmd = cmd + extra_dump_args
+        submodule_cmd = submodule_cmd + ['-module-to-print=%s' % (full_submodule)]
+        output_command_result_to_file(submodule_cmd, output_file)
+
+    return
+
 def main():
     source_filename = 'omit-needless-words.swift'
     parser = create_parser()
@@ -78,12 +105,10 @@ def main():
 
     swift_ide_test_cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-sdk', sdkroot, '-target', args.target, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments']
 
-    submodules = collect_submodules(swift_ide_test_cmd_common, args.module)
-
-    # Determine the set of arguments we'll use.
-    swift_ide_test_cmd = swift_ide_test_cmd_common + ['-skip-imports']
+    # Determine the set of extra arguments we'll use.
+    extra_args = ['-skip-imports']
     if args.swift_3:
-        swift_ide_test_cmd = swift_ide_test_cmd + ['-enable-omit-needless-words', '-enable-infer-default-arguments', '-enable-strip-ns-prefix']
+        extra_args = extra_args + ['-enable-omit-needless-words', '-enable-infer-default-arguments', '-enable-strip-ns-prefix']
 
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])
