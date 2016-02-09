@@ -22,11 +22,12 @@
 #include "swift/AST/Decl.h"
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Bitcode/BitCodes.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
 namespace serialization {
 
-using llvm::Fixnum;
+using llvm::PointerEmbeddedInt;
 using llvm::BCArray;
 using llvm::BCBlob;
 using llvm::BCFixed;
@@ -54,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 const uint16_t VERSION_MINOR = 238; // SILValue changes
 
-using DeclID = Fixnum<31>;
+using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
 
 // TypeID must be the same as DeclID because it is stored in the same way.
@@ -78,7 +79,7 @@ using NormalConformanceIDField = DeclIDField;
 using ModuleID = IdentifierID;
 using ModuleIDField = IdentifierIDField;
 
-using BitOffset = Fixnum<31>;
+using BitOffset = PointerEmbeddedInt<unsigned, 31>;
 using BitOffsetField = BCFixed<31>;
 
 // CharOffset must be the same as BitOffset because it is stored in the

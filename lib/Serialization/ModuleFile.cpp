@@ -355,7 +355,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(DeclID) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -364,7 +364,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<DeclID, little, unaligned>(data);
+    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
     auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
     return { declID, discriminator };
   }
@@ -432,7 +432,7 @@ public:
       bool isInstanceMethod = *data++ != 0;
       DeclID methodID = endian::readNext<uint32_t, little, unaligned>(data);
       result.push_back(std::make_tuple(typeID, isInstanceMethod, methodID));
-      length -= sizeof(TypeID) + 1 + sizeof(DeclID);
+      length -= sizeof(uint32_t) + 1 + sizeof(uint32_t);
     }
 
     return result;

@@ -386,7 +386,6 @@ void SwiftLookupTable::dump() const {
 // ---------------------------------------------------------------------------
 // Serialization
 // ---------------------------------------------------------------------------
-using llvm::Fixnum;
 using llvm::BCArray;
 using llvm::BCBlob;
 using llvm::BCFixed;

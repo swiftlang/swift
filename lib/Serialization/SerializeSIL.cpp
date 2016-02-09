@@ -88,7 +88,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
-      uint32_t dataLength = sizeof(DeclID);
+      uint32_t dataLength = sizeof(uint32_t);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -101,7 +101,6 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      static_assert(sizeof(DeclID) <= 32, "DeclID too large");
       endian::Writer<little>(out).write<uint32_t>(data);
     }
   };
@@ -225,7 +224,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   ValueIDs.clear();
   InstID = 0;
 
-  FuncTable[Ctx.getIdentifier(F.getName())] = FuncID++;
+  FuncTable[Ctx.getIdentifier(F.getName())] = FuncID;
+  FuncID = FuncID + 1;
   Funcs.push_back(Out.GetCurrentBitNo());
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
   TypeID FnID = S.addTypeRef(F.getLoweredType().getSwiftType());
@@ -1272,7 +1272,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // (DeclID + hasOperand), and an operand.
     const EnumInst *UI = cast<EnumInst>(&SI);
     TypeID OperandTy = UI->hasOperand() ?
-      S.addTypeRef(UI->getOperand()->getType().getSwiftRValueType()) : (TypeID)0;
+      S.addTypeRef(UI->getOperand()->getType().getSwiftRValueType()) : TypeID();
     unsigned OperandTyCategory = UI->hasOperand() ?
         (unsigned)UI->getOperand()->getType().getCategory() : 0;
     SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
@@ -1282,7 +1282,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)UI->getType().getCategory(),
         S.addDeclRef(UI->getElement()),
         OperandTy, OperandTyCategory,
-        UI->hasOperand() ? addValueRef(UI->getOperand()) : (ValueID)0);
+        UI->hasOperand() ? addValueRef(UI->getOperand()) : ValueID());
     break;
   }
   case ValueKind::WitnessMethodInst: {
@@ -1299,7 +1299,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     TypeID OperandTy =
         AMI->hasOperand()
             ? S.addTypeRef(AMI->getOperand()->getType().getSwiftRValueType())
-            : (TypeID)0;
+            : TypeID();
     unsigned OperandTyCategory =
         AMI->hasOperand() ? (unsigned)AMI->getOperand()->getType().getCategory()
                           : 0;
@@ -1444,7 +1444,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Non-void values get registered in the value table.
   if (SI.hasValue()) {
     addValueRef(&SI);
-    ++InstID;
+    InstID = InstID + 1;
   }
 }
 
@@ -1504,7 +1504,8 @@ void SILSerializer::writeIndexTables() {
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
-  GlobalVarList[Ctx.getIdentifier(g.getName())] = GlobalVarID++;
+  GlobalVarList[Ctx.getIdentifier(g.getName())] = GlobalVarID;
+  GlobalVarID = GlobalVarID + 1;
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
   TypeID TyID = S.addTypeRef(g.getLoweredType().getSwiftType());
   DeclID dID = S.addDeclRef(g.getDecl());
@@ -1517,7 +1518,8 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
-  VTableList[vt.getClass()->getName()] = VTableID++;
+  VTableList[vt.getClass()->getName()] = VTableID;
+  VTableID = VTableID + 1;
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
                            S.addDeclRef(vt.getClass()));
@@ -1536,7 +1538,8 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 }
 
 void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
-  WitnessTableList[wt.getIdentifier()] = WitnessTableID++;
+  WitnessTableList[wt.getIdentifier()] = WitnessTableID;
+  WitnessTableID = WitnessTableID + 1;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
 
   WitnessTableLayout::emitRecord(

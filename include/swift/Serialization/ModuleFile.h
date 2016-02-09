@@ -25,7 +25,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -199,7 +198,9 @@ public:
       : Value(), Offset(offset), IsFullyDeserialized(0) {}
 
     /*implicit*/ PartiallySerialized(RawBitOffset offset)
-      : Value(), Offset(offset), IsFullyDeserialized(0) {}
+      : Value(), Offset(static_cast<unsigned>(offset)), IsFullyDeserialized(0) {
+      assert(Offset == offset && "offset is too large");
+    }
 
     bool isDeserialized() const {
       return Value != T();
@@ -257,7 +258,9 @@ private:
 
     template <typename IntTy>
     /*implicit*/ SerializedIdentifier(IntTy rawOffset)
-      : Offset(rawOffset) {}
+      : Offset(static_cast<unsigned>(rawOffset)) {
+      assert(Offset == rawOffset && "not enough bits");
+    }
   };
 
   /// Identifiers referenced by this module.

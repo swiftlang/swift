@@ -55,6 +55,14 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::BCBlockRAII;
 
+/// Used for static_assert.
+static constexpr bool declIDFitsIn32Bits() {
+  using Int32Info = std::numeric_limits<uint32_t>;
+  using PtrIntInfo = std::numeric_limits<uintptr_t>;
+  using DeclIDTraits = llvm::PointerLikeTypeTraits<DeclID>;
+  return PtrIntInfo::digits - DeclIDTraits::NumLowBitsAvailable <= Int32Info::digits;
+}
+
 namespace {
   /// Used to serialize the on-disk decl hash table.
   class DeclTableInfo {
@@ -75,7 +83,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
-      uint32_t dataLength = (sizeof(DeclID) + 1) * data.size();
+      uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -88,7 +96,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      static_assert(sizeof(DeclID) <= 4, "DeclID too large");
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
       endian::Writer<little> writer(out);
       for (auto entry : data) {
         writer.write<uint8_t>(entry.first);
@@ -115,7 +123,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = key.size();
-      uint32_t dataLength = sizeof(DeclID) + sizeof(unsigned);
+      uint32_t dataLength = sizeof(uint32_t) + sizeof(unsigned);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       return { keyLength, dataLength };
@@ -127,9 +135,9 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      static_assert(sizeof(DeclID) <= 4, "DeclID too large");
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
       endian::Writer<little> writer(out);
-      writer.write<DeclID>(data.first);
+      writer.write<uint32_t>(data.first);
       writer.write<unsigned>(data.second);
     }
   };
@@ -260,7 +268,8 @@ DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
   if (id != 0)
     return id;
 
-  id = { ++LastLocalDeclContextID };
+  LastLocalDeclContextID = LastLocalDeclContextID + 1;
+  id = LastLocalDeclContextID;
   LocalDeclContextsToWrite.push(DC);
   return id;
 }
@@ -285,7 +294,8 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   if (id)
     return id;
 
-  id = { ++LastDeclContextID };
+  LastDeclContextID = LastDeclContextID + 1;
+  id = LastDeclContextID;
   DeclContextsToWrite.push(DC);
 
   return id;
@@ -317,7 +327,8 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   if (paramList)
     GenericContexts[paramList] = D;
 
-  id = { ++LastDeclID, forceSerialization };
+  LastDeclID = LastDeclID + 1;
+  id = { LastDeclID, forceSerialization };
   DeclsAndTypesToWrite.push(D);
   return id.first;
 }
@@ -330,7 +341,8 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (id.first != 0)
     return id.first;
 
-  id = { ++LastTypeID, true };
+  LastTypeID = LastTypeID + 1;
+  id = { LastTypeID, true };
   DeclsAndTypesToWrite.push(ty);
   return id.first;
 }
@@ -343,7 +355,8 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
   if (id != 0)
     return id;
 
-  id = ++LastIdentifierID;
+  LastIdentifierID = LastIdentifierID + 1;
+  id = LastIdentifierID;
   IdentifiersToWrite.push_back(ident);
   return id;
 }
@@ -372,7 +385,8 @@ NormalConformanceID Serializer::addConformanceRef(
   if (conformanceID)
     return conformanceID;
 
-  conformanceID = ++LastNormalConformanceID;
+  LastNormalConformanceID = LastNormalConformanceID + 1;
+  conformanceID = LastNormalConformanceID;
   NormalConformancesToWrite.push(conformance);
 
   return conformanceID;
@@ -2933,7 +2947,7 @@ void Serializer::writeType(Type ty) {
   case TypeKind::PolymorphicFunction: {
     auto fnTy = cast<PolymorphicFunctionType>(ty.getPointer());
     const Decl *genericContext = getGenericContext(&fnTy->getGenericParams());
-    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID(0);
+    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID();
 
     unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
     PolymorphicFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3619,7 +3633,8 @@ namespace {
                                                     data_type_ref data) {
       llvm::SmallString<32> scratch;
       uint32_t keyLength = key.getString(scratch).size();
-      uint32_t dataLength = (sizeof(TypeID) + 1 + sizeof(DeclID)) * data.size();
+      size_t entrySize = sizeof(uint32_t) + 1 + sizeof(uint32_t);
+      uint32_t dataLength = entrySize * data.size();
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -3633,7 +3648,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      static_assert(sizeof(DeclID) <= 4, "DeclID too large");
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
       endian::Writer<little> writer(out);
       for (auto entry : data) {
         writer.write<uint32_t>(std::get<0>(entry));
