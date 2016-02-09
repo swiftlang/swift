@@ -5614,7 +5614,7 @@ static bool checkStructDeclCircularity(StructDecl *S, NominalDeclSet &known,
                                        Type baseType,
                                        bool isGenericArg = false);
 
-// dispatch arbitrary declaration to relavent circularity checks.
+// dispatch arbitrary declaration to relevant circularity checks.
 static bool checkNominalDeclCircularity(Decl *decl, NominalDeclSet &known,
                                         Type baseType,
                                         bool isGenericArg = false) {

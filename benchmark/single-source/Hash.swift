@@ -667,7 +667,7 @@ public func run_HashTest(N: Int) {
       SH.update(S)
     }
 
-    // Check that the order in which we push values does not chage the result.
+    // Check that the order in which we push values does not change the result.
     SH.reset()
     L = ""
     for _ in 1...size {

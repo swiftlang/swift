@@ -15,7 +15,7 @@ This benchmark is used to check the performance of polymorphic invocations.
 Essentially, it checks how good a compiler can optimize virtual calls of class
 methods in cases where multiple sub-classes of a given class are available.
 
-In particular, this benchark would benefit from a good devirtualization.
+In particular, this benchmark would benefit from a good devirtualization.
 In case of applying a speculative devirtualization, it would be benefit from
 applying a jump-threading in combination with the speculative devirtualization.
 */
