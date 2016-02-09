@@ -1854,14 +1854,38 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          CanSILFunctionType substCalleeType,
                                          const LoweredValue &lv,
                                          llvm::Value *selfValue,
-                                         Explosion &args,
-                                         ArrayRef<Substitution> substitutions) {
+                                         ArrayRef<Substitution> substitutions,
+                                         WitnessMetadata *witnessMetadata,
+                                         Explosion &args) {
   llvm::Value *calleeFn, *calleeData;
   
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
     calleeData = selfValue;
+
+    if (origCalleeType->getRepresentation()
+          == SILFunctionType::Representation::WitnessMethod) {
+      // The protocol we're calling on.
+      ProtocolDecl *proto;
+      CanArchetypeType archetype;
+
+      llvm::errs() << "#######\n";
+      llvm::errs() << substitutions.size() << "\n";
+      origCalleeType.dump();
+      substCalleeType.dump();
+      //calleeFn.getLoweredType().dump();
+      llvm::errs() << "#######\n";
+
+      assert(false);
+      // Find the witness table.
+      // FIXME conformance for concrete type
+      llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, archetype, proto);
+
+      witnessMetadata->SelfWitnessTable = wtable;
+      assert(witnessMetadata->SelfWitnessTable->getType() ==
+             IGF.IGM.WitnessTablePtrTy);
+    }
     break;
       
   case LoweredValue::Kind::ObjCMethod: {
@@ -1916,6 +1940,13 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     case SILFunctionType::Representation::Thick: {
       Explosion calleeValues = lv.getExplosion(IGF);
       calleeFn = calleeValues.claimNext();
+
+      if (origCalleeType->getRepresentation()
+            == SILFunctionType::Representation::WitnessMethod) {
+        witnessMetadata->SelfWitnessTable = calleeValues.claimNext();
+        assert(witnessMetadata->SelfWitnessTable->getType() ==
+               IGF.IGM.WitnessTablePtrTy);
+      }
 
       if (origCalleeType->getRepresentation()
             == SILFunctionType::Representation::Thick) {
@@ -2018,10 +2049,11 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   Explosion llArgs;    
+  WitnessMetadata witnessMetadata;
   CallEmission emission =
     getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
-                                   calleeLV, selfValue, llArgs,
-                                   site.getSubstitutions());
+                                   calleeLV, selfValue, site.getSubstitutions(),
+                                   &witnessMetadata, llArgs);
 
   // Lower the arguments and return value in the callee's generic context.
   GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
@@ -2040,7 +2072,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Pass the generic arguments.
-  WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origCalleeType)) {
     emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
                              site.getSubstitutions(), &witnessMetadata, llArgs);
@@ -2150,7 +2181,11 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::ObjCMethod:
-    case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::WitnessMethod: {
+      llvm::Value *wtable = ex.claimNext();
+      assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
+      break;
+    }
     case SILFunctionType::Representation::CFunctionPointer:
       break;
     case SILFunctionType::Representation::Thick:

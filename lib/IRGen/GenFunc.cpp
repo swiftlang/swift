@@ -2970,7 +2970,9 @@ void CallEmission::setArgs(Explosion &arg,
     // This is basically duplicating emitTrailingWitnessArguments.
     assert(witnessMetadata);
     assert(witnessMetadata->SelfMetadata);
-    Args.back() = witnessMetadata->SelfMetadata;
+    assert(witnessMetadata->SelfWitnessTable);
+    Args.rbegin()[1] = witnessMetadata->SelfMetadata;
+    Args.rbegin()[0] = witnessMetadata->SelfWitnessTable;
     SWIFT_FALLTHROUGH;
 
   case SILFunctionTypeRepresentation::Method:
@@ -3426,6 +3428,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
+  if (origType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    witnessMetadata.SelfWitnessTable = origParams.claimNext();
+    assert(witnessMetadata.SelfWitnessTable->getType() ==
+           subIGF.IGM.WitnessTablePtrTy);
+  }
   if (hasPolymorphicParameters(origType)) {
     emitPolymorphicArguments(subIGF, origType, substType, subs,
                              &witnessMetadata, polyArgs);
@@ -3654,6 +3662,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   if (origType->getRepresentation() ==
       SILFunctionTypeRepresentation::WitnessMethod) {
     args.add(witnessMetadata.SelfMetadata);
+    args.add(witnessMetadata.SelfWitnessTable);
   }
 
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, args.claimAll());

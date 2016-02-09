@@ -3309,6 +3309,13 @@ void irgen::collectTrailingWitnessMetadata(IRGenFunction &IGF,
   assert(fn.getLoweredFunctionType()->getRepresentation()
            == SILFunctionTypeRepresentation::WitnessMethod);
 
+  llvm::Value *wtable = params.takeLast();
+  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy &&
+         "parameter signature mismatch: witness metadata didn't "
+         "end in witness table?");
+  wtable->setName("SelfWitnessTable");
+  witnessMetadata.SelfWitnessTable = wtable;
+
   llvm::Value *metatype = params.takeLast();
   assert(metatype->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "parameter signature mismatch: witness metadata didn't "
@@ -3645,8 +3652,11 @@ void irgen::emitTrailingWitnessArguments(IRGenFunction &IGF,
                                          WitnessMetadata &witnessMetadata,
                                          Explosion &args) {
   llvm::Value *self = witnessMetadata.SelfMetadata;
-  assert(self && "no Self value bound");
+  assert(self && "no Self metadata bound");
   args.add(self);
+  llvm::Value *wtable = witnessMetadata.SelfWitnessTable;
+  assert(wtable && "no Self witness table bound");
+  args.add(wtable);
 }
 
 /// Pass all the arguments necessary for the given function.
@@ -3756,6 +3766,9 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       assert(witnessMetadata && "no metadata structure for witness method");
       auto self = IGF.emitTypeMetadataRef(substInputType);
       witnessMetadata->SelfMetadata = self;
+      // witnessMetadata->SelfWitnessTable should have already been filled in
+      assert(witnessMetadata->SelfWitnessTable &&
+             "no witness table for witness method call");
       continue;
     }
     }
@@ -3831,13 +3844,13 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
   assert(polyFn->getRepresentation()
           == SILFunctionTypeRepresentation::WitnessMethod);
 
-  assert(getTrailingWitnessSignatureLength(IGM, polyFn) == 1);
+  assert(getTrailingWitnessSignatureLength(IGM, polyFn) == 2);
 
   // A witness method always provides Self.
   out.push_back(IGM.TypeMetadataPtrTy);
 
-  // TODO: Should also provide the protocol witness table,
-  // for default implementations.
+  // A witness method always provides the witness table for Self.
+  out.push_back(IGM.WitnessTablePtrTy);
 }
 
 void
@@ -3869,6 +3882,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   
   // Build the value.
   out.add(witness);
+  out.add(wtable);
 }
 
 llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {
