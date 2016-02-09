@@ -2158,6 +2158,9 @@ void WitnessTableBuilder::bindArchetypes(IRGenFunction &IGF,
     //     be stored in the private section of the witness table.
     SmallVector<llvm::Value*, 4> archetypeWitnessTables;
     for (auto protocol : archetype->getConformsTo()) {
+      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+        continue;
+
       llvm::Value *wtable;
       if (auto fulfillment =
             fulfillments.getWitnessTable(CanType(archetype), protocol)) {
