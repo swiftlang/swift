@@ -902,11 +902,10 @@ void SILGenFunction::checkForImportedUsedConformances(Type type) {
   if (auto bridgedNSErrorProtocol =
           getASTContext().getProtocol(KnownProtocolKind::BridgedNSError)) {
     if (auto nominalDecl = type->getAnyNominal()) {
-      auto conformances = nominalDecl->getAllConformances();
-      for (auto conformance : conformances) {
-        if (conformance->getProtocol() == bridgedNSErrorProtocol) {
-          SGM.useConformance(ProtocolConformanceRef(conformance));
-        }
+      SmallVector<ProtocolConformance *, 4> conformances;
+      if (nominalDecl->lookupConformance(
+              SGM.SwiftModule, bridgedNSErrorProtocol, conformances)) {
+        SGM.useConformance(ProtocolConformanceRef(conformances.front()));
       }
     }
   }
