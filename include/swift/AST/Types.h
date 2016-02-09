@@ -2805,21 +2805,7 @@ public:
 class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
-// Some macros to aid the SILFunctionType transition.
-#if 0
-# define SIL_FUNCTION_TYPE_DEPRECATED __attribute__((deprecated))
-# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN \
-    _Pragma("clang diagnostic push") \
-    _Pragma("clang diagnostic ignored \"-Wdeprecated\"")
-# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END \
-    _Pragma("clang diagnostic pop")
-#else
-# define SIL_FUNCTION_TYPE_DEPRECATED
-# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
-# define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
-#endif
-  
-/// SILFunctionType - The detailed type of a function value, suitable
+/// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
 ///
 /// This type is defined by the AST library because it must be capable
