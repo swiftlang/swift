@@ -2809,7 +2809,10 @@ public:
 
   void collectResolvedType(Solution &S, SmallVectorImpl<Type> &PossibleTypes) {
     if (auto Bind = S.typeBindings[VT]) {
-      if (Bind->getKind() != TypeKind::TypeVariable)
+      // We allow type variables in the overall solution, but must skip any
+      // type variables in the binding for VT; these types must outlive the
+      // constraint solver memory arena.
+      if (!Bind->hasTypeVariable())
         PossibleTypes.push_back(Bind);
     }
   }
