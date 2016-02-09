@@ -99,9 +99,125 @@
 //
 // 2. We can't specify constraints on associated types.  This forces many
 //    trivial algorithms to specify useless constraints.
+//
+// Trees
+// =====
+//
+// Trees are very interesting data structures with many unique
+// requirements.  We are interested in allowing efficient and
+// memory-safe implementations of collections based on a search trees
+// (e.g., RB trees or B-trees).  The specific list of requirements is
+// as follows.
+//
+// - The collection and indices should be memory-safe.  They should
+//   provide good QoI in the form of precondition traps.  Ensuring
+//   memory-safety shouldn't cause unreasonable performance or memory
+//   overhead.
+//
+// - Collection instances should be able to share nodes on mutation
+//   (persistent data structures).
+//
+// - Subscript on an index should be at worst amortized O(1).
+//
+// - Advancing an index to the next or previous position should cost
+//   at worst amortized O(1).
+//
+// - Indices should not contain reference countable stored properties.
+//
+// - Mutating or deleting an element in the collection should not
+//   invalidate indices pointing at other elements.
+//
+//   This design constraint needs some extra motivation, because it
+//   might not be obvious.  Preserving index validity across mutation
+//   is important for algorithms that iterate over the tree and mutate
+//   it in place, for exmaple, removing a subrange of elements between
+//   two indices, or removing elements that don't satisfy a predicate.
+//   When implementing such an algorithm, you would typically have an
+//   index that points to the current element.  You can copy the
+//   index, advance it, and then remove the previous element using its
+//   index.  If the mutation of the tree invalidates all indices,
+//   it is not possible to continue the iteration.  Thus, it is
+//   desired to invalidate just one index for the element that was
+//   deleted.
+//
+// It is not possible to satisfy all of these requirements at the same
+// time.  Designs that cover some of the requiremens are possible.
+//
+// 1. Persistent trees with O(log n) subscripting and advancing, and
+//    strict index invalidation.
+//
+//    If we choose to make a persistent data structure with node
+//    reuse, then the tree nodes can't have parent pointers (a node
+//    can have multiple different parents in different trees).  This
+//    means that it is not possible to advance an index in O(1).  If
+//    we need to go up the tree while advancing the index, we would
+//    need to traverse the tree starting from the root in O(log n).
+//    Thus, index has to essentially store a path through the tree
+//    from the root to the node (it is usually possible to encode this
+//    path in a 64-bit number).  Since the index stores the path,
+//    subscripting on such an index would also cost O(log n).
+//
+//    We should note that even though the operations mentioned cost
+//    O(log n), the base of the logarithm would be typically large
+//    (e.g., 32), and the size of the machine memory is limited.
+//    Thus, we could treat the complexity as effectively constant for
+//    all practical purposes.
+//
+// 2. Trees with O(1) subscripting and advancing.
+//
+//    If we want subscripting to be O(1), then the index has to store
+//    a pointer to a tree node.  Since we want avoid reference
+//    countable properties in indices, the node pointer should either
+//    be `unsafe(unowned)` or an `UnsafePointer`.  These pointers
+//    can't be dereferenced safely without knowing in advance that it
+//    is safe to do so.  We need some way to quickly check if it is
+//    safe to dereference the pointer stored in the node.
+//
+//    A pointer to a tree node can become invalid when the node was
+//    deallocated.  A tree node can be deallocated if the
+//    corresponding element is removed from the tree.
+//
+//    (a) Trees with O(1) subscripting and advancing, and strict index
+//        invalidation.
+//
+//        One simple way to perform the safety check when
+//        dereferencing the unsafe pointer stored within the index
+//        would be to detect any tree mutation between the index
+//        creation and index use.  It is simple to do with version
+//        numbers: we add an ID number to every tree.  This ID would
+//        be unique among all trees created within the process, and it
+//        would be re-generated on every mutation.  The tree ID is
+//        copied into every index.  When the index is used with the
+//        collection, we check that the ID of the tree matches the
+//        tree ID stored in the index.  This fast check ensures memory
+//        safety.
+//
+//    (b) Trees with O(1) subscripting and advancing, permissive index
+//        invalidation, and extra storage to ensure memory safety.
+//
+//        Another way to perform the safety check would be to directly
+//        check if the unsafe pointer stored in the index is actually
+//        linked into the tree.  To do that with acceptable time
+//        complexity, we would need to have an extra data structure
+//        for every tree, for example, a hash table-based set of all
+//        node pointers.  With this design, all index operations get
+//        an O(1) hit for the hash table lookup for the safety check,
+//        but we get an O(log n) memory overhead for the extra data
+//        structure.  On the other hand, a tree already has O(log n)
+//        memory overhead for allocating nodes themselves, thus the
+//        extra data structure would only increase the constant factor
+//        on memory overhead.
+//
+// Each of the designs discussed above has its uses, but the intuition
+// is that (2)(a) is the one most commonly needed in practice.  (2)(a)
+// does not have the desired index invalidation properties.  There is
+// a small number of commonly used algorithms that require that
+// property, and they can be provided as methods on the collection,
+// for example removeAll(in: Range<Index>) and
+// removeAll(_: (Element)->Bool).
 
-infix operator  ...* { associativity none precedence 135 }
-infix operator  ..<* { associativity none precedence 135 }
+infix operator ...* { associativity none precedence 135 }
+infix operator ..<* { associativity none precedence 135 }
 
 public protocol MyGeneratorType {
   associatedtype Element
@@ -1296,6 +1412,381 @@ public func < (
 
 // FIXME: how does AnyCollection look like in the new scheme?
 
+//------------------------------------------------------------------------
+// A simple binary tree
+
+internal final class _NodePayload<Element : Comparable> {
+  internal var _parent: _UnownedUnsafeNodeReference<Element>?
+  internal var _leftChild: _NodeReference<Element>?
+  internal var _rightChild: _NodeReference<Element>?
+  internal var _data: Element
+
+  internal init(
+    _data: Element,
+    parent: _NodeReference<Element>?,
+    leftChild: _NodeReference<Element>? = nil,
+    rightChild: _NodeReference<Element>? = nil
+  ) {
+    self._data = _data
+    self._parent = parent.map { _UnownedUnsafeNodeReference($0) }
+    self._leftChild = leftChild
+    self._rightChild = rightChild
+  }
+}
+
+extension _NodePayload : CustomReflectable {
+  internal func customMirror() -> Mirror {
+    if let lc = _leftChild, rc = _rightChild {
+      return Mirror(self, children: [ "left": lc, "data": _data, "right": rc ])
+    }
+    if let lc = _leftChild {
+      return Mirror(self, children: [ "left": lc, "data": _data ])
+    }
+    if let rc = _rightChild {
+      return Mirror(self, children: [ "data": _data, "right": rc ])
+    }
+    return Mirror(self, children: [ "data": _data ])
+  }
+}
+
+internal struct _NodeReference<Element : Comparable> {
+  internal var _payload: _NodePayload<Element>
+
+  internal var _parent: _NodeReference<Element>? {
+    get {
+      return _payload._parent.map { _NodeReference($0) }
+    }
+    set {
+      _payload._parent = newValue.map { _UnownedUnsafeNodeReference($0) }
+    }
+  }
+
+  internal var _leftChild: _NodeReference<Element>? {
+    get {
+      return _payload._leftChild
+    }
+    set {
+      _payload._leftChild = newValue
+    }
+  }
+
+  internal var _rightChild: _NodeReference<Element>? {
+    get {
+      return _payload._rightChild
+    }
+    set {
+      _payload._rightChild = newValue
+    }
+  }
+
+  internal var _data: Element {
+    get {
+      return _payload._data
+    }
+    set {
+      _payload._data = newValue
+    }
+  }
+
+  internal init(_payload: _NodePayload<Element>) {
+    self._payload = _payload
+  }
+
+  internal init(
+    _data: Element,
+    parent: _NodeReference<Element>? = nil,
+    leftChild: _NodeReference<Element>? = nil,
+    rightChild: _NodeReference<Element>? = nil
+  ) {
+    self._payload = _NodePayload(
+      _data: _data,
+      parent: parent,
+      leftChild: leftChild,
+      rightChild: rightChild)
+    self._leftChild?._parent = self
+    self._rightChild?._parent = self
+  }
+}
+
+internal func === <Element : Comparable>(
+  lhs: _NodeReference<Element>?,
+  rhs: _NodeReference<Element>?
+) -> Bool {
+  return lhs?._payload === rhs?._payload
+}
+
+extension _NodeReference : CustomReflectable {
+  internal func customMirror() -> Mirror {
+    return Mirror(reflecting: _payload)
+  }
+}
+
+/// Swift does not currently support optionals of unowned references.  This
+/// type provides a workaround.  <rdar://problem/17277899>
+internal struct _UnownedUnsafe<Instance : AnyObject> {
+  internal unowned(unsafe) var _reference: Instance
+
+  internal init(_ instance: Instance) {
+    self._reference = instance
+  }
+}
+
+internal struct _UnownedUnsafeNodeReference<Element : Comparable> {
+  internal var _payload: _UnownedUnsafe<_NodePayload<Element>>
+
+  internal init(_ ownedNode: _NodeReference<Element>) {
+    self._payload = _UnownedUnsafe(ownedNode._payload)
+  }
+}
+
+extension _NodeReference {
+  internal init(_ unownedNode: _UnownedUnsafeNodeReference<Element>) {
+    self._payload = unownedNode._payload._reference
+  }
+}
+
+internal let _myBinaryTreeNextTreeID: _stdlib_AtomicInt = _stdlib_AtomicInt()
+
+// FIXME: implement value semantics.
+public struct MyBinaryTree<Element : Comparable> {
+  internal var _treeID: Int
+  internal var _root: _NodeReference<Element>?
+
+  internal init(_root: _NodeReference<Element>?) {
+    self._treeID = _myBinaryTreeNextTreeID.fetchAndAdd(1)
+    self._root = _root
+  }
+
+  public init() {
+    self = MyBinaryTree(_root: nil)
+  }
+
+  public mutating func insert(element: Element) {
+    self = MyBinaryTree(_root: MyBinaryTree._insert(element, into: _root))
+  }
+
+  internal static func _insert(
+    element: Element,
+    into root: _NodeReference<Element>?
+  ) -> _NodeReference<Element> {
+    guard let root = root else {
+      // The tree is empty, create a new one.
+      return _NodeReference(_data: element)
+    }
+
+    if element < root._data {
+      // Insert into the left subtree.
+      return _NodeReference(
+        _data: root._data,
+        leftChild: _insert(element, into: root._leftChild),
+        rightChild: root._rightChild)
+    }
+
+    if element > root._data {
+      // Insert into the right subtree.
+      return _NodeReference(
+        _data: root._data,
+        leftChild: root._leftChild,
+        rightChild: _insert(element, into: root._rightChild))
+    }
+
+    // We found the element in the tree, update it (to preserve reference
+    // equality).
+    _precondition(element == root._data)
+    return _NodeReference(
+      _data: element,
+      leftChild: root._leftChild,
+      rightChild: root._rightChild)
+  }
+}
+
+internal struct _MyBinaryTreePath {
+  internal var _path: UInt
+
+  internal var parent: _MyBinaryTreePath {
+    let distanceToParent = (_path | (_path &+ 1)) ^ _path
+    let newPath = (_path | (_path &+ 1)) & ~(distanceToParent << 1)
+    return _MyBinaryTreePath(_path: newPath)
+  }
+
+  internal var leftChild: _MyBinaryTreePath {
+    let delta = ~_path & (_path &+ 1)
+    let newPath = _path &- (delta >> 1)
+    return _MyBinaryTreePath(_path: newPath)
+  }
+
+  internal var rightChild: _MyBinaryTreePath {
+    let delta = ~_path & (_path &+ 1)
+    let newPath = _path &+ (delta >> 1)
+    return _MyBinaryTreePath(_path: newPath)
+  }
+
+  internal static var root: _MyBinaryTreePath {
+    return _MyBinaryTreePath(_path: UInt(Int.max))
+  }
+
+  internal static var endIndex: _MyBinaryTreePath {
+    return _MyBinaryTreePath(_path: UInt.max)
+  }
+}
+
+public struct MyBinaryTreeIndex<Element : Comparable> : Comparable {
+  internal var _treeID: Int
+  internal var _path: _MyBinaryTreePath
+  internal var _unsafeNode: _UnownedUnsafeNodeReference<Element>?
+}
+
+public func == <Element : Comparable>(
+  lhs: MyBinaryTreeIndex<Element>,
+  rhs: MyBinaryTreeIndex<Element>
+) -> Bool {
+  _precondition(
+    lhs._treeID == rhs._treeID,
+    "can't compare indices from different trees")
+  return lhs._path._path == rhs._path._path
+}
+
+public func < <Element : Comparable>(
+  lhs: MyBinaryTreeIndex<Element>,
+  rhs: MyBinaryTreeIndex<Element>
+) -> Bool {
+  _precondition(
+    lhs._treeID == rhs._treeID,
+    "can't compare indices from different trees")
+  return lhs._path._path < rhs._path._path
+}
+
+extension MyBinaryTree : MyBidirectionalCollectionType {
+  public typealias Index = MyBinaryTreeIndex<Element>
+
+  public var startIndex: Index {
+    guard var root = _root else {
+      return endIndex
+    }
+    var path = _MyBinaryTreePath.root
+    while let lc = root._leftChild {
+      root = lc
+      path = path.leftChild
+    }
+    return Index(
+      _treeID: _treeID,
+      _path: path,
+      _unsafeNode: _UnownedUnsafeNodeReference(root))
+  }
+
+  public var endIndex: Index {
+    return Index(
+      _treeID: _treeID,
+      _path: _MyBinaryTreePath.endIndex,
+      _unsafeNode: nil)
+  }
+
+  public subscript(i: Index) -> Element {
+    _precondition(
+      i._treeID == _treeID,
+      "can't use index from another tree")
+    guard let node = i._unsafeNode.map({ _NodeReference($0) }) else {
+      fatalError("can't subscript with endIndex")
+    }
+    return node._data
+  }
+
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    _precondition(
+      i._treeID == _treeID,
+      "can't use index from another tree")
+    guard var node = i._unsafeNode.map({ _NodeReference($0) }) else {
+      fatalError("can't increment endIndex")
+    }
+    var path = i._path
+    if let rightChild = node._rightChild {
+      node = rightChild
+      path = path.rightChild
+      while let lc = node._leftChild {
+        node = lc
+        path = path.leftChild
+      }
+      return Index(
+        _treeID: i._treeID,
+        _path: path,
+        _unsafeNode: _UnownedUnsafeNodeReference(node))
+    }
+    while true {
+      guard let parent = node._parent else {
+        return endIndex
+      }
+
+      let isLeftChild = parent._leftChild === node
+      node = parent
+      path = path.parent
+      if isLeftChild {
+        return Index(
+          _treeID: i._treeID,
+          _path: path,
+          _unsafeNode: _UnownedUnsafeNodeReference(node))
+      }
+    }
+  }
+
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    _precondition(
+      i._treeID == _treeID,
+      "can't use index from another tree")
+
+    var path = i._path
+    guard var node = i._unsafeNode.map({ _NodeReference($0) }) else {
+      // We are decrementing endIndex.
+
+      guard var root = _root else {
+        // The tree is empty.
+        fatalError("can't decrement startIndex")
+      }
+      path = _MyBinaryTreePath.root
+      while let rc = root._rightChild {
+        root = rc
+        path = path.rightChild
+      }
+      return Index(
+        _treeID: _treeID,
+        _path: path,
+        _unsafeNode: _UnownedUnsafeNodeReference(root))
+    }
+
+    if let leftChild = node._leftChild {
+      node = leftChild
+      path = path.leftChild
+      while let rc = node._rightChild {
+        node = rc
+        path = path.rightChild
+      }
+      return Index(
+        _treeID: i._treeID,
+        _path: path,
+        _unsafeNode: _UnownedUnsafeNodeReference(node))
+    }
+
+    while true {
+      guard let parent = node._parent else {
+        return startIndex
+      }
+
+      let isRightChild = parent._rightChild === node
+      node = parent
+      path = path.parent
+      if isRightChild {
+        return Index(
+          _treeID: i._treeID,
+          _path: path,
+          _unsafeNode: _UnownedUnsafeNodeReference(node))
+      }
+    }
+  }
+}
+
+//------------------------------------------------------------------------
+
 import StdlibUnittest
 
 // Also import modules which are used by StdlibUnittest internally. This
@@ -1434,6 +1925,47 @@ NewCollection.test("RangeLiterals") {
   expectType(MyIterableRange<MySimplestStrideable>.self, &strideableRange)
 
   for _ in OldSequence(0..<*10) {}
+}
+
+NewCollection.test("MyBinaryTree.init()") {
+  _ = MyBinaryTree<Int>()
+}
+
+NewCollection.test("MyBinaryTree.insert(_:)") {
+  var t = MyBinaryTree<Int>()
+  t.insert(20)
+  t.insert(10)
+  t.insert(30)
+  dump(t)
+
+  do {
+    var i = t.startIndex
+    expectEqual(10, t[i])
+
+    i = t.next(i)
+    expectEqual(20, t[i])
+
+    i = t.next(i)
+    expectEqual(30, t[i])
+
+    i = t.next(i)
+    expectEqual(t.endIndex, i)
+  }
+  do {
+    var i = t.endIndex
+    i = t.previous(i)
+    dump(i, name: "30")
+    expectEqual(30, t[i])
+
+    i = t.previous(i)
+    dump(i, name: "20")
+    expectEqual(20, t[i])
+
+    i = t.previous(i)
+    dump(i, name: "10")
+    expectEqual(10, t[i])
+    expectEqual(t.startIndex, i)
+  }
 }
 
 runAllTests()
