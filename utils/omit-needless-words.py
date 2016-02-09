@@ -91,6 +91,22 @@ def dump_module_api(cmd, extra_dump_args, output_dir, module, quiet):
 
     return
 
+# Collect the set of frameworks we should dump 
+def collect_frameworks(sdk):
+    (exitcode, out, err) = run_command(["xcrun", "--show-sdk-path", "-sdk", sdk])
+    if exitcode != 0:
+        print('error: framework collection failed with error %d' % (exitcode))
+        return ()
+    sdk_path = out
+    
+    (exitcode, out, err) = run_command(["xcrun", "--show-sdk-version", "-sdk", sdk])
+    if exitcode != 0:
+        print('error: framework collection failed with error %d' % (exitcode))
+        return ()
+
+
+
+        
 def main():
     source_filename = 'omit-needless-words.swift'
     parser = create_parser()
