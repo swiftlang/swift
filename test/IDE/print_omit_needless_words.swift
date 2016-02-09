@@ -272,6 +272,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x _: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
+// CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

@@ -818,9 +818,11 @@ static bool wordConflictsBeforePreposition(StringRef word,
 /// splitting.
 static bool wordConflictsAfterPreposition(StringRef word,
                                           StringRef preposition) {
-  if (camel_case::sameWordIgnoreFirstCase(word, "error") &&
-      camel_case::sameWordIgnoreFirstCase(preposition, "with"))
-    return true;
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "with")) {
+    if (camel_case::sameWordIgnoreFirstCase(word, "error") ||
+        camel_case::sameWordIgnoreFirstCase(word, "no"))
+      return true;
+  }
 
   if (camel_case::sameWordIgnoreFirstCase(word, "visible") &&
       camel_case::sameWordIgnoreFirstCase(preposition, "to"))
