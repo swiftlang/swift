@@ -56,7 +56,6 @@ func foo() -> Int32 {
 
 // rdar://problem/24572268
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_while.goo
-// CHECK: [[@LINE+1]]:12 -> {{[0-9]+}}:2 : [[BAR:[0-9]+]]
 func goo() {
   var x : Int32 = 0
 
