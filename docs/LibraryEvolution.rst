@@ -1525,11 +1525,11 @@ Recompiling changes a protocol's implementation
 
     func use<T: MagicType>(item: T) { item.equip() }
 
-Before the client is recompiled, the implementation of ``foo()`` used for ``S``
-instances can only be the default implementation, i.e. the one that prints
-"Equipped". However, recompiling the client will result in the constrained
-implementation being considered a "better" match for the protocol requirement,
-thus changing the behavior of the program.
+Before the client is recompiled, the implementation of ``equip()`` used for
+``Amulet`` instances can only be the default implementation, i.e. the one that
+prints "Equipped". However, recompiling the client will result in the
+constrained implementation being considered a "better" match for the protocol
+requirement, thus changing the behavior of the program.
 
 This should never change the *meaning* of a program, since the default
 implementation for a newly-added requirement should always be *correct.*
