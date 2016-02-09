@@ -273,6 +273,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
+// CHECK-OMIT-NEEDLESS-WORDS: func bookmarkWith(_: [URL])
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

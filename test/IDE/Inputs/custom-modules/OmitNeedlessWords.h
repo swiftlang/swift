@@ -7,4 +7,5 @@
 -(void)setIndirectlyToValue:(nonnull id)object;
 -(void)jumpToTop:(nonnull id)sender;
 -(void)removeWithNoRemorse:(nonnull id)object;
+-(void)bookmarkWithURLs:(nonnull NSArray<NSURL *> *)urls;
 @end

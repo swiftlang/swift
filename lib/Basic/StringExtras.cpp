@@ -96,6 +96,11 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
   return PartOfSpeech::Unknown;
 }
 
+/// Whether the given word is a plural s
+static bool isPluralSuffix(StringRef word) {
+  return word == "s" || word == "es" || word == "ies";
+}
+
 void WordIterator::computeNextPosition() const {
   assert(Position < String.size() && "Already at end of string");
 
@@ -118,7 +123,20 @@ void WordIterator::computeNextPosition() const {
     // If we hit the end of the string, that's it. Otherwise, this
     // word ends before the last uppercase letter if the next word is alphabetic
     // (URL_Loader) or after the last uppercase letter if it's not (UTF_8).
-    NextPosition = (i == n || !clang::isLowercase(String[i])) ? i : i-1;
+
+    // Collect the lowercase letters up to the next word.
+    unsigned endOfNext = i;
+    while (endOfNext < n && clang::isLowercase(String[endOfNext]))
+      ++endOfNext;
+
+    // If the next word is a plural suffix, add it on.
+    if (i == n || isPluralSuffix(String.slice(i, endOfNext)))
+      NextPosition = endOfNext;
+    else if (clang::isLowercase(String[i]))
+      NextPosition = i-1;
+    else
+      NextPosition = i;
+
     NextPositionValid = true;
     return;
   }
@@ -140,9 +158,19 @@ void WordIterator::computePrevPosition() const {
   while (i > 0 && !clang::isUppercase(String[i-1]) && String[i-1] != '_')
     --i;
 
+  // If what we found is a plural suffix, keep going.
+  bool skippedPluralSuffix = false;
+  unsigned effectiveEndPosition = Position;
+  if (i > 0 && isPluralSuffix(String.slice(i, Position))) {
+    skippedPluralSuffix = true;
+    effectiveEndPosition = i;
+    while (i > 0 && !clang::isUppercase(String[i-1]) && String[i-1] != '_')
+      --i;
+  }
+
   // If we found any lowercase letters, this was a normal camel case
   // word (not an acronym).
-  if (i < Position) {
+  if (i < effectiveEndPosition) {
     // If we hit the beginning of the string, that's it. Otherwise, this
     // word starts with an uppercase letter if the next word is alphabetic
     // (URL_Loader) or after the last uppercase letter if it's not (UTF_8).
@@ -577,6 +605,14 @@ static StringRef omitNeedlessWords(StringRef name,
       auto newShortenedNameWord
         = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
                             NameRole::Partial, allPropertyNames, scratch);
+      if (shortenedNameWord == newShortenedNameWord &&
+          shortenedNameWord.back() == 'e') {
+        shortenedNameWord.drop_back();
+        newShortenedNameWord =
+          omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
+                            NameRole::Partial, allPropertyNames, scratch);
+      }
+
       if (shortenedNameWord != newShortenedNameWord) {
         matched();
         unsigned targetSize = newShortenedNameWord.size();
@@ -749,11 +785,6 @@ static StringRef omitNeedlessWords(StringRef name,
   return name;
 }
 
-/// Whether the given word is a plural s
-static bool isPluralSuffix(StringRef word) {
-  return word == "s" || word == "es" || word == "ies";
-}
-
 StringRef camel_case::toLowercaseInitialisms(StringRef string,
                                              StringScratchSpace &scratch) {
   if (string.empty())
@@ -834,8 +865,7 @@ static bool wordConflictsAfterPreposition(StringRef word,
 /// Split the base name after the last preposition, if there is one.
 static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
                                               StringRef &argName,
-                                              const OmissionTypeName &paramType,
-                                              StringScratchSpace &scratch) {
+                                              const OmissionTypeName &paramType) {
   // Scan backwards for a preposition.
   auto nameWords = camel_case::getWords(baseName);
   auto nameWordRevIter = nameWords.rbegin(),
@@ -928,8 +958,7 @@ static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
   }
 
   // Update the argument label and base name.
-  argName = toLowercaseInitialisms(baseName.substr(startOfArgumentLabel),
-                                   scratch);
+  argName = baseName.substr(startOfArgumentLabel);
   baseName = newBaseName;
 
   return true;
@@ -938,8 +967,7 @@ static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
 /// Split the base name, if it makes sense.
 static bool splitBaseName(StringRef &baseName, StringRef &argName,
                           const OmissionTypeName &paramType,
-                          StringRef paramName,
-                          StringScratchSpace &scratch) {
+                          StringRef paramName) {
   // If there is already an argument label, do nothing.
   if (!argName.empty()) return false;
 
@@ -962,7 +990,7 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
     return false;
 
   // Try splitting after the last preposition.
-  if (splitBaseNameAfterLastPreposition(baseName, argName, paramType, scratch))
+  if (splitBaseNameAfterLastPreposition(baseName, argName, paramType))
     return true;
 
   return false;
@@ -1042,8 +1070,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // If needed, split the base name.
   if (!argNames.empty() &&
-      splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName,
-                    scratch))
+      splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))
     anyChanges = true;
 
   // Omit needless words based on parameter types.
