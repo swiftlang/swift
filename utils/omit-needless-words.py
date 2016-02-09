@@ -21,13 +21,36 @@ DEFAULT_TARGET_BASED_ON_SDK = {
     'appletvos.simulator': 'x86_64-apple-tvos9',
 }
 
+SKIPPED_FRAMEWORKS = {
+    'CalendarStore',
+    'CoreMIDIServer',
+    'DrawSprocket',
+    'DVComponentGlue',
+    'InstallerPlugins',
+    'InstantMessage',
+    'JavaFrameEmbedding',
+    'JavaVM',
+    'Kerberos',
+    'Kernel',
+    'LDAP',
+    'Message',
+    'PCSC',
+    'QTKit',
+    'Ruby',
+    'SyncServices',
+    'System',
+    'Tk',
+    'VideoDecodeAcceleration',
+    'vecLib',
+}
+
 def create_parser():
     parser = argparse.ArgumentParser(
         description="Determines the effects of omitting 'needless' words from imported APIs",
         prog='omit-needless-words.py',
         usage='python omit-needless-words.py -m AppKit')
-    parser.add_argument('-m', '--module', required=True, help='The module name.')
-    parser.add_argument('-s', '--sdk', default='macosx', help="The SDK to use.")
+    parser.add_argument('-m', '--module', help='The module name.')
+    parser.add_argument('-s', '--sdk', nargs='+', required=True, help="The SDKs to use.")
     parser.add_argument('-t', '--target', help="The target triple to use.")
     parser.add_argument('-i', '--swift-ide-test', default='swift-ide-test', help="The swift-ide-test executable.")
     parser.add_argument('-3', '--swift-3', action='store_true', help="Use Swift 3 transformation")
@@ -91,35 +114,73 @@ def dump_module_api(cmd, extra_dump_args, output_dir, module, quiet):
 
     return
 
+def pretty_sdk_name(sdk):
+    if sdk.find("macosx") == 0: return 'OSX'
+    if sdk.find("iphoneos") == 0: return 'iOS'
+    if sdk.find("watchos") == 0: return 'watchOS'
+    if sdk.find("appletvos") == 0: return 'tvOS'
+    return 'unknownOS'
+
 # Collect the set of frameworks we should dump 
 def collect_frameworks(sdk):
-    (exitcode, out, err) = run_command(["xcrun", "--show-sdk-path", "-sdk", sdk])
+    (exitcode, sdk_path, err) = run_command(["xcrun", "--show-sdk-path", "-sdk", sdk])
     if exitcode != 0:
         print('error: framework collection failed with error %d' % (exitcode))
         return ()
-    sdk_path = out
+    sdk_path = sdk_path.rstrip()
     
-    (exitcode, out, err) = run_command(["xcrun", "--show-sdk-version", "-sdk", sdk])
+    (exitcode, sdk_version, err) = run_command(["xcrun", "--show-sdk-version", "-sdk", sdk])
     if exitcode != 0:
         print('error: framework collection failed with error %d' % (exitcode))
         return ()
+    sdk_version = sdk_version.rstrip()
+    
+    print('Collecting frameworks from %s %s at %s' % (pretty_sdk_name(sdk), sdk_version, sdk_path))
 
+    # Collect all of the framework names
+    frameworks_dir = '%s/System/Library/Frameworks' % sdk_path
+    framework_matcher = re.compile('([A-Za-z_0-9.]+)\.framework')
+    frameworks = set()
+    for entry in os.listdir(frameworks_dir):
+        match = framework_matcher.match(entry)
+        if match:
+            framework = match.group(1)
+            if not framework in SKIPPED_FRAMEWORKS:
+                frameworks.add(framework)
 
+    return (sorted(list(frameworks)), sdk_path)
 
-        
+def dump_sdk_api(cmd_common, cmd_extra_args, sdk, module, target, source_filename, output_dir, quiet):
+
+    # Determine the SDK root and collect the set of frameworks.
+    (frameworks, sdk_root) = collect_frameworks(sdk)
+
+    # Determine the default target.
+    if target:
+        sdk_target = target
+    else:
+        sdk_target = DEFAULT_TARGET_BASED_ON_SDK[sdk]
+
+    # Determine the output idirectory
+    pretty_sdk = pretty_sdk_name(sdk)
+    sdk_output_dir = '%s/%s' % (output_dir, pretty_sdk)
+
+    # Dump the APIs
+    cmd = cmd_common + ['-sdk', sdk_root, '-target', sdk_target]
+    if module:
+        dump_module_api(cmd, cmd_extra_args, sdk_output_dir, module, quiet)
+    else:
+        for framework in frameworks:
+            dump_module_api(cmd, cmd_extra_args, sdk_output_dir, framework, quiet)
+
+    return
+
 def main():
     source_filename = 'omit-needless-words.swift'
     parser = create_parser()
     args = parser.parse_args()
-    if not args.target:
-        args.target = DEFAULT_TARGET_BASED_ON_SDK[args.sdk]
 
-    # Figure out the SDK root for the requested SDK
-    sdkroot = subprocess.check_output(['xcrun', '--show-sdk-path', '--sdk', args.sdk]).rstrip()
-    if not args.quiet:
-        print('SDK Root = %s' % (sdkroot))
-
-    swift_ide_test_cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-sdk', sdkroot, '-target', args.target, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments']
+    cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments']
 
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
@@ -129,10 +190,10 @@ def main():
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])
 
-    # Dump the API for this module.
-    dump_module_api(swift_ide_test_cmd_common, extra_args, args.output_dir,
-                    args.module, args.quiet)
-
+    # Dump the requested APIs.
+    for sdk in args.sdk:
+        dump_sdk_api(cmd_common, extra_args, sdk, args.module, args.target, source_filename, args.output_dir, args.quiet)
+    
     # Remove the .swift file we fed into swift-ide-test
     subprocess.call(['rm', '-f', source_filename])
 
