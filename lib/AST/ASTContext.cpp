@@ -832,8 +832,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 
   // _BridgedNSError is in the Foundation module.
   if (kind == KnownProtocolKind::BridgedNSError) {
-    Module *foundation = const_cast<ASTContext *>(this)->getModule(
-                           {{Id_Foundation, SourceLoc()}});
+    Module *foundation =
+        const_cast<ASTContext *>(this)->getLoadedModule(Id_Foundation);
     if (!foundation)
       return nullptr;
 
