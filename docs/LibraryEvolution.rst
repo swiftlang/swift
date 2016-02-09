@@ -1089,7 +1089,7 @@ following changes are permitted:
 
     Although it is not related to evolution, it is worth noting that members of
     protocol extensions that do *not* satisfy protocol requirements are not
-    overrideable, even when the conforming type is a class.
+    overridable, even when the conforming type is a class.
 
 
 Operators
