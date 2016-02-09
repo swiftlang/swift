@@ -599,13 +599,13 @@ can enforce its safe use.
 We've considered two possible syntaxes for this::
 
     @available(1.1)
-    extension MyStruct : SomeProto {…}
+    extension Wand : MagicType {…}
 
 and
 
 ::
 
-    extension MyStruct : @available(1.1) SomeProto {…}
+    extension Wand : @available(1.1) MagicType {…}
 
 The former requires fewer changes to the language grammar, but the latter could
 also be used on the declaration of the type itself (i.e. the ``struct``
@@ -1465,30 +1465,30 @@ Subclass and base both conform to protocol
 ::
 
     // Library, version 1
-    class Base {}
-    protocol P {}
+    class Elf {}
+    protocol Summonable {}
 
 ::
 
     // Client, version 1
-    class Subclass : Base, P {}
+    class ShoemakingElf : Elf, Summonable {}
 
 ::
 
     // Library, version 2
     @available(2.0)
-    extension Base : P {}
+    extension Elf : Summonable {}
 
-Now ``Subclass`` conforms to ``P`` two different ways, which may be
-incompatible (especially if ``P`` has associated types or requirements
-involving ``Self``).
+Now ``ShoemakingElf`` conforms to ``Summonable`` in two different ways, which
+may be incompatible (especially if ``Summonable`` had associated types or
+requirements involving ``Self``).
 
-Additionally, the client can't even remove ``Subclass``'s conformance to ``P``,
-because it may itself be a library with other code depending on it. We could
-fix that with an annotation to explicitly inherent the conformance of ``P``
-from the base class, but even that may not be possible if there are
-incompatible associated types involved (because changing a member typealias is
-not a safe change).
+Additionally, the client can't even remove ``ShoemakingElf``'s conformance to
+``Summonable``, because it may itself be a library with other code depending on
+it. We could fix that with an annotation to explicitly inherent the conformance
+of ``Summonable`` from the base class, but even that may not be possible if
+there are incompatible associated types involved (because changing a member
+typealias is not a safe change).
 
 One solution is to disallow adding a conformance for an existing protocol to a
 publicly-subclassable class.
@@ -1500,34 +1500,34 @@ Recompiling changes a protocol's implementation
 ::
 
     // Library, version 1
-    protocol P {}
-    protocol Q {}
-    func use<T: P>(value: T) {}
+    protocol MagicType {}
+    protocol Wearable {}
+    func use<T: MagicType>(item: T) {}
 
 ::
 
     // Client, version 1
-    struct S : P, Q {}
-    use(S())
+    struct Amulet : MagicType, Wearable {}
+    use(Amulet())
 
 ::
 
     // Library, version 2
-    protocol P {
+    protocol MagicType {
       @available(2.0)
-      func foo() { print("default") }
+      func equip() { print("Equipped.") }
     }
     
-    extension P where Self: Q {
+    extension Wearable where Self: MagicType {
       @available(2.0)
-      func foo() { print("constrained") }
+      func equip() { print("You put it on.") }
     }
 
-    func use<T: P>(value: T) { value.foo() }
+    func use<T: MagicType>(item: T) { item.equip() }
 
 Before the client is recompiled, the implementation of ``foo()`` used for ``S``
 instances can only be the default implementation, i.e. the one that prints
-"default". However, recompiling the client will result in the constrained
+"Equipped". However, recompiling the client will result in the constrained
 implementation being considered a "better" match for the protocol requirement,
 thus changing the behavior of the program.
 
