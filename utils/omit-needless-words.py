@@ -83,7 +83,7 @@ def main():
     # Determine the set of arguments we'll use.
     swift_ide_test_cmd = swift_ide_test_cmd_common + ['-skip-imports']
     if args.swift_3:
-        swift_ide_test_cmd = swift_ide_test_cmd + ['-enable-omit-needless-words', '-enable-infer-default-arguments']
+        swift_ide_test_cmd = swift_ide_test_cmd + ['-enable-omit-needless-words', '-enable-infer-default-arguments', '-enable-strip-ns-prefix']
 
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])

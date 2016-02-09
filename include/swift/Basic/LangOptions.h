@@ -150,6 +150,11 @@ namespace swift {
     /// omit-needless-words.
     bool OmitNeedlessWords = false;
 
+    /// Whether we are stripping the "NS" prefix from Foundation et al.
+    ///
+    /// This is only queried when \c OmitNeedlessWords is true.
+    bool StripNSPrefix = false;
+
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
 

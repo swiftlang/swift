@@ -2320,7 +2320,8 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
   // If we're omitting needless words and the name won't conflict with
   // something in the standard library, strip the prefix off the Swift
   // name.
-  if (LangOpts.OmitNeedlessWords && !nameConflictsWithStandardLibrary(kind))
+  if (LangOpts.OmitNeedlessWords && LangOpts.StripNSPrefix &&
+      !nameConflictsWithStandardLibrary(kind))
     return objcName.substr(2);
 
   return objcName;
