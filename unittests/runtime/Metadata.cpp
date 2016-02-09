@@ -215,6 +215,33 @@ TEST(Concurrent, ConcurrentList) {
   EXPECT_EQ(ListLen, results.size() * numElem);
 }
 
+
+TEST(Concurrent, ConcurrentMap) {
+  const int numElem = 100;
+
+  ConcurrentMap<size_t, int> Map;
+
+  // Add a bunch of numbers to the map concurrently.
+   auto results = RaceTest<int*>(
+    [&]() -> int* {
+      for (int i = 0; i < numElem; i++) {
+        size_t hash = (i * 123512) % 0xFFFF ;
+        while(!Map.tryToAllocateNewNode(hash, i)) {
+          hash++;
+        }
+      }
+      return nullptr;
+    }
+  );
+
+  // Check that all of the values that we inserted are in the map.
+  for (int i=0; i < numElem; i++) {
+    size_t hash = (i * 123512) % 0xFFFF ;
+    EXPECT_TRUE(Map.findValueByKey(hash));
+  }
+}
+
+
 TEST(MetadataAllocator, alloc_firstAllocationMoreThanPageSized) {
   using swift::MetadataAllocator;
   MetadataAllocator allocator;
