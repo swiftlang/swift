@@ -623,14 +623,23 @@ public:
 
     // Print inlined-at location, if any.
     if (DS) {
+      SILFunction *InlinedF = DS->getInlinedFunction();
       for (auto *CS : reversed(DS->flattenedInlineTree())) {
-        *this << ": perf_inlined_at ";
+        *this << ": ";
+        if (InlinedF) {
+          *this << demangleSymbol(InlinedF->getName());
+        } else {
+          *this << '?';
+        }
+        *this << " perf_inlined_at ";
         auto CallSite = CS->Loc;//DS->InlinedCallSite->Loc;
         if (!CallSite.isNull())
           CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
         else
           *this << "?";
+
+        InlinedF = CS->getInlinedFunction();
       }
     }
   }
