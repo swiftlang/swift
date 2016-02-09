@@ -413,6 +413,7 @@ public:
   virtual void editorOpenInterface(EditorConsumer &Consumer,
                                    StringRef Name,
                                    StringRef ModuleName,
+                                   Optional<StringRef> Group,
                                    ArrayRef<const char *> Args) = 0;
 
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,

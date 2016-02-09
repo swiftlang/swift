@@ -50,3 +50,6 @@ var x: Int
 // GROUP1: String
 // GROUP1: Zip
 // GROUP1: <\GROUPS>
+
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Zip > %t.zip.response
+// RUN: diff -u %s.zip.response %t.zip.response

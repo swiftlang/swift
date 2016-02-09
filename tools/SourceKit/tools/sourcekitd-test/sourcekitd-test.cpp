@@ -542,6 +542,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
                                             RequestEditorOpenSwiftSourceInterface);
     }
     sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName());
+    if (!Opts.ModuleGroupName.empty())
+      sourcekitd_request_dictionary_set_string(Req, KeyGroupName,
+                                               Opts.ModuleGroupName.c_str());
     break;
 
   case SourceKitRequest::FindInterfaceDoc:

@@ -36,6 +36,7 @@ public:
   static SwiftInterfaceGenContextRef create(StringRef DocumentName,
                                             bool IsModule,
                                             StringRef ModuleOrHeaderName,
+                                            Optional<StringRef> Group,
                                             swift::CompilerInvocation Invocation,
                                             std::string &ErrorMsg);
 

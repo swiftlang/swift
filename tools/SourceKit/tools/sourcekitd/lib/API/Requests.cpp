@@ -178,7 +178,7 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    ArrayRef<const char *> Args);
+                    Optional<StringRef> Group, ArrayRef<const char *> Args);
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
@@ -404,7 +404,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Optional<StringRef> ModuleName = Req.getString(KeyModuleName);
     if (!ModuleName.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
-    return Rec(editorOpenInterface(*Name, *ModuleName, Args));
+    Optional<StringRef> GroupName = Req.getString(KeyGroupName);
+    return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args));
   }
 
   if (ReqUID == RequestEditorOpenHeaderInterface) {
@@ -1616,13 +1617,13 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    ArrayRef<const char *> Args) {
+                    Optional<StringRef> Group, ArrayRef<const char *> Args) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpenInterface(EditC, Name, ModuleName, Args);
+  Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args);
   return EditC.createResponse();
 }
 
