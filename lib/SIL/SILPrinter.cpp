@@ -632,7 +632,7 @@ public:
           *this << '?';
         }
         *this << " perf_inlined_at ";
-        auto CallSite = CS->Loc;//DS->InlinedCallSite->Loc;
+        auto CallSite = CS->Loc;
         if (!CallSite.isNull())
           CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
