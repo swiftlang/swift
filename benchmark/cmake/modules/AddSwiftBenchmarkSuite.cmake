@@ -68,7 +68,9 @@ function (swift_benchmark_compile_archopts)
 
   set(bench_library_objects)
   set(bench_library_sibfiles)
-  foreach(module_name ${BENCH_DRIVER_LIBRARY_MODULES})
+  foreach(module_name_path ${BENCH_DRIVER_LIBRARY_MODULES})
+    get_filename_component(module_name "${module_name_path}" NAME)
+
     if("${module_name}" STREQUAL "DriverUtils")
       set(extra_sources "${srcdir}/utils/ArgParse.swift")
     endif()
@@ -76,7 +78,7 @@ function (swift_benchmark_compile_archopts)
     set(objfile "${objdir}/${module_name}.o")
     set(swiftmodule "${objdir}/${module_name}.swiftmodule")
     list(APPEND bench_library_objects "${objfile}")
-    set(source "${srcdir}/utils/${module_name}.swift")
+    set(source "${srcdir}/${module_name_path}.swift")
     add_custom_command(
         OUTPUT "${objfile}"
         DEPENDS ${stdlib_dependencies} "${source}" ${extra_sources}
@@ -95,7 +97,7 @@ function (swift_benchmark_compile_archopts)
       add_custom_command(
           OUTPUT "${sibfile}"
           DEPENDS
-            ${stdlib_dependencies} "${srcdir}/utils/${module_name}.swift"
+            ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
             ${extra_sources}
           COMMAND "${SWIFT_EXEC}"
           ${common_options_driver}
@@ -105,18 +107,20 @@ function (swift_benchmark_compile_archopts)
           "-module-name" "${module_name}"
           "-emit-sib"
           "-o" "${sibfile}"
-          "${srcdir}/utils/${module_name}.swift" ${extra_sources})
+          "${srcdir}/${module_name_path}.swift" ${extra_sources})
     endif()
   endforeach()
 
-  foreach(module_name ${BENCH_LIBRARY_MODULES})
+  foreach(module_name_path ${BENCH_LIBRARY_MODULES})
+    get_filename_component(module_name "${module_name_path}" NAME)
+
     set(objfile "${objdir}/${module_name}.o")
     set(swiftmodule "${objdir}/${module_name}.swiftmodule")
     list(APPEND bench_library_objects "${objfile}")
     add_custom_command(
         OUTPUT "${objfile}"
         DEPENDS
-          ${stdlib_dependencies} "${srcdir}/utils/${module_name}.swift"
+          ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
           ${extra_sources}
         COMMAND "${SWIFT_EXEC}"
         ${common_options}
@@ -125,14 +129,14 @@ function (swift_benchmark_compile_archopts)
         "-module-name" "${module_name}"
         "-emit-module" "-emit-module-path" "${swiftmodule}"
         "-o" "${objfile}"
-        "${srcdir}/utils/${module_name}.swift" ${extra_sources})
+        "${srcdir}/${module_name_path}.swift" ${extra_sources})
     if (SWIFT_BENCHMARK_EMIT_SIB)
       set(sibfile "${objdir}/${module_name}.sib")
       list(APPEND bench_library_sibfiles "${sibfile}")
       add_custom_command(
           OUTPUT "${sibfile}"
           DEPENDS
-            ${stdlib_dependencies} "${srcdir}/utils/${module_name}.swift"
+            ${stdlib_dependencies} "${srcdir}/${module_name_path}.swift"
             ${extra_sources}
           COMMAND "${SWIFT_EXEC}"
           ${common_options}
@@ -141,13 +145,15 @@ function (swift_benchmark_compile_archopts)
           "-module-name" "${module_name}"
           "-emit-sib"
           "-o" "${sibfile}"
-          "${srcdir}/utils/${module_name}.swift" ${extra_sources})
+          "${srcdir}/${module_name_path}.swift" ${extra_sources})
     endif()
   endforeach()
 
   set(SWIFT_BENCH_OBJFILES)
   set(SWIFT_BENCH_SIBFILES)
-  foreach(module_name ${SWIFT_BENCH_MODULES})
+  foreach(module_name_path ${SWIFT_BENCH_MODULES})
+    get_filename_component(module_name "${module_name_path}" NAME)
+
     if(module_name)
       set(objfile "${objdir}/${module_name}.o")
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
@@ -156,7 +162,7 @@ function (swift_benchmark_compile_archopts)
           OUTPUT "${objfile}"
           DEPENDS
             ${stdlib_dependencies} ${bench_library_objects}
-            "${srcdir}/single-source/${module_name}.swift"
+            "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
           ${common_options}
           "-parse-as-library"
@@ -165,7 +171,7 @@ function (swift_benchmark_compile_archopts)
           "-emit-module" "-emit-module-path" "${swiftmodule}"
           "-I" "${objdir}"
           "-o" "${objfile}"
-          "${srcdir}/single-source/${module_name}.swift")
+          "${srcdir}/${module_name_path}.swift")
       if (SWIFT_BENCHMARK_EMIT_SIB)
         set(sibfile "${objdir}/${module_name}.sib")
         list(APPEND SWIFT_BENCH_SIBFILES "${sibfile}")
@@ -173,7 +179,7 @@ function (swift_benchmark_compile_archopts)
             OUTPUT "${sibfile}"
             DEPENDS
               ${stdlib_dependencies} ${bench_library_sibfiles}
-              "${srcdir}/single-source/${module_name}.swift"
+              "${srcdir}/${module_name_path}.swift"
             COMMAND "${SWIFT_EXEC}"
             ${common_options}
             "-parse-as-library"
@@ -182,12 +188,14 @@ function (swift_benchmark_compile_archopts)
             "-I" "${objdir}"
             "-emit-sib"
             "-o" "${sibfile}"
-            "${srcdir}/single-source/${module_name}.swift")
+            "${srcdir}/${module_name_path}.swift")
       endif()
     endif()
   endforeach()
 
-  foreach(module_name ${SWIFT_MULTISOURCE_BENCHES})
+  foreach(module_name_path ${SWIFT_MULTISOURCE_BENCHES})
+    get_filename_component(module_name "${module_name_path}" NAME)
+
     if ("${bench_flags}" MATCHES "-whole-module.*" AND
         NOT "${bench_flags}" MATCHES "-num-threads.*")
       # Regular whole-module-compilation: only a single object file is
@@ -196,7 +204,7 @@ function (swift_benchmark_compile_archopts)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
       set(sources)
       foreach(source ${${module_name}_sources})
-        list(APPEND sources "${srcdir}/multi-source/${source}")
+        list(APPEND sources "${srcdir}/${source}")
       endforeach()
       add_custom_command(
           OUTPUT "${objfile}"
@@ -219,13 +227,13 @@ function (swift_benchmark_compile_archopts)
       set(objfiles)
       set(json "{\n")
       foreach(source ${${module_name}_sources})
-          list(APPEND sources "${srcdir}/multi-source/${source}")
+          list(APPEND sources "${srcdir}/${source}")
 
           get_filename_component(basename "${source}" NAME_WE)
           set(objfile "${objdir}/${module_name}/${basename}.o")
 
               string(CONCAT json "${json}"
-    "  \"${srcdir}/multi-source/${source}\": { \"object\": \"${objfile}\" },\n")
+    "  \"${srcdir}/${source}\": { \"object\": \"${objfile}\" },\n")
 
           list(APPEND objfiles "${objfile}")
           list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
