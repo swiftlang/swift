@@ -31,7 +31,8 @@ syn keyword swiftKeyword load load_unowned store assign mark_uninitialized mark_
 syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_unowned store_weak fix_lifetime autorelease_value is_unique is_unique_or_pinned strong_pin strong_unpin skipwhite
 syn keyword swiftKeyword function_ref integer_literal float_literal string_literal global_addr skipwhite
 syn keyword swiftKeyword class_method super_method witness_method dynamic_method skipwhite
-syn keyword swiftKeyword apply try_apply partial_apply builtin skipwhite
+syn keyword swiftKeyword partial_apply builtin skipwhite
+syn keyword swiftApplyKeyword apply try_apply skipwhite
 syn keyword swiftKeyword metatype value_metatype existential_metatype skipwhite
 syn keyword swiftKeyword retain_value release_value tuple tuple_extract tuple_element_addr struct struct_extract struct_element_addr ref_element_addr skipwhite
 syn keyword swiftKeyword init_enum_data_addr unchecked_enum_data unchecked_take_enum_data_addr inject_enum_addr skipwhite
@@ -66,6 +67,7 @@ syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
+hi def link swiftApplyKeyword ModeMsg
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftTypeName Type
