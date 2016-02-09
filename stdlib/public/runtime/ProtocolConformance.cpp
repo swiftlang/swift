@@ -406,7 +406,7 @@ recur_inside_cache_lock:
         }
       }
 
-      // The entry that we fetched does not match our key due to a collission.
+      // The entry that we fetched does not match our key due to a collision.
       // If we have a collision increase the hash value by one and try again.
       hash++;
     }

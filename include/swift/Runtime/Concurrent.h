@@ -143,7 +143,7 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
 /// the tree. Much like the concurrent linked list this data structure
 /// does not support the removal of nodes. In order to reduce the memory usage
 /// of the map we only store a hash of the key and the value. It is the
-/// responsibility of the caller to handle hash collissions.
+/// responsibility of the caller to handle hash collisions.
 template <class KeyTy, class ValueTy> class ConcurrentMap {
 public:
   ConcurrentMap() : Root(), LastSearch(nullptr) {}
