@@ -2227,3 +2227,649 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
     NewNodes.clear();
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                             NewProjectionTreeNode
+//===----------------------------------------------------------------------===//
+
+NewProjectionTreeNode *
+NewProjectionTreeNode::getChildForProjection(NewProjectionTree &Tree,
+                                          const NewProjection &P) {
+  for (unsigned Index : ChildProjections) {
+    NewProjectionTreeNode *N = Tree.getNode(Index);
+    if (N->Proj && N->Proj.getValue() == P) {
+      return N;
+    }
+  }
+
+  return nullptr;
+}
+
+NewProjectionTreeNode *
+NewProjectionTreeNode::getParent(NewProjectionTree &Tree) {
+  if (!Parent)
+    return nullptr;
+  return Tree.getNode(Parent.getValue());
+}
+
+const NewProjectionTreeNode *
+NewProjectionTreeNode::getParent(const NewProjectionTree &Tree) const {
+  if (!Parent)
+    return nullptr;
+  return Tree.getNode(Parent.getValue());
+}
+
+NullablePtr<SILInstruction>
+NewProjectionTreeNode::
+createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
+  if (!Proj)
+    return nullptr;
+
+  return Proj->createProjection(B, Loc, Arg);
+}
+
+
+void
+NewProjectionTreeNode::
+processUsersOfValue(NewProjectionTree &Tree,
+                    llvm::SmallVectorImpl<ValueNodePair> &Worklist,
+                    SILValue Value) {
+  DEBUG(llvm::dbgs() << "    Looking at Users:\n");
+
+  // For all uses of V...
+  for (Operand *Op : getNonDebugUses(Value)) {
+    // Grab the User of V.
+    SILInstruction *User = Op->getUser();
+
+    DEBUG(llvm::dbgs() << "        " << *User);
+
+    // First try to create a Projection for User.
+    auto P = NewProjection::NewProjection(User);
+
+    // If we fail to create a projection, add User as a user to this node and
+    // continue.
+    if (!P.isValid()) {
+      DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
+            "to non projection user!\n");
+      addNonProjectionUser(Op);
+      continue;
+    }
+
+    DEBUG(llvm::dbgs() << "            Created projection.\n");
+
+    assert(User->hasValue() && "Projections should have a value");
+
+    // we have a projection to the next level children, create the next
+    // level children nodes lazily.
+    if (!Initialized)
+      createNextLevelChildren(Tree);
+
+    // Look up the Node for this projection add {User, ChildNode} to the
+    // worklist.
+    //
+    // *NOTE* This means that we will process ChildNode multiple times
+    // potentially with different projection users.
+    if (auto *ChildNode = getChildForProjection(Tree, P)) {
+      DEBUG(llvm::dbgs() << "            Found child for projection: "
+            << ChildNode->getType() << "\n");
+
+      SILValue V = SILValue(User);
+      Worklist.push_back({V, ChildNode});
+    } else {
+      DEBUG(llvm::dbgs() << "            Did not find a child for projection!. "
+            "Adding to non projection user!\b");
+
+      // The only projection which we do not currently handle are enums since we
+      // may not know the correct case. This can be extended in the future.
+      addNonProjectionUser(Op);
+    }
+  }
+}
+
+void
+NewProjectionTreeNode::
+createNextLevelChildrenForStruct(NewProjectionTree &Tree, StructDecl *SD) {
+  SILModule &Mod = Tree.getModule();
+  unsigned ChildIndex = 0;
+  SILType Ty = getType();
+  for (VarDecl *VD : SD->getStoredProperties()) {
+    assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
+    SILType NodeTy = Ty.getFieldType(VD, Mod);
+    auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
+    DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
+    DEBUG(llvm::dbgs() << "            Projection: " 
+          << Node->getProjection().getValue().getIndex() << "\n");
+    ChildProjections.push_back(Node->getIndex());
+    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+           "Child not matched to its projection in parent!");
+    assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
+  }
+}
+
+void
+NewProjectionTreeNode::
+createNextLevelChildrenForTuple(NewProjectionTree &Tree, TupleType *TT) {
+  SILType Ty = getType();
+  for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+    assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
+    SILType NodeTy = Ty.getTupleElementType(i);
+    auto *Node = Tree.createChildForTuple(this, NodeTy, i);
+    DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
+    DEBUG(llvm::dbgs() << "            Projection: "
+          << Node->getProjection().getValue().getIndex() << "\n");
+    ChildProjections.push_back(Node->getIndex());
+    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+           "Child not matched to its projection in parent!");
+    assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
+  }
+}
+
+void
+NewProjectionTreeNode::
+createNextLevelChildren(NewProjectionTree &Tree) {
+  DEBUG(llvm::dbgs() << "    Creating children for: " << getType() << "\n");
+  if (Initialized) {
+    DEBUG(llvm::dbgs() << "        Already initialized! bailing!\n");
+    return;
+  }
+
+  Initialized = true;
+
+  SILType Ty = getType();
+
+  if (Ty.aggregateHasUnreferenceableStorage()) {
+    DEBUG(llvm::dbgs() << "        Has unreferenced storage bailing!\n");
+    return;
+  }
+
+  if (auto *SD = Ty.getStructOrBoundGenericStruct()) {
+    DEBUG(llvm::dbgs() << "        Found a struct!\n");
+    createNextLevelChildrenForStruct(Tree, SD);
+    return;
+  }
+
+  auto TT = Ty.getAs<TupleType>();
+  if (!TT) {
+    DEBUG(llvm::dbgs() << "        Did not find a tuple or struct, "
+          "bailing!\n");
+    return;
+  }
+
+  DEBUG(llvm::dbgs() << "        Found a tuple.");
+  createNextLevelChildrenForTuple(Tree, TT);
+}
+
+SILInstruction *
+NewProjectionTreeNode::
+createAggregate(SILBuilder &B, SILLocation Loc, ArrayRef<SILValue> Args) const {
+  assert(Initialized && "Node must be initialized to create aggregates");
+
+  SILType Ty = getType();
+
+  if (Ty.getStructOrBoundGenericStruct()) {
+    return B.createStruct(Loc, Ty, Args);
+  }
+
+  if (Ty.getAs<TupleType>()) {
+    return B.createTuple(Loc, Ty, Args);
+  }
+
+  llvm_unreachable("Unhandled type");
+}
+
+class NewProjectionTreeNode::NewAggregateBuilder {
+  NewProjectionTreeNode *Node;
+  SILBuilder &Builder;
+  SILLocation Loc;
+  llvm::SmallVector<SILValue, 8> Values;
+
+  // Did this aggregate already create an aggregate and thus is "invalidated".
+  bool Invalidated;
+
+public:
+  NewAggregateBuilder(NewProjectionTreeNode *N, SILBuilder &B, SILLocation L)
+    : Node(N), Builder(B), Loc(L), Values(), Invalidated(false) {
+    assert(N->Initialized && "N must be initialized since we are mapping Node "
+           "Children -> SILValues");
+
+    // Initialize the Values array with empty SILValues.
+    for (unsigned Child : N->ChildProjections) {
+      (void)Child;
+      Values.push_back(SILValue());
+    }
+  }
+
+  bool isInvalidated() const { return Invalidated; }
+
+  /// If all SILValues have been set, we are complete.
+  bool isComplete() const {
+    return std::all_of(Values.begin(), Values.end(), [](SILValue V) -> bool {
+      return V;
+    });
+  }
+
+  SILInstruction *createInstruction() const {
+    assert(isComplete() && "Cannot create instruction until the aggregate is "
+           "complete");
+    assert(!Invalidated && "Must not be invalidated to create an instruction");
+    const_cast<NewAggregateBuilder *>(this)->Invalidated = true;
+    return Node->createAggregate(Builder, Loc, Values);
+  }
+
+  void setValueForChild(NewProjectionTreeNode *Child, SILValue V) {
+    assert(!Invalidated && "Must not be invalidated to set value for child");
+    Values[Child->Proj.getValue().getIndex()] = V;
+  }
+};
+
+namespace {
+
+using NewAggregateBuilder = NewProjectionTreeNode::NewAggregateBuilder;
+
+/// A wrapper around a MapVector with generalized operations on the map.
+///
+/// TODO: Replace this with a simple RPOT and use GraphUtils. Since we do not
+/// look through enums or classes, in the current type system it should not be
+/// possible to have a cycle implying that a RPOT should be fine.
+class NewAggregateBuilderMap {
+  SILBuilder &Builder;
+  SILLocation Loc;
+  llvm::MapVector<NewProjectionTreeNode *, NewAggregateBuilder> NodeBuilderMap;
+
+public:
+
+  NewAggregateBuilderMap(SILBuilder &B, SILLocation Loc)
+    : Builder(B), Loc(Loc), NodeBuilderMap() {}
+
+  /// Get the NewAggregateBuilder associated with Node or if none is created,
+  /// create one for Node.
+  NewAggregateBuilder &getBuilder(NewProjectionTreeNode *Node) {
+    auto I = NodeBuilderMap.find(Node);
+    if (I != NodeBuilderMap.end()) {
+      return I->second;
+    } else {
+      auto AggIt = NodeBuilderMap.insert({Node, NewAggregateBuilder(Node, Builder,
+                                                                 Loc)});
+      return AggIt.first->second;
+    }
+  }
+
+  /// Get the NewAggregateBuilder associated with Node. Assert on failure.
+  NewAggregateBuilder &get(NewProjectionTreeNode *Node) {
+    auto It = NodeBuilderMap.find(Node);
+    assert(It != NodeBuilderMap.end() && "Every item in the worklist should have "
+           "an NewAggregateBuilder associated with it");
+    return It->second;
+  }
+
+  bool isComplete(NewProjectionTreeNode *Node) {
+    return get(Node).isComplete();
+  }
+
+  bool isInvalidated(NewProjectionTreeNode *Node) {
+    return get(Node).isInvalidated();
+  }
+
+  NewProjectionTreeNode *
+  getNextValidNode(llvm::SmallVectorImpl<NewProjectionTreeNode *> &Worklist,
+                   bool CheckForDeadLock=false);
+};
+
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                               NewProjectionTree
+//===----------------------------------------------------------------------===//
+
+NewProjectionTree::NewProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA,
+                               SILType BaseTy) : Mod(Mod), Allocator(BPA) {
+  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
+
+  // Create the root node of the tree with our base type.
+  createRoot(BaseTy);
+
+  // Create the rest of the type tree lazily based on uses.
+}
+
+NewProjectionTree::~NewProjectionTree() {
+  for (auto *N : NewProjectionTreeNodes)
+    N->~NewProjectionTreeNode();
+}
+
+SILValue
+NewProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
+                                                  SILLocation Loc,
+                                                  NewProjectionTreeNode *Node,
+                                                  LeafValueMapTy &LeafValues) {
+  // Use the child node value if the child is alive.
+  if (Node->ChildProjections.empty()) {
+    auto Iter = LeafValues.find(Node->getIndex());
+    if (Iter != LeafValues.end())
+      return Iter->second;
+    // Return undef for dead node.
+    return SILUndef::get(Node->getType(), Mod);
+  }
+
+  // This is an aggregate node, construct its value from its children
+  // recursively. 
+  //
+  // NOTE: We do not expect to have too many levels of nesting, so
+  // recursion should be fine.
+  llvm::SmallVector<SILValue, 8> ChildValues;
+  for (unsigned ChildIdx : Node->ChildProjections) {
+    NewProjectionTreeNode *Child = getNode(ChildIdx);
+    ChildValues.push_back(computeExplodedArgumentValueInner(Builder, Loc, Child,
+                                                            LeafValues));
+  }
+
+  // Form and return the aggregate.
+  NullablePtr<swift::SILInstruction> AI =
+      Projection::createAggFromFirstLevelProjections(Builder, Loc,
+                                                     Node->getType(),
+                                                     ChildValues);
+
+  assert(AI.get() && "Failed to get a part of the debug value");
+  return SILValue(AI.get());
+}
+
+SILValue
+NewProjectionTree::computeExplodedArgumentValue(SILBuilder &Builder, 
+                                             SILLocation Loc,
+                                             llvm::SmallVector<SILValue, 8> &LeafValues) {
+  // Construct the leaf index to leaf value map.
+  llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;
+  for (unsigned i = 0; i < LeafValues.size(); ++i) {
+    LeafIndexToValue[LeafIndices[i]] = LeafValues[i];
+  }
+
+  // Compute the full root node debug node by walking down the projection tree.
+  return computeExplodedArgumentValueInner(Builder, Loc, getRoot(),
+                                           LeafIndexToValue);
+}
+
+void
+NewProjectionTree::computeUsesAndLiveness(SILValue Base) {
+  // Propagate liveness and users through the tree.
+  llvm::SmallVector<NewProjectionTreeNode::ValueNodePair, 32> UseWorklist;
+  UseWorklist.push_back({Base, getRoot()});
+
+  // Then until the worklist is empty...
+  while (!UseWorklist.empty()) {
+    DEBUG(llvm::dbgs() << "Current Worklist:\n");
+    DEBUG(for (auto &T : UseWorklist) {
+        llvm::dbgs() << "    Type: " << T.second->getType() << "; Value: ";
+        if (T.first) {
+          llvm::dbgs() << T.first;
+        } else {
+          llvm::dbgs() << "<null>\n";
+        }
+    });
+
+    SILValue Value;
+    NewProjectionTreeNode *Node;
+
+    // Pop off the top type, value, and node.
+    std::tie(Value, Node) = UseWorklist.pop_back_val();
+
+    DEBUG(llvm::dbgs() << "Visiting: " << Node->getType() << "\n");
+
+    // If Value is not null, collate all users of Value the appropriate child
+    // nodes and add such items to the worklist.
+    if (Value) {
+      Node->processUsersOfValue(*this, UseWorklist, Value);
+    }
+
+    // If this node is live due to a non projection user, propagate down its
+    // liveness to its children and its children with an empty value to the
+    // worklist so we propagate liveness down to any further descendants.
+    if (Node->IsLive) {
+      DEBUG(llvm::dbgs() << "Node Is Live. Marking Children Live!\n");
+      for (unsigned ChildIdx : Node->ChildProjections) {
+        NewProjectionTreeNode *Child = getNode(ChildIdx);
+        Child->IsLive = true;
+        DEBUG(llvm::dbgs() << "    Marking child live: " << Child->getType() << "\n");
+        UseWorklist.push_back({SILValue(), Child});
+      }
+    }
+  }
+
+  // Then setup the leaf list by iterating through our Nodes looking for live
+  // leafs. We use a DFS order, always processing the left leafs first so that
+  // we match the order in which we will lay out arguments.
+  llvm::SmallVector<NewProjectionTreeNode *, 8> Worklist;
+  Worklist.push_back(getRoot());
+  while (!Worklist.empty()) {
+    NewProjectionTreeNode *Node = Worklist.pop_back_val();
+
+    // If node is not a leaf, add its children to the worklist and continue.
+    if (!Node->ChildProjections.empty()) {
+      for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
+        Worklist.push_back(getNode(ChildIdx));
+      }
+      continue;
+    }
+
+    // If the node is a leaf and is not a live, continue.
+    if (!Node->IsLive)
+      continue;
+
+    // Otherwise we have a live leaf, add its index to our LeafIndices list.
+    LeafIndices.push_back(Node->getIndex());
+  }
+
+#ifndef NDEBUG
+  DEBUG(llvm::dbgs() << "Final Leafs: \n");
+  llvm::SmallVector<SILType, 8> LeafTypes;
+  getLeafTypes(LeafTypes);
+  for (SILType Leafs : LeafTypes) {
+    DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
+  }
+#endif
+}
+
+void
+NewProjectionTree::
+createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
+                    llvm::SmallVectorImpl<SILValue> &Leafs) const {
+  DEBUG(llvm::dbgs() << "Recreating tree from value: " << NewBase);
+
+  using WorklistEntry =
+    std::tuple<const NewProjectionTreeNode *, SILValue>;
+  llvm::SmallVector<WorklistEntry, 32> Worklist;
+
+  // Start our worklist with NewBase and Root.
+  Worklist.push_back(std::make_tuple(getRoot(), NewBase));
+
+  // Then until our worklist is clear...
+  while (Worklist.size()) {
+    // Pop off the top of the list.
+    const NewProjectionTreeNode *Node = std::get<0>(Worklist.back());
+    SILValue V = std::get<1>(Worklist.back());
+    Worklist.pop_back();
+
+    DEBUG(llvm::dbgs() << "Visiting: " << V->getType() << ": " << V);
+
+    // If we have any children...
+    unsigned NumChildren = Node->ChildProjections.size();
+    if (NumChildren) {
+      DEBUG(llvm::dbgs() << "    Not Leaf! Adding children to list.\n");
+
+      // Create projections for each one of them and the child node and
+      // projection to the worklist for processing.
+      for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
+        const NewProjectionTreeNode *ChildNode = getNode(ChildIdx);
+        SILInstruction *I = ChildNode->createProjection(B, Loc, V).get();
+        DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": " << *I);
+        Worklist.push_back(std::make_tuple(ChildNode, SILValue(I)));
+      }
+    } else {
+      // Otherwise, we have a leaf node. If the leaf node is not alive, do not
+      // add it to our leaf list.
+      if (!Node->IsLive)
+        continue;
+
+      // Otherwise add it to our leaf list.
+      DEBUG(llvm::dbgs() << "    Is a Leaf! Adding to leaf list\n");
+      Leafs.push_back(V);
+    }
+  }
+}
+
+NewProjectionTreeNode *
+NewAggregateBuilderMap::
+getNextValidNode(llvm::SmallVectorImpl<NewProjectionTreeNode *> &Worklist,
+                 bool CheckForDeadLock) {
+  if (Worklist.empty())
+    return nullptr;
+
+  NewProjectionTreeNode *Node = Worklist.back();
+
+  // If the Node is not complete, then we have reached a dead lock. This should never happen.
+  //
+  // TODO: Prove this and put the proof here.
+  if (CheckForDeadLock && !isComplete(Node)) {
+    llvm_unreachable("Algorithm Dead Locked!");
+  }
+
+  // This block of code, performs the pop back and also if the Node has been
+  // invalidated, skips until we find a non invalidated value.
+  while (isInvalidated(Node)) {
+    assert(isComplete(Node) && "Invalidated values must be complete");
+
+    // Pop Node off the back of the worklist.
+    Worklist.pop_back();
+
+    if (Worklist.empty())
+      return nullptr;
+
+    Node = Worklist.back();
+  }
+
+  return Node;
+}
+
+void
+NewProjectionTree::
+replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
+                             llvm::SmallVectorImpl<SILValue> &Leafs) {
+  assert(Leafs.size() == LeafIndices.size() && "Leafs and leaf indices must "
+         "equal in size.");
+
+  NewAggregateBuilderMap AggBuilderMap(Builder, Loc);
+  llvm::SmallVector<NewProjectionTreeNode *, 8> Worklist;
+
+  DEBUG(llvm::dbgs() << "Replacing all uses in callee with leafs!\n");
+
+  // For each Leaf we have as input...
+  for (unsigned i = 0, e = Leafs.size(); i != e; ++i) {
+    SILValue Leaf = Leafs[i];
+    NewProjectionTreeNode *Node = getNode(LeafIndices[i]);
+
+    DEBUG(llvm::dbgs() << "    Visiting leaf: " << Leaf);
+
+    assert(Node->IsLive && "Unexpected dead node in LeafIndices!");
+
+    // Otherwise replace all uses at this level of the tree with uses of the
+    // Leaf value.
+    DEBUG(llvm::dbgs() << "        Replacing operands with leaf!\n");
+    for (auto *Op : Node->NonProjUsers) {
+      DEBUG(llvm::dbgs() << "            User: " << *Op->getUser());
+      Op->set(Leaf);
+    }
+
+    // Grab the parent of this node.
+    NewProjectionTreeNode *Parent = Node->getParent(*this);
+    DEBUG(llvm::dbgs() << "        Visiting parent of leaf: " <<
+          Parent->getType() << "\n");
+
+    // If the parent is dead, continue.
+    if (!Parent->IsLive) {
+      DEBUG(llvm::dbgs() << "        Parent is dead... continuing.\n");
+      continue;
+    }
+
+    DEBUG(llvm::dbgs() << "        Parent is alive! Adding to parent "
+          "builder\n");
+
+    // Otherwise either create an aggregate builder for the parent or reuse one
+    // that has already been created for it.
+    AggBuilderMap.getBuilder(Parent).setValueForChild(Node, Leaf);
+
+    DEBUG(llvm::dbgs() << "            Is parent complete: "
+          << (AggBuilderMap.isComplete(Parent)? "yes" : "no") << "\n");
+
+    // Finally add the parent to the worklist.
+    Worklist.push_back(Parent);
+  }
+
+  // A utility array to add new Nodes to the list so we maintain while
+  // processing the current worklist we maintain only completed items at the end
+  // of the list.
+  llvm::SmallVector<NewProjectionTreeNode *, 8> NewNodes;
+
+  DEBUG(llvm::dbgs() << "Processing worklist!\n");
+
+  // Then until we have no work left...
+  while (!Worklist.empty()) {
+    // Sort the worklist so that complete items are first.
+    //
+    // TODO: Just change this into a partition method. Should be significantly
+    // faster.
+    std::sort(Worklist.begin(), Worklist.end(),
+              [&AggBuilderMap](NewProjectionTreeNode *N1,
+                     NewProjectionTreeNode *N2) -> bool {
+                bool IsComplete1 = AggBuilderMap.isComplete(N1);
+                bool IsComplete2 = AggBuilderMap.isComplete(N2);
+
+                // Sort N1 after N2 if N1 is complete and N2 is not. This puts
+                // complete items at the end of our list.
+                return unsigned(IsComplete1) < unsigned(IsComplete2);
+              });
+
+    DEBUG(llvm::dbgs() << "    Current Worklist:\n");
+#ifndef NDEBUG
+    for (auto *_N : Worklist) {
+      DEBUG(llvm::dbgs() << "        Type: " << _N->getType()
+                   << "; Complete: "
+                   << (AggBuilderMap.isComplete(_N)? "yes" : "no")
+                   << "; Invalidated: "
+            << (AggBuilderMap.isInvalidated(_N)? "yes" : "no") << "\n");
+    }
+#endif
+
+    // Find the first non invalidated node. If we have all invalidated nodes,
+    // this will return nullptr.
+    NewProjectionTreeNode *Node = AggBuilderMap.getNextValidNode(Worklist, true);
+
+    // Then until we find a node that is not complete...
+    while (Node && AggBuilderMap.isComplete(Node)) {
+      // Create the aggregate for the current complete Node we are processing...
+      SILValue Agg = AggBuilderMap.get(Node).createInstruction();
+
+      // Replace all uses at this level of the tree with uses of the newly
+      // constructed aggregate.
+      for (auto *Op : Node->NonProjUsers) {
+        Op->set(Agg);
+      }
+
+      // If this node has a parent and that parent is alive...
+      NewProjectionTreeNode *Parent = Node->getParentOrNull(*this);
+      if (Parent && Parent->IsLive) {
+        // Create or lookup the node builder for the parent and associate the
+        // newly created aggregate with this node.
+        AggBuilderMap.getBuilder(Parent).setValueForChild(Node, SILValue(Agg));
+        // Then add the parent to NewNodes to be added to our list.
+        NewNodes.push_back(Parent);
+      }
+
+      // Grab the next non-invalidated node for the next iteration. If we had
+      // all invalidated nodes, this will return nullptr.
+      Node = AggBuilderMap.getNextValidNode(Worklist);
+    }
+
+    // Copy NewNodes onto the back of our Worklist now that we have finished
+    // this iteration.
+    std::copy(NewNodes.begin(), NewNodes.end(), std::back_inserter(Worklist));
+    NewNodes.clear();
+  }
+}
