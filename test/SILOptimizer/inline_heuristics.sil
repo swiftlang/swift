@@ -1,6 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -debug-only=sil-inliner -sil-inline-test-threshold=1 2>%t/log | FileCheck %s
-// RUN: FileCheck -check-prefix=LOG %s < %t/log
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-test-threshold=1 | FileCheck %s
 // REQUIRES: asserts
 
 // This test checks the inline heuristics based on the debug log output of
@@ -33,10 +32,6 @@ enum E {
 // CHECK: apply [[C]](
 // CHECK: return
 
-// LOG-LABEL: Visiting Function: testDirectClosure 
-// LOG: Eligible callee: takeDirectClosure
-// LOG: Boost: apply const function
-
 sil @testDirectClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeDirectClosure : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32
@@ -63,10 +58,6 @@ bb0(%0 : $@callee_owned (Int32) -> Int32):
 // CHECK: [[C:%[0-9]+]] = struct_extract
 // CHECK: apply [[C]](
 // CHECK: return
-
-// LOG-LABEL: Visiting Function: testStructClosure
-// LOG: Eligible callee: takeStructClosure
-// LOG: Boost: apply const function
 
 sil @testStructClosure : $@convention(thin) () -> Int32 {
 bb0:
@@ -96,10 +87,6 @@ bb0(%0 : $Cont):
 // CHECK: [[C:%[0-9]+]] = load
 // CHECK: apply [[C]](
 // CHECK: return
-
-// LOG-LABEL: Visiting Function: testStructAddrClosure
-// LOG: Eligible callee: takeStructAddrClosure
-// LOG: Boost: apply const function
 
 sil @testStructAddrClosure : $@convention(thin) () -> Int32 {
 bb0:
@@ -138,10 +125,6 @@ bb0(%0 : $*Cont):
 // CHECK: apply [[C]](
 // CHECK: return
 
-// LOG-LABEL: Visiting Function: testTupleClosure
-// LOG: Eligible callee: takeTupleClosure
-// LOG: Boost: apply const function
-
 sil @testTupleClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeTupleClosure : $@convention(thin) (@owned Cont2) -> Int32
@@ -174,10 +157,6 @@ bb0(%0 : $Cont2):
 // CHECK: [[C:%[0-9]+]] = unchecked_enum_data
 // CHECK: apply [[C]](
 // CHECK: return
-
-// LOG-LABEL: Visiting Function: testEnumClosure
-// LOG: Eligible callee: takeEnumClosure
-// LOG: Boost: apply const function
 
 sil @testEnumClosure : $@convention(thin) () -> Int32 {
 bb0:
@@ -224,10 +203,6 @@ bb0(%0 : $Int32):
 // CHECK-NOT: apply
 // CHECK: return %{{.*}} : $()
 
-// LOG-LABEL: Visiting Function: testCondBr
-// LOG: Eligible callee: condBrCallee
-// LOG: Take bb1 of cond_br
-
 sil @testCondBr : $@convention(thin) () -> () {
 bb0:
 
@@ -266,10 +241,6 @@ bb3(%8 : $Int32):
 // CHECK: builtin "assert_configuration"()
 // CHECK-NOT: apply
 // CHECK: return %{{.*}} : $()
-
-// LOG-LABEL: Visiting Function: testSwitchValue
-// LOG: Eligible callee: switchValueCallee
-// LOG: Take bb2 of switch_value
 
 sil @testSwitchValue : $@convention(thin) () -> () {
 bb0:
@@ -316,11 +287,6 @@ bb4(%8 : $Builtin.Int32):
 // CHECK: builtin "assert_configuration"()
 // CHECK-NOT: apply
 // CHECK: return %{{.*}} : $()
-
-// LOG-LABEL: Visiting Function: testSwitchEnum
-// LOG: Eligible callee: switchEnumCallee
-// LOG: Take bb1 of switch_enum
-
 
 sil @testSwitchEnum : $@convention(thin) () -> () {
 bb0:

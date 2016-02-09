@@ -222,6 +222,16 @@ namespace {
     /// global_init attributes.
     InlineSelection WhatToInline;
 
+#ifndef NDEBUG
+    SILFunction *LastPrintedCaller = nullptr;
+    void dumpCaller(SILFunction *Caller) {
+      if (Caller != LastPrintedCaller) {
+        llvm::dbgs() << "\nInline into caller: " << Caller->getName() << '\n';
+        LastPrintedCaller = Caller;
+      }
+    }
+#endif
+
     SILFunction *getEligibleFunction(FullApplySite AI);
 
     bool isProfitableToInline(FullApplySite AI, unsigned loopDepthOfAI,
@@ -229,6 +239,8 @@ namespace {
                               SILLoopAnalysis *LA,
                               ConstantTracker &constTracker,
                               unsigned &NumCallerBlocks);
+
+    bool isProfitableInColdBlock(FullApplySite AI, SILFunction *Callee);
 
     void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
                          SILBasicBlock *root, DominanceInfo *DT);
@@ -507,7 +519,6 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   SILFunction *Callee = AI.getCalleeFunction();
   
   if (!Callee) {
-    DEBUG(llvm::dbgs() << "        FAIL: Cannot find inlineable callee.\n");
     return nullptr;
   }
 
@@ -515,8 +526,6 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
-      DEBUG(llvm::dbgs() << "        FAIL: Function " << Callee->getName()
-            << " has special semantics or effects attribute.\n");
       return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
@@ -527,44 +536,32 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
     }
   } else if (Callee->isGlobalInit()) {
     if (WhatToInline != InlineSelection::Everything) {
-      DEBUG(llvm::dbgs() << "        FAIL: Function " << Callee->getName()
-            << " has the global-init attribute.\n");
       return nullptr;
     }
   }
 
   // We can't inline external declarations.
   if (Callee->empty() || Callee->isExternalDeclaration()) {
-    DEBUG(llvm::dbgs() << "        FAIL: Cannot inline external " <<
-          Callee->getName() << ".\n");
     return nullptr;
   }
 
   // Explicitly disabled inlining.
   if (Callee->getInlineStrategy() == NoInline) {
-    DEBUG(llvm::dbgs() << "        FAIL: noinline attribute on " <<
-          Callee->getName() << ".\n");
     return nullptr;
   }
   
   if (!Callee->shouldOptimize()) {
-    DEBUG(llvm::dbgs() << "        FAIL: optimizations disabled on " <<
-          Callee->getName() << ".\n");
     return nullptr;
   }
 
   // We don't support this yet.
   if (AI.hasSubstitutions()) {
-    DEBUG(llvm::dbgs() << "        FAIL: Generic substitutions on " <<
-          Callee->getName() << ".\n");
     return nullptr;
   }
 
   // We don't support inlining a function that binds dynamic self because we
   // have no mechanism to preserve the original function's local self metadata.
   if (computeMayBindDynamicSelf(Callee)) {
-    DEBUG(llvm::dbgs() << "        FAIL: Binding dynamic Self in " <<
-          Callee->getName() << ".\n");
     return nullptr;
   }
 
@@ -572,15 +569,11 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   // Detect self-recursive calls.
   if (Caller == Callee) {
-    DEBUG(llvm::dbgs() << "        FAIL: Detected a recursion inlining " <<
-          Callee->getName() << ".\n");
     return nullptr;
   }
 
   // A non-fragile function may not be inlined into a fragile function.
   if (Caller->isFragile() && !Callee->isFragile()) {
-    DEBUG(llvm::dbgs() << "        FAIL: Can't inline fragile " <<
-          Callee->getName() << ".\n");
     return nullptr;
   }
 
@@ -588,14 +581,9 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   // in excessive code duplication since we run the inliner multiple
   // times in our pipeline
   if (calleeIsSelfRecursive(Callee)) {
-    DEBUG(llvm::dbgs() << "        FAIL: Callee is self-recursive in "
-                       << Callee->getName() << ".\n");
     return nullptr;
   }
 
-  DEBUG(llvm::dbgs() << "        Eligible callee: " <<
-        Callee->getName() << "\n");
-  
   return Callee;
 }
 
@@ -715,9 +703,6 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         // threshold, because inlining will (probably) eliminate the closure.
         SILInstruction *def = constTracker.getDefInCaller(AI->getCallee());
         if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def))) {
-
-          DEBUG(llvm::dbgs() << "        Boost: apply const function at"
-                             << *AI);
           unsigned loopDepth = LI->getLoopDepth(block);
           Benefit += ConstCalleeBenefit + loopDepth * LoopBenefitFactor;
           testThreshold *= 2;
@@ -729,8 +714,6 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               constTracker);
     if (takenBlock) {
       Benefit += ConstTerminatorBenefit + TestOpt;
-      DEBUG(llvm::dbgs() << "      Take bb" << takenBlock->getDebugID() <<
-            " of" << *block->getTerminator());
       domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
         return child->getSinglePredecessor() != block || child == takenBlock;
       });
@@ -762,18 +745,22 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   }
 
   if (CalleeCost > Threshold) {
-    DEBUG(llvm::dbgs() << "        NO: Function too big to inline, "
-          "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
     return false;
   }
-  DEBUG(llvm::dbgs() << "        YES: ready to inline, "
-        "cost: " << CalleeCost << ", threshold: " << Threshold << "\n");
   NumCallerBlocks += Callee->size();
+
+  DEBUG(
+    dumpCaller(AI.getFunction());
+    llvm::dbgs() << "    decision {" << CalleeCost << " < " << Threshold <<
+        ", ld=" << loopDepthOfAI << ", bb=" << NumCallerBlocks << "} " <<
+        Callee->getName() << '\n';
+  );
   return true;
 }
 
 /// Return true if inlining this call site into a cold block is profitable.
-static bool isProfitableInColdBlock(SILFunction *Callee) {
+bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
+                                                    SILFunction *Callee) {
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
 
@@ -792,9 +779,11 @@ static bool isProfitableInColdBlock(SILFunction *Callee) {
         return false;
     }
   }
-
-  DEBUG(llvm::dbgs() << "        YES: ready to inline into cold block, cost:"
-        << CalleeCost << "\n");
+  DEBUG(
+    dumpCaller(AI.getFunction());
+    llvm::dbgs() << "    cold decision {" << CalleeCost << "} " <<
+              Callee->getName() << '\n';
+  );
   return true;
 }
 
@@ -822,8 +811,6 @@ void SILPerformanceInliner::collectAppliesToInline(
         continue;
 
       FullApplySite AI = FullApplySite(&*I);
-
-      DEBUG(llvm::dbgs() << "    Check:" << *I);
 
       auto *Callee = getEligibleFunction(AI);
       if (Callee) {
@@ -871,8 +858,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   if (!Caller->shouldOptimize())
     return false;
 
-  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
-
   // First step: collect all the functions we want to inline.  We
   // don't change anything yet so that the dominator information
   // remains valid.
@@ -887,17 +872,19 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     SILFunction *Callee = AI.getCalleeFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
-    DEBUG(llvm::dbgs() << "    Inline:" <<  *AI.getInstruction());
-
     if (!Callee->shouldOptimize()) {
-      DEBUG(llvm::dbgs() << "    Cannot inline function " << Callee->getName()
-                         << " marked to be excluded from optimizations.\n");
       continue;
     }
     
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
+
+    DEBUG(
+      dumpCaller(Caller);
+      llvm::dbgs() << "    inline [" << Callee->size() << "->" <<
+          Caller->size() << "] " << Callee->getName() << "\n";
+    );
 
     // Notice that we will skip all of the newly inlined ApplyInsts. That's
     // okay because we will visit them in our next invocation of the inliner.
@@ -917,7 +904,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     NumFunctionsInlined++;
   }
 
-  DEBUG(llvm::dbgs() << "\n");
   return true;
 }
 
@@ -934,8 +920,7 @@ void SILPerformanceInliner::visitColdBlocks(
         continue;
 
       auto *Callee = getEligibleFunction(AI);
-      if (Callee && isProfitableInColdBlock(Callee)) {
-        DEBUG(llvm::dbgs() << "    inline in cold block:" <<  *AI);
+      if (Callee && isProfitableInColdBlock(AI, Callee)) {
         AppliesToInline.push_back(AI);
       }
     }
@@ -966,7 +951,6 @@ public:
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
 
     if (getOptions().InlineThreshold == 0) {
-      DEBUG(llvm::dbgs() << "*** The Performance Inliner is disabled ***\n");
       return;
     }
 
