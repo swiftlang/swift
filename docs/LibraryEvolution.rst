@@ -44,8 +44,6 @@ published should not limit its evolution in the future.
 
 .. contents:: :local:
 
-.. warning:: **This document is still in draft stages.**
-
 
 Introduction
 ============
