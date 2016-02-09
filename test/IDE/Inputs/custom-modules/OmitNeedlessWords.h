@@ -8,4 +8,5 @@
 -(void)jumpToTop:(nonnull id)sender;
 -(void)removeWithNoRemorse:(nonnull id)object;
 -(void)bookmarkWithURLs:(nonnull NSArray<NSURL *> *)urls;
+-(void)saveToURL:(nonnull NSURL *)url forSaveOperation:(NSInteger)operation;
 @end
