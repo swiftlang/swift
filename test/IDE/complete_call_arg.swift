@@ -34,6 +34,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_2 | FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 | FileCheck %s -check-prefix=FIRST_ARG_NAME_3
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_1 | FileCheck %s -check-prefix=BOUND_GENERIC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_2 | FileCheck %s -check-prefix=BOUND_GENERIC_1
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -342,3 +345,18 @@ func testArg2Name3() {
   firstArg(#^FIRST_ARG_NAME_3^#,
 }
 // FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
+
+func takeArray<T>(x: [T]) {}
+struct TestBoundGeneric1 {
+  let x: [Int]
+  let y: [Int]
+  func test1() {
+    takeArray(self.#^BOUND_GENERIC_1_1^#)
+  }
+  func test2() {
+    takeArray(#^BOUND_GENERIC_1_2^#)
+  }
+// FIXME: These should be convertible to [T]. rdar://problem/24570603
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
+}
