@@ -1649,7 +1649,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
       }
     }
 
-    printSubmoduleInterface(M, ModuleName, TraversalOptions, *Printer, Options,
+    printSubmoduleInterface(M, ModuleName, None, TraversalOptions, *Printer, Options,
                             SynthesizeExtensions);
   }
 

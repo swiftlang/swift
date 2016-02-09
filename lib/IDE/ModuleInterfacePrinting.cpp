@@ -117,7 +117,7 @@ void swift::ide::printModuleInterface(Module *M,
                                       ASTPrinter &Printer,
                                       const PrintOptions &Options,
                                       const bool PrintSynthesizedExtensions) {
-  printSubmoduleInterface(M, M->getName().str(), TraversalOptions, Printer,
+  printSubmoduleInterface(M, M->getName().str(), None, TraversalOptions, Printer,
                           Options, PrintSynthesizedExtensions);
 }
 
@@ -166,6 +166,7 @@ void findExtensionsFromConformingProtocols(Decl *D,
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,
+       Optional<StringRef> GroupName,
        ModuleTraversalOptions TraversalOptions,
        ASTPrinter &Printer,
        const PrintOptions &Options,
@@ -367,6 +368,10 @@ void swift::ide::printSubmoduleInterface(
 
   auto PrintDecl = [&](Decl *D) -> bool {
     ASTPrinter &Printer = *PrinterToUse;
+    if (GroupName && (!D->getGroupName() ||
+                      D->getGroupName().getValue() != GroupName.getValue()))
+      return false;
+
     if (!shouldPrint(D, AdjustedOptions)) {
       Printer.avoidPrintDeclPost(D);
       return false;

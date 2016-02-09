@@ -285,7 +285,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
-  printSubmoduleInterface(Mod, SplitModuleName,
+  printSubmoduleInterface(Mod, SplitModuleName, None,
                           TraversalOptions,
                           Printer, Options, false);
 
