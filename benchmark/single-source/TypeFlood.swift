@@ -9,6 +9,18 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// We use this test to benchmark the runtime memory that Swift programs use.
+//
+// The Swift compiler caches the metadata that it needs to generate to support
+// code that checks for protocol conformance and other operations that require
+// use of metadata.
+// This mechanism has the potential to allocate a lot of memory. This benchmark
+// program generates 2^15 calls to swift_conformsToProtocol and fills the
+// metadata/conformance caches with data that we never free. We use this
+// program to track the runtime memory usage of swift programs. The test is
+// optimized away in Release builds but kept in Debug mode.
+
 
 import TestsUtils
 protocol Pingable {}
