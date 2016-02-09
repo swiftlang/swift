@@ -1087,13 +1087,11 @@ following changes are permitted:
 - Removing any non-public, non-versioned member.
 - Changing the body of any methods, initializers, or accessors.
 
-.. admonition:: TODO
+.. note::
 
-    How does "adding any new member" square with the restrictions on adding
-    initializers to classes? Are they inherently convenience initializers?
-
-    What about everything else? New members in protocols can result in new
-    overridable members in classes. How does that work?
+    Although it is not related to evolution, it is worth noting that members of
+    protocol extensions that do *not* satisfy protocol requirements are not
+    overrideable, even when the conforming type is a class.
 
 
 Operators
@@ -1452,6 +1450,104 @@ simple checker tool:
 
 Because this tool would require a fair amount of additional work, it is not
 part of this initial model. It is something we may decide to add in the future.
+
+
+Open Issues
+===========
+
+There are still a number of known issues with the model described in this
+document. We should endeavour to account for each of them, and if we can't come
+up with a satisfactory implementation we should at least make sure that they
+will not turn into pitfalls for library or client developers.
+
+
+Subclass and base both conform to protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    // Library, version 1
+    class Base {}
+    protocol P {}
+
+::
+
+    // Client, version 1
+    class Subclass : Base, P {}
+
+::
+
+    // Library, version 2
+    @available(2.0)
+    extension Base : P {}
+
+Now ``Subclass`` conforms to ``P`` two different ways, which may be
+incompatible (especially if ``P`` has associated types or requirements
+involving ``Self``).
+
+Additionally, the client can't even remove ``Subclass``'s conformance to ``P``,
+because it may itself be a library with other code depending on it. We could
+fix that with an annotation to explicitly inherent the conformance of ``P``
+from the base class, but even that may not be possible if there are
+incompatible associated types involved (because changing a member typealias is
+not a safe change).
+
+One solution is to disallow adding a conformance for an existing protocol to a
+publicly-subclassable class.
+
+
+Recompiling changes a protocol's implementation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    // Library, version 1
+    protocol P {}
+    protocol Q {}
+    func use<T: P>(value: T) {}
+
+::
+
+    // Client, version 1
+    struct S : P, Q {}
+    use(S())
+
+::
+
+    // Library, version 2
+    protocol P {
+      @available(2.0)
+      func foo() { print("default") }
+    }
+    
+    extension P where Self: Q {
+      @available(2.0)
+      func foo() { print("constrained") }
+    }
+
+    func use<T: P>(value: T) { value.foo() }
+
+Before the client is recompiled, the implementation of ``foo()`` used for ``S``
+instances can only be the default implementation, i.e. the one that prints
+"default". However, recompiling the client will result in the constrained
+implementation being considered a "better" match for the protocol requirement,
+thus changing the behavior of the program.
+
+This should never change the *meaning* of a program, since the default
+implementation for a newly-added requirement should always be *correct.*
+However, it may have significantly different performance characteristics or
+side effects that would make the difference in behavior a surprise.
+
+This is similar to adding a new overload to an existing set of functions, which
+can also change the meaning of client code just by recompiling. However, the
+difference here is that the before-recompilation behavior was never requested
+or acknowledged by the client; it's just the best the library can do.
+
+A possible solution here is to require the client to acknowledge the added
+requirement in some way when it is recompiled.
+
+(We do not want to perform overload resolution at run time to find the best
+possible default implementation for a given type.)
 
 
 Summary
