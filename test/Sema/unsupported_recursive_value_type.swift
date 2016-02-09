@@ -49,13 +49,13 @@ enum OptionallySelfRecursiveEnum { // expected-error{{recursive enum 'Optionally
   case A(Optional<OptionallySelfRecursiveEnum>)
 }
 
-// self-recursive struct with self as member's type argement, a proper name would
+// self-recursive struct with self as member's type argument, a proper name would
 // be too long.
 struct X<T> { // expected-error{{value type 'X<T>' cannot have a stored property that references itself}}
   let s: X<X>
 }
 
-// self-recursive enum with self as generic arugment associated type, a proper
+// self-recursive enum with self as generic argument associated type, a proper
 // name would be too long
 enum Y<T> { // expected-error{{recursive enum 'Y<T>' is not marked 'indirect'}}
     case A(Int, Y<Y>)
@@ -102,7 +102,7 @@ struct Outer {
 struct NestedGenericParamStruct {
     let n: [[Int]]
 }
-struct NestedGenercParamEnum {
+struct NestedGenericParamEnum {
     let n: Int??
 }
 

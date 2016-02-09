@@ -102,7 +102,7 @@ Using the Harness Generator
 contained in the directories `single-source` and `multi-source`. It gathers
 information about the tests and then generates the files from templates using
 jinja2. The motivation for creating this script was to eliminate the need to
-manually add atleast three lines to harness files (one to `CMakeLists.txt` and
+manually add at least three lines to harness files (one to `CMakeLists.txt` and
 two to `utils/main.swift`) for every new benchmark added.
 
 **Warning:**
@@ -162,7 +162,7 @@ To add a new multiple file test:
         │   │   ├── TestFile2.swift
         │   │   ├── TestFile3.swift
 
-    Atleast one run function (specified in the template below) must
+    At least one run function (specified in the template below) must
     exist in the files.
 
 2.  Regenerate harness files by following the directions in

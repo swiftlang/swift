@@ -45,7 +45,7 @@ func genIOUArray() {
 }
 
 // Check the performance of destroying an array of structs where the
-// struct has a multipe fields of trivial type. Destroying the
+// struct has multiple fields of trivial type. Destroying the
 // elements should be a nop.
 struct S<T> {
   var x : T

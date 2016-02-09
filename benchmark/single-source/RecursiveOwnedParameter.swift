@@ -14,7 +14,7 @@ import TestsUtils
 
 // This test recursively visits each element of an array in a class and compares
 // it with every value in a different array stored in a different class. The
-// idea is to make sure that we can get rid of the overhead from gauranteed
+// idea is to make sure that we can get rid of the overhead from guaranteed
 // parameters.
 
 // We use final since we are not interesting in devirtualization for the
