@@ -59,8 +59,8 @@ protocol InternalProtocol {
 // CHECK-SAME:   i32 1031,
 // CHECK-SAME:   i16 4,
 // CHECK-SAME:   i16 2,
-// CHECK-SAME:   void (%swift.opaque*, %swift.type*)* @defaultC,
-// CHECK-SAME:   void (%swift.opaque*, %swift.type*)* @defaultD  
+// CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultC,
+// CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultD
 // CHECK-SAME: }>
 
 // CHECK: @_TMp19protocol_resilience16InternalProtocol = {{(protected )?}}constant %swift.protocol {
