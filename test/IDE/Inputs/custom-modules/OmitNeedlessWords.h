@@ -6,4 +6,5 @@
 -(void)insetByX:(NSInteger)x y:(NSInteger)y;
 -(void)setIndirectlyToValue:(nonnull id)object;
 -(void)jumpToTop:(nonnull id)sender;
+-(void)removeWithNoRemorse:(nonnull id)object;
 @end
