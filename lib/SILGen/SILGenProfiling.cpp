@@ -229,6 +229,9 @@ private:
   /// \brief A stack of currently live regions.
   std::vector<SourceMappingRegion> RegionStack;
 
+  /// \brief A stack of active repeat-while loops.
+  std::vector<RepeatWhileStmt *> RepeatWhileStack;
+
   CounterExpr *ExitCounter;
 
   /// \brief Return true if \c Node has an associated counter.
@@ -269,6 +272,16 @@ private:
       Counter = CounterExpr::Ref(Expr);
     else
       Counter = CounterExpr::Add(createCounter(std::move(Counter)), Expr);
+  }
+
+  /// \brief Subtract \c Expr from \c Node's counter.
+  void subtractFromCounter(ASTNode Node, CounterExpr &Expr) {
+    CounterExpr &Counter = getCounter(Node);
+    assert(!Counter.isZero() && "Cannot create a negative counter");
+    if (const CounterExpr *ReferencedCounter = Counter.getReferencedNode())
+      Counter = CounterExpr::Sub(*ReferencedCounter, Expr);
+    else
+      Counter = CounterExpr::Sub(createCounter(std::move(Counter)), Expr);
   }
 
   /// \brief Return the current region's counter.
@@ -457,6 +470,7 @@ public:
       assignCounter(RWS, CounterExpr::Zero());
       CounterExpr &BodyCounter = assignCounter(RWS->getBody());
       assignCounter(RWS->getCond(), CounterExpr::Ref(BodyCounter));
+      RepeatWhileStack.push_back(RWS);
 
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       assignCounter(FS, CounterExpr::Zero());
@@ -505,6 +519,10 @@ public:
       if (auto *E = getConditionNode(WS->getCond()))
         addToCounter(E, getExitCounter());
 
+    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+      assert(RepeatWhileStack.back() == RWS && "Malformed repeat-while stack");
+      RepeatWhileStack.pop_back();
+
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       // Both the condition and the increment are reached through the backedge.
       if (Expr *E = FS->getCond().getPtrOrNull())
@@ -527,8 +545,7 @@ public:
     } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
       // When we break from a loop, we need to adjust the exit count.
       if (auto *RWS = dyn_cast<RepeatWhileStmt>(BS->getTarget())) {
-        auto CondCount = CounterExpr::Sub(getCounter(RWS), getCurrentCounter());
-        addToCounter(RWS->getCond(), createCounter(std::move(CondCount)));
+        subtractFromCounter(RWS->getCond(), getCurrentCounter());
       } else if (!isa<SwitchStmt>(BS->getTarget())) {
         addToCounter(BS->getTarget(), getCurrentCounter());
       }
@@ -548,6 +565,10 @@ public:
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
+      // When we return, we may need to adjust some loop condition counts.
+      for (auto *RWS : RepeatWhileStack)
+        subtractFromCounter(RWS->getCond(), getCurrentCounter());
+
       terminateRegion(S);
     }
     return S;

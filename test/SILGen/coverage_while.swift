@@ -97,8 +97,18 @@ func goo() {
   repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+4]]:4 : [[RWS6:[0-9]+]]
     repeat { // CHECK-DAG: [[@LINE]]:12 -> [[@LINE+2]]:6 : [[RWS7:[0-9]+]]
       return
-    } while false // CHECK-DAG: [[@LINE]]:13 -> [[@LINE]]:18 : [[RWS7]]
-  } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : [[RWS6]]
+    } while false // CHECK-DAG: [[@LINE]]:13 -> [[@LINE]]:18 : zero
+  } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : ([[RWS6]] - [[RWS7]])
+
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+6]]:4 : [[RWS8:[0-9]+]]
+    repeat { // CHECK-DAG: [[@LINE]]:12 -> [[@LINE+4]]:6 : [[RWS9:[0-9]+]]
+      if (true) { // CHECK-DAG: [[@LINE]]:17 -> [[@LINE+2]]:8 : [[RET1:[0-9]+]]
+        return
+      }
+    } while false // CHECK-DAG: [[@LINE]]:13 -> [[@LINE]]:18 : ([[RWS9]] - [[RET1]])
+  } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : ([[RWS8]] - [[RET1]])
+
+  // TODO(vsk): need tests for fail and throw statements.
 }
 
 foo()
