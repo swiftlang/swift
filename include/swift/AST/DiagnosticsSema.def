@@ -1930,6 +1930,11 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
+WARNING(tuple_splat_use,none,
+        "passing %0 arguments to a callee as a single tuple value is deprecated",
+        (unsigned))
+
+
 ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 

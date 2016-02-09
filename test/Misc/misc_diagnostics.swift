@@ -134,3 +134,24 @@ func test20770032() {
   if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'Range<Int>' cannot match values of type '(Int, Int)'}}
   }
 }
+
+
+
+func tuple_splat1(a : Int, _ b : Int) {
+  let x = (1,2)
+  tuple_splat1(x)          // expected-warning {{passing 2 arguments to a callee as a single tuple value is deprecated}}
+  tuple_splat1(1, 2)       // Ok.
+  tuple_splat1((1, 2))     // expected-error {{missing argument for parameter #2 in call}}
+}
+
+// This take a tuple as a value, so it isn't a tuple splat.
+func tuple_splat2(q : (a : Int, b : Int)) {
+  let x = (1,2)
+  tuple_splat2(x)          // Ok
+  let y = (1, b: 2)
+  tuple_splat2(y)          // Ok
+  tuple_splat2((1, b: 2))  // Ok.
+  tuple_splat2(1, b: 2)    // expected-error {{extra argument 'b' in call}}
+}
+
+
