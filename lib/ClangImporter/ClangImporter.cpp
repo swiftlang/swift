@@ -1183,8 +1183,10 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
 
   // Prepopulate the set of module prefixes.
   // FIXME: Hard-coded list should move into the module map language.
-  ModulePrefixes["Foundation"] = "NS";
-  ModulePrefixes["ObjectiveC"] = "NS";
+  if (ctx.LangOpts.StripNSPrefix) {
+    ModulePrefixes["Foundation"] = "NS";
+    ModulePrefixes["ObjectiveC"] = "NS";
+  }
 }
 
 
@@ -2548,10 +2550,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-<<<<<<< HEAD
   if (omitNeedlessWords) {
-=======
-  if (OmitNeedlessWords) {
     // Check whether the module in which the declaration resides has a
     // module prefix. If so, strip that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
@@ -2577,7 +2576,6 @@ auto ClangImporter::Implementation::importFullName(
       }
     }
 
->>>>>>> 03c1ac4... [Omit needless words] Lowercase enum cases/option set members consistently.
     // Objective-C properties.
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(D->getDeclContext());
