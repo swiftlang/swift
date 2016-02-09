@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main

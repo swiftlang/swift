@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
 // Test top-level/module locations.
 class TopLevelObjectTy {

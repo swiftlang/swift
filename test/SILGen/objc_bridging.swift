@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
 
 // REQUIRES: objc_interop
 

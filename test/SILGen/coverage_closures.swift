@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_closures %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_closures %s | FileCheck %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_closures.foo
 func foo() {
