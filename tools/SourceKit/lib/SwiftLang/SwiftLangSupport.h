@@ -354,6 +354,9 @@ public:
 
   void findInterfaceDocument(StringRef ModuleName, ArrayRef<const char *> Args,
                std::function<void(const InterfaceDocInfo &)> Receiver) override;
+
+  void findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
+               std::function<void(ArrayRef<StringRef>, StringRef Error)> Receiver) override;
 };
 
 namespace trace {

@@ -126,6 +126,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("print-annotations", SourceKitRequest::PrintAnnotations)
         .Case("print-diags", SourceKitRequest::PrintDiags)
         .Case("extract-comment", SourceKitRequest::ExtractComment)
+        .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "

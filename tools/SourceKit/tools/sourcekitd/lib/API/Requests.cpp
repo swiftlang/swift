@@ -90,6 +90,8 @@ static LazySKDUID RequestEditorFindInterfaceDoc(
     "source.request.editor.find_interface_doc");
 static LazySKDUID RequestBuildSettingsRegister(
     "source.request.buildsettings.register");
+static LazySKDUID RequestModuleGroups(
+    "source.request.module.groups");
 
 static LazySKDUID KindExpr("source.lang.swift.expr");
 static LazySKDUID KindStmt("source.lang.swift.stmt");
@@ -211,6 +213,9 @@ editorFindUSR(StringRef DocumentName, StringRef USR);
 
 static sourcekitd_response_t
 editorFindInterfaceDoc(StringRef ModuleName, ArrayRef<const char *> Args);
+
+static sourcekitd_response_t
+editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args);
 
 static bool isSemanticEditorDisabled();
 
@@ -444,6 +449,13 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!ModuleName.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
     return Rec(editorFindInterfaceDoc(*ModuleName, Args));
+  }
+
+  if (ReqUID == RequestModuleGroups) {
+    Optional<StringRef> ModuleName = Req.getString(KeyModuleName);
+    if (!ModuleName.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
+    return Rec(editorFindModuleGroups(*ModuleName, Args));
   }
 
   if (ReqUID == RequestCodeCompleteClose) {
@@ -1962,6 +1974,28 @@ editorFindInterfaceDoc(StringRef ModuleName, ArrayRef<const char *> Args) {
       Resp = RespBuilder.createResponse();
     });
 
+  return Resp;
+}
+
+static sourcekitd_response_t
+editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args) {
+  ResponseBuilder RespBuilder;
+  sourcekitd_response_t Resp;
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.findModuleGroups(ModuleName, Args,
+                        [&](ArrayRef<StringRef> Groups, StringRef Error) {
+    if (!Error.empty()) {
+      Resp = createErrorRequestFailed(Error.str().c_str());
+      return;
+    }
+    auto Dict = RespBuilder.getDictionary();
+    auto Arr = Dict.setArray(KeyModuleGroups);
+    for (auto G : Groups) {
+      auto Entry = Arr.appendDictionary();
+      Entry.set(KeyGroupName, G);
+    }
+    Resp = RespBuilder.createResponse();
+  });
   return Resp;
 }
 

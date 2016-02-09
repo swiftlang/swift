@@ -44,7 +44,8 @@ enum class SourceKitRequest {
   Edit,
   PrintAnnotations,
   PrintDiags,
-  ExtractComment
+  ExtractComment,
+  ModuleGroups,
 };
 
 struct TestOptions {

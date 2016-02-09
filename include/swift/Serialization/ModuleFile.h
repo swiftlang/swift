@@ -616,6 +616,7 @@ public:
 
   Optional<StringRef> getGroupNameById(unsigned Id);
   Optional<StringRef> getGroupNameForDecl(const Decl *D);
+  void collectAllGroups(std::vector<StringRef> &Names);
   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
   Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
 

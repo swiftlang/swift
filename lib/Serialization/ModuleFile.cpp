@@ -1556,6 +1556,14 @@ Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) {
   return getGroupNameById(Triple.getValue().Group);
 }
 
+void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) {
+  if (!GroupNamesMap)
+    return;
+  for (auto It = GroupNamesMap->begin(); It != GroupNamesMap->end(); ++ It) {
+    Names.push_back(It->getSecond());
+  }
+}
+
 Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
   if (!DeclCommentTable)
     return None;
