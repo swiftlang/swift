@@ -58,6 +58,7 @@ def create_parser():
     parser.add_argument('-3', '--swift-3', action='store_true', help="Use Swift 3 transformation")
     parser.add_argument('-o', '--output-dir', default=os.getcwd(), help='Directory to which the output will be emitted.')
     parser.add_argument('-q', '--quiet', action='store_true', help='Suppress printing of status messages.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Print extra information.')
     return parser
 
 def output_command_result_to_file(command_args, filename):
@@ -89,18 +90,30 @@ def collect_submodules(common_args, module):
 
     return sorted(list(submodules))
 
+# Print out the command we're about to execute
+def printCommand(cmd, outfile=""):
+    str = " ".join(cmd)
+    if outfile != "":
+        str += " > " + outfile
+    print(str)
+
 # Dump the API for the given module.
-def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet)):
+def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
 
     # Dump the top-level module
+    if verbose:
+        print("mkdir -p %s/%s" % (output_dir, module))
     subprocess.call(['mkdir', '-p', ('%s/%s' % (output_dir, module))])
     output_file = '%s/%s/%s.swift' % (output_dir, module, module)
     if not quiet:
         print('Writing %s...' % output_file)
 
     top_level_cmd = cmd + extra_dump_args + ['-module-to-print=%s' % (module)]
+    if verbose:
+        printCommand(top_level_cmd, output_file)
+
     output_command_result_to_file(top_level_cmd, output_file)
 
     # Dump each submodule.
@@ -112,6 +125,9 @@ def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet)):
         full_submodule = '%s.%s' % (module, submodule)
         submodule_cmd = cmd + extra_dump_args
         submodule_cmd = submodule_cmd + ['-module-to-print=%s' % (full_submodule)]
+        if verbose:
+            printCommand(submodule_cmd, output_file)
+
         output_command_result_to_file(submodule_cmd, output_file)
 
     return
@@ -152,7 +168,7 @@ def collect_frameworks(sdk):
 
     return (sorted(list(frameworks)), sdk_path)
 
-def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target, source_filename, output_dir, quiet):
+def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target, source_filename, output_dir, quiet, verbose):
 
     # Determine the SDK root and collect the set of frameworks.
     (frameworks, sdk_root) = collect_frameworks(sdk)
@@ -171,10 +187,10 @@ def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target,
     results = []
     cmd = cmd_common + ['-sdk', sdk_root, '-target', sdk_target]
     if module:
-        results.append((cmd, cmd_extra_args, sdk_output_dir, module, quiet))
+        results.append((cmd, cmd_extra_args, sdk_output_dir, module, quiet, verbose))
     else:
         for framework in frameworks:
-            results.append((cmd, cmd_extra_args, sdk_output_dir, framework, quiet))
+            results.append((cmd, cmd_extra_args, sdk_output_dir, framework, quiet, verbose))
 
     return results
 
@@ -196,7 +212,7 @@ def main():
     # Construct the set of API dumps we should perform.
     jobs = []
     for sdk in args.sdk:
-        jobs = jobs + create_dump_module_api_args(cmd_common, extra_args, sdk, args.module, args.target, source_filename, args.output_dir, args.quiet)
+        jobs = jobs + create_dump_module_api_args(cmd_common, extra_args, sdk, args.module, args.target, source_filename, args.output_dir, args.quiet, args.verbose)
 
     # Execute the API dumps
     pool = multiprocessing.Pool(processes=args.jobs)
