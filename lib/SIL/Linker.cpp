@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linker"
-#include "swift/SIL/Linker.h"
+#include "Linker.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
