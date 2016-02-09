@@ -60,6 +60,9 @@ private:
   /// The map from dataflow terminating increment -> decrement dataflow state.
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
 
+  llvm::BumpPtrAllocator Allocator;
+  ImmutablePointerSetFactory<SILInstruction> SetFactory;
+
   /// Stashed BB information.
   ARCBBStateInfo *BBStateInfo;
 
@@ -98,7 +101,7 @@ private:
 
   bool processBBBottomUp(ARCBBState &BBState,
                          bool FreezeOwnedArgEpilogueReleases);
-
+  bool processBBTopDown(ARCBBState &BBState);
   void computePostDominatingConsumedArgMap();
 
   llvm::Optional<ARCBBStateInfoHandle> getBottomUpBBState(SILBasicBlock *BB);

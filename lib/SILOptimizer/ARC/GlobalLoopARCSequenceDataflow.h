@@ -18,6 +18,7 @@
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/ImmutablePointerSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
 
@@ -37,6 +38,9 @@ class ARCRegionState;
 class LoopARCSequenceDataflowEvaluator {
   /// The bump ptr allocator that is used to allocate memory in the allocator.
   llvm::BumpPtrAllocator Allocator;
+
+  /// The factory that we use to generate immutable pointer sets.
+  ImmutablePointerSetFactory<SILInstruction> SetFactory;
 
   /// The SILFunction that we are applying the dataflow to.
   SILFunction &F;

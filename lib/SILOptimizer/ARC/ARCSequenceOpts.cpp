@@ -218,19 +218,23 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
                                           RecomputePostDomReleases);
     MatchedPair = Context.performMatching(NewInsts, DeadInsts);
 
-    DEBUG(llvm::dbgs() << "    Adding new interesting insts!\n");
-    while (!NewInsts.empty()) {
-      auto *I = NewInsts.pop_back_val();
-      DEBUG(llvm::dbgs() << "    " << *I);
-      Evaluator.addInterestingInst(I);
+    if (!NewInsts.empty()) {
+      DEBUG(llvm::dbgs() << "Adding new interesting insts!\n");
+      do {
+        auto *I = NewInsts.pop_back_val();
+        DEBUG(llvm::dbgs() << "    " << *I);
+        Evaluator.addInterestingInst(I);
+      } while (!NewInsts.empty());
     }
 
-    DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
-    while (!DeadInsts.empty()) {
-      SILInstruction *I = DeadInsts.pop_back_val();
-      DEBUG(llvm::dbgs() << "    " << *I);
-      Evaluator.removeInterestingInst(I);
-      I->eraseFromParent();
+    if (!DeadInsts.empty()) {
+      DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
+      do {
+        SILInstruction *I = DeadInsts.pop_back_val();
+        DEBUG(llvm::dbgs() << "    " << *I);
+        Evaluator.removeInterestingInst(I);
+        I->eraseFromParent();
+      } while (!DeadInsts.empty());
     }
 
     MadeChange |= MatchedPair;

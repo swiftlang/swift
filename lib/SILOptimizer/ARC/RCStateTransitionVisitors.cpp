@@ -34,10 +34,12 @@ BottomUpDataflowRCStateVisitor<ARCState>::BottomUpDataflowRCStateVisitor(
     RCIdentityFunctionInfo *RCFI, ARCState &State,
     bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ERM,
-    IncToDecStateMapTy &IncToDecStateMap)
+    IncToDecStateMapTy &IncToDecStateMap,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory)
     : RCFI(RCFI), DataflowState(State),
       FreezeOwnedArgEpilogueReleases(FreezeOwnedArgEpilogueReleases),
-      EpilogueReleaseMatcher(ERM), IncToDecStateMap(IncToDecStateMap) {}
+      EpilogueReleaseMatcher(ERM), IncToDecStateMap(IncToDecStateMap),
+      SetFactory(SetFactory) {}
 
 template <class ARCState>
 typename BottomUpDataflowRCStateVisitor<ARCState>::DataflowResult
@@ -66,7 +68,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
     return DataflowResult(Op);
 
   BottomUpRefCountState &State = DataflowState.getBottomUpRefCountState(Op);
-  bool NestingDetected = State.initWithMutatorInst(I);
+  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I));
 
   // If we are running with 'frozen' owned arg releases, check if we have a
   // frozen use in the side table. If so, this release must be known safe.
@@ -134,9 +136,10 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
 template <class ARCState>
 TopDownDataflowRCStateVisitor<ARCState>::TopDownDataflowRCStateVisitor(
     RCIdentityFunctionInfo *RCFI, ARCState &DataflowState,
-    DecToIncStateMapTy &DecToIncStateMap)
+    DecToIncStateMapTy &DecToIncStateMap,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory)
     : RCFI(RCFI), DataflowState(DataflowState),
-      DecToIncStateMap(DecToIncStateMap) {}
+      DecToIncStateMap(DecToIncStateMap), SetFactory(SetFactory) {}
 
 template <class ARCState>
 typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
@@ -200,7 +203,7 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
   // count state and continue...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
   auto &State = DataflowState.getTopDownRefCountState(Op);
-  bool NestingDetected = State.initWithMutatorInst(I);
+  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I));
 
   DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
                      << (State.isKnownSafe() ? "yes" : "no") << "\n");
@@ -244,7 +247,7 @@ visitStrongEntranceApply(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "    Initializing state.\n");
 
   auto &State = DataflowState.getTopDownRefCountState(AI);
-  State.initWithEntranceInst(AI, AI);
+  State.initWithEntranceInst(SetFactory.get(AI), AI);
 
   return DataflowResult(AI);
 }
@@ -255,7 +258,7 @@ TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntranceAllocRef(AllocRefInst *ARI) {
   // Alloc refs always introduce new references at +1.
   TopDownRefCountState &State = DataflowState.getTopDownRefCountState(ARI);
-  State.initWithEntranceInst(ARI, ARI);
+  State.initWithEntranceInst(SetFactory.get(ARI), ARI);
 
   return DataflowResult(ARI);
 }
@@ -266,7 +269,7 @@ TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI) {
   // Alloc ref dynamic always introduce references at +1.
   auto &State = DataflowState.getTopDownRefCountState(ARI);
-  State.initWithEntranceInst(ARI, ARI);
+  State.initWithEntranceInst(SetFactory.get(ARI), ARI);
 
   return DataflowResult(ARI);
 }
@@ -277,7 +280,7 @@ TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongAllocBox(AllocBoxInst *ABI) {
   // Alloc box introduces a ref count of +1 on its container.
   auto &State = DataflowState.getTopDownRefCountState(ABI);
-  State.initWithEntranceInst(ABI, ABI);
+  State.initWithEntranceInst(SetFactory.get(ABI), ABI);
   return DataflowResult(ABI);
 }
 

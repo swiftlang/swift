@@ -200,7 +200,8 @@ static bool isARCSignificantTerminator(TermInst *TI) {
 // have predecessors in the loop itself implying that loop exit blocks at the
 // loop region level always have only one predecessor, the loop itself.
 void ARCRegionState::processBlockBottomUpPredTerminators(
-    const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI) {
+    const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   auto &BB = *R->getBlock();
   llvm::TinyPtrVector<SILInstruction *> PredTerminators;
   for (unsigned PredID : R->getPreds()) {
@@ -220,14 +221,15 @@ void ARCRegionState::processBlockBottomUpPredTerminators(
     if (!OtherState.hasValue())
       continue;
 
-    OtherState->second.updateForPredTerminators(PredTerminators, InsertPt, AA);
+    OtherState->second.updateForPredTerminators(PredTerminators, InsertPt,
+                                                SetFactory, AA);
   }
 }
 
 static bool processBlockBottomUpInsts(
     ARCRegionState &State, SILBasicBlock &BB,
     BottomUpDataflowRCStateVisitor<ARCRegionState> &DataflowVisitor,
-    AliasAnalysis *AA) {
+    AliasAnalysis *AA, ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
 
   auto II = State.summarizedinterestinginsts_rbegin();
   auto IE = State.summarizedinterestinginsts_rend();
@@ -278,7 +280,7 @@ static bool processBlockBottomUpInsts(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(I, InsertPt, AA);
+      OtherState->second.updateForSameLoopInst(I, InsertPt, SetFactory, AA);
     }
   }
 
@@ -289,25 +291,26 @@ bool ARCRegionState::processBlockBottomUp(
     const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
 
   SILBasicBlock &BB = *R->getBlock();
   BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
       RCIA, *this, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-      IncToDecStateMap);
+      IncToDecStateMap, SetFactory);
 
   // Visit each non-terminator arc relevant instruction I in BB visited in
   // reverse...
   bool NestingDetected =
-      processBlockBottomUpInsts(*this, BB, DataflowVisitor, AA);
+      processBlockBottomUpInsts(*this, BB, DataflowVisitor, AA, SetFactory);
 
   // Now visit each one of our predecessor regions and see if any are blocks
   // that can use reference counted values. If any of them do, we advance the
   // sequence for the pointer and create an insertion point here. This state
   // will be propagated into all of our predecessors, allowing us to be
   // conservatively correct in all cases.
-  processBlockBottomUpPredTerminators(R, AA, LRFI);
+  processBlockBottomUpPredTerminators(R, AA, LRFI, SetFactory);
 
   return NestingDetected;
 }
@@ -340,12 +343,17 @@ static bool getInsertionPtsForLoopRegionExits(
     InsertPts.push_back(&*SuccRegion->getBlock()->begin());
   }
 
+  // Sort and unique the insert points so we can put them into
+  // ImmutablePointerSets.
+  sortUnique(InsertPts);
+
   return true;
 }
 
 bool ARCRegionState::processLoopBottomUp(
     const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
-    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   ARCRegionState *State = RegionStateInfo[R];
 
   llvm::SmallVector<SILInstruction *, 2> InsertPts;
@@ -364,7 +372,8 @@ bool ARCRegionState::processLoopBottomUp(
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts())
-      OtherState->second.updateForDifferentLoopInst(I, InsertPts, AA);
+      OtherState->second.updateForDifferentLoopInst(I, InsertPts, SetFactory,
+                                                    AA);
   }
 
   return false;
@@ -375,16 +384,18 @@ bool ARCRegionState::processBottomUp(
     LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
-    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate
   // the empty set from loops.
   if (!R->isBlock())
-    return processLoopBottomUp(R, AA, LRFI, RegionStateInfo);
+    return processLoopBottomUp(R, AA, LRFI, RegionStateInfo, SetFactory);
 
   return processBlockBottomUp(R, AA, RCIA, LRFI, FreezeOwnedArgEpilogueReleases,
-                              ConsumedArgToReleaseMap, IncToDecStateMap);
+                              ConsumedArgToReleaseMap, IncToDecStateMap,
+                              SetFactory);
 }
 
 //===---
@@ -393,13 +404,14 @@ bool ARCRegionState::processBottomUp(
 
 bool ARCRegionState::processBlockTopDown(
     SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap) {
+    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
 
   bool NestingDetected = false;
 
   TopDownDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
-      RCIA, *this, DecToIncStateMap);
+      RCIA, *this, DecToIncStateMap, SetFactory);
 
   // If the current BB is the entry BB, initialize a state corresponding to each
   // of its owned parameters. This enables us to know that if we see a retain
@@ -448,17 +460,17 @@ bool ARCRegionState::processBlockTopDown(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(I, I, AA);
+      OtherState->second.updateForSameLoopInst(I, I, SetFactory, AA);
     }
   }
 
   return NestingDetected;
 }
 
-bool ARCRegionState::processLoopTopDown(const LoopRegion *R,
-                                        ARCRegionState *State,
-                                        AliasAnalysis *AA,
-                                        LoopRegionFunctionInfo *LRFI) {
+bool ARCRegionState::processLoopTopDown(
+    const LoopRegion *R, ARCRegionState *State, AliasAnalysis *AA,
+    LoopRegionFunctionInfo *LRFI,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
 
   assert(R->isLoop() && "We assume we are processing a loop");
 
@@ -483,7 +495,8 @@ bool ARCRegionState::processLoopTopDown(const LoopRegion *R,
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts())
-      OtherState->second.updateForDifferentLoopInst(I, InsertPt, AA);
+      OtherState->second.updateForDifferentLoopInst(I, InsertPt, SetFactory,
+                                                    AA);
   }
 
   return false;
@@ -493,15 +506,17 @@ bool ARCRegionState::processTopDown(
     AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     LoopRegionFunctionInfo *LRFI,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
+    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate
   // the empty set from loops.
   if (!R->isBlock())
-    return processLoopTopDown(R, RegionStateInfo[R], AA, LRFI);
+    return processLoopTopDown(R, RegionStateInfo[R], AA, LRFI, SetFactory);
 
-  return processBlockTopDown(*R->getBlock(), AA, RCIA, DecToIncStateMap);
+  return processBlockTopDown(*R->getBlock(), AA, RCIA, DecToIncStateMap,
+                             SetFactory);
 }
 
 //===---
