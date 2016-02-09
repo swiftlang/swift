@@ -19,12 +19,16 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
 /// This describes a list of parameters.  Each parameter descriptor is tail
 /// allocated onto this list.
-class alignas(alignof(ParamDecl*)) ParameterList {
+class alignas(ParamDecl *) ParameterList final :
+    private llvm::TrailingObjects<ParameterList, ParamDecl *> {
+  friend TrailingObjects;
+
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
@@ -84,12 +88,10 @@ public:
   const_iterator end() const { return getArray().end(); }
   
   MutableArrayRef<ParamDecl*> getArray() {
-    auto Ptr = reinterpret_cast<ParamDecl**>(this + 1);
-    return { Ptr, numParameters };
+    return {getTrailingObjects<ParamDecl*>(), numParameters};
   }
   ArrayRef<ParamDecl*> getArray() const {
-    auto Ptr = reinterpret_cast<ParamDecl*const*>(this + 1);
-    return { Ptr, numParameters };
+    return {getTrailingObjects<ParamDecl*>(), numParameters};
   }
 
   size_t size() const {

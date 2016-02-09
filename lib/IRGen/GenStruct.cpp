@@ -232,7 +232,7 @@ namespace {
   };
 
   /// A type implementation for loadable record types imported from Clang.
-  class ClangRecordTypeInfo :
+  class ClangRecordTypeInfo final :
     public StructTypeInfoBase<ClangRecordTypeInfo, LoadableTypeInfo,
                               ClangFieldInfo> {
   public:
@@ -260,7 +260,7 @@ namespace {
   };
 
   /// A type implementation for loadable struct types.
-  class LoadableStructTypeInfo
+  class LoadableStructTypeInfo final
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
   public:
     // FIXME: Spare bits between struct members.
@@ -289,7 +289,7 @@ namespace {
   };
 
   /// A type implementation for non-loadable but fixed-size struct types.
-  class FixedStructTypeInfo
+  class FixedStructTypeInfo final
       : public StructTypeInfoBase<FixedStructTypeInfo,
                                   IndirectTypeInfo<FixedStructTypeInfo,
                                                    FixedTypeInfo>> {
@@ -372,7 +372,7 @@ namespace {
   };
 
   /// A type implementation for non-fixed struct types.
-  class NonFixedStructTypeInfo
+  class NonFixedStructTypeInfo final
       : public StructTypeInfoBase<NonFixedStructTypeInfo,
                                   WitnessSizedTypeInfo<NonFixedStructTypeInfo>>
   {

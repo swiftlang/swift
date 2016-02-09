@@ -21,6 +21,7 @@
 #include "swift/AST/Substitution.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
@@ -87,7 +88,11 @@ public:
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
-class GenericSignature : public llvm::FoldingSetNode {
+class GenericSignature final : public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<GenericSignature, GenericTypeParamType *,
+                                  Requirement> {
+  friend TrailingObjects;
+
   unsigned NumGenericParams;
   unsigned NumRequirements;
 
@@ -95,17 +100,21 @@ class GenericSignature : public llvm::FoldingSetNode {
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
 
+  size_t numTrailingObjects(OverloadToken<GenericTypeParamType *>) const {
+    return NumGenericParams;
+  }
+  size_t numTrailingObjects(OverloadToken<Requirement>) const {
+    return NumRequirements;
+  }
+
   /// Retrieve a mutable version of the generic parameters.
   MutableArrayRef<GenericTypeParamType *> getGenericParamsBuffer() {
-    return { reinterpret_cast<GenericTypeParamType **>(this + 1),
-             NumGenericParams };
+    return {getTrailingObjects<GenericTypeParamType *>(), NumGenericParams};
   }
 
   /// Retrieve a mutable version of the requirements.
   MutableArrayRef<Requirement> getRequirementsBuffer() {
-    void *genericParams = getGenericParamsBuffer().end();
-    return { reinterpret_cast<Requirement *>(genericParams),
-      NumRequirements };
+    return {getTrailingObjects<Requirement>(), NumRequirements};
   }
 
   GenericSignature(ArrayRef<GenericTypeParamType *> params,
@@ -135,8 +144,7 @@ public:
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
-    return { reinterpret_cast<GenericTypeParamType * const *>(this + 1),
-             NumGenericParams };
+    return const_cast<GenericSignature *>(this)->getGenericParamsBuffer();
   }
 
   /// Retrieve the innermost generic parameters.
@@ -147,9 +155,7 @@ public:
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
-    const void *genericParams = getGenericParams().end();
-    return { reinterpret_cast<const Requirement *>(genericParams),
-             NumRequirements };
+    return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
   }
 
   // Only allow allocation by doing a placement new.

@@ -179,7 +179,7 @@ namespace {
   };
 
   /// Type implementation for loadable tuples.
-  class LoadableTupleTypeInfo :
+  class LoadableTupleTypeInfo final :
       public TupleTypeInfoBase<LoadableTupleTypeInfo, LoadableTypeInfo> {
   public:
     // FIXME: Spare bits between tuple elements.
@@ -203,7 +203,7 @@ namespace {
   };
 
   /// Type implementation for fixed-size but non-loadable tuples.
-  class FixedTupleTypeInfo :
+  class FixedTupleTypeInfo final :
       public TupleTypeInfoBase<FixedTupleTypeInfo,
                                IndirectTypeInfo<FixedTupleTypeInfo,
                                                 FixedTypeInfo>>
@@ -257,7 +257,7 @@ namespace {
   };
 
   /// Type implementation for non-fixed-size tuples.
-  class NonFixedTupleTypeInfo :
+  class NonFixedTupleTypeInfo final :
       public TupleTypeInfoBase<NonFixedTupleTypeInfo,
                                WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
   {

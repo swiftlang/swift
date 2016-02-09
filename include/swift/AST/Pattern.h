@@ -26,6 +26,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
   class ASTContext;
@@ -249,16 +250,11 @@ public:
 };
 
 /// A pattern consisting of a tuple of patterns.
-class TuplePattern : public Pattern {
+class TuplePattern final : public Pattern,
+    private llvm::TrailingObjects<TuplePattern, TuplePatternElt> {
+  friend TrailingObjects;
   SourceLoc LPLoc, RPLoc;
   // TuplePatternBits.NumElements
-
-  TuplePatternElt *getElementsBuffer() {
-    return reinterpret_cast<TuplePatternElt *>(this+1);
-  }
-  const TuplePatternElt *getElementsBuffer() const {
-    return reinterpret_cast<const TuplePatternElt *>(this + 1);
-  }
 
   TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp,
                bool implicit)
@@ -285,14 +281,10 @@ public:
   }
 
   MutableArrayRef<TuplePatternElt> getElements() {
-    return getNumElements() == 0 ? MutableArrayRef<TuplePatternElt>() :
-                                   MutableArrayRef<TuplePatternElt>(getElementsBuffer(),
-                                                                    getNumElements());
+    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
   }
   ArrayRef<TuplePatternElt> getElements() const {
-    return getNumElements() == 0 ? ArrayRef<TuplePatternElt>() :
-                                   ArrayRef<TuplePatternElt>(getElementsBuffer(),
-                                                             getNumElements());
+    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
   }
 
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}
@@ -457,14 +449,9 @@ public:
   }
 };
 
-  
-/// A pattern that matches a nominal type and destructures elements out of it.
-/// The match succeeds if the loaded property values all match their associated
-/// subpatterns.
-class NominalTypePattern : public Pattern {
-public:
+namespace detail {
   /// A nominal type subpattern record.
-  class Element {
+  class NominalTypePatternElement {
     /// The location of the property name.
     SourceLoc PropertyLoc;
     /// The location of the colon.
@@ -476,9 +463,8 @@ public:
     /// The subpattern.
     Pattern *SubPattern;
   public:
-    Element(SourceLoc PropLoc, Identifier PropName, VarDecl *Prop,
-            SourceLoc ColonLoc,
-            Pattern *SubP)
+    NominalTypePatternElement(SourceLoc PropLoc, Identifier PropName,
+                              VarDecl *Prop, SourceLoc ColonLoc, Pattern *SubP)
       : PropertyLoc(PropLoc), ColonLoc(ColonLoc),
         PropertyName(PropName), Property(Prop),
         SubPattern(SubP)
@@ -496,20 +482,26 @@ public:
     Pattern *getSubPattern() { return SubPattern; }
     void setSubPattern(Pattern *p) { SubPattern = p; }
   };
+} // end namespace detail
   
+/// A pattern that matches a nominal type and destructures elements out of it.
+/// The match succeeds if the loaded property values all match their associated
+/// subpatterns.
+class NominalTypePattern final : public Pattern,
+    private llvm::TrailingObjects<NominalTypePattern,
+                                  detail::NominalTypePatternElement> {
+  friend TrailingObjects;
+
+public:
+  /// A nominal type subpattern record.
+  using Element = detail::NominalTypePatternElement;
+
 private:
   TypeLoc CastType;
   SourceLoc LParenLoc, RParenLoc;
   
   unsigned NumElements;
-  
-  Element *getElementStorage() {
-    return reinterpret_cast<Element *>(this + 1);
-  }
-  const Element *getElementStorage() const {
-    return reinterpret_cast<const Element *>(this + 1);
-  }
-  
+
   NominalTypePattern(TypeLoc CastTy, SourceLoc LParenLoc,
                      ArrayRef<Element> Elements,
                      SourceLoc RParenLoc,
@@ -520,10 +512,8 @@ private:
   {
     if (implicit.hasValue() ? *implicit : !CastTy.hasLocation())
       setImplicit();
-    static_assert(IsTriviallyCopyable<Element>::value,
-                  "assuming Element is trivially copyable");
-    memcpy(getElementStorage(), Elements.begin(),
-           Elements.size() * sizeof(Element));
+    std::uninitialized_copy(Elements.begin(), Elements.end(),
+                            getTrailingObjects<Element>());
   }
   
 public:
@@ -537,10 +527,10 @@ public:
   TypeLoc getCastTypeLoc() const { return CastType; }
   
   ArrayRef<Element> getElements() const {
-    return {getElementStorage(), NumElements};
+    return {getTrailingObjects<Element>(), NumElements};
   }
   MutableArrayRef<Element> getMutableElements() {
-    return {getElementStorage(), NumElements};
+    return {getTrailingObjects<Element>(), NumElements};
   }
   
   SourceLoc getLoc() const { return CastType.getSourceRange().Start; }

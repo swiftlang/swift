@@ -19,6 +19,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/TimeValue.h"
+#include "llvm/Support/TrailingObjects.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -56,225 +57,237 @@ std::string removeCodeCompletionTokens(StringRef Input,
                                        StringRef TokenName,
                                        unsigned *CompletionOffset);
 
-/// \brief A structured representation of a code completion string.
-class CodeCompletionString {
-  friend class CodeCompletionResultBuilder;
+namespace detail {
+class CodeCompletionStringChunk {
+  friend class swift::ide::CodeCompletionResultBuilder;
 
 public:
-  class Chunk {
-    friend class CodeCompletionResultBuilder;
+  enum class ChunkKind {
+    /// "internal", "private" or "public".
+    AccessControlKeyword,
 
-  public:
-    enum class ChunkKind {
-      /// "internal", "private" or "public".
-      AccessControlKeyword,
+    /// such as @"availability"
+    DeclAttrKeyword,
 
-      /// such as @"availability"
-      DeclAttrKeyword,
+    /// such as "unavailable" etc. for @available
+    DeclAttrParamKeyword,
 
-      /// such as "unavailable" etc. for @available
-      DeclAttrParamKeyword,
+    /// The "override" keyword.
+    OverrideKeyword,
 
-      /// The "override" keyword.
-      OverrideKeyword,
+    /// The "throws" keyword.
+    ThrowsKeyword,
 
-      /// The "throws" keyword.
-      ThrowsKeyword,
+    /// The "rethrows" keyword.
+    RethrowsKeyword,
 
-      /// The "rethrows" keyword.
-      RethrowsKeyword,
+    /// The keyword part of a declaration before the name, like "func".
+    DeclIntroducer,
 
-      /// The keyword part of a declaration before the name, like "func".
-      DeclIntroducer,
+    /// Normal text chunk.
+    Text,
 
-      /// Normal text chunk.
-      Text,
+    /// The first chunk of an optional substring that continues until
+    /// \c NestingLevel decreases.
+    OptionalBegin,
 
-      /// The first chunk of an optional substring that continues until
-      /// \c NestingLevel decreases.
-      OptionalBegin,
+    // Punctuation.
+    LeftParen,
+    RightParen,
+    LeftBracket,
+    RightBracket,
+    LeftAngle,
+    RightAngle,
+    Dot,
+    Ellipsis,
+    Comma,
+    ExclamationMark,
+    QuestionMark,
+    Ampersand,
+    Whitespace,
 
-      // Punctuation.
-      LeftParen,
-      RightParen,
-      LeftBracket,
-      RightBracket,
-      LeftAngle,
-      RightAngle,
-      Dot,
-      Ellipsis,
-      Comma,
-      ExclamationMark,
-      QuestionMark,
-      Ampersand,
-      Whitespace,
+    /// The first chunk of a substring that describes the parameter for a
+    /// generic type.
+    GenericParameterBegin,
+    /// Generic type parameter name.
+    GenericParameterName,
 
-      /// The first chunk of a substring that describes the parameter for a
-      /// generic type.
-      GenericParameterBegin,
-      /// Generic type parameter name.
-      GenericParameterName,
+    /// The first chunk of a substring that describes the parameter for a
+    /// function call.
+    CallParameterBegin,
+    /// Function call parameter name.
+    CallParameterName,
+    /// Function call parameter internal / local name. If the parameter has no
+    /// formal API name, it can still have a local name which can be useful
+    /// for display purposes.
+    ///
+    /// This chunk should not be inserted into the editor buffer.
+    CallParameterInternalName,
+    /// A colon between parameter name and value.  Should be inserted in the
+    /// editor buffer if the preceding CallParameterName was inserted.
+    CallParameterColon,
 
-      /// The first chunk of a substring that describes the parameter for a
-      /// function call.
-      CallParameterBegin,
-      /// Function call parameter name.
-      CallParameterName,
-      /// Function call parameter internal / local name. If the parameter has no
-      /// formal API name, it can still have a local name which can be useful
-      /// for display purposes.
-      ///
-      /// This chunk should not be inserted into the editor buffer.
-      CallParameterInternalName,
-      /// A colon between parameter name and value.  Should be inserted in the
-      /// editor buffer if the preceding CallParameterName was inserted.
-      CallParameterColon,
+    /// A equal sign between parameter name and value. Used in decl attribute.
+    DeclAttrParamEqual,
 
-      /// A equal sign between parameter name and value. Used in decl attribute.
-      DeclAttrParamEqual,
+    /// Required parameter type.
+    CallParameterType,
+    /// Desugared closure parameter type. This can be used to get the
+    /// closure type if CallParameterType is a NameAliasType.
+    CallParameterClosureType,
 
-      /// Required parameter type.
-      CallParameterType,
-      /// Desugared closure parameter type. This can be used to get the
-      /// closure type if CallParameterType is a NameAliasType.
-      CallParameterClosureType,
+    /// A placeholder for \c ! or \c ? in a call to a method found by dynamic
+    /// lookup.
+    ///
+    /// The default spelling is \c !, but clients may render it as \c ? if
+    /// desired.
+    DynamicLookupMethodCallTail,
 
-      /// A placeholder for \c ! or \c ? in a call to a method found by dynamic
-      /// lookup.
-      ///
-      /// The default spelling is \c !, but clients may render it as \c ? if
-      /// desired.
-      DynamicLookupMethodCallTail,
+    /// A placeholder for \c ! or \c ? in a call to an optional method.
+    ///
+    /// The default spelling is \c !, but clients may render it as \c ? if
+    /// desired.
+    OptionalMethodCallTail,
 
-      /// A placeholder for \c ! or \c ? in a call to an optional method.
-      ///
-      /// The default spelling is \c !, but clients may render it as \c ? if
-      /// desired.
-      OptionalMethodCallTail,
+    /// Specifies the type of the whole entity that is returned in this code
+    /// completion result.  For example, for variable references it is the
+    /// variable type, for function calls it is the return type.
+    ///
+    /// This chunk should not be inserted into the editor buffer.
+    TypeAnnotation,
 
-      /// Specifies the type of the whole entity that is returned in this code
-      /// completion result.  For example, for variable references it is the
-      /// variable type, for function calls it is the return type.
-      ///
-      /// This chunk should not be inserted into the editor buffer.
-      TypeAnnotation,
+    /// A brace statement -- left brace and right brace.  The preferred
+    /// position to put the cursor after the completion result is inserted
+    /// into the editor buffer is between the braces.
+    ///
+    /// The spelling as always "{}", but clients may choose to insert newline
+    /// and indentation in between.
+    BraceStmtWithCursor,
 
-      /// A brace statement -- left brace and right brace.  The preferred
-      /// position to put the cursor after the completion result is inserted
-      /// into the editor buffer is between the braces.
-      ///
-      /// The spelling as always "{}", but clients may choose to insert newline
-      /// and indentation in between.
-      BraceStmtWithCursor,
-
-      ///
-    };
-
-    static bool chunkStartsNestedGroup(ChunkKind Kind) {
-      return Kind == ChunkKind::CallParameterBegin ||
-             Kind == ChunkKind::GenericParameterBegin ||
-             Kind == ChunkKind::OptionalBegin;
-    }
-
-    static bool chunkHasText(ChunkKind Kind) {
-      return Kind == ChunkKind::AccessControlKeyword ||
-             Kind == ChunkKind::OverrideKeyword ||
-             Kind == ChunkKind::ThrowsKeyword ||
-             Kind == ChunkKind::RethrowsKeyword ||
-             Kind == ChunkKind::DeclAttrKeyword ||
-             Kind == ChunkKind::DeclIntroducer ||
-             Kind == ChunkKind::Text ||
-             Kind == ChunkKind::LeftParen ||
-             Kind == ChunkKind::RightParen ||
-             Kind == ChunkKind::LeftBracket ||
-             Kind == ChunkKind::RightBracket ||
-             Kind == ChunkKind::LeftAngle ||
-             Kind == ChunkKind::RightAngle ||
-             Kind == ChunkKind::Dot ||
-             Kind == ChunkKind::Ellipsis ||
-             Kind == ChunkKind::Comma ||
-             Kind == ChunkKind::ExclamationMark ||
-             Kind == ChunkKind::QuestionMark ||
-             Kind == ChunkKind::Ampersand ||
-             Kind == ChunkKind::Whitespace ||
-             Kind == ChunkKind::CallParameterName ||
-             Kind == ChunkKind::CallParameterInternalName ||
-             Kind == ChunkKind::CallParameterColon ||
-             Kind == ChunkKind::DeclAttrParamEqual ||
-             Kind == ChunkKind::DeclAttrParamKeyword ||
-             Kind == ChunkKind::CallParameterType ||
-             Kind == ChunkKind::CallParameterClosureType ||
-             Kind == ChunkKind::GenericParameterName ||
-             Kind == ChunkKind::DynamicLookupMethodCallTail ||
-             Kind == ChunkKind::OptionalMethodCallTail ||
-             Kind == ChunkKind::TypeAnnotation ||
-             Kind == ChunkKind::BraceStmtWithCursor;
-    }
-
-  private:
-    unsigned Kind : 8;
-    unsigned NestingLevel : 8;
-
-    /// \brief If true, then this chunk is an annotation that is included only
-    /// for exposition and may not be inserted in the editor buffer.
-    unsigned IsAnnotation : 1;
-
-    StringRef Text;
-
-    Chunk(ChunkKind Kind, unsigned NestingLevel, StringRef Text,
-          bool isAnnotation)
-        : Kind(unsigned(Kind)), NestingLevel(NestingLevel),
-          IsAnnotation(isAnnotation), Text(Text) {
-      assert(chunkHasText(Kind));
-    }
-
-    Chunk(ChunkKind Kind, unsigned NestingLevel, bool isAnnotation)
-        : Kind(unsigned(Kind)), NestingLevel(NestingLevel),
-          IsAnnotation(isAnnotation) {
-      assert(!chunkHasText(Kind));
-    }
-
-    void setIsAnnotation() {
-      IsAnnotation = 1;
-    }
-
-  public:
-    ChunkKind getKind() const {
-      return ChunkKind(Kind);
-    }
-
-    bool is(ChunkKind K) const { return getKind() == K; }
-
-    unsigned getNestingLevel() const {
-      return NestingLevel;
-    }
-
-    bool isAnnotation() const {
-      return IsAnnotation;
-    }
-
-    bool hasText() const { return chunkHasText(getKind()); }
-
-    StringRef getText() const {
-      assert(hasText());
-      return Text;
-    }
-
-    bool endsPreviousNestedGroup(unsigned GroupNestingLevel) const {
-      return NestingLevel < GroupNestingLevel ||
-       (NestingLevel == GroupNestingLevel && chunkStartsNestedGroup(getKind()));
-    }
-
-    static Chunk createWithText(ChunkKind Kind, unsigned NestingLevel,
-                                StringRef Text, bool isAnnotation = false) {
-      return Chunk(Kind, NestingLevel, Text, isAnnotation);
-    }
-
-    static Chunk createSimple(ChunkKind Kind, unsigned NestingLevel,
-                              bool isAnnotation = false) {
-      return Chunk(Kind, NestingLevel, isAnnotation);
-    }
+    ///
   };
+
+  static bool chunkStartsNestedGroup(ChunkKind Kind) {
+    return Kind == ChunkKind::CallParameterBegin ||
+           Kind == ChunkKind::GenericParameterBegin ||
+           Kind == ChunkKind::OptionalBegin;
+  }
+
+  static bool chunkHasText(ChunkKind Kind) {
+    return Kind == ChunkKind::AccessControlKeyword ||
+           Kind == ChunkKind::OverrideKeyword ||
+           Kind == ChunkKind::ThrowsKeyword ||
+           Kind == ChunkKind::RethrowsKeyword ||
+           Kind == ChunkKind::DeclAttrKeyword ||
+           Kind == ChunkKind::DeclIntroducer ||
+           Kind == ChunkKind::Text ||
+           Kind == ChunkKind::LeftParen ||
+           Kind == ChunkKind::RightParen ||
+           Kind == ChunkKind::LeftBracket ||
+           Kind == ChunkKind::RightBracket ||
+           Kind == ChunkKind::LeftAngle ||
+           Kind == ChunkKind::RightAngle ||
+           Kind == ChunkKind::Dot ||
+           Kind == ChunkKind::Ellipsis ||
+           Kind == ChunkKind::Comma ||
+           Kind == ChunkKind::ExclamationMark ||
+           Kind == ChunkKind::QuestionMark ||
+           Kind == ChunkKind::Ampersand ||
+           Kind == ChunkKind::Whitespace ||
+           Kind == ChunkKind::CallParameterName ||
+           Kind == ChunkKind::CallParameterInternalName ||
+           Kind == ChunkKind::CallParameterColon ||
+           Kind == ChunkKind::DeclAttrParamEqual ||
+           Kind == ChunkKind::DeclAttrParamKeyword ||
+           Kind == ChunkKind::CallParameterType ||
+           Kind == ChunkKind::CallParameterClosureType ||
+           Kind == ChunkKind::GenericParameterName ||
+           Kind == ChunkKind::DynamicLookupMethodCallTail ||
+           Kind == ChunkKind::OptionalMethodCallTail ||
+           Kind == ChunkKind::TypeAnnotation ||
+           Kind == ChunkKind::BraceStmtWithCursor;
+  }
+
+private:
+  unsigned Kind : 8;
+  unsigned NestingLevel : 8;
+
+  /// \brief If true, then this chunk is an annotation that is included only
+  /// for exposition and may not be inserted in the editor buffer.
+  unsigned IsAnnotation : 1;
+
+  StringRef Text;
+
+  CodeCompletionStringChunk(ChunkKind Kind, unsigned NestingLevel, StringRef Text,
+                            bool isAnnotation)
+      : Kind(unsigned(Kind)), NestingLevel(NestingLevel),
+        IsAnnotation(isAnnotation), Text(Text) {
+    assert(chunkHasText(Kind));
+  }
+
+  CodeCompletionStringChunk(ChunkKind Kind, unsigned NestingLevel,
+                            bool isAnnotation)
+      : Kind(unsigned(Kind)), NestingLevel(NestingLevel),
+        IsAnnotation(isAnnotation) {
+    assert(!chunkHasText(Kind));
+  }
+
+  void setIsAnnotation() {
+    IsAnnotation = 1;
+  }
+
+public:
+  ChunkKind getKind() const {
+    return ChunkKind(Kind);
+  }
+
+  bool is(ChunkKind K) const { return getKind() == K; }
+
+  unsigned getNestingLevel() const {
+    return NestingLevel;
+  }
+
+  bool isAnnotation() const {
+    return IsAnnotation;
+  }
+
+  bool hasText() const { return chunkHasText(getKind()); }
+
+  StringRef getText() const {
+    assert(hasText());
+    return Text;
+  }
+
+  bool endsPreviousNestedGroup(unsigned GroupNestingLevel) const {
+    return NestingLevel < GroupNestingLevel ||
+     (NestingLevel == GroupNestingLevel && chunkStartsNestedGroup(getKind()));
+  }
+
+  static CodeCompletionStringChunk createWithText(ChunkKind Kind,
+                                                  unsigned NestingLevel,
+                                                  StringRef Text,
+                                                  bool isAnnotation = false) {
+    return CodeCompletionStringChunk(Kind, NestingLevel, Text, isAnnotation);
+  }
+
+  static CodeCompletionStringChunk createSimple(ChunkKind Kind,
+                                                unsigned NestingLevel,
+                                                bool isAnnotation = false) {
+    return CodeCompletionStringChunk(Kind, NestingLevel, isAnnotation);
+  }
+};
+
+} // end namespace detail
+
+/// \brief A structured representation of a code completion string.
+class alignas(detail::CodeCompletionStringChunk) CodeCompletionString final :
+    private llvm::TrailingObjects<CodeCompletionString,
+                                  detail::CodeCompletionStringChunk> {
+  friend class CodeCompletionResultBuilder;
+  friend TrailingObjects;
+
+public:
+  using Chunk = detail::CodeCompletionStringChunk;
 
 private:
   unsigned NumChunks : 16;
@@ -290,8 +303,7 @@ public:
                                       ArrayRef<Chunk> Chunks);
 
   ArrayRef<Chunk> getChunks() const {
-    return llvm::makeArrayRef(reinterpret_cast<const Chunk *>(this + 1),
-                              NumChunks);
+    return {getTrailingObjects<Chunk>(), NumChunks};
   }
 
   StringRef getFirstTextChunk() const;
