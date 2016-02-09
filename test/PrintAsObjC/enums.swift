@@ -12,18 +12,24 @@
 import Foundation
 
 // NEGATIVE-NOT: NSMalformedEnumMissingTypedef :
+// NEGATIVE-NOT: enum EnumNamed
 // CHECK-LABEL: enum FooComments : NSInteger;
 // CHECK-LABEL: enum NegativeValues : int16_t;
+// CHECK-LABEL: enum ObjcEnumNamed : NSInteger;
 
 // CHECK-LABEL: @interface AnEnumMethod
 // CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
 // CHECK-NEXT: - (void)acceptPlainEnum:(enum NSMalformedEnumMissingTypedef)_;
+// CHECK-NEXT: - (enum ObjcEnumNamed)takeAndReturnRenamedEnum:(enum ObjcEnumNamed)foo;
 // CHECK: @end
 @objc class AnEnumMethod {
   @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {
     return .Zung
   }
   @objc func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
+  @objc func takeAndReturnRenamedEnum(foo: EnumNamed) -> EnumNamed {
+    return .A
+  }
 }
 
 // CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcEnumNamed, "EnumNamed") {
@@ -102,6 +108,14 @@ import Foundation
 // NEGATIVE-NOT: NSString * _Nonnull const SomeOtherErrorTypeDomain
 @objc enum SomeOtherErrorType: Int, ErrorType {
   case Domain // collision!
+}
+
+// CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcErrorType, "SomeRenamedErrorType") {
+// CHECK-NEXT:   ObjcErrorTypeBadStuff = 0,
+// CHECK-NEXT: };
+// CHECK-NEXT: static NSString * _Nonnull const ObjcErrorTypeDomain = @"enums.SomeRenamedErrorType";
+@objc(ObjcErrorType) enum SomeRenamedErrorType: Int, ErrorType {
+  case BadStuff
 }
 
 // CHECK-NOT: enum {{[A-Z]+}}
