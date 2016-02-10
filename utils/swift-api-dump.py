@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
-# This tool helps assess the impact of automatically applying
-# heuristics that omit 'needless' words from APIs imported from Clang
-# into Swift.
+# This tool helps dump the APIs of imported modules for a module, SDK,
+# or set of SDKs. It is primarily useful in determining the effect of
+# changes to the Clang importer.
 
 from __future__ import print_function
 
 import argparse
+import multiprocessing
 import os
 import re
 import subprocess
-import multiprocessing
+import sys
 
 DEFAULT_TARGET_BASED_ON_SDK = {
     'macosx': 'x86_64-apple-macosx10.11',
@@ -46,6 +47,10 @@ SKIPPED_FRAMEWORKS = {
 }
 
 def create_parser():
+    script_path = os.path.dirname(sys.argv[0])
+    script_path = os.path.abspath(script_path)
+    default_swift_ide_test = '%s/swift-ide-test' % (script_path)
+    
     parser = argparse.ArgumentParser(
         description="Determines the effects of omitting 'needless' words from imported APIs",
         prog='omit-needless-words.py',
@@ -54,7 +59,7 @@ def create_parser():
     parser.add_argument('-j', '--jobs', type=int, help='The number of parallel jobs to execute')
     parser.add_argument('-s', '--sdk', nargs='+', required=True, help="The SDKs to use.")
     parser.add_argument('-t', '--target', help="The target triple to use.")
-    parser.add_argument('-i', '--swift-ide-test', default='swift-ide-test', help="The swift-ide-test executable.")
+    parser.add_argument('-i', '--swift-ide-test', default=default_swift_ide_test, help="The swift-ide-test executable.")
     parser.add_argument('-3', '--swift-3', action='store_true', help="Use Swift 3 transformation")
     parser.add_argument('-o', '--output-dir', default=os.getcwd(), help='Directory to which the output will be emitted.')
     parser.add_argument('-q', '--quiet', action='store_true', help='Suppress printing of status messages.')
