@@ -394,7 +394,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
   // pairs.
-  using ProjInstPairTy = std::pair<NewProjection, SILInstruction *>;
+  using ProjInstPairTy = std::pair<Projection, SILInstruction *>;
 
   // Go through the loads uses and add any users that are projections to the
   // projection list.
@@ -406,7 +406,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     if (!isa<StructExtractInst>(User) && !isa<TupleExtractInst>(User))
       return nullptr;
 
-    Projections.push_back({NewProjection(User), User});
+    Projections.push_back({Projection(User), User});
   }
 
   // The reason why we sort the list is so that we will process projections with
@@ -416,7 +416,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   std::sort(Projections.begin(), Projections.end());
 
   // Go through our sorted list creating new GEPs only when we need to.
-  NewProjection *LastProj = nullptr;
+  Projection *LastProj = nullptr;
   LoadInst *LastNewLoad = nullptr;
   for (auto &Pair : Projections) {
     auto &Proj = Pair.first;

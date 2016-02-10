@@ -145,7 +145,7 @@ struct ArgumentDescriptor {
   SILInstruction *CalleeReleaseInThrowBlock;
 
   /// The projection tree of this arguments.
-  NewProjectionTree ProjTree;
+  ProjectionTree ProjTree;
 
   ArgumentDescriptor() = delete;
 

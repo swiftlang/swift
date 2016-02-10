@@ -135,7 +135,7 @@ SILValue swift::stripClassCasts(SILValue V) {
 SILValue swift::stripAddressProjections(SILValue V) {
   while (true) {
     V = stripSinglePredecessorArgs(V);
-    if (!NewProjection::isAddressProjection(V))
+    if (!Projection::isAddressProjection(V))
       return V;
     V = cast<SILInstruction>(V)->getOperand(0);
   }
@@ -144,7 +144,7 @@ SILValue swift::stripAddressProjections(SILValue V) {
 SILValue swift::stripUnaryAddressProjections(SILValue V) {
   while (true) {
     V = stripSinglePredecessorArgs(V);
-    if (!NewProjection::isAddressProjection(V))
+    if (!Projection::isAddressProjection(V))
       return V;
     auto *Inst = cast<SILInstruction>(V);
     if (Inst->getNumOperands() > 1)
@@ -156,7 +156,7 @@ SILValue swift::stripUnaryAddressProjections(SILValue V) {
 SILValue swift::stripValueProjections(SILValue V) {
   while (true) {
     V = stripSinglePredecessorArgs(V);
-    if (!NewProjection::isObjectProjection(V))
+    if (!Projection::isObjectProjection(V))
       return V;
     V = cast<SILInstruction>(V)->getOperand(0);
   }

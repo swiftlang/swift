@@ -777,7 +777,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
     L = BaseToLocIndex[Mem];
   } else {
     SILValue UO = getUnderlyingObject(Mem);
-    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+    L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
   // If we cant figure out the Base or Projection Path for the read instruction,
@@ -862,7 +862,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     L = BaseToLocIndex[Mem];
   } else {
     SILValue UO = getUnderlyingObject(Mem);
-    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+    L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
   // If we cant figure out the Base or Projection Path for the store
@@ -943,7 +943,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     // particular instruction may not be accessing the base, so we need to
     // *rebase* the locations w.r.t. to the current instruction.
     SILValue B = Locs[0].getBase();
-    Optional<NewProjectionPath> BP = NewProjectionPath::getProjectionPath(B, Mem);
+    Optional<ProjectionPath> BP = ProjectionPath::getProjectionPath(B, Mem);
     // Strip off the projection path from base to the accessed field.
     for (auto &X : Alives) {
       X.removePathPrefix(BP);

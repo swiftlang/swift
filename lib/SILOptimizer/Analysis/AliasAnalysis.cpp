@@ -216,7 +216,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
   // derived pointers.
-  if (!NewProjection::isAddressProjection(V2)) {
+  if (!Projection::isAddressProjection(V2)) {
     // Ok, V2 is not an address projection. See if V2 after stripping casts
     // aliases O1. If so, then we know that V2 must partially alias V1 via a
     // must alias relation on O1. This ensures that given an alloc_stack and a
@@ -227,9 +227,9 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::MayAlias;
   }
   
-  assert(!NewProjection::isAddressProjection(O1) &&
+  assert(!Projection::isAddressProjection(O1) &&
          "underlying object may not be a projection");
-  assert(!NewProjection::isAddressProjection(O2) &&
+  assert(!Projection::isAddressProjection(O2) &&
          "underlying object may not be a projection");
 
   // Do the base pointers alias?
@@ -241,8 +241,8 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     return AliasResult::NoAlias;
 
   // Let's do alias checking based on projections.
-  auto V1Path = NewProjectionPath::getProjectionPath(O1, V1);
-  auto V2Path = NewProjectionPath::getProjectionPath(O2, V2);
+  auto V1Path = ProjectionPath::getProjectionPath(O1, V1);
+  auto V2Path = ProjectionPath::getProjectionPath(O2, V2);
 
   // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
   // what the base pointer of the two values are. Be conservative and return
@@ -612,15 +612,15 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 
   // First if one instruction is a gep and the other is not, canonicalize our
   // inputs so that V1 always is the instruction containing the GEP.
-  if (!NewProjection::isAddressProjection(V1) &&
-       NewProjection::isAddressProjection(V2)) {
+  if (!Projection::isAddressProjection(V1) &&
+       Projection::isAddressProjection(V2)) {
     std::swap(V1, V2);
     std::swap(O1, O2);
   }
 
   // If V1 is an address projection, attempt to use information from the
   // aggregate type tree to disambiguate it from V2.
-  if (NewProjection::isAddressProjection(V1)) {
+  if (Projection::isAddressProjection(V1)) {
     AliasResult Result = aliasAddressProjection(V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
       return Result;

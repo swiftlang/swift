@@ -645,7 +645,7 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
     L = BaseToLocIndex[Mem];
   } else {
     SILValue UO = getUnderlyingObject(Mem);
-    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+    L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
   LSLocationValueMap Values;
@@ -777,7 +777,7 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
     L = BaseToLocIndex[Mem];
   } else {
     SILValue UO = getUnderlyingObject(Mem);
-    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+    L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
   // If we cant figure out the Base or Projection Path for the write,
@@ -834,7 +834,7 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
     L = BaseToLocIndex[Mem];
   } else {
     SILValue UO = getUnderlyingObject(Mem);
-    L = LSLocation(UO, NewProjectionPath::getProjectionPath(UO, Mem));
+    L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
   // If we cant figure out the Base or Projection Path for the read, simply
