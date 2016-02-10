@@ -37,6 +37,7 @@ from SwiftBuildSupport import (
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 import swift_build_support.clang
 import swift_build_support.cmake
+import swift_build_support.debug
 import swift_build_support.ninja
 import swift_build_support.targets
 from swift_build_support.migration import migrate_impl_args
@@ -545,6 +546,9 @@ the number of parallel build jobs to use""",
     parser.add_argument("--cmake",
                         help="the path to a CMake executable that will be "
                              "used to build Swift")
+    parser.add_argument("--show-sdks",
+                        help="print installed Xcode and SDK versions",
+                        action="store_true")
 
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
@@ -561,6 +565,7 @@ the number of parallel build jobs to use""",
         '--cmake',
         '--host-target',
         '--skip-build',
+        '--show-sdks',
     ]))
 
     if args.host_target is None:
@@ -862,6 +867,13 @@ the number of parallel build jobs to use""",
     # Unset environment variables that might affect how tools behave.
     for v in ['MAKEFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET', 'IPHONEOS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
+
+    if args.show_sdks:
+        swift_build_support.debug.print_xcodebuild_versions([
+            'iphonesimulator',
+            'appletvsimulator',
+            'watchsimulator',
+        ])
 
     check_call(build_script_impl_args)
 
