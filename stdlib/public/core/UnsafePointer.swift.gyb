@@ -30,12 +30,12 @@
 ///
 /// The pointer can be in one of the following states:
 ///
-/// - memory is not allocated (for example, pointer is null, or memory has
-///   been deallocated previously);
+/// - Memory is not allocated (for example, pointer is null, or memory has
+///   been deallocated previously).
 ///
-/// - memory is allocated, but value has not been initialized;
+/// - Memory is allocated, but value has not been initialized.
 ///
-/// - memory is allocated and value is initialized.
+/// - Memory is allocated and value is initialized.
 public struct ${Self}<@swift3_migration(renamed="Pointee") Memory>
   : RandomAccessIndexType, Hashable,
     NilLiteralConvertible, _PointerType {

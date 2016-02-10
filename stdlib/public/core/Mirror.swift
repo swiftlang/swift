@@ -51,13 +51,7 @@ public struct Mirror {
   /// `AncestorRepresentation`.  This setting has no effect on mirrors
   /// reflecting value type instances.
   public enum AncestorRepresentation {
-  /// Generate a default mirror for all ancestor classes.  This is the
-  /// default behavior.
-  ///
-  /// - Note: This option bypasses any implementation of `customMirror`
-  ///   that may be supplied by a `CustomReflectable` ancestor, so this
-  ///   is typically not the right option for a `customMirror`implementation 
-    
+
   /// Generate a default mirror for all ancestor classes.
   ///
   /// This case is the default.
@@ -701,10 +695,10 @@ extension PlaygroundQuickLook {
 /// `CustomPlaygroundQuickLookable` and return a custom
 /// `PlaygroundQuickLook`.
 public protocol CustomPlaygroundQuickLookable {
-  /// Return the `Mirror` for `self`.
+  /// Return the `PlaygroundQuickLook` for `self`.
   ///
-  /// - Note: If `Self` has value semantics, the `Mirror` should be
-  ///   unaffected by subsequent mutations of `self`.
+  /// - Note: If `Self` has value semantics, the `PlaygroundQuickLook` should
+  ///   be unaffected by subsequent mutations of `self`.
   @swift3_migration(renamedToProperty="customPlaygroundQuickLook")
   @warn_unused_result
   func customPlaygroundQuickLook() -> PlaygroundQuickLook

@@ -181,8 +181,9 @@ T : UnsignedIntegerType, U : _SignedIntegerType
 %   Self = self_ty.stdlib_name
 %   BuiltinName = self_ty.builtin_name
 %   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
+%   Article = 'An' if bits == 8 else 'A'
 
-/// A ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
+/// ${Article} ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
 public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'},
