@@ -9,4 +9,5 @@
 -(void)removeWithNoRemorse:(nonnull id)object;
 -(void)bookmarkWithURLs:(nonnull NSArray<NSURL *> *)urls;
 -(void)saveToURL:(nonnull NSURL *)url forSaveOperation:(NSInteger)operation;
+-(void)indexWithItemNamed:(nonnull NSString *)name;
 @end

@@ -820,26 +820,18 @@ StringRef camel_case::toLowercaseInitialisms(StringRef string,
   return scratch.copyString(scratchStr);
 }
 
-/// Determine whether the given word preceding "with" indicates that
-/// "with" should be retained.
-static bool wordPairsWithWith(StringRef word) {
-  return camel_case::sameWordIgnoreFirstCase(word, "compatible");
-}
-
 /// Determine whether the given word occurring before the given
 /// preposition results in a conflict that suppresses preposition
 /// splitting.
 static bool wordConflictsBeforePreposition(StringRef word,
                                            StringRef preposition) {
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "with")) {
-    if (camel_case::sameWordIgnoreFirstCase(word, "encode"))
-      return true;
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
+      camel_case::sameWordIgnoreFirstCase(word, "compatible"))
+    return true;
 
-    if (camel_case::sameWordIgnoreFirstCase(word, "copy"))
-      return true;
-
-    return false;
-  }
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "of") &&
+      camel_case::sameWordIgnoreFirstCase(word, "kind"))
+    return true;
 
   return false;
 }
@@ -855,27 +847,78 @@ static bool wordConflictsAfterPreposition(StringRef word,
       return true;
   }
 
-  if (camel_case::sameWordIgnoreFirstCase(word, "visible") &&
-      camel_case::sameWordIgnoreFirstCase(preposition, "to"))
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "to") &&
+      camel_case::sameWordIgnoreFirstCase(word, "visible"))
     return true;
 
   return false;
 }
 
-/// Determine whether there is a preposition in the given name.
-static bool containsPreposition(StringRef name) {
-  for (auto word : camel_case::getWords(name)) {
-    if (camel_case::sameWordIgnoreFirstCase(word, "with")) continue;
-    if (getPartOfSpeech(word) == PartOfSpeech::Preposition) return true;
+/// When splitting based on a preposition, whether we should place the
+/// preposition on the argument label (vs. on the base name).
+static bool shouldPlacePrepositionOnArgLabel(StringRef beforePreposition,
+                                             StringRef preposition,
+                                             StringRef afterPreposition) {
+  // X/Y/Z often used as coordinates and should be the labels.
+  if (afterPreposition == "X" ||
+      afterPreposition == "Y" ||
+      afterPreposition == "Z")
+    return false;
+
+  return true;
+}
+
+/// Determine whether the preposition in a split is "vacuous", and
+/// should be removed.
+static bool isVacuousPreposition(StringRef beforePreposition,
+                                 StringRef preposition,
+                                 StringRef afterPreposition,
+                                 const OmissionTypeName &paramType) {
+  // Only consider "with" or "using" to be potentially vacuous.
+  if (!camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
+      !camel_case::sameWordIgnoreFirstCase(preposition, "using"))
+    return false;
+
+  // If the preposition is "with", check for special cases.
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "with")) {
+    // Some words following the preposition indicate that "with" is
+    // not vacuous.
+    auto following = camel_case::getFirstWord(afterPreposition);
+    if (camel_case::sameWordIgnoreFirstCase(following, "coder") ||
+        camel_case::sameWordIgnoreFirstCase(following, "zone"))
+      return false;
+
+    // If the last word of the argument label looks like a past
+    // participle (ends in "-ed"), the preposition is not vacuous.
+    auto lastWord = camel_case::getLastWord(afterPreposition);
+    if (lastWord.endswith("ed"))
+      return false;
+
+    if (camel_case::sameWordIgnoreFirstCase(following, "delegate") ||
+        camel_case::sameWordIgnoreFirstCase(following, "frame"))
+      return true;
   }
+
+  // If the parameter has a default argument, it's vacuous.
+  if (paramType.hasDefaultArgument()) return true;
+
+  // If the parameter is of function type, it's vacuous.
+  if (paramType.isFunction()) return true;
+
+  // If the first word of the name is a verb, the preposition is
+  // likely vacuous.
+  if (getPartOfSpeech(camel_case::getFirstWord(beforePreposition))
+        == PartOfSpeech::Verb)
+    return true;
+
   return false;
 }
 
 /// Split the base name after the last preposition, if there is one.
-static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
-                                              StringRef &argName,
-                                              const OmissionTypeName &paramType,
-                                              StringRef secondArgName) {
+static bool splitBaseNameAfterLastPreposition(
+    StringRef &baseName,
+    StringRef &argName,
+    const OmissionTypeName &paramType) {
   // Scan backwards for a preposition.
   auto nameWords = camel_case::getWords(baseName);
   auto nameWordRevIter = nameWords.rbegin(),
@@ -917,36 +960,21 @@ static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
     return false;
 
   // Determine whether we should drop the preposition.
-  bool dropPreposition = false;
+  StringRef beforePreposition(baseName.begin(),
+                              preposition.begin() - baseName.begin());
+  StringRef afterPreposition(preposition.end(),
+                             baseName.end() - preposition.end());
+  bool dropPreposition = isVacuousPreposition(beforePreposition,
+                                              preposition,
+                                              afterPreposition,
+                                              paramType);
 
-  // If the first parameter has a default, drop the preposition.
-  if (paramType.hasDefaultArgument()) {
-    dropPreposition = true;
-
-    // If the preposition is "with" and the base name starts with a
-    // verb, assume "with" is a separator and remove it.
-  } else if (nameWordRevIter.base().getPosition() > 4 &&
-             camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
-             !wordPairsWithWith(*std::next(nameWordRevIter)) &&
-             getPartOfSpeech(camel_case::getFirstWord(baseName))
-               == PartOfSpeech::Verb) {
-    dropPreposition = true;
-
-  // If the preposition is "using" and the parameter is a function or
-  // block, assume "using" is a separator and remove it.
-  } else if (nameWordRevIter.base().getPosition() > 5 &&
-             paramType.isFunction() &&
-             camel_case::sameWordIgnoreFirstCase(preposition, "using")) {
-    dropPreposition = true;
-  }
-
-  // If we have a preposition in the second argument label, pull the
-  // first preposition into the first argument label to balance them.
-  bool prepositionOnArgLabel = false;
-  if (containsPreposition(secondArgName)) {
-    prepositionOnArgLabel = true;
+  // By default, put the prposition on the argument label.
+  bool prepositionOnArgLabel =
+    shouldPlacePrepositionOnArgLabel(beforePreposition, preposition,
+                                     afterPreposition);
+  if (prepositionOnArgLabel)
     ++nameWordRevIter;
-  }
 
   unsigned startOfArgumentLabel = nameWordRevIter.base().getPosition();
   unsigned endOfBaseName = startOfArgumentLabel;
@@ -990,8 +1018,7 @@ static bool splitBaseNameAfterLastPreposition(StringRef &baseName,
 /// Split the base name, if it makes sense.
 static bool splitBaseName(StringRef &baseName, StringRef &argName,
                           const OmissionTypeName &paramType,
-                          StringRef paramName,
-                          StringRef secondArgName) {
+                          StringRef paramName) {
   // If there is already an argument label, do nothing.
   if (!argName.empty()) return false;
 
@@ -1014,18 +1041,10 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
     return false;
 
   // Try splitting after the last preposition.
-  if (splitBaseNameAfterLastPreposition(baseName, argName, paramType,
-                                        secondArgName))
+  if (splitBaseNameAfterLastPreposition(baseName, argName, paramType))
     return true;
 
   return false;
-}
-
-// Retrieve the second "real" argument label.
-static StringRef getSecondArgumentName(ArrayRef<StringRef> names) {
-  if (names.empty()) return "";
-  if (names[0] == "error") return getSecondArgumentName(names.slice(1));
-  return names[0];
 }
 
 bool swift::omitNeedlessWords(StringRef &baseName,
@@ -1102,8 +1121,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // If needed, split the base name.
   if (!argNames.empty() &&
-      splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName,
-                    getSecondArgumentName(argNames.slice(1))))
+      splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))
     anyChanges = true;
 
   // Omit needless words based on parameter types.
