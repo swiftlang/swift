@@ -1233,7 +1233,7 @@ public:
       SmallVectorImpl<StringRef> &Keywords) override;
 
   void completePoundAvailablePlatform() override;
-  void completeImportDecl(ArrayRef<std::pair<Identifier, SourceLoc>> Path) override;
+  void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
   void completeUnresolvedMember(UnresolvedMemberExpr *E,
                                 ArrayRef<StringRef> Identifiers,
                                 bool HasReturn) override;
@@ -4010,7 +4010,7 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
 }
 
 void CodeCompletionCallbacksImpl::completeImportDecl(
-    ArrayRef<std::pair<Identifier, SourceLoc>> Path) {
+    std::vector<std::pair<Identifier, SourceLoc>> &Path) {
   Kind = CompletionKind::Import;
   CurDeclContext = P.CurDeclContext;
   DotLoc = Path.empty() ? SourceLoc() : Path.back().second;
@@ -4018,7 +4018,15 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
     return;
   auto Importer = static_cast<ClangImporter *>(CurDeclContext->getASTContext().
                                                getClangModuleLoader());
-  Importer->collectSubModuleNamesAndVisibility(Path, SubModuleNameVisibilityPairs);
+  std::vector<std::string> SubNames;
+  Importer->collectSubModuleNames(Path, SubNames);
+  ASTContext &Ctx = CurDeclContext->getASTContext();
+  for (StringRef Sub : SubNames) {
+    Path.push_back(std::make_pair(Ctx.getIdentifier(Sub), SourceLoc()));
+    SubModuleNameVisibilityPairs.push_back(
+      std::make_pair(Sub.str(), Ctx.getLoadedModule(Path)));
+    Path.pop_back();
+  }
 }
 
 void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E,

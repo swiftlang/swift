@@ -943,9 +943,9 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   return result;
 }
 
-void ClangImporter::collectSubModuleNamesAndVisibility(
+void ClangImporter::collectSubModuleNames(
     ArrayRef<std::pair<Identifier, SourceLoc>> path,
-    std::vector<std::pair<std::string, bool>> &namesVisiblePairs) {
+    std::vector<std::string> &names) {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
@@ -962,9 +962,7 @@ void ClangImporter::collectSubModuleNamesAndVisibility(
   auto submoduleNameLength = submodule->getFullModuleName().length();
   for (auto sub : submodule->submodules()) {
     StringRef full = sub->getFullModuleName();
-    namesVisiblePairs.push_back(
-      std::make_pair(full.substr(submoduleNameLength + 1).str(),
-      isModuleImported(sub)));
+    names.push_back(full.substr(submoduleNameLength + 1).str());
   }
 }
 

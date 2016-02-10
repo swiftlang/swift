@@ -2258,7 +2258,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     KindLoc = consumeToken();
   }
 
-  SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath;
+  std::vector<std::pair<Identifier, SourceLoc>> ImportPath;
   do {
     if (Tok.is(tok::code_complete)) {
       consumeToken();
