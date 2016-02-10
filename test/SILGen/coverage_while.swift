@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_while %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_while %s | FileCheck %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_while.foo
 func foo() -> Int32 {
@@ -8,14 +8,16 @@ func foo() -> Int32 {
     x += 1
   }
 
-  // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : (0 + 2)
-  while (--x > 0) {
+  // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:22 : (0 + 2)
+  while ((x - 1) > 0) {
+    x -= 1
     if (x % 2 == 0) { continue }
   }
 
   // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 4) - 5)
   while (x < 100) {
-    if (x++ == 10) { break }
+    x += 1
+    if (x == 10) { break }
   }
 
   // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 6) - 9)
@@ -43,12 +45,12 @@ func foo() -> Int32 {
 
   var y : Int32? = 2
   // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:15 : ((0 + 13) - 12)
-  while x > 30, let z = y {
+  while x > 30, let _ = y {
     y = nil
   }
 
   // TODO: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 14) - 12)
-  while let z = y {
+  while let _ = y {
   }
   // CHECK: [[@LINE-1]]:4 -> [[@LINE+1]]:11 : (0 - 12)
   return x
