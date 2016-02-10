@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A value type whose instances are either `true` or `false`.
+@_fixed_layout
 public struct Bool {
   internal var _value: Builtin.Int1
 

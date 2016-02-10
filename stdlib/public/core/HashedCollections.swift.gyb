@@ -280,6 +280,7 @@ internal struct _UnmanagedAnyObjectArray {
 ///
 /// The order of elements in a set is stable between mutations but
 /// otherwise unpredictable.
+@_fixed_layout
 public struct Set<Element : Hashable> :
   SetAlgebra, Hashable, Collection, ArrayLiteralConvertible {
 
@@ -956,6 +957,7 @@ public func _setBridgeFromObjectiveCConditional<
 ///
 /// The order of elements in a dictionary is stable between mutations
 /// but otherwise unpredictable.
+@_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
   Collection, DictionaryLiteralConvertible {
 
@@ -1870,6 +1872,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 }
 
+@_fixed_layout
 public // @testable
 struct _Native${Self}Storage<${TypeParametersDecl}> :
   _HashStorage, CustomStringConvertible {

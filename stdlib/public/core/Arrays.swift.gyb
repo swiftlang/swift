@@ -169,6 +169,9 @@ if True:
 }%
 
 ${SelfDocComment}
+% if Self != 'ArraySlice':
+@_fixed_layout
+%end
 public struct ${Self}<Element>
   : Collection, MutableCollection, _DestructorSafeContainer {
 

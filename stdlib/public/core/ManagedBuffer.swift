@@ -164,6 +164,7 @@ public class ManagedBuffer<Value, Element>
 ///        }
 ///      }
 ///
+@_fixed_layout
 public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Create with new storage containing an initial `Value` and space

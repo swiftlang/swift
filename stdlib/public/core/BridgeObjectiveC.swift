@@ -101,6 +101,7 @@ public protocol _ObjectiveCBridgeable {
 /// a metatype, make it conform to _ObjectiveCBridgeable, and its witness table
 /// will be ABI-compatible with one that directly provided conformance to the
 /// metatype type itself.
+@_fixed_layout
 public struct _BridgeableMetatype: _ObjectiveCBridgeable {
   internal var value: AnyObject.Type
 
@@ -358,6 +359,7 @@ internal var _nilNativeObject: AnyObject? {
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
+@_fixed_layout
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   : Equatable, NilLiteralConvertible, _Pointer {
 
@@ -462,6 +464,7 @@ public func == <Pointee> (
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
+@_fixed_layout
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
   internal var _item0: Builtin.RawPointer
