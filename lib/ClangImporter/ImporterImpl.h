@@ -26,6 +26,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/StringExtras.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -498,24 +499,55 @@ private:
     SwiftContext.bumpGeneration();
   }
 
-  /// \brief Cache enum infos
-  llvm::DenseMap<const clang::EnumDecl *, importer::EnumInfo> enumInfos;
+  /// \brief Cache enum infos, referenced with a dotted Clang name
+  /// "ModuleName.EnumName".
+  llvm::StringMap<importer::EnumInfo> enumInfos;
 
 public:
   /// \brief Keep track of subscript declarations based on getter/setter
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
 
+  /// Retrieve the key to use when looking for enum information.
+  StringRef getEnumInfoKey(const clang::EnumDecl *decl,
+                           SmallVectorImpl<char> &scratch) {
+    StringRef moduleName;
+    if (auto moduleOpt = getClangSubmoduleForDecl(decl)) {
+      if (*moduleOpt)
+        moduleName = (*moduleOpt)->getTopLevelModuleName();
+    }
+
+    StringRef enumName =
+      decl->getDeclName() ? decl->getName()
+                          : decl->getTypedefNameForAnonDecl()->getName();
+
+    if (moduleName.empty()) return enumName;
+
+    scratch.append(moduleName.begin(), moduleName.end());
+    scratch.push_back('.');
+    scratch.append(enumName.begin(), enumName.end());
+    return StringRef(scratch.data(), scratch.size());
+  }
+
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl,
                                  clang::Preprocessor *ppOverride = nullptr) {
-    if (enumInfos.count(decl))
-      return enumInfos[decl];
     // Due to the semaOverride present in importFullName(), we might be using a
     // decl from a different context.
     auto &preprocessor = ppOverride ? *ppOverride : getClangPreprocessor();
 
+    // If there is no name for linkage, the computation is trivial and we
+    // wouldn't be able to perfom name-based caching anyway.
+    if (!decl->hasNameForLinkage())
+      return importer::EnumInfo(decl, preprocessor);
+
+    SmallString<32> keyScratch;
+    auto key = getEnumInfoKey(decl, keyScratch);
+    auto known = enumInfos.find(key);
+    if (known != enumInfos.end())
+      return known->second;
+
     importer::EnumInfo enumInfo(decl, preprocessor);
-    enumInfos[decl] = enumInfo;
+    enumInfos[key] = enumInfo;
     return enumInfo;
   }
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl,
