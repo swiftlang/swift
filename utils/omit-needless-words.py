@@ -10,6 +10,7 @@ import argparse
 import os
 import re
 import subprocess
+import multiprocessing
 
 DEFAULT_TARGET_BASED_ON_SDK = {
     'macosx'              : 'x86_64-apple-macosx10.11',
@@ -50,6 +51,7 @@ def create_parser():
         prog='omit-needless-words.py',
         usage='python omit-needless-words.py -m AppKit')
     parser.add_argument('-m', '--module', help='The module name.')
+    parser.add_argument('-j', '--jobs', type=int, help='The number of parallel jobs to execute')
     parser.add_argument('-s', '--sdk', nargs='+', required=True, help="The SDKs to use.")
     parser.add_argument('-t', '--target', help="The target triple to use.")
     parser.add_argument('-i', '--swift-ide-test', default='swift-ide-test', help="The swift-ide-test executable.")
@@ -88,7 +90,7 @@ def collect_submodules(common_args, module):
     return sorted(list(submodules))
 
 # Dump the API for the given module.
-def dump_module_api(cmd, extra_dump_args, output_dir, module, quiet):
+def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet)):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
 
@@ -150,7 +152,7 @@ def collect_frameworks(sdk):
 
     return (sorted(list(frameworks)), sdk_path)
 
-def dump_sdk_api(cmd_common, cmd_extra_args, sdk, module, target, source_filename, output_dir, quiet):
+def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target, source_filename, output_dir, quiet):
 
     # Determine the SDK root and collect the set of frameworks.
     (frameworks, sdk_root) = collect_frameworks(sdk)
@@ -165,15 +167,16 @@ def dump_sdk_api(cmd_common, cmd_extra_args, sdk, module, target, source_filenam
     pretty_sdk = pretty_sdk_name(sdk)
     sdk_output_dir = '%s/%s' % (output_dir, pretty_sdk)
 
-    # Dump the APIs
+    # Create the sets of arguments to dump_module_api.
+    results = []
     cmd = cmd_common + ['-sdk', sdk_root, '-target', sdk_target]
     if module:
-        dump_module_api(cmd, cmd_extra_args, sdk_output_dir, module, quiet)
+        results.append((cmd, cmd_extra_args, sdk_output_dir, module, quiet))
     else:
         for framework in frameworks:
-            dump_module_api(cmd, cmd_extra_args, sdk_output_dir, framework, quiet)
+            results.append((cmd, cmd_extra_args, sdk_output_dir, framework, quiet))
 
-    return
+    return results
 
 def main():
     source_filename = 'omit-needless-words.swift'
@@ -190,9 +193,14 @@ def main():
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])
 
-    # Dump the requested APIs.
+    # Construct the set of API dumps we should perform.
+    jobs = []
     for sdk in args.sdk:
-        dump_sdk_api(cmd_common, extra_args, sdk, args.module, args.target, source_filename, args.output_dir, args.quiet)
+        jobs = jobs + create_dump_module_api_args(cmd_common, extra_args, sdk, args.module, args.target, source_filename, args.output_dir, args.quiet)
+
+    # Execute the API dumps
+    pool = multiprocessing.Pool(processes=args.jobs)
+    pool.map(dump_module_api, jobs)
     
     # Remove the .swift file we fed into swift-ide-test
     subprocess.call(['rm', '-f', source_filename])
