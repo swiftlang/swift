@@ -658,12 +658,6 @@ if [[ "${SKIP_TEST_WATCHOS}" ]] ; then
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
-if [[ "${CMAKE_GENERATOR}" == "Ninja" && \
-      -z "$(which ninja 2>/dev/null)" &&
-      -z "$(which ninja-build 2>/dev/null)" ]] ; then
-    BUILD_NINJA=1
-fi
-
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
 case "${WORKSPACE}" in
     /*) ;;

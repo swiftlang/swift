@@ -37,6 +37,7 @@ from SwiftBuildSupport import (
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 import swift_build_support.clang
 import swift_build_support.cmake
+import swift_build_support.ninja
 import swift_build_support.targets
 from swift_build_support.migration import migrate_impl_args
 
@@ -826,6 +827,9 @@ the number of parallel build jobs to use""",
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant
         ]
+    if args.cmake_generator == 'Ninja' and \
+       not swift_build_support.ninja.is_ninja_installed():
+        build_script_impl_args += ["--build-ninja"]
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add
