@@ -2987,7 +2987,8 @@ case TypeKind::Id:
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
     auto objectTy = lvalue->getObjectType().transform(fn);
-    if (!objectTy) return Type();
+    if (!objectTy || objectTy->is<ErrorType>())
+      return objectTy;
 
     return objectTy.getPointer() == lvalue->getObjectType().getPointer() ?
       *this : LValueType::get(objectTy);
@@ -2996,7 +2997,8 @@ case TypeKind::Id:
   case TypeKind::InOut: {
     auto inout = cast<InOutType>(base);
     auto objectTy = inout->getObjectType().transform(fn);
-    if (!objectTy) return Type();
+    if (!objectTy || objectTy->is<ErrorType>())
+      return objectTy;
     
     return objectTy.getPointer() == inout->getObjectType().getPointer() ?
       *this : InOutType::get(objectTy);
