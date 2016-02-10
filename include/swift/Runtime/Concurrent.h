@@ -128,6 +128,24 @@ template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
     delete Right.load(std::memory_order_acquire);
   }
 
+#ifndef NDEBUG
+  void dump() {
+    auto L = Left.load(std::memory_order_acquire);
+    auto R = Right.load(std::memory_order_acquire);
+    printf("\"%p\" [ label = \" {<f0> %08lx | {<f1> | <f2>}}\""
+           "style=\"rounded\" shape = \"record\"];\n", this, Key);
+
+    if (L) {
+      L->dump();
+      printf("\"%p\":f1 -> \"%p\":f0;\n", this, L);
+    }
+    if (R) {
+      R->dump();
+      printf("\"%p\":f2 -> \"%p\":f0;\n", this, R);
+    }
+  }
+#endif
+
   ConcurrentMapNode(const ConcurrentMapNode &) = delete;
   ConcurrentMapNode &operator=(const ConcurrentMapNode &) = delete;
 
@@ -160,6 +178,20 @@ public:
   /// search procedure. We cache the last search to accelerate code that
   /// searches the same value in a loop.
   std::atomic<NodeTy *> LastSearch;
+
+#ifndef NDEBUG
+  void dump() {
+    auto R = Root.load(std::memory_order_acquire);
+    printf("digraph g {\n"
+           "graph [ rankdir = \"TB\"];\n"
+           "node  [ fontsize = \"16\" ];\n"
+           "edge  [ ];\n");
+    if (R) {
+      R->dump();
+    }
+    printf("\n}\n");
+  }
+#endif
 
   /// Search for a value by key \p Key.
   /// \returns a pointer to the value or null if the value is not in the map.
