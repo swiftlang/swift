@@ -2608,9 +2608,9 @@ void ClangImporter::Implementation::mergePropInfoIntoAccessor(
   }
 }
 
-static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>> lookupObjCContext(api_notes::APINotesReader *reader,
-                    StringRef contextName,
-                    const clang::ObjCContainerDecl *contextDecl) {
+static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
+lookupObjCContext(api_notes::APINotesReader *reader, StringRef contextName,
+                  const clang::ObjCContainerDecl *contextDecl) {
   Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
     contextInfo;
 
