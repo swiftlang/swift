@@ -17,7 +17,7 @@
 // For comparison, we always create four arrays of 10,000 words.
 
 protocol Constructible {
-  typealias Element
+  associatedtype Element
   init(e:Element)
 }
 class ConstructibleArray<T:Constructible> {
