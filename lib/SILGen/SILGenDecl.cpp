@@ -1599,14 +1599,16 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       sig = GenericSignature::get(allParams, allReqts);
     }
 
-    witnessSubstIfaceTy = cast<GenericFunctionType>(
-      GenericFunctionType::get(sig,
-                               witnessSubstIfaceTy.getInput(),
-                               witnessSubstIfaceTy.getResult(),
-                               witnessSubstIfaceTy->getExtInfo())
-        ->getCanonicalType());
+  } else {
+    sig = reqtIfaceTy->getGenericSignature();
   }
 
+  witnessSubstIfaceTy = cast<GenericFunctionType>(
+    GenericFunctionType::get(sig,
+                             witnessSubstIfaceTy.getInput(),
+                             witnessSubstIfaceTy.getResult(),
+                             witnessSubstIfaceTy->getExtInfo())
+      ->getCanonicalType());
   // Lower the witness type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(M,
                                                    AbstractionPattern(reqtIfaceTy),
@@ -1645,7 +1647,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     witnessContextParams
       = reqtParams->cloneWithOuterParameters(getASTContext(),
                                              witnessContextParams);
-  }
+  } else if (!witnessContextParams)
+    witnessContextParams = requirementInfo.ContextGenericParams;
 
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
