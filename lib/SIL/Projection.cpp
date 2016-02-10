@@ -37,7 +37,11 @@ static_assert(std::is_standard_layout<Projection>::value,
 //                              Utility 
 //===----------------------------------------------------------------------===//
 
-/// We do not support symbolic projections yet, only 32-bit unsigned integers.
+/// Extract an integer index from a SILValue.
+///
+/// Return true if IndexVal is a constant index representable as unsigned
+/// int. We do not support symbolic projections yet, only 32-bit unsigned
+/// integers.
 bool swift::getIntegerIndex(SILValue IndexVal, unsigned &IndexConst) {
   if (auto *IndexLiteral = dyn_cast<IntegerLiteralInst>(IndexVal)) {
     APInt ConstInt = IndexLiteral->getValue();
@@ -187,7 +191,7 @@ Projection::Projection(SILInstruction *I) : Value() {
 
 NullablePtr<SILInstruction>
 Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
-                                      SILValue Base) const {
+                                   SILValue Base) const {
   SILType BaseTy = Base->getType();
 
   // We can only create a value projection from an object.
@@ -221,7 +225,7 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
 
 NullablePtr<SILInstruction>
 Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
-                                       SILValue Base) const {
+                                    SILValue Base) const {
   SILType BaseTy = Base->getType();
 
   // We can only create an address projection from an object, unless we have a
@@ -259,8 +263,8 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   }
 }
 
-void Projection::getFirstLevelProjections(
-    SILType Ty, SILModule &Mod, llvm::SmallVectorImpl<Projection> &Out) {
+void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
+                                  llvm::SmallVectorImpl<Projection> &Out) {
   if (auto *S = Ty.getStructOrBoundGenericStruct()) {
     unsigned Count = 0;
     for (auto *VDecl : S->getStoredProperties()) {
@@ -319,11 +323,11 @@ void Projection::getFirstLevelProjections(
 }
 
 //===----------------------------------------------------------------------===//
-//                            New Projection Path
+//                            Projection Path
 //===----------------------------------------------------------------------===//
 
 Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
-                                                                 SILValue End) {
+                                                           SILValue End) {
   ProjectionPath P(Start->getType(), End->getType());
 
   // If Start == End, there is a "trivial" projection path in between the
@@ -364,8 +368,8 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
 ///
 /// This means that the two objects have the same base but access different
 /// fields of the base object.
-bool ProjectionPath::hasNonEmptySymmetricDifference(
-    const ProjectionPath &RHS) const {
+bool 
+ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
   // First make sure that both of our base types are the same.
   if (BaseType != RHS.BaseType)
     return false;
@@ -489,63 +493,9 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
   return SubSeqRelation_t::RHSStrictSubSeqOfLHS;
 }
 
-bool ProjectionPath::findMatchingObjectProjectionPaths(
-    SILInstruction *I, SmallVectorImpl<SILInstruction *> &T) const {
-  // We only support unary instructions.
-  if (I->getNumOperands() != 1)
-    return false;
-
-  // Check that the base result type of I is equivalent to this types base path.
-  if (I->getOperand(0)->getType().copyCategory(BaseType) != BaseType)
-    return false;
-
-  // We maintain the head of our worklist so we can use our worklist as a queue
-  // and work in breadth first order. This makes sense since we want to process
-  // in levels so we can maintain one tail list and delete the tail list when we
-  // move to the next level.
-  unsigned WorkListHead = 0;
-  llvm::SmallVector<SILInstruction *, 8> WorkList;
-  WorkList.push_back(I);
-
-  // Start at the root of the list.
-  for (auto PI = rbegin(), PE = rend(); PI != PE; ++PI) {
-    // When we start a new level, clear the tail list.
-    T.clear();
-
-    // If we have an empty worklist, return false. We have been unable to
-    // complete the list.
-    unsigned WorkListSize = WorkList.size();
-    if (WorkListHead == WorkListSize)
-      return false;
-
-    // Otherwise, process each instruction in the worklist.
-    for (; WorkListHead != WorkListSize; WorkListHead++) {
-      SILInstruction *Ext = WorkList[WorkListHead];
-
-      // If the current projection does not match I, continue and process the
-      // next instruction.
-      if (!PI->matchesObjectProjection(Ext)) {
-        continue;
-      }
-
-      // Otherwise, we know that Ext matched this projection path and we should
-      // visit all of its uses and add Ext itself to our tail list.
-      T.push_back(Ext);
-      for (auto *Op : Ext->getUses()) {
-        WorkList.push_back(Op->getUser());
-      }
-    }
-
-    // Reset the worklist size.
-    WorkListSize = WorkList.size();
-  }
-
-  return true;
-}
-
 Optional<ProjectionPath>
 ProjectionPath::removePrefix(const ProjectionPath &Path,
-                                const ProjectionPath &Prefix) {
+                             const ProjectionPath &Prefix) {
   // We can only subtract paths that have the same base.
   if (Path.BaseType != Prefix.BaseType)
     return llvm::NoneType::None;
@@ -573,19 +523,6 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   }
 
   return P;
-}
-
-SILValue ProjectionPath::createObjectProjections(SILBuilder &B,
-                                                    SILLocation Loc,
-                                                    SILValue Base) {
-  assert(BaseType.isAddress());
-  assert(Base->getType().isObject());
-  assert(Base->getType().getAddressType() == BaseType);
-  SILValue Val = Base;
-  for (auto iter : Path) {
-    Val = iter.createObjectProjection(B, Loc, Val).get();
-  }
-  return Val;
 }
 
 raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
@@ -685,7 +622,7 @@ void ProjectionPath::verify(SILModule &M) {
 
 void
 ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
-                                                     ProjectionPathList &Paths) {
+                                                  ProjectionPathList &Paths) {
   // Perform a BFS to expand the given type into projectionpath each of
   // which contains 1 field from the type.
   llvm::SmallVector<ProjectionPath, 8> Worklist;
@@ -751,7 +688,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
 
 void
 ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
-                                                     ProjectionPathList &Paths) {
+                                                  ProjectionPathList &Paths) {
   // Perform a BFS to expand the given type into projectionpath each of
   // which contains 1 field from the type.
   llvm::SmallVector<ProjectionPath, 8> Worklist;
@@ -905,7 +842,6 @@ ProjectionTreeNode::getChildForProjection(ProjectionTree &Tree,
       return N;
     }
   }
-
   return nullptr;
 }
 
@@ -932,10 +868,8 @@ createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
   return Proj->createProjection(B, Loc, Arg);
 }
 
-
 void
-ProjectionTreeNode::
-processUsersOfValue(ProjectionTree &Tree,
+ProjectionTreeNode::processUsersOfValue(ProjectionTree &Tree,
                     llvm::SmallVectorImpl<ValueNodePair> &Worklist,
                     SILValue Value) {
   DEBUG(llvm::dbgs() << "    Looking at Users:\n");
@@ -1232,14 +1166,14 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
                                                      Node->getType(),
                                                      ChildValues);
 
-  assert(AI.get() && "Failed to get a part of the debug value");
+  assert(AI.get() && "Failed to get a part of value");
   return SILValue(AI.get());
 }
 
 SILValue
-ProjectionTree::computeExplodedArgumentValue(SILBuilder &Builder, 
-                                             SILLocation Loc,
-                                             llvm::SmallVector<SILValue, 8> &LeafValues) {
+ProjectionTree::computeExplodedArgumentValue(
+                            SILBuilder &Builder,  SILLocation Loc,
+                            llvm::SmallVector<SILValue, 8> &LeafValues) {
   // Construct the leaf index to leaf value map.
   llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;
   for (unsigned i = 0; i < LeafValues.size(); ++i) {
@@ -1388,7 +1322,8 @@ getNextValidNode(llvm::SmallVectorImpl<ProjectionTreeNode *> &Worklist,
 
   ProjectionTreeNode *Node = Worklist.back();
 
-  // If the Node is not complete, then we have reached a dead lock. This should never happen.
+  // If the Node is not complete, then we have reached a dead lock. This should
+  // never happen.
   //
   // TODO: Prove this and put the proof here.
   if (CheckForDeadLock && !isComplete(Node)) {

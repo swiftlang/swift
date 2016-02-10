@@ -103,7 +103,7 @@ constexpr unsigned MaxPointerProjectionKind = ((1 << TypeAlignInBits) - 1);
 /// Make sure that our tagged pointer assumptions are true. See comment above
 /// the declaration of ProjectionKind.
 static_assert(unsigned(ProjectionKind::LastPointerKind) <=
-                  unsigned(MaxPointerProjectionKind),
+              unsigned(MaxPointerProjectionKind),
               "Too many projection kinds to fit in Projection");
 
 static inline bool isCastProjectionKind(ProjectionKind Kind) {
@@ -130,7 +130,7 @@ struct ProjectionIndex {
   SILValue Aggregate;
   unsigned Index;
 
-  explicit ProjectionIndex(SILValue V) :Index(~0U) {
+  explicit ProjectionIndex(SILValue V) : Index(~0U) {
     switch (V->getKind()) {
     default:
       break;
@@ -281,7 +281,7 @@ public:
       return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
     case ProjectionKind::Box:
       return SILType::getPrimitiveAddressType(BaseType.castTo<SILBoxType>()->
-                                                getBoxedType());
+                                              getBoxedType());
     case ProjectionKind::Tuple:
       return BaseType.getTupleElementType(getIndex());
     case ProjectionKind::Upcast:
@@ -313,24 +313,6 @@ public:
     auto Iter = BaseType.getEnumOrBoundGenericEnum()->getAllElements().begin();
     std::advance(Iter, getIndex());
     return *Iter;
-  }
-
-  ValueDecl *getValueDecl(SILType BaseType) const {
-    assert(isValid());
-    switch (getKind()) {
-    case ProjectionKind::Enum:
-      return getEnumElementDecl(BaseType);
-    case ProjectionKind::Struct:
-    case ProjectionKind::Class:
-      return getVarDecl(BaseType);
-    case ProjectionKind::Upcast:
-    case ProjectionKind::RefCast:
-    case ProjectionKind::BitwiseCast:
-    case ProjectionKind::Index:
-    case ProjectionKind::Tuple:
-    case ProjectionKind::Box:
-      llvm_unreachable("ProjectionKind that does not have a value decl?");
-    }
   }
 
   SILType getCastType(SILType BaseType) const {
@@ -483,6 +465,7 @@ public:
 private:
   SILType BaseType;
   SILType MostDerivedType;
+  /// A path from base to most-derived.
   PathTy Path;
 
 public:
@@ -555,7 +538,7 @@ public:
   /// types via ref_element_addr. If Start is an address type though, End will
   /// always also be an address type.
   static Optional<ProjectionPath> getProjectionPath(SILValue Start,
-                                                       SILValue End);
+                                                    SILValue End);
 
   /// Treating a projection path as an ordered set, if RHS is a prefix of LHS,
   /// return the projection path with that prefix removed.
@@ -594,27 +577,6 @@ public:
   /// user whether or not the two sequences are unrelated, equal, or if one is a
   /// subsequence of the other.
   SubSeqRelation_t computeSubSeqRelation(const ProjectionPath &RHS) const;
-
-  /// Returns true if this is a projection path that takes an address base type
-  /// to an address derived type.
-  bool isAddressProjectionPath() const;
-
-  /// Returns true if this is a projection path that takes an object base type
-  /// to an object derived type.
-  bool isObjectProjectionPath() const;
-
-  /// Find all object projection paths from I that matches this projection
-  /// path. Return the tails of each extract path in T.
-  bool
-  findMatchingObjectProjectionPaths(SILInstruction *I,
-                                    SmallVectorImpl<SILInstruction *> &T) const;
-
-  /// If this is an address projection path and \p Base is a SILValue with the
-  /// object version of said type, use \p B and \p Loc to recreate the stored
-  /// address projection path as an object projection path from \p Base. Return
-  /// the SILValue at the end of the path.
-  SILValue createObjectProjections(SILBuilder &B, SILLocation Loc,
-                                   SILValue Base);
 
   /// Pushes an element to the path.
   void push_back(const Projection &Proj) { Path.push_back(Proj); }
@@ -713,13 +675,8 @@ class ProjectionTreeNode {
   /// invalidating our pointers.
   unsigned Index;
 
-  /// The base type from which this projection tree node is derived via Proj. It
-  /// is necessary to maintain a separate such entry from BaseValues since we
-  /// may have projection tree nodes without any BaseValues since we completely
-  /// explode non-enum scalar values to the leafs of our tree.
-  ///
-  /// In the root of the tree, this is the actual type.
-  SILType BaseType;
+  /// The type this projection tree node represents.
+  SILType NodeType;
 
   /// The projection that this node represents. None in the root.
   llvm::Optional<Projection> Proj;
@@ -755,14 +712,14 @@ class ProjectionTreeNode {
   };
 
   /// Constructor for the root of the tree.
-  ProjectionTreeNode(SILType BaseTy)
-    : Index(0), BaseType(BaseTy), Proj(), Parent(),
+  ProjectionTreeNode(SILType NodeTy)
+    : Index(0), NodeType(NodeTy), Proj(), Parent(),
       NonProjUsers(), ChildProjections(), Initialized(false), IsLive(false) {}
 
   // Normal constructor for non-root nodes.
-  ProjectionTreeNode(ProjectionTreeNode *Parent, unsigned Index, SILType BaseTy,
+  ProjectionTreeNode(ProjectionTreeNode *Parent, unsigned Index, SILType NodeTy,
                      Projection P)
-    : Index(Index), BaseType(BaseTy), Proj(P),
+    : Index(Index), NodeType(NodeTy), Proj(P),
       Parent(Parent->getIndex()), NonProjUsers(), ChildProjections(),
       Initialized(false), IsLive(false) {}
 
@@ -776,9 +733,9 @@ public:
      return llvm::makeArrayRef(ChildProjections);
   }
 
-  llvm::Optional<Projection> &getProjection() {
-    return Proj;
-  }
+  llvm::Optional<Projection> &getProjection() { return Proj; }
+
+  SILType getType() const { return NodeType; }
 
   bool isRoot() const {
     // Root does not have a parent. So if we have a parent, we cannot be root.
@@ -792,10 +749,6 @@ public:
       assert(Index == RootIndex && "Index must be root index");
       return true;
     }
-  }
-
-  SILType getType() const {
-    return BaseType;
   }
 
   ProjectionTreeNode *getChildForProjection(ProjectionTree &Tree,
@@ -818,9 +771,6 @@ public:
       return nullptr;
     return getParent(Tree);
   }
-
-
-  llvm::Optional<Projection> getProjection() const { return Proj; }
 
 private:
   void addNonProjectionUser(Operand *Op) {
