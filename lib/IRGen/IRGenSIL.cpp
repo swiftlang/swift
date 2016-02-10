@@ -2259,7 +2259,7 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
 
 static llvm::Constant *getAddrOfString(IRGenModule &IGM, StringRef string,
                                        StringLiteralInst::Encoding encoding) {
-  bool addNull = string.back() != '\0';
+  bool addNull = !string.empty() && string.back() != '\0';
   switch (encoding) {
   case swift::StringLiteralInst::Encoding::UTF8:
     return IGM.getAddrOfGlobalString(string,
