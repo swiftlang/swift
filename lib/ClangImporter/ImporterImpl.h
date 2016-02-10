@@ -498,9 +498,6 @@ private:
     SwiftContext.bumpGeneration();
   }
 
-  /// \brief Cache of the class extensions.
-  llvm::DenseMap<ClassDecl *, CachedExtensions> ClassExtensions;
-
   /// \brief Cache enum infos
   llvm::DenseMap<const clang::EnumDecl *, importer::EnumInfo> enumInfos;
 
