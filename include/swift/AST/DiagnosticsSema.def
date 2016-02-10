@@ -1280,15 +1280,14 @@ ERROR(recursive_requirement_reference,none,
       "type may not reference itself as a requirement",())
 ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
+ERROR(recursive_superclass_constraint,none,
+      "superclass constraint %0 is recursive", (Type))
 ERROR(requires_same_type_conflict,none,
       "generic parameter %0 cannot be equal to both %1 and %2",
       (Identifier, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
-ERROR(dependent_superclass_constraint,none,
-      "superclass constraint %0 cannot depend on a type parameter",
-      (Type))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{private|internal|PUBLIC}3"

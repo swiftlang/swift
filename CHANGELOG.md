@@ -5,6 +5,12 @@ Swift 3
 * Curried function syntax has been removed, and now produces a compile-time
   error.
 
+* Generic signatures can now contain superclass requirements with generic
+  parameter types, for example:
+
+  ```
+  func f<Food : Chunks<Meat>, Meat : Molerat>(f: Food, m: Meat) {}
+  ```
 
 Swift 2.2
 ---------
