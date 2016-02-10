@@ -1602,6 +1602,12 @@ public:
     }
   }
 
+  bool isModuleLoaded(ASTContext &Ctx, clang::Module *M) {
+    return Ctx.getLoadedModule(llvm::makeArrayRef(
+      std::make_pair(Ctx.getIdentifier(M->getTopLevelModuleName()),
+                     SourceLoc())));
+  }
+
   void addImportModuleNames() {
     // FIXME: Add user-defined swift modules
     SmallVector<clang::Module*, 20> Modules;
@@ -1628,7 +1634,8 @@ public:
         Builder.addTypeAnnotation("Module");
 
         // Imported modules are not recommended.
-        Builder.setNotRecommended(ClangImporter::isModuleImported(M));
+        Builder.setNotRecommended(isModuleLoaded(CurrDeclContext->
+          getASTContext(), M));
       }
     }
   }
