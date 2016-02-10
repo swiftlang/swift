@@ -1,4 +1,4 @@
-//===------------- LLVMInlineTree.cpp - Prints the inline tree ------------===//
+//===--- LLVMInlineTree.cpp - Prints the inline tree ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
