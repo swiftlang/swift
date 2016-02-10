@@ -117,26 +117,30 @@ def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet)):
     return
 
 def pretty_sdk_name(sdk):
-    if sdk.find("macosx") == 0: return 'OSX'
-    if sdk.find("iphoneos") == 0: return 'iOS'
-    if sdk.find("watchos") == 0: return 'watchOS'
-    if sdk.find("appletvos") == 0: return 'tvOS'
+    if sdk.find("macosx") == 0:
+        return 'OSX'
+    if sdk.find("iphoneos") == 0:
+        return 'iOS'
+    if sdk.find("watchos") == 0:
+        return 'watchOS'
+    if sdk.find("appletvos") == 0:
+        return 'tvOS'
     return 'unknownOS'
 
-# Collect the set of frameworks we should dump 
+# Collect the set of frameworks we should dump
 def collect_frameworks(sdk):
     (exitcode, sdk_path, err) = run_command(["xcrun", "--show-sdk-path", "-sdk", sdk])
     if exitcode != 0:
         print('error: framework collection failed with error %d' % (exitcode))
         return ()
     sdk_path = sdk_path.rstrip()
-    
+
     (exitcode, sdk_version, err) = run_command(["xcrun", "--show-sdk-version", "-sdk", sdk])
     if exitcode != 0:
         print('error: framework collection failed with error %d' % (exitcode))
         return ()
     sdk_version = sdk_version.rstrip()
-    
+
     print('Collecting frameworks from %s %s at %s' % (pretty_sdk_name(sdk), sdk_version, sdk_path))
 
     # Collect all of the framework names
@@ -147,7 +151,7 @@ def collect_frameworks(sdk):
         match = framework_matcher.match(entry)
         if match:
             framework = match.group(1)
-            if not framework in SKIPPED_FRAMEWORKS:
+            if framework not in SKIPPED_FRAMEWORKS:
                 frameworks.add(framework)
 
     return (sorted(list(frameworks)), sdk_path)
@@ -201,7 +205,7 @@ def main():
     # Execute the API dumps
     pool = multiprocessing.Pool(processes=args.jobs)
     pool.map(dump_module_api, jobs)
-    
+
     # Remove the .swift file we fed into swift-ide-test
     subprocess.call(['rm', '-f', source_filename])
 
