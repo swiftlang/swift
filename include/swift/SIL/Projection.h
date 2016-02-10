@@ -721,12 +721,6 @@ class ProjectionTreeNode {
   /// In the root of the tree, this is the actual type.
   SILType BaseType;
 
-  /// The derived type.
-  SILType DerivedType;
-
-  /// The base values we are tracking for which there is a Proj projection from.
-  llvm::SmallVector<SILValue, 4> BaseValues;
-
   /// The projection that this node represents. None in the root.
   llvm::Optional<Projection> Proj;
 
@@ -762,13 +756,13 @@ class ProjectionTreeNode {
 
   /// Constructor for the root of the tree.
   ProjectionTreeNode(SILType BaseTy)
-    : Index(0), BaseType(BaseTy), BaseValues(), Proj(), Parent(),
+    : Index(0), BaseType(BaseTy), Proj(), Parent(),
       NonProjUsers(), ChildProjections(), Initialized(false), IsLive(false) {}
 
   // Normal constructor for non-root nodes.
   ProjectionTreeNode(ProjectionTreeNode *Parent, unsigned Index, SILType BaseTy,
                      Projection P)
-    : Index(Index), BaseType(BaseTy), BaseValues(), Proj(P),
+    : Index(Index), BaseType(BaseTy), Proj(P),
       Parent(Parent->getIndex()), NonProjUsers(), ChildProjections(),
       Initialized(false), IsLive(false) {}
 
