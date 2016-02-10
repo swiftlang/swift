@@ -101,7 +101,6 @@ KNOWN_SETTINGS=(
     skip-ios                    ""               "set to skip everything iOS-related"
     skip-tvos                   ""               "set to skip everything tvOS-related"
     skip-watchos                ""               "set to skip everything watchOS-related"
-    skip-build                  ""               "set to skip building anything"
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
@@ -538,29 +537,6 @@ while [[ "$1" ]] ; do
     esac
     shift
 done
-
-if [[ "${SKIP_BUILD}" ]]; then
-    SKIP_BUILD_CMARK=1
-    SKIP_BUILD_LLVM=1
-    SKIP_BUILD_SWIFT=1
-    SKIP_BUILD_OSX=1
-    SKIP_BUILD_IOS=1
-    SKIP_BUILD_IOS_DEVICE=1
-    SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_BUILD_TVOS=1
-    SKIP_BUILD_TVOS_DEVICE=1
-    SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_BUILD_WATCHOS=1
-    SKIP_BUILD_WATCHOS_DEVICE=1
-    SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_BUILD_LLDB=1
-    SKIP_BUILD_LLBUILD=1
-    SKIP_BUILD_SWIFTPM=1
-    SKIP_BUILD_XCTEST=1
-    SKIP_BUILD_FOUNDATION=1
-    SKIP_BUILD_LIBDISPATCH=1
-    SKIP_BUILD_BENCHMARKS=1
-fi
 
 if [[ "${SKIP_IOS}" ]] ; then
     SKIP_BUILD_IOS=1

@@ -560,6 +560,7 @@ the number of parallel build jobs to use""",
         '--darwin-xcrun-toolchain',
         '--cmake',
         '--host-target',
+        '--skip-build',
     ]))
 
     if args.host_target is None:
@@ -727,7 +728,26 @@ the number of parallel build jobs to use""",
 
     if args.skip_build:
         build_script_impl_inferred_args += [
-            "--skip-build"
+            "--skip-build-cmark",
+            "--skip-build-llvm",
+            "--skip-build-swift",
+            "--skip-build-osx",
+            "--skip-build-ios",
+            "--skip-build-ios-device",
+            "--skip-build-ios-simulator",
+            "--skip-build-tvos",
+            "--skip-build-tvos_device",
+            "--skip-build-tvos-simulator",
+            "--skip-build-watchos",
+            "--skip-build-watchos-device",
+            "--skip-build-watchos-simulator",
+            "--skip-build-lldb",
+            "--skip-build-llbuild",
+            "--skip-build-swiftpm",
+            "--skip-build-xctest",
+            "--skip-build-foundation",
+            "--skip-build-libdispatch",
+            "--skip-build-benchmarks",
         ]
 
     if args.build_subdir is None:
