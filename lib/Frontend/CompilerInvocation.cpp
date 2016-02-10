@@ -1175,6 +1175,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.EmbedMode = IRGenEmbedMode::EmbedBitcode;

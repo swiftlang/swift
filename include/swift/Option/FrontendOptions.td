@@ -289,6 +289,9 @@ def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
 
+def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
+  HelpText<"Print the LLVM inline tree.">;
+
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;
