@@ -326,6 +326,10 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-assert-config" "Release")
   endif()
 
+  if(SWIFT_STDLIB_ENABLE_RESILIENCE AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
+  endif()
+
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
