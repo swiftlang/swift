@@ -247,7 +247,11 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       ClassDecl *superClass = super->getClassOrBoundGenericClass();
       refcount = getReferenceCountingForClass(IGM, superClass);
 
-      auto &superTI = IGM.getTypeInfoForUnlowered(super);
+      // FIXME: Bypass type lowering here, since lowering a generic superclass
+      // requirement triggers a crash when it's dependent on generic params
+      // (rdar://problem/24590570). Nominal class types are currently
+      // unaffected by type lowering (and are likely to remain so).
+      auto &superTI = IGM.getTypeInfoForLowered(super->getCanonicalType());
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
     }
 
