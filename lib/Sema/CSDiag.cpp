@@ -3975,8 +3975,19 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       .highlight(lhsExpr->getSourceRange())
       .highlight(rhsExpr->getSourceRange());
     }
-    
-    calleeInfo.suggestPotentialOverloads(callExpr->getLoc());
+
+    if (lhsType->isEqual(rhsType) &&
+        isNameOfStandardComparisonOperator(overloadName) &&
+        lhsType->is<EnumType>() &&
+        !lhsType->getAs<EnumType>()->getDecl()
+          ->hasOnlyCasesWithoutAssociatedValues()) {
+      diagnose(callExpr->getLoc(),
+               diag::no_binary_op_overload_for_enum_with_payload,
+               overloadName);
+    } else {
+      calleeInfo.suggestPotentialOverloads(callExpr->getLoc());
+    }
+
     return true;
   }
   
