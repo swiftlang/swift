@@ -552,10 +552,26 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     Protos.push_back(conforms.first);
   }
 
+  Type superclass;
+
+  if (Superclass) {
+    if (representative->RecursiveSuperclassType) {
+      builder.Diags.diagnose(SuperclassSource->getLoc(),
+                             diag::recursive_superclass_constraint,
+                             Superclass);
+    } else {
+      representative->RecursiveSuperclassType = true;
+      assert(!Superclass->hasArchetype() &&
+             "superclass constraint must use interface types");
+      superclass = builder.substDependentType(Superclass);
+      representative->RecursiveSuperclassType = false;
+    }
+  }
+
   auto arch
     = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
                             assocTypeOrProto, getName(), Protos,
-                            Superclass, isRecursive());
+                            superclass, isRecursive());
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
   
@@ -824,6 +840,22 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
                                                 Type Superclass,
                                                 RequirementSource Source) {
+  if (Superclass->hasArchetype()) {
+    // Map contextual type to interface type.
+    // FIXME: There might be a better way to do this.
+    Superclass = Superclass.transform(
+        [&](Type t) -> Type {
+          if (t->is<ArchetypeType>()) {
+            auto *pa = resolveArchetype(t);
+            // Why does this happen?
+            if (!pa)
+              return ErrorType::get(Context);
+            return pa->getDependentType(*this, false);
+          }
+          return t;
+        });
+  }
+
   // If T already has a superclass, make sure it's related.
   if (T->Superclass) {
     if (T->Superclass->isSuperclassOf(Superclass, nullptr)) {
@@ -1184,15 +1216,6 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
     RequirementSource source(RequirementSource::Explicit,
                              Req.getConstraintLoc().getSourceRange().Start);
     if (Req.getConstraint()->getClassOrBoundGenericClass()) {
-      // We don't currently allow superclasses to refer to type parameters.
-      if (Req.getConstraint()->hasTypeParameter()) {
-        Diags.diagnose(Req.getConstraintLoc().getSourceRange().Start,
-                       diag::dependent_superclass_constraint,
-                       Req.getConstraint());
-        return true;
-      }
-      
-
       return addSuperclassRequirement(PA, Req.getConstraint(), source);
     }
 
