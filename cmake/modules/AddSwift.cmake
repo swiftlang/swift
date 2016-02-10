@@ -335,7 +335,7 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
-      list(append swift_flags "-Xfrontend" "-sil-serialize-all")
+      list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
     endif()
   endif()
 
