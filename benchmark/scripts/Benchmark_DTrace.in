@@ -40,7 +40,7 @@ class DTraceResult(perf_test_driver.Result):
     @classmethod
     def data_format(cls, max_test_len):
         non_name_headers = DTraceResult.data_headers()[1:]
-        fmt = ('{:<%d}' % (max_test_len+5)) + ''.join(['{:<%d}' % (len(h)+2) for h in non_name_headers])
+        fmt = ('{:<%d}' % (max_test_len + 5)) + ''.join(['{:<%d}' % (len(h) + 2) for h in non_name_headers])
         return fmt
 
     @classmethod
@@ -63,7 +63,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def __init__(self, binary, xfail_list, csv_output):
         perf_test_driver.BenchmarkDriver.__init__(self, binary, xfail_list,
                                                  enable_parallel=False,
-                                                 opt_levels = ['O'])
+                                                 opt_levels=['O'])
         self.csv_output = csv_output
 
     def print_data_header(self, max_test_len):
@@ -81,7 +81,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             p = subprocess.Popen(['sudo', 'dtrace', '-s', DTRACE_PATH, '-c', '%s %s %s' % (data['path'], data['test_name'], '--num-iters=%d' % iters)],
                                  stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'))
             results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
-            return [x.split(',')[1] for x in results[results.index('DTRACE RESULTS')+1:]]
+            return [x.split(',')[1] for x in results[results.index('DTRACE RESULTS') + 1:]]
         iter_2_results = get_results_with_iters(2)
         iter_3_results = get_results_with_iters(3)
 
