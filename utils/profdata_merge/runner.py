@@ -15,13 +15,40 @@ import os
 import socket
 import sys
 import logging
-
+import subprocess
+import tarfile
 from multiprocessing import JoinableQueue
 from process import ProfdataMergerProcess
 from server import ProfdataServer
 from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
 from config import Config
 
+
+# hack to import SwiftBuildSupport
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from SwiftBuildSupport import WorkingDirectory, check_call
+
+def cleanup(config):
+    if not config.swift_bin_path and config.cov_compare_path:
+        return
+    yaml_path = os.path.join("coverage.yaml")
+    cov_compare_cmd = ("%s yaml \"%s\" \"%s\" -o \"%s\"" %
+        (config.cov_compare_path,
+         config.final_profdata_path,
+         config.swift_bin_path,
+         yaml_path)
+    )
+    result = subprocess.call(cov_compare_cmd, shell=True)
+    if result != 0:
+        return
+    tarfile_name = os.path.join(config.out_dir, 'coverage.tar.gz')
+    logging.info("creating tar file at %s..." % tarfile_name)
+    tf = tarfile.open(tarfile_name, mode='w:gz', compresslevel=9)
+    logging.info("adding yaml file at %s..."
+                 % yaml_path)
+    tf.add('coverage.yaml')
+    logging.info("writing tarfile...")
+    tf.close()
 
 def run_server(config):
     pid = os.getpid()
@@ -61,7 +88,15 @@ def run_server(config):
         if os.path.exists(p.profdata_path):
             logging.info("merging " + p.profdata_path + "...")
             merge_final.filename_buffer.append(p.profdata_path)
+
+    if not merge_final.filename_buffer:
+        merge_final.abort("no profraw files found, aborting.")
+        return
+
     merge_final.merge_file_buffer()
+
+    with WorkingDirectory(config.out_dir):
+        cleanup(config)
 
 
 def stop_server(args):
@@ -72,7 +107,7 @@ def stop_server(args):
 
 
 def start_server(args):
-    config = Config(args.output_dir, args.no_remove)
+    config = Config(args.output_dir, args.swift_bin_dir, args.no_remove)
     if not args.debug:
         pid = os.fork()
         if pid != 0:

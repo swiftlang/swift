@@ -33,6 +33,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--log-file",
                         help="The file to write logs in debug mode.")
+    parser.add_argument("-s", "--swift-bin-dir",
+                        help="The directory to look for the cov-compare tool")
 
     subparsers = parser.add_subparsers()
 
