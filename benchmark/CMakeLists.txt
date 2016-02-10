@@ -73,6 +73,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Sim2DArray
     single-source/SortLettersInPlace
     single-source/SortStrings
+    single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StringBuilder
     single-source/StringInterpolation
