@@ -2787,8 +2787,8 @@ Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
 /// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                               bool willBeRelativelyAddressed) {
+llvm::Constant *IRGenModule::getAddrOfGlobalString(
+    StringRef data, bool willBeRelativelyAddressed, bool addNull) {
   // Check whether this string already exists.
   auto &entry = GlobalStrings[data];
   if (entry.second) {
@@ -2799,7 +2799,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
-  entry = createStringConstant(data, willBeRelativelyAddressed);
+  entry = createStringConstant(data, willBeRelativelyAddressed, addNull);
   return entry.second;
 }
 
