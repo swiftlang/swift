@@ -2259,13 +2259,17 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
 
 static llvm::Constant *getAddrOfString(IRGenModule &IGM, StringRef string,
                                        StringLiteralInst::Encoding encoding) {
+  bool addNull = string.back() != '\0';
   switch (encoding) {
   case swift::StringLiteralInst::Encoding::UTF8:
-    return IGM.getAddrOfGlobalString(string);
+    return IGM.getAddrOfGlobalString(string,
+                                     /*willBeRelativelyAddressed=*/false,
+                                     addNull);
 
   case swift::StringLiteralInst::Encoding::UTF16: {
     // This is always a GEP of a GlobalVariable with a nul terminator.
-    auto addr = IGM.getAddrOfGlobalUTF16String(string);
+    auto addr = IGM.getAddrOfGlobalUTF16String(
+        string, /*willBeRelativelyAddressed=*/false, addNull);
 
     // Cast to Builtin.RawPointer.
     return llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);

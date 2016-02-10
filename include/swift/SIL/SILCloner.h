@@ -575,14 +575,13 @@ SILCloner<ImplClass>::visitFloatLiteralInst(FloatLiteralInst *Inst) {
                                     Inst->getValue()));
 }
 
-template <typename ImplClass>
+template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitStringLiteralInst(StringLiteralInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createStringLiteralWithNullTerminator(
-                            getOpLocation(Inst->getLoc()), Inst->getValue(),
-                            Inst->getEncoding()));
+      getOpLocation(Inst->getLoc()), Inst->getValue(), Inst->getEncoding()));
 }
 
 template<typename ImplClass>

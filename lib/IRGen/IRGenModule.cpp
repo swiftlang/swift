@@ -471,11 +471,11 @@ llvm::Constant *IRGenModule::get##ID##Fn() {               \
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
 IRGenModule::createStringConstant(StringRef Str,
-  bool willBeRelativelyAddressed, StringRef sectionName) {
-  auto init =
-      llvm::ConstantDataArray::getString(LLVMContext, Str, /*AddNull=*/false);
-  auto global = new llvm::GlobalVariable(
-      Module, init->getType(), true, llvm::GlobalValue::PrivateLinkage, init);
+  bool willBeRelativelyAddressed, StringRef sectionName, bool addNull) {
+  auto init = llvm::ConstantDataArray::getString(LLVMContext, Str, addNull);
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         init);
   // FIXME: ld64 crashes resolving relative references to coalesceable symbols.
   // rdar://problem/22674524
   // If we intend to relatively address this string, don't mark it with

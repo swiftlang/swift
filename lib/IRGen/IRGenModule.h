@@ -559,9 +559,10 @@ private:
 public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *>
   createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
-                       StringRef sectionName = "");
+                       StringRef sectionName = "", bool addNull = true);
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false);
+                                        bool willBeRelativelyAddressed = false,
+                                        bool addNull = true);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);

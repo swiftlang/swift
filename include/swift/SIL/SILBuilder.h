@@ -412,7 +412,7 @@ public:
   StringLiteralInst *
   createStringLiteralWithNullTerminator(SILLocation Loc, const Twine &text,
                                         StringLiteralInst::Encoding encoding) {
-    SmallVector<char, 256> Out;
+    llvm::SmallString<256> Out;
     return insert(StringLiteralInst::create(createSILDebugLocation(Loc),
                                             text.toNullTerminatedStringRef(Out),
                                             encoding, F));
