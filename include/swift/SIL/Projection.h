@@ -406,6 +406,8 @@ public:
                                      BaseType.getCategory());
   }
 
+  bool operator<(const NewProjection &Other) const;
+
   bool operator==(const NewProjection &Other) const {
     return Value == Other.Value;
   }

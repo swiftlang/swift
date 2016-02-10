@@ -394,7 +394,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
   // pairs.
-  using ProjInstPairTy = std::pair<Projection, SILInstruction *>;
+  using ProjInstPairTy = std::pair<NewProjection, SILInstruction *>;
 
   // Go through the loads uses and add any users that are projections to the
   // projection list.
@@ -406,8 +406,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     if (!isa<StructExtractInst>(User) && !isa<TupleExtractInst>(User))
       return nullptr;
 
-    auto P = Projection::valueProjectionForInstruction(User);
-    Projections.push_back({P.getValue(), User});
+    Projections.push_back({NewProjection(User), User});
   }
 
   // The reason why we sort the list is so that we will process projections with
@@ -417,7 +416,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   std::sort(Projections.begin(), Projections.end());
 
   // Go through our sorted list creating new GEPs only when we need to.
-  Projection *LastProj = nullptr;
+  NewProjection *LastProj = nullptr;
   LoadInst *LastNewLoad = nullptr;
   for (auto &Pair : Projections) {
     auto &Proj = Pair.first;
@@ -433,7 +432,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 
     // Ok, we have started to visit the range of instructions associated with
     // a new projection. Create the new address projection.
-    auto I = Proj.createAddrProjection(Builder, LI->getLoc(), LI->getOperand());
+    auto I = Proj.createAddressProjection(Builder, LI->getLoc(), LI->getOperand());
     LastProj = &Proj;
     LastNewLoad = Builder.createLoad(LI->getLoc(), I.get());
     replaceInstUsesWith(*Inst, LastNewLoad);

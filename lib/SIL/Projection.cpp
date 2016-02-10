@@ -1532,6 +1532,30 @@ ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
   } while (!Worklist.empty());
 }
 
+bool
+NewProjection::operator<(const NewProjection &Other) const {
+  // If we have a nominal kind...
+  if (isNominalKind()) {
+    // And Other is also nominal...
+    if (Other.isNominalKind()) {
+      // Just compare the value decl pointers.
+      return getIndex() < Other.getIndex();
+    }
+
+    // Otherwise if Other is not nominal, return true since we always sort
+    // decls before indices.
+    return true;
+  } else {
+    // If this is not a nominal kind and Other is nominal, return
+    // false. Nominal kinds are always sorted before non-nominal kinds.
+    if (Other.isNominalKind())
+      return false;
+
+    // Otherwise, we are both index projections. Compare the indices.
+    return getIndex() < Other.getIndex();
+  }
+}
+
 NullablePtr<SILInstruction>
 NewProjection::
 createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
