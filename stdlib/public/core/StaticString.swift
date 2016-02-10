@@ -27,6 +27,7 @@
 ///        case utf8(start: UnsafePointer<UInt8>, count: Int)
 ///        case scalar(UnicodeScalar)
 ///      }
+@_fixed_layout
 public struct StaticString
   : _BuiltinUnicodeScalarLiteralConvertible,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,

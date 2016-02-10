@@ -185,6 +185,7 @@ T : UnsignedInteger, U : _SignedInteger
 
 /// ${Article} ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
+@_fixed_layout
 public struct ${Self}
    : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'},
      Comparable, Equatable {

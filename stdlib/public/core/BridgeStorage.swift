@@ -20,6 +20,7 @@
 //===----------------------------------------------------------------------===//
 import SwiftShims
 
+@_fixed_layout
 public // @testable
 struct _BridgeStorage<
   NativeClass: AnyObject, ObjCClass: AnyObject

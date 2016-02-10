@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An optional type that allows implicit member access.
+@_fixed_layout
 public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
