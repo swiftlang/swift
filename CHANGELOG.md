@@ -26,6 +26,19 @@ Swift 2.2
   Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
   types, and "x = x.successor()" on Index types.
 
+* The implicit tuple splat behavior in function application has been deprecated
+  and will be removed in Swift 3.0.  For example, this code:
+
+    func foo(a : Int, b : Int) { ... }
+    let x = (1, b: 2)
+    foo(x)   // Warning, deprecated.
+
+  should move to being written as:
+    foo(x.0, x.b)
+
+  For more information and rationale, see 
+  [SE-0029](https://github.com/apple/swift-evolution/blob/master/proposals/0029-remove-implicit-tuple-splat.md).
+
 * New #file, #line, #column, and #function expressions have been introduced to
   replace the existing __FILE__, __LINE__, __COLUMN__, and __FUNCTION__ symbols.
   The __FILE__-style symbols have been deprecated, and will be removed in
