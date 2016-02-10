@@ -41,7 +41,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
       I->getModule().getOptions().Optimization <= SILOptions::SILOptMode::None)
     return false;
 
-  if (!hasNoUsesExceptDebug(I) || isa<TermInst>(I))
+  if (!onlyHaveDebugUses(I) || isa<TermInst>(I))
     return false;
 
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {

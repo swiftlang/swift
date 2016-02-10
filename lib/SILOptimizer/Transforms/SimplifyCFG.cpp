@@ -2459,7 +2459,7 @@ bool ArgumentSplitter::createNewArguments() {
 
   // If we only had such users of Agg and Agg is dead now (ignoring debug
   // instructions), remove it.
-  if (hasNoUsesExceptDebug(Agg))
+  if (onlyHaveDebugUses(Agg))
     eraseFromParentWithDebugInsts(Agg);
 
   return true;

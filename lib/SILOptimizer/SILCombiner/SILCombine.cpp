@@ -289,7 +289,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
                                             bool AddOperandsToWorklist) {
   DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
 
-  assert(hasNoUsesExceptDebug(&I) && "Cannot erase instruction that is used!");
+  assert(onlyHaveDebugUses(&I) && "Cannot erase instruction that is used!");
   // Make sure that we reprocess all operands now that we reduced their
   // use counts.
   if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
