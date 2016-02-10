@@ -13,7 +13,6 @@
 # ===----------------------------------------------------------------------===//
 
 import os
-import sys
 import subprocess
 import multiprocessing
 import re
@@ -96,7 +95,7 @@ class PerfTestDriver(object):
         results = None
         if self.enable_parallel:
             p = multiprocessing.Pool()
-            z = zip([self]*len(prepared_input), prepared_input)
+            z = zip([self] * len(prepared_input), prepared_input)
             results = p.map(_unwrap_self, z)
         else:
             results = map(self.process_input, prepared_input)
