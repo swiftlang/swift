@@ -16,5 +16,5 @@ add_swift_library(swiftSwiftPrivateDarwinExtras SHARED IS_STDLIB
   Subprocess.swift
 
   SWIFT_MODULE_DEPENDS ${swift_private_darwin_extras_module_depends}
-  SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
+  SWIFT_COMPILE_FLAGS ${STDLIB_SIL_SERIALIZE_ALL}
   INSTALL_IN_COMPONENT stdlib-experimental)
