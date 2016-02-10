@@ -12,9 +12,11 @@ Swift 2.2
 * Associated types in protocols can now be specified with a new 'associatedtype'
   declaration, to replace the use of 'typealias':
 
+    ```
     protocol P {
       associatedtype Ty
     }
+    ```
 
   The typealias keyword is still allowed (but deprecated and produces a warning)
   in Swift 2.2. This warning will become an error in Swift 3.
@@ -23,18 +25,22 @@ Swift 2.2
   Swift 3.
 
 * The ++ and -- operators have been deprecated, and are slated to be removed in
-  Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
-  types, and "x = x.successor()" on Index types.
+  Swift 3.0.  As a replacement, please use "`x += 1`" on integer or floating point
+  types, and "`x = x.successor()`" on Index types.
 
 * The implicit tuple splat behavior in function application has been deprecated
   and will be removed in Swift 3.0.  For example, this code:
 
+    ```
     func foo(a : Int, b : Int) { ... }
     let x = (1, b: 2)
     foo(x)   // Warning, deprecated.
+    ```
 
   should move to being written as:
+    ```
     foo(x.0, x.b)
+    ```
 
   For more information and rationale, see 
   [SE-0029](https://github.com/apple/swift-evolution/blob/master/proposals/0029-remove-implicit-tuple-splat.md).
