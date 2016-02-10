@@ -519,6 +519,9 @@ private:
   /// \brief Cache of the class extensions.
   llvm::DenseMap<ClassDecl *, CachedExtensions> ClassExtensions;
 
+  /// \brief Cache enum infos
+  llvm::DenseMap<const clang::EnumDecl *, importer::EnumInfo> enumInfos;
+
 public:
   /// \brief Keep track of subscript declarations based on getter/setter
   /// pairs.
