@@ -70,7 +70,7 @@ public:
   ///
   void printTypeExpansion(SILFunction &Fn) {
     SILModule *M = &Fn.getModule();
-    ProjectionPathList PPList;
+    NewProjectionPathList PPList;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
@@ -78,12 +78,12 @@ public:
           SILValue V = LI->getOperand();
           // This is an address type, take it object type.
           SILType Ty = V->getType().getObjectType();
-          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
+          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           SILValue V = SI->getDest();
           // This is an address type, take it object type.
           SILType Ty = V->getType().getObjectType();
-          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
+          NewProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -91,7 +91,7 @@ public:
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &T : PPList) {
-          llvm::outs() << T.getValue();
+          T.getValue().print(llvm::outs(), *M);
         }
         PPList.clear();
       }
