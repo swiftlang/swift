@@ -718,14 +718,6 @@ function true_false() {
 # Set default values for command-line parameters.
 #
 
-if [[ "${INSTALL_PREFIX}" == "" ]] ; then
-    if [[ "$(uname -s)" == "Darwin" ]] ; then
-        INSTALL_PREFIX="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr"
-    else
-        INSTALL_PREFIX="/usr"
-    fi
-fi
-
 if [[ "$(uname -s)" == "Darwin" ]] ; then
     TOOLCHAIN_PREFIX=$(echo ${INSTALL_PREFIX} | sed -E 's/\/usr$//')
 fi

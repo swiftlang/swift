@@ -532,6 +532,11 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
 name of the directory under $SWIFT_BUILD_ROOT where the build products will be
 placed""",
         metavar="PATH")
+    parser.add_argument("--install-prefix",
+        help="The installation prefix. This is where built Swift products "
+             "(like bin, lib, and include) will be installed.",
+        metavar="PATH",
+        default=swift_build_support.targets.install_prefix())
 
     parser.add_argument("-j", "--jobs",
         help="""
@@ -566,6 +571,7 @@ the number of parallel build jobs to use""",
         '--host-target',
         '--skip-build',
         '--show-sdks',
+        '--install-prefix',
     ]))
 
     if args.host_target is None:
@@ -830,6 +836,7 @@ the number of parallel build jobs to use""",
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
+        "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
         "--host-cc", host_clang.cc,
         "--host-cxx", host_clang.cxx,

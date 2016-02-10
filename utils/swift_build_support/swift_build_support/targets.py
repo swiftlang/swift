@@ -44,3 +44,15 @@ def host_target():
             return 'freebsd-x86_64'
 
     return None
+
+
+def install_prefix():
+    """
+    Returns the default path at which built Swift products (like bin, lib,
+    and include) will be installed, based on the host machine's operating
+    system.
+    """
+    if platform.system() == 'Darwin':
+        return '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr'
+    else:
+        return '/usr'
