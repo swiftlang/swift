@@ -290,9 +290,9 @@ public:
     // Check if the ObjC runtime already has a descriptor for this
     // protocol. If so, use it.
     SmallString<32> buf;
-    auto protocolName
-      = IGM.getAddrOfGlobalString(proto->getObjCRuntimeName(buf));
-    
+    auto protocolName =
+        IGM.getAddrOfNullTerminatedGlobalString(proto->getObjCRuntimeName(buf));
+
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
                    llvm::ConstantPointerNull::get(IGM.ProtocolDescriptorPtrTy));
@@ -2781,14 +2781,14 @@ Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
 
 /// Get or create a global string constant.
 ///
-/// \returns an i8* with a null terminator; note that embedded nulls
-///   are okay
+/// \returns an i8* (optionally with a null terminator); note that embedded
+//    nulls are okay
 ///
 /// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *IRGenModule::getAddrOfGlobalString(
-    StringRef data, bool willBeRelativelyAddressed, bool addNull) {
+llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
+                                               bool willBeRelativelyAddressed) {
   // Check whether this string already exists.
   auto &entry = GlobalStrings[data];
   if (entry.second) {
@@ -2800,8 +2800,15 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(
   }
 
   entry = createStringConstant(data, willBeRelativelyAddressed,
-                               /*sectionName=*/"", addNull);
+                               /*sectionName=*/"", /*addNull=*/ false);
   return entry.second;
+}
+
+llvm::Constant *IRGenModule::getAddrOfNullTerminatedGlobalString(StringRef data,
+                                               bool willBeRelativelyAddressed) {
+  llvm::SmallString<256> Out;
+  return getAddrOfGlobalString(Twine(data).toNullTerminatedStringRef(Out),
+                               willBeRelativelyAddressed);
 }
 
 /// Get or create a global UTF-16 string constant.

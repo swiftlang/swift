@@ -157,9 +157,11 @@ llvm::Constant *EnumImplStrategy::emitCaseNames() const {
     fieldNames.append(noPayloadCase.decl->getName().str());
     fieldNames.push_back('\0');
   }
-  // The final null terminator is provided by getAddrOfGlobalString.
-  return IGM.getAddrOfGlobalString(fieldNames,
-                                   /*willBeRelativelyAddressed*/ true);
+  // The final null terminator is provided by
+  // getAddrOfNullTerminatedGlobalString.
+  return IGM.getAddrOfNullTerminatedGlobalString(
+      fieldNames,
+      /*willBeRelativelyAddressed*/ true);
 }
 
 unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {

@@ -893,7 +893,7 @@ namespace {
       SmallVector<llvm::Constant*, 11> fields;
       // struct category_t {
       //   char const *name;
-      fields.push_back(IGM.getAddrOfGlobalString(CategoryName));
+      fields.push_back(IGM.getAddrOfNullTerminatedGlobalString(CategoryName));
       //   const class_t *theClass;
       if (getClass()->hasClangNode())
         fields.push_back(IGM.getAddrOfObjCClass(getClass(), NotForDefinition));
@@ -927,7 +927,8 @@ namespace {
       //   Class super;
       fields.push_back(null());
       //   char const *name;
-      fields.push_back(IGM.getAddrOfGlobalString(getEntityName(nameBuffer)));
+      fields.push_back(
+          IGM.getAddrOfNullTerminatedGlobalString(getEntityName(nameBuffer)));
       //   const protocol_list_t *baseProtocols;
       fields.push_back(buildProtocolList());
       //   const method_list_t *requiredInstanceMethods;
@@ -1075,7 +1076,8 @@ namespace {
       }
       
       llvm::SmallString<64> buffer;
-      Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer));
+      Name = IGM.getAddrOfNullTerminatedGlobalString(
+          getClass()->getObjCRuntimeName(buffer));
       return Name;
     }
 
@@ -1360,10 +1362,11 @@ namespace {
       }
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
-      auto name = IGM.getAddrOfGlobalString(ivar->getName().str());
+      auto name =
+          IGM.getAddrOfNullTerminatedGlobalString(ivar->getName().str());
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      auto typeEncode = IGM.getAddrOfGlobalString("");
+      auto typeEncode = IGM.getAddrOfNullTerminatedGlobalString("");
 
       Size size;
       Alignment alignment;
@@ -1523,10 +1526,11 @@ namespace {
     llvm::Constant *buildProperty(VarDecl *prop) {
       llvm::SmallString<16> propertyAttributes;
       buildPropertyAttributes(prop, propertyAttributes);
-      
+
       llvm::Constant *fields[] = {
-        IGM.getAddrOfGlobalString(prop->getObjCPropertyName().str()),
-        IGM.getAddrOfGlobalString(propertyAttributes)
+        IGM.getAddrOfNullTerminatedGlobalString(
+            prop->getObjCPropertyName().str()),
+        IGM.getAddrOfNullTerminatedGlobalString(propertyAttributes)
       };
       return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
     }

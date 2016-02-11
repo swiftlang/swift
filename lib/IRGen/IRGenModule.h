@@ -561,8 +561,9 @@ public:
   createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
                        StringRef sectionName = "", bool addNull = true);
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false,
-                                        bool addNull = true);
+                                        bool willBeRelativelyAddressed = false);
+  llvm::Constant *getAddrOfNullTerminatedGlobalString(StringRef utf8,
+                                        bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
