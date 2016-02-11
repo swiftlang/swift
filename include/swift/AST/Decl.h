@@ -5810,7 +5810,7 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
 }
 
 namespace impl {
-  bool isTestingEnabled(const ValueDecl *VD);
+  bool isInternalDeclEffectivelyPublic(const ValueDecl *VD);
 }
 
 inline Accessibility ValueDecl::getEffectiveAccess() const {
@@ -5818,8 +5818,9 @@ inline Accessibility ValueDecl::getEffectiveAccess() const {
   case Accessibility::Public:
     return Accessibility::Public;
   case Accessibility::Internal:
-    if (impl::isTestingEnabled(this))
+    if (impl::isInternalDeclEffectivelyPublic(this)) {
       return Accessibility::Public;
+    }
     return Accessibility::Internal;
   case Accessibility::Private:
     return Accessibility::Private;

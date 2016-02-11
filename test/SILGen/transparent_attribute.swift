@@ -200,3 +200,13 @@ struct testVarDeclShortenedSyntax {
   }
   zim()
 }
+
+
+// Check that @_versioned entities have public linkage.
+// CHECK-LABEL: sil @_TF21transparent_attribute25referencedFromTransparentFT_T_ : $@convention(thin) () -> () {
+@_versioned func referencedFromTransparent() {}
+
+// CHECK-LABEL: sil [transparent] [fragile] @_TF21transparent_attribute23referencesVersionedFuncFT_FT_T_ : $@convention(thin) () -> @owned @callee_owned () -> () {
+@_transparent public func referencesVersionedFunc() -> () -> () {
+  return referencedFromTransparent
+}

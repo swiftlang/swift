@@ -43,8 +43,21 @@
 
 using namespace swift;
 
-bool impl::isTestingEnabled(const ValueDecl *VD) {
-  return VD->getModuleContext()->isTestingEnabled();
+bool impl::isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
+  assert(VD->getFormalAccess() == Accessibility::Internal);
+
+  if (VD->getAttrs().hasAttribute<VersionedAttr>())
+    return true;
+
+  if (auto *fn = dyn_cast<FuncDecl>(VD))
+    if (auto *ASD = fn->getAccessorStorageDecl())
+      if (ASD->getAttrs().hasAttribute<VersionedAttr>())
+        return true;
+
+  if (VD->getModuleContext()->isTestingEnabled())
+    return true;
+
+  return false;
 }
 
 clang::SourceLocation ClangNode::getLocation() const {
