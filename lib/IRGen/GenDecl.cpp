@@ -2774,14 +2774,12 @@ static llvm::Constant *getAddrOfGlobalStringImpl(
     return entry.second;
   }
 
-  llvm::SmallString<256> Out;
-  if (nullTerminate) {
-    Out.append(data.begin(), data.end());
-    Out.push_back('\0');
-    data = StringRef(Out.data(), Out.size());
-  }
+  if (nullTerminate)
+    entry =
+        IGM.createNullTerminatedStringConstant(data, willBeRelativelyAddressed);
+  else
+    entry = IGM.createStringConstant(data, willBeRelativelyAddressed);
 
-  entry = IGM.createStringConstant(data, willBeRelativelyAddressed);
   return entry.second;
 }
 
