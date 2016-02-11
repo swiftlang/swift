@@ -470,9 +470,10 @@ llvm::Constant *IRGenModule::get##ID##Fn() {               \
 #include "RuntimeFunctions.def"
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
-IRGenModule::createStringConstant(StringRef Str,
-  bool willBeRelativelyAddressed, StringRef sectionName, bool addNull) {
-  auto init = llvm::ConstantDataArray::getString(LLVMContext, Str, addNull);
+IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
+                                  StringRef sectionName) {
+  auto init =
+      llvm::ConstantDataArray::getString(LLVMContext, Str, /*AddNull=*/false);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);
@@ -494,6 +495,15 @@ IRGenModule::createStringConstant(StringRef Str,
     global->getValueType(), global, indices);
 
   return { global, address };
+}
+
+std::pair<llvm::GlobalVariable *, llvm::Constant *>
+IRGenModule::createNullTerminatedStringConstant(StringRef Str,
+                                                bool willBeRelativelyAddressed,
+                                                StringRef sectionName) {
+  llvm::SmallString<256> Out;
+  return createStringConstant(Twine(Str).toNullTerminatedStringRef(Out),
+                              willBeRelativelyAddressed, sectionName);
 }
 
 llvm::Constant *IRGenModule::getEmptyTupleMetadata() {

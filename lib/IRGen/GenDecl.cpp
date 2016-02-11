@@ -2799,8 +2799,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
-  entry = createStringConstant(data, willBeRelativelyAddressed,
-                               /*sectionName=*/"", /*addNull=*/ false);
+  entry = createStringConstant(data, willBeRelativelyAddressed);
   return entry.second;
 }
 

@@ -559,7 +559,11 @@ private:
 public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *>
   createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
-                       StringRef sectionName = "", bool addNull = true);
+                       StringRef sectionName = "");
+  std::pair<llvm::GlobalVariable *, llvm::Constant *>
+  createNullTerminatedStringConstantStringConstant(
+      StringRef Str, bool willBeRelativelyAddressed = false,
+      StringRef sectionName = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfNullTerminatedGlobalString(StringRef utf8,
