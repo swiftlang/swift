@@ -8,6 +8,7 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+import os
 import platform
 
 
@@ -56,3 +57,12 @@ def install_prefix():
         return '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr'
     else:
         return '/usr'
+
+
+def darwin_toolchain_prefix(darwin_install_prefix):
+    """
+    Given the install prefix for a Darwin system, and assuming that that path
+    is to a .xctoolchain directory, return the path to the .xctoolchain
+    directory.
+    """
+    return os.path.split(darwin_install_prefix)[0]

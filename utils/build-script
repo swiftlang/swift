@@ -14,6 +14,7 @@ from __future__ import print_function
 import argparse
 import multiprocessing
 import os
+import platform
 import shutil
 import sys
 import textwrap
@@ -759,6 +760,12 @@ the number of parallel build jobs to use""",
             "--skip-build-foundation",
             "--skip-build-libdispatch",
             "--skip-build-benchmarks",
+        ]
+
+    if platform.system() == 'Darwin':
+        build_script_impl_inferred_args += [
+            "--toolchain-prefix",
+            swift_build_support.targets.darwin_toolchain_prefix(args.install_prefix),
         ]
 
     if args.build_subdir is None:

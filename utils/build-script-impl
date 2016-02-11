@@ -86,6 +86,7 @@ KNOWN_SETTINGS=(
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
     install-prefix              ""               "installation prefix"
+    toolchain-prefix            ""               "the path to the .xctoolchain directory that houses the install prefix path"
     install-destdir             ""               "the path to use as the filesystem root for the installation"
     install-symroot             ""               "the path to install debug symbols into"
     swift-install-components    ""               "a semicolon-separated list of Swift components to install"
@@ -713,15 +714,6 @@ function true_false() {
             ;;
     esac
 }
-
-#
-# Set default values for command-line parameters.
-#
-
-if [[ "$(uname -s)" == "Darwin" ]] ; then
-    TOOLCHAIN_PREFIX=$(echo ${INSTALL_PREFIX} | sed -E 's/\/usr$//')
-fi
-
 
 # A list of deployment targets to cross-compile the Swift host tools for.
 # We can't run the resulting binaries on the build machine.
