@@ -11,8 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An optional type that allows implicit member access.
-public enum ImplicitlyUnwrappedOptional<Wrapped>
-  : _Reflectable, NilLiteralConvertible {
+public enum ImplicitlyUnwrappedOptional<Wrapped>: NilLiteralConvertible {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
   // the library intrinsics below.
