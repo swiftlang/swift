@@ -15,6 +15,7 @@ extension String {
   public struct UTF16View
     : CollectionType, CustomStringConvertible, CustomDebugStringConvertible {
 
+    /// A position in a string's collection of UTF-16 code units.
     public struct Index {
       // Foundation needs access to these fields so it can expose
       // random access

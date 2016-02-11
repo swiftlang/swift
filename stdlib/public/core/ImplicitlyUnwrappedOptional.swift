@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// An optional type that allows implicit member access (via compiler
-/// magic).
-///
-/// The compiler has special knowledge of the existence of
-/// `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
-/// the library intrinsics below.
-public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
+/// An optional type that allows implicit member access.
+public enum ImplicitlyUnwrappedOptional<Wrapped>
+  : _Reflectable, NilLiteralConvertible {
+  // The compiler has special knowledge of the existence of
+  // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
+  // the library intrinsics below.
+  
   case None
   case Some(Wrapped)
 

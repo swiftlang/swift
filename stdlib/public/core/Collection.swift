@@ -15,17 +15,16 @@ public func count <T : CollectionType>(x: T) -> T.Index.Distance {
   fatalError("unavailable function can't be called")
 }
 
-/// A protocol representing the minimal requirements of
-/// `CollectionType`.
+/// A type that provides subscript access to its elements.
 ///
-/// - Note: In most cases, it's best to ignore this protocol and use
+/// - Important: In most cases, it's best to ignore this protocol and use
 ///   `CollectionType` instead, as it has a more complete interface.
-//
-// This protocol is almost an implementation detail of the standard
-// library; it is used to deduce things like the `SubSequence` and
-// `Generator` type from a minimal collection, but it is also used in
-// exposed places like as a constraint on IndexingGenerator.
 public protocol Indexable {
+  // This protocol is almost an implementation detail of the standard
+  // library; it is used to deduce things like the `SubSequence` and
+  // `Generator` type from a minimal collection, but it is also used in
+  // exposed places like as a constraint on IndexingGenerator.
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -64,6 +63,7 @@ public protocol Indexable {
   subscript(position: Index) -> _Element { get }
 }
 
+/// A type that supports subscript assignment to a mutable collection.
 public protocol MutableIndexable {
   associatedtype Index : ForwardIndexType
 

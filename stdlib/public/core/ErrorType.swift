@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// The protocol for error values that can be thrown.
 // TODO: API review
+/// A type representing an error value that can be thrown.
 public protocol ErrorType {
   var _domain: String { get }
   var _code: Int { get }
