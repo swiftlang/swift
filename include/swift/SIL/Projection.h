@@ -801,7 +801,7 @@ class ProjectionTree {
 
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
-  llvm::SmallVector<unsigned, 3> LeafIndices;
+  llvm::SmallVector<unsigned, 3> LiveLeafIndices;
 
   using LeafValueMapTy = llvm::DenseMap<unsigned, SILValue>;
 
@@ -881,7 +881,7 @@ public:
   }
 
   void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
-    for (unsigned LeafIndex : LeafIndices) {
+    for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
       OutArray.push_back(Node->getType());
@@ -890,7 +890,7 @@ public:
 
   /// Return the number of live leafs in the projection.
   size_t liveLeafCount() const {
-    return LeafIndices.size();
+    return LiveLeafIndices.size();
   }
 
   void createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,

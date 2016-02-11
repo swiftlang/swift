@@ -1177,7 +1177,7 @@ ProjectionTree::computeExplodedArgumentValue(
   // Construct the leaf index to leaf value map.
   llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;
   for (unsigned i = 0; i < LeafValues.size(); ++i) {
-    LeafIndexToValue[LeafIndices[i]] = LeafValues[i];
+    LeafIndexToValue[LiveLeafIndices[i]] = LeafValues[i];
   }
 
   // Compute the full root node debug node by walking down the projection tree.
@@ -1251,8 +1251,8 @@ ProjectionTree::computeUsesAndLiveness(SILValue Base) {
     if (!Node->IsLive)
       continue;
 
-    // Otherwise we have a live leaf, add its index to our LeafIndices list.
-    LeafIndices.push_back(Node->getIndex());
+    // Otherwise we have a live leaf, add its index to our LiveLeafIndices list.
+    LiveLeafIndices.push_back(Node->getIndex());
   }
 
 #ifndef NDEBUG
@@ -1351,7 +1351,7 @@ void
 ProjectionTree::
 replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
                              llvm::SmallVectorImpl<SILValue> &Leafs) {
-  assert(Leafs.size() == LeafIndices.size() && "Leafs and leaf indices must "
+  assert(Leafs.size() == LiveLeafIndices.size() && "Leafs and leaf indices must "
          "equal in size.");
 
   NewAggregateBuilderMap AggBuilderMap(Builder, Loc);
@@ -1362,11 +1362,11 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
   // For each Leaf we have as input...
   for (unsigned i = 0, e = Leafs.size(); i != e; ++i) {
     SILValue Leaf = Leafs[i];
-    ProjectionTreeNode *Node = getNode(LeafIndices[i]);
+    ProjectionTreeNode *Node = getNode(LiveLeafIndices[i]);
 
     DEBUG(llvm::dbgs() << "    Visiting leaf: " << Leaf);
 
-    assert(Node->IsLive && "Unexpected dead node in LeafIndices!");
+    assert(Node->IsLive && "Unexpected dead node in LiveLeafIndices!");
 
     // Otherwise replace all uses at this level of the tree with uses of the
     // Leaf value.
