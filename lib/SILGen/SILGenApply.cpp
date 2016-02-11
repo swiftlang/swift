@@ -524,7 +524,7 @@ public:
 
       // Look up the witness for the archetype.
       auto proto = Constant.getDecl()->getDeclContext()
-                                     ->isProtocolOrProtocolExtensionContext();
+                                     ->getAsProtocolOrProtocolExtensionContext();
       auto archetype = getWitnessMethodSelfType();
       // Get the openend existential value if the archetype is an opened
       // existential type.
@@ -1358,7 +1358,7 @@ public:
     // Determine whether we'll need to use an allocating constructor (vs. the
     // initializing constructor).
     auto nominal = ctorRef->getDecl()->getDeclContext()
-                     ->isNominalTypeOrNominalTypeExtensionContext();
+                     ->getAsNominalTypeOrNominalTypeExtensionContext();
     bool useAllocatingCtor;
     
     // Value types only have allocating initializers.
@@ -3910,7 +3910,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // a non-class protocol, this is innocuous.
 #ifndef NDEBUG
       auto isNonClassProtocolMember = [](Decl *d) {
-        auto p = d->getDeclContext()->isProtocolOrProtocolExtensionContext();
+        auto p = d->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
         return (p && !p->requiresClass());
       };
 #endif
@@ -4050,7 +4050,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   WritebackScope writebackScope(*this);
 
   assert(!materializeForSet.getDecl()
-           ->getDeclContext()->isProtocolExtensionContext() &&
+           ->getDeclContext()->getAsProtocolExtensionContext() &&
          "direct use of materializeForSet from a protocol extension is"
          " probably a miscompile");
 

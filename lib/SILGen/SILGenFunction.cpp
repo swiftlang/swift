@@ -665,7 +665,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
     if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
       OpenedExistential = thisArg;
     auto protocol =
-      next.getDecl()->getDeclContext()->isProtocolOrProtocolExtensionContext();
+      next.getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
     auto conformance = ProtocolConformanceRef(protocol);
     return gen.B.createWitnessMethod(loc, thisType, conformance, next,
                                      constantInfo.getSILType(),

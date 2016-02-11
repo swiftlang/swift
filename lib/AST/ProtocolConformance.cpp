@@ -635,7 +635,7 @@ ArrayRef<ValueDecl *>
 NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
                                              const ValueDecl *member,
                                              bool sorted) const {
-  assert(member->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext()
+  assert(member->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()
            == this);
   assert(!isa<ProtocolDecl>(this));
   prepareConformanceTable();
@@ -654,7 +654,7 @@ DeclContext::getLocalProtocols(
   SmallVector<ProtocolDecl *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = isNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *nominal = getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominal)
     return result;
 
@@ -687,7 +687,7 @@ DeclContext::getLocalConformances(
   SmallVector<ProtocolConformance *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = isNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *nominal = getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominal)
     return result;
 

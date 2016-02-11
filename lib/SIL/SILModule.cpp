@@ -281,7 +281,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
   if (context->isExtensionContext())
     return SILFunction::NotRelevant;
 
-  auto *classType = context->isClassOrClassExtensionContext();
+  auto *classType = context->getAsClassOrClassExtensionContext();
   if (!classType || classType->isFinal())
     return SILFunction::NotRelevant;
 

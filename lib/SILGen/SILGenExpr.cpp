@@ -624,7 +624,7 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
     (void)baseMeta;
     assert(!baseMeta->is<BoundGenericType>() &&
            "generic static stored properties not implemented");
-    if (field->getDeclContext()->isClassOrClassExtensionContext() &&
+    if (field->getDeclContext()->getAsClassOrClassExtensionContext() &&
         field->hasStorage())
       // FIXME: don't need to check hasStorage, already done above
       assert(field->isFinal() && "non-final class stored properties not implemented");

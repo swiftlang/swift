@@ -1068,7 +1068,8 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
       // Mark all associatedtypes in this protocol as recursive (and error-type)
       // to avoid later crashes dealing with this invalid protocol in other
       // contexts.
-      auto containingProto = assocType->getDeclContext()->isProtocolOrProtocolExtensionContext();
+      auto containingProto =
+        assocType->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       for (auto member : containingProto->getMembers())
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
           assocType->setIsRecursive();
