@@ -277,5 +277,8 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>)
 
+// Look for preposition prior to "of".
+// CHECK-OMIT-NEEDLESS-WORDS: func append(contentsOf _: String)
+
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

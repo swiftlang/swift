@@ -849,7 +849,13 @@ static bool wordConflictsAfterPreposition(StringRef word,
   }
 
   if (camel_case::sameWordIgnoreFirstCase(preposition, "to")) {
-    if (camel_case::sameWordIgnoreFirstCase(word, "visible"))
+    if (camel_case::sameWordIgnoreFirstCase(word, "visible") ||
+        camel_case::sameWordIgnoreFirstCase(word, "backing"))
+      return true;
+  }
+
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "from")) {
+    if (camel_case::sameWordIgnoreFirstCase(word, "backing"))
       return true;
   }
 
@@ -926,11 +932,27 @@ namespace {
 
 /// Find the last preposition in the given word.
 static ReverseWordIterator findLastPreposition(ReverseWordIterator first,
-                                               ReverseWordIterator last) {
-  return std::find_if(first, last,
-           [](StringRef word) {
-             return getPartOfSpeech(word) == PartOfSpeech::Preposition;
-         });
+                                               ReverseWordIterator last,
+                                               bool recursive = false) {
+  // Find the last preposition.
+  auto result =
+    std::find_if(first, last,
+                 [](StringRef word) {
+                   return getPartOfSpeech(word) == PartOfSpeech::Preposition;
+                 });
+
+  // If the preposition is "of", look for a previous preposition.
+  if (!recursive && result != last &&
+      camel_case::sameWordIgnoreFirstCase(*result, "of")) {
+    auto prevPreposition = findLastPreposition(std::next(result), last,
+                                               /*recursive=*/true);
+    if (prevPreposition != last &&
+        !camel_case::sameWordIgnoreFirstCase(*prevPreposition, "of") &&
+        !camel_case::sameWordIgnoreFirstCase(*prevPreposition, "for"))
+      return prevPreposition;
+  }
+
+  return result;
 }
 
 /// Split the base name after the last preposition, if there is one.
