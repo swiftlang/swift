@@ -18,7 +18,7 @@
 #include "TypeInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/ADT/Fixnum.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include <utility>
 
@@ -29,7 +29,9 @@ namespace irgen {
 /// A payload can either use a generic word-chunked representation, or attempt
 /// to follow the explosion schema of one of its payload types.
 class EnumPayloadSchema {
-  const llvm::PointerUnion<ExplosionSchema *, llvm::Fixnum<31>> Value;
+  using BitSizeTy = llvm::PointerEmbeddedInt<unsigned, 31>;
+
+  const llvm::PointerUnion<ExplosionSchema *, BitSizeTy> Value;
 
 public:
   EnumPayloadSchema() : Value((ExplosionSchema *)nullptr) {}
@@ -39,7 +41,7 @@ public:
   }
 
   explicit EnumPayloadSchema(unsigned bits)
-    : Value(llvm::Fixnum<31>(bits)) {}
+    : Value(BitSizeTy(bits)) {}
 
   EnumPayloadSchema(ExplosionSchema &s)
     : Value(&s) {}
@@ -69,7 +71,7 @@ public:
     }
     
     // Otherwise, chunk into pointer-sized integer values by default.
-    unsigned bitSize = Value.get<llvm::Fixnum<31>>();
+    unsigned bitSize = Value.get<BitSizeTy>();
     unsigned pointerSize = IGM.getPointerSize().getValueInBits();
     
     while (bitSize >= pointerSize) {

@@ -32,7 +32,6 @@
 #include <functional>
 #include <iterator>
 using namespace swift;
-using llvm::Fixnum;
 
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
@@ -1350,7 +1349,7 @@ unsigned GenericTypeParamType::getDepth() const {
     return param->getDepth();
   }
 
-  auto fixedNum = ParamOrDepthIndex.get<Fixnum<31>>();
+  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
   return fixedNum >> 16;
 }
 
@@ -1359,7 +1358,7 @@ unsigned GenericTypeParamType::getIndex() const {
     return param->getIndex();
   }
 
-  auto fixedNum = ParamOrDepthIndex.get<Fixnum<31>>();
+  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
   return fixedNum & 0xFFFF;
 }
 
@@ -1373,7 +1372,7 @@ Identifier GenericTypeParamType::getName() const {
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
-  unsigned depthIndex = ParamOrDepthIndex.get<Fixnum<31>>();
+  unsigned depthIndex = ParamOrDepthIndex.get<DepthIndexTy>();
   auto cached = names.find(depthIndex);
   if (cached != names.end())
     return cached->second;

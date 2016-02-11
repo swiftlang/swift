@@ -30,7 +30,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
