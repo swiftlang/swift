@@ -165,7 +165,7 @@ if True:
 /// first element access.'''
 # FIXME: Write about Array up/down-casting.
     else:
-      raise AssertionError('Unhandled case: ' + Self)
+      raise ValueError('Unhandled case: ' + Self)
 }%
 
 ${SelfDocComment}

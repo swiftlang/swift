@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// An index that traverses the same positions as an underlying index,
+/// with inverted traversal direction.
 @swift3_migration(renamed="ReverseIndexProtocol")
 public protocol ReverseIndexType : BidirectionalIndexType {
   associatedtype Base : BidirectionalIndexType
