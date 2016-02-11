@@ -514,15 +514,6 @@ IRGenModule::createNullTerminatedStringConstant(StringRef Str,
                                   /*addNull=*/true);
 }
 
-std::pair<llvm::GlobalVariable *, llvm::Constant *>
-IRGenModule::createNullTerminatedStringConstant(StringRef Str,
-                                                bool willBeRelativelyAddressed,
-                                                StringRef sectionName) {
-  llvm::SmallString<256> Out;
-  return createStringConstant(Twine(Str).toNullTerminatedStringRef(Out),
-                              willBeRelativelyAddressed, sectionName);
-}
-
 llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   if (EmptyTupleMetadata)
     return EmptyTupleMetadata;
