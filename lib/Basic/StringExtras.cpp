@@ -848,8 +848,13 @@ static bool wordConflictsAfterPreposition(StringRef word,
       return true;
   }
 
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "to") &&
-      camel_case::sameWordIgnoreFirstCase(word, "visible"))
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "to")) {
+    if (camel_case::sameWordIgnoreFirstCase(word, "visible"))
+      return true;
+  }
+
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "and") &&
+      camel_case::sameWordIgnoreFirstCase(word, "return"))
     return true;
 
   return false;
@@ -922,22 +927,10 @@ namespace {
 /// Find the last preposition in the given word.
 static ReverseWordIterator findLastPreposition(ReverseWordIterator first,
                                                ReverseWordIterator last) {
-  while (first != last) {
-    switch (getPartOfSpeech(*first)) {
-    case PartOfSpeech::Preposition:
-      return first;
-
-    case PartOfSpeech::Verb:
-    case PartOfSpeech::Gerund:
-      return last;
-
-    case PartOfSpeech::Unknown:
-      ++first;
-      break;
-    }
-  }
-
-  return last;
+  return std::find_if(first, last,
+           [](StringRef word) {
+             return getPartOfSpeech(word) == PartOfSpeech::Preposition;
+         });
 }
 
 /// Split the base name after the last preposition, if there is one.

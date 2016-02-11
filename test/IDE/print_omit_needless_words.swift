@@ -136,10 +136,10 @@
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingWith(_: Copying)
+// CHECK-FOUNDATION: func doSomething(_: Copying)
 
 // Note: NSObject<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingElseWith(_: protocol<Copying, ObjectProtocol>)
+// CHECK-FOUNDATION: func doSomethingElse(_: protocol<Copying, ObjectProtocol>)
 
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
@@ -247,7 +247,7 @@
 // CHECK-APPKIT: func shouldCollapseAutoExpandedItems(forDeposited _: Bool) -> Bool
 
 // Introducing argument labels and pruning the base name.
-// CHECK-APPKIT: func rectForCancelButtonWhenCentered(_: Bool)
+// CHECK-APPKIT: func rectForCancelButton(whenCentered _: Bool)
 
 // CHECK-APPKIT: func openUntitledDocumentAndDisplay(_: Bool)
 
@@ -275,6 +275,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with _: [URL])
 // CHECK-OMIT-NEEDLESS-WORDS: func save(to _: URL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>)
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

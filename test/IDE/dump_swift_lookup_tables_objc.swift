@@ -92,5 +92,5 @@
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT:     -[NSObject respondsToSelector:]
 
 // CHECK-OMIT-NEEDLESS-WORDS: Base name -> entry mappings:
-// CHECK-OMIT-NEEDLESS-WORDS:   methodWith:
-// CHECK-OMIT-NEEDLESS-WORDS:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
+// CHECK-OMIT-NEEDLESS-WORDS:   method:
+// CHECK-OMIT-NEEDLESS-WORDS:     NSErrorImports: {{.*}}-[NSErrorImports methodWithFloat:error:]
