@@ -28,7 +28,7 @@ func expectOverflow<T>(
   @autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
 ) {
   expectTrue(
     res.overflow, "expected overflow",
@@ -41,7 +41,7 @@ func expectNoOverflow<T>(
   @autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
 ) {
   expectFalse(
     res.overflow, "expected no overflow",
@@ -68,45 +68,45 @@ var FixedPointArithmeticTraps = TestSuite("FixedPointArithmeticTraps")
 
 FixedPointArithmeticTraps.test("PreDecrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.min)
-  ++x
+  x += 1
 
   x = get${IntTy}(${IntTy}.min)
   expectCrashLater()
   // --IntTy.min
-  --x
+  x -= 1
   _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PreIncrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.max)
-  --x
+  x -= 1
 
   x = get${IntTy}(${IntTy}.max)
   expectCrashLater()
   // ++IntTy.max
-  ++x
+  x += 1
   _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PostDecrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.min)
-  x++
+  x += 1
 
   x = get${IntTy}(${IntTy}.min)
   expectCrashLater()
   // IntTy.min--
-  x--
+  x -= 1
   _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.max)
-  x--
+  x -= 1
 
   x = get${IntTy}(${IntTy}.max)
   expectCrashLater()
   // IntTy.max++
-  x++
+  x += 1
   _blackHole(x)
 }
 
