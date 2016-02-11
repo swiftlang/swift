@@ -1572,7 +1572,7 @@ getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
   assert(isa<AnyFunctionType>(key.SubstType));
   assert(key.UncurryLevel == 0);
 
-#ifdef DEBUG
+#ifndef NDEBUG
   // Catch recursions.
   insert(key, nullptr);
 #endif
@@ -1600,7 +1600,7 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   assert(!find(key) && "re-entrant or already cached");
   assert(isLoweredType(key.SubstType) && "didn't lower out l-value type?");
 
-#ifdef DEBUG
+#ifndef NDEBUG
   // Catch reentrancy bugs.
   insert(key, nullptr);
 #endif
