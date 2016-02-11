@@ -130,7 +130,7 @@
 //   This design constraint needs some extra motivation, because it
 //   might not be obvious.  Preserving index validity across mutation
 //   is important for algorithms that iterate over the tree and mutate
-//   it in place, for exmaple, removing a subrange of elements between
+//   it in place, for example, removing a subrange of elements between
 //   two indices, or removing elements that don't satisfy a predicate.
 //   When implementing such an algorithm, you would typically have an
 //   index that points to the current element.  You can copy the
