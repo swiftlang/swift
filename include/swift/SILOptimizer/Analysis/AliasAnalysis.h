@@ -37,7 +37,7 @@ namespace {
     void *T1, *T2;
   };
 
-  /// A key used for for the MemoryBehavior Analysis cache.
+  /// A key used for the MemoryBehavior Analysis cache.
   ///
   /// The two SILValue pointers are mapped to size_t indices because we need an
   /// efficient way to invalidate them (the mechanism is described below).  The
