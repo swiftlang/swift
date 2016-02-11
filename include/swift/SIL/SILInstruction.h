@@ -1201,7 +1201,7 @@ class StringLiteralInst : public LiteralInst {
   friend class SILBuilder;
 
 public:
-  enum class Encoding {
+  enum class Encoding : uint8_t {
     UTF8,
     UTF16,
     /// UTF-8 encoding of an Objective-C selector.
@@ -1211,12 +1211,14 @@ public:
 private:
   unsigned Length;
   Encoding TheEncoding;
+  bool NullTerminated;
 
   StringLiteralInst(SILDebugLocation *DebugLoc, StringRef text,
-                    Encoding encoding, SILType ty);
+                    Encoding encoding, bool nullTerminate, SILType ty);
 
   static StringLiteralInst *create(SILDebugLocation *DebugLoc, StringRef Text,
-                                   Encoding encoding, SILFunction &F);
+                                   Encoding encoding, bool nullTerminate,
+                                   SILFunction &F);
 
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
@@ -1226,6 +1228,9 @@ public:
 
   /// getEncoding - Return the desired encoding of the text.
   Encoding getEncoding() const { return TheEncoding; }
+
+  /// isNullTerminated - Return whether or not the string is null terminated.
+  bool isNullTerminated() const { return NullTerminated; }
 
   /// getCodeUnitCount - Return encoding-based length of the string
   /// literal in code units.
