@@ -279,7 +279,7 @@
 
 // "Of" associates left.
 // CHECK-OMIT-NEEDLESS-WORDS: func typeOf(_: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func typeOf(namedString _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func type(ofNamedString _: String)
 
 // Look for preposition prior to "of".
 // CHECK-OMIT-NEEDLESS-WORDS: func append(contentsOf _: String)
