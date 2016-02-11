@@ -969,7 +969,7 @@ static bool splitBaseNameAfterLastPreposition(
                                               afterPreposition,
                                               paramType);
 
-  // By default, put the prposition on the argument label.
+  // By default, put the preposition on the argument label.
   bool prepositionOnArgLabel =
     shouldPlacePrepositionOnArgLabel(beforePreposition, preposition,
                                      afterPreposition);
