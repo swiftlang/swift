@@ -915,6 +915,31 @@ static bool isVacuousPreposition(StringRef beforePreposition,
   return false;
 }
 
+namespace {
+  typedef std::reverse_iterator<camel_case::WordIterator> ReverseWordIterator;
+}
+
+/// Find the last preposition in the given word.
+static ReverseWordIterator findLastPreposition(ReverseWordIterator first,
+                                               ReverseWordIterator last) {
+  while (first != last) {
+    switch (getPartOfSpeech(*first)) {
+    case PartOfSpeech::Preposition:
+      return first;
+
+    case PartOfSpeech::Verb:
+    case PartOfSpeech::Gerund:
+      return last;
+
+    case PartOfSpeech::Unknown:
+      ++first;
+      break;
+    }
+  }
+
+  return last;
+}
+
 /// Split the base name after the last preposition, if there is one.
 static bool splitBaseNameAfterLastPreposition(
     StringRef &baseName,
@@ -922,28 +947,14 @@ static bool splitBaseNameAfterLastPreposition(
     const OmissionTypeName &paramType) {
   // Scan backwards for a preposition.
   auto nameWords = camel_case::getWords(baseName);
-  auto nameWordRevIter = nameWords.rbegin(),
-    nameWordRevIterBegin = nameWordRevIter,
+  auto nameWordRevIterBegin = nameWords.rbegin(),
     nameWordRevIterEnd = nameWords.rend();
-  bool done = false;
-  while (nameWordRevIter != nameWordRevIterEnd && !done) {
-    switch (getPartOfSpeech(*nameWordRevIter)) {
-    case PartOfSpeech::Preposition:
-      done = true;
-      break;
 
-    case PartOfSpeech::Verb:
-    case PartOfSpeech::Gerund:
-      return false;
+  // Find the last preposition.
+  auto nameWordRevIter = findLastPreposition(nameWordRevIterBegin,
+                                             nameWordRevIterEnd);
 
-    case PartOfSpeech::Unknown:
-      ++nameWordRevIter;
-      break;
-    }
-  }
-
-  // If we ran out of words, there's nothing to split.
-  if (!done) return false;
+  if (nameWordRevIter == nameWordRevIterEnd) return false;
 
   // We found a split point.
   auto preposition = *nameWordRevIter;
