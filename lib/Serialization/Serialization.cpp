@@ -3415,7 +3415,6 @@ struct DeclCommentTableData {
   StringRef Brief;
   RawComment Raw;
   uint32_t Group;
-  uint32_t Order;
 };
 
 class DeclCommentTableInfo {
@@ -3448,9 +3447,6 @@ public:
 
     // Group Id.
     dataLength += numLen;
-
-    // Source order.
-    dataLength += numLen;
     endian::Writer<little> writer(out);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
@@ -3473,7 +3469,6 @@ public:
       out << C.RawText;
     }
     writer.write<uint32_t>(data.Group);
-    writer.write<uint32_t>(data.Order);
   }
 };
 
@@ -3580,8 +3575,7 @@ static void writeDeclCommentTable(
 
       generator.insert(copyString(USRBuffer.str()),
                        { VD->getBriefComment(), Raw,
-                         GroupContext.getGroupSequence(VD),
-                         SourceOrder ++ });
+                         GroupContext.getGroupSequence(VD) });
       return true;
     }
   };

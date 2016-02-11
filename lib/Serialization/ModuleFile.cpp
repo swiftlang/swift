@@ -597,7 +597,6 @@ public:
     }
     result.Raw = RawComment(Comments);
     result.Group = endian::readNext<uint32_t, little, unaligned>(data);
-    result.SourceOrder = endian::readNext<uint32_t, little, unaligned>(data);
     return result;
   }
 };
@@ -1555,15 +1554,6 @@ Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
     return None;
   }
   return getGroupNameById(Triple.getValue().Group);
-}
-
-Optional<unsigned>
-ModuleFile::getSourceOrderForDecl(const Decl *D) const {
-  auto Triple = getCommentForDecl(D);
-  if (!Triple.hasValue()) {
-    return None;
-  }
-  return Triple.getValue().SourceOrder;
 }
 
 void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {

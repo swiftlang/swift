@@ -347,28 +347,27 @@ void swift::ide::printSubmoduleInterface(
     return false;
   });
 
-  std::sort(SwiftDecls.begin(), SwiftDecls.end(),
-            [&](Decl *LHS, Decl *RHS) -> bool {
-    auto *LHSValue = dyn_cast<ValueDecl>(LHS);
-    auto *RHSValue = dyn_cast<ValueDecl>(RHS);
+  // If the group name is specified, we sort them according to their source order,
+  // which is the order preserved by getTopLeveDecls.
+  if (!GroupName) {
+    std::sort(SwiftDecls.begin(), SwiftDecls.end(),
+      [&](Decl *LHS, Decl *RHS) -> bool {
+        auto *LHSValue = dyn_cast<ValueDecl>(LHS);
+        auto *RHSValue = dyn_cast<ValueDecl>(RHS);
 
-    // If group is specified, we order the decls by their source order.
-    if (GroupName && LHS->getSourceOrder() && RHS->getSourceOrder()) {
-      return LHS->getSourceOrder().getValue() < RHS->getSourceOrder().getValue();
-    }
+        if (LHSValue && RHSValue) {
+          StringRef LHSName = LHSValue->getName().str();
+          StringRef RHSName = RHSValue->getName().str();
+          if (int Ret = LHSName.compare(RHSName))
+            return Ret < 0;
+          // FIXME: this is not sufficient to establish a total order for overloaded
+          // decls.
+          return LHS->getKind() < RHS->getKind();
+        }
 
-    if (LHSValue && RHSValue) {
-      StringRef LHSName = LHSValue->getName().str();
-      StringRef RHSName = RHSValue->getName().str();
-      if (int Ret = LHSName.compare(RHSName))
-        return Ret < 0;
-      // FIXME: this is not sufficient to establish a total order for overloaded
-      // decls.
-      return LHS->getKind() < RHS->getKind();
-    }
-
-    return LHS->getKind() < RHS->getKind();
-  });
+        return LHS->getKind() < RHS->getKind();
+      });
+  }
 
   ASTPrinter *PrinterToUse = &Printer;
 
