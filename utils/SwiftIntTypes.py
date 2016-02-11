@@ -38,6 +38,18 @@ class SwiftIntegerType(object):
     def get_opposite_signedness(self):
         return SwiftIntegerType(self.is_word, self.bits, not self.is_signed)
 
+    # If self is a word type (Int or UInt), returns a dictionary
+    # whose keys are the type's possible bit widths on different
+    # platforms and whose values are the corresponding non-word types.
+    # Returns an empty dictionary if self is a non-word type.
+    def get_corresponding_non_word_types(self):
+        non_word_types = {}
+        for bitwidth in self.possible_bitwidths:
+            non_word_types[bitwidth] = \
+                SwiftIntegerType(is_word=False, bits=bitwidth,
+                    is_signed=self.is_signed)
+        return non_word_types
+
     def __eq__(self, other):
         return self.is_word == other.is_word and \
             self.bits == other.bits and \

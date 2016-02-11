@@ -179,8 +179,20 @@ T : UnsignedIntegerType, U : _SignedIntegerType
 %   BuiltinName = self_ty.builtin_name
 %   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
 
+% if self_ty.is_word:
+/// ${'An un' if sign == 'u' else 'A '}signed integer value type that has
+/// the same size as the current platform's native word size.
+///
+%   non_word_types = self_ty.get_corresponding_non_word_types()
+%   for bitwidth in sorted(non_word_types):
+%     non_word_type = non_word_types[bitwidth]
+/// On a ${bitwidth}-bit platform, `${Self}` is the same size
+/// as `${non_word_type.stdlib_name}`.
+%   end
+% else:
 /// A ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
+% end
 public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'},
      Comparable, Equatable {
