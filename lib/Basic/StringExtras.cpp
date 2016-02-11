@@ -761,10 +761,6 @@ static StringRef omitNeedlessWords(StringRef name,
 
   }
 
-  // If we ended up with a vacuous name like "get" or "set", do nothing.
-  if (isVacuousName(name))
-    return origName;
-
   switch (role) {
   case NameRole::BaseName:
   case NameRole::BaseNameSelf:
@@ -773,6 +769,11 @@ static StringRef omitNeedlessWords(StringRef name,
     // do nothing.
     if (isKeyword(name))
       return origName;
+
+    // If we ended up with a vacuous name like "get" or "set", do nothing.
+    if (isVacuousName(name))
+      return origName;
+
     break;
 
   case NameRole::SubsequentParameter:

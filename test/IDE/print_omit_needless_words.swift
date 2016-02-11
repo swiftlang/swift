@@ -31,8 +31,8 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
 // Note: "with" parameters.
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?)
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?, withObject: AnyObject?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
 
 // Note: id -> "Object".
 // CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
@@ -40,14 +40,13 @@
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
-// Note: Pointer-to-struct name matching; "with" splits the first
-// piece, then the "with" is dropped.
+// Note: Pointer-to-struct name matching; preposition splitting.
 //
-// CHECK-FOUNDATION: func copy(withZone _: Zone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with _: Zone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(forKey _: Copying) -> AnyObject?
-// CHECK-FOUNDATION: func removeObject(forKey _: Copying)
+// CHECK-FOUNDATION: func object(for _: Copying) -> AnyObject?
+// CHECK-FOUNDATION: func removeObject(for _: Copying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
@@ -131,7 +130,7 @@
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], usingBlock: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
@@ -262,7 +261,7 @@
 // type information from the base name.
 // CHECK-APPKIT: func addGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
-// CHECK-APPKIT: func favoriteView(forGestureRecognizer _: NSGestureRecognizer) -> NSView?
+// CHECK-APPKIT: func favoriteView(for _: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
 // CHECK-APPKIT: func add(_: Rect)
 // CHECK-APPKIT: class func conjureRect(_: Rect)
@@ -273,7 +272,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
-// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(withURLs _: [URL])
+// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with _: [URL])
 // CHECK-OMIT-NEEDLESS-WORDS: func save(to _: URL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
 
