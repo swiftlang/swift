@@ -597,6 +597,7 @@ public:
     }
     result.Raw = RawComment(Comments);
     result.Group = endian::readNext<uint32_t, little, unaligned>(data);
+    result.SourceOrder = endian::readNext<uint32_t, little, unaligned>(data);
     return result;
   }
 };
@@ -1508,7 +1509,7 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   getTopLevelDecls(results);
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
+Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) const {
   assert(D);
 
   // Keep these as assertions instead of early exits to ensure that we are not
@@ -1539,7 +1540,7 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) {
+Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
   if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
     return None;
   auto Group = (*GroupNamesMap)[Id];
@@ -1548,7 +1549,7 @@ Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) {
   return Group;
 }
 
-Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) {
+Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
   auto Triple = getCommentForDecl(D);
   if (!Triple.hasValue()) {
     return None;
@@ -1556,7 +1557,16 @@ Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) {
   return getGroupNameById(Triple.getValue().Group);
 }
 
-void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) {
+Optional<unsigned>
+ModuleFile::getSourceOrderForDecl(const Decl *D) const {
+  auto Triple = getCommentForDecl(D);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return Triple.getValue().SourceOrder;
+}
+
+void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
   if (!GroupNamesMap)
     return;
   for (auto It = GroupNamesMap->begin(); It != GroupNamesMap->end(); ++ It) {
@@ -1564,7 +1574,8 @@ void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) {
   }
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
+Optional<BriefAndRawComment>
+ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   if (!DeclCommentTable)
     return None;
 

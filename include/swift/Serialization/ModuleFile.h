@@ -614,11 +614,12 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  Optional<StringRef> getGroupNameById(unsigned Id);
-  Optional<StringRef> getGroupNameForDecl(const Decl *D);
-  void collectAllGroups(std::vector<StringRef> &Names);
-  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
-  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
+  Optional<StringRef> getGroupNameById(unsigned Id) const;
+  Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
+  void collectAllGroups(std::vector<StringRef> &Names) const;
+  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D) const;
+  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR) const;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 
