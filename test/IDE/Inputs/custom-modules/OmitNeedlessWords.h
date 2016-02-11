@@ -10,4 +10,5 @@
 -(void)bookmarkWithURLs:(nonnull NSArray<NSURL *> *)urls;
 -(void)saveToURL:(nonnull NSURL *)url forSaveOperation:(NSInteger)operation;
 -(void)indexWithItemNamed:(nonnull NSString *)name;
+-(void)methodAndReturnError:(NSError **)error;
 @end
