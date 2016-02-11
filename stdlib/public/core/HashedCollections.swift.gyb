@@ -1068,7 +1068,7 @@ public struct Dictionary<Key : Hashable, Value> :
     }
   }
 
-  /// Update the value stored in the dictionary for the given key, or, if they
+  /// Update the value stored in the dictionary for the given key, or, if the
   /// key does not exist, add a new key-value pair to the dictionary.
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
