@@ -15,7 +15,7 @@
 import SwiftShims
 
 extension String {
-  /// Creates a new `String` by copying the nul-terminated UTF-8 data
+  /// Creates a new `String` by copying the null-terminated UTF-8 data
   /// referenced by a `CString`.
   ///
   /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
@@ -30,7 +30,7 @@ extension String {
         input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
   }
 
-  /// Creates a new `String` by copying the nul-terminated UTF-8 data
+  /// Creates a new `String` by copying the null-terminated UTF-8 data
   /// referenced by a `CString`.
   ///
   /// Returns `nil` if the `CString` is `NULL`.  If `CString` contains
