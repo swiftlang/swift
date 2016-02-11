@@ -659,11 +659,17 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       RightLoc = Tok.getLoc();
       return Status;
     }
+    SourceLoc SepLoc = Tok.getLoc();
     if (consumeIf(SeparatorK)) {
-      if (AllowSepAfterLast && Tok.is(RightK))
+      if (Tok.is(RightK)) {
+        if (!AllowSepAfterLast) {
+          diagnose(Tok, diag::unexpected_separator,
+                   SeparatorK == tok::comma ? "," : ";")
+            .fixItRemove(SourceRange(SepLoc));
+        }
         break;
-      else
-        continue;
+      }
+      continue;
     }
     if (!OptionalSep) {
       // If we're in a comma-separated list and the next token starts a new
