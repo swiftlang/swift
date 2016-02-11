@@ -345,7 +345,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addCSE();
   PM.addSILCombine();
   PM.addJumpThreadSimplifyCFG();
-  PM.addRedundantLoadElimination();
   PM.addDeadStoreElimination();
   PM.addCSE();
   PM.addLateCodeMotion();

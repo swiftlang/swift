@@ -23,6 +23,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/TrailingObjects.h"
 #include <cstring>
 
 namespace swift {
@@ -37,7 +38,10 @@ class ValueDecl;
 class ConcreteDeclRef {
   /// A specialized declaration reference, which provides substitutions
   /// that fully specialize a generic declaration.
-  class SpecializedDeclRef {
+  class SpecializedDeclRef final :
+      private llvm::TrailingObjects<SpecializedDeclRef, Substitution> {
+    friend TrailingObjects;
+
     /// The declaration.
     ValueDecl *TheDecl;
 
@@ -47,9 +51,8 @@ class ConcreteDeclRef {
     SpecializedDeclRef(ValueDecl *decl, ArrayRef<Substitution> substitutions)
       : TheDecl(decl), NumSubstitutions(substitutions.size())
     {
-      std::memcpy(reinterpret_cast<Substitution *>(this + 1),
-                  substitutions.data(),
-                  sizeof(Substitution) * substitutions.size());
+      std::uninitialized_copy(substitutions.begin(), substitutions.end(),
+                              getTrailingObjects<Substitution>());
     }
 
   public:
@@ -58,8 +61,7 @@ class ConcreteDeclRef {
 
     /// Retrieve the substitutions.
     ArrayRef<Substitution> getSubstitutions() const {
-      return llvm::makeArrayRef(reinterpret_cast<const Substitution *>(this+1),
-                                NumSubstitutions);
+      return {getTrailingObjects<Substitution>(), NumSubstitutions};
     }
     
     /// Allocate a new specialized declaration reference.

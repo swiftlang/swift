@@ -322,8 +322,8 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  if(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE)
-    list(APPEND swift_flags "-assert-config" "Release")
+  if(SWIFT_STDLIB_ENABLE_RESILIENCE AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
   endif()
 
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
@@ -333,8 +333,10 @@ function(_compile_swift_files dependency_target_out_var_name)
   # FIXME: Cleaner way to do this?
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
-        "-nostdimport" "-parse-stdlib" "-module-name" "Swift"
-        "-Xfrontend" "-sil-serialize-all")
+        "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
+    if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
+      list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
+    endif()
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)

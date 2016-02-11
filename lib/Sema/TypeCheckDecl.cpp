@@ -5096,6 +5096,14 @@ public:
     }
     if (EED->hasType())
       return;
+    
+    if (EED->isBeingTypeChecked()) {
+      TC.diagnose(EED->getLoc(), diag::circular_reference);
+      EED->setType(ErrorType::get(TC.Context));
+      EED->setInvalid();
+      return;
+    }
+    
 
     TC.checkDeclAttributesEarly(EED);
 
@@ -5150,7 +5158,8 @@ public:
 
     // Now that we have an argument type we can set the element's declared
     // type.
-    EED->computeType();
+    if (!EED->hasType())
+      EED->computeType();
     EED->setIsBeingTypeChecked(false);
 
     // Test for type parameters, as opposed to a generic decl context, in
@@ -5614,7 +5623,7 @@ static bool checkStructDeclCircularity(StructDecl *S, NominalDeclSet &known,
                                        Type baseType,
                                        bool isGenericArg = false);
 
-// dispatch arbitrary declaration to relavent circularity checks.
+// dispatch arbitrary declaration to relevant circularity checks.
 static bool checkNominalDeclCircularity(Decl *decl, NominalDeclSet &known,
                                         Type baseType,
                                         bool isGenericArg = false) {

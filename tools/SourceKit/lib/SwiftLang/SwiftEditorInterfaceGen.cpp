@@ -243,6 +243,7 @@ static void reportSemanticAnnotations(const SourceTextInfo &IFaceInfo,
 
 static bool getModuleInterfaceInfo(ASTContext &Ctx,
                                    StringRef ModuleName,
+                                   Optional<StringRef> Group,
                                  SwiftInterfaceGenContext::Implementation &Impl,
                                    std::string &ErrMsg) {
   Module *&Mod = Impl.Mod;
@@ -285,7 +286,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
-  printSubmoduleInterface(Mod, SplitModuleName,
+  printSubmoduleInterface(Mod, SplitModuleName, Group,
                           TraversalOptions,
                           Printer, Options, false);
 
@@ -341,6 +342,7 @@ SwiftInterfaceGenContextRef
 SwiftInterfaceGenContext::create(StringRef DocumentName,
                                  bool IsModule,
                                  StringRef ModuleOrHeaderName,
+                                 Optional<StringRef> Group,
                                  CompilerInvocation Invocation,
                                  std::string &ErrMsg) {
   SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
@@ -370,7 +372,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   }
 
   if (IsModule) {
-    if (getModuleInterfaceInfo(Ctx, ModuleOrHeaderName, IFaceGenCtx->Impl,
+    if (getModuleInterfaceInfo(Ctx, ModuleOrHeaderName, Group, IFaceGenCtx->Impl,
                                ErrMsg))
       return nullptr;
   } else {
@@ -549,6 +551,7 @@ SwiftInterfaceGenMap::find(StringRef ModuleName,
 void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
                                            StringRef Name,
                                            StringRef ModuleName,
+                                           Optional<StringRef> Group,
                                            ArrayRef<const char *> Args) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -580,6 +583,7 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/true,
                                                       ModuleName,
+                                                      Group,
                                                       Invocation,
                                                       ErrMsg);
   if (!IFaceGenRef) {
@@ -683,6 +687,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,
                                                       HeaderName,
+                                                      None,
                                                       Invocation,
                                                       Error);
   if (!IFaceGenRef) {

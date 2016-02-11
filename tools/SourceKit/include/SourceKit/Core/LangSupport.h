@@ -413,6 +413,7 @@ public:
   virtual void editorOpenInterface(EditorConsumer &Consumer,
                                    StringRef Name,
                                    StringRef ModuleName,
+                                   Optional<StringRef> Group,
                                    ArrayRef<const char *> Args) = 0;
 
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
@@ -459,6 +460,11 @@ public:
   virtual void findInterfaceDocument(StringRef ModuleName,
                                      ArrayRef<const char *> Args,
                     std::function<void(const InterfaceDocInfo &)> Receiver) = 0;
+
+  virtual void findModuleGroups(StringRef ModuleName,
+                                ArrayRef<const char *> Args,
+                                std::function<void(ArrayRef<StringRef>,
+                                                   StringRef Error)> Receiver) = 0;
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,

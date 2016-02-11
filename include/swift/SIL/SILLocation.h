@@ -332,6 +332,19 @@ public:
     return { getStartSourceLoc(), getEndSourceLoc() };
   }
 
+  typedef struct {
+    unsigned Line = 0, Col = 0;
+    const char *Filename = nullptr;
+  } DebugLoc;
+
+  /// Extract the line, column, and filename.
+  static DebugLoc decode(SourceLoc Loc, const SourceManager &SM);
+
+  /// Return the decoded debug location.
+  DebugLoc decodeDebugLoc(const SourceManager &SM) const {
+    return decode(getDebugSourceLoc(), SM);
+  }
+  
   /// Pretty-print the value.
   void dump(const SourceManager &SM) const;
   void print(raw_ostream &OS, const SourceManager &SM) const;

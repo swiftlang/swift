@@ -1066,6 +1066,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     // keeps that working.
     if (values.empty() && !retrying &&
         getContext().LangOpts.OmitNeedlessWords &&
+        getContext().LangOpts.StripNSPrefix &&
         (M->getName().str() == "ObjectiveC" ||
          M->getName().str() == "Foundation")) {
       if (name.str().startswith("NS")) {

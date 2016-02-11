@@ -382,6 +382,11 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
     // ArgBB is not the entry block and has predecessors.
     unsigned idx = 0;
     for (auto *PredBB : ArgBB->getPreds()) {
+
+      // We must avoid that we are going to change a block twice.
+      if (BlocksToEdit.count(PredBB) != 0)
+        return false;
+
       auto IncomingValue = IncomingValues[idx];
       SILValue ReachingValue = isArgValueEquivalentToCondition(
           IncomingValue, DomBB, DomCondition, DT);

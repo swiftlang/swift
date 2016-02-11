@@ -44,8 +44,6 @@ published should not limit its evolution in the future.
 
 .. contents:: :local:
 
-.. warning:: **This document is still in draft stages.**
-
 
 Introduction
 ============
@@ -601,13 +599,13 @@ can enforce its safe use.
 We've considered two possible syntaxes for this::
 
     @available(1.1)
-    extension MyStruct : SomeProto {…}
+    extension Wand : MagicType {…}
 
 and
 
 ::
 
-    extension MyStruct : @available(1.1) SomeProto {…}
+    extension Wand : @available(1.1) MagicType {…}
 
 The former requires fewer changes to the language grammar, but the latter could
 also be used on the declaration of the type itself (i.e. the ``struct``
@@ -807,6 +805,7 @@ There are very few safe changes to make to protocols:
 
 - A new non-type requirement may be added to a protocol, as long as it has an
   unconstrained default implementation.
+- A new associated type may be added to a protocol, as long as it has a default.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 - Changing *internal* parameter names of function and subscript requirements
@@ -826,10 +825,16 @@ Protocol extensions may be more freely modified; `see below`__.
 
 __ #protocol-extensions
 
-.. admonition:: TODO
+.. note::
 
-    It would also be nice to be able to add new associated types with default
-    values, but that seems trickier to implement.
+    Allowing the addition of associated types means implementing some form of
+    "generalized existentials", so that existing existential values (values
+    with protocol type) continue to work even if a protocol gets its first
+    associated type. Until we have that feature implemented, it is only safe to
+    add an associated type to a protocol that already has associated types, or
+    uses ``Self`` in a non-return position (i.e. one that currently cannot be
+    used as the type of a value).
+
 
 Classes
 ~~~~~~~
@@ -1080,13 +1085,11 @@ following changes are permitted:
 - Removing any non-public, non-versioned member.
 - Changing the body of any methods, initializers, or accessors.
 
-.. admonition:: TODO
+.. note::
 
-    How does "adding any new member" square with the restrictions on adding
-    initializers to classes? Are they inherently convenience initializers?
-
-    What about everything else? New members in protocols can result in new
-    overridable members in classes. How does that work?
+    Although it is not related to evolution, it is worth noting that members of
+    protocol extensions that do *not* satisfy protocol requirements are not
+    overridable, even when the conforming type is a class.
 
 
 Operators
@@ -1447,6 +1450,104 @@ Because this tool would require a fair amount of additional work, it is not
 part of this initial model. It is something we may decide to add in the future.
 
 
+Open Issues
+===========
+
+There are still a number of known issues with the model described in this
+document. We should endeavour to account for each of them, and if we can't come
+up with a satisfactory implementation we should at least make sure that they
+will not turn into pitfalls for library or client developers.
+
+
+Subclass and base both conform to protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    // Library, version 1
+    class Elf {}
+    protocol Summonable {}
+
+::
+
+    // Client, version 1
+    class ShoemakingElf : Elf, Summonable {}
+
+::
+
+    // Library, version 2
+    @available(2.0)
+    extension Elf : Summonable {}
+
+Now ``ShoemakingElf`` conforms to ``Summonable`` in two different ways, which
+may be incompatible (especially if ``Summonable`` had associated types or
+requirements involving ``Self``).
+
+Additionally, the client can't even remove ``ShoemakingElf``'s conformance to
+``Summonable``, because it may itself be a library with other code depending on
+it. We could fix that with an annotation to explicitly inherent the conformance
+of ``Summonable`` from the base class, but even that may not be possible if
+there are incompatible associated types involved (because changing a member
+typealias is not a safe change).
+
+One solution is to disallow adding a conformance for an existing protocol to a
+publicly-subclassable class.
+
+
+Recompiling changes a protocol's implementation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    // Library, version 1
+    protocol MagicType {}
+    protocol Wearable {}
+    func use<T: MagicType>(item: T) {}
+
+::
+
+    // Client, version 1
+    struct Amulet : MagicType, Wearable {}
+    use(Amulet())
+
+::
+
+    // Library, version 2
+    protocol MagicType {
+      @available(2.0)
+      func equip() { print("Equipped.") }
+    }
+    
+    extension Wearable where Self: MagicType {
+      @available(2.0)
+      func equip() { print("You put it on.") }
+    }
+
+    func use<T: MagicType>(item: T) { item.equip() }
+
+Before the client is recompiled, the implementation of ``equip()`` used for
+``Amulet`` instances can only be the default implementation, i.e. the one that
+prints "Equipped". However, recompiling the client will result in the
+constrained implementation being considered a "better" match for the protocol
+requirement, thus changing the behavior of the program.
+
+This should never change the *meaning* of a program, since the default
+implementation for a newly-added requirement should always be *correct.*
+However, it may have significantly different performance characteristics or
+side effects that would make the difference in behavior a surprise.
+
+This is similar to adding a new overload to an existing set of functions, which
+can also change the meaning of client code just by recompiling. However, the
+difference here is that the before-recompilation behavior was never requested
+or acknowledged by the client; it's just the best the library can do.
+
+A possible solution here is to require the client to acknowledge the added
+requirement in some way when it is recompiled.
+
+(We do not want to perform overload resolution at run time to find the best
+possible default implementation for a given type.)
+
+
 Summary
 =======
 
@@ -1470,6 +1571,7 @@ document that affect language semantics:
 - (planned) Making classes "sealed" by default
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) Default implementations in protocols
+- (planned) Generalized existentials (values of protocol type)
 - (planned) Open and closed enums
 - (planned) Syntax for declaring "versioned" entities and their features
 - (planned) Syntax for declaring inlineable code

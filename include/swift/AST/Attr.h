@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "clang/Basic/VersionTuple.h"
 
 namespace swift {
@@ -760,7 +761,10 @@ public:
 };
 
 /// Indicates that the given declaration is visible to Objective-C.
-class ObjCAttr : public DeclAttribute {
+class ObjCAttr final : public DeclAttribute,
+    private llvm::TrailingObjects<ObjCAttr, SourceLoc> {
+  friend TrailingObjects;
+
   /// The Objective-C name associated with this entity, stored in its opaque
   /// representation so that we can use null as an indicator for "no name".
   void *NameData;
@@ -793,7 +797,7 @@ class ObjCAttr : public DeclAttribute {
     unsigned length = 2;
     if (auto name = getName())
       length += name->getNumSelectorPieces();
-    return { reinterpret_cast<SourceLoc *>(this + 1), length };
+    return {getTrailingObjects<SourceLoc>(), length};
   }
 
   /// Retrieve the trailing location information.
@@ -802,7 +806,7 @@ class ObjCAttr : public DeclAttribute {
     unsigned length = 2;
     if (auto name = getName())
       length += name->getNumSelectorPieces();
-    return { reinterpret_cast<const SourceLoc *>(this + 1), length };
+    return {getTrailingObjects<SourceLoc>(), length};
   }
 
 public:

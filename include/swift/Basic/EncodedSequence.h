@@ -21,11 +21,12 @@
 #ifndef SWIFT_BASIC_ENCODEDSEQUENCE_H
 #define SWIFT_BASIC_ENCODEDSEQUENCE_H
 
-#include <climits>
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrefixMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/TrailingObjects.h"
+#include <climits>
 
 namespace swift {
 
@@ -66,7 +67,10 @@ private:
   }
 
   /// A structure representing out-of-line chunk storage.
-  struct OutOfLineStorage {
+  struct OutOfLineStorage final :
+      private llvm::TrailingObjects<OutOfLineStorage, Chunk> {
+    friend TrailingObjects;
+
     uint16_t Size;
     uint16_t Capacity;
 
@@ -74,13 +78,13 @@ private:
 
   public:
     OutOfLineStorage *clone(size_t newCapacity) const {
-      size_t newAllocSize =
-        sizeof(OutOfLineStorage) + newCapacity * sizeof(Chunk);
+      assert(newCapacity >= Size);
+      size_t newAllocSize = totalSizeToAlloc<Chunk>(newCapacity);
       auto newData =
         new (operator new(newAllocSize)) OutOfLineStorage(newCapacity);
       newData->setSize(Size);
-      memcpy(newData->chunkStorage().data(), chunks().data(),
-             Size * sizeof(Chunk));
+      std::uninitialized_copy(chunks().begin(), chunks().end(),
+                              newData->chunkStorage().begin());
       return newData;
     }
     static OutOfLineStorage *alloc(size_t newSizeInBytes) {
@@ -97,13 +101,13 @@ private:
     }
 
     MutableArrayRef<Chunk> chunkStorage() {
-      return MutableArrayRef<Chunk>(reinterpret_cast<Chunk*>(this+1), Capacity);
+      return {getTrailingObjects<Chunk>(), Capacity};
     }
     ArrayRef<Chunk> chunkStorage() const {
-      return ArrayRef<Chunk>(reinterpret_cast<const Chunk*>(this+1), Capacity);
+      return {getTrailingObjects<Chunk>(), Capacity};
     }
     ArrayRef<Chunk> chunks() const {
-      return ArrayRef<Chunk>(reinterpret_cast<const Chunk*>(this+1), Size);
+      return {getTrailingObjects<Chunk>(), Size};
     }
   };
   OutOfLineStorage *getOutOfLineStorage() {

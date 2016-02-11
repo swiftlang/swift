@@ -665,7 +665,7 @@ public:
   /// This function is an implementation detail for comment serialization.
   /// If you just want to get a comment attached to a decl, use
   /// \c Decl::getRawComment() or \c Decl::getBriefComment().
-  virtual Optional<BriefAndRawComment>
+  virtual Optional<CommentInfo>
   getCommentForDecl(const Decl *D) const {
     return None;
   }
@@ -674,6 +674,8 @@ public:
   getGroupNameForDecl(const Decl *D) const {
     return None;
   }
+
+  virtual void collectAllGroups(std::vector<StringRef> &Names) const {}
 
   /// Returns an implementation-defined "discriminator" for \p D, which
   /// distinguishes \p D from other declarations in the same module with the

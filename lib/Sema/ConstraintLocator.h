@@ -22,7 +22,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -231,9 +230,6 @@ public:
       StoredKindAndValue
     };
 
-    /// \brief The type of storage used for a kind and numeric value.
-    typedef llvm::Fixnum<62> KindAndValueStorage;
-
     /// \brief The actual storage for the path element, which involves both a
     /// kind and (potentially) a value.
     ///
@@ -251,15 +247,13 @@ public:
     uint64_t storedKind : 2;
 
     /// \brief Encode a path element kind and a value into the storage format.
-    static KindAndValueStorage encodeStorage(PathElementKind kind,
-                                             unsigned value) {
-      unsigned result = (value << 8) | (unsigned)kind;
-      return result;
+    static uint64_t encodeStorage(PathElementKind kind, unsigned value) {
+      return ((uint64_t)value << 8) | kind;
     }
 
     /// \brief Decode a storage value into path element kind and value.
     static std::pair<PathElementKind, unsigned>
-    decodeStorage(KindAndValueStorage storage) {
+    decodeStorage(uint64_t storage) {
       return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
     }
 

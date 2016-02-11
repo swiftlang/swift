@@ -108,6 +108,7 @@ extern SourceKit::UIdent KeyDeprecated;
 extern SourceKit::UIdent KeyObsoleted;
 extern SourceKit::UIdent KeyRemoveCache;
 extern SourceKit::UIdent KeyTypeInterface;
+extern SourceKit::UIdent KeyModuleGroups;
 
 /// \brief Used for determining the printing order of dictionary keys.
 bool compareDictKeys(SourceKit::UIdent LHS, SourceKit::UIdent RHS);

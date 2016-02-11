@@ -44,9 +44,8 @@ class GuardMallocBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         print "Running {}...".format(test_name)
         sys.stdout.flush()
         status = subprocess.call([data['path'], data['test_name'], '--num-iters=2'],
-                                  env=data['env'],
-                                  stderr=open('/dev/null', 'w'),
-                                  stdout=open('/dev/null', 'w'))
+            env=data['env'], stderr=open('/dev/null', 'w'),
+            stdout=open('/dev/null', 'w'))
         return GuardMallocResult(test_name, status)
 
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -57,4 +56,3 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         sys.exit(-1)
-

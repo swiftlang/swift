@@ -12,32 +12,32 @@ cmake_minimum_required(VERSION 2.8.12)
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-include(add-swift-benchmark-suite)
+include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
 {% for test in tests %}
-    {{ test }}
+    single-source/{{ test }}
 {% endfor %}
 )
 
 set(SWIFT_MULTISOURCE_BENCHES
 {% for multisource_bench in multisource_benches %}
-    {{ multisource_bench.name }}
+    multi-source/{{ multisource_bench.name }}
 {% endfor %}
 )
 
 {% for multisource_bench in multisource_benches %}
 set({{ multisource_bench.name }}_sources
     {% for file in multisource_bench.files %}
-    {{ multisource_bench.name }}/{{ file }}
+    multi-source/{{ multisource_bench.name }}/{{ file }}
     {% endfor %}
 )
 
 {% endfor %}
 
 set(BENCH_DRIVER_LIBRARY_MODULES
-    DriverUtils
-    TestsUtils
+    utils/DriverUtils
+    utils/TestsUtils
 )
 
 set(BENCH_DRIVER_LIBRARY_FLAGS)
@@ -155,3 +155,4 @@ foreach(platform ${platforms})
 endforeach()
 
 add_subdirectory(scripts)
+

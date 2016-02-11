@@ -121,6 +121,7 @@ UIdent sourcekitd::KeyDeprecated("key.deprecated");
 UIdent sourcekitd::KeyObsoleted("key.obsoleted");
 UIdent sourcekitd::KeyRemoveCache("key.removecache");
 UIdent sourcekitd::KeyTypeInterface("key.typeinterface");
+UIdent sourcekitd::KeyModuleGroups("key.modulegroups");
 
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.

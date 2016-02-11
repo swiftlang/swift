@@ -73,6 +73,7 @@ import RC4
 import RGBHistogram
 import RangeAssignment
 import RecursiveOwnedParameter
+import StaticArray
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -86,6 +87,7 @@ import StringTests
 import StringWalk
 import SuperChars
 import TwoSum
+import TypeFlood
 import Walsh
 import XorLoop
 
@@ -147,6 +149,7 @@ precommitTests = [
   "RGBHistogram": run_RGBHistogram,
   "RangeAssignment": run_RangeAssignment,
   "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
+  "StaticArray": run_StaticArray,
   "SetExclusiveOr": run_SetExclusiveOr,
   "SetIntersect": run_SetIntersect,
   "SetIsSubsetOf": run_SetIsSubsetOf,
@@ -163,6 +166,7 @@ precommitTests = [
   "StringWithCString": run_StringWithCString,
   "SuperChars": run_SuperChars,
   "TwoSum": run_TwoSum,
+  "TypeFlood": run_TypeFlood,
   "Walsh": run_Walsh,
   "XorLoop": run_XorLoop,
 ]

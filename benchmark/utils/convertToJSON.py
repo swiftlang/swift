@@ -62,32 +62,12 @@ import json
 import re
 # Parse lines like this
 # #,TEST,SAMPLES,MIN(ms),MAX(ms),MEAN(ms),SD(ms),MEDIAN(ms)
-SCORERE=re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+)")
+SCORERE = re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+)")
 
 # The Totals line would be parsed like this.
-TOTALRE=re.compile(r"()(Totals),[ \t]*([\d.]+),[ \t]*([\d.]+)")
-KEYGROUP=2
-VALGROUP=4
-
-def getScores(fname):
-    scores = {}
-    runs = 0
-    f = open(fname)
-    try:
-        for line in f:
-            if VERBOSE: print "Parsing", line,
-            m = SCORERE.match(line)
-            if not m:
-                continue
-
-            if not m.group(KEYGROUP) in scores:
-                scores[m.group(KEYGROUP)] = []
-            scores[m.group(KEYGROUP)].append(parseFloat(m.group(VALGROUP)))
-            if len(scores[m.group(KEYGROUP)]) > runs:
-                runs = len(scores[m.group(KEYGROUP)])
-    finally:
-        f.close()
-    return scores, runs
+TOTALRE = re.compile(r"()(Totals),[ \t]*([\d.]+),[ \t]*([\d.]+)")
+KEYGROUP = 2
+VALGROUP = 4
 
 if __name__ == "__main__":
     data = {}

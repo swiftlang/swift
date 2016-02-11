@@ -76,7 +76,7 @@ struct PointerIntEnumIndexKindValue
 /// determine what cases are pointer and which are indices. For instance the one
 /// used by Projection in swift is:
 ///
-///    enum class NewProjectionKind : unsigned {
+///    enum class ProjectionKind : unsigned {
 ///      // PointerProjectionKinds
 ///      Upcast = 0,
 ///      RefCast = 1,

@@ -57,12 +57,7 @@ namespace irgen {
 
 class IRGenFunction;
 
-typedef struct {
-  unsigned Line, Col;
-  const char *Filename;
-} Location;
-
-typedef struct { Location LocForLinetable, Loc; } FullLocation;
+typedef struct { SILLocation::DebugLoc LocForLinetable, Loc; } FullLocation;
 
 typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
     TrackingDIRefMap;
@@ -91,17 +86,17 @@ class IRGenDebugInfo {
   llvm::SmallPtrSet<const llvm::DIType *, 16> IndirectEnumCases;
 
   llvm::BumpPtrAllocator DebugInfoNames;
-  StringRef CWDName;               /// The current working directory.
+  StringRef CWDName;                    /// The current working directory.
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
   llvm::DIFile *MainFile = nullptr;     /// The main file.
   llvm::DIModule *MainModule = nullptr; /// The current module.
-  llvm::MDNode *EntryPointFn;      /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
-  TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
+  llvm::MDNode *EntryPointFn;           /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  TypeAliasDecl *MetadataTypeDecl;      /// The type decl for swift.type.
   llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
 
-  Location LastDebugLoc;    /// The last location that was emitted.
-  const SILDebugScope *LastScope; /// The scope of that last location.
-  bool IsLibrary;           /// Whether this is a library or a top level module.
+  SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
+  const SILDebugScope *LastScope;     /// The scope of that last location.
+  bool IsLibrary; /// Whether this is a library or a top level module.
 #ifndef NDEBUG
   /// The basic block where the location was last changed.
   llvm::BasicBlock *LastBasicBlock;
@@ -109,7 +104,8 @@ class IRGenDebugInfo {
 #endif
 
   /// Used by pushLoc.
-  SmallVector<std::pair<Location, const SILDebugScope *>, 8> LocationStack;
+  SmallVector<std::pair<SILLocation::DebugLoc, const SILDebugScope *>, 8>
+      LocationStack;
 
 public:
   IRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,

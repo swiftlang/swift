@@ -2158,6 +2158,9 @@ void WitnessTableBuilder::bindArchetypes(IRGenFunction &IGF,
     //     be stored in the private section of the witness table.
     SmallVector<llvm::Value*, 4> archetypeWitnessTables;
     for (auto protocol : archetype->getConformsTo()) {
+      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+        continue;
+
       llvm::Value *wtable;
       if (auto fulfillment =
             fulfillments.getWitnessTable(CanType(archetype), protocol)) {
@@ -2542,9 +2545,7 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
 /// Allocate a new ProtocolInfo.
 ProtocolInfo *ProtocolInfo::create(unsigned numWitnesses,
                                    ArrayRef<WitnessTableEntry> table) {
-  unsigned numEntries = table.size();
-  size_t bufferSize =
-    sizeof(ProtocolInfo) + numEntries * sizeof(WitnessTableEntry);
+  size_t bufferSize = totalSizeToAlloc<WitnessTableEntry>(table.size());
   void *buffer = ::operator new(bufferSize);
   return new(buffer) ProtocolInfo(numWitnesses, table);
 }

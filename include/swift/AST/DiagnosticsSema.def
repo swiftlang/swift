@@ -243,6 +243,11 @@ NOTE(suggest_partial_overloads,none,
       "partially matching parameter lists|result types}0: %2",
       (bool, StringRef, StringRef))
 
+NOTE(no_binary_op_overload_for_enum_with_payload,none,
+      "binary operator '%0' cannot be synthesized for enums "
+      "with associated values",
+      (StringRef))
+
 ERROR(cannot_convert_initializer_value,none,
       "cannot convert value of type %0 to specified type %1", (Type,Type))
 ERROR(cannot_convert_initializer_value_protocol,none,
@@ -1959,6 +1964,11 @@ NOTE(recursive_accessor_reference_silence,none,
 WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
+
+WARNING(tuple_splat_use,none,
+        "passing %0 arguments to a callee as a single tuple value is deprecated",
+        (unsigned))
+
 
 ERROR(value_of_module_type,none,
       "expected module member name after module name", ())

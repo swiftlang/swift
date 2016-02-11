@@ -31,7 +31,7 @@ import Swift
 // --       template fill function
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_RootGeneric
 // --       nominal type descriptor
-// CHECK:   @_TMnC15generic_classes11RootGeneric,
+// CHECK:   @_TMnC15generic_classes11RootGeneric
 // --       vtable
 // CHECK:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
 // CHECK:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
@@ -81,7 +81,7 @@ import Swift
 // CHECK:   i32 33,
 // CHECK:   i16 7,
 // CHECK:   i16 0,
-// CHECK:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
+// CHECK:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric
 // CHECK: }>
 
 // CHECK: @_TMPC15generic_classes22GenericInheritsGeneric = {{(protected )?}}global

@@ -101,7 +101,6 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
       type->getCalleeConvention() == callee)
     return type;
 
-  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
   return SILFunctionType::get(type->getGenericSignature(),
                               extInfo,
                               callee,
@@ -109,7 +108,6 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
                               type->getResult(),
                               type->getOptionalErrorResult(),
                               type->getASTContext());
-  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
 }
 
 namespace {

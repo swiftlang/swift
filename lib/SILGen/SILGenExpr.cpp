@@ -1411,6 +1411,7 @@ ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
 
 RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
                                                  SGFContext C) {
+  SGF.checkForImportedUsedConformances(E);
   return emitUnconditionalCheckedCast(SGF, E, E->getSubExpr(), E->getType(),
                                       E->getCastKind(), C);
 }
@@ -1419,12 +1420,14 @@ RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
 RValue RValueEmitter::
 visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
+  SGF.checkForImportedUsedConformances(E);
   ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
   return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
                                     E->getType(), E->getCastKind(), C);
 }
 
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
+  SGF.checkForImportedUsedConformances(E);
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
                          E->getCastTypeLoc().getType(), E->getCastKind());
 
@@ -1438,6 +1441,7 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
+  SGF.checkForImportedUsedConformances(E);
   return visit(E->getSubExpr(), C);
 }
 

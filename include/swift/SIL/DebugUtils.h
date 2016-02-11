@@ -26,7 +26,7 @@
 // some utility functions, which can be used instead of the relevant member
 // functions in ValueBase and SILValue:
 //
-// V->use_empty()        ->  hasNoUsesExceptDebug(V)
+// V->use_empty()        ->  onlyHaveDebugUses(V)
 // V.hasOneUse()         ->  hasOneNonDebugUse(V)
 // V.getUses()           ->  getNonDebugUses(V)
 // I->eraseFromParent()  ->  eraseFromParentWithDebugInsts(I)
@@ -137,7 +137,7 @@ inline iterator_range<NonDUIterator> getNonDebugUses(SILValue V) {
 
 /// Returns true if a value (e.g. SILInstruction) has no uses except debug
 /// instructions.
-inline bool hasNoUsesExceptDebug(SILValue V) {
+inline bool onlyHaveDebugUses(SILValue V) {
   auto NonDebugUses = getNonDebugUses(V);
   return NonDebugUses.begin() == NonDebugUses.end();
 }

@@ -2267,11 +2267,12 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
 /// existing external declaration to the address point as an alias into the
 /// full metadata object.
 llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
-                                                   bool isIndirect,
-                                                   bool isPattern,
-                                                   bool isConstant,
-                                                   llvm::Constant *init,
-                                                   llvm::StringRef section) {
+                                 bool isIndirect,
+                                 bool isPattern,
+                                 bool isConstant,
+                                 llvm::Constant *init,
+                                 std::unique_ptr<llvm::GlobalVariable> replace,
+                                 llvm::StringRef section) {
   assert(init);
   assert(!isIndirect && "indirect type metadata not used yet");
 
@@ -2313,6 +2314,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   var->setConstant(isConstant);
   if (!section.empty())
     var->setSection(section);
+  
+  // Replace the placeholder if we were given one.
+  if (replace) {
+    auto replacer = llvm::ConstantExpr::getBitCast(var, replace->getType());
+    replace->replaceAllUsesWith(replacer);
+    replace.release();
+  }
 
   // Keep type metadata around for all types, although the runtime can currently
   // only perform name lookup of non-generic types.
@@ -2483,42 +2491,6 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
   
   return addr;
-}
-
-/// Return the address of a foreign-type metadata candidate.  There is no
-/// single translation unit which can uniquely emit foreign-type metadata,
-/// and we don't want to force the dynamic linker to eagerly unique them
-/// by symbol name, so instead we emit a "candidate" metadata and ask
-/// the runtime to unique them.
-llvm::Constant *
-IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
-  // What we save in GlobalVars is actually the offsetted value.
-  auto entity = LinkEntity::forForeignTypeMetadataCandidate(type);
-  if (auto entry = GlobalVars[entity])
-    return entry;
-
-  // Compute the constant initializer and the offset of the type
-  // metadata candidate within it.
-  Size addressPoint;
-  auto init = emitForeignTypeMetadataInitializer(*this, type, addressPoint);
-
-  // Create the global variable.
-  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
-  auto var = link.createVariable(*this, init->getType(),
-                                 getPointerAlignment());
-  var->setInitializer(init);
-
-  // Apply the offset.
-  llvm::Constant *result = var;
-  result = llvm::ConstantExpr::getBitCast(result, Int8PtrTy);
-  result = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      Int8Ty, result, getSize(addressPoint));
-  result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
-
-  // Only remember the offset.
-  GlobalVars[entity] = result;
-
-  return result;
 }
 
 /// Return the address of a nominal type descriptor.  Right now, this

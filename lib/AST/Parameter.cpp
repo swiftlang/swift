@@ -30,15 +30,14 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Either both paren locs are valid or neither are");
   
-  auto byteSize = sizeof(ParameterList)+params.size()*sizeof(ParamDecl*);
+  auto byteSize = totalSizeToAlloc<ParamDecl *>(params.size());
   auto rawMem = C.Allocate(byteSize, alignof(ParameterList));
   
   //  Placement initialize the ParameterList and the Parameter's.
   auto PL = ::new (rawMem) ParameterList(LParenLoc, params.size(), RParenLoc);
 
-  for (size_t i = 0, e = params.size(); i != e; ++i)
-    ::new (&PL->get(i)) ParamDecl*(params[i]);
-  
+  std::uninitialized_copy(params.begin(), params.end(), PL->getArray().begin());
+
   return PL;
 }
 

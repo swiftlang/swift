@@ -943,9 +943,9 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   return result;
 }
 
-void ClangImporter::collectSubModuleNamesAndVisibility(
+void ClangImporter::collectSubModuleNames(
     ArrayRef<std::pair<Identifier, SourceLoc>> path,
-    std::vector<std::pair<std::string, bool>> &namesVisiblePairs) {
+    std::vector<std::string> &names) {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
@@ -962,9 +962,7 @@ void ClangImporter::collectSubModuleNamesAndVisibility(
   auto submoduleNameLength = submodule->getFullModuleName().length();
   for (auto sub : submodule->submodules()) {
     StringRef full = sub->getFullModuleName();
-    namesVisiblePairs.push_back(
-      std::make_pair(full.substr(submoduleNameLength + 1).str(),
-      isModuleImported(sub)));
+    names.push_back(full.substr(submoduleNameLength + 1).str());
   }
 }
 
@@ -1184,7 +1182,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
 
   // Prepopulate the set of module prefixes.
   // FIXME: Hard-coded list should move into the module map language.
-  if (OmitNeedlessWords) {
+  if (OmitNeedlessWords && ctx.LangOpts.StripNSPrefix) {
     ModulePrefixes["Foundation"] = "NS";
     ModulePrefixes["ObjectiveC"] = "NS";
   }
@@ -2610,9 +2608,9 @@ void ClangImporter::Implementation::mergePropInfoIntoAccessor(
   }
 }
 
-static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>> lookupObjCContext(api_notes::APINotesReader *reader,
-                    StringRef contextName,
-                    const clang::ObjCContainerDecl *contextDecl) {
+static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
+lookupObjCContext(api_notes::APINotesReader *reader, StringRef contextName,
+                  const clang::ObjCContainerDecl *contextDecl) {
   Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
     contextInfo;
 

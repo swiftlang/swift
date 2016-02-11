@@ -123,6 +123,9 @@ public:
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
+  /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
+  unsigned PrintInlineTree : 1;
+
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
 
@@ -145,7 +148,7 @@ public:
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), Playground(false),
                    EmitStackPromotionChecks(false), GenerateProfile(false),
-                   EmbedMode(IRGenEmbedMode::None),
+                   PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
                    StripReflectionNames(true), StripReflectionMetadata(true)
                    {}

@@ -13,7 +13,6 @@
 # ===----------------------------------------------------------------------===//
 
 import os
-import sys
 import subprocess
 import multiprocessing
 import re
@@ -60,12 +59,12 @@ class Result(object):
 def _unwrap_self(args):
     return type(args[0]).process_input(*args)
 
-PerfTestDriver_OptLevels = ['Onone', 'O', 'Ounchecked']
+BenchmarkDriver_OptLevels = ['Onone', 'O', 'Ounchecked']
 
-class PerfTestDriver(object):
+class BenchmarkDriver(object):
 
-    def __init__(self, binary_dir, xfail_list, enable_parallel=False, opt_levels=PerfTestDriver_OptLevels):
-        self.targets = [(os.path.join(binary_dir, 'PerfTests_%s' % o), o) for o in opt_levels]
+    def __init__(self, binary_dir, xfail_list, enable_parallel=False, opt_levels=BenchmarkDriver_OptLevels):
+        self.targets = [(os.path.join(binary_dir, 'Benchmark_%s' % o), o) for o in opt_levels]
         self.xfail_list = xfail_list
         self.enable_parallel = enable_parallel
         self.data = None
@@ -96,7 +95,7 @@ class PerfTestDriver(object):
         results = None
         if self.enable_parallel:
             p = multiprocessing.Pool()
-            z = zip([self]*len(prepared_input), prepared_input)
+            z = zip([self] * len(prepared_input), prepared_input)
             results = p.map(_unwrap_self, z)
         else:
             results = map(self.process_input, prepared_input)

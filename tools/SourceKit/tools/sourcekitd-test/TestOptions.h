@@ -44,7 +44,8 @@ enum class SourceKitRequest {
   Edit,
   PrintAnnotations,
   PrintDiags,
-  ExtractComment
+  ExtractComment,
+  ModuleGroups,
 };
 
 struct TestOptions {
@@ -53,6 +54,7 @@ struct TestOptions {
   std::string TextInputFile;
   std::string JsonRequestPath;
   llvm::Optional<std::string> SourceText;
+  std::string ModuleGroupName;
   unsigned Line = 0;
   unsigned Col = 0;
   unsigned Offset = 0;

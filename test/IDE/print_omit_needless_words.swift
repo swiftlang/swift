@@ -3,28 +3,28 @@
 
 // REQUIRES: objc_interop
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/ObjectiveC.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words -enable-strip-ns-prefix %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/ObjectiveC.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words -enable-strip-ns-prefix %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words  -enable-strip-ns-prefix %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/Foundation.swift
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/AppKit.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-omit-needless-words  -enable-strip-ns-prefix %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/AppKit.swift
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ObjectiveC -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -enable-infer-default-arguments > %t.ObjectiveC.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ObjectiveC -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -enable-infer-default-arguments > %t.ObjectiveC.txt
 // RUN: FileCheck %s -check-prefix=CHECK-OBJECTIVEC -strict-whitespace < %t.ObjectiveC.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.Foundation.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.Foundation.txt
 // RUN: FileCheck %s -check-prefix=CHECK-FOUNDATION -strict-whitespace < %t.Foundation.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.AppKit.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.AppKit.txt
 // RUN: FileCheck %s -check-prefix=CHECK-APPKIT -strict-whitespace < %t.AppKit.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangModules/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.CoreCooling.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangModules/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.CoreCooling.txt
 // RUN: FileCheck %s -check-prefix=CHECK-CORECOOLING -strict-whitespace < %t.CoreCooling.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=OmitNeedlessWords -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.OmitNeedlessWords.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=OmitNeedlessWords -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.OmitNeedlessWords.txt
 // RUN: FileCheck %s -check-prefix=CHECK-OMIT-NEEDLESS-WORDS -strict-whitespace < %t.OmitNeedlessWords.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=errors -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.errors.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=errors -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.errors.txt
 // RUN: FileCheck %s -check-prefix=CHECK-ERRORS -strict-whitespace < %t.errors.txt
 
 // Note: SEL -> "Selector"
@@ -35,7 +35,7 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?, withObject: AnyObject?)
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
+// CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
 
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
@@ -43,11 +43,11 @@
 // Note: Pointer-to-struct name matching; "with" splits the first
 // piece, then the "with" is dropped.
 //
-// CHECK-FOUNDATION: func copyWith(_: Zone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(withZone _: Zone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func objectFor(_: Copying) -> AnyObject?
-// CHECK-FOUNDATION: func removeObjectFor(_: Copying)
+// CHECK-FOUNDATION: func object(forKey _: Copying) -> AnyObject?
+// CHECK-FOUNDATION: func removeObject(forKey _: Copying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
@@ -74,7 +74,7 @@
 // CHECK-FOUNDATION: var isMakingHoney: Bool
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethodWith(_: DeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethod(_: DeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
@@ -104,7 +104,7 @@
 // CHECK-FOUNDATION: func add(_: [AnyObject])
 
 // Note: Int and Index match.
-// CHECK-FOUNDATION: func sliceFrom(_: Int, to: Int) -> String
+// CHECK-FOUNDATION: func slice(from _: Int, to: Int) -> String
 
 // Note: <context type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func appending(_: String) -> String
@@ -112,8 +112,8 @@
 // Note: <context type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
-// Note: Not splitting on "With".
-// CHECK-FOUNDATION: func urlWith(addedString _: String) -> URL?
+// Note: Noun phrase puts preposition inside.
+// CHECK-FOUNDATION: func url(withAddedString _: String) -> URL?
 
 // Note: CalendarUnits is not a set of "Options".
 // CHECK-FOUNDATION: class func forCalendarUnits(_: CalendarUnit) -> String!
@@ -207,19 +207,19 @@
 // CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8>)
 
 // Note: Skipping over "3D"
-// CHECK-APPKIT: func drawInAirAt(_: Point3D)
+// CHECK-APPKIT: func drawInAir(at _: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func drawAt(_: Point3D, withAttributes: [String : AnyObject]? = [:])
+// CHECK-APPKIT: func draw(at _: Point3D, withAttributes: [String : AnyObject]? = [:])
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
 
 // Note: Splitting with default arguments.
-// CHECK-APPKIT: func drawIn(_: NSView?)
+// CHECK-APPKIT: func draw(in _: NSView?)
 
 // Note: NSDictionary default arguments for "options"
-// CHECK-APPKIT: func drawAnywhereIn(_: NSView?, options: [Object : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(in _: NSView?, options: [Object : AnyObject] = [:])
 // CHECK-APPKIT: func drawAnywhere(options _: [Object : AnyObject] = [:])
 
 // Note: no lowercasing of initialisms when there might be a prefix.
@@ -245,7 +245,7 @@
 
 // CHECK-APPKIT: func dismiss(animated _: Bool)
 
-// CHECK-APPKIT: func shouldCollapseAutoExpandedItemsFor(deposited _: Bool) -> Bool
+// CHECK-APPKIT: func shouldCollapseAutoExpandedItems(forDeposited _: Bool) -> Bool
 
 // Introducing argument labels and pruning the base name.
 // CHECK-APPKIT: func rectForCancelButtonWhenCentered(_: Bool)
@@ -256,22 +256,26 @@
 // CHECK-APPKIT: func setContentHuggingPriority(_: NSLayoutPriority)
 
 // Look through typedefs of pointers.
-// CHECK-APPKIT: func layoutAt(_: NSPointPointer)
+// CHECK-APPKIT: func layout(at _: NSPointPointer)
 
 // The presence of a property prevents us from stripping redundant
 // type information from the base name.
 // CHECK-APPKIT: func addGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
-// CHECK-APPKIT: func favoriteViewFor(_: NSGestureRecognizer) -> NSView?
+// CHECK-APPKIT: func favoriteView(forGestureRecognizer _: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
 // CHECK-APPKIT: func add(_: Rect)
 // CHECK-APPKIT: class func conjureRect(_: Rect)
 
-// CHECK-OMIT-NEEDLESS-WORDS: func jumpTo(_: URL)
+// CHECK-OMIT-NEEDLESS-WORDS: func jump(to _: URL)
 // CHECK-OMIT-NEEDLESS-WORDS: func objectIsCompatibleWith(_: AnyObject) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x _: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
+// CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
+// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(withURLs _: [URL])
+// CHECK-OMIT-NEEDLESS-WORDS: func save(to _: URL, forSaveOperation: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

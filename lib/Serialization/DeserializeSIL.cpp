@@ -574,7 +574,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     auto Arg = new (SILMod) SILArgument(CurrentBB,
                                         getSILType(ArgTy,
                                                    (SILValueCategory)Args[I+1]));
-    setLocalValue(Arg, ++LastValueID);
+    LastValueID = LastValueID + 1;
+    setLocalValue(Arg, LastValueID);
   }
   return CurrentBB;
 }
@@ -1728,8 +1729,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   }
-  if (ResultVal->hasValue())
-    setLocalValue(ResultVal, ++LastValueID);
+  if (ResultVal->hasValue()) {
+    LastValueID = LastValueID + 1;
+    setLocalValue(ResultVal, LastValueID);
+  }
 
   return false;
 }

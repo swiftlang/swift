@@ -389,25 +389,26 @@ recur_inside_cache_lock:
   {
     // Hash and lookup the type-protocol pair in the cache.
     size_t hash = hashTypeProtocolPair(type, protocol);
-    ConcurrentList<ConformanceCacheEntry> &Bucket =
-      C.Cache.findOrAllocateNode(hash);
 
     // Check if the type-protocol entry exists in the cache entry that we found.
-    for (auto &Entry : Bucket) {
-      if (!Entry.matches(type, protocol)) continue;
+    while (auto *Value = C.Cache.findValueByKey(hash)) {
+      if (Value->matches(type, protocol)) {
+        if (Value->isSuccessful())
+          return std::make_pair(Value->getWitnessTable(), true);
 
-      if (Entry.isSuccessful()) {
-        return std::make_pair(Entry.getWitnessTable(), true);
+        if (type == origType)
+          foundEntry = Value;
+
+        // If we got a cached negative response, check the generation number.
+        if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
+          // We found an entry with a negative value.
+          return std::make_pair(nullptr, true);
+        }
       }
 
-      if (type == origType)
-        foundEntry = &Entry;
-
-      // If we got a cached negative response, check the generation number.
-      if (Entry.getFailureGeneration() == C.SectionsToScan.size()) {
-        // We found an entry with a negative value.
-        return std::make_pair(nullptr, true);
-      }
+      // The entry that we fetched does not match our key due to a collision.
+      // If we have a collision increase the hash value by one and try again.
+      hash++;
     }
   }
 
@@ -419,16 +420,18 @@ recur_inside_cache_lock:
 
     // Hash and lookup the type-protocol pair in the cache.
     size_t hash = hashTypeProtocolPair(description, protocol);
-    ConcurrentList<ConformanceCacheEntry> &Bucket =
-      C.Cache.findOrAllocateNode(hash);
 
-    for (auto &Entry : Bucket) {
-      if (!Entry.matches(description, protocol)) continue;
-      if (Entry.isSuccessful()) {
-        return std::make_pair(Entry.getWitnessTable(), true);
+    while (auto *Value = C.Cache.findValueByKey(hash)) {
+      if (Value->matches(description, protocol)) {
+        if (Value->isSuccessful())
+          return std::make_pair(Value->getWitnessTable(), true);
+
+        // We don't try to cache negative responses for generic
+        // patterns.
       }
-      // We don't try to cache negative responses for generic
-      // patterns.
+
+      // If we have a collision increase the hash value by one and try again.
+      hash++;
     }
   }
 
@@ -522,10 +525,14 @@ recur:
 
     // Hash and lookup the type-protocol pair in the cache.
     size_t hash = hashTypeProtocolPair(type, protocol);
-    ConcurrentList<ConformanceCacheEntry> &Bucket =
-      C.Cache.findOrAllocateNode(hash);
-    Bucket.push_front(ConformanceCacheEntry::createFailure(
-        type, protocol, C.SectionsToScan.size()));
+    auto E = ConformanceCacheEntry::createFailure(type, protocol,
+                                                  C.SectionsToScan.size());
+
+    while (!C.Cache.tryToAllocateNewNode(hash, E)) {
+      // If we have a collision increase the hash value by one and try again.
+      hash++;
+    }
+
     pthread_mutex_unlock(&C.SectionsToScanLock);
     return nullptr;
   }
@@ -552,18 +559,21 @@ recur:
         if (!isRelatedType(type, metadata, /*isMetadata=*/true))
           continue;
 
-        // Hash and lookup the type-protocol pair in the cache.
+        // Store the type-protocol pair in the cache.
         size_t hash = hashTypeProtocolPair(metadata, P);
-        ConcurrentList<ConformanceCacheEntry> &Bucket =
-          C.Cache.findOrAllocateNode(hash);
 
         auto witness = record.getWitnessTable(metadata);
+        ConformanceCacheEntry E;
         if (witness)
-          Bucket.push_front(
-              ConformanceCacheEntry::createSuccess(metadata, P, witness));
+          E = ConformanceCacheEntry::createSuccess(metadata, P, witness);
         else
-          Bucket.push_front(ConformanceCacheEntry::createFailure(
-              metadata, P, C.SectionsToScan.size()));
+          E = ConformanceCacheEntry::createFailure(metadata, P,
+                                                   C.SectionsToScan.size());
+
+        while (!C.Cache.tryToAllocateNewNode(hash, E)) {
+          // If we have a collision increase the hash value by one and try again.
+          hash++;
+        }
 
       // If the record provides a nondependent witness table for all instances
       // of a generic type, cache it for the generic pattern.
@@ -585,12 +595,16 @@ recur:
         if (!isRelatedType(type, R, /*isMetadata=*/false))
           continue;
 
-        // Hash and lookup the type-protocol pair in the cache.
+        // Hash and store the type-protocol pair in the cache.
         size_t hash = hashTypeProtocolPair(R, P);
-        ConcurrentList<ConformanceCacheEntry> &Bucket =
-          C.Cache.findOrAllocateNode(hash);
-          Bucket.push_front(ConformanceCacheEntry::createSuccess(
-              R, P, record.getStaticWitnessTable()));
+        auto E = ConformanceCacheEntry::createSuccess(R, P,
+                                  record.getStaticWitnessTable());
+
+        while (!C.Cache.tryToAllocateNewNode(hash, E)) {
+          // If we have a collision increase the hash value by one and try again.
+          hash++;
+        }
+
       }
     }
   }
