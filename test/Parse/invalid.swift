@@ -64,3 +64,5 @@ func f573(s Starfish,  // expected-error {{parameter requires an explicit type}}
           _ ss: Salmon) -> [Int] {}
 func g573() { f573(Starfish(), Salmon()) }
 
+func SR698(a: Int, b: Int) {}
+SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
