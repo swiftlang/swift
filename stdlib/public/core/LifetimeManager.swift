@@ -31,7 +31,7 @@ public func withExtendedLifetime<T, Result>(
 extension String {
 
   /// Invoke `f` on the contents of this string, represented as
-  /// a nul-terminated array of char, ensuring that the array's
+  /// a null-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
   public func withCString<Result>(
     @noescape f: UnsafePointer<Int8> throws -> Result

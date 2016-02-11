@@ -247,7 +247,7 @@ extension String {
     return _core.elementWidth == 1 ? _core.startASCII : nil
   }
 
-  /// A contiguously-stored nul-terminated UTF-8 representation of
+  /// A contiguously-stored null-terminated UTF-8 representation of
   /// `self`.
   ///
   /// To access the underlying memory, invoke
