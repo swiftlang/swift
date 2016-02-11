@@ -413,7 +413,7 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation *Loc, StringRef Text,
                                      SILType Ty)
     : LiteralInst(ValueKind::StringLiteralInst, Loc, Ty), Length(Text.size()),
       TheEncoding(encoding), NullTerminated(nullTerminate) {
-  memcpy(this + 1, Text.data(), Text.size());
+  memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
 }
 
 StringLiteralInst *StringLiteralInst::create(SILDebugLocation *Loc,
