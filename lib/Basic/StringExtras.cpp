@@ -830,10 +830,6 @@ static bool wordConflictsBeforePreposition(StringRef word,
       camel_case::sameWordIgnoreFirstCase(word, "compatible"))
     return true;
 
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "of") &&
-      camel_case::sameWordIgnoreFirstCase(word, "kind"))
-    return true;
-
   return false;
 }
 
@@ -875,6 +871,10 @@ static bool shouldPlacePrepositionOnArgLabel(StringRef beforePreposition,
   if (afterPreposition == "X" ||
       afterPreposition == "Y" ||
       afterPreposition == "Z")
+    return false;
+
+  // The preposition "of" binds tightly to the left word.
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "of"))
     return false;
 
   return true;
