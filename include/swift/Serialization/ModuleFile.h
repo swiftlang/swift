@@ -618,8 +618,8 @@ public:
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
   Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(std::vector<StringRef> &Names) const;
-  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D) const;
-  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR) const;
+  Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 

@@ -543,7 +543,7 @@ class ModuleFile::DeclCommentTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = StringRef;
-  using data_type = BriefAndRawComment;
+  using data_type = CommentInfo;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -1509,7 +1509,7 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   getTopLevelDecls(results);
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) const {
+Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   assert(D);
 
   // Keep these as assertions instead of early exits to ensure that we are not
@@ -1574,7 +1574,7 @@ void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
   }
 }
 
-Optional<BriefAndRawComment>
+Optional<CommentInfo>
 ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   if (!DeclCommentTable)
     return None;

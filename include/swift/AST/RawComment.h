@@ -69,7 +69,7 @@ struct RawComment {
   }
 };
 
-struct BriefAndRawComment {
+struct CommentInfo {
   StringRef Brief;
   RawComment Raw;
   uint32_t Group;

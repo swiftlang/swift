@@ -149,7 +149,7 @@ RawComment Decl::getRawComment() const {
   // Ask the parent module.
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
-    if (Optional<BriefAndRawComment> C = Unit->getCommentForDecl(this)) {
+    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
       llvm::markup::MarkupContext MC;
       Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
