@@ -286,11 +286,11 @@ final public class VaListBuilder {
 
   func append(arg: CVarArgType) {
     // Write alignment padding if necessary.
-    // This is needed on architectures where the ABI alignment of some 
-    // supported vararg type is greater than the alignment of Int.
-    // FIXME: this implementation is not portable because
-    // alignof differs from the ABI alignment on some architectures
-#if os(watchOS) && arch(arm)   // FIXME: rdar://21203036 should be arch(armv7k)
+    // This is needed on architectures where the ABI alignment of some
+    // supported vararg type is greater than the alignment of Int, such
+    // as non-iOS ARM. Note that we can't use alignof because it
+    // differs from ABI alignment on some architectures.
+#if arch(arm) && !os(iOS)
     if let arg = arg as? _CVarArgAlignedType {
       let alignmentInWords = arg._cVarArgAlignment / sizeof(Int)
       let misalignmentInWords = count % alignmentInWords
