@@ -5,10 +5,10 @@
 import Swift
 
 
-// CHECK: private unnamed_addr constant [21 x i8] c"this is just a\0A\0A test"
+// CHECK: private unnamed_addr constant [22 x i8] c"this is just a\0A\0A test\00"
 
 // CHECK: define hidden [[stringLayout:[^@]*]] @_TF11expressions17TestStringLiteralFT_SS() {{.*}} {
-// CHECK: call [[stringLayout]] @{{.*}}_builtinStringLiteral{{.*}}(i8* getelementptr inbounds ([21 x i8], [21 x i8]* @0, i64 0, i64 0), i64 21, i1 true)
+// CHECK: call [[stringLayout]] @{{.*}}_builtinStringLiteral{{.*}}(i8* getelementptr inbounds ([22 x i8], [22 x i8]* @0, i64 0, i64 0), i64 21, i1 true)
 
 func TestStringLiteral() -> String {
   return "this is just a\n\u{0a} test"

@@ -2,8 +2,8 @@
 
 // REQUIRES: CPU=x86_64
 
-// CHECK: [[U8_0:@.*]] = private unnamed_addr constant [7 x i8] c"help\09me"
-// CHECK: [[U8_1:@.*]] = private unnamed_addr constant [4 x i8] c"\00x\C6\AB"
+// CHECK: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00"
+// CHECK: [[U8_1:@.*]] = private unnamed_addr constant [5 x i8] c"\00x\C6\AB\00"
 // CHECK: [[U16_0:@.*]] = private unnamed_addr constant [8 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0]
 // CHECK: [[U16_1:@.*]] = private unnamed_addr constant [4 x i16] [i16 0, i16 120, i16 427, i16 0]
 
@@ -17,7 +17,7 @@ bb0:
   return %0 : $Builtin.RawPointer
 }
 // CHECK: define{{( protected)?}} i8* @utf8_literal() {{.*}} {
-// CHECK:   ret i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[U8_0]], i64 0, i64 0)
+// CHECK:   ret i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[U8_0]], i64 0, i64 0)
 
 sil @utf8_literal_with_nul : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
@@ -25,7 +25,7 @@ bb0:
   return %0 : $Builtin.RawPointer
 }
 // CHECK: define{{( protected)?}} i8* @utf8_literal_with_nul() {{.*}} {
-// CHECK:   ret i8* getelementptr inbounds ([4 x i8], [4 x i8]* [[U8_1]], i64 0, i64 0)
+// CHECK:   ret i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[U8_1]], i64 0, i64 0)
 
 sil @utf16_literal : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
