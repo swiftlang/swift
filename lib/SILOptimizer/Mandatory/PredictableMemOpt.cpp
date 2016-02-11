@@ -41,8 +41,6 @@ getFullyReferenceableStruct(SILType Ty) {
 }
 
 static unsigned getNumSubElements(SILType T, SILModule &M) {
-  if (!M.getTypeLowering(T).isValid())
-    return 0;
 
   if (auto TT = T.getAs<TupleType>()) {
     unsigned NumElements = 0;
