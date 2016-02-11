@@ -141,7 +141,7 @@
 //   deleted.
 //
 // It is not possible to satisfy all of these requirements at the same
-// time.  Designs that cover some of the requiremens are possible.
+// time.  Designs that cover some of the requirements are possible.
 //
 // 1. Persistent trees with O(log n) subscripting and advancing, and
 //    strict index invalidation.
