@@ -536,7 +536,7 @@ public:
     auto &preprocessor = ppOverride ? *ppOverride : getClangPreprocessor();
 
     // If there is no name for linkage, the computation is trivial and we
-    // wouldn't be able to perfom name-based caching anyway.
+    // wouldn't be able to perform name-based caching anyway.
     if (!decl->hasNameForLinkage())
       return importer::EnumInfo(decl, preprocessor);
 
