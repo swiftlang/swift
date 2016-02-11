@@ -93,7 +93,6 @@ KNOWN_SETTINGS=(
     llvm-install-components    ""                "a semicolon-separated list of LLVM components to install"
     installable-package         ""               "the path to the archive of the installation directory"
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
-    symbols-package             ""               "the path to the archive of the symbols directory"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
     swift-sdks                  ""               "build target binaries only for specified SDKs (semicolon-separated list)"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
@@ -659,14 +658,6 @@ case "${INSTALLABLE_PACKAGE}" in
     "") ;;
     *)
         echo "installable-package must be an absolute path (was '${INSTALLABLE_PACKAGE}')"
-        exit 1
-        ;;
-esac
-case "${SYMBOLS_PACKAGE}" in
-    /*) ;;
-    "") ;;
-    *)
-        echo "symbols-package must be an absolute path (was '${SYMBOLS_PACKAGE}')"
         exit 1
         ;;
 esac
@@ -2322,17 +2313,5 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         (cd "${PKG_TESTS_SOURCE_DIR}" &&
                 python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
         { set +x; } 2>/dev/null
-    fi
-fi
-
-if [[ "${SYMBOLS_PACKAGE}" ]] ; then
-    echo "--- Creating symbols package ---"
-    echo "-- Package file: ${SYMBOLS_PACKAGE} --"
-    if [[ "$(uname -s)" == "Darwin" ]] ; then
-      (cd "${INSTALL_SYMROOT}" &&
-        tar -c -z -f "${SYMBOLS_PACKAGE}" "${TOOLCHAIN_PREFIX/#\/}")
-    else
-      (cd "${INSTALL_SYMROOT}" &&
-        tar -c -z -f "${SYMBOLS_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
     fi
 fi
