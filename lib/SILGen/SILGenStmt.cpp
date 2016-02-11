@@ -589,6 +589,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   SGF.BreakContinueDestStack.push_back({ S, endDest, condDest });
 
   // Emit the body, which is always evaluated the first time around.
+  SGF.emitProfilerIncrement(S->getBody());
   visit(S->getBody());
 
   // Let's not differ from C99 6.8.5.2: "The evaluation of the controlling
@@ -601,7 +602,6 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
     Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false);
     
     Cond.enterTrue(SGF);
-    SGF.emitProfilerIncrement(S->getBody());
     if (SGF.B.hasValidInsertionPoint()) {
       SGF.B.createBranch(S->getCond(), loopBB);
     }

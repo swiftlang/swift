@@ -1,5 +1,18 @@
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_while %s | FileCheck %s
 
+// CHECK-LABEL: // coverage_while.eoo () -> ()
+func eoo() {
+  // CHECK: int_instrprof_increment
+  var x : Int32 = 0
+
+  repeat {
+    // CHECK: int_instrprof_increment
+    // CHECK: sadd_with_overflow_Int32
+    x += 1
+    // CHECK: cmp_slt_Int32
+  } while x < 10
+}
+
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_while.foo
 func foo() -> Int32 {
   var x : Int32 = 0
@@ -99,5 +112,6 @@ func goo() {
   } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : [[RWS6]]
 }
 
+eoo()
 foo()
 goo()
