@@ -11,4 +11,5 @@
 -(void)saveToURL:(nonnull NSURL *)url forSaveOperation:(NSInteger)operation;
 -(void)indexWithItemNamed:(nonnull NSString *)name;
 -(void)methodAndReturnError:(NSError **)error;
+-(void)appendWithContentsOfString:(nonnull NSString *)string;
 @end
