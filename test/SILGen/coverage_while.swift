@@ -78,20 +78,18 @@ func goo() {
     x += 1
   } while x < 10 // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:17 : [[RWS1]]
 
-  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+6]]:4 : [[RWS2:[0-9]+]]
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+5]]:4 : [[RWS2:[0-9]+]]
     x += 1
     if (x % 2 == 0) { // CHECK-DAG: [[@LINE]]:21 -> [[@LINE+2]]:6 : [[CONT1:[0-9]+]]
       continue
-    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+2]]:4 : ([[RWS2]] - [[CONT1]])
-    x += 1
+    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+1]]:4 : ([[RWS2]] - [[CONT1]])
   } while x < 20 // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:17 : [[RWS2]]
 
-  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+6]]:4 : [[RWS3:[0-9]+]]
+  repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+5]]:4 : [[RWS3:[0-9]+]]
     x += 1
     if (x % 2 == 0) { // CHECK-DAG: [[@LINE]]:21 -> [[@LINE+2]]:6 : [[BRK1:[0-9]+]]
       break
-    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+2]]:4 : ([[RWS3]] - [[BRK1]])
-    x += 1
+    } // CHECK-DAG: [[@LINE]]:6 -> [[@LINE+1]]:4 : ([[RWS3]] - [[BRK1]])
   } while x < 30 // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:17 : ([[RWS3]] - [[BRK1]])
 
   repeat { // CHECK-DAG: [[@LINE]]:10 -> [[@LINE+10]]:4 : [[RWS4:[0-9]+]]
