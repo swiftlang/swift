@@ -140,7 +140,7 @@ private:
   virtual void handleDeleteNotification(ValueBase *I) override {
     // The pointer I is going away.  We can't scan the whole cache and remove
     // all of the occurrences of the pointer. Instead we remove the pointer
-    // from the cache the translates pointers to indices.
+    // from the cache that translates pointers to indices.
     AliasValueBaseToIndex.invalidateValue(I);
     MemoryBehaviorValueBaseToIndex.invalidateValue(I);
   }
