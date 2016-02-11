@@ -35,7 +35,7 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
+// CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
 
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
@@ -276,6 +276,10 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func save(to _: URL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>)
+
+// "Of" associates left.
+// CHECK-OMIT-NEEDLESS-WORDS: func typeOf(_: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func typeOf(namedString _: String)
 
 // Look for preposition prior to "of".
 // CHECK-OMIT-NEEDLESS-WORDS: func append(contentsOf _: String)
