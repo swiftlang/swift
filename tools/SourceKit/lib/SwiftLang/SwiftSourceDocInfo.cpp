@@ -55,6 +55,49 @@ private:
   }
 };
 
+static StringRef getTagForDecl(const Decl *D, bool isRef) {
+  auto UID = SwiftLangSupport::getUIDForDecl(D, isRef);
+  static const char *prefix = "source.lang.swift.";
+  assert(UID.getName().startswith(prefix));
+  return UID.getName().drop_front(strlen(prefix));
+}
+
+/// An ASTPrinter for annotating declarations with XML tags that describe the
+/// key substructure of the declaration for CursorInfo/DocInfo.
+///
+/// Prints declarations with decl- and type-specific tags derived from the
+/// UIDs used for decl/refs.  For example,
+/// <decl.function.free>func foo(x: <ref.struct usr="Si">Int</...>)</...>
+class FullyAnnotatedDeclarationPrinter final : public XMLEscapingPrinter {
+public:
+  FullyAnnotatedDeclarationPrinter(raw_ostream &OS) : XMLEscapingPrinter(OS) {}
+
+private:
+
+  // MARK: The ASTPrinter callback interface.
+
+  void printDeclPre(const Decl *D) override {
+    openTag(getTagForDecl(D, /*isRef=*/false));
+  }
+  void printDeclPost(const Decl *D) override {
+    closeTag(getTagForDecl(D, /*isRef=*/false));
+  }
+
+  void printTypeRef(const TypeDecl *TD, Identifier name) override {
+    auto tag = getTagForDecl(TD, /*isRef=*/true);
+    OS << "<" << tag << " usr=\"";
+    SwiftLangSupport::printUSR(TD, OS);
+    OS << "\">";
+    XMLEscapingPrinter::printTypeRef(TD, name);
+    closeTag(tag);
+  }
+
+  // MARK: Convenience functions for printing.
+
+  void openTag(StringRef tag) { OS << "<" << tag << ">"; }
+  void closeTag(StringRef tag) { OS << "</" << tag << ">"; }
+};
+
 static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {
   if (Ty.isNull())
     return Type();
@@ -96,6 +139,22 @@ static void printAnnotatedDeclaration(const ValueDecl *VD, const Type Ty,
   OS<<"<Declaration>";
   VD->print(Printer, PO);
   OS<<"</Declaration>";
+}
+
+static void printFullyAnnotatedDeclaration(const ValueDecl *VD, const Type Ty,
+                                           const Type BaseTy, raw_ostream &OS) {
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  if (BaseTy)
+    PO.setArchetypeTransformForQuickHelp(BaseTy, VD->getDeclContext());
+
+  // If it's implicit, try to find an overridden ValueDecl that's not implicit.
+  // This will ensure we can properly annotate TypeRepr with a usr
+  // in AnnotatedDeclarationPrinter.
+  while (VD->isImplicit() && VD->getOverriddenDecl())
+    VD = VD->getOverriddenDecl();
+
+  VD->print(Printer, PO);
 }
 
 template <typename FnTy>
@@ -299,6 +358,13 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
   unsigned DeclEnd = SS.size();
 
+  unsigned FullDeclBegin = SS.size();
+  {
+    llvm::raw_svector_ostream OS(SS);
+    printFullyAnnotatedDeclaration(VD, Ty, BaseType, OS);
+  }
+  unsigned FullDeclEnd = SS.size();
+
   unsigned GroupBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
@@ -387,6 +453,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
                                    DocCommentEnd-DocCommentBegin);
   StringRef AnnotatedDecl = StringRef(SS.begin()+DeclBegin,
                                       DeclEnd-DeclBegin);
+  StringRef FullyAnnotatedDecl =
+      StringRef(SS.begin() + FullDeclBegin, FullDeclEnd - FullDeclBegin);
   StringRef GroupName = StringRef(SS.begin() + GroupBegin, GroupEnd - GroupBegin);
 
   llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
@@ -423,6 +491,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.TypeName = TypeName;
   Info.DocComment = DocComment;
   Info.AnnotatedDeclaration = AnnotatedDecl;
+  Info.FullyAnnotatedDeclaration = FullyAnnotatedDecl;
   Info.ModuleName = ModuleName;
   Info.ModuleInterfaceName = ModuleInterfaceName;
   Info.DeclarationLoc = DeclarationLoc;

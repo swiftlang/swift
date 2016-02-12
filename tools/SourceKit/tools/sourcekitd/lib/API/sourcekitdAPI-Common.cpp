@@ -69,6 +69,7 @@ UIdent sourcekitd::KeyDocFullAsXML("key.doc.full_as_xml");
 UIdent sourcekitd::KeyGenericParams("key.generic_params");
 UIdent sourcekitd::KeyGenericRequirements("key.generic_requirements");
 UIdent sourcekitd::KeyAnnotatedDecl("key.annotated_decl");
+UIdent sourcekitd::KeyFullyAnnotatedDecl("key.fully_annotated_decl");
 UIdent sourcekitd::KeyRelatedDecls("key.related_decls");
 UIdent sourcekitd::KeyContext("key.context");
 UIdent sourcekitd::KeyModuleImportDepth("key.moduleimportdepth");
@@ -158,6 +159,7 @@ static UIdent *OrderedKeys[] = {
   &KeyRuntimeName,
   &KeySelectorName,
   &KeyAnnotatedDecl,
+  &KeyFullyAnnotatedDecl,
   &KeyDocBrief,
   &KeyContext,
   &KeyModuleImportDepth,

@@ -1123,6 +1123,8 @@ static void reportCursorInfo(StringRef Filename,
       Elem.set(KeyDocFullAsXML, Info.DocComment);
     if (!Info.AnnotatedDeclaration.empty())
       Elem.set(KeyAnnotatedDecl, Info.AnnotatedDeclaration);
+    if (!Info.FullyAnnotatedDeclaration.empty())
+      Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDeclaration);
     if (!Info.ModuleName.empty())
       Elem.set(KeyModuleName, Info.ModuleName);
     if (!Info.GroupName.empty())

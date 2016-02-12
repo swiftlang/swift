@@ -85,6 +85,7 @@ static sourcekitd_uid_t KeyTypename;
 static sourcekitd_uid_t KeyOverrides;
 static sourcekitd_uid_t KeyRelatedDecls;
 static sourcekitd_uid_t KeyAnnotatedDecl;
+static sourcekitd_uid_t KeyFullyAnnotatedDecl;
 static sourcekitd_uid_t KeyDocFullAsXML;
 static sourcekitd_uid_t KeyResults;
 static sourcekitd_uid_t KeySyntaxMap;
@@ -171,6 +172,8 @@ static int skt_main(int argc, const char **argv) {
   KeyOverrides = sourcekitd_uid_get_from_cstr("key.overrides");
   KeyRelatedDecls = sourcekitd_uid_get_from_cstr("key.related_decls");
   KeyAnnotatedDecl = sourcekitd_uid_get_from_cstr("key.annotated_decl");
+  KeyFullyAnnotatedDecl =
+      sourcekitd_uid_get_from_cstr("key.fully_annotated_decl");
   KeyDocFullAsXML = sourcekitd_uid_get_from_cstr("key.doc.full_as_xml");
   KeyResults = sourcekitd_uid_get_from_cstr("key.results");
   KeySyntaxMap = sourcekitd_uid_get_from_cstr("key.syntaxmap");
@@ -879,6 +882,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   bool IsSystem = sourcekitd_variant_dictionary_get_bool(Info, KeyIsSystem);
   const char *AnnotDecl = sourcekitd_variant_dictionary_get_string(Info,
                                                               KeyAnnotatedDecl);
+  const char *FullAnnotDecl =
+      sourcekitd_variant_dictionary_get_string(Info, KeyFullyAnnotatedDecl);
   const char *DocFullAsXML =
       sourcekitd_variant_dictionary_get_string(Info, KeyDocFullAsXML);
   sourcekitd_variant_t OffsetObj =
@@ -937,6 +942,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << "SYSTEM\n";
   if (AnnotDecl)
     OS << AnnotDecl << '\n';
+  if (FullAnnotDecl)
+    OS << FullAnnotDecl << '\n';
   if (DocFullAsXML)
     OS << DocFullAsXML << '\n';
   OS << "OVERRIDES BEGIN\n";

@@ -87,12 +87,15 @@ public class SubscriptCursorTest {
 // CHECK2-NEXT: Swift{{$}}
 // CHECK2-NEXT: SYSTEM
 // CHECK2-NEXT: <Declaration>func +(lhs: <Type usr="s:Si">Int</Type>, rhs: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type></Declaration>
+// CHECK2-NEXT: <decl.function.operator.infix>func +(lhs: <ref.struct usr="s:Si">Int</ref.struct>, rhs: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.function.operator.infix>
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:12 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK3 %s
 // CHECK3:      source.lang.swift.ref.var.local (8:10-8:11)
 // CHECK3-NEXT: x{{$}}
 // CHECK3-NEXT: s:vF11cursor_info3gooFSiT_L_1xSi{{$}}
 // CHECK3-NEXT: Int{{$}}
+// CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
+// CHECK3-NEXT: <decl.var.local>let x: <ref.struct usr="s:Si">Int</ref.struct></decl.var.local>
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:18 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK4 %s
 // CHECK4:      source.lang.swift.ref.var.global ({{.*}}Foo.framework/Headers/Foo.h:62:12-62:21)
@@ -101,6 +104,7 @@ public class SubscriptCursorTest {
 // CHECK4-NEXT: Int32{{$}}
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:Vs5Int32">Int32</Type></Declaration>
+// CHECK4-NEXT: <decl.var.global>var fooIntVar: <ref.struct usr="s:Vs5Int32">Int32</ref.struct></decl.var.global>
 // CHECK4-NEXT: <Variable file="{{[^"]+}}Foo.h" line="{{[0-9]+}}" column="{{[0-9]+}}"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK5 %s
@@ -116,6 +120,7 @@ public class SubscriptCursorTest {
 // CHECK6-NEXT: () -> Int
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
+// CHECK6-NEXT: <decl.function.free>func fooSwiftFunc() -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.function.free>
 // CHECK6-NEXT: {{^}}<Function><Name>fooSwiftFunc()</Name><USR>s:F14FooSwiftModule12fooSwiftFuncFT_Si</USR><Declaration>func fooSwiftFunc() -&gt; Int</Declaration><Abstract><Para>This is &apos;fooSwiftFunc&apos; from &apos;FooSwiftModule&apos;.</Para></Abstract></Function>{{$}}
 
 // RUN: %sourcekitd-test -req=cursor -pos=14:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK7 %s
@@ -124,6 +129,7 @@ public class SubscriptCursorTest {
 // CHECK7-NEXT: s:V11cursor_info2S1
 // CHECK7-NEXT: S1.Type
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
+// CHECK7-NEXT: <decl.struct>struct S1</decl.struct>
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:V11cursor_info2S1</USR><Declaration>struct S1</Declaration><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></Class>
 
 // RUN: %sourcekitd-test -req=cursor -pos=19:12 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK8 %s
@@ -131,26 +137,33 @@ public class SubscriptCursorTest {
 // CHECK8-NEXT: init
 // CHECK8-NEXT: s:FC11cursor_info2CCcFT1xSi_S0_
 // CHECK8-NEXT: CC.Type -> (x: Int) -> CC
+// CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK8-NEXT: <decl.function.constructor>convenience init(x: <ref.struct usr="s:Si">Int</ref.struct>)</decl.function.constructor>
 
 // RUN: %sourcekitd-test -req=cursor -pos=23:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK9 %s
 // CHECK9:      source.lang.swift.decl.var.global (23:5-23:15)
 // CHECK9: <Declaration>var testString: <Type usr="s:SS">String</Type></Declaration>
+// CHECK9: <decl.var.global>var testString: <ref.struct usr="s:SS">String</ref.struct></decl.var.global>
 
 // RUN: %sourcekitd-test -req=cursor -pos=24:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK10 %s
 // CHECK10: source.lang.swift.decl.var.global (24:5-24:18)
 // CHECK10: <Declaration>let testLetString: <Type usr="s:SS">String</Type></Declaration>
+// CHECK10: <decl.var.global>let testLetString: <ref.struct usr="s:SS">String</ref.struct></decl.var.global>
 
 // RUN: %sourcekitd-test -req=cursor -pos=26:20 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK11 %s
 // CHECK11: source.lang.swift.decl.var.local (26:19-26:23)
 // CHECK11: <Declaration>let arg1: <Type usr="s:Si">Int</Type></Declaration>
+// CHECK11: <decl.var.local>let arg1: <ref.struct usr="s:Si">Int</ref.struct></decl.var.local>
 
 // RUN: %sourcekitd-test -req=cursor -pos=28:24 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK12 %s
 // CHECK12: source.lang.swift.decl.var.local (28:23-28:27)
 // CHECK12: <Declaration>var arg1: <Type usr="s:Si">Int</Type></Declaration>
+// CHECK12: <decl.var.local>var arg1: <ref.struct usr="s:Si">Int</ref.struct></decl.var.local>
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)
 // CHECK13: <Declaration>func testDefaultParam(arg1: <Type usr="s:Si">Int</Type> = default)</Declaration>
+// CHECK13: <decl.function.free>func testDefaultParam(arg1: <ref.struct usr="s:Si">Int</ref.struct> = default)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=34:4 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK14 %s
 // CHECK14: source.lang.swift.ref.function.free ({{.*}}Foo.framework/Frameworks/FooSub.framework/Headers/FooSub.h:4:5-4:16)
@@ -162,6 +175,7 @@ public class SubscriptCursorTest {
 // CHECK15: source.lang.swift.decl.function.free (38:6-38:40)
 // CHECK15: myFunc
 // CHECK15: <Declaration>func myFunc(arg1: <Type usr="s:SS">String</Type>, options: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK15: <decl.function.free>func myFunc(arg1: <ref.struct usr="s:SS">String</ref.struct>, options: <ref.struct usr="s:Si">Int</ref.struct>)</decl.function.free>
 // CHECK15: RELATED BEGIN
 // CHECK15-NEXT: <RelatedName usr="s:F11cursor_info6myFuncFSST_">myFunc(_:)</RelatedName>
 // CHECK15-NEXT: RELATED END
@@ -170,6 +184,8 @@ public class SubscriptCursorTest {
 // CHECK16:      source.lang.swift.ref.class ({{.*}}Foo.framework/Headers/Foo.h:157:12-157:27)
 // CHECK16-NEXT: FooClassDerived
 // CHECK16-NEXT: c:objc(cs)FooClassDerived
+// CHECK16: <Declaration>class FooClassDerived : <Type usr="c:objc(cs)FooClassBase">FooClassBase</Type>, <Type usr="c:objc(pl)FooProtocolDerived">FooProtocolDerived</Type></Declaration>
+// CHECK16-NEXT: <decl.class>class FooClassDerived : <ref.class usr="c:objc(cs)FooClassBase">FooClassBase</ref.class>, <ref.protocol usr="c:objc(pl)FooProtocolDerived">FooProtocolDerived</ref.protocol></decl.class>
 
 // RUN: %sourcekitd-test -req=cursor -pos=1:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK17 %s
 // CHECK17:      source.lang.swift.ref.module ()
@@ -178,6 +194,7 @@ public class SubscriptCursorTest {
 // RUN: %sourcekitd-test -req=cursor -pos=44:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK18 %s
 // CHECK18: source.lang.swift.ref.typealias (43:11-43:16)
 // CHECK18: <Declaration>typealias MyInt = <Type usr="s:Si">Int</Type></Declaration>
+// CHECK18: <decl.typealias>typealias MyInt = <ref.struct usr="s:Si">Int</ref.struct></decl.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=46:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK19 %s
 // CHECK19:      source.lang.swift.ref.module ()
@@ -193,22 +210,29 @@ public class SubscriptCursorTest {
 
 // RUN: %sourcekitd-test -req=cursor -pos=55:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK22 %s
 // CHECK22: <Declaration>func availabilityIntroduced()</Declaration>
+// CHECK22: <decl.function.method.instance>func availabilityIntroduced()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=56:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK23 %s
 // CHECK23-NOT: <Declaration>func swiftUnavailable()</Declaration>
+// CHECK23-NOT: <decl.function.method.instance>func swiftUnavailable()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=57:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK24 %s
 // CHECK24-NOT: <Declaration>func unavailable()</Declaration>
+// CHECK24-NOT: <decl.function.method.instance>func unavailable()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=58:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK25 %s
 // CHECK25: <Declaration>func availabilityIntroducedMsg()</Declaration>
+// CHECK25: <decl.function.method.instance>func availabilityIntroducedMsg()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=59:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK26 %s
 // CHECK26-NOT: <Declaration>func availabilityDeprecated()</Declaration>
+// CHECK26-NOT: <decl.function.method.instance>func availabilityDeprecated()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK27 %s
 // CHECK27: <Declaration>public subscript (i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
+// CHECK27: <decl.function.subscript>public subscript (i: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK28 %s
 // CHECK28: <Declaration>public subscript (i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
+// CHECK28: <decl.function.subscript>public subscript (i: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
 

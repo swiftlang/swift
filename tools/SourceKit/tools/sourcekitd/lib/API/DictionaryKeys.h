@@ -56,6 +56,7 @@ extern SourceKit::UIdent KeyDocFullAsXML;
 extern SourceKit::UIdent KeyGenericParams;
 extern SourceKit::UIdent KeyGenericRequirements;
 extern SourceKit::UIdent KeyAnnotatedDecl;
+extern SourceKit::UIdent KeyFullyAnnotatedDecl;
 extern SourceKit::UIdent KeyRelatedDecls;
 extern SourceKit::UIdent KeyContext;
 extern SourceKit::UIdent KeyModuleImportDepth;

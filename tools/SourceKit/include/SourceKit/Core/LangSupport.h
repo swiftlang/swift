@@ -277,6 +277,9 @@ struct CursorInfo {
   StringRef GroupName;
   /// Annotated XML pretty printed declaration.
   StringRef AnnotatedDeclaration;
+  /// Fully annotated XML pretty printed declaration.
+  /// FIXME: this should eventually replace \c AnnotatedDeclaration.
+  StringRef FullyAnnotatedDeclaration;
   /// Non-empty if the symbol was imported from a clang module.
   StringRef ModuleName;
   /// Non-empty if a generated interface editor document has previously been
