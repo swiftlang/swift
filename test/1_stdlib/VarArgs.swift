@@ -12,8 +12,8 @@ typealias CGFloat = Double
 #endif
 
 func my_printf(format: String, _ arguments: CVarArgType...) {
-  withVaList(arguments) {
-    vprintf(format, $0)
+  withVaList(arguments) { (vaList: CVaListPointer) in
+    vprintf(format, vaList)
   }
 }
 
