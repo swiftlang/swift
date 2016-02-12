@@ -23,7 +23,7 @@ public enum UnicodeDecodingResult {
   case EmptyInput
   case Error
 
-  /// Returns true if `self` indicates no more unicode scalars are
+  /// Returns `true` if `self` indicates no more unicode scalars are
   /// available.
   @warn_unused_result
   public func isEmptyInput() -> Bool {

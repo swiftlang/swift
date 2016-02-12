@@ -153,7 +153,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   }
 #endif
 
-  /// Returns true if the `proposedElementType` is `Element` or a subclass of
+  /// Returns `true` if the `proposedElementType` is `Element` or a subclass of
   /// `Element`.  We can't store anything else without violating type
   /// safety; for example, the destructor has static knowledge that
   /// all of the elements can be destroyed as `Element`.
@@ -411,7 +411,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     return __bufferPointer.holdsUniqueReference()
   }
 
-  /// Returns true iff this buffer's storage is either
+  /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
   @warn_unused_result

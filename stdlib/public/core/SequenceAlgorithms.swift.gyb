@@ -124,8 +124,8 @@ extension SequenceType ${"" if preds else "where Generator.Element : Equatable"}
 %{
 if preds:
   comment = """
-  /// Returns true iff `self` begins with elements equivalent to those of
-  /// `other`, using `isEquivalent` as the equivalence test.  Returns true if
+  /// Returns `true` iff `self` begins with elements equivalent to those of
+  /// `other`, using `isEquivalent` as the equivalence test.  Returns `true` if
   /// `other` is empty.
   ///
   /// - Requires: `isEquivalent` is an
@@ -134,8 +134,8 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns true iff the initial elements of `self` are equal to `prefix`.
-  /// Returns true if `other` is empty."""
+  /// Returns `true` iff the initial elements of `self` are equal to `prefix`.
+  /// Returns `true` if `other` is empty."""
   rethrows_ = ""
 }%
   ${comment}
@@ -178,7 +178,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Equatable"}
 %{
 if preds:
   comment = """
-  /// Returns true iff `self` and `other` contain equivalent elements, using
+  /// Returns `true` iff `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
   /// - Requires: `isEquivalent` is an
@@ -234,7 +234,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 %{
 if preds:
   comment = """
-  /// Returns true iff `self` precedes `other` in a lexicographical 
+  /// Returns `true` iff `self` precedes `other` in a lexicographical 
   /// ("dictionary") ordering, using `isOrderedBefore` as the comparison 
   /// between elements.
   ///
@@ -249,7 +249,7 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns true iff `self` precedes `other` in a lexicographical
+  /// Returns `true` iff `self` precedes `other` in a lexicographical
   /// ("dictionary") ordering, using "<" as the comparison between elements.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical

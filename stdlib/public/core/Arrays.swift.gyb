@@ -281,7 +281,7 @@ public struct ${Self}<Element>
 
   //===--- private --------------------------------------------------------===//
 
-  /// Returns true if the array is native and does not need a deferred
+  /// Returns `true` if the array is native and does not need a deferred
   /// type check.  May be hoisted by the optimizer, which means its
   /// results may be stale by the time they are used if there is an
   /// inout violation in user code.
@@ -1255,7 +1255,7 @@ internal func _arrayAppendSequence<
 // that are the same, e.g. Array<Int> and Array<Int>, not
 // ArraySlice<Int> and Array<Int>.
 
-/// Returns true if these arrays contain the same elements.
+/// Returns `true` if these arrays contain the same elements.
 @warn_unused_result
 public func == <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>
@@ -1300,7 +1300,7 @@ public func == <Element : Equatable>(
   return true
 }
 
-/// Returns true if the arrays do not contain the same elements.
+/// Returns `true` if the arrays do not contain the same elements.
 @warn_unused_result
 public func != <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>

@@ -47,7 +47,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> _ContiguousArrayBuffer<Element>?
 
-  /// Returns true iff this buffer is backed by a uniquely-referenced mutable
+  /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.
   ///
   /// - Note: This function must remain mutating; otherwise the buffer

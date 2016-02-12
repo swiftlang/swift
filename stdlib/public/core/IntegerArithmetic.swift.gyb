@@ -32,7 +32,7 @@ integerBinaryOps = [
 public protocol _IntegerArithmeticType {
 % for name,_,Action,result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and a `Bool` that is
-  /// true iff the operation caused an arithmetic overflow.
+  /// `true` iff the operation caused an arithmetic overflow.
   static func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
 % end
 }
