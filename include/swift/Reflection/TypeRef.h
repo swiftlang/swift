@@ -546,8 +546,8 @@ TypeRefPointer decodeDemangleNode(Demangle::NodePointer Node) {
       return ProtocolTypeRef::create(moduleName, name);
     }
     case NodeKind::DependentGenericParamType: {
-      auto index = Node->getChild(0)->getIndex();
-      auto depth = Node->getChild(1)->getIndex();
+      auto depth = Node->getChild(0)->getIndex();
+      auto index = Node->getChild(1)->getIndex();
       return GenericTypeParameterTypeRef::create(index, depth);
     }
     case NodeKind::FunctionType: {
