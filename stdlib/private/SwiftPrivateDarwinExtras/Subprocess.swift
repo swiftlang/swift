@@ -158,8 +158,7 @@ internal func _readAll(fd: CInt) -> String {
     }
     preconditionFailure("read() failed")
   }
-  return String.fromCodeUnitsWithRepair(
-    buffer[0..<usedBytes], encoding: UTF8.self).0
+  return String(codeUnits: buffer[0..<usedBytes], as: UTF8.self)
 }
 
 

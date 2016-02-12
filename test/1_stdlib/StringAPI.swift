@@ -321,6 +321,80 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
     acceptor[donor.startIndex.advancedBy(1)..<donor.startIndex.advancedBy(5)])
 }
 
+var StringDecodeTests = TestSuite("StringDecodeTests")
+
+func getASCIICodePoints() -> (UnsafeBufferPointer<UInt8>, dealloc: () -> ()) {
+  let up = UnsafeMutablePointer<UInt8>.alloc(100)
+  up[0] = 0x61
+  up[1] = 0x62
+  up[2] = 0
+  let buffer = UnsafeBufferPointer(start: up, count: 2)
+  return (buffer, { up.dealloc(100) })
+}
+
+func getNonASCIICodePoints() -> (UnsafeBufferPointer<UInt8>, dealloc: () -> ()) {
+  let up = UnsafeMutablePointer<UInt8>.alloc(100)
+  up[0] = 0xd0
+  up[1] = 0xb0
+  up[2] = 0xd0
+  up[3] = 0xb1
+  up[4] = 0
+  let buffer = UnsafeBufferPointer(start: up, count: 4)
+  return (buffer, { up.dealloc(100) })
+}
+
+func getIllFormedCodePoints(
+) -> (UnsafeBufferPointer<UInt8>, dealloc: () -> ()) {
+  let up = UnsafeMutablePointer<UInt8>.alloc(100)
+  up[0] = 0x41
+  up[1] = 0xed
+  up[2] = 0xa0
+  up[3] = 0x80
+  up[4] = 0x41
+  up[5] = 0
+  let buffer = UnsafeBufferPointer(start: up, count: 5)
+  return (buffer, { up.dealloc(100) })
+}
+
+StringDecodeTests.test("String(codeUnits:as:)") {
+  do {
+    let (s, dealloc) = getASCIICodePoints()
+    let result = String(codeUnits: s, as: UTF8.self)
+    expectEqual("ab", result)
+    dealloc()
+  }
+  do {
+    let (s, dealloc) = getNonASCIICodePoints()
+    let result = String(codeUnits: s, as: UTF8.self)
+    expectEqual("аб", result)
+    dealloc()
+  }
+  do {
+    let (s, dealloc) = getIllFormedCodePoints()
+    let result = String(codeUnits: s, as: UTF8.self)
+    expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+    dealloc()
+  }
+}
+
+StringDecodeTests.test("String(validatingCodeUnits:as:)") {
+  do {
+    let (s, dealloc) = getASCIICodePoints()
+    expectOptionalEqual("ab", String(validatingCodeUnits: s, as: UTF8.self))
+    dealloc()
+  }
+  do {
+    let (s, dealloc) = getNonASCIICodePoints()
+    expectOptionalEqual("аб", String(validatingCodeUnits: s, as: UTF8.self))
+    dealloc()
+  }
+  do {
+    let (s, dealloc) = getIllFormedCodePoints()
+    expectEmpty(String(validatingCodeUnits: s, as: UTF8.self))
+    dealloc()
+  }
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullCString() -> UnsafeMutablePointer<CChar> {

@@ -230,7 +230,7 @@ extension String {
     }
 
     public var description: String {
-      return String.fromCodeUnitsWithRepair(self, encoding: UTF8.self).0
+      return String(codeUnits: self, as: UTF8.self)
     }
 
     public var debugDescription: String {
