@@ -79,8 +79,8 @@ public func _getTypeName(type: Any.Type, qualified: Bool)
 public // @testable
 func _typeName(type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
-  return ._fromWellFormedCodeUnitSequence(UTF8.self,
-    input: UnsafeBufferPointer(start: stringPtr, count: count))
+  let buffer = UnsafeBufferPointer(start: stringPtr, count: count)
+  return String(validatingCodeUnits: buffer, as: UTF8.self)!
 }
 
 @_silgen_name("swift_getTypeByMangledName")

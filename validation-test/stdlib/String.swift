@@ -824,7 +824,7 @@ StringTests.test("toInt") {
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
-    let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
+    let str = String(validatingCodeUnits: chars, as: UTF8.self)!
     expectEmpty(Int(str))
   }
 

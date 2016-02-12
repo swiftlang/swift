@@ -121,17 +121,6 @@ public struct String {
 
 extension String {
   @warn_unused_result
-  public // @testable
-  static func _fromWellFormedCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
-  >(
-    encoding: Encoding.Type, input: Input
-  ) -> String {
-    return String(validatingCodeUnits: input, as: encoding)!
-  }
-
-  @warn_unused_result
   public static func _decode<
     Encoding: UnicodeCodecType, Input: CollectionType
     where Input.Generator.Element == Encoding.CodeUnit
@@ -182,8 +171,8 @@ extension String : _BuiltinUnicodeScalarLiteralConvertible {
   @effects(readonly)
   public // @testable
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self, input: CollectionOfOne(UInt32(value)))
+    let input = CollectionOfOne(UInt32(value))
+    self.init(validatingCodeUnits: input, as: UTF32.self)!
   }
 }
 
@@ -201,11 +190,9 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1) {
-    self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(
-            start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-            count: Int(byteSize)))
+    let input = UnsafeBufferPointer<UTF8.CodeUnit>(start: UnsafePointer(start),
+      count: Int(byteSize))
+    self.init(validatingCodeUnits: input, as: UTF8.self)!
   }
 }
 
@@ -250,11 +237,10 @@ extension String : _BuiltinStringLiteralConvertible {
           owner: nil))
     }
     else {
-      self = String._fromWellFormedCodeUnitSequence(
-          UTF8.self,
-          input: UnsafeBufferPointer(
-              start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-              count: Int(byteSize)))
+      let input = UnsafeBufferPointer<UTF8.CodeUnit>(
+        start: UnsafePointer(start),
+        count: Int(byteSize))
+      self = String(validatingCodeUnits: input, as: UTF8.self)!
     }
   }
 }
@@ -543,9 +529,9 @@ extension String {
     resultStorage: UnsafeMutablePointer<String>,
     start: UnsafeMutablePointer<UTF8.CodeUnit>, utf8Count: Int
   ) {
+    let input = UnsafeBufferPointer(start: start, count: utf8Count)
     resultStorage.initialize(
-        String._fromWellFormedCodeUnitSequence(UTF8.self,
-            input: UnsafeBufferPointer(start: start, count: utf8Count)))
+        String(validatingCodeUnits: input, as: UTF8.self)!)
   }
 }
 

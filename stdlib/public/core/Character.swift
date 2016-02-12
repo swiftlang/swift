@@ -49,9 +49,8 @@ public struct Character :
 
   @effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = Character(
-      String._fromWellFormedCodeUnitSequence(
-        UTF32.self, input: CollectionOfOne(UInt32(value))))
+    let input = CollectionOfOne(UInt32(value))
+    self.init(String(validatingCodeUnits: input, as: UTF32.self)!)
   }
 
   /// Create an instance initialized to `value`.
@@ -282,8 +281,7 @@ extension String {
     case let .Small(_63bits):
       let value = Character._smallValue(_63bits)
       let smallUTF8 = Character._SmallUTF8(value)
-      self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: smallUTF8)
+      self = String(validatingCodeUnits: smallUTF8, as: UTF8.self)!
     case let .Large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
       self = buf[buf.startIndex..<buf.startIndex.successor()]

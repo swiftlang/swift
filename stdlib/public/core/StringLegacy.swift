@@ -28,8 +28,8 @@ extension String {
   /// Construct an instance that is the concatenation of `count` copies
   /// of `Character(repeatedValue)`.
   public init(count: Int, repeatedValue c: UnicodeScalar) {
-    self = String._fromWellFormedCodeUnitSequence(UTF32.self,
-        input: Repeat(count: count, repeatedValue: c.value))
+    let input = Repeat(count: count, repeatedValue: c.value)
+    self.init(validatingCodeUnits: input, as: UTF32.self)!
   }
   
   public var _lines : [String] {
