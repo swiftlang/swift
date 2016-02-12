@@ -312,7 +312,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK: }
 
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_RootGenericFixedLayout(%swift.type_pattern*, i8**) {{.*}} {
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, i64 3, i64* %25, i64* %23)
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, i64 3, i64* {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_GenericInheritsGeneric(%swift.type_pattern*, i8**) {{.*}} {
