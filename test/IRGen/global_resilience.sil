@@ -61,7 +61,8 @@ bb0:
   %addr = global_addr @smallGlobal : $*SmallResilientStruct
 
   // CHECK: [[VALUE:%.*]] = load i32, i32* getelementptr inbounds (%V17global_resilience20SmallResilientStruct, %V17global_resilience20SmallResilientStruct* bitcast ([[BUFFER]]* @smallGlobal to %V17global_resilience20SmallResilientStruct*), i32 0, i32 0, i32 0)
-  %value = load %addr : $*SmallResilientStruct
+  %x_addr = struct_element_addr %addr : $*SmallResilientStruct, #SmallResilientStruct.x
+  %x = load %x_addr : $*Int32
 
   %tuple = tuple ()
 
