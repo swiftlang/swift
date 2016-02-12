@@ -8,17 +8,17 @@ var x = 0
 var y = 0
 #endif
 
-#if foo(BAR) // expected-error {{unexpected target configuration expression (expected 'os', 'arch', or 'swift')}}
+#if foo(BAR) // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
 var z = 0
 #endif
 
 #if FOO || !FOO
 func f() {}
-#endif ; f() // expected-error {{extra tokens at the end of the build configuration directive}}
+#endif ; f() // expected-error {{extra tokens following conditional compilation directive}}
 
 #if FOO || !FOO
 func g() {}
-#else g()  // expected-error {{extra tokens at the end of the build configuration directive}}
+#else g()  // expected-error {{extra tokens following conditional compilation directive}}
 #endif
 
 
@@ -28,7 +28,7 @@ func h() {}
 #endif /* bbb */
 
 #if foo.bar() 
-      .baz() // expected-error {{unexpected target configuration expression (expected 'os', 'arch', or 'swift')}}
+      .baz() // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
 
 #endif
 

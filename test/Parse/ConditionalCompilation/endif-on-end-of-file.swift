@@ -3,7 +3,7 @@
 
 #if DEBUG
 
-#endif ; // expected-error {{extra tokens at the end of the build configuration directive}}
+#endif ; // expected-error {{extra tokens following conditional compilation directive}}
 
 // <rdar://problem/17569958> #endif not parsed correctly when occurs as last line in file
 #if DEBUG

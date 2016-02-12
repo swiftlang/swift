@@ -90,10 +90,10 @@ public:
     return Components.empty();
   }
 
-  /// Parse a _compiler_version build configuration from source code.
+  /// Parse a version in the form used by the _compiler_version \#if condition.
   static Version parseCompilerVersionString(llvm::StringRef VersionString,
-                                                    SourceLoc Loc,
-                                                    DiagnosticEngine *Diags);
+                                            SourceLoc Loc,
+                                            DiagnosticEngine *Diags);
 
   /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
   ///

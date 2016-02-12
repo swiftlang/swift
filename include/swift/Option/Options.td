@@ -131,7 +131,7 @@ def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
-  HelpText<"Specifies one or more build configuration options">;
+  HelpText<"Marks a conditional compilation flag as true">;
 
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
   HelpText<"Add directory to framework search path">;

@@ -59,9 +59,9 @@ namespace swift {
     /// The top-level of a file, when in parse-as-library mode.
     TopLevelLibrary,
     /// The body of the inactive clause of an #if/#else/#endif block
-    InactiveConfigBlock,
+    InactiveConditionalBlock,
     /// The body of the active clause of an #if/#else/#endif block
-    ActiveConfigBlock
+    ActiveConditionalBlock
   };
 
   
@@ -478,10 +478,10 @@ public:
   void skipSingle();
 
   /// \brief Skip until the next '#else', '#endif' or until eof.
-  void skipUntilConfigBlockClose();
+  void skipUntilConditionalBlockClose();
 
   /// Parse an #endif.
-  bool parseConfigEndIf(SourceLoc &Loc);
+  bool parseEndIfDirective(SourceLoc &Loc);
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
@@ -621,7 +621,7 @@ public:
   ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
                                BraceItemListKind Kind =
                                    BraceItemListKind::Brace,
-                               BraceItemListKind ConfigKind =
+                               BraceItemListKind ConditionalBlockKind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
@@ -1088,7 +1088,7 @@ public:
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
-                                       bool isConfigCondition = false);
+                                       bool isForConditionalDirective = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
@@ -1204,8 +1204,9 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Evaluate the conditional configuration expression of an #if statement
-  ConfigParserState evaluateConfigConditionExpr(Expr *configExpr);
+  /// Evaluate the condition of an #if directive.
+  ConditionalCompilationExprState
+  evaluateConditionalCompilationExpr(Expr *condition);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
