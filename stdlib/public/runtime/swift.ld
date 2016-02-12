@@ -2,7 +2,8 @@ SECTIONS
 {
   .swift3_typeref : { *(.swift3_typeref) },
   .swift3_reflstr : { *(.swift3_reflstr) },
-  .swift3_reflect : { *(.swift3_reflect) },
+  .swift3_fieldmd : { *(.swift3_fieldmd) },
+  .swift3_assocty : { *(.swift3_assocty) },
   .swift2_protocol_conformances :
   {
     .swift2_protocol_conformances_start = . ;
