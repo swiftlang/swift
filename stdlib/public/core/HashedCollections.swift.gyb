@@ -465,7 +465,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns true if the set is a subset of a finite sequence as a `Set`.
+  /// Returns `true` if the set is a subset of a finite sequence as a `Set`.
   @warn_unused_result
   public func isSubsetOf<
     S : SequenceType where S.Generator.Element == Element
@@ -475,7 +475,7 @@ public struct Set<Element : Hashable> :
     return isSubset || isEqual
   }
 
-  /// Returns true if the set is a subset of a finite sequence as a `Set`
+  /// Returns `true` if the set is a subset of a finite sequence as a `Set`
   /// but not equal.
   @warn_unused_result
   public func isStrictSubsetOf<
@@ -486,7 +486,7 @@ public struct Set<Element : Hashable> :
     return isSubset && !isEqual
   }
 
-  /// Returns true if the set is a superset of a finite sequence as a `Set`.
+  /// Returns `true` if the set is a superset of a finite sequence as a `Set`.
   @warn_unused_result
   public func isSupersetOf<
     S : SequenceType where S.Generator.Element == Element
@@ -495,7 +495,7 @@ public struct Set<Element : Hashable> :
     return other.isSubsetOf(self)
   }
 
-  /// Returns true if the set is a superset of a finite sequence as a `Set`
+  /// Returns `true` if the set is a superset of a finite sequence as a `Set`
   /// but not equal.
   @warn_unused_result
   public func isStrictSupersetOf<
@@ -505,7 +505,7 @@ public struct Set<Element : Hashable> :
     return other.isStrictSubsetOf(self)
   }
 
-  /// Returns true if no members in the set are in a finite sequence as a `Set`.
+  /// Returns `true` if no members in the set are in a finite sequence as a `Set`.
   @warn_unused_result
   public func isDisjointWith<
     S : SequenceType where S.Generator.Element == Element

@@ -540,7 +540,7 @@ public struct _StringCore {
     _invariantCheck()
   }
 
-  /// Returns true iff the contents of this string can be
+  /// Returns `true` iff the contents of this string can be
   /// represented as pure ASCII.
   ///
   /// - Complexity: O(N) in the worst case.

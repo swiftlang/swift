@@ -24,7 +24,7 @@ public enum UnicodeDecodingResult {
   case EmptyInput
   case Error
 
-  /// Returns true if `self` indicates no more unicode scalars are
+  /// Returns `true` if `self` indicates no more unicode scalars are
   /// available.
   @swift3_migration(renamedToProperty="isEmptyInput")
   @warn_unused_result

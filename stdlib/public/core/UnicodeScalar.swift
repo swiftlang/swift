@@ -142,7 +142,7 @@ public struct UnicodeScalar :
     }
   }
 
-  /// Returns true if this is an ASCII character (code point 0 to 127
+  /// Returns `true` if this is an ASCII character (code point 0 to 127
   /// inclusive).
   @warn_unused_result
   public func isASCII() -> Bool {

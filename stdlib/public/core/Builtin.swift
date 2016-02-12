@@ -516,21 +516,21 @@ func _getSuperclass(t: Any.Type) -> AnyClass? {
 // will attempt to generate generic code for the transparent function
 // and type checking will fail.
 
-/// Returns true if `object` is uniquely referenced.
+/// Returns `true` if `object` is uniquely referenced.
 @_transparent
 @warn_unused_result
 internal func _isUnique<T>(inout object: T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
-/// Returns true if `object` is uniquely referenced or pinned.
+/// Returns `true` if `object` is uniquely referenced or pinned.
 @_transparent
 @warn_unused_result
 internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned(&object))
 }
 
-/// Returns true if `object` is uniquely referenced.
+/// Returns `true` if `object` is uniquely referenced.
 /// This provides sanity checks on top of the Builtin.
 @_transparent
 @warn_unused_result
@@ -547,7 +547,7 @@ func _isUnique_native<T>(inout object: T) -> Bool {
   return Bool(Builtin.isUnique_native(&object))
 }
 
-/// Returns true if `object` is uniquely referenced or pinned.
+/// Returns `true` if `object` is uniquely referenced or pinned.
 /// This provides sanity checks on top of the Builtin.
 @_transparent
 @warn_unused_result
@@ -563,7 +563,7 @@ func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned_native(&object))
 }
 
-/// Returns true if type is a POD type. A POD type is a type that does not
+/// Returns `true` if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
 @_transparent
 @warn_unused_result
@@ -572,7 +572,7 @@ func _isPOD<T>(type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
 }
 
-/// Returns true if type is nominally an Optional type.
+/// Returns `true` if type is nominally an Optional type.
 @_transparent
 @warn_unused_result
 public // @testable
