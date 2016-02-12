@@ -140,7 +140,7 @@ public:
     }
   }
 
-  void printDeclNameEndLoc(const Decl *D) override {
+  void printDeclNameOrSignatureEndLoc(const Decl *D) override {
     unsigned Offset = OS.tell();
 
     if (!Info.Decls.empty() && Info.Decls.back().Dcl == D) {

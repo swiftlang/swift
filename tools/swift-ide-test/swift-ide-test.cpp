@@ -1564,7 +1564,7 @@ public:
   void printDeclLoc(const Decl *D) override {
     OS << "<loc>";
   }
-  void printDeclNameEndLoc(const Decl *D) override {
+  void printDeclNameOrSignatureEndLoc(const Decl *D) override {
     OS << "</loc>";
   }
   void printDeclPost(const Decl *D) override {

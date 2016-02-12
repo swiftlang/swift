@@ -59,6 +59,9 @@ private:
   void printDeclNameEndLoc(const Decl *D) override {
     return OtherPrinter.printDeclNameEndLoc(D);
   }
+  void printDeclNameOrSignatureEndLoc(const Decl *D) override {
+    return OtherPrinter.printDeclNameOrSignatureEndLoc(D);
+  }
   void printTypeRef(const TypeDecl *TD, Identifier Name) override {
     return OtherPrinter.printTypeRef(TD, Name);
   }

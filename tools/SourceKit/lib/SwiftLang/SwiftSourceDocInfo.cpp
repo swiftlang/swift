@@ -83,6 +83,13 @@ private:
     closeTag(getTagForDecl(D, /*isRef=*/false));
   }
 
+  void printDeclLoc(const Decl *D) override {
+    openTag("decl.name");
+  }
+  void printDeclNameEndLoc(const Decl *D) override {
+    closeTag("decl.name");
+  }
+
   void printTypeRef(const TypeDecl *TD, Identifier name) override {
     auto tag = getTagForDecl(TD, /*isRef=*/true);
     OS << "<" << tag << " usr=\"";
