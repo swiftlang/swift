@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# ld - Fake Darwin linker to test driver-produced -filelists.
+# fake-ld.py - Fake Darwin linker to test driver-produced -filelists.
 #
 # This source file is part of the Swift.org open source project
 #
