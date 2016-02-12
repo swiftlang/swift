@@ -176,7 +176,7 @@ public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// When adopting `Equatable`, only the `==` operator is required to be
 /// implemented.  The standard library provides an implementation for `!=`.
 public protocol Equatable {
-  /// Return true if `lhs` is equal to `rhs`.
+  /// Returns true if `lhs` is equal to `rhs`.
   ///
   /// **Equality implies substitutability**.  When `x == y`, `x` and
   /// `y` are interchangeable in any code that only depends on their

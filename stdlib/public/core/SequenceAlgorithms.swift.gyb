@@ -23,7 +23,7 @@ GElement = "Generator.Element"
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
-  /// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
+  /// Returns a lazy `SequenceType` containing pairs (*n*, *x*), where
   /// *n*s are consecutive `Int`s starting at zero, and *x*s are
   /// the elements of `base`:
   ///
@@ -127,8 +127,8 @@ extension SequenceType ${"" if preds else "where Generator.Element : Equatable"}
 %{
 if preds:
   comment = """
-  /// Return true iff `self` begins with elements equivalent to those of
-  /// `other`, using `isEquivalent` as the equivalence test.  Return true if
+  /// Returns true iff `self` begins with elements equivalent to those of
+  /// `other`, using `isEquivalent` as the equivalence test.  Returns true if
   /// `other` is empty.
   ///
   /// - Requires: `isEquivalent` is an
@@ -137,8 +137,8 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Return true iff the initial elements of `self` are equal to `prefix`.
-  /// Return true if `other` is empty."""
+  /// Returns true iff the initial elements of `self` are equal to `prefix`.
+  /// Returns true if `other` is empty."""
   rethrows_ = ""
 }%
   ${comment}
@@ -181,7 +181,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Equatable"}
 %{
 if preds:
   comment = """
-  /// Return true iff `self` and `other` contain equivalent elements, using
+  /// Returns true iff `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
   /// - Requires: `isEquivalent` is an
@@ -189,7 +189,7 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Return `true` iff `self` and `other` contain the same elements in the
+  /// Returns `true` iff `self` and `other` contain the same elements in the
   /// same order."""
   rethrows_ = ""
 }%
@@ -237,8 +237,9 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 %{
 if preds:
   comment = """
-  /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
-  /// ordering, using `isOrderedBefore` as the comparison between elements.
+  /// Returns true iff `self` precedes `other` in a lexicographical 
+  /// ("dictionary") ordering, using `isOrderedBefore` as the comparison 
+  /// between elements.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting strings
@@ -251,8 +252,8 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
-  /// ordering, using "<" as the comparison between elements.
+  /// Returns true iff `self` precedes `other` in a lexicographical
+  /// ("dictionary") ordering, using "<" as the comparison between elements.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting strings
@@ -299,7 +300,7 @@ else:
 //===----------------------------------------------------------------------===//
 
 extension SequenceType where Generator.Element : Equatable {
-  /// Return `true` iff `element` is in `self`.
+  /// Returns `true` iff `element` is in `self`.
   @warn_unused_result
   public func contains(element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
@@ -316,7 +317,7 @@ extension SequenceType where Generator.Element : Equatable {
 }
 
 extension SequenceType {
-  /// Return `true` iff an element in `self` satisfies `predicate`.
+  /// Returns `true` iff an element in `self` satisfies `predicate`.
   @warn_unused_result
   public func contains(
     @noescape predicate: (${GElement}) throws -> Bool
@@ -335,7 +336,7 @@ extension SequenceType {
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
-  /// Return the result of repeatedly calling `combine` with an
+  /// Returns the result of repeatedly calling `combine` with an
   /// accumulated value initialized to `initial` and each element of
   /// `self`, in turn, i.e. return
   /// `combine(combine(...combine(combine(initial, self[0]),
@@ -357,7 +358,7 @@ extension SequenceType {
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
-  /// Return an `Array` containing the elements of `self` in reverse
+  /// Returns an `Array` containing the elements of `self` in reverse
   /// order.
   ///
   /// Complexity: O(N), where N is the length of `self`.
@@ -381,7 +382,7 @@ extension SequenceType {
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
-  /// Return an `Array` containing the concatenated results of mapping
+  /// Returns an `Array` containing the concatenated results of mapping
   /// `transform` over `self`.
   ///
   ///     s.flatMap(transform)
@@ -405,7 +406,7 @@ extension SequenceType {
 }
 
 extension SequenceType {
-  /// Return an `Array` containing the non-nil results of mapping
+  /// Returns an `Array` containing the non-nil results of mapping
   /// `transform` over `self`.
   ///
   /// - Complexity: O(*M* + *N*), where *M* is the length of `self`

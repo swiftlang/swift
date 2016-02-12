@@ -27,7 +27,7 @@ protocol _SequenceWrapperType {
 
 extension SequenceType
   where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
-  /// Return a generator over the elements of this sequence.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")

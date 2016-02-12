@@ -28,7 +28,7 @@ cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
 
 }%
 
-/// Return true iff isspace(u) would return nonzero when the current
+/// Returns `true` iff isspace(u) would return nonzero when the current
 /// locale is the C locale.
 @warn_unused_result
 internal func _isspace_clocale(u: UTF16.CodeUnit) -> Bool {

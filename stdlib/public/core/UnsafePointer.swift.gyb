@@ -367,7 +367,7 @@ ${comment}
   }
 
 #if _runtime(_ObjC)
-  /// Return the result of invoking body.  If self was converted from
+  /// Returns the result of invoking body.  If self was converted from
   /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
   /// of a `Memory` which is written into buffer before this method returns.
   @_transparent public
@@ -378,7 +378,7 @@ ${comment}
   }
 #endif
 
-  /// Return the result of invoking body.  If self was converted from
+  /// Returns the result of invoking body.  If self was converted from
   /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
   /// of buffer.
   @_transparent public

@@ -121,7 +121,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
     return (_allocatedSize(), _allocatedAlignMask())
   }
 
-  /// Return the actual number of `Elements` we can possibly store.
+  /// Returns the actual number of `Elements` we can possibly store.
   @warn_unused_result
   func _capacity() -> Int {
     return (_allocatedSize() - _HeapBuffer._elementOffset())

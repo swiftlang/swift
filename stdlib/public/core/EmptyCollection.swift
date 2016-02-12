@@ -28,7 +28,7 @@ public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
   /// Construct an instance.
   public init() {}
 
-  /// Return `nil`, indicating that there are no more elements.
+  /// Returns `nil`, indicating that there are no more elements.
   public mutating func next() -> Element? {
     return nil
   }
@@ -73,7 +73,7 @@ public struct EmptyCollection<Element> : CollectionType {
     _preconditionFailure("Index out of range")
   }
 
-  /// Return the number of elements (always zero).
+  /// The number of elements (always zero).
   public var count: Int {
     return 0
   }

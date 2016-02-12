@@ -97,11 +97,11 @@ public func ${op}= <T : _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 /// - `-(-x) == x`
 @swift3_migration(renamed="SignedNumber")
 public protocol SignedNumberType : Comparable, IntegerLiteralConvertible {
-  /// Return the result of negating `x`.
+  /// Returns the result of negating `x`.
   @warn_unused_result
   prefix func - (x: Self) -> Self
 
-  /// Return the difference between `lhs` and `rhs`.
+  /// Returns the difference between `lhs` and `rhs`.
   @warn_unused_result
   func - (lhs: Self, rhs: Self) -> Self
   
@@ -149,7 +149,7 @@ public func ~> <T : AbsoluteValuable>(x:T,_:(_Abs, ())) -> T {
   return T.abs(x)
 }
 
-/// Return the absolute value of `x`.
+/// Returns the absolute value of `x`.
 ///
 /// Concrete instances of `SignedNumberType` can specialize this
 /// function by conforming to `AbsoluteValuable`.
