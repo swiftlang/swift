@@ -24,6 +24,7 @@ DEFAULT_TARGET_BASED_ON_SDK = {
 }
 
 SKIPPED_FRAMEWORKS = {
+    'AppKitScripting',
     'CalendarStore',
     'CoreMIDIServer',
     'DrawSprocket',
@@ -37,8 +38,11 @@ SKIPPED_FRAMEWORKS = {
     'LDAP',
     'Message',
     'PCSC',
+    'PubSub',
     'QTKit',
+    'QuickTime',
     'Ruby',
+    'Scripting',
     'SyncServices',
     'System',
     'Tk',
@@ -81,7 +85,7 @@ def collect_submodules(common_args, module):
     my_args = ['-module-print-submodules', '-module-to-print=%s' % (module)]
     (exitcode, out, err) = run_command(common_args + my_args)
     if exitcode != 0:
-        print('error: submodule collection failed with error %d' %(exitcode))
+        print('error: submodule collection failed for module %s with error %d' % (module, exitcode))
         return ()
 
     # Find all of the submodule imports.
