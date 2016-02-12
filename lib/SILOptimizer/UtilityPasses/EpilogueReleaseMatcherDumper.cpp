@@ -50,11 +50,9 @@ class SILEpilogueReleaseMatcherDumper : public SILModuleTransform {
       // Iterate over arguments and dump their epilogue releases.
       for (auto Arg : Fn.getArguments()) {
         llvm::outs() << *Arg;
-        auto *RI = ArgToRetRelMap.releaseForArgument(Arg);
         // Can not find an epilogue release instruction for the argument.
-        if (!RI)
-          continue;
-        llvm::outs() << *RI;
+        for (auto &RI : ArgToRetRelMap.getReleasesForArgument(Arg))
+          llvm::outs() << *RI;
       }
 
       llvm::outs() << "END: sil @" << Fn.getName() << "\n";

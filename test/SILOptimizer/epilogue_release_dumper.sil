@@ -3,6 +3,11 @@
 import Builtin
 import Swift
 
+
+/////////////////////
+// Data Structures //
+/////////////////////
+
 class foo {
   var a: Int
    deinit 
@@ -13,6 +18,12 @@ class bar {
   var start: foo
   var end: foo
    deinit 
+  init()
+}
+
+struct baz {
+  var start: foo
+  var end: foo
   init()
 }
 
@@ -50,18 +61,52 @@ bb0(%0 : $bar):
   return %3 : $()
 }
 
-// CHECK-LABEL: START: sil @expanded_release_bar
-// CHECK: [[IN1:%.*]] = argument of bb0 : $bar
-// CHECK-NOT: strong_release [[IN1]] : $foo 
-// CHECK: END: sil @expanded_release_bar
-sil @expanded_release_bar : $@convention(thin) (@owned bar) -> () {
-bb0(%0 : $bar):
-  %1 = ref_element_addr %0 : $bar, #bar.start
-  %2 = ref_element_addr %0 : $bar, #bar.end
-  %3 = load %1 : $*foo
-  %4 = load %2 : $*foo
-  strong_release %3 : $foo
-  strong_release %4 : $foo
+// CHECK-LABEL: START: sil @exploded_release_baz
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: END: sil @exploded_release_baz
+sil @exploded_release_baz : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  strong_release %2 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we stop at retain_value   %0.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_interfering_uses
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK: strong_release
+// CHECK: END: sil @exploded_release_with_interfering_uses
+sil @exploded_release_with_interfering_uses : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  retain_value   %0 : $baz
+  strong_release %2 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Make sure we stop at an overlapping release.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_overlapping_releases
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+// CHECK: END: sil @exploded_release_with_overlapping_releases
+sil @exploded_release_with_overlapping_releases : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  release_value  %0 : $baz
+  strong_release %2 : $foo
   %5 = tuple ()
   return %5 : $()
 }

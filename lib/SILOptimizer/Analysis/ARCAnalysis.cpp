@@ -13,8 +13,10 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
@@ -479,8 +481,8 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
 
 void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     SILBasicBlock *BB) {
-  for (auto II = std::next(BB->rbegin()), IE = BB->rend();
-       II != IE; ++II) {
+
+  for (auto II = std::next(BB->rbegin()), IE = BB->rend(); II != IE; ++II) {
     // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
       // And the object cannot use values in a manner that will keep the object
@@ -490,30 +492,53 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
 
       // Otherwise, we need to stop computing since we do not want to reduce the
       // lifetime of objects.
-      return;
+      break;
     }
 
     // Ok, we have a release_value or strong_release. Grab Target and find the
     // RC identity root of its operand.
     SILInstruction *Target = &*II;
-    SILValue Op = RCFI->getRCIdentityRoot(Target->getOperand(0));
+    SILValue OrigOp = Target->getOperand(0);
+    SILValue Op = RCFI->getRCIdentityRoot(OrigOp);
+
+    // Check whether this is a SILArgument.
+    auto *Arg = dyn_cast<SILArgument>(Op);
+    // If this is not a SILArgument, maybe it is a part of a SILArgument.
+    // This is possible after we expand release instructions in SILLowerAgg pass.
+    if (!Arg) { 
+      Arg = dyn_cast<SILArgument>(stripValueProjections(OrigOp));
+    }
 
     // If Op is not a consumed argument, we must break since this is not an Op
     // that is a part of a return sequence. We are being conservative here since
     // we could make this more general by allowing for intervening non-arg
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
-    auto *Arg = dyn_cast<SILArgument>(Op);
     if (!Arg || !Arg->isFunctionArg() ||
         !Arg->hasConvention(ParameterConvention::Direct_Owned))
-      return;
+      break;
 
     // Ok, we have a release on a SILArgument that is direct owned. Attempt to
     // put it into our arc opts map. If we already have it, we have exited the
     // return value sequence so break. Otherwise, continue looking for more arc
     // operations.
-    if (!ArgInstMap.insert({Arg, Target}).second)
-      return;
+    auto Iter = ArgInstMap.find(Arg);
+    if (Iter == ArgInstMap.end()) {
+      ArgInstMap[Arg].push_back(Target);
+      continue;
+    }
+
+    // We've already seen at least part of this base. Check to see whether we
+    // are seeing a redundant release.
+    //
+    // If we are seeing a redundant release we have exited the return value
+    // sequence, so break.
+    if (ProjectionTree::isRedundantRelease(Iter->second, Arg, OrigOp)) 
+      break;
+    
+    // We've seen part of this base, but this is a part we've have not seen.
+    // Record it. 
+    Iter->second.push_back(Target);
   }
 }
 

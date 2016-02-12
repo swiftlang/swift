@@ -62,7 +62,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
   // it up with anything. Do make sure that it does not effect any other
   // instructions.
   if (FreezeOwnedArgEpilogueReleases &&
-      EpilogueReleaseMatcher.isReleaseMatchedToArgument(I))
+      EpilogueReleaseMatcher.isSingleReleaseMatchedToArgument(I))
     return DataflowResult(Op);
 
   BottomUpRefCountState &State = DataflowState.getBottomUpRefCountState(Op);
@@ -71,7 +71,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
   // If we are running with 'frozen' owned arg releases, check if we have a
   // frozen use in the side table. If so, this release must be known safe.
   if (FreezeOwnedArgEpilogueReleases) {
-    if (auto *OwnedRelease = EpilogueReleaseMatcher.releaseForArgument(Op)) {
+    if (auto *OwnedRelease = EpilogueReleaseMatcher.getSingleReleaseForArgument(Op)) {
       if (I != OwnedRelease) {
         State.updateKnownSafe(true);
       }
