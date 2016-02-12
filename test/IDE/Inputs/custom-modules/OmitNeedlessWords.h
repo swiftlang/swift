@@ -13,5 +13,6 @@
 -(void)methodAndReturnError:(NSError **)error;
 -(nullable Class)typeOfString:(nonnull NSString *)string;
 -(nullable Class)typeOfNamedString:(nonnull NSString *)string;
+-(nullable Class)typeOfTypeNamed:(nonnull NSString *)string;
 -(void)appendWithContentsOfString:(nonnull NSString *)string;
 @end
