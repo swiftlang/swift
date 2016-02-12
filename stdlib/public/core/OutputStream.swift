@@ -136,7 +136,8 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStreamType>(
         }
         target.write(")")
       case .Enum:
-        if let caseName = String.fromCString(_getEnumCaseName(value)) {
+        let caseNamePtr = _getEnumCaseName(value)
+        if caseNamePtr != nil, let caseName = String(validatingCString: caseNamePtr) {
           // Write the qualified type name in debugPrint.
           if isDebugPrint {
             printTypeName(mirror.subjectType)
@@ -164,7 +165,8 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStreamType>(
     printTypeName(metatypeValue)
   } else {
     // Fall back to the type or an opaque summary of the kind
-    if let opaqueSummary = String.fromCString(_opaqueSummary(mirror.subjectType)) {
+    let opaqueSummaryPtr = _opaqueSummary(mirror.subjectType)
+    if opaqueSummaryPtr != nil, let opaqueSummary = String(validatingCString: opaqueSummaryPtr) {
       target.write(opaqueSummary)
     } else {
       target.write(_typeName(mirror.subjectType, qualified: true))
@@ -303,7 +305,9 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStreamType>(
         return
       case .Enum:
         target.write(_typeName(mirror.subjectType, qualified: true))
-        if let caseName = String.fromCString(_getEnumCaseName(value)) {
+
+        let caseNamePtr = _getEnumCaseName(value)
+        if caseNamePtr != nil, let caseName = String(validatingCString: caseNamePtr) {
           target.write(".")
           target.write(caseName)
         }
