@@ -26,8 +26,10 @@ extension String {
       return nil
     }
     let len = Int(_swift_stdlib_strlen(cs))
-    return String._fromCodeUnitSequence(UTF8.self,
-        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
+    return String(codeUnits: UnsafeBufferPointer(
+        start: UnsafePointer(cs),
+        count: len),
+      encoding: UTF8.self)
   }
 
   /// Creates a new `String` by copying the nul-terminated UTF-8 data
@@ -44,8 +46,9 @@ extension String {
       return (nil, hadError: false)
     }
     let len = Int(_swift_stdlib_strlen(cs))
-    let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
-        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
+    let (result, hadError) = String.fromCodeUnitsWithRepair(
+        UnsafeBufferPointer(start: UnsafePointer(cs), count: len),
+        encoding: UTF8.self)
     return (result, hadError: hadError)
   }
 }

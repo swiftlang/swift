@@ -128,34 +128,44 @@ extension String {
   >(
     encoding: Encoding.Type, input: Input
   ) -> String {
-    return String._fromCodeUnitSequence(encoding, input: input)!
+    return String(codeUnits: input, encoding: encoding)!
   }
 
-  @warn_unused_result
-  public // @testable
-  static func _fromCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+  /// Create an instance by copying the Unicode data contained in `codeUnits`
+  /// using the `encoding` strategy.
+  ///
+  /// If the `codeUnits` contains ill-formed code unit sequences, the result is
+  /// `nil`.
+  ///
+  /// - Requires: `codeUnits` does not contain a nul terminator.
+  public init?<
+    Input: CollectionType, Encoding: UnicodeCodecType
+    where Encoding.CodeUnit == Input.Generator.Element
   >(
-    encoding: Encoding.Type, input: Input
-  ) -> String? {
-    let (stringBufferOptional, _) =
-        _StringBuffer.fromCodeUnits(encoding, input: input,
-            repairIllFormedSequences: false)
-    if let stringBuffer = stringBufferOptional {
-      return String(_storage: stringBuffer)
-    } else {
-      return nil
+    codeUnits input: Input, encoding: Encoding.Type
+  ) {
+    guard let stringBuffer =
+      _StringBuffer.fromCodeUnits(encoding, input: input,
+          repairIllFormedSequences: false).0 else {
+            return nil
     }
+    self.init(_storage: stringBuffer)
   }
 
+  /// Creates a new `String` by copying the Unicode data contained in `input`
+  /// using the `encoding` strategy.
+  ///
+  /// If `input` contains ill-formed code unit sequences, replaces them with
+  /// replacement characters (U+FFFD).
+  ///
+  /// - Requires: `input` does not contain a nul terminator.
   @warn_unused_result
   public // @testable
-  static func _fromCodeUnitSequenceWithRepair<
-    Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+  static func fromCodeUnitsWithRepair<
+    Input: CollectionType, Encoding: UnicodeCodecType
+    where Encoding.CodeUnit == Input.Generator.Element
   >(
-    encoding: Encoding.Type, input: Input
+    input: Input, encoding: Encoding.Type
   ) -> (String, hadError: Bool) {
     let (stringBuffer, hadError) =
         _StringBuffer.fromCodeUnits(encoding, input: input,
