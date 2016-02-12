@@ -1742,7 +1742,7 @@ struct ASTNodeBase {};
       } else {
         auto ext = cast<ExtensionDecl>(decl);
         conformingDC = ext;
-        nominal = ext->isNominalTypeOrNominalTypeExtensionContext();
+        nominal = ext->getAsNominalTypeOrNominalTypeExtensionContext();
       }
 
       auto proto = conformance->getProtocol();

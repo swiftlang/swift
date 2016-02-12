@@ -931,7 +931,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   auto *AFD = dyn_cast<AbstractFunctionDecl>(Callee->getDeclContext());
   if (!AFD)
     return nullptr;
-  auto *PD = AFD->getDeclContext()->isProtocolOrProtocolExtensionContext();
+  auto *PD = AFD->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
 
 
   // No need to propagate anything into the callee operand.

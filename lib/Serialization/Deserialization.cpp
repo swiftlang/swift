@@ -572,7 +572,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
 
-  dc->isNominalTypeOrNominalTypeExtensionContext()
+  dc->getAsNominalTypeOrNominalTypeExtensionContext()
     ->registerProtocolConformance(conformance);
 
 
@@ -989,8 +989,8 @@ static void filterValues(Type expectedTy, Module *expectedModule,
     // filter by whether we expect to find something in a protocol extension or
     // not. This lets us distinguish between a protocol member and a protocol
     // extension member that have the same type.
-    if (value->getDeclContext()->isProtocolOrProtocolExtensionContext() &&
-        (bool)value->getDeclContext()->isProtocolExtensionContext()
+    if (value->getDeclContext()->getAsProtocolOrProtocolExtensionContext() &&
+        (bool)value->getDeclContext()->getAsProtocolExtensionContext()
           != inProtocolExt)
       return true;
 

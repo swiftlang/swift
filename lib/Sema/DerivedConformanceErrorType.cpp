@@ -46,7 +46,7 @@ static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
   auto parentDC = codeDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->isEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   SmallVector<CaseStmt*, 4> cases;

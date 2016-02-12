@@ -1220,7 +1220,8 @@ bool AbstractStorageDecl::hasFixedLayout() const {
     return true;
 
   // If we're in a nominal type, just query the type.
-  auto nominal = getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominal =
+    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (nominal)
     return nominal->hasFixedLayout();
 
@@ -1521,7 +1522,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 
   signature.Name = getFullName();
   signature.InProtocolExtension
-    = getDeclContext()->isProtocolExtensionContext();
+    = getDeclContext()->getAsProtocolExtensionContext();
 
   // Functions, initializers, and de-initializers include their
   // interface types in their signatures as well as whether they are
@@ -1633,7 +1634,7 @@ ArrayRef<ValueDecl *>
 ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   // Dig out the nominal type.
   NominalTypeDecl *NTD =
-    getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD || isa<ProtocolDecl>(NTD))
     return {};
 
@@ -1893,7 +1894,8 @@ Type NominalTypeDecl::computeInterfaceType() const {
 
   // Figure out the interface type of the parent.
   Type parentType;
-  if (auto parent = getDeclContext()->isNominalTypeOrNominalTypeExtensionContext())
+  if (auto parent =
+    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext())
     parentType = parent->getDeclaredInterfaceType();
 
   Type type;
@@ -2024,7 +2026,7 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
 bool GenericTypeParamDecl::isProtocolSelf() const {
   if (!isImplicit()) return false;
   auto dc = getDeclContext();
-  if (!dc->isProtocolOrProtocolExtensionContext()) return false;
+  if (!dc->getAsProtocolOrProtocolExtensionContext()) return false;
   return dc->getProtocolSelf() == this;
 }
 
@@ -3302,7 +3304,7 @@ static Type getSelfTypeForContext(DeclContext *dc) {
   // For a protocol or extension thereof, the type is 'Self'.
   // FIXME: Weird that we're producing an archetype for protocol Self,
   // but the declared type of the context in non-protocol cases.
-  if (dc->isProtocolOrProtocolExtensionContext()) {
+  if (dc->getAsProtocolOrProtocolExtensionContext()) {
     // In the parser, generic parameters won't be wired up yet, just give up on
     // producing a type.
     if (dc->getGenericParamsOfContext() == nullptr)
@@ -3971,7 +3973,7 @@ bool FuncDecl::isUnaryOperator() const {
     return false;
   
   unsigned opArgIndex
-    = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
+    = getDeclContext()->getAsProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *params = getParameterList(opArgIndex);
   return params->size() == 1 && !params->get(0)->isVariadic();
@@ -3982,7 +3984,7 @@ bool FuncDecl::isBinaryOperator() const {
     return false;
   
   unsigned opArgIndex
-    = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
+    = getDeclContext()->getAsProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *params = getParameterList(opArgIndex);
   return params->size() == 2 && !params->get(1)->isVariadic();
@@ -4084,7 +4086,7 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
 }
 
 bool FuncDecl::hasArchetypeSelf() const {
-  if (!getDeclContext()->isProtocolExtensionContext())
+  if (!getDeclContext()->getAsProtocolExtensionContext())
     return false;
 
   auto selfTy = getDeclContext()->getProtocolSelf()->getArchetype();

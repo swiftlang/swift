@@ -175,7 +175,7 @@ static void doGlobalExtensionLookup(Type BaseType,
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
     bool validatedExtension = false;
-    if (TypeResolver && extension->isProtocolExtensionContext()) {
+    if (TypeResolver && extension->getAsProtocolExtensionContext()) {
       if (!TypeResolver->isProtocolExtensionUsable(
               const_cast<DeclContext *>(CurrDC), BaseType, extension)) {
         continue;
@@ -754,7 +754,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
 
-        if (DC->isProtocolExtensionContext())
+        if (DC->getAsProtocolExtensionContext())
           ExtendedType = DC->getProtocolSelf()->getArchetype();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))

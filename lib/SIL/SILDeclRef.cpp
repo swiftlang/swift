@@ -43,7 +43,7 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
 
   // Class extension methods are only dynamically dispatched if they're
   // dispatched by objc_msgSend, which happens if they're foreign or dynamic.
-  if (dc->isClassOrClassExtensionContext()) {
+  if (dc->getAsClassOrClassExtensionContext()) {
     if (method->hasClangNode())
       return MethodDispatch::Class;
     if (auto fd = dyn_cast<FuncDecl>(method)) {
