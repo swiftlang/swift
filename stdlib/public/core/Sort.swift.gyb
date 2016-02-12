@@ -350,7 +350,7 @@ public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
   fatalError("unavailable function can't be called")
 }
 
-/// Return an `Array` containing the sorted elements of `source`${according}.
+/// Returns an `Array` containing the sorted elements of `source`${according}.
 ///
 ${sortIsUnstable}
 ///

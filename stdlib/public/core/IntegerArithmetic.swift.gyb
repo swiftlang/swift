@@ -32,7 +32,7 @@ integerBinaryOps = [
 public protocol _IntegerArithmeticType {
 % for name,_,Action,result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and a `Bool` that is
-  /// true iff the operation caused an arithmetic overflow.
+  /// `true` iff the operation caused an arithmetic overflow.
   static func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
 % end
 }
@@ -95,11 +95,11 @@ public func ${op}= <T : _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 /// - `-x == 0 - x`
 /// - `-(-x) == x`
 public protocol SignedNumberType : Comparable, IntegerLiteralConvertible {
-  /// Return the result of negating `x`.
+  /// Returns the result of negating `x`.
   @warn_unused_result
   prefix func - (x: Self) -> Self
 
-  /// Return the difference between `lhs` and `rhs`.
+  /// Returns the difference between `lhs` and `rhs`.
   @warn_unused_result
   func - (lhs: Self, rhs: Self) -> Self
   
@@ -147,7 +147,7 @@ public func ~> <T : AbsoluteValuable>(x:T,_:(_Abs, ())) -> T {
   return T.abs(x)
 }
 
-/// Return the absolute value of `x`.
+/// Returns the absolute value of `x`.
 ///
 /// Concrete instances of `SignedNumberType` can specialize this
 /// function by conforming to `AbsoluteValuable`.

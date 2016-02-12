@@ -23,7 +23,7 @@ public enum UnicodeDecodingResult {
   case EmptyInput
   case Error
 
-  /// Return true if `self` indicates no more unicode scalars are
+  /// Returns `true` if `self` indicates no more unicode scalars are
   /// available.
   @warn_unused_result
   public func isEmptyInput() -> Bool {
@@ -59,7 +59,7 @@ public protocol UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult
@@ -141,7 +141,7 @@ public struct UTF8 : UnicodeCodecType {
   /// buffer with a shift, and update flags with a single-bit right shift.
   var _lookaheadFlags: UInt8 = 0
 
-  /// Return `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
+  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
   /// unit sequence.
   @warn_unused_result
   static func _isValidUTF8Impl(buffer: UInt32, length: UInt8) -> Bool {
@@ -192,7 +192,7 @@ public struct UTF8 : UnicodeCodecType {
     }
   }
 
-  /// Return `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
+  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
   /// unit sequence.
   @warn_unused_result
   static func _isValidUTF8(buffer: UInt32, validBytes: UInt8) -> Bool {
@@ -332,7 +332,7 @@ public struct UTF8 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult {
@@ -479,7 +479,7 @@ public struct UTF8 : UnicodeCodecType {
     put(buf3)
   }
 
-  /// Return `true` if `byte` is a continuation byte of the form
+  /// Returns `true` if `byte` is a continuation byte of the form
   /// `0b10xxxxxx`.
   @warn_unused_result
   public static func isContinuation(byte: CodeUnit) -> Bool {
@@ -518,7 +518,7 @@ public struct UTF16 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
@@ -653,7 +653,7 @@ public struct UTF32 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
@@ -858,13 +858,13 @@ extension UTF8.CodeUnit : _StringElementType {
 }
 
 extension UTF16 {
-  /// Return the number of code units required to encode `x`.
+  /// Returns the number of code units required to encode `x`.
   @warn_unused_result
   public static func width(x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
-  /// Return the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
+  /// Returns the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
   /// `x`.
   ///
   /// - Requires: `width(x) == 2`.
@@ -874,7 +874,7 @@ extension UTF16 {
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
   }
 
-  /// Return the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
+  /// Returns the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
   /// `x`.
   ///
   /// - Requires: `width(x) == 2`.

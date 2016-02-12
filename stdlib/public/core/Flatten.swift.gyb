@@ -78,7 +78,7 @@ public struct FlattenSequence<
     self._base = base
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> FlattenGenerator<Base.Generator> {
@@ -249,7 +249,7 @@ public struct ${Collection}<
     self._base = base
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> FlattenGenerator<Base.Generator> {
