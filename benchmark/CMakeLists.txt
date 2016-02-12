@@ -46,6 +46,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hanoi
     single-source/Hash
     single-source/Histogram
+    single-source/Integrate
     single-source/Join
     single-source/LinkedList
     single-source/MapReduce

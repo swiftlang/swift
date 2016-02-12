@@ -51,6 +51,7 @@ import GlobalClass
 import Hanoi
 import Hash
 import Histogram
+import Integrate
 import Join
 import LinkedList
 import MapReduce
@@ -73,12 +74,12 @@ import RC4
 import RGBHistogram
 import RangeAssignment
 import RecursiveOwnedParameter
-import StaticArray
 import SetTests
 import SevenBoom
 import Sim2DArray
 import SortLettersInPlace
 import SortStrings
+import StaticArray
 import StrComplexWalk
 import StrToInt
 import StringBuilder
@@ -126,6 +127,7 @@ precommitTests = [
   "Hanoi": run_Hanoi,
   "HashTest": run_HashTest,
   "Histogram": run_Histogram,
+  "Integrate": run_Integrate,
   "Join": run_Join,
   "LinkedList": run_LinkedList,
   "MapReduce": run_MapReduce,
@@ -149,7 +151,6 @@ precommitTests = [
   "RGBHistogram": run_RGBHistogram,
   "RangeAssignment": run_RangeAssignment,
   "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
-  "StaticArray": run_StaticArray,
   "SetExclusiveOr": run_SetExclusiveOr,
   "SetIntersect": run_SetIntersect,
   "SetIsSubsetOf": run_SetIsSubsetOf,
@@ -158,6 +159,7 @@ precommitTests = [
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
   "SortStrings": run_SortStrings,
+  "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
   "StringBuilder": run_StringBuilder,
