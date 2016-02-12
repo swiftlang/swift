@@ -595,6 +595,21 @@ static StringRef omitNeedlessWords(StringRef name,
       continue;
     }
 
+    // Special case: "ObjectValue" in the name matches "Object" in the
+    // type.
+    if (matchNameWordToTypeWord("Object", *typeWordRevIter) &&
+        matchNameWordToTypeWord(nameWord, "Value")) {
+      auto nextNameWordRevIter = std::next(nameWordRevIter);
+      if (nextNameWordRevIter != nameWordRevIterEnd &&
+          matchNameWordToTypeWord(*nextNameWordRevIter, "Object")) {
+        matched();
+        nameWordRevIter = nextNameWordRevIter;
+        ++nameWordRevIter;
+        ++typeWordRevIter;
+        continue;
+      }
+    }
+
     // Special case: if the word in the name ends in 's', and we have
     // a collection element type, see if this is a plural.
     if (!typeName.CollectionElement.empty() && nameWord.size() > 2 &&
