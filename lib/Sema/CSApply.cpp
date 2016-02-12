@@ -5450,7 +5450,7 @@ TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
       !base->isStaticallyDerivedMetatype() &&
       !ctorDecl->hasClangNode() &&
       !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->isProtocolOrProtocolExtensionContext())) {
+        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
     if (SuppressDiagnostics)
       return false;
 

@@ -1219,7 +1219,7 @@ void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
       // For a protocol extension, print only the where clause; the
       // generic parameter list is implicit. For other nominal types,
       // print the generic parameters.
-      if (decl->isProtocolOrProtocolExtensionContext())
+      if (decl->getAsProtocolOrProtocolExtensionContext())
         printWhereClause(gp->getRequirements());
       else
         printGenericParams(gp);

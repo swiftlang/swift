@@ -172,7 +172,7 @@ struct MaterializeForSetEmitter {
     // protocol context because IRGen won't know how to reconstruct
     // the type parameters.  (In principle, this can be done in the
     // callback storage if we need to.)
-    if (Witness->getDeclContext()->isProtocolOrProtocolExtensionContext())
+    if (Witness->getDeclContext()->getAsProtocolOrProtocolExtensionContext())
       return true;
 
     return false;

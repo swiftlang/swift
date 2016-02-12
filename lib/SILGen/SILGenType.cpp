@@ -267,7 +267,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *dd) {
-    if (dd->getParent()->isClassOrClassExtensionContext() == theClass) {
+    if (dd->getParent()->getAsClassOrClassExtensionContext() == theClass) {
       // Add the deallocating destructor to the vtable just for the purpose
       // that it is referenced and cannot be eliminated by dead function removal.
       // In reality, the deallocating destructor is referenced directly from
@@ -290,7 +290,7 @@ static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
                                          NominalTypeDecl *theType,
                                          VarDecl *var) {
   assert(!generics && "generic static properties not implemented");
-  if (var->getDeclContext()->isClassOrClassExtensionContext()) {
+  if (var->getDeclContext()->getAsClassOrClassExtensionContext()) {
     assert(var->isFinal() && "only 'static' ('class final') stored properties are implemented in classes");
   }
 

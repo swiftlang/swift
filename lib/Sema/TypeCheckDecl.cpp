@@ -1042,7 +1042,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   ArrayRef<ValueDecl *> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
-    if (auto nominal = currentDC->isNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto nominal = currentDC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       otherDefinitions = nominal->lookupDirect(current->getBaseName());
       if (tracker)
         tracker->addUsedMember({nominal, current->getName()}, isCascading);
@@ -1284,7 +1284,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       // occur once per instantiation, which we don't yet handle.
       } else if (dc->isGenericContext()) {
         unimplementedStatic(GenericTypes);
-      } else if (dc->isClassOrClassExtensionContext()) {
+      } else if (dc->getAsClassOrClassExtensionContext()) {
         auto staticSpelling = binding->getStaticSpelling();
         if (staticSpelling != StaticSpellingKind::KeywordStatic)
           unimplementedStatic(Classes);
@@ -1705,7 +1705,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   if (minAccess.hasValue()) {
     bool isExplicit =
       owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
-      owner->getDeclContext()->isProtocolOrProtocolExtensionContext();
+      owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
     auto diag = TC.diagnose(owner, diag::generic_param_access,
                             owner->getDescriptiveKind(), isExplicit,
                             contextAccess, minAccess.getValue(),
@@ -1804,7 +1804,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                  const TypeRepr *complainRepr) {
         bool isExplicit =
           anyVar->getAttrs().hasAttribute<AccessibilityAttr>() ||
-          anyVar->getDeclContext()->isProtocolOrProtocolExtensionContext();
+          anyVar->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
         auto diag = TC.diagnose(P->getLoc(), diag::pattern_type_access,
                                 anyVar->isLet(),
                                 isTypeContext,
@@ -2002,7 +2002,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     if (minAccess) {
       bool isExplicit =
         SD->getAttrs().hasAttribute<AccessibilityAttr>() ||
-        SD->getDeclContext()->isProtocolOrProtocolExtensionContext();
+        SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       auto diag = TC.diagnose(SD, diag::subscript_type_access,
                               isExplicit,
                               SD->getFormalAccess(),
@@ -2061,7 +2061,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     if (minAccess) {
       bool isExplicit =
         fn->getAttrs().hasAttribute<AccessibilityAttr>() ||
-        D->getDeclContext()->isProtocolOrProtocolExtensionContext();
+        D->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       auto diag = TC.diagnose(fn, diag::function_type_access,
                               isExplicit,
                               fn->getFormalAccess(),
@@ -2275,7 +2275,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
   // Record the name of this Objective-C method in its class.
   if (auto classDecl
-        = D->getDeclContext()->isClassOrClassExtensionContext()) {
+        = D->getDeclContext()->getAsClassOrClassExtensionContext()) {
     if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
       // If we are overriding another method, make sure the
       // selectors line up.
@@ -2693,7 +2693,7 @@ public:
     }
 
     if ((IsSecondPass && !IsFirstPass) ||
-        decl->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+        decl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
@@ -2839,7 +2839,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-      if (!VD->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+      if (!VD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
         synthesizeMaterializeForSet(materializeForSet, VD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3072,7 +3072,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      if (!SD->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+      if (!SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
         synthesizeMaterializeForSet(materializeForSet, SD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -3203,7 +3203,7 @@ public:
       return;
 
     // Types cannot be defined in a protocol extension.
-    if (ED->getDeclContext()->isProtocolExtensionContext()) {
+    if (ED->getDeclContext()->getAsProtocolExtensionContext()) {
       if (!ED->isInvalid())
         TC.diagnose(ED->getLoc(), diag::extension_protocol_type_definition,
                     ED->getFullName());
@@ -3275,7 +3275,7 @@ public:
       return;
 
     // Types cannot be defined in a protocol extension.
-    if (SD->getDeclContext()->isProtocolExtensionContext()) {
+    if (SD->getDeclContext()->getAsProtocolExtensionContext()) {
       if (!SD->isInvalid())
         TC.diagnose(SD->getLoc(), diag::extension_protocol_type_definition,
                     SD->getFullName());
@@ -3420,7 +3420,7 @@ public:
       return;
 
     // Types cannot be defined in a protocol extension.
-    if (CD->getDeclContext()->isProtocolExtensionContext()) {
+    if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
       if (!CD->isInvalid())
         TC.diagnose(CD->getLoc(), diag::extension_protocol_type_definition,
                     CD->getFullName());
@@ -3821,12 +3821,12 @@ public:
     }
 
     // 'Self' in protocol extensions is not dynamic 'Self'.
-    if (dc->isProtocolExtensionContext()) {
+    if (dc->getAsProtocolExtensionContext()) {
       return false;
     }
 
     // 'Self' is only a dynamic self on class methods.
-    auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+    auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
     assert(nominal && "Non-nominal container for method type?");
     if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
       int which;
@@ -4397,7 +4397,7 @@ public:
       if (member->getKind() != decl->getKind())
         continue;
 
-      if (!member->getDeclContext()->isClassOrClassExtensionContext())
+      if (!member->getDeclContext()->getAsClassOrClassExtensionContext())
         continue;
 
       auto parentDecl = cast<ValueDecl>(member);
@@ -5308,7 +5308,7 @@ public:
         TC.diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
           .fixItInsert(CD->getLoc(), "convenience ");
         CD->setInitKind(CtorInitializerKind::Convenience);
-      } else if (CD->getDeclContext()->isProtocolExtensionContext()) {
+      } else if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
         CD->setInitKind(CtorInitializerKind::Convenience);
       }
     }
@@ -5541,7 +5541,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   if (!DC->getParentSourceFile())
     return true;
 
-  NominalTypeDecl *conformingDecl = DC->isNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *conformingDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
   assert(conformingDecl && "Must have conforming declaration");
 
   // Make sure that any access of the witness through the protocol
@@ -7044,7 +7044,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
   auto checkObjCDeclContext = [](Decl *D) {
     DeclContext *DC = D->getDeclContext();
-    if (DC->isClassOrClassExtensionContext())
+    if (DC->getAsClassOrClassExtensionContext())
       return true;
     if (auto *PD = dyn_cast<ProtocolDecl>(DC))
       if (PD->isObjC())

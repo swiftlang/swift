@@ -517,7 +517,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       const auto *VD = cast<ValueDecl>(D);
       const TypeDecl *declParent =
-          VD->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+          VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!declParent) {
         assert(VD->getDeclContext()->isModuleScopeContext());
         declParent = VD->getDeclContext()->getParentModule();
@@ -1918,7 +1918,7 @@ class ObjCSelectorWalker : public ASTWalker {
 
     // Look for members with the given name.
     auto nominal =
-      method->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+      method->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
     auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
                                   nominal->getInterfaceType(), lookupName,
                                   (defaultMemberLookupOptions |
@@ -2107,11 +2107,11 @@ public:
 
       // If this method is within a protocol...
       if (auto proto =
-            method->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+            method->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
         // If the best so far is not from a protocol, or is from a
         // protocol that inherits this protocol, we have a new best.
         auto bestProto = bestMethod->getDeclContext()
-          ->isProtocolOrProtocolExtensionContext();
+          ->getAsProtocolOrProtocolExtensionContext();
         if (!bestProto || bestProto->inheritsFrom(proto))
           bestMethod = method;
         continue;
@@ -2119,11 +2119,11 @@ public:
 
       // This method is from a class.
       auto classDecl =
-        method->getDeclContext()->isClassOrClassExtensionContext();
+        method->getDeclContext()->getAsClassOrClassExtensionContext();
 
       // If the best method was from a protocol, keep it.
       auto bestClassDecl =
-        bestMethod->getDeclContext()->isClassOrClassExtensionContext();
+        bestMethod->getDeclContext()->getAsClassOrClassExtensionContext();
       if (!bestClassDecl) continue;
 
       // If the best method was from a subclass of the place where
@@ -2148,7 +2148,7 @@ public:
       {
         llvm::raw_svector_ostream out(replacement);
         auto nominal = bestMethod->getDeclContext()
-                         ->isNominalTypeOrNominalTypeExtensionContext();
+                         ->getAsNominalTypeOrNominalTypeExtensionContext();
         auto name = bestMethod->getFullName();
         out << "#selector(" << nominal->getName().str() << "."
             << name.getBaseName().str();

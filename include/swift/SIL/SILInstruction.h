@@ -2949,7 +2949,7 @@ public:
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
     return getMember().getDecl()->getDeclContext()
-             ->isProtocolOrProtocolExtensionContext();
+             ->getAsProtocolOrProtocolExtensionContext();
   }
   ProtocolConformanceRef getConformance() const { return Conformance; }
 

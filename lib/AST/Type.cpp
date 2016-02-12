@@ -2411,7 +2411,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
 
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
-  if (dc->isProtocolOrProtocolExtensionContext()) {
+  if (dc->getAsProtocolOrProtocolExtensionContext()) {
     // We only substitute into archetypes for now for protocols.
     // FIXME: This seems like an odd restriction. Whatever is depending on
     // this, shouldn't.
@@ -2431,7 +2431,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
-  auto ownerNominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+  auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   while (!baseTy->is<ErrorType>() &&
          baseTy->getAnyNominal() &&
          baseTy->getAnyNominal() != ownerNominal) {

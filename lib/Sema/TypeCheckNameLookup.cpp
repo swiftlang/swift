@@ -112,7 +112,7 @@ namespace {
         conformanceOptions |= ConformanceCheckFlags::InExpression;
 
       DeclContext *foundDC = found->getDeclContext();
-      auto foundProto = foundDC->isProtocolOrProtocolExtensionContext();
+      auto foundProto = foundDC->getAsProtocolOrProtocolExtensionContext();
 
       // Determine the nominal type through which we found the
       // declaration.
@@ -124,7 +124,7 @@ namespace {
         if (isa<AbstractFunctionDecl>(baseDC))
           baseDC = baseDC->getParent();
 
-        baseNominal = baseDC->isNominalTypeOrNominalTypeExtensionContext();
+        baseNominal = baseDC->getAsNominalTypeOrNominalTypeExtensionContext();
         assert(baseNominal && "Did not find nominal type");
       } else {
         baseNominal = cast<NominalTypeDecl>(base);
@@ -217,7 +217,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
     } else {
       auto baseNominal = cast<NominalTypeDecl>(found.getBaseDecl());
       for (auto currentDC = dc; currentDC; currentDC = currentDC->getParent()) {
-        if (currentDC->isNominalTypeOrNominalTypeExtensionContext()
+        if (currentDC->getAsNominalTypeOrNominalTypeExtensionContext()
               == baseNominal) {
           foundInType = currentDC->getDeclaredTypeInContext();
         }

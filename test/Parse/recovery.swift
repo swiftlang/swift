@@ -354,7 +354,7 @@ struct ErrorTypeInVarDeclFunctionType1 {
   var v2 : Int
 }
 
-struct ErrorTypeInVarDeclArrayType1 {
+struct ErrorTypeInVarDeclArrayType1 { // expected-note{{in declaration of 'ErrorTypeInVarDeclArrayType1':}}
   var v1 : Int[+] // expected-error {{expected declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}}
   // expected-error @-1 {{expected expression after unary operator}}
   // expected-error @-2 {{expected expression}}
@@ -409,7 +409,7 @@ struct ErrorInFunctionSignatureResultArrayType5 {
 }
 
 
-struct ErrorInFunctionSignatureResultArrayType11 {
+struct ErrorInFunctionSignatureResultArrayType11 { // expected-note{{in declaration of 'ErrorInFunctionSignatureResultArrayType11':}}
   func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
   }
 }
@@ -448,7 +448,7 @@ class ExprSuper2 {
 
 //===--- Recovery for braces inside a nominal decl.
 
-struct BracesInsideNominalDecl1 {
+struct BracesInsideNominalDecl1 { // expected-note{{in declaration of 'BracesInsideNominalDecl1':}}
   { // expected-error {{expected declaration}}
     aaa
   }
@@ -461,7 +461,7 @@ func use_BracesInsideNominalDecl1() {
 
 //===--- Recovery for wrong decl introducer keyword.
 
-class WrongDeclIntroducerKeyword1 {
+class WrongDeclIntroducerKeyword1 { // expected-note{{in declaration of 'WrongDeclIntroducerKeyword1':}}
   notAKeyword() {} // expected-error {{expected declaration}}
   func foo() {}
   class func bar() {}
