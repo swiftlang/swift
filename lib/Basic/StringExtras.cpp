@@ -873,6 +873,18 @@ static bool shouldPlacePrepositionOnArgLabel(StringRef beforePreposition,
       afterPreposition == "Z")
     return false;
 
+  // The preposition "of" binds tightly to the left word, except in
+  // rare cases.
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "of")) {
+    auto following = camel_case::getFirstWord(afterPreposition);
+    if (!camel_case::sameWordIgnoreFirstCase(following, "type") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "types") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "kind") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "size") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "length"))
+      return false;
+  }
+
   return true;
 }
 
@@ -1143,12 +1155,9 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   }
 
   // If needed, split the base name.
-  bool didSplitBaseName = false;
   if (!argNames.empty() &&
-      splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName)) {
-    didSplitBaseName = true;
+      splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))
     anyChanges = true;
-  }
 
   // Omit needless words based on parameter types.
   for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
@@ -1179,17 +1188,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     } else {
       argNames[i] = newName;
     }
-  }
-
-  // Place a "lonely of" on the base name, rather than having it as
-  // the first argument label.
-  if (didSplitBaseName &&
-      camel_case::sameWordIgnoreFirstCase(argNames[0], "of")) {
-    SmallString<16> newBaseName;
-    newBaseName += baseName;
-    newBaseName += "Of";
-    baseName = scratch.copyString(newBaseName);
-    argNames[0] = StringRef();
   }
 
   return lowercaseAcronymsForReturn();
