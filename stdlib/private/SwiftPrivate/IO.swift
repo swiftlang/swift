@@ -26,15 +26,15 @@ public struct _FDInputStream {
   public mutating func getline() -> String? {
     if let newlineIndex =
       _buffer[0..<_bufferUsed].indexOf(UInt8(UnicodeScalar("\n").value)) {
-      let result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<newlineIndex])
+      let result = String(validatingCodeUnits: _buffer[0..<newlineIndex],
+        as: UTF8.self)
       _buffer.removeRange(0...newlineIndex)
       _bufferUsed -= newlineIndex + 1
       return result
     }
     if isEOF && _bufferUsed > 0 {
-      let result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<_bufferUsed])
+      let result = String(validatingCodeUnits: _buffer[0..<_bufferUsed],
+        as: UTF8.self)
       _buffer.removeAll()
       _bufferUsed = 0
       return result

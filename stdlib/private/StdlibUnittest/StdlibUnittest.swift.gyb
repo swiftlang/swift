@@ -424,10 +424,10 @@ func _stdlib_getline() -> String? {
       if result.isEmpty {
         return nil
       }
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
+      return String(validatingCodeUnits: result, as: UTF8.self)
     }
     if c == CInt(UnicodeScalar("\n").value) {
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
+      return String(validatingCodeUnits: result, as: UTF8.self)
     }
     result.append(UInt8(c))
   }
