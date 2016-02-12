@@ -779,7 +779,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   for (const Arg *A : make_range(Args.filtered_begin(OPT_D),
                                  Args.filtered_end())) {
-    Opts.addBuildConfigOption(A->getValue());
+    Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
@@ -799,7 +799,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   // Must be processed after any other language options that could affect
-  // target configuration options.
+  // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
   std::tie(UnsupportedOS, UnsupportedArch) = Opts.setTarget(Target);
 
@@ -1000,10 +1000,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
 
-  // Parse the build configuration identifier.
+  // Parse the assert configuration identifier.
   if (const Arg *A = Args.getLastArg(OPT_AssertConfig)) {
-    // We currently understand build configuration up to 3 of which we only use
-    // 0 and 1 in the standard library.
     StringRef Configuration = A->getValue();
     if (Configuration == "DisableReplacement") {
       Opts.AssertConfig = SILOptions::DisableReplacement;
