@@ -28,7 +28,7 @@ public func <(
 
 extension String {
   /// A collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value) that
-  /// encode a `String` .
+  /// encodes a `String` value.
   public struct UnicodeScalarView : CollectionType, _Reflectable,
     CustomStringConvertible, CustomDebugStringConvertible {
     init(_ _core: _StringCore) {
