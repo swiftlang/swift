@@ -3520,7 +3520,7 @@ namespace {
       // FIXME: if only the superclass is resilient, we can get away
       // with sliding field offsets instead of doing the entire layout all
       // over again.
-      if (!Layout.isFixedLayout()) {
+      if (!Layout.isFixedLayout() || Target->isGenericContext()) {
         llvm::Value *fieldVector
           = emitAddressOfFieldOffsetVectorInClassMetadata(IGF,
                                                           Target, metadata)
