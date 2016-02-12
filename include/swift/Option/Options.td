@@ -290,7 +290,7 @@ def gline_tables_only : Flag<["-"], "gline-tables-only">,
 def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the assert_configuration replacement. "
-           "Possible values are Debug, Release, Replacement.">;
+           "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
 
 // File types
 

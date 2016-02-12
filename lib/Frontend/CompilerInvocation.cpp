@@ -988,7 +988,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.Optimization = SILOptions::SILOptMode::OptimizeUnchecked;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
-      Opts.AssertConfig = SILOptions::Fast;
+      Opts.AssertConfig = SILOptions::Unchecked;
     } else if (A->getOption().matches(OPT_Oplayground)) {
       // For now -Oplayground is equivalent to -Onone.
       IRGenOpts.Optimize = false;
@@ -1009,8 +1009,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.AssertConfig = SILOptions::Debug;
     } else if (Configuration == "Release") {
       Opts.AssertConfig = SILOptions::Release;
-    } else if (Configuration == "Fast") {
-      Opts.AssertConfig = SILOptions::Fast;
+    } else if (Configuration == "Unchecked") {
+      Opts.AssertConfig = SILOptions::Unchecked;
     } else {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
