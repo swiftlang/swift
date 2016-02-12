@@ -294,5 +294,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching _: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func isCompatibleWith(_: String)
 
+// CHECK-OMIT-NEEDLESS-WORDS: func add(_: AnyObject)
+
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

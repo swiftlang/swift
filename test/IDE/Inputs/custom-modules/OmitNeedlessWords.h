@@ -18,4 +18,5 @@
 -(nonnull id)objectAtIndexedSubscript:(NSUInteger)idx;
 -(void)exportPresetsBestMatchingString:(nonnull NSString *)string;
 -(void)isCompatibleWithString:(nonnull NSString *)string;
+-(void)addObjectValue:(nonnull id)object;
 @end
