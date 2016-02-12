@@ -287,5 +287,9 @@
 // Look for preposition prior to "of".
 // CHECK-OMIT-NEEDLESS-WORDS: func append(contentsOf _: String)
 
+// Leave subscripts alone
+// CHECK-OMIT-NEEDLESS-WORDS: subscript (_: UInt) -> AnyObject { get }
+// CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
+
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

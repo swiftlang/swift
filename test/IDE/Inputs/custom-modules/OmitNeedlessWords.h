@@ -15,4 +15,5 @@
 -(nullable Class)typeOfNamedString:(nonnull NSString *)string;
 -(nullable Class)typeOfTypeNamed:(nonnull NSString *)string;
 -(void)appendWithContentsOfString:(nonnull NSString *)string;
+-(nonnull id)objectAtIndexedSubscript:(NSUInteger)idx;
 @end
