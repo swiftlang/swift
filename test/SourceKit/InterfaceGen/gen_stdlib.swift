@@ -52,4 +52,10 @@ var x: Int
 // GROUP1: <\GROUPS>
 
 // RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Zip > %t.zip.response
-// RUN: diff -u %s.zip.response %t.zip.response
+// RUN: FileCheck -check-prefix=CHECK-ZIP -input-file %t.zip.response %s
+// CHECK-ZIP: public func zip<Sequence1 : SequenceType, Sequence2 : SequenceType>(sequence1: Sequence1, _ sequence2: Sequence2) -> Zip2Sequence<Sequence1, Sequence2>
+// CHECK-ZIP: public struct Zip2Generator<Generator1 : GeneratorType, Generator2 : GeneratorType> : GeneratorType {
+// CHECK-ZIP: public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType> : SequenceType {
+// Zip group cannot include Int
+// CHECK-ZIP-NOT: struct Int : SignedIntegerType, Comparable, Equatable {
+// CHECK-ZIP-NOT: extension String.UTF16View.Index {
