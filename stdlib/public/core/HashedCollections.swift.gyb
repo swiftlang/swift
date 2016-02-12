@@ -414,7 +414,7 @@ public struct Set<Element : Hashable> :
     return _variantStorage.assertingGet(position)
   }
 
-  /// Return a generator over the members.
+  /// Returns a generator over the members.
   ///
   /// - Complexity: O(1).
   public func generate() -> SetGenerator<Element> {
@@ -517,7 +517,7 @@ public struct Set<Element : Hashable> :
     return true
   }
 
-  /// Return a new `Set` with items in both this set and a finite sequence.
+  /// Returns a new `Set` with items in both this set and a finite sequence.
   @warn_unused_result
   public func union<
     S : SequenceType where S.Generator.Element == Element
@@ -527,7 +527,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Insert elements of a finite sequence into this `Set`.
+  /// Inserts elements of a finite sequence into this `Set`.
   public mutating func unionInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -536,7 +536,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Return a new set with elements in this set that do not occur
+  /// Returns a new set with elements in this set that do not occur
   /// in a finite sequence.
   @warn_unused_result
   public func subtract<
@@ -547,7 +547,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Remove all members in the set that occur in a finite sequence.
+  /// Removes all members in the set that occur in a finite sequence.
   public mutating func subtractInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -556,7 +556,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Return a new set with elements common to this set and a finite sequence.
+  /// Returns a new set with elements common to this set and a finite sequence.
   @warn_unused_result
   public func intersect<
     S : SequenceType where S.Generator.Element == Element
@@ -571,7 +571,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Remove any members of this set that aren't also in a finite sequence.
+  /// Removes any members of this set that aren't also in a finite sequence.
   public mutating func intersectInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -591,7 +591,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Return a new set with elements that are either in the set or a finite
+  /// Returns a new set with elements that are either in the set or a finite
   /// sequence but do not occur in both.
   @warn_unused_result
   public func exclusiveOr<
@@ -602,8 +602,8 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// For each element of a finite sequence, remove it from the set if it is a
-  /// common element, otherwise add it to the set. Repeated elements of the
+  /// For each element of a finite sequence, removes it from the set if it is a
+  /// common element, otherwise adds it to the set. Repeated elements of the
   /// sequence will be ignored.
   public mutating func exclusiveOrInPlace<
     S : SequenceType where S.Generator.Element == Element
@@ -1095,7 +1095,7 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.removeValueForKey(key)
   }
 
-  /// Remove all elements.
+  /// Removes all elements.
   ///
   /// - Postcondition: `capacity == 0` if `keepCapacity` is `false`, otherwise
   ///   the capacity will not be decreased.
@@ -1125,7 +1125,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // `SequenceType` conformance
   //
 
-  /// Return a generator over the (key, value) pairs.
+  /// Returns a generator over the (key, value) pairs.
   ///
   /// - Complexity: O(1).
   public func generate() -> DictionaryGenerator<Key, Value> {
@@ -3494,7 +3494,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     }
   }
 
-  /// Return a generator over the (Key, Value) pairs.
+  /// Returns a generator over the (Key, Value) pairs.
   ///
   /// - Complexity: O(1).
   internal func generate() -> ${Self}Generator<${TypeParameters}> {

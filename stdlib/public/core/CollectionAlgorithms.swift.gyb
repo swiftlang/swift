@@ -75,7 +75,7 @@ extension CollectionType {
 //===----------------------------------------------------------------------===//
 
 extension CollectionType {
-  /// Return the range of valid index values.
+  /// Returns the range of valid index values.
   ///
   /// The result's `endIndex` is the same as that of `self`.  Because
   /// `Range` is half-open, iterating the values of the result produces
@@ -187,11 +187,11 @@ ${orderingRequirementForComparable}
 %{
 
 sortDocCommentForPredicate = """\
-  /// Return an `Array` containing the sorted elements of `source`
+  /// Returns an `Array` containing the sorted elements of `source`
   /// according to `isOrderedBefore`."""
 
 sortDocCommentForComparable = """\
-  /// Return an `Array` containing the sorted elements of `source`."""
+  /// Returns an `Array` containing the sorted elements of `source`."""
 
 sortInPlaceDocCommentForPredicate = """\
   /// Sort `self` in-place according to `isOrderedBefore`."""

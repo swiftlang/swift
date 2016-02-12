@@ -207,7 +207,7 @@ public struct ReverseRandomAccessCollection<
 }
 
 extension CollectionType where Index : BidirectionalIndexType {
-  /// Return the elements of `self` in reverse order.
+  /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -217,7 +217,7 @@ extension CollectionType where Index : BidirectionalIndexType {
 }
 
 extension CollectionType where Index : RandomAccessIndexType {
-  /// Return the elements of `self` in reverse order.
+  /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -228,7 +228,7 @@ extension CollectionType where Index : RandomAccessIndexType {
 
 extension LazyCollectionType
 where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
-  /// Return the elements of `self` in reverse order.
+  /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -241,7 +241,7 @@ where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
 
 extension LazyCollectionType
 where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
-  /// Return the elements of `self` in reverse order.
+  /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -252,7 +252,7 @@ where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
   }
 }
 
-/// Return an `Array` containing the elements of `source` in reverse
+/// Returns an `Array` containing the elements of `source` in reverse
 /// order.
 @available(*, unavailable, message="call the 'reverse()' method on the collection")
 public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(

@@ -310,7 +310,7 @@ extension CollectionType {
 //===----------------------------------------------------------------------===//
 
 extension CollectionType {
-  /// Return an `Array` containing the results of mapping `transform`
+  /// Returns an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
   /// - Complexity: O(N).

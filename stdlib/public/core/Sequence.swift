@@ -74,20 +74,20 @@ public protocol SequenceType {
   /// A type that represents a subsequence of some of the elements.
   associatedtype SubSequence
 
-  /// Return a generator over the elements of this sequence.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @warn_unused_result
   func generate() -> Generator
 
-  /// Return a value less than or equal to the number of elements in
+  /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
   @warn_unused_result
   func underestimateCount() -> Int
 
-  /// Return an `Array` containing the results of mapping `transform`
+  /// Returns an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
   /// - Complexity: O(N).
@@ -96,7 +96,7 @@ public protocol SequenceType {
     @noescape transform: (Generator.Element) throws -> T
   ) rethrows -> [T]
 
-  /// Return an `Array` containing the elements of `self`,
+  /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   func filter(
@@ -302,7 +302,7 @@ internal class _PrefixSequence<Base : GeneratorType>
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
-  /// Return an `Array` containing the results of mapping `transform`
+  /// Returns an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
   /// - Complexity: O(N).
@@ -327,7 +327,7 @@ extension SequenceType {
     return Array(result)
   }
 
-  /// Return an `Array` containing the elements of `self`,
+  /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   public func filter(
@@ -446,7 +446,7 @@ extension SequenceType {
     return result
   }
 
-  /// Return a value less than or equal to the number of elements in
+  /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
@@ -595,9 +595,9 @@ extension SequenceType {
   public func dropLast() -> SubSequence  { return dropLast(1) }
 }
 
-/// Return an underestimate of the number of elements in the given
-/// sequence, without consuming the sequence.  For Sequences that are
-/// actually Collections, this will return `x.count`.
+/// Returns an underestimate of the number of elements in the given
+/// sequence, without consuming the sequence.  For sequences that are
+/// actually collections, this will return `x.count`.
 @available(*, unavailable, message="call the 'underestimateCount()' method on the sequence")
 public func underestimateCount<T : SequenceType>(x: T) -> Int {
   fatalError("unavailable function can't be called")

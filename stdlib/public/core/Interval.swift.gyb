@@ -19,7 +19,7 @@ public protocol IntervalType {
   @warn_unused_result
   func contains(value: Bound) -> Bool
 
-  /// Return `rhs` clamped to `self`.  The bounds of the result, even
+  /// Returns `rhs` clamped to `self`.  The bounds of the result, even
   /// if it is empty, are always within the bounds of `self`.
   @warn_unused_result
   func clamp(intervalToClamp: Self) -> Self

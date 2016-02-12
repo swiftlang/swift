@@ -1325,9 +1325,9 @@ public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
 
 #if _runtime(_ObjC)
 extension Array {
-  /// Try to downcast the source `NSArray` as our native buffer type.
-  /// If it succeeds, create a new `Array` around it and return that.
-  /// Return `nil` otherwise.
+  /// Tries to downcast the source `NSArray` as our native buffer type.
+  /// If it succeeds, creates a new `Array` around it and returns that.
+  /// Returns `nil` otherwise.
   // Note: this function exists here so that Foundation doesn't have
   // to know Array's implementation details.
   @warn_unused_result

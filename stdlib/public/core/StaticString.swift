@@ -128,7 +128,7 @@ public struct StaticString
     }
   }
 
-  /// Return a `String` representing the same sequence of Unicode
+  /// Returns a `String` representing the same sequence of Unicode
   /// scalar values as `self` does.
   @_transparent
   public var stringValue: String {

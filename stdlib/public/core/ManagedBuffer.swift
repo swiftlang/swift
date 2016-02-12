@@ -233,7 +233,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     }
   }
 
-  /// Return the object instance being used for storage.
+  /// Returns the object instance being used for storage.
   public var buffer: AnyObject {
     return Builtin.castFromNativeObject(_nativeBuffer)
   }

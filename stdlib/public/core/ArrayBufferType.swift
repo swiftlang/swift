@@ -103,8 +103,8 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// element. Otherwise, `nil`.
   var firstElementAddress: UnsafeMutablePointer<Element> { get }
 
-  /// Return a base address to which you can add an index `i` to get the address
-  /// of the corresponding element at `i`.
+  /// Returns a base address to which you can add an index `i` to get the 
+  /// address of the corresponding element at `i`.
   var subscriptBaseAddress: UnsafeMutablePointer<Element> { get }
 
   /// Like `subscriptBaseAddress`, but can assume that `self` is a mutable,

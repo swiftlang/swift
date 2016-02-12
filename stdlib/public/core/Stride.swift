@@ -148,7 +148,7 @@ public struct StrideTo<Element : Strideable> : SequenceType, CustomReflectable {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a generator over the elements of this sequence.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> StrideToGenerator<Element> {
@@ -174,7 +174,7 @@ public struct StrideTo<Element : Strideable> : SequenceType, CustomReflectable {
 }
 
 extension Strideable {
-  /// Return the sequence of values (`self`, `self + stride`, `self +
+  /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
   @warn_unused_result
@@ -226,7 +226,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType, CustomReflecta
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a generator over the elements of this sequence.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> StrideThroughGenerator<Element> {
@@ -251,7 +251,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType, CustomReflecta
 }
 
 extension Strideable {
-  /// Return the sequence of values (`self`, `self + stride`, `self +
+  /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression less than or equal to `end`.
   ///

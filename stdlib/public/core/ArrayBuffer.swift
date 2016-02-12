@@ -229,7 +229,7 @@ extension _ArrayBuffer {
     return result
   }
 
-  /// Return a `_SliceBuffer` containing the given `subRange` of values
+  /// Returns a `_SliceBuffer` containing the given `subRange` of values
   /// from this buffer.
   public subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {
     get {
