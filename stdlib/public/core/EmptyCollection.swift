@@ -57,7 +57,7 @@ public struct EmptyCollection<Element> : CollectionType {
     return 0
   }
 
-  /// Returns an empty *generator*.
+  /// Returns an empty generator.
   ///
   /// - Complexity: O(1).
   public func generate() -> EmptyGenerator<Element> {

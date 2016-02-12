@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A *collection* that supports replacement of an arbitrary subRange
+/// A collection that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
 public protocol RangeReplaceableCollectionType : CollectionType {
   //===--- Fundamental Requirements ---------------------------------------===//

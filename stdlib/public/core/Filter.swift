@@ -61,7 +61,7 @@ public struct LazyFilterGenerator<
 public struct LazyFilterSequence<Base : SequenceType>
   : LazySequenceType {
   
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> LazyFilterGenerator<Base.Generator> {
@@ -212,7 +212,7 @@ public struct LazyFilterCollection<
     return _base[position.base]
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> LazyFilterGenerator<Base.Generator> {

@@ -148,7 +148,7 @@ public struct StrideTo<Element : Strideable> : SequenceType, CustomReflectable {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> StrideToGenerator<Element> {
@@ -226,7 +226,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType, CustomReflecta
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> StrideThroughGenerator<Element> {

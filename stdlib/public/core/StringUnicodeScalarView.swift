@@ -201,8 +201,8 @@ extension String {
       var _generator: IndexingGenerator<_StringCore>!
     }
 
-    /// Return a *generator* over the `UnicodeScalar`s that comprise
-    /// this *sequence*.
+    /// Return a generator over the `UnicodeScalar`s that comprise
+    /// this sequence.
     ///
     /// - Complexity: O(1).
     @warn_unused_result

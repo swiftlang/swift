@@ -118,7 +118,7 @@ public struct Range<
 
   //===--------------------------------------------------------------------===//
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> RangeGenerator<Element> {

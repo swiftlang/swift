@@ -75,7 +75,7 @@ public protocol MutableIndexable {
   subscript(position: Index) -> _Element { get set }
 }
 
-/// A *generator* for an arbitrary *collection*.  Provided `C`
+/// A generator for an arbitrary collection.  Provided `C`
 /// conforms to the other requirements of `Indexable`,
 /// `IndexingGenerator<C>` can be used as the result of `C`'s
 /// `generate()` method.  For example:
@@ -90,7 +90,7 @@ public protocol MutableIndexable {
 public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
   
-  /// Create a *generator* over the given collection.
+  /// Create a generator over the given collection.
   public init(_ elements: Elements) {
     self._elements = elements
     self._position = elements.startIndex
@@ -111,11 +111,11 @@ public struct IndexingGenerator<Elements : Indexable>
   internal var _position: Elements.Index
 }
 
-/// A multi-pass *sequence* with addressable positions.
+/// A multi-pass sequence with addressable positions.
 ///
 /// Positions are represented by an associated `Index` type.  Whereas
-/// an arbitrary *sequence* may be consumed as it is traversed, a
-/// *collection* is multi-pass: any element may be revisited merely by
+/// an arbitrary sequence may be consumed as it is traversed, a
+/// collection is multi-pass: any element may be revisited merely by
 /// saving its index.
 ///
 /// The sequence view of the elements is identical to the collection
@@ -126,7 +126,7 @@ public struct IndexingGenerator<Elements : Indexable>
 ///       let x = self[i]
 ///     }
 public protocol CollectionType : Indexable, SequenceType {
-  /// A type that provides the *sequence*'s iteration interface and
+  /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   ///
   /// By default, a `CollectionType` satisfies `SequenceType` by
@@ -758,7 +758,7 @@ public func indices<
   fatalError("unavailable function can't be called")
 }
 
-/// A *generator* that adapts a *collection* `C` and any *sequence* of
+/// A generator that adapts a collection `C` and any sequence of
 /// its `Index` type to present the collection's elements in a
 /// permuted order.
 public struct PermutationGenerator<
@@ -779,7 +779,7 @@ public struct PermutationGenerator<
     return indices.next().map { seq[$0] }
   }
 
-  /// Construct a *generator* over a permutation of `elements` given
+  /// Construct a generator over a permutation of `elements` given
   /// by `indices`.
   ///
   /// - Requires: `elements[i]` is valid for every `i` in `indices`.

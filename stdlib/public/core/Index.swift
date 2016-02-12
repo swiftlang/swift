@@ -266,7 +266,7 @@ extension ForwardIndexType {
 //===--- BidirectionalIndexType -------------------------------------------===//
 
 
-/// An *index* that can step backwards via application of its
+/// An index that can step backwards via application of its
 /// `predecessor()` method.
 public protocol BidirectionalIndexType : ForwardIndexType {
   /// Return the previous consecutive value in a discrete sequence.
@@ -354,7 +354,7 @@ extension _RandomAccessAmbiguity {
   }
 }
 
-/// An *index* that can be offset by an arbitrary number of positions,
+/// An index that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
 public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
   _RandomAccessAmbiguity {

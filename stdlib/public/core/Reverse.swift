@@ -161,7 +161,7 @@ public struct ReverseCollection<
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ReverseIndex<Base.Index>
 
-  /// A type that provides the *sequence*'s iteration interface and
+  /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   public typealias Generator = IndexingGenerator<ReverseCollection>
   
@@ -194,7 +194,7 @@ public struct ReverseRandomAccessCollection<
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ReverseRandomAccessIndex<Base.Index>
   
-  /// A type that provides the *sequence*'s iteration interface and
+  /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   public typealias Generator = IndexingGenerator<
     ReverseRandomAccessCollection

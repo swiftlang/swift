@@ -44,7 +44,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   
   public typealias Elements = LazyMapSequence
   
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> LazyMapGenerator<Base.Generator, Element> {
@@ -102,7 +102,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   public var first: Element? { return _base.first.map(_transform) }
   
 
-  /// Returns a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> LazyMapGenerator<Base.Generator, Element> {
