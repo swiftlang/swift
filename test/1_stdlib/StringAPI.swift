@@ -397,104 +397,41 @@ StringDecodeTests.test("String(validatingCodeUnits:as:)") {
 
 var CStringTests = TestSuite("CStringTests")
 
-func getNullCString() -> UnsafeMutablePointer<CChar> {
-  return nil
-}
-
-func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<CChar>.alloc(100)
-  up[0] = 0x61
-  up[1] = 0x62
-  up[2] = 0
-  return (up, { up.dealloc(100) })
-}
-
-func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<UInt8>.alloc(100)
-  up[0] = 0xd0
-  up[1] = 0xb0
-  up[2] = 0xd0
-  up[3] = 0xb1
-  up[4] = 0
-  return (UnsafeMutablePointer(up), { up.dealloc(100) })
-}
-
-func getIllFormedUTF8String1(
-) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<UInt8>.alloc(100)
-  up[0] = 0x41
-  up[1] = 0xed
-  up[2] = 0xa0
-  up[3] = 0x80
-  up[4] = 0x41
-  up[5] = 0
-  return (UnsafeMutablePointer(up), { up.dealloc(100) })
-}
-
-func getIllFormedUTF8String2(
-) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<UInt8>.alloc(100)
-  up[0] = 0x41
-  up[1] = 0xed
-  up[2] = 0xa0
-  up[3] = 0x81
-  up[4] = 0x41
-  up[5] = 0
-  return (UnsafeMutablePointer(up), { up.dealloc(100) })
-}
-
-func asCCharArray(a: [UInt8]) -> [CChar] {
-  return a.map { CChar(bitPattern: $0) }
-}
-
-CStringTests.test("String.fromCString") {
+CStringTests.test("String(validatingCString:)") {
   do {
-    let s = getNullCString()
-    expectEmpty(String.fromCString(s))
-  }
-  do {
-    let (s, dealloc) = getASCIICString()
-    expectOptionalEqual("ab", String.fromCString(s))
+    let (s, dealloc) = getASCIICodePoints()
+    expectOptionalEqual("ab", String(validatingCString: UnsafePointer(s.baseAddress)))
     dealloc()
   }
   do {
-    let (s, dealloc) = getNonASCIICString()
-    expectOptionalEqual("аб", String.fromCString(s))
+    let (s, dealloc) = getNonASCIICodePoints()
+    expectOptionalEqual("аб", String(validatingCString: UnsafePointer(s.baseAddress)))
     dealloc()
   }
   do {
-    let (s, dealloc) = getIllFormedUTF8String1()
-    expectEmpty(String.fromCString(s))
+    let (s, dealloc) = getIllFormedCodePoints()
+    expectEmpty(String(validatingCString: UnsafePointer(s.baseAddress)))
     dealloc()
   }
 }
 
-CStringTests.test("String.fromCStringRepairingIllFormedUTF8") {
+CStringTests.test("String(cString:)") {
   do {
-    let s = getNullCString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectEmpty(result)
-    expectFalse(hadError)
-  }
-  do {
-    let (s, dealloc) = getASCIICString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("ab", result)
-    expectFalse(hadError)
+    let (s, dealloc) = getASCIICodePoints()
+    let result = String(cString: UnsafePointer(s.baseAddress))
+    expectEqual("ab", result)
     dealloc()
   }
   do {
-    let (s, dealloc) = getNonASCIICString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("аб", result)
-    expectFalse(hadError)
+    let (s, dealloc) = getNonASCIICodePoints()
+    let result = String(cString: UnsafePointer(s.baseAddress))
+    expectEqual("аб", result)
     dealloc()
   }
   do {
-    let (s, dealloc) = getIllFormedUTF8String1()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
-    expectTrue(hadError)
+    let (s, dealloc) = getIllFormedCodePoints()
+    let result = String(cString: UnsafePointer(s.baseAddress))
+    expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
     dealloc()
   }
 }
