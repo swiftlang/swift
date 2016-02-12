@@ -2319,7 +2319,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords) {
+  if (OmitNeedlessWords && !result.IsSubscriptAccessor) {
     // Check whether the module in which the declaration resides has a
     // module prefix. If so, strip that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
