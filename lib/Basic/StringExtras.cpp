@@ -826,10 +826,6 @@ StringRef camel_case::toLowercaseInitialisms(StringRef string,
 /// splitting.
 static bool wordConflictsBeforePreposition(StringRef word,
                                            StringRef preposition) {
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
-      camel_case::sameWordIgnoreFirstCase(word, "compatible"))
-    return true;
-
   return false;
 }
 
@@ -886,6 +882,23 @@ static bool shouldPlacePrepositionOnArgLabel(StringRef beforePreposition,
   }
 
   return true;
+}
+
+/// Determine whether the word preceding the preposition is part of an
+/// "extended" preposition, such as "compatible with".
+static bool priorWordExtendsPreposition(StringRef preceding,
+                                        StringRef preposition) {
+  // compatible with
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "compatible") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "with"))
+    return true;
+
+  // best matching
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "best") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "matching"))
+    return true;
+
+  return false;
 }
 
 /// Determine whether the preposition in a split is "vacuous", and
@@ -994,6 +1007,15 @@ static bool splitBaseNameAfterLastPreposition(
       wordConflictsAfterPreposition(*std::prev(nameWordRevIter), preposition))
     return false;
 
+  // If the word preceding the preposition extends the preposition, it
+  // will never be dropped.
+  if (std::next(nameWordRevIter) != nameWordRevIterEnd &&
+      priorWordExtendsPreposition(*std::next(nameWordRevIter), preposition)) {
+    ++nameWordRevIter;
+    preposition = StringRef((*nameWordRevIter).begin(),
+                            preposition.size() + (*nameWordRevIter).size());
+  }
+
   // Determine whether we should drop the preposition.
   StringRef beforePreposition(baseName.begin(),
                               preposition.begin() - baseName.begin());
@@ -1024,20 +1046,22 @@ static bool splitBaseNameAfterLastPreposition(
   }
   if (endOfBaseName == 0) return false;
 
-  // If the base name is vacuous and there are two or fewer words in
-  // the base name, don't split.
+  // If the base name is vacuous or is a keyword and there are two or
+  // fewer words in the base name, don't split.
   auto newBaseName = baseName.substr(0, endOfBaseName);
   {
     auto newWords = camel_case::getWords(newBaseName);
     auto newWordsIter = newWords.begin();
-    if (isVacuousName(*newWordsIter)) {
+    bool isKeyword = ::isKeyword(*newWordsIter);
+    bool isVacuous = isVacuousName(*newWordsIter);
+    if (isKeyword || isVacuous) {
       // Just one word?
       ++newWordsIter;
       if (newWordsIter == newWords.end()) return false;
 
-      // Or two words?
+      // Or two words, if it's vacuous.
       ++newWordsIter;
-      if (newWordsIter == newWords.end()) return false;
+      if (newWordsIter == newWords.end() && isVacuous) return false;
 
       // Okay: there is enough in the base name.
     }
