@@ -16,4 +16,6 @@
 -(nullable Class)typeOfTypeNamed:(nonnull NSString *)string;
 -(void)appendWithContentsOfString:(nonnull NSString *)string;
 -(nonnull id)objectAtIndexedSubscript:(NSUInteger)idx;
+-(void)exportPresetsBestMatchingString:(nonnull NSString *)string;
+-(void)isCompatibleWithString:(nonnull NSString *)string;
 @end

@@ -267,7 +267,7 @@
 // CHECK-APPKIT: class func conjureRect(_: Rect)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func jump(to _: URL)
-// CHECK-OMIT-NEEDLESS-WORDS: func objectIsCompatibleWith(_: AnyObject) -> Bool
+// CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith _: AnyObject) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x _: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
@@ -290,6 +290,9 @@
 // Leave subscripts alone
 // CHECK-OMIT-NEEDLESS-WORDS: subscript (_: UInt) -> AnyObject { get }
 // CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
+
+// CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func isCompatibleWith(_: String)
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws
