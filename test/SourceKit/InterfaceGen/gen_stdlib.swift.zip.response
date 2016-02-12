@@ -30,7 +30,7 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType> :
     /// Construct an instance that makes pairs of elements from `sequence1` and
     /// `sequence2`.
     public init(_ sequence1: Sequence1, _ sequence2: Sequence2)
-    /// Return a *generator* over the elements of this *sequence*.
+    /// Returns a generator over the elements of this sequence.
     ///
     /// - Complexity: O(1).
     public func generate() -> Zip2Generator<Sequence1.Generator, Sequence2.Generator>
@@ -541,61 +541,61 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType> :
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 1764,
-    key.length: 63
+    key.length: 60
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 1831,
+    key.offset: 1828,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 1839,
+    key.offset: 1836,
     key.length: 24
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment.field,
-    key.offset: 1845,
+    key.offset: 1842,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1867,
+    key.offset: 1864,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1874,
+    key.offset: 1871,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1879,
+    key.offset: 1876,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1893,
+    key.offset: 1890,
     key.length: 13
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1907,
+    key.offset: 1904,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1917,
+    key.offset: 1914,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1928,
+    key.offset: 1925,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1938,
+    key.offset: 1935,
     key.length: 9
   }
 ]
@@ -662,7 +662,7 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType> :
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1893,
+    key.offset: 1890,
     key.length: 13,
     key.is_system: 1
   }
@@ -770,11 +770,11 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType> :
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "Zip2Sequence",
     key.offset: 1223,
-    key.length: 727,
+    key.length: 724,
     key.nameoffset: 1230,
     key.namelength: 12,
     key.bodyoffset: 1311,
-    key.bodylength: 638,
+    key.bodylength: 635,
     key.inheritedtypes: [
       {
         key.name: "SequenceType"
@@ -821,9 +821,9 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType> :
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "generate()",
-        key.offset: 1874,
+        key.offset: 1871,
         key.length: 74,
-        key.nameoffset: 1879,
+        key.nameoffset: 1876,
         key.namelength: 10
       }
     ]
