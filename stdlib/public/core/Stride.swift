@@ -149,7 +149,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")
@@ -226,7 +226,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")

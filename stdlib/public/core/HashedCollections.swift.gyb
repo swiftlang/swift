@@ -415,7 +415,7 @@ public struct Set<Element : Hashable> :
     return _variantStorage.assertingGet(position)
   }
 
-  /// Return a *generator* over the members.
+  /// Return a generator over the members.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator")
@@ -1129,7 +1129,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // `SequenceType` conformance
   //
 
-  /// Return a *generator* over the (key, value) pairs.
+  /// Return a generator over the (key, value) pairs.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator")
@@ -3468,7 +3468,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     }
   }
 
-  /// Return a *generator* over the (Key, Value) pairs.
+  /// Return a generator over the (Key, Value) pairs.
   ///
   /// - Complexity: O(1).
   internal func generate() -> ${Self}Generator<${TypeParameters}> {

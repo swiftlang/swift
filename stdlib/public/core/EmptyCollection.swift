@@ -58,7 +58,7 @@ public struct EmptyCollection<Element> : CollectionType {
     return 0
   }
 
-  /// Returns an empty *generator*.
+  /// Returns an empty generator.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator")

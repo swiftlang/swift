@@ -62,7 +62,7 @@ public protocol UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult
@@ -335,7 +335,7 @@ public struct UTF8 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult {
@@ -521,7 +521,7 @@ public struct UTF16 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
@@ -656,7 +656,7 @@ public struct UTF32 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {

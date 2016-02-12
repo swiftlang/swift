@@ -267,7 +267,7 @@ extension ForwardIndexType {
 //===--- BidirectionalIndexType -------------------------------------------===//
 
 
-/// An *index* that can step backwards via application of its
+/// An index that can step backwards via application of its
 /// `predecessor()` method.
 @swift3_migration(renamed="BidirectionalIndex")
 public protocol BidirectionalIndexType : ForwardIndexType {
@@ -356,7 +356,7 @@ extension _RandomAccessAmbiguity {
   }
 }
 
-/// An *index* that can be offset by an arbitrary number of positions,
+/// An index that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
 @swift3_migration(renamed="RandomAccessIndex")
 public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
