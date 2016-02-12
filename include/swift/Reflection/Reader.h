@@ -1,9 +1,29 @@
+//===--- Reader.h - Swift Type Reflection Memory Reader ---------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Implements reading memory from the current or external process
+// for reflection.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_REFLECTION_READER_H
 #define SWIFT_REFLECTION_READER_H
 
+#include "swift/Reflection/Buffer.h"
+#include "swift/Reflection/Records.h"
+
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 class BufferImpl;
 
@@ -12,79 +32,45 @@ namespace reflection {
 
 using CopyFunction = size_t (*)(uintptr_t Source, void *Dest, size_t Size);
 
-/// An abstract impl interface for getting the head of what may be a buffer
-/// copied from an external address space.
-class BufferImpl {
-public:
-  virtual const void *getPointer() = 0;
-  virtual ~BufferImpl() {}
-};
-
-/// A trivial wrapper for pointers in the current address space.
-template <typename T>
-class InternalBuffer final : public BufferImpl {
-  const T *Source;
+template <typename Iterator>
+class ReflectionSection {
+  using const_iterator = Iterator;
+  const std::string ImageFilename;
+  const void * const Begin;
+  const void * const End;
 
 public:
-  InternalBuffer(const T *Source) : Source(Source) {}
-  virtual const void *getPointer() override {
-    return reinterpret_cast<const void *>(Source);
+  ReflectionSection(const char *ImageFilename, const void * const Begin,
+                    const void * const End)
+  : ImageFilename(ImageFilename), Begin(Begin), End(End) {}
+
+  const_iterator begin() const {
+    return const_iterator(Begin, End);
   }
-};
 
-/// A buffer of data copied out of an external address space.
-template <typename T>
-class ExternalBuffer final : public BufferImpl {
-  uint8_t Buf[sizeof(T)] = {0};
+  const_iterator end() const {
+    return const_iterator(End, End);
+  }
 
-public:
-  virtual const void *getPointer() override {
-    return reinterpret_cast<const void *>(Buf);
+  const std::string getImageFilename() const {
+    return ImageFilename;
   }
 };
 
-/// An abstraction over a pointer which may be in another
-/// address space.
-///
-/// These will always be backed by real data, but it is
-/// important not to indirect twice out of this type.
-/// Ask the MemoryReader to read each pointer. For example:
-/// Buffer<MyStruct> MS = Reader.read(APointer);
-/// int i = MS->i; // OK.
-///
-/// If MyStruct has a nested MyStruct *, you read it like so:
-/// Buffer<MyStruct> MS = Reader.read(MS->nestedMyStruct);
-template <typename T>
-class Buffer {
-  friend class MemoryReader;
+using FieldSection = ReflectionSection<FieldDescriptorIterator>;
+using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
 
-  std::unique_ptr<BufferImpl> Impl;
-
-  Buffer() : Impl(nullptr) {}
-
-  Buffer(std::unique_ptr<BufferImpl> Impl)
-    : Impl(std::move(Impl)) {}
-
-public:
-  const T& operator*() {
-      return *reinterpret_cast<const T*>(Impl->getPointer());
-  }
-
-  const T* operator->() {
-      return reinterpret_cast<const T*>(Impl->getPointer());
-  }
-
-  operator bool() const {
-    return bool(Impl);
-  }
+struct ReflectionInfo {
+  FieldSection Fields;
+  AssociatedTypeSection AssociatedTypes;
 };
 
 class MemoryReader {
   CopyFunction copy;
+  std::vector<ReflectionInfo> Info;
 
 public:
   MemoryReader() : copy(nullptr) {}
-  MemoryReader(CopyFunction copy) : copy(copy) {}
 
   template <typename T>
   Buffer<T> read(const T *Source) {
@@ -104,6 +90,14 @@ public:
       auto internal = new Internal(Source);
       return Buffer<T>(std::unique_ptr<Internal>(internal));
     }
+  }
+
+  void addReflectionInfo(ReflectionInfo I) {
+    Info.push_back(I);
+  }
+
+  const std::vector<ReflectionInfo> &getInfo() const {
+    return Info;
   }
 };
 

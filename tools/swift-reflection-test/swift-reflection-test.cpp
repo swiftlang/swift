@@ -123,7 +123,7 @@ static int doDumpReflectionSections(std::string BinaryFilename,
   StringRef fieldSectionContents;
   fieldSectionRef.getContents(fieldSectionContents);
 
-  const ReflectionSection<FieldDescriptorIterator> fieldSection {
+  const FieldSection fieldSection {
     BinaryFilename.c_str(),
     reinterpret_cast<const void *>(fieldSectionContents.begin()),
     reinterpret_cast<const void *>(fieldSectionContents.end())
@@ -132,13 +132,14 @@ static int doDumpReflectionSections(std::string BinaryFilename,
   StringRef associatedTypeSectionContents;
   associatedTypeSectionRef.getContents(associatedTypeSectionContents);
 
-  const ReflectionSection<AssociatedTypeIterator> associatedTypeSection {
+  const AssociatedTypeSection associatedTypeSection {
     BinaryFilename.c_str(),
     reinterpret_cast<const void *>(associatedTypeSectionContents.begin()),
     reinterpret_cast<const void *>(associatedTypeSectionContents.end())
   };
 
-  ReflectionSectionReader Reader({fieldSection}, {associatedTypeSection});
+  MemoryReader Reader;
+  Reader.addReflectionInfo({fieldSection, associatedTypeSection});
   ReflectionContext RC(Reader);
   RC.dumpAllSections(std::cout);
 
