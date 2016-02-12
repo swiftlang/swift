@@ -97,6 +97,110 @@ public:
   }
 };
 
+class AssociatedTypeRecord {
+  const RelativeDirectPointer<const char> Name;
+  const RelativeDirectPointer<const char> SubstitutedTypeName;
+
+public:
+  std::string getName() const {
+    return Name.get();
+  }
+
+  std::string getMangledSubstitutedTypeName() const {
+    return SubstitutedTypeName.get();
+  }
+};
+
+struct AssociatedTypeRecordIterator {
+  const AssociatedTypeRecord *Cur;
+  const AssociatedTypeRecord * const End;
+
+  AssociatedTypeRecordIterator(const AssociatedTypeRecord *Cur,
+                               const AssociatedTypeRecord * const End)
+  : Cur(Cur), End(End) {}
+
+  const AssociatedTypeRecord &operator*() const {
+    return *Cur;
+  }
+
+  AssociatedTypeRecordIterator &operator++() {
+    ++Cur;
+    return *this;
+  }
+
+  bool operator==(const AssociatedTypeRecordIterator &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(const AssociatedTypeRecordIterator &other) const {
+    return !(*this == other);
+  }
+};
+
+struct AssociatedTypeDescriptor {
+  const RelativeDirectPointer<const char> ConformingTypeName;
+  const RelativeDirectPointer<const char> ProtocolTypeName;
+  uint32_t NumAssociatedTypes;
+  uint32_t AssociatedTypeRecordSize;
+
+  const AssociatedTypeRecord *getAssociatedTypeRecordBuffer() const {
+    return reinterpret_cast<const AssociatedTypeRecord *>(this + 1);
+  }
+
+public:
+  using const_iterator = AssociatedTypeRecordIterator;
+
+  const_iterator begin() const {
+    auto Begin = getAssociatedTypeRecordBuffer();
+    auto End = Begin + NumAssociatedTypes;
+    return const_iterator { Begin, End };
+  }
+
+  const_iterator end() const {
+    auto Begin = getAssociatedTypeRecordBuffer();
+    auto End = Begin + NumAssociatedTypes;
+    return const_iterator { End, End };
+  }
+
+  std::string getMangledProtocolTypeName() const {
+    return ProtocolTypeName.get();
+  }
+
+  std::string getMangledConformingTypeName() const {
+    return ConformingTypeName.get();
+  }
+};
+
+class AssociatedTypeIterator
+  : public std::iterator<std::forward_iterator_tag, AssociatedTypeDescriptor> {
+public:
+  const void *Cur;
+  const void * const End;
+  AssociatedTypeIterator(const void *Cur, const void * const End)
+    : Cur(Cur), End(End) {}
+
+  const AssociatedTypeDescriptor &operator*() const {
+    return *reinterpret_cast<const AssociatedTypeDescriptor *>(Cur);
+  }
+
+  AssociatedTypeIterator &operator++() {
+    const auto &ATR = this->operator*();
+    size_t Size = sizeof(AssociatedTypeDescriptor) +
+      ATR.NumAssociatedTypes * ATR.AssociatedTypeRecordSize;
+    const void *Next = reinterpret_cast<const char *>(Cur) + Size;
+    Cur = Next;
+    return *this;
+  }
+
+  bool operator==(AssociatedTypeIterator const &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(AssociatedTypeIterator const &other) const {
+    return !(*this == other);
+  }
+};
+
 class FieldDescriptorIterator
   : public std::iterator<std::forward_iterator_tag, FieldDescriptor> {
 public:
@@ -126,8 +230,9 @@ public:
   }
 };
 
+template <typename Iterator>
 class ReflectionSection {
-  using const_iterator = FieldDescriptorIterator;
+  using const_iterator = Iterator;
   const std::string ImageFilename;
   const void * const Begin;
   const void * const End;
@@ -150,44 +255,77 @@ public:
   }
 };
 
-class ReflectionReader {
-public:
-  virtual std::vector<const ReflectionSection> getSections() const = 0;
-  virtual size_t read(void *dst, void *src, size_t count) const = 0;
-  virtual ~ReflectionReader() {}
+using FieldSection = ReflectionSection<FieldDescriptorIterator>;
+using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
+
+struct ReflectionSectionReader {
+  std::vector<FieldSection> FieldSections;
+  std::vector<AssociatedTypeSection> AssociatedTypeSections;
+
+  ReflectionSectionReader(std::vector<FieldSection> FieldSections,
+                          std::vector<AssociatedTypeSection>
+                            AssociatedTypeSections)
+    : FieldSections(FieldSections),
+      AssociatedTypeSections(AssociatedTypeSections) {}
 };
 
 class ReflectionContext {
-  ReflectionReader &Reader;
+  ReflectionSectionReader &Reader;
+
+  void dumpTypeRef(const std::string &MangledName,
+                   std::ostream &OS, bool printTypeName = false) const {
+    auto TypeName = Demangle::demangleTypeAsString(MangledName);
+    auto DemangleTree = Demangle::demangleTypeAsNode(MangledName);
+    auto TR = decodeDemangleNode(DemangleTree);
+    OS << TypeName << '\n';
+    TR->dump(OS);
+    std::cout << std::endl;
+  }
+
 public:
-  ReflectionContext(ReflectionReader &Reader) : Reader(Reader) {}
+  ReflectionContext(ReflectionSectionReader &Reader) : Reader(Reader) {}
 
-  void dumpSections(std::ostream &OS) const {
-    for (const auto &section : Reader.getSections()) {
+  void dumpFieldSection(std::ostream &OS) const {
+    for (const auto &section : Reader.FieldSections) {
       for (const auto &descriptor : section) {
-        auto mangledTypeName = descriptor.getMangledTypeName();
-        auto typeName = Demangle::demangleTypeAsString(mangledTypeName);
-        auto demangleTree = Demangle::demangleTypeAsNode(mangledTypeName);
-        auto TR = decodeDemangleNode(demangleTree);
-        OS << typeName << '\n';
-        for (size_t i = 0; i < typeName.size(); ++i)
-          OS << '=';
-        OS << '\n';
-        TR->dump(OS);
-        std::cout << std::endl;
-
+        dumpTypeRef(descriptor.getMangledTypeName(), OS);
         for (auto &field : descriptor) {
-          auto fieldDemangleTree = Demangle::demangleTypeAsNode(
-              field.getMangledTypeName());
-          auto fieldTR = decodeDemangleNode(fieldDemangleTree);
-          auto fieldName = field.getFieldName();
-
-          OS << "- " << fieldName << ":\n";
-          fieldTR->dump(OS);
-          OS << std::endl;
+          OS << field.getFieldName() << ": ";
+          dumpTypeRef(field.getMangledTypeName(), OS);
         }
       }
     }
+  }
+
+  void dumpAssociatedTypeSection(std::ostream &OS) const {
+    for (const auto &section : Reader.AssociatedTypeSections) {
+      for (const auto &descriptor : section) {
+        auto conformingTypeName = Demangle::demangleTypeAsString(
+          descriptor.getMangledConformingTypeName());
+        auto protocolName = Demangle::demangleTypeAsString(
+          descriptor.getMangledProtocolTypeName());
+
+        OS << conformingTypeName << " : " << protocolName;
+        OS << std::endl;
+
+        for (const auto &associatedType : descriptor) {
+          OS << "typealias " << associatedType.getName() << " = ";
+          dumpTypeRef(associatedType.getMangledSubstitutedTypeName(), OS);
+        }
+      }
+    }
+  }
+
+  void dumpAllSections(std::ostream &OS) const {
+    OS << "FIELDS:\n";
+    for (size_t i = 0; i < 7; ++i) OS << '=';
+    OS << std::endl;
+    dumpFieldSection(OS);
+    OS << "\nASSOCIATED TYPES:\n";
+    for (size_t i = 0; i < 17; ++i) OS << '=';
+    OS << std::endl;
+    dumpAssociatedTypeSection(OS);
+    OS << std::endl;
   }
 };
 

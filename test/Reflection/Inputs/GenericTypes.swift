@@ -1,6 +1,7 @@
-public class C1<T> {
+public class C1<T> : ClassBoundP {
   public typealias Function = C1<T> -> S1<T> -> E1<T> -> Int
   public typealias Tuple = (C1<T>, S1<T>, E1<T>, Int)
+  public typealias Inner = T
   public let aClass: C1<T>
   public let aStruct: S1<T>
   public let anEnum: E1<T>
@@ -62,6 +63,11 @@ public class C3<T: P2> {
   }
 }
 
+public struct C4<T : P1, U : P1> {}
+extension C4 : P1, P2 {
+  public typealias Inner = T
+  public typealias Outer = T
+}
 
 public struct S1<T> {
   public let aClass: C1<T>
@@ -105,6 +111,11 @@ public struct S3<T: P2> {
   }
 }
 
+public struct S4<T : P1, U : P1> {}
+extension S4 : P1, P2 {
+  public typealias Inner = T
+  public typealias Outer = T
+}
 
 public enum E1<T> {
   case Class(C1<T>)
@@ -137,4 +148,13 @@ public enum E3<T: P2> {
   case Primary(T)
   case DependentMemberOuter(T.Outer)
   case DependentMemberInner(T.Outer.Inner)
+}
+
+public enum E4<T : P1, U : P1> {
+  public typealias First = T
+}
+extension E4 : P1, P2, P3 {
+  public typealias Inner = T
+  public typealias Outer = U
+  public typealias Second = U
 }

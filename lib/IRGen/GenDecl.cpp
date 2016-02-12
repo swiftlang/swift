@@ -879,11 +879,18 @@ void IRGenModuleDispatcher::emitTypeMetadataRecords() {
   }
 }
 
-void IRGenModuleDispatcher::emitReflectionMetadataRecords() {
+void IRGenModuleDispatcher::emitFieldTypeMetadataRecords() {
   for (auto &m : *this) {
-    m.second->emitReflectionMetadataRecords();
+    m.second->emitFieldTypeMetadataRecords();
   }
 }
+
+void IRGenModuleDispatcher::emitAssociatedTypeMetadataRecords() {
+  for (auto &m : *this) {
+    m.second->emitAssociatedTypeMetadataRecords();
+  }
+}
+
 
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
