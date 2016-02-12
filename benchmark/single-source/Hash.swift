@@ -55,7 +55,7 @@ class Hash {
   func digestFast(inout Res : [UInt8]) {
     fillBlock()
     hash()
-    // We use [UInt8] to avoid using String::apend.
+    // We use [UInt8] to avoid using String::append.
     hashStateFast(&Res)
   }
 
