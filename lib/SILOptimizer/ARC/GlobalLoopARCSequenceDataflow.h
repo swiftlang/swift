@@ -90,9 +90,21 @@ public:
   bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
                  bool RecomputePostDomReleases);
 
+  /// Summarize the subregions of \p R that are blocks.
+  ///
+  /// We assume that all subregions that are loops have already been summarized
+  /// since we are processing bottom up through the loop nest hierarchy.
+  void summarizeSubregionBlocks(const LoopRegion *R);
+
   /// Summarize the contents of the loop so that loops further up the loop tree
   /// can reason about the loop.
   void summarizeLoop(const LoopRegion *R);
+
+  /// Add \p I to the interesting instruction list of its parent block.
+  void addInterestingInst(SILInstruction *I);
+
+  /// Remove \p I from the interesting instruction list of its parent block.
+  void removeInterestingInst(SILInstruction *I);
 
 private:
   /// Merge in the BottomUp state of any successors of DataHandle.getBB() into

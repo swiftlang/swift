@@ -224,28 +224,32 @@ void ARCRegionState::processBlockBottomUpPredTerminators(
   }
 }
 
-bool ARCRegionState::processBlockBottomUp(
-    const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
-    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
-  DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
+static bool processBlockBottomUpInsts(
+    ARCRegionState &State, SILBasicBlock &BB,
+    BottomUpDataflowRCStateVisitor<ARCRegionState> &DataflowVisitor,
+    AliasAnalysis *AA) {
 
-  SILBasicBlock &BB = *R->getBlock();
-  bool NestingDetected = false;
+  auto II = State.summarizedinterestinginsts_rbegin();
+  auto IE = State.summarizedinterestinginsts_rend();
 
-  BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
-      RCIA, *this, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-      IncToDecStateMap);
+  // If we do not have any interesting instructions, bail and return false since
+  // we can not have any nested instructions.
+  if (II == IE)
+    return false;
 
-  // For each non-terminator instruction I in BB visited in reverse...
-  for (auto II = std::next(BB.rbegin()), IE = BB.rend(); II != IE;) {
-    SILInstruction &I = *II;
+  // If II is the terminator, skip it since our terminator was already processed
+  // in our successors.
+  if (*II == BB.getTerminator())
     ++II;
 
-    DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
+  bool NestingDetected = false;
+  while (II != IE) {
+    SILInstruction *I = *II;
+    ++II;
 
-    auto Result = DataflowVisitor.visit(&I);
+    DEBUG(llvm::dbgs() << "VISITING:\n    " << *I);
+
+    auto Result = DataflowVisitor.visit(I);
 
     // If this instruction can have no further effects on another instructions,
     // continue. This happens for instance if we have cleared all of the state
@@ -260,11 +264,11 @@ bool ARCRegionState::processBlockBottomUp(
     // that the instruction "visits".
     SILValue Op = Result.RCIdentity;
 
-    auto *InsertPt = &*std::next(SILBasicBlock::iterator(&I));
+    auto *InsertPt = &*std::next(I->getIterator());
 
     // For all other (reference counted value, ref count state) we are
     // tracking...
-    for (auto &OtherState : getBottomupStates()) {
+    for (auto &OtherState : State.getBottomupStates()) {
       // If the other state's value is blotted, skip it.
       if (!OtherState.hasValue())
         continue;
@@ -274,9 +278,29 @@ bool ARCRegionState::processBlockBottomUp(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, InsertPt, AA);
+      OtherState->second.updateForSameLoopInst(I, InsertPt, AA);
     }
   }
+
+  return NestingDetected;
+}
+
+bool ARCRegionState::processBlockBottomUp(
+    const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+    LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
+    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
+  DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
+
+  SILBasicBlock &BB = *R->getBlock();
+  BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
+      RCIA, *this, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
+      IncToDecStateMap);
+
+  // Visit each non-terminator arc relevant instruction I in BB visited in
+  // reverse...
+  bool NestingDetected =
+      processBlockBottomUpInsts(*this, BB, DataflowVisitor, AA);
 
   // Now visit each one of our predecessor regions and see if any are blocks
   // that can use reference counted values. If any of them do, we advance the
@@ -393,11 +417,11 @@ bool ARCRegionState::processBlockTopDown(
   }
 
   // For each instruction I in BB...
-  for (auto &I : BB) {
+  for (auto *I : SummarizedInterestingInsts) {
 
-    DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
+    DEBUG(llvm::dbgs() << "VISITING:\n    " << *I);
 
-    auto Result = DataflowVisitor.visit(&I);
+    auto Result = DataflowVisitor.visit(I);
 
     // If this instruction can have no further effects on another instructions,
     // continue. This happens for instance if we have cleared all of the state
@@ -424,7 +448,7 @@ bool ARCRegionState::processBlockTopDown(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, &I, AA);
+      OtherState->second.updateForSameLoopInst(I, I, AA);
     }
   }
 
@@ -484,11 +508,23 @@ bool ARCRegionState::processTopDown(
 // Summary
 //
 
+static bool isStrongEntranceInstruction(const SILInstruction &I) {
+  switch (I.getKind()) {
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst:
+  case ValueKind::AllocBoxInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void ARCRegionState::summarizeBlock(SILBasicBlock *BB) {
   SummarizedInterestingInsts.clear();
 
   for (auto &I : *BB)
-    if (!canNeverUseValues(&I) || I.mayReleaseOrReadRefCount())
+    if (!canNeverUseValues(&I) || I.mayReleaseOrReadRefCount() ||
+        isStrongEntranceInstruction(I))
       SummarizedInterestingInsts.push_back(&I);
 }
 
@@ -526,4 +562,54 @@ void ARCRegionState::summarize(
   }
 
   summarizeLoop(R, LRFI, RegionStateInfo);
+}
+
+void ARCRegionState::addInterestingInst(SILInstruction *TargetInst) {
+  // Insert I into its location in the interesting instruction list.
+  SILBasicBlock *BB = getRegion()->getBlock();
+  assert(TargetInst->getParent() == BB);
+
+  auto II = BB->begin();
+  auto IE = BB->end();
+  assert(II != IE && "I can not be an element of an empty block");
+
+  auto SI = SummarizedInterestingInsts.begin();
+  auto SE = SummarizedInterestingInsts.end();
+
+  while (II != IE) {
+    if (SI == SE) {
+      // Ok, TargetInst is after all of the interesting insts. Append it to the
+      // list.
+      SummarizedInterestingInsts.push_back(TargetInst);
+      return;
+    }
+
+    // Move II down the block until it hits TargetInst or the first
+    // SummarizedInterestingInst.
+    while (&*II != *SI && &*II != TargetInst) {
+      ++II;
+      return;
+    }
+
+    // If II == SI and TargetInst == II then there is nothing further to do.
+    if (&*II == TargetInst) {
+      assert(&*II != *SI);
+      SummarizedInterestingInsts.insert(SI, TargetInst);
+      return;
+    }
+
+    // If we reach this point, then we know that II == SI and we have not found
+    // TargetInst yet. So we move to the next II, SI.
+    ++II;
+    ++SI;
+  }
+
+  llvm_unreachable("Could not find Inst in the block?!");
+}
+
+void ARCRegionState::removeInterestingInst(SILInstruction *I) {
+  SummarizedInterestingInsts.erase(
+      std::remove(SummarizedInterestingInsts.begin(),
+                  SummarizedInterestingInsts.end(), I),
+      SummarizedInterestingInsts.end());
 }
