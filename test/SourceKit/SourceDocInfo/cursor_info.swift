@@ -60,7 +60,7 @@ func test1(foo: FooUnavailableMembers) {
 }
 
 public class SubscriptCursorTest {
-  public subscript (i: Int) -> Int {
+  public subscript(i: Int) -> Int {
     return 0
   }
 
@@ -229,10 +229,10 @@ public class SubscriptCursorTest {
 // CHECK26-NOT: <decl.function.method.instance>func <decl.name>availabilityDeprecated</decl.name>()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK27 %s
-// CHECK27: <Declaration>public subscript (i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK27: <decl.function.subscript>public <decl.name>subscript </decl.name>(i: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
+// CHECK27: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
+// CHECK27: <decl.function.subscript>public <decl.name>subscript</decl.name>(i: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK28 %s
-// CHECK28: <Declaration>public subscript (i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK28: <decl.function.subscript>public <decl.name>subscript </decl.name>(i: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
+// CHECK28: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
+// CHECK28: <decl.function.subscript>public <decl.name>subscript</decl.name>(i: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
 

@@ -288,7 +288,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func append(contentsOf _: String)
 
 // Leave subscripts alone
-// CHECK-OMIT-NEEDLESS-WORDS: subscript (_: UInt) -> AnyObject { get }
+// CHECK-OMIT-NEEDLESS-WORDS: subscript(_: UInt) -> AnyObject { get }
 // CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
 
 // CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching _: String)

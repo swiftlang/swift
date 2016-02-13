@@ -164,14 +164,14 @@ struct d0100_FooStruct {
       return Double(i)
     }
   }
-// PASS_COMMON-NEXT: {{^}}  subscript (i: Int) -> Double { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  subscript(i: Int) -> Double { get }{{$}}
 
   subscript(i: Int, j: Int) -> Double {
     get {
       return Double(i + j)
     }
   }
-// PASS_COMMON-NEXT: {{^}}  subscript (i: Int, j: Int) -> Double { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  subscript(i: Int, j: Int) -> Double { get }{{$}}
 
   func bodyNameVoidFunc1(a: Int, b x: Float) {}
 // PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc1(a: Int, b x: Float){{$}}
@@ -324,8 +324,8 @@ struct d0110_ReadWriteProperties {
     }
     set {}
   }
-// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  subscript (i: Int) -> Int { get set }{{$}}
-// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  subscript (i: Int) -> Int{{$}}
+// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  subscript(i: Int) -> Int { get set }{{$}}
+// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  subscript(i: Int) -> Int{{$}}
 
   static var computedStaticProp1: Int {
     get {
@@ -369,8 +369,8 @@ struct d0110_ReadWriteProperties {
     }
     nonmutating set {}
   }
-// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  subscript (i: Float) -> Int { get nonmutating set }{{$}}
-// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  subscript (i: Float) -> Int { get nonmutating set }{{$}}
+// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  subscript(i: Float) -> Int { get nonmutating set }{{$}}
+// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  subscript(i: Float) -> Int { get nonmutating set }{{$}}
 }
 // PASS_RW_PROP_GET_SET-NEXT:    {{^}}  init(){{$}}
 // PASS_RW_PROP_GET_SET-NEXT:    {{^}}}{{$}}
@@ -421,7 +421,7 @@ class d0120_TestClassBase {
   subscript(i: Int) -> Int {
     return 0
   }
-// PASS_COMMON-NEXT: {{^}}  subscript (i: Int) -> Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  subscript(i: Int) -> Int { get }{{$}}
 }
 
 class d0121_TestClassDerived : d0120_TestClassBase {
@@ -436,7 +436,7 @@ class d0121_TestClassDerived : d0120_TestClassBase {
   override final subscript(i: Int) -> Int {
     return 0
   }
-// PASS_COMMON-NEXT: {{^}}  override final subscript (i: Int) -> Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  override final subscript(i: Int) -> Int { get }{{$}}
 }
 
 protocol d0130_TestProtocol {
@@ -926,8 +926,8 @@ class d0700_InClassSubscript1 {
     }
   }
   subscript(index i: Float) -> Int { return 42 }
-// PASS_COMMON: {{^}}  subscript (i: Int) -> Int { get }{{$}}
-// PASS_COMMON: {{^}}  subscript (index i: Float) -> Int { get }{{$}}
+// PASS_COMMON: {{^}}  subscript(i: Int) -> Int { get }{{$}}
+// PASS_COMMON: {{^}}  subscript(index i: Float) -> Int { get }{{$}}
 // PASS_COMMON-NOT: subscript
 }
 // PASS_COMMON: {{^}}}{{$}}

@@ -2091,7 +2091,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printAttributes(decl);
   printAccessibility(decl);
   recordDeclLoc(decl, [&]{
-    Printer << "subscript ";
+    Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), /*Curried=*/false,
                        /*isAPINameByDefault*/[](unsigned)->bool{return false;});
