@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/StringExtras.h"
 
 using namespace swift;
 using namespace constraints;
@@ -3361,6 +3362,173 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 }
 
 
+/// Diagnose an argument labeling issue, returning true if we successfully
+/// diagnosed the issue.
+static bool diagnoseArgumentLabelError(Expr *expr,
+                                       ArrayRef<Identifier> newNames,
+                                       bool isSubscript, ConstraintSystem &CS) {
+  
+  auto tuple = dyn_cast<TupleExpr>(expr);
+  if (!tuple) {
+    if (newNames[0].empty()) {
+      // This is probably a conversion from a value of labeled tuple type to
+      // a scalar.
+      // FIXME: We want this issue to disappear completely when single-element
+      // labelled tuples go away.
+      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
+        int scalarFieldIdx = tupleTy->getElementForScalarInit();
+        if (scalarFieldIdx >= 0) {
+          auto &field = tupleTy->getElement(scalarFieldIdx);
+          if (field.hasName()) {
+            llvm::SmallString<16> str;
+            str = ".";
+            str += field.getName().str();
+            CS.TC.diagnose(expr->getStartLoc(),
+                           diag::extra_named_single_element_tuple,
+                           field.getName().str())
+            .fixItInsertAfter(expr->getEndLoc(), str);
+            return true;
+          }
+        }
+      }
+      
+      // We don't know what to do with this.
+      return false;
+    }
+    
+    // This is a scalar-to-tuple conversion. Add the name.  We "know"
+    // that we're inside a ParenExpr, because ParenExprs are required
+    // by the syntax and locator resolution looks through on level of
+    // them.
+    
+    // Look through the paren expression, if there is one.
+    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
+      expr = parenExpr->getSubExpr();
+    
+    llvm::SmallString<16> str;
+    str += newNames[0].str();
+    str += ": ";
+    CS.TC.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false,
+                   str.substr(0, str.size()-1), isSubscript)
+    .fixItInsert(expr->getStartLoc(), str);
+    return true;
+  }
+  
+  // Figure out how many extraneous, missing, and wrong labels are in
+  // the call.
+  unsigned numExtra = 0, numMissing = 0, numWrong = 0;
+  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
+  
+  llvm::SmallString<16> missingBuffer;
+  llvm::SmallString<16> extraBuffer;
+  for (unsigned i = 0; i != n; ++i) {
+    Identifier oldName;
+    if (i < tuple->getNumElements())
+      oldName = tuple->getElementName(i);
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
+    
+    if (oldName == newName ||
+        (tuple->hasTrailingClosure() && i == tuple->getNumElements()-1))
+      continue;
+    
+    if (oldName.empty()) {
+      ++numMissing;
+      missingBuffer += newName.str();
+      missingBuffer += ":";
+    } else if (newName.empty()) {
+      ++numExtra;
+      extraBuffer += oldName.str();
+      extraBuffer += ':';
+    } else
+      ++numWrong;
+  }
+  
+  // Emit the diagnostic.
+  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
+  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
+  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
+  Optional<InFlightDiagnostic> diagOpt;
+  
+  // If we had any wrong labels, or we have both missing and extra labels,
+  // emit the catch-all "wrong labels" diagnostic.
+  bool plural = (numMissing + numExtra + numWrong) > 1;
+  if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
+    for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      auto haveName = tuple->getElementName(i);
+      if (haveName.empty())
+        haveBuffer += '_';
+      else
+        haveBuffer += haveName.str();
+      haveBuffer += ':';
+    }
+    
+    for (auto expected : newNames) {
+      if (expected.empty())
+        expectedBuffer += '_';
+      else
+        expectedBuffer += expected.str();
+      expectedBuffer += ':';
+    }
+    
+    StringRef haveStr = haveBuffer;
+    StringRef expectedStr = expectedBuffer;
+    diagOpt.emplace(CS.TC.diagnose(expr->getLoc(), diag::wrong_argument_labels,
+                                   plural, haveStr, expectedStr, isSubscript));
+  } else if (numMissing > 0) {
+    StringRef missingStr = missingBuffer;
+    diagOpt.emplace(CS.TC.diagnose(expr->getLoc(),diag::missing_argument_labels,
+                                   plural, missingStr, isSubscript));
+  } else {
+    assert(numExtra > 0);
+    StringRef extraStr = extraBuffer;
+    diagOpt.emplace(CS.TC.diagnose(expr->getLoc(), diag::extra_argument_labels,
+                                   plural, extraStr, isSubscript));
+  }
+  
+  // Emit Fix-Its to correct the names.
+  auto &diag = *diagOpt;
+  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+    Identifier oldName = tuple->getElementName(i);
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
+    
+    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
+      continue;
+    
+    if (newName.empty()) {
+      // Delete the old name.
+      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
+                            tuple->getElement(i)->getStartLoc());
+      continue;
+    }
+    
+    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
+    llvm::SmallString<16> newStr;
+    if (newNameIsReserved)
+      newStr += "`";
+    newStr += newName.str();
+    if (newNameIsReserved)
+      newStr += "`";
+    
+    if (oldName.empty()) {
+      // Insert the name.
+      newStr += ": ";
+      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
+      continue;
+    }
+    
+    // Change the name.
+    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
+  }
+  
+  return true;
+}
+
+
+
 /// Emit a class of diagnostics that we only know how to generate when there is
 /// exactly one candidate we know about.  Return true if an error is emitted.
 static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
@@ -3506,8 +3674,9 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 
   // If this is an argument label mismatch, then diagnose that error now.
   if (!correctNames.empty() &&
-      CCI.CS->diagnoseArgumentLabelError(argExpr, correctNames,
-                                 /*isSubscript=*/isa<SubscriptExpr>(fnExpr)))
+      diagnoseArgumentLabelError(argExpr, correctNames,
+                                 /*isSubscript=*/isa<SubscriptExpr>(fnExpr),
+                                 *CCI.CS))
     return true;
 
   // If we have an out-of-order argument, diagnose it as such.
@@ -4856,8 +5025,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     for (auto &arg : arguments)
       expectedNames.push_back(arg.Label);
 
-    return CS->diagnoseArgumentLabelError(argExpr, expectedNames,
-                                          /*isSubscript*/false);
+    return diagnoseArgumentLabelError(argExpr, expectedNames,
+                                      /*isSubscript*/false, *CS);
   }
     
   case CC_GeneralMismatch:        // Something else is wrong.

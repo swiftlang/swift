@@ -1292,11 +1292,6 @@ public:
   void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
   
-  /// Diagnose an argument labeling issue, returning true if we successfully
-  /// diagnosed the issue.
-  bool diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
-                                  bool isSubscript);
-  
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.
