@@ -271,7 +271,7 @@ _ = { $0 }  // expected-error {{unable to infer closure return type in current c
 
 
 
-_ = 4()   // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}} {{6-8=}}
+_ = 4()   // expected-error {{cannot call value of non-function type 'Int'}}
 _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 
 

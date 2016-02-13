@@ -50,7 +50,7 @@ func funcdecl5(a: Int, _ y: Int) {
   funcdecl1(123, 444)
   
   // Calls.
-  4()  // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}} {{4-6=}}
+  4()  // expected-error {{cannot call value of non-function type 'Int'}}
   
   
   // rdar://12017658 - Infer some argument types from func6.
