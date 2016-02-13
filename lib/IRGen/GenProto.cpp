@@ -2663,21 +2663,22 @@ namespace {
   class PolymorphicConvention {
   public:
     enum class SourceKind {
-      /// The polymorphic arguments are derived from a source class
-      /// pointer.
+      /// Metadata is derived from a source class pointer.
       ClassPointer,
 
-      /// The polymorphic arguments are derived from a type metadata
-      /// pointer.
+      /// Metadata is derived from a type metadata pointer.
       Metadata,
 
-      /// The polymorphic arguments are passed from generic type
-      /// metadata for the origin type.
+      /// Metadata is derived from the origin type parameter.
       GenericLValueMetadata,
 
-      /// The polymorphic arguments are derived from a Self type binding
+      /// Metadata is obtained directly from the from a Self metadata
+      /// parameter passed via the WitnessMethod convention.
+      SelfMetadata,
+
+      /// Metadata is derived from the Self witness table parameter
       /// passed via the WitnessMethod convention.
-      WitnessSelf,
+      SelfWitnessTable,
     };
 
     static bool requiresSourceIndex(SourceKind kind) {
@@ -2743,15 +2744,12 @@ namespace {
         // arguments; doing so would potentially make the signature
         // incompatible with other witnesses for the same method.
         selfIndex = params.size() - 1;
-        Sources.emplace_back(SourceKind::WitnessSelf, InvalidSourceIndex,
-                             CanType());
         considerWitnessSelf(params[selfIndex], selfIndex);
       } else if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
-        // Objective-C methods also always derive all polymorphic parameter
-        // information from the Self argument.
+        // Objective-C thunks for generic methods also always derive all
+        // polymorphic parameter information from the Self argument.
         selfIndex = params.size() - 1;
-        Sources.emplace_back(SourceKind::ClassPointer, selfIndex, CanType());
-        considerWitnessSelf(params[selfIndex], selfIndex);
+        considerObjCGenericSelf(params[selfIndex], selfIndex);
       } else {
         // We don't need to pass anything extra as long as all of the
         // archetypes (and their requirements) are producible from
@@ -2826,15 +2824,51 @@ namespace {
                                              std::move(path), callbacks);
     }
 
-    /// Testify to generic parameters in the Self type.
+    /// Testify to generic parameters in the Self type of a protocol
+    /// witness method.
     void considerWitnessSelf(SILParameterInfo param, unsigned paramIndex) {
+      // If this is a static method, get the instance type.
       CanType selfTy = param.getType();
       if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
         selfTy = metaTy.getInstanceType();
-      Sources.back().Type = selfTy;
+
+      // First, bind type metadata for Self.
+      Sources.emplace_back(SourceKind::SelfMetadata, InvalidSourceIndex,
+                           selfTy);
+
+      if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+        // Don't pass in witness tables for associated types of Self.
+        addImpossibleFulfillments(paramTy);
+
+        // The Self type is abstract, so we must pass in a witness table.
+        addSelfMetadataFulfillment(paramTy);
+
+        // Look at the witness table for the conformance.
+        Sources.emplace_back(SourceKind::SelfWitnessTable, InvalidSourceIndex,
+                             selfTy);
+        addSelfWitnessTableFulfillment(paramTy);
+      } else {
+        // If the Self type is concrete, we have a witness thunk with a
+        // fully substituted Self type. The witness table parameter is not
+        // used.
+        considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
+      }
+    }
+
+    /// Testify to generic parameters in the Self type of an @objc
+    /// generic or protocol method.
+    void considerObjCGenericSelf(SILParameterInfo param, unsigned paramIndex) {
+      // If this is a static method, get the instance type.
+      CanType selfTy = param.getType();
+      if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
+        selfTy = metaTy.getInstanceType();
+
+      // Bind type metadata for Self.
+      Sources.emplace_back(SourceKind::ClassPointer, paramIndex,
+                           selfTy);
 
       if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy))
-        considerWitnessParamType(paramTy);
+        addSelfMetadataFulfillment(paramTy);
       else
         considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
     }
@@ -2888,27 +2922,23 @@ namespace {
       llvm_unreachable("bad parameter convention");
     }
 
-    /// We're binding an archetype for a protocol witness.
-    void considerWitnessParamType(CanGenericTypeParamType arg) {
-      assert(arg->getDepth() == 0 && arg->getIndex() == 0);
-
-      // First of all, the archetype or concrete type fulfills its own
-      // requirements.
-      addSelfFulfillment(arg, MetadataPath());
-
-      // FIXME: We can't pass associated types of Self through the witness
-      // CC, so as a hack, fake up impossible fulfillments for the associated
-      // types. For now all conformances are concrete, so the associated types
-      // can be recovered by substitution on the implementation side. For
-      // default implementations, we will need to get associated types from
-      // witness tables anyway.
+    /// We're binding an archetype for a protocol witness, and we're only
+    /// passing in metadata for Self, so make sure we don't try passing in
+    /// secondary archetypes too, since that would break the calling
+    /// convention.
+    ///
+    /// This works when calling concrete witnesses because there the
+    /// associated types are always known; for default implementations,
+    /// we will need to do some work still to implement default
+    /// implementations for protocols with associated types.
+    void addImpossibleFulfillments(CanGenericTypeParamType arg) {
       for (auto depTy : getAllDependentTypes()) {
         // Is this a dependent member?
         auto depMemTy = dyn_cast<DependentMemberType>(CanType(depTy));
         if (!depMemTy)
           continue;
 
-        // Is it rooted in a generic parameter?
+        // Is it rooted in the protocol Self type?
         CanType rootTy;
         do {
           rootTy = depMemTy.getBase();
@@ -2923,18 +2953,34 @@ namespace {
         if (rootParamTy == arg) {
           MetadataPath path;
           path.addImpossibleComponent();
-          addSelfFulfillment(CanType(depTy), std::move(path));
+          unsigned source = Sources.size() - 1;
+          Fulfillments.addFulfillment({depTy, nullptr}, source,
+                                      MetadataPath(path));
+          for (auto protocol : getConformsTo(depTy)) {
+            Fulfillments.addFulfillment({depTy, protocol}, source,
+                                        MetadataPath(path));
+          }
         }
       }
     }
 
-    void addSelfFulfillment(CanType arg, MetadataPath &&path) {
+    void addSelfMetadataFulfillment(CanGenericTypeParamType arg) {
+      assert(arg->getDepth() == 0 && arg->getIndex() == 0);
+
       unsigned source = Sources.size() - 1;
-      for (auto protocol : getConformsTo(arg)) {
-        Fulfillments.addFulfillment({arg, protocol}, source,
-                                    MetadataPath(path));
+      Fulfillments.addFulfillment({arg, nullptr}, source, MetadataPath());
+    }
+
+    void addSelfWitnessTableFulfillment(CanGenericTypeParamType arg) {
+      assert(arg->getDepth() == 0 && arg->getIndex() == 0);
+
+      unsigned source = Sources.size() - 1;
+      auto protos = getConformsTo(arg);
+      assert(protos.size() == 1);
+      for (auto protocol : protos) {
+        //considerWitnessTable(arg, protocol, Sources.size() - 1, MetadataPath());
+        Fulfillments.addFulfillment({arg, protocol}, source, MetadataPath());
       }
-      Fulfillments.addFulfillment({arg, nullptr}, source, std::move(path));
     }
   };
 
@@ -3001,7 +3047,7 @@ namespace {
         return metatype;
       }
 
-      case SourceKind::WitnessSelf: {
+      case SourceKind::SelfMetadata: {
         assert(witnessMetadata && "no metadata for witness method");
         llvm::Value *metadata = witnessMetadata->SelfMetadata;
         assert(metadata && "no Self metadata for witness method");
@@ -3012,6 +3058,25 @@ namespace {
         IGF.setUnscopedLocalTypeData(argTy,
                                LocalTypeDataKind::forTypeMetadata(), metadata);
         return metadata;
+      }
+
+      case SourceKind::SelfWitnessTable: {
+        assert(witnessMetadata && "no metadata for witness method");
+        llvm::Value *wtable = witnessMetadata->SelfWitnessTable;
+        assert(wtable && "no Self witness table for witness method");
+        
+        // Mark this as the cached witness table for Self.
+        CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
+
+        if (auto archetypeTy = dyn_cast<ArchetypeType>(argTy)) {
+          auto protos = archetypeTy->getConformsTo();
+          assert(protos.size() == 1);
+          auto *protocol = protos[0];
+
+          setProtocolWitnessTableName(IGF.IGM, wtable, argTy, protocol);
+        }
+
+        return wtable;
       }
       }
       llvm_unreachable("bad source kind!");
@@ -3311,6 +3376,13 @@ void irgen::collectTrailingWitnessMetadata(IRGenFunction &IGF,
                                            WitnessMetadata &witnessMetadata) {
   assert(fn.getLoweredFunctionType()->getRepresentation()
            == SILFunctionTypeRepresentation::WitnessMethod);
+
+  llvm::Value *wtable = params.takeLast();
+  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy &&
+         "parameter signature mismatch: witness metadata didn't "
+         "end in witness table?");
+  wtable->setName("SelfWitnessTable");
+  witnessMetadata.SelfWitnessTable = wtable;
 
   llvm::Value *metatype = params.takeLast();
   assert(metatype->getType() == IGF.IGM.TypeMetadataPtrTy &&
@@ -3633,23 +3705,16 @@ namespace {
           continue;
         }
 
-        // Witness 'Self' argument(s) are added as a special case in
+        // Witness 'Self' arguments are added as a special case in
         // EmitPolymorphicArguments::emit.
-        case SourceKind::WitnessSelf:
+        case SourceKind::SelfMetadata:
+        case SourceKind::SelfWitnessTable:
           continue;
         }
         llvm_unreachable("bad source kind!");
       }
     }
   };
-}
-
-void irgen::emitTrailingWitnessArguments(IRGenFunction &IGF,
-                                         WitnessMetadata &witnessMetadata,
-                                         Explosion &args) {
-  llvm::Value *self = witnessMetadata.SelfMetadata;
-  assert(self && "no Self value bound");
-  args.add(self);
 }
 
 /// Pass all the arguments necessary for the given function.
@@ -3755,10 +3820,15 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       // Added in the early phase.
       continue;
 
-    case SourceKind::WitnessSelf: {
+    case SourceKind::SelfMetadata: {
       assert(witnessMetadata && "no metadata structure for witness method");
       auto self = IGF.emitTypeMetadataRef(substInputType);
       witnessMetadata->SelfMetadata = self;
+      continue;
+    }
+
+    case SourceKind::SelfWitnessTable: {
+      // Added later.
       continue;
     }
     }
@@ -3813,7 +3883,8 @@ namespace {
       case SourceKind::Metadata: return; // already accounted for
       case SourceKind::GenericLValueMetadata:
         return out.push_back(IGM.TypeMetadataPtrTy);
-      case SourceKind::WitnessSelf:
+      case SourceKind::SelfMetadata:
+      case SourceKind::SelfWitnessTable:
         return; // handled as a special case in expand()
       }
       llvm_unreachable("bad source kind");
@@ -3834,13 +3905,13 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
   assert(polyFn->getRepresentation()
           == SILFunctionTypeRepresentation::WitnessMethod);
 
-  assert(getTrailingWitnessSignatureLength(IGM, polyFn) == 1);
+  assert(getTrailingWitnessSignatureLength(IGM, polyFn) == 2);
 
   // A witness method always provides Self.
   out.push_back(IGM.TypeMetadataPtrTy);
 
-  // TODO: Should also provide the protocol witness table,
-  // for default implementations.
+  // A witness method always provides the witness table for Self.
+  out.push_back(IGM.WitnessTablePtrTy);
 }
 
 void
@@ -3872,6 +3943,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   
   // Build the value.
   out.add(witness);
+  out.add(wtable);
 }
 
 llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {
