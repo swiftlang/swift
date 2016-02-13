@@ -1136,8 +1136,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     Identifier StringVal = MF->getIdentifier(ValID);
     auto encoding = fromStableStringEncoding(Attr);
     if (!encoding) return true;
-    ResultVal = Builder.createStringLiteralWithNullTerminator(
-        Loc, StringVal.str(), encoding.getValue());
+    ResultVal = Builder.createStringLiteral(Loc, StringVal.str(),
+                                            encoding.getValue());
     break;
   }
   case ValueKind::MarkFunctionEscapeInst: {
