@@ -61,8 +61,8 @@ test suite.
 
 For every target above, there are variants for different optimizations:
 
-* the target itself (e.g., ``check-swift``) -- runs execution tests in
-  ``-Onone`` mode.
+* the target itself (e.g., ``check-swift``) -- runs all tests from the primary
+  testsuite.  The execution tests are run in ``-Onone`` mode.
 
 * the target with ``-optimize`` suffix (e.g., ``check-swift-optimize``) -- runs
   execution tests in ``-O`` mode.  This target will only run tests marked as
@@ -72,6 +72,10 @@ For every target above, there are variants for different optimizations:
   ``check-swift-optimize-unchecked``) -- runs execution tests in
   ``-Ounchecked`` mode. This target will only run tests marked as
   ``executable_test``.
+
+* the target with ``-executable`` suffix (e.g.,
+  ``check-swift-executable-iphoneos-arm64``) -- runs tests marked with
+  ``executable_test`` in ``-Onone`` mode.
 
 * the target with ``-non-executable`` suffix (e.g.,
   ``check-swift-non-executable-iphoneos-arm64``) -- runs tests not marked with
