@@ -304,8 +304,7 @@ public:
   /// Whether the fix kind is a tuple-relabelling fix.
   static bool isRelabelTupleKind(FixKind kind) { 
     return kind == FixKind::TupleToScalar ||
-           kind == FixKind::ScalarToTuple ||
-           kind == FixKind::RelabelCallTuple;
+           kind == FixKind::ScalarToTuple;
   }
 
   /// For a relabel-tuple fix, retrieve the new names.

@@ -506,42 +506,13 @@ static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
                    Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
-  /// Listener used to produce failures if they should be produced.
-  class Listener : public MatchCallArgumentListener {
-    ConstraintSystem &CS;
-    Type ArgType;
-    Type ParamType;
-    ConstraintLocatorBuilder &Locator;
-
-  public:
-    Listener(ConstraintSystem &cs, Type argType, Type paramType,
-             ConstraintLocatorBuilder &locator)
-      : CS(cs), ArgType(argType), ParamType(paramType), Locator(locator) { }
-
-    bool relabelArguments(ArrayRef<Identifier> newNames) override {
-      if (!CS.shouldAttemptFixes()) {
-        // FIXME: record why this failed. We have renaming.
-        return true;
-      }
-
-      // Add a fix for the name. This is only responsible for recording the fix.
-      auto result = CS.simplifyFixConstraint(
-                      Fix::getRelabelTuple(CS, FixKind::RelabelCallTuple,
-                                           newNames),
-                      ArgType, ParamType,
-                      TypeMatchKind::ArgumentTupleConversion,
-                      ConstraintSystem::TMF_None,
-                      Locator);
-      return result != ConstraintSystem::SolutionKind::Solved;
-    }
-  };
   
   // In the empty existential parameter case, we don't need to decompose the
   // arguments.
   if (paramType->isEmptyExistentialComposition()) {
-    if (argType->is<InOutType>()) {
+    if (argType->is<InOutType>())
       return ConstraintSystem::SolutionKind::Error;
-    }
+
     // If the param type is an empty existential composition, the function can
     // only have one argument. Check if exactly one argument was passed to this
     // function, otherwise we obviously have a mismatch
@@ -560,7 +531,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   auto params = decomposeArgParamType(paramType);
 
   // Match up the call arguments to the parameters.
-  Listener listener(cs, argType, paramType, locator);
+  MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
   if (constraints::matchCallArguments(args, params,
                                       hasTrailingClosure(locator),
@@ -4330,7 +4301,6 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
                         ConstraintLocator::ScalarToTuple));
   }
 
-  case FixKind::RelabelCallTuple:
   case FixKind::OptionalToBoolean:
     // The actual semantics are handled elsewhere.
     return SolutionKind::Solved;

@@ -456,8 +456,6 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: tuple-to-scalar";
   case FixKind::ScalarToTuple:
     return "fix: scalar-to-tuple";
-  case FixKind::RelabelCallTuple:
-    return "fix: relabel call tuple";
   case FixKind::OptionalToBoolean:
     return "fix: convert optional to boolean";
   case FixKind::FromRawToInit:

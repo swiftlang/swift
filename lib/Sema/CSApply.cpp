@@ -6182,7 +6182,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 
   case FixKind::TupleToScalar: 
   case FixKind::ScalarToTuple:
-  case FixKind::RelabelCallTuple:
     return diagnoseArgumentLabelError(affected,
                                       fix.first.getRelabelTupleNames(*this),
                            /*isSubscript=*/locator->getPath().back().getKind()
