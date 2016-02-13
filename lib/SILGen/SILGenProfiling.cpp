@@ -30,13 +30,14 @@ using namespace swift;
 using namespace Lowering;
 
 static bool isUnmappedDecl(Decl *D) {
-  return (D->isImplicit() && !isa<ConstructorDecl>(D) &&
-          !isa<DestructorDecl>(D)) ||
-         isa<EnumCaseDecl>(D);
+  if (isa<ConstructorDecl>(D) || isa<DestructorDecl>(D))
+    return false;
+
+  return D->isImplicit() || isa<EnumCaseDecl>(D);
 }
 
 ProfilerRAII::ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D)
-    : SGM(SGM) {
+    : SGM(SGM), PreviousProfiler(std::move(SGM.Profiler)) {
   const auto &Opts = SGM.M.getOptions();
   if (!Opts.GenerateProfile || isUnmappedDecl(D))
     return;
@@ -45,7 +46,7 @@ ProfilerRAII::ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D)
   SGM.Profiler->assignRegionCounters(D);
 }
 
-ProfilerRAII::~ProfilerRAII() { SGM.Profiler = nullptr; }
+ProfilerRAII::~ProfilerRAII() { SGM.Profiler = std::move(PreviousProfiler); }
 
 namespace {
 

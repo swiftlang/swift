@@ -51,4 +51,15 @@ func main() {
   let _ = Class1()
 }
 
+// rdar://problem/22761498 - enum declaration suppresses coverage
+func foo() {
+  var x : Int32 = 0   // CHECK-COV: 1|{{.*}}[[@LINE]]
+  enum ETy { case A } // CHECK-COV: 1|{{.*}}[[@LINE]]
+  repeat {            // CHECK-COV: 1|{{.*}}[[@LINE]]
+    x += 1            // CHECK-COV: 1|{{.*}}[[@LINE]]
+  } while x == 0      // CHECK-COV: 1|{{.*}}[[@LINE]]
+  x += 1              // CHECK-COV: 1|{{.*}}[[@LINE]]
+}
+
 main()
+foo()
