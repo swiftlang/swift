@@ -44,6 +44,16 @@ published should not limit its evolution in the future.
 
 .. contents:: :local:
 
+.. admonition:: TODO
+
+    - Drew Crawford is concerned about inlineable code breaking modularity;
+      you can't just release a new dylib to fix a bug.
+    - Joe Groff has brought up always-emitted-into-the-client code, which has
+      fewer restrictions and different behavior than may-inline code.
+    - David Owens wants it to be clearer that this document doesn't really
+      cover behavior changes and proper semantic versioning, just binary
+      compatibility.
+
 
 Introduction
 ============
@@ -156,7 +166,7 @@ version of the library where the entity may be used.
 - Methods, properties, subscripts, and initializers may be versioned entities.
 - Top-level functions, variables, and constants may be versioned entities.
 - Protocol conformances may be versioned entities, despite not explicitly having
-  a declaration in Swift, because a client may depend on them
+  a declaration in Swift, because a client may depend on them.
   See `New Conformances`_, below.
 
 In a versioned library, any top-level public entity from the list above may not
@@ -266,19 +276,13 @@ The following changes are permitted:
 - Changing *internal* parameter names (i.e. the names used within the function
   body, not the labels that are part of the function's full name).
 - Reordering generic requirements (but not the generic parameters themselves).
-- Adding a default value to a parameter.
-- Changing or removing a default value is permitted but discouraged; it may
-  break or change the meaning of existing source code.
+- Adding a default argument expression to a parameter.
+- Changing or removing a default argument is a `binary-compatible
+  source-breaking change`.
 - The ``@noreturn`` attribute may be added to a function. ``@noreturn`` is a
   `versioned attribute`.
 - The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
   be added to a function without any additional versioning information.
-
-.. note::
-
-    Swift 2's implementation of default values puts the evaluation of the
-    default value expression in the library, rather than in the client like C++
-    or C#. We plan to change this.
 
 No other changes are permitted; the following are particularly of note:
 
@@ -286,7 +290,7 @@ No other changes are permitted; the following are particularly of note:
 - A versioned function may not change its generic requirements.
 - A versioned function may not change its external parameter names (labels).
 - A versioned function may not add, remove, or reorder parameters, whether or
-  not they have default values.
+  not they have default arguments.
 - A versioned function that throws may not become non-throwing or vice versa.
 - ``@noreturn`` may not be removed from a function.
 - The ``@noescape`` attribute may not be added to or removed from a parameter.
@@ -318,15 +322,17 @@ available to clients as part of the module's public interface. ``@inlineable``
 is a `versioned attribute`; clients may not assume that the body of the
 function is suitable when deploying against older versions of the library.
 
+
 Clients are not required to inline a function marked ``@inlineable``.
 
 .. note::
 
     It is legal to change the implementation of an inlineable function in the
     next release of the library. However, any such change must be made with the
-    understanding that it may or may not affect existing clients. Existing
-    clients may use the new implementation, or they may use the implementation
-    from the time they were compiled, or they may use both inconsistently.
+    understanding that it may or may not affect existing clients. This is the
+    canonical `binary-compatible source-breaking change`: existing clients may
+    use the new implementation, or they may use the implementation from the
+    time they were compiled, or they may use both inconsistently.
 
 
 Restrictions on Inlineable Functions
@@ -379,8 +385,6 @@ makes it possible to take an existing function and make it inlineable, as long
 as the current body makes sense when deploying against an earlier version of
 the library.
 
-Default parameter value expressions are subject to the same restrictions as
-inlineable functions, because they are implemented as inlineable functions.
 
 Local Functions
 ---------------
@@ -394,6 +398,23 @@ considered to have ``shared`` linkage.)
 
 Local functions are subject to the same restrictions as the inlineable
 functions containing them, as described above.
+
+
+Default Argument Expressions
+----------------------------
+
+Default argument expressions are subject to the same restrictions as inlineable
+functions, because they are implemented as inlineable functions. However,
+default arguments are *always* inlined into their callers and cannot be
+referenced as first-class functions, so they do not need to be versioned. (More
+explicitly, a default argument implicitly has the same availability as the
+function it is attached to.)
+
+.. note::
+
+    Swift 2's implementation of default arguments puts the evaluation of the
+    default argument expression in the library, rather than in the client like
+    C++ or C#. We plan to change this.
 
 
 Top-Level Variables and Constants
@@ -438,8 +459,11 @@ It is *not* safe to change a ``let`` constant into a variable or vice versa.
 Top-level constants are assumed not to change for the entire lifetime of the
 program once they have been initialized.
 
-.. note:: We could make it safe to turn a read-only variable into a constant,
-    but currently do not promise that that is a binary-compatible change.
+.. admonition:: TODO
+
+    We could make it safe to turn a read-only ``var`` into a ``let``, but do we
+    want to? We would have to come up with syntax for declaring when it
+    changed, at least.
 
 
 Giving Up Flexibility
@@ -452,20 +476,17 @@ clients to access them more efficiently. This restricts changes a fair amount:
 - Adding or removing a non-public, non-versioned setter is still permitted.
 - Changing from stored to computed or vice versa is forbidden, because it would
   break existing clients.
-- Changing the body of an accessor is permitted but discouraged; existing
-  clients may use the new implementations, or they may use the implementations
-  from the time they were compiled, or a mix of both.
-- Adding/removing observing accessors is likewise permitted but discouraged,
-  for the same reason.
+- Changing the body of an accessor is a `binary-compatible source-breaking
+  change`.
+- Adding/removing observing accessors is likewise a `binary-compatible 
+  source-breaking change`.
 - Changing the initial value of a stored variable is still permitted.
-- Changing the value of a constant is permitted but discouraged; like accessors,
-  existing clients may use the new value, or the value from when they were
-  compiled, or a mix of both.
+- Changing the value of a constant is a `binary-compatible source-breaking
+  change`.
 - Adding or removing ``weak`` is forbidden.
 - Adding or removing ``unowned`` is forbidden.
-- Adding or removing ``@NSCopying`` to/from a variable is permitted but
-  discouraged for the same reason; like accessors, existing clients may use the
-  new behavior, or the behavior from when they were compiled, or a mix of both.
+- Adding or removing ``@NSCopying`` to/from a variable is `binary-compatible
+  source-breaking change`.
 
 .. admonition:: TODO
 
@@ -570,9 +591,8 @@ set of changes:
 
 - Adding a versioned setter is still permitted.
 - Adding or removing a non-public, non-versioned setter is still permitted.
-- Changing the body of an accessor is permitted but discouraged; existing
-  clients may use the new implementations, or they may use the implementations
-  from the time they were compiled, or a mix of both.
+- Changing the body of an accessor is a `binary-compatible source-breaking
+  change`.
 
 Any inlineable accessors must follow the rules for `inlineable functions`_,
 as described above.
@@ -681,8 +701,8 @@ defined in a C header and imported into Swift.
 
 .. note::
 
-    It would be possible to say that a ``@fixed_contents`` struct only
-    guarantees the "shape" of the struct, so to speak, while
+    Hypothetically, we could use a different model where a ``@fixed_contents``
+    struct only guarantees the "shape" of the struct, so to speak, while
     leaving all property accesses to go through function calls. This would
     allow stored properties to change their accessors, or (with the Behaviors
     proposal) to change a behavior's implementation, or change from one
@@ -712,9 +732,9 @@ amount of indirection when dealing with enum values, in order to potentially
 accommodate new values. More specifically, the following changes are permitted:
 
 - Adding a new case.
-- Reordering existing cases, although this is discouraged. In particular, if
-  an enum is RawRepresentable, changing the raw representations of cases may
-  break existing clients who use them for serialization.
+- Reordering existing cases is a `binary-compatible source-breaking change`. In
+  particular, if an enum is RawRepresentable, changing the raw representations
+  of cases may break existing clients who use them for serialization.
 - Adding a raw type to an enum that does not have one.
 - Removing a non-public, non-versioned case.
 - Adding any other members.
@@ -861,11 +881,14 @@ little more restrictive than structs; they only allow the following changes:
   subclassable.
 - Adding a deinitializer.
 - Adding new, non-overriding method, subscript, or property.
-- Adding a new overriding member, as long as its type does not change.
+- Adding a new overriding member, though if the class is publicly-subclassable
+  the type of the member may not deviate from the member it overrides.
   Changing the type could be incompatible with existing overrides in subclasses.
 
 Finally, classes allow the following changes that do not apply to structs:
 
+- Removing an explicit deinitializer. (A class with no declared deinitializer
+  effectively has an implicit deinitializer.)
 - "Moving" a method, subscript, or property up to its superclass. The
   declaration of the original member must remain along with its original
   availability, but its body may consist of simply calling the new superclass
@@ -878,9 +901,11 @@ Finally, classes allow the following changes that do not apply to structs:
   overridable.
 - ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
   without providing any extra version information. Removing any of these is
-  permitted but discouraged.
+  a `binary-compatible source-breaking change` if the member remains ``@objc``,
+  and disallowed if not.
 - Likewise, ``@IBDesignable`` may be added to a class without providing any
-  extra version information. Removing it is permitted but discouraged.
+  extra version information. Removing it is considered a `binary-compatible
+  source-breaking change`.
 - Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
   is a subclass of ``A`` *and* class ``B``, along with any superclasses between
   it and class ``A``, were introduced in the latest version of the library.
@@ -909,10 +934,6 @@ are permitted. In particular:
 - A ``final`` override of a member may *not* be removed, even if the type
   matches exactly; existing clients may be performing a direct call to the
   implementation instead of using dynamic dispatch.
-- It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
-  or accessor within a class. These modifiers are not `versioned attributes
-  <versioned attribute>` and as such there is no safety guarantee for a client
-  deploying against an earlier version of the library.
 - ``@objc`` and ``@nonobjc`` may not be added to or removed from the class or
   any existing members.
 - ``@NSManaged`` may not be added to or removed from any existing members.
@@ -935,12 +956,9 @@ This would change the inheritance of convenience initializers, which existing
 subclasses may depend on. A publicly-subclassable class also may not change
 a convenience initializer into a designated initializer or vice versa.
 
-Similarly, new ``required`` initializers may not be added to a
-publicly-subclassable class, including marking an existing initializer
-``required``; there is no way to guarantee their presence on existing
-subclasses. This also limits adding a conformance to a protocol with an
-initializer requirement if the corresponding initializer is not already
-``required``.
+A new ``required`` initializer may be added to a class only if it is a
+convenience initializer; that initializer may only call existing ``required``
+initializers. An existing initializer may not be marked ``required``.
 
 All of the modifications permitted for top-level functions are also permitted
 for class initializers. Convenience initializers may be marked ``@inlineable``,
@@ -958,9 +976,9 @@ top-level functions, but the potential for overrides complicates things a little
 - Changing *internal* parameter names (i.e. the names used within the method
   body, not the labels that are part of the method's full name).
 - Reordering generic requirements (but not the generic parameters themselves).
-- Adding a default value to a parameter.
-- Changing or removing a default value is permitted but discouraged; it may
-  break or change the meaning of existing source code.
+- Adding a default argument expression to a parameter.
+- Changing or removing a default argument is a `binary-compatible
+  source-breaking change`.
 - The ``@noreturn`` attribute may be added to a public method only if it is
   ``final`` or the class is not publicly subclassable. ``@noreturn`` is a
   `versioned attribute`.
@@ -1000,9 +1018,9 @@ Variable properties (those declared with ``var``) allow the following changes:
 - Adding or removing ``unowned`` from a variable.
 - Adding or removing ``@NSCopying`` to/from a variable.
 
-Adding a public setter to a computed property that may be overridden is
-permitted but discouraged; any existing overrides will not know what to do with
-the setter and will likely not behave correctly.
+Adding a public setter to a computed property that may be overridden is a
+`binary-compatible source-breaking change`; any existing overrides will not
+know what to do with the setter and will likely not behave correctly.
 
 Constant properties (those declared with ``let``) still permit changing their
 value, as well as adding or removing an initial value entirely.
@@ -1023,13 +1041,13 @@ Subscripts behave much like properties; they inherit the rules of their struct
 counterparts with a few small changes:
 
 - Adding (but not removing) a public setter to a ``final`` subscript or a
-  subscript in a non-publicly-subclassable class.
-- Adding or removing a non-public, non-versioned setter.
-- Changing the body of an accessor.
+  subscript is permitted in a non-publicly-subclassable class.
+- Adding or removing a non-public, non-versioned setter is permitted.
+- Changing the body of an accessor is permitted.
 
-Adding a public setter to a subscript that may be overridden is permitted but
-discouraged; any existing overrides will not know what to do with the setter
-and will likely not behave correctly.
+Adding a public setter to a subscript that may be overridden is a
+`binary-compatible source-breaking change`; any existing overrides will not
+know what to do with the setter and will likely not behave correctly.
 
 Class subscripts may be marked ``@inlineable``, which behaves as described for
 struct subscripts. ``dynamic`` subscripts may not be marked ``@inlineable``.
@@ -1102,21 +1120,24 @@ changed at all except for the following:
 
 - Making a non-associative operator left- or right-associative.
 
+Any other change counts as a `binary-compatible source-breaking change`.
+
 Operator declarations are not versioned.
 
 
 Typealiases
 ~~~~~~~~~~~
 
-Typealiases only exist at compile-time, so changing a top-level typealias
-affects source compatibility but not binary compatibility. Since a typealias is
-only made up of its name and its type, it is recommended that a public
-top-level typealias is never changed at all after being published.
-
 Public typealiases within structs, enums, and protocols may be used for
 protocol conformances (to satisfy associated type requirements), not only
 within the library but within client modules as well. Therefore, changing a
-member typealias in any way is not permitted.
+member typealias in any way is not permitted; while it will not break existing
+clients, they cannot recompile their code and get correct behavior.
+
+Top-level typealiases only exist at compile-time, so changing the underlying
+type of one is a `binary-compatible source-breaking change`. However, if the
+typealias is *used* in the type of any `versioned entity` in a library, it
+may be an actual breaking change and would not be permitted.
 
 It is always permitted to change the *use* of a public typealias to its
 underlying type, and vice versa, at any location in the program.
@@ -1212,9 +1233,9 @@ or struct.
 
 As the sole exception, it is safe to backdate ``@inlineable`` on a top-level
 function, a method, a subscript, or a struct or enum initializer. It is not
-safe to backdate ``@inlineable`` for a top-level binding, a property, or a
-class initializer. As usual, a library author may not assume that a client will
-actually inline the call.
+safe to backdate ``@inlineable`` for a top-level variable or constant, a
+property, or a class initializer. As usual, a library author may not assume
+that a client will actually inline the call.
 
 .. note::
 
@@ -1246,9 +1267,10 @@ In order to make sure client code doesn't make unsafe assumptions, queries
 about properties that may change between library versions must be parameterized
 with the `availability context` that is using the entity. An availability
 context is a set of minimum platform and library versions that can be assumed
-present for code executing within the context. This allows the compiler to
-answer the question, "Given what I know about where this code will be executed,
-what can I assume about a particular entity being used?".
+present for code executing within the context. (See `Declaring Library Version
+Dependencies`_.) This allows the compiler to answer the question, "Given what I
+know about where this code will be executed, what can I assume about a
+particular entity being used?".
 
 If the entity is declared within the same module as the code that's using it,
 then the code is permitted to know all the details of how the entity is
@@ -1317,7 +1339,8 @@ Advanced users may want to promise more specific things about various types.
 These are similar to the internal ``effects`` attribute we have for functions,
 except that they can be enforced by the compiler.
 
-- ``trivial``: Promises that the type is `trivial`.
+- ``trivial``: Promises that assignment just requires a fixed-size bit-for-bit
+  copy without any indirection or reference-counting operations.
 
 - ``size_in_bits(N)``: Promises that the type is not larger than a certain
   size. (It may be smaller.)
@@ -1414,6 +1437,10 @@ for verification. Important cases include but are not limited to:
 
 - Unsafe modifications to entities marked with fragility attributes, such as
   adding a stored property to a ``@fixed_contents`` struct.
+
+Wherever possible, this tool should also check for `binary-compatible
+source-breaking changes <binary-compatible source-breaking change>`, such as
+changing a default argument from ``false`` to ``true``.
 
 
 Automatic Versioning
@@ -1567,7 +1594,7 @@ affect the model described in this document, or concern the parts of this
 document that affect language semantics:
 
 - `SE-0030 Property Behaviors`_
-- (planned) Overridable methods in extensions
+- (draft) `Overridable methods in extensions`_
 - (planned) Making classes "sealed" by default
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) Default implementations in protocols
@@ -1576,10 +1603,13 @@ document that affect language semantics:
 - (planned) Syntax for declaring "versioned" entities and their features
 - (planned) Syntax for declaring inlineable code
 - (planned) Syntax for declaring fixed-contents structs
+- (?) Non-inherited protocol conformances
 - (future) Performance annotations for types
 - (future) Attributes for stored property accessors
+- (future) Stored properties in extensions
 
 .. _SE-0030 Property Behaviors: https://github.com/apple/swift-evolution/blob/master/proposals/0030-property-behavior-decls.md
+.. _Overridable methods in extensions: https://github.com/jrose-apple/swift-evolution/blob/overridable-members-in-extensions/proposals/nnnn-overridable-members-in-extensions.md
 
 This does not mean all of these proposals need to be accepted, only that their
 acceptance or rejection will affect this document.
@@ -1614,6 +1644,16 @@ Glossary
   binary compatibility
     A general term encompassing both backwards- and forwards-compatibility
     concerns. Also known as "ABI compatibility".
+
+  binary-compatible source-breaking change
+    A change that does not break `binary compatibility`, but which is known to
+    either change the behavior of existing clients or potentially result in
+    errors when a client is recompiled. In most cases, a client that *hasn't*
+    been recompiled may use the new behavior or the old behavior, or even a
+    mix of both; however, this will always be deterministic (same behavior when
+    a program is re-run) and will not break Swift's memory-safety and 
+    type-safety guarantees. It is recommended that these kinds of changes are
+    avoided just like those that break binary compatibility.
 
   client
     A target that depends on a particular library. It's usually easiest to
@@ -1658,10 +1698,6 @@ Glossary
     In this document, a collection of code in a single Swift module that is
     built together; a "compilation unit". Roughly equivalent to a target in
     Xcode.
-
-  trivial
-    A value whose assignment just requires a fixed-size bit-for-bit copy
-    without any indirection or reference-counting operations.
 
   versioned entity
     See `Publishing Versioned API`_.
