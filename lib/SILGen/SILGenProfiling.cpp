@@ -20,6 +20,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ProfileData/CoverageMapping.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
+#include "llvm/ProfileData/InstrProf.h"
 
 #include <forward_list>
 
@@ -672,11 +673,20 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   auto Int64Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(64, C));
 
   SILLocation Loc = getLocation(Node);
+
+  const SourceManager &SM = SGM.M.getASTContext().SourceMgr;
+  StringRef Filename =
+      SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+  std::string NameValue = llvm::getPGOFuncName(
+      CurrentFuncName, llvm::GlobalValue::LinkOnceAnyLinkage, Filename);
+
   SILValue Args[] = {
       // TODO: In C++ we give this string linkage that matches the functions, so
       // that it's uniqued appropriately across TUs.
-      Builder.createStringLiteral(Loc, StringRef(CurrentFuncName),
-                                  StringLiteralInst::Encoding::UTF8),
+      Builder.createGlobalAddr(
+          Loc,
+          SILGlobalVariable::create(&SGM.M, SILLinkage::Private,
+                                    /*IsFragile=*/false, NameValue, Int8PtrTy)),
       Builder.createIntegerLiteral(Loc, Int64Ty, FunctionHash),
       Builder.createIntegerLiteral(Loc, Int32Ty, NumRegionCounters),
       // TODO: Should we take care to emit only one copy of each of the above
