@@ -27,12 +27,7 @@ namespace Lowering {
 class SILGenModule;
 class SILGenBuilder;
 
-/// RAII object to set up profiling for a function.
-struct ProfilerRAII {
-  SILGenModule &SGM;
-  ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D);
-  ~ProfilerRAII();
-};
+struct ProfilerRAII;
 
 /// Profiling state.
 class SILGenProfiling {
@@ -65,6 +60,15 @@ private:
   void assignRegionCounters(AbstractFunctionDecl *Root);
 
   friend struct ProfilerRAII;
+};
+
+/// RAII object to set up profiling for a function.
+struct ProfilerRAII {
+  SILGenModule &SGM;
+  std::unique_ptr<SILGenProfiling> PreviousProfiler;
+
+  ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D);
+  ~ProfilerRAII();
 };
 
 } // end namespace Lowering
