@@ -940,6 +940,8 @@ public:
   }
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
+    require(LI->getType().isLoadable(LI->getModule()),
+            "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
     require(LI->getOperand()->getType().getObjectType() == LI->getType(),
@@ -949,6 +951,8 @@ public:
   void checkStoreInst(StoreInst *SI) {
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
+    require(SI->getSrc()->getType().isLoadable(SI->getModule()),
+            "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
     require(SI->getDest()->getType().getObjectType() == SI->getSrc()->getType(),
