@@ -859,3 +859,53 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
   if (Failed)
     Consumer.failed("Error occurred");
 }
+
+void SwiftLangSupport::findModuleGroups(StringRef ModuleName,
+                                        ArrayRef<const char *> Args,
+                                        std::function<void(ArrayRef<StringRef>,
+                                                           StringRef Error)> Receiver) {
+  CompilerInvocation Invocation;
+  Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
+  Invocation.clearInputs();
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  std::vector<StringRef> Groups;
+  std::string Error;
+  if (getASTManager().initCompilerInvocation(Invocation, Args, CI.getDiags(),
+                                             StringRef(), Error)) {
+    Receiver(Groups, Error);
+    return;
+  }
+  if (CI.setup(Invocation)) {
+    Error = "Compiler invocation set up fails.";
+    Receiver(Groups, Error);
+    return;
+  }
+
+  ASTContext &Ctx = CI.getASTContext();
+  // Setup a typechecker for protocol conformance resolving.
+  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  // Load standard library so that Clang importer can use it.
+  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  if (!Stdlib) {
+    Error = "Cannot load stdlib.";
+    Receiver(Groups, Error);
+    return;
+  }
+  auto *M = getModuleByFullName(Ctx, ModuleName);
+  if (!M) {
+    Error = "Cannot find the module.";
+    Receiver(Groups, Error);
+    return;
+  }
+  for (auto File : M->getFiles()) {
+    File->collectAllGroups(Groups);
+  }
+  std::sort(Groups.begin(), Groups.end(), [](StringRef L, StringRef R) {
+    return L.compare_lower(R) < 0;
+  });
+  Receiver(Groups, Error);
+}

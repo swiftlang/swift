@@ -15,6 +15,7 @@ extension String {
   public struct UTF16View
     : CollectionType, CustomStringConvertible, CustomDebugStringConvertible {
 
+    /// A position in a string's collection of UTF-16 code units.
     public struct Index {
       // Foundation needs access to these fields so it can expose
       // random access
@@ -263,7 +264,7 @@ extension String.UTF16View.Index {
     _offset = characterIndex._utf16Index
   }
 
-  /// Return the position in `utf8` that corresponds exactly
+  /// Returns the position in `utf8` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of
@@ -275,7 +276,7 @@ extension String.UTF16View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
 
-  /// Return the position in `unicodeScalars` that corresponds exactly
+  /// Returns the position in `unicodeScalars` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of
@@ -287,7 +288,7 @@ extension String.UTF16View.Index {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
 
-  /// Return the position in `characters` that corresponds exactly
+  /// Returns the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.utf16.indices`.

@@ -233,7 +233,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     }
   }
 
-  /// Return the object instance being used for storage.
+  /// Returns the object instance being used for storage.
   public var buffer: AnyObject {
     return Builtin.castFromNativeObject(_nativeBuffer)
   }
@@ -282,14 +282,14 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     return result
   }
 
-  /// Returns true iff `self` holds the only strong reference to its buffer.
+  /// Returns `true` iff `self` holds the only strong reference to its buffer.
   ///
   /// See `isUniquelyReferenced` for details.
   public mutating func holdsUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
   }
 
-  /// Returns true iff either `self` holds the only strong reference
+  /// Returns `true` iff either `self` holds the only strong reference
   /// to its buffer or the pinned has been 'pinned'.
   ///
   /// See `isUniquelyReferenced` for details.

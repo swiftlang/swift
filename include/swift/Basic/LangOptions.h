@@ -150,10 +150,15 @@ namespace swift {
     /// omit-needless-words.
     bool OmitNeedlessWords = false;
 
+    /// Whether we are stripping the "NS" prefix from Foundation et al.
+    ///
+    /// This is only queried when \c OmitNeedlessWords is true.
+    bool StripNSPrefix = false;
+
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
 
-    /// Sets the target we are building for and updates configuration options
+    /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
     /// \returns A pair - the first element is true if the OS was invalid.
@@ -182,63 +187,58 @@ namespace swift {
       return clang::VersionTuple(major, minor, revision);
     }
 
-    /// Implicit target configuration options.  There are currently three
-    ///   supported target configuration values:
-    ///     os - The active os target (OSX or IOS)
-    ///     arch - The active arch target (X64, I386, ARM, ARM64)
-    ///     _runtime - Runtime support (_ObjC or _Native)
-    void addTargetConfigOption(StringRef Name, StringRef Value) {
+    /// Sets an implicit platform condition.
+    ///
+    /// There are currently three supported platform conditions:
+    /// - os: The active os target (OSX or iOS)
+    /// - arch: The active arch target (x86_64, i386, arm, arm64)
+    /// - _runtime: Runtime support (_ObjC or _Native)
+    void addPlatformConditionValue(StringRef Name, StringRef Value) {
       assert(!Name.empty() && !Value.empty());
-      TargetConfigOptions.push_back(std::make_pair(Name, Value));
+      PlatformConditionValues.emplace_back(Name, Value);
     }
 
-    /// Removes all configuration options added with addTargetConfigOption.
-    void clearAllTargetConfigOptions() {
-      TargetConfigOptions.clear();
+    /// Removes all values added with addPlatformConditionValue.
+    void clearAllPlatformConditionValues() {
+      PlatformConditionValues.clear();
     }
     
-    /// Returns the value for the given target configuration or an empty string.
-    StringRef getTargetConfigOption(StringRef Name) const;
-    
-    /// Explicit build configuration options, initialized via the '-D'
+    /// Returns the value for the given platform condition or an empty string.
+    StringRef getPlatformConditionValue(StringRef Name) const;
+
+    /// Explicit conditional compilation flags, initialized via the '-D'
     /// compiler flag.
-    void addBuildConfigOption(StringRef Name) {
+    void addCustomConditionalCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      BuildConfigOptions.push_back(Name);
+      CustomConditionalCompilationFlags.push_back(Name);
     }
 
-    /// Determines if a given build configuration has been defined.
-    bool hasBuildConfigOption(StringRef Name) const;
+    /// Determines if a given conditional compilation flag has been set.
+    bool isCustomConditionalCompilationFlagSet(StringRef Name) const;
 
     ArrayRef<std::pair<std::string, std::string>>
-        getTargetConfigOptions() const {
-      return TargetConfigOptions;
+    getPlatformConditionValues() const {
+      return PlatformConditionValues;
     }
 
-    ArrayRef<std::string> getBuildConfigOptions() const {
-      return BuildConfigOptions;
+    ArrayRef<std::string> getCustomConditionalCompilationFlags() const {
+      return CustomConditionalCompilationFlags;
     }
 
-    /// The constant list of supported os build configuration arguments.
-    static const std::vector<std::string> SupportedOSBuildConfigArguments;
-
-    /// Returns true if the os build configuration argument represents
+    /// Returns true if the 'os' platform condition argument represents
     /// a supported target operating system.
-    static bool isOSBuildConfigSupported(StringRef OSName);
+    static bool isPlatformConditionOSSupported(StringRef OSName);
 
-    /// The constant list of supported arch build configuration arguments.
-    static const std::vector<std::string> SupportedArchBuildConfigArguments;
-
-    /// Returns true if the arch build configuration argument represents
+    /// Returns true if the 'arch' platform condition argument represents
     /// a supported target architecture.
-    static bool isArchBuildConfigSupported(StringRef ArchName);
+    static bool isPlatformConditionArchSupported(StringRef ArchName);
 
   private:
-    llvm::SmallVector<std::pair<std::string, std::string>, 2>
-        TargetConfigOptions; 
-    llvm::SmallVector<std::string, 2> BuildConfigOptions;
+    llvm::SmallVector<std::pair<std::string, std::string>, 3>
+        PlatformConditionValues;
+    llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
 }
 
-#endif // LLVM_SWIFT_LANGOPTIONS_H
+#endif // SWIFT_LANGOPTIONS_H
 

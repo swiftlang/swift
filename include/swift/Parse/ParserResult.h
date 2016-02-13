@@ -217,7 +217,7 @@ template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
     setHasCodeCompletion();
 }
 
-enum class ConfigExprKind {
+enum class ConditionalCompilationExprKind {
   Unknown,
   Error,
   OS,
@@ -231,17 +231,20 @@ enum class ConfigExprKind {
   Integer
 };
 
-class ConfigParserState {
+class ConditionalCompilationExprState {
 
-  unsigned ConditionActive : 1;
-  ConfigExprKind Kind;
+  uint8_t ConditionActive : 1;
+  uint8_t Kind : 7;
 public:
-  friend class ConfigParserState;
+  ConditionalCompilationExprState() : ConditionActive(false) {
+    setKind(ConditionalCompilationExprKind::Unknown);
+  }
 
-  ConfigParserState() : ConditionActive(false), Kind(ConfigExprKind::Unknown) {}
-
-  ConfigParserState(bool ConditionActive, ConfigExprKind Kind)
-    : ConditionActive(ConditionActive), Kind(Kind) {}
+  ConditionalCompilationExprState(bool ConditionActive,
+                                  ConditionalCompilationExprKind Kind)
+    : ConditionActive(ConditionActive) {
+    setKind(Kind);
+  }
 
   bool isConditionActive() const {
     return ConditionActive;
@@ -251,32 +254,36 @@ public:
     ConditionActive = A;
   }
 
-  ConfigExprKind getKind() const {
-    return Kind;
+  ConditionalCompilationExprKind getKind() const {
+    return static_cast<ConditionalCompilationExprKind>(Kind);
   }
 
-  void setKind(ConfigExprKind K) {
-    Kind = K;
+  void setKind(ConditionalCompilationExprKind K) {
+    Kind = static_cast<uint8_t>(K);
+    assert(getKind() == K);
   }
 
   bool shouldParse() const {
-    if (Kind == ConfigExprKind::Error)
+    if (getKind() == ConditionalCompilationExprKind::Error)
       return true;
     return ConditionActive ||
-      (Kind != ConfigExprKind::CompilerVersion &&
-       Kind != ConfigExprKind::LanguageVersion);
+      (getKind() != ConditionalCompilationExprKind::CompilerVersion &&
+       getKind() != ConditionalCompilationExprKind::LanguageVersion);
   }
 
-  static ConfigParserState error() {
-    return ConfigParserState(false, ConfigExprKind::Error);
+  static ConditionalCompilationExprState error() {
+    return {false, ConditionalCompilationExprKind::Error};
   }
 };
 
-ConfigParserState operator&&(const ConfigParserState lhs,
-                              const ConfigParserState rhs);
-ConfigParserState operator||(const ConfigParserState lhs,
-                              const ConfigParserState rhs);
-ConfigParserState operator!(const ConfigParserState Result);
+ConditionalCompilationExprState
+operator&&(const ConditionalCompilationExprState lhs,
+           const ConditionalCompilationExprState rhs);
+ConditionalCompilationExprState
+operator||(const ConditionalCompilationExprState lhs,
+           const ConditionalCompilationExprState rhs);
+ConditionalCompilationExprState
+operator!(const ConditionalCompilationExprState Result);
 
 } // namespace swift
 

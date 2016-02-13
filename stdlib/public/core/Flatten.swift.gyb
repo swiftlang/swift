@@ -78,7 +78,7 @@ public struct FlattenSequence<
     self._base = base
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> FlattenGenerator<Base.Generator> {
@@ -117,6 +117,7 @@ extension LazySequenceType
 %   %(Base)sIndex : BidirectionalIndexType, 
 %   %(Base)sGenerator.Element.Index : BidirectionalIndexType'''
 %   Index = Collection + 'Index'
+/// A position in a `${Collection}`.
 public struct ${Index}<
   BaseElements: CollectionType where ${constraints % {'Base': 'BaseElements.'}}
 > : ${traversal}IndexType {
@@ -248,7 +249,7 @@ public struct ${Collection}<
     self._base = base
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> FlattenGenerator<Base.Generator> {

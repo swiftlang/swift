@@ -23,6 +23,12 @@ if(SWIFT_HOST_VARIANT STREQUAL "linux")
   find_package(BSD REQUIRED)
 endif()
 
+if(SWIFT_STDLIB_ENABLE_RESILIENCE)
+  set(STDLIB_SIL_SERIALIZE_ALL)
+else()
+  set(STDLIB_SIL_SERIALIZE_ALL "-Xfrontend" "-sil-serialize-all")
+endif()
+
 add_subdirectory(public)
 add_subdirectory(internal)
 add_subdirectory(private)

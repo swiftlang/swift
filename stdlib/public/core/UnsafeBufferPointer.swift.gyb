@@ -83,7 +83,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     _end = start + count
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> UnsafeBufferPointerGenerator<Element> {

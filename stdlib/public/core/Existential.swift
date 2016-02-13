@@ -36,7 +36,7 @@ internal struct _CollectionOf<
     _subscriptImpl = subscriptImpl
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   func generate() -> AnyGenerator<T> {

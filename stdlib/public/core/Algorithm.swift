@@ -191,7 +191,7 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
     self.base = base
   }
 
-  /// Returns a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> EnumerateGenerator<Base.Generator> {

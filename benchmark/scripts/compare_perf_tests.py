@@ -19,27 +19,26 @@
 # compare_perf_tests.py tot.O.times mypatch.O.times | sort -t, -n -k 6 | column -s, -t
 
 import sys
-import os
 import re
 
-VERBOSE=0
+VERBOSE = 0
 
 # #,TEST,SAMPLES,MIN(ms),MAX(ms),MEAN(ms),SD(ms),MEDIAN(ms)
-SCORERE=re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+)")
-TOTALRE=re.compile(r"()(Totals),[ \t]*([\d.]+),[ \t]*([\d.]+)")
-KEYGROUP=2
-VALGROUP=4
-NUMGROUP=1
+SCORERE = re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+)")
+TOTALRE = re.compile(r"()(Totals),[ \t]*([\d.]+),[ \t]*([\d.]+)")
+KEYGROUP = 2
+VALGROUP = 4
+NUMGROUP = 1
 
-IsTime=1
-ShowSpeedup=1
-PrintAllScores=0
+IsTime = 1
+ShowSpeedup = 1
+PrintAllScores = 0
 
 def parseInt(word):
     try:
         return int(word)
     except:
-        raise ScoreParserException("Expected integer value, not "+word)
+        raise Exception("Expected integer value, not " + word)
 
 def getScores(fname):
     scores = {}
@@ -48,7 +47,8 @@ def getScores(fname):
     f = open(fname)
     try:
         for line in f:
-            if VERBOSE: print "Parsing", line,
+            if VERBOSE:
+                print "Parsing", line,
             m = SCORERE.match(line)
             is_total = False
             if not m:
@@ -57,7 +57,8 @@ def getScores(fname):
             if not m:
                 continue
 
-            if VERBOSE: print "  match", m.group(KEYGROUP), m.group(VALGROUP)
+            if VERBOSE:
+                print "  match", m.group(KEYGROUP), m.group(VALGROUP)
 
             if not m.group(KEYGROUP) in scores:
                 scores[m.group(KEYGROUP)] = []
@@ -90,31 +91,34 @@ def compareScores(key, score1, score2, runs, num):
             bestscore1 = score
         if isMaxScore(newscore=score, maxscore=worstscore1, invert=minworst):
             worstscore1 = score
-        if PrintAllScores: print ("%d" % score).rjust(16),
+        if PrintAllScores:
+            print ("%d" % score).rjust(16),
     for score in score2:
         if isMaxScore(newscore=score, maxscore=bestscore2, invert=minbest):
             bestscore2 = score
         if isMaxScore(newscore=score, maxscore=worstscore2, invert=minworst):
             worstscore2 = score
-        if PrintAllScores: print ("%d" % score).rjust(16),
+        if PrintAllScores:
+            print ("%d" % score).rjust(16),
         r += 1
     while r < runs:
-        if PrintAllScores: print ("0").rjust(9),
+        if PrintAllScores:
+            print ("0").rjust(9),
         r += 1
 
     if not PrintAllScores:
         print ("%d" % bestscore1).rjust(16),
         print ("%d" % bestscore2).rjust(16),
 
-    print ("%+d" % (bestscore2-bestscore1)).rjust(9),
+    print ("%+d" % (bestscore2 - bestscore1)).rjust(9),
 
     if bestscore1 != 0 and bestscore2 != 0:
-        print ("%+.1f%%"%(((float(bestscore2)/bestscore1)-1)*100)).rjust(9),
+        print ("%+.1f%%" % (((float(bestscore2) / bestscore1) - 1) * 100)).rjust(9),
         if ShowSpeedup:
             Num, Den = float(bestscore2), float(bestscore1)
             if IsTime:
                 Num, Den = Den, Num
-            print ("%.2fx"%(Num/Den)).rjust(9),
+            print ("%.2fx" % (Num / Den)).rjust(9),
     else:
         print "*".rjust(9),
         if ShowSpeedup:
@@ -165,21 +169,25 @@ if __name__ == '__main__':
     if runs2 > runs:
         runs = runs2
 
-    if VERBOSE: print scores1; print scores2
+    if VERBOSE:
+        print scores1
+        print scores2
 
     keys = list(set(scores1.keys() + scores2.keys()))
     keys.sort()
     if VERBOSE:
         print "comparing ", file1, "vs", file2, "=",
-        if IsTime: print file1, "/", file2
-        else: print file2, "/", file1
+        if IsTime:
+            print file1, "/", file2
+        else:
+            print file2, "/", file1
 
     print "#".rjust(3),
     print "TEST".ljust(25),
     if PrintAllScores:
-        for i in range(0,runs):
+        for i in range(0, runs):
             print ("OLD_RUN%d" % i).rjust(9),
-        for i in range(0,runs):
+        for i in range(0, runs):
             print ("NEW_RUN%d" % i).rjust(9),
     else:
         print "BEST_OLD_MIN(μs)".rjust(17),
@@ -187,10 +195,10 @@ if __name__ == '__main__':
     print 'DELTA'.rjust(9), '%DELTA'.rjust(9), 'SPEEDUP'.rjust(9)
 
     for key in keys:
-        if not key in scores1:
+        if key not in scores1:
             print key, "not in", file1
             continue
-        if not key in scores2:
+        if key not in scores2:
             print key, "not in", file2
             continue
         compareScores(key, scores1[key], scores2[key], runs, nums[key])

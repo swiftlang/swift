@@ -85,7 +85,7 @@ public:
   void replaceAllUsesWith(ValueBase *RHS);
 
   /// Returns true if this value has no uses.
-  /// To ignore debug-info instructions use swift::hasNoUsesExceptDebug instead
+  /// To ignore debug-info instructions use swift::onlyHaveDebugUses instead
   /// (see comment in DebugUtils.h).
   bool use_empty() const { return FirstUse == nullptr; }
 

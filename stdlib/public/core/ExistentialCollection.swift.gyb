@@ -268,7 +268,7 @@ public struct AnySequence<Element> : SequenceType {
     _box = box
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> AnyGenerator<Element> {
@@ -453,7 +453,7 @@ public struct ${Self} : ${Traversal}IndexType {
     _box = _${Traversal}IndexBox(base)
   }
 
-  /// Return the next consecutive value in a discrete sequence of
+  /// Returns the next consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
   /// - Requires: `self` has a well-defined successor.
@@ -471,7 +471,7 @@ public struct ${Self} : ${Traversal}IndexType {
   }
 
   % if Traversal != 'Forward':
-  /// Return the previous consecutive value in a discrete sequence of
+  /// Returns the previous consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
   /// - Requires: `self` has a well-defined predecessor.
@@ -526,7 +526,7 @@ public struct ${Self} : ${Traversal}IndexType {
   }
 }
 
-/// Return true iff `lhs` and `rhs` wrap equal underlying
+/// Returns `true` iff `lhs` and `rhs` wrap equal underlying
 /// `${Self}`s.
 ///
 /// - Requires: The types of indices wrapped by `lhs` and `rhs` are
@@ -567,7 +567,7 @@ public protocol AnyCollectionType : CollectionType {
   var _underlyingCollectionID: ObjectIdentifier { get }
 }
 
-/// Return true iff `lhs` and `rhs` store the same underlying collection.
+/// Returns `true` iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func === <
   L: AnyCollectionType, R: AnyCollectionType
@@ -575,7 +575,7 @@ public func === <
   return lhs._underlyingCollectionID == rhs._underlyingCollectionID
 }
 
-/// Returns false iff `lhs` and `rhs` store the same underlying collection.
+/// Returns `false` iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func !== <
   L: AnyCollectionType, R: AnyCollectionType
@@ -640,7 +640,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   }
 %   end
 
-  /// Returns a *generator* over the elements of this *collection*.
+  /// Returns a generator over the elements of this collection.
   ///
   /// - Complexity: O(1).
   public func generate() -> AnyGenerator<Element> {
@@ -671,7 +671,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
     return _box[position._box]
   }
 
-  /// Return the number of elements.
+  /// The number of elements.
   ///
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}.
   public var count: IntMax {

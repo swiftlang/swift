@@ -299,6 +299,20 @@ namespace {
     bool SkipClosures;
 
   private:
+    /// Recognize used conformances from an imported type when we must emit
+    /// the witness table.
+    ///
+    /// This arises in _BridgedNSError, where we wouldn't otherwise pull in
+    /// the witness table, causing dynamic casts to perform incorrectly.
+    void checkForImportedUsedConformances(Type toType) {
+      if (auto bridgedNSErrorProtocol = cs.getASTContext().getProtocol(
+              KnownProtocolKind::BridgedNSError)) {
+        // Force it as "Used", if it conforms
+        cs.getTypeChecker().conformsToProtocol(toType, bridgedNSErrorProtocol,
+                                               dc, ConformanceCheckFlags::Used);
+      }
+    }
+
     /// \brief Coerce the given tuple to another tuple type.
     ///
     /// \param expr The expression we're converting.
@@ -2784,6 +2798,7 @@ namespace {
       if (!sub)
         return nullptr;
       
+      checkForImportedUsedConformances(toType);
       expr->setSubExpr(sub);
 
       // Set the type we checked against.
@@ -2995,6 +3010,7 @@ namespace {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      checkForImportedUsedConformances(toType);
 
       // Determine whether we performed a coercion or downcast.
       if (cs.shouldAttemptFixes()) {
@@ -3026,6 +3042,7 @@ namespace {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      checkForImportedUsedConformances(toType);
 
       // The subexpression is always an rvalue.
       auto &tc = cs.getTypeChecker();
@@ -3098,6 +3115,7 @@ namespace {
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      checkForImportedUsedConformances(toType);
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // The subexpression is always an rvalue.
@@ -5432,7 +5450,7 @@ TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
       !base->isStaticallyDerivedMetatype() &&
       !ctorDecl->hasClangNode() &&
       !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->isProtocolOrProtocolExtensionContext())) {
+        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
     if (SuppressDiagnostics)
       return false;
 
@@ -5597,169 +5615,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return finishApply(apply, openedType, locator);
 }
 
-/// Diagnose an argument labeling issue, returning true if we successfully
-/// diagnosed the issue.
-bool ConstraintSystem::
-diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
-                           bool isSubscript) {
-  auto tuple = dyn_cast<TupleExpr>(expr);
-  if (!tuple) {
-    if (newNames[0].empty()) {
-      // This is probably a conversion from a value of labeled tuple type to
-      // a scalar.
-      // FIXME: We want this issue to disappear completely when single-element
-      // labelled tuples go away.
-      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
-        int scalarFieldIdx = tupleTy->getElementForScalarInit();
-        if (scalarFieldIdx >= 0) {
-          auto &field = tupleTy->getElement(scalarFieldIdx);
-          if (field.hasName()) {
-            llvm::SmallString<16> str;
-            str = ".";
-            str += field.getName().str();
-            TC.diagnose(expr->getStartLoc(),
-                        diag::extra_named_single_element_tuple,
-                        field.getName().str())
-              .fixItInsertAfter(expr->getEndLoc(), str);
-            return true;
-          }
-        }
-      }
-
-      // We don't know what to do with this.
-      return false;
-    }
-
-    // This is a scalar-to-tuple conversion. Add the name.  We "know"
-    // that we're inside a ParenExpr, because ParenExprs are required
-    // by the syntax and locator resolution looks through on level of
-    // them.
-
-    // Look through the paren expression, if there is one.
-    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
-      expr = parenExpr->getSubExpr();
-
-    llvm::SmallString<16> str;
-    str += newNames[0].str();
-    str += ": ";
-    TC.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false,
-                str.substr(0, str.size()-1), isSubscript)
-      .fixItInsert(expr->getStartLoc(), str);
-    return true;
-  }
-
-  // Figure out how many extraneous, missing, and wrong labels are in
-  // the call.
-  unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
-
-  llvm::SmallString<16> missingBuffer;
-  llvm::SmallString<16> extraBuffer;
-  for (unsigned i = 0; i != n; ++i) {
-    Identifier oldName;
-    if (i < tuple->getNumElements())
-      oldName = tuple->getElementName(i);
-    Identifier newName;
-    if (i < newNames.size())
-      newName = newNames[i];
-
-    if (oldName == newName ||
-        (tuple->hasTrailingClosure() && i == tuple->getNumElements()-1))
-      continue;
-
-    if (oldName.empty()) {
-      ++numMissing;
-      missingBuffer += newName.str();
-      missingBuffer += ":";
-    } else if (newName.empty()) {
-      ++numExtra;
-      extraBuffer += oldName.str();
-      extraBuffer += ':';
-    } else
-      ++numWrong;
-  }
-
-  // Emit the diagnostic.
-  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
-  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
-  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
-  Optional<InFlightDiagnostic> diagOpt;
-
-  // If we had any wrong labels, or we have both missing and extra labels,
-  // emit the catch-all "wrong labels" diagnostic.
-  bool plural = (numMissing + numExtra + numWrong) > 1;
-  if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-    for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-      auto haveName = tuple->getElementName(i);
-      if (haveName.empty())
-        haveBuffer += '_';
-      else
-        haveBuffer += haveName.str();
-      haveBuffer += ':';
-    }
-
-    for (auto expected : newNames) {
-      if (expected.empty())
-        expectedBuffer += '_';
-      else
-        expectedBuffer += expected.str();
-      expectedBuffer += ':';
-    }
-
-    StringRef haveStr = haveBuffer;
-    StringRef expectedStr = expectedBuffer;
-    diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::wrong_argument_labels,
-                                plural, haveStr, expectedStr, isSubscript));
-  } else if (numMissing > 0) {
-    StringRef missingStr = missingBuffer;
-    diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::missing_argument_labels,
-                                plural, missingStr, isSubscript));
-  } else {
-    assert(numExtra > 0);
-    StringRef extraStr = extraBuffer;
-    diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::extra_argument_labels,
-                                plural, extraStr, isSubscript));
-  }
-
-  // Emit Fix-Its to correct the names.
-  auto &diag = *diagOpt;
-  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-    Identifier oldName = tuple->getElementName(i);
-    Identifier newName;
-    if (i < newNames.size())
-      newName = newNames[i];
-
-    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
-      continue;
-
-    if (newName.empty()) {
-      // Delete the old name.
-      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
-                            tuple->getElement(i)->getStartLoc());
-      continue;
-    }
-
-    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
-    llvm::SmallString<16> newStr;
-    if (newNameIsReserved)
-      newStr += "`";
-    newStr += newName.str();
-    if (newNameIsReserved)
-      newStr += "`";
-
-    if (oldName.empty()) {
-      // Insert the name.
-      newStr += ": ";
-      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
-      continue;
-    }
-    
-    // Change the name.
-    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
-  }
-
-  return true;
-}
 
 // Return the precedence-yielding parent of 'expr', along with the index of
 // 'expr' as the child of that parent. The precedence-yielding parent is the
@@ -6162,14 +6017,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     return true;
   }
 
-  case FixKind::TupleToScalar: 
-  case FixKind::ScalarToTuple:
-  case FixKind::RelabelCallTuple:
-    return diagnoseArgumentLabelError(affected,
-                                      fix.first.getRelabelTupleNames(*this),
-                           /*isSubscript=*/locator->getPath().back().getKind()
-                           == ConstraintLocator::SubscriptIndex);
-    
   case FixKind::OptionalToBoolean: {
     // If we're implicitly trying to treat an optional type as a boolean,
     // let the user know that they should be testing for a value manually

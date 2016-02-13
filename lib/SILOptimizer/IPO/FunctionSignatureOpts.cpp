@@ -542,13 +542,13 @@ bool ParameterAnalyzer::analyze() {
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     if (A.hasConvention(ParameterConvention::Direct_Owned)) {
-      if (auto *Release = ArgToReturnReleaseMap.releaseForArgument(A.Arg)) {
+      if (auto *Release = ArgToReturnReleaseMap.getSingleReleaseForArgument(A.Arg)) {
         SILInstruction *ReleaseInThrow = nullptr;
 
         // If the function has a throw block we must also find a matching
         // release in the throw block.
         if (!ArgToThrowReleaseMap.hasBlock() ||
-            (ReleaseInThrow = ArgToThrowReleaseMap.releaseForArgument(A.Arg))) {
+            (ReleaseInThrow = ArgToThrowReleaseMap.getSingleReleaseForArgument(A.Arg))) {
 
           // TODO: accept a second release in the throw block to let the
           // argument be dead.

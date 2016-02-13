@@ -1546,6 +1546,16 @@ public:
   /// Produce a substitution for invoking a pointer argument conversion
   /// intrinsic.
   Substitution getPointerSubstitution(Type pointerType);
+
+  /// Recognize used conformances from an imported type when we must emit the
+  /// witness table.
+  ///
+  /// This arises in _BridgedNSError, where we wouldn't otherwise pull in the
+  /// witness table, causing dynamic casts to perform incorrectly.
+  void checkForImportedUsedConformances(Type type);
+  void checkForImportedUsedConformances(ExplicitCastExpr *expr) {
+    checkForImportedUsedConformances(expr->getCastTypeLoc().getType());
+  }
 };
 
 

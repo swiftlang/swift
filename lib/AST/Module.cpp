@@ -666,7 +666,7 @@ DeclContext *BoundGenericType::getGenericParamContext(
   if (!gpContext)
     return getDecl();
 
-  assert(gpContext->isNominalTypeOrNominalTypeExtensionContext() == getDecl() &&
+  assert(gpContext->getAsNominalTypeOrNominalTypeExtensionContext() == getDecl() &&
          "not a valid context");
   return gpContext;
 }

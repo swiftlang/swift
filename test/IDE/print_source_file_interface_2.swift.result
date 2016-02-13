@@ -15,5 +15,5 @@ public class MyClass {
 extension MyClass {
 
     /// and a nice subscript.
-    internal subscript (i: Int) -> Int { get }
+    internal subscript(i: Int) -> Int { get }
 }

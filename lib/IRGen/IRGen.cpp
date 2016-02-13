@@ -200,6 +200,9 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());
 
+  if (Opts.PrintInlineTree)
+    ModulePasses.add(createInlineTreePrinterPass());
+
   // Do it.
   ModulePasses.run(*Module);
 }
@@ -317,6 +320,7 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
 
     ArrayRef<uint8_t> HashData(Result, sizeof(MD5::MD5Result));
     if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
+        !Opts.PrintInlineTree &&
         !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {
       // The llvm IR did not change. We don't need to re-create the object file.
       return false;
@@ -564,7 +568,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       // In JIT mode these are manually registered above.
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
-      IGM.emitReflectionMetadataRecords();
+      IGM.emitFieldTypeMetadataRecords();
+      IGM.emitAssociatedTypeMetadataRecords();
     }
 
     // Okay, emit any definitions that we suddenly need.
@@ -705,7 +710,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   // Emit protocol conformances.
   dispatcher.emitProtocolConformances();
 
-  dispatcher.emitReflectionMetadataRecords();
+  dispatcher.emitFieldTypeMetadataRecords();
+
+  dispatcher.emitAssociatedTypeMetadataRecords();
 
   // Okay, emit any definitions that we suddenly need.
   dispatcher.emitLazyDefinitions();

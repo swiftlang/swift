@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_default_args %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_default_args %s | FileCheck %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_default_args.closureInArgs
 // CHECK: [[@LINE+2]]:39 -> [[@LINE+2]]:55 : 1

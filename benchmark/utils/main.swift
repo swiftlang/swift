@@ -51,6 +51,7 @@ import GlobalClass
 import Hanoi
 import Hash
 import Histogram
+import Integrate
 import Join
 import LinkedList
 import MapReduce
@@ -78,6 +79,7 @@ import SevenBoom
 import Sim2DArray
 import SortLettersInPlace
 import SortStrings
+import StaticArray
 import StrComplexWalk
 import StrToInt
 import StringBuilder
@@ -86,6 +88,7 @@ import StringTests
 import StringWalk
 import SuperChars
 import TwoSum
+import TypeFlood
 import Walsh
 import XorLoop
 
@@ -124,6 +127,7 @@ precommitTests = [
   "Hanoi": run_Hanoi,
   "HashTest": run_HashTest,
   "Histogram": run_Histogram,
+  "Integrate": run_Integrate,
   "Join": run_Join,
   "LinkedList": run_LinkedList,
   "MapReduce": run_MapReduce,
@@ -155,6 +159,7 @@ precommitTests = [
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
   "SortStrings": run_SortStrings,
+  "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
   "StringBuilder": run_StringBuilder,
@@ -163,6 +168,7 @@ precommitTests = [
   "StringWithCString": run_StringWithCString,
   "SuperChars": run_SuperChars,
   "TwoSum": run_TwoSum,
+  "TypeFlood": run_TypeFlood,
   "Walsh": run_Walsh,
   "XorLoop": run_XorLoop,
 ]

@@ -355,7 +355,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(DeclID) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -364,7 +364,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<DeclID, little, unaligned>(data);
+    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
     auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
     return { declID, discriminator };
   }
@@ -432,7 +432,7 @@ public:
       bool isInstanceMethod = *data++ != 0;
       DeclID methodID = endian::readNext<uint32_t, little, unaligned>(data);
       result.push_back(std::make_tuple(typeID, isInstanceMethod, methodID));
-      length -= sizeof(TypeID) + 1 + sizeof(DeclID);
+      length -= sizeof(uint32_t) + 1 + sizeof(uint32_t);
     }
 
     return result;
@@ -543,7 +543,7 @@ class ModuleFile::DeclCommentTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = StringRef;
-  using data_type = BriefAndRawComment;
+  using data_type = CommentInfo;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -1219,19 +1219,21 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isHeader())
         continue;
 
-      StringRef ModulePath, ScopePath;
-      std::tie(ModulePath, ScopePath) = Dep.RawPath.split('\0');
+      StringRef ModulePathStr = Dep.RawPath;
+      StringRef ScopePath;
+      if (Dep.isScoped())
+        std::tie(ModulePathStr, ScopePath) = ModulePathStr.rsplit('\0');
 
-      auto ModuleID = Ctx.getIdentifier(ModulePath);
-      assert(!ModuleID.empty() &&
-             "invalid module name (submodules not yet supported)");
+      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1> AccessPath;
+      while (!ModulePathStr.empty()) {
+        StringRef NextComponent;
+        std::tie(NextComponent, ModulePathStr) = ModulePathStr.split('\0');
+        AccessPath.push_back({Ctx.getIdentifier(NextComponent), SourceLoc()});
+      }
 
-      if (ModuleID == Ctx.StdlibModuleName)
+      if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
-          AccessPath;
-      AccessPath.push_back({ ModuleID, SourceLoc() });
       Module *M = Ctx.getModule(AccessPath);
 
       auto Kind = ImportKind::Module;
@@ -1245,10 +1247,15 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           // about the import kind, we cannot do better.
           Kind = ImportKind::Func;
         } else {
+          // Lookup the decl in the top-level module.
+          Module *TopLevelModule = M;
+          if (AccessPath.size() > 1)
+            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().first);
+
           SmallVector<ValueDecl *, 8> Decls;
-          M->lookupQualified(ModuleType::get(M), ScopeID,
-                             NL_QualifiedDefault | NL_KnownNoDependency,
-                             nullptr, Decls);
+          TopLevelModule->lookupQualified(
+              ModuleType::get(TopLevelModule), ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");
@@ -1501,7 +1508,7 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   getTopLevelDecls(results);
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
+Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   assert(D);
 
   // Keep these as assertions instead of early exits to ensure that we are not
@@ -1532,7 +1539,7 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) {
+Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
   if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
     return None;
   auto Group = (*GroupNamesMap)[Id];
@@ -1541,7 +1548,7 @@ Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) {
   return Group;
 }
 
-Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) {
+Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
   auto Triple = getCommentForDecl(D);
   if (!Triple.hasValue()) {
     return None;
@@ -1549,7 +1556,16 @@ Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) {
   return getGroupNameById(Triple.getValue().Group);
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
+void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
+  if (!GroupNamesMap)
+    return;
+  for (auto It = GroupNamesMap->begin(); It != GroupNamesMap->end(); ++ It) {
+    Names.push_back(It->getSecond());
+  }
+}
+
+Optional<CommentInfo>
+ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   if (!DeclCommentTable)
     return None;
 

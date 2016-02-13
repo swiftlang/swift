@@ -12,7 +12,7 @@ extension CGColor {
   var red: CGFloat { return 0 }
   // CHECK-LABEL: {{^}} func asCMYK() -> CGColor
   func asCMYK() -> CGColor { return self }
-  // CHECK-LABEL: {{^}} subscript (x: CGColor) -> CGFloat
+  // CHECK-LABEL: {{^}} subscript(x: CGColor) -> CGFloat
   subscript(x: CGColor) -> CGFloat { return 0 }
 
   @objc var blue: CGFloat { return 0 } // expected-error{{method cannot be marked @objc because Core Foundation types are not classes in Objective-C}}

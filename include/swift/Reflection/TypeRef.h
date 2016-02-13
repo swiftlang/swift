@@ -18,11 +18,10 @@
 #ifndef SWIFT_REFLECTION_TYPEREF_H
 #define SWIFT_REFLECTION_TYPEREF_H
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
+#include "swift/Basic/Demangle.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TrailingObjects.h"
+
+#include <iostream>
 
 class NodePointer;
 
@@ -31,8 +30,6 @@ namespace reflection {
 
 class ReflectionContext;
 
-using llvm::ArrayRef;
-using llvm::StringRef;
 using llvm::cast;
 
 enum class TypeRefKind {
@@ -41,7 +38,13 @@ enum class TypeRefKind {
 #undef TYPEREF
 };
 
-class alignas(void *) TypeRef {
+class TypeRef;
+using TypeRefPointer = std::shared_ptr<TypeRef>;
+using ConstTypeRefPointer = std::shared_ptr<const TypeRef>;
+using TypeRefVector = std::vector<TypeRefPointer>;
+using ConstTypeRefVector = const std::vector<TypeRefPointer>;
+
+class TypeRef : public std::enable_shared_from_this<TypeRef> {
   TypeRefKind Kind;
 
 public:
@@ -52,17 +55,21 @@ public:
   }
 
   void dump() const;
-  void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
+  void dump(std::ostream &OS, unsigned Indent = 0) const;
 };
 
 class BuiltinTypeRef final : public TypeRef {
-  StringRef MangledName;
-  BuiltinTypeRef(StringRef MangledName);
+  std::string MangledName;
 
 public:
-  static BuiltinTypeRef *create(ReflectionContext &RC, StringRef MangledName);
+  BuiltinTypeRef(std::string MangledName)
+    : TypeRef(TypeRefKind::Builtin), MangledName(MangledName) {}
 
-  StringRef getMangledName() const {
+  static std::shared_ptr<BuiltinTypeRef> create(std::string MangledName) {
+    return std::make_shared<BuiltinTypeRef>(MangledName);
+  }
+
+  std::string getMangledName() const {
     return MangledName;
   }
 
@@ -72,12 +79,17 @@ public:
 };
 
 class NominalTypeRef final : public TypeRef {
-  StringRef MangledName;
-  NominalTypeRef(StringRef MangledName);
-public:
-  static NominalTypeRef *create(ReflectionContext &RC, StringRef MangledName);
+  std::string MangledName;
 
-  StringRef getMangledName() const {
+public:
+  NominalTypeRef(std::string MangledName)
+    : TypeRef(TypeRefKind::Nominal), MangledName(MangledName) {}
+
+  static std::shared_ptr<NominalTypeRef> create(std::string MangledName) {
+    return std::make_shared<NominalTypeRef>(MangledName);
+  }
+
+  std::string getMangledName() const {
     return MangledName;
   }
 
@@ -86,31 +98,31 @@ public:
   }
 };
 
-class BoundGenericTypeRef final
-  : public TypeRef,
-    private llvm::TrailingObjects<BoundGenericTypeRef, TypeRef *> {
-  friend class llvm::TrailingObjects<BoundGenericTypeRef, TypeRef *>;
-  StringRef MangledName;
-  uint32_t NumGenericParams;
-
-  BoundGenericTypeRef(StringRef MangledName,
-                      ArrayRef<TypeRef *> GenericParams);
+class BoundGenericTypeRef final : public TypeRef {
+  std::string MangledName;
+  TypeRefVector GenericParams;
 
 public:
-  static BoundGenericTypeRef *create(ReflectionContext &RC,
-                                     StringRef MangledName,
-                                     ArrayRef<TypeRef *> GenericParams);
+  BoundGenericTypeRef(std::string MangledName, TypeRefVector GenericParams)
+    : TypeRef(TypeRefKind::BoundGeneric),
+      MangledName(MangledName),
+      GenericParams(GenericParams) {}
 
-  StringRef getMangledName() const {
+  static std::shared_ptr<BoundGenericTypeRef>
+  create(std::string MangledName, TypeRefVector GenericParams) {
+    return std::make_shared<BoundGenericTypeRef>(MangledName, GenericParams);
+  }
+
+  std::string getMangledName() const {
     return MangledName;
   }
 
-  ArrayRef<TypeRef *> getGenericParams() {
-    return { getTrailingObjects<TypeRef *>(), NumGenericParams };
-  };
+  TypeRefVector getGenericParams() {
+    return GenericParams;
+  }
 
-  ArrayRef<const TypeRef *> getGenericParams() const {
-    return { getTrailingObjects<TypeRef *>(), NumGenericParams };
+  ConstTypeRefVector getGenericParams() const {
+    return GenericParams;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -118,25 +130,24 @@ public:
   }
 };
 
-class TupleTypeRef final
-  : public TypeRef,
-    private llvm::TrailingObjects<TupleTypeRef, TypeRef *> {
-  friend class llvm::TrailingObjects<TupleTypeRef, TypeRef *>;
-  uint32_t NumElements;
-
-  TupleTypeRef(ArrayRef<TypeRef *> Elements);
+class TupleTypeRef final : public TypeRef {
+  TypeRefVector Elements;
 
 public:
-  static TupleTypeRef *create(ReflectionContext &RC,
-                              ArrayRef<TypeRef *> Elements);
+  TupleTypeRef(TypeRefVector Elements)
+    : TypeRef(TypeRefKind::Tuple), Elements(Elements) {}
 
-  ArrayRef<TypeRef *> getElements() {
-    return { getTrailingObjects<TypeRef *>(), NumElements };
+  static std::shared_ptr<TupleTypeRef> create(TypeRefVector Elements) {
+    return std::make_shared<TupleTypeRef>(Elements);
+  }
+
+  TypeRefVector getElements() {
+    return Elements;
   };
 
-  ArrayRef<const TypeRef *> getElements() const {
-    return { getTrailingObjects<TypeRef *>(), NumElements };
-  }
+  ConstTypeRefVector getElements() const {
+    return Elements;
+  };
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Tuple;
@@ -144,27 +155,31 @@ public:
 };
 
 class FunctionTypeRef final : public TypeRef {
-  TypeRef *Input;
-  TypeRef *Result;
+  TypeRefPointer Input;
+  TypeRefPointer Result;
 
-  FunctionTypeRef(TypeRef *Input, TypeRef *Result);
 public:
-  static FunctionTypeRef *create(ReflectionContext &RC, TypeRef *Input,
-                          TypeRef *Result);
+  FunctionTypeRef(TypeRefPointer Input, TypeRefPointer Result)
+    : TypeRef(TypeRefKind::Function), Input(Input), Result(Result) {}
 
-  TypeRef *getInput() {
+  static std::shared_ptr<FunctionTypeRef> create(TypeRefPointer Input,
+                                                 TypeRefPointer Result) {
+    return std::make_shared<FunctionTypeRef>(Input, Result);
+  }
+
+  TypeRefPointer getInput() {
     return Input;
   };
 
-  const TypeRef *getInput() const {
+  ConstTypeRefPointer getInput() const {
     return Input;
-  }
+  };
 
-  TypeRef *getResult() {
+  TypeRefPointer getResult() {
     return Result;
   }
 
-  const TypeRef *getResult() const {
+  ConstTypeRefPointer getResult() const {
     return Result;
   }
 
@@ -174,20 +189,23 @@ public:
 };
 
 class ProtocolTypeRef final : public TypeRef {
-  StringRef ModuleName;
-  StringRef Name;
-
-  ProtocolTypeRef(StringRef ModuleName, StringRef Name);
+  std::string ModuleName;
+  std::string Name;
 
 public:
-  static ProtocolTypeRef *create(ReflectionContext &RC, StringRef ModuleName,
-                                 StringRef Name);
+  ProtocolTypeRef(std::string ModuleName, std::string Name)
+    : TypeRef(TypeRefKind::Protocol), ModuleName(ModuleName), Name(Name) {}
 
-  StringRef getName() const {
+  static std::shared_ptr<ProtocolTypeRef>
+  create(std::string ModuleName, std::string Name) {
+    return std::make_shared<ProtocolTypeRef>(ModuleName, Name);
+  }
+
+  std::string getName() const {
     return Name;
   }
 
-  StringRef getModuleName() const {
+  std::string getModuleName() const {
     return ModuleName;
   }
 
@@ -196,24 +214,24 @@ public:
   }
 };
 
-class ProtocolCompositionTypeRef final
-  : public TypeRef,
-    private llvm::TrailingObjects<ProtocolCompositionTypeRef, TypeRef *>{
-  friend class llvm::TrailingObjects<ProtocolCompositionTypeRef, TypeRef *>;
-  uint32_t NumProtocols;
-
-  ProtocolCompositionTypeRef(ArrayRef<TypeRef *> Protocols);
+class ProtocolCompositionTypeRef final : public TypeRef {
+  TypeRefVector Protocols;
 
 public:
-  static ProtocolCompositionTypeRef *create(ReflectionContext &RC,
-                                     ArrayRef<TypeRef *> Protocols);
+  ProtocolCompositionTypeRef(TypeRefVector Protocols)
+    : TypeRef(TypeRefKind::ProtocolComposition), Protocols(Protocols) {}
 
-  ArrayRef<TypeRef *>getProtocols() {
-    return { getTrailingObjects<TypeRef *>(), NumProtocols };
+  static std::shared_ptr<ProtocolCompositionTypeRef>
+  create(TypeRefVector Protocols) {
+    return std::make_shared<ProtocolCompositionTypeRef>(Protocols);
   }
 
-  ArrayRef<const TypeRef *> getProtocols() const {
-    return { getTrailingObjects<TypeRef *>(), NumProtocols };
+  TypeRefVector getProtocols() {
+    return Protocols;
+  }
+
+  ConstTypeRefVector getProtocols() const {
+    return Protocols;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -222,18 +240,21 @@ public:
 };
 
 class MetatypeTypeRef final : public TypeRef {
-  TypeRef *InstanceType;
-
-  MetatypeTypeRef(TypeRef *InstanceType);
+  TypeRefPointer InstanceType;
 
 public:
-  static MetatypeTypeRef *create(ReflectionContext &RC, TypeRef *InstanceType);
+  MetatypeTypeRef(TypeRefPointer InstanceType)
+    : TypeRef(TypeRefKind::Metatype), InstanceType(InstanceType) {}
 
-  TypeRef *getInstanceType() {
+  static std::shared_ptr<MetatypeTypeRef> create(TypeRefPointer InstanceType) {
+    return std::make_shared<MetatypeTypeRef>(InstanceType);
+  }
+
+  TypeRefPointer getInstanceType() {
     return InstanceType;
   }
 
-  const TypeRef *getInstanceType() const {
+  ConstTypeRefPointer getInstanceType() const {
     return InstanceType;
   }
 
@@ -243,18 +264,21 @@ public:
 };
 
 class ExistentialMetatypeTypeRef final : public TypeRef {
-  TypeRef *InstanceType;
+  TypeRefPointer InstanceType;
 
-  ExistentialMetatypeTypeRef(TypeRef *InstanceType);
 public:
-  static ExistentialMetatypeTypeRef *create(ReflectionContext &RC,
-                                     TypeRef *InstanceType);
+  ExistentialMetatypeTypeRef(TypeRefPointer InstanceType)
+    : TypeRef(TypeRefKind::ExistentialMetatype), InstanceType(InstanceType) {}
+  static std::shared_ptr<ExistentialMetatypeTypeRef>
+  create(TypeRefPointer InstanceType) {
+    return std::make_shared<ExistentialMetatypeTypeRef>(InstanceType);
+  }
 
-  TypeRef *getInstanceType() {
+  TypeRefPointer getInstanceType() {
     return InstanceType;
   }
 
-  const TypeRef *getInstanceType() const {
+  ConstTypeRefPointer getInstanceType() const {
     return InstanceType;
   }
 
@@ -267,11 +291,14 @@ class GenericTypeParameterTypeRef final : public TypeRef {
   const uint32_t Index;
   const uint32_t Depth;
 
-  GenericTypeParameterTypeRef(uint32_t Index, uint32_t Depth);
 public:
+  GenericTypeParameterTypeRef(uint32_t Index, uint32_t Depth)
+    : TypeRef(TypeRefKind::GenericTypeParameter), Index(Index), Depth(Depth) {}
 
-  static GenericTypeParameterTypeRef *create(ReflectionContext &RC,
-                                             uint32_t Index, uint32_t Depth);
+  static std::shared_ptr<GenericTypeParameterTypeRef>
+  create(uint32_t Index, uint32_t Depth) {
+    return std::make_shared<GenericTypeParameterTypeRef>(Index, Depth);
+  }
 
   uint32_t getIndex() const {
     return Index;
@@ -287,27 +314,30 @@ public:
 };
 
 class DependentMemberTypeRef final : public TypeRef {
-  TypeRef *Member;
-  TypeRef *Base;
+  TypeRefPointer Member;
+  TypeRefPointer Base;
 
-  DependentMemberTypeRef(TypeRef *Member, TypeRef *Base);
 public:
-  static DependentMemberTypeRef *create(ReflectionContext &RC,
-                                 TypeRef *Member,
-                                 TypeRef *Base);
-  TypeRef *getMember() {
+  DependentMemberTypeRef(TypeRefPointer Member, TypeRefPointer Base)
+    : TypeRef(TypeRefKind::DependentMember), Member(Member), Base(Base) {}
+  static std::shared_ptr<DependentMemberTypeRef>
+  create(TypeRefPointer Member, TypeRefPointer Base) {
+    return std::make_shared<DependentMemberTypeRef>(Member, Base);
+  }
+
+  TypeRefPointer getMember() {
     return Member;
   }
 
-  const TypeRef *getMember() const {
+  ConstTypeRefPointer getMember() const {
     return Member;
   }
 
-  TypeRef *getBase() {
+  TypeRefPointer getBase() {
     return Base;
   }
 
-  const TypeRef *getBase() const {
+  ConstTypeRefPointer getBase() const {
     return Base;
   }
 
@@ -317,14 +347,17 @@ public:
 };
 
 class AssociatedTypeRef final : public TypeRef {
-  StringRef Name;
-
-  AssociatedTypeRef(StringRef Name);
+  std::string Name;
 
 public:
-  static AssociatedTypeRef *create(ReflectionContext &RC, StringRef Name);
+  AssociatedTypeRef(std::string Name)
+    : TypeRef(TypeRefKind::Associated), Name(Name) {}
 
-  StringRef getName() const {
+  static std::shared_ptr<AssociatedTypeRef> create(std::string Name) {
+    return std::make_shared<AssociatedTypeRef>(Name);
+  }
+
+  std::string getName() const {
     return Name;
   }
 
@@ -343,23 +376,29 @@ public:
     case TypeRefKind::Id: \
       return static_cast<ImplClass*>(this) \
         ->visit##Id##TypeRef(cast<Id##TypeRef>(typeRef), \
-                             ::std::forward<Args>(args)...);
+                           ::std::forward<Args>(args)...);
 #include "swift/Reflection/TypeRefs.def"
     }
   }
 };
 
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
-  llvm::raw_ostream &OS;
+  std::ostream &OS;
   unsigned Indent;
 
-  llvm::raw_ostream &printHeader(StringRef Name) {
-    OS.indent(Indent) << '(' << Name;
+  std::ostream &indent(unsigned Amount) {
+    for (unsigned i = 0; i < Amount; ++i)
+      OS << ' ';
+    return OS;
+  }
+
+  std::ostream &printHeader(std::string Name) {
+    indent(Indent) << '(' << Name;
     return OS;
   }
 
   template<typename T>
-  llvm::raw_ostream &printField(StringRef name, const T &value) {
+  std::ostream &printField(std::string name, const T &value) {
     if (!name.empty())
       OS << " " << name << "=" << value;
     else
@@ -380,7 +419,7 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   }
 
 public:
-  PrintTypeRef(llvm::raw_ostream &OS, unsigned Indent)
+  PrintTypeRef(std::ostream &OS, unsigned Indent)
     : OS(OS), Indent(Indent) {}
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
@@ -402,21 +441,21 @@ public:
     auto demangled = Demangle::demangleTypeAsString(BG->getMangledName());
     printField("", demangled);
     for (auto param : BG->getGenericParams())
-      printRec(param);
+      printRec(param.get());
     OS << ')';
   }
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
     printHeader("tuple");
     for (auto element : T->getElements())
-      printRec(element);
+      printRec(element.get());
     OS << ')';
   }
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
     printHeader("function");
-    printRec(F->getInput());
-    printRec(F->getResult());
+    printRec(F->getInput().get());
+    printRec(F->getResult().get());
     OS << ')';
   }
 
@@ -430,19 +469,19 @@ public:
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol-composition");
     for (auto protocol : PC->getProtocols())
-      printRec(protocol);
+      printRec(protocol.get());
     OS << ')';
   }
 
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     printHeader("metatype");
-    printRec(M->getInstanceType());
+    printRec(M->getInstanceType().get());
     OS << ')';
   }
 
   void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     printHeader("existential-metatype");
-    printRec(EM->getInstanceType());
+    printRec(EM->getInstanceType().get());
     OS << ')';
   }
 
@@ -455,8 +494,8 @@ public:
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     printHeader("dependent-member");
-    printRec(DM->getBase());
-    printRec(DM->getMember());
+    printRec(DM->getBase().get());
+    printRec(DM->getMember().get());
     OS << ')';
   }
 
@@ -467,8 +506,90 @@ public:
   }
 };
 
-TypeRef *decodeDemangleNode(ReflectionContext &RC,
-                            Demangle::NodePointer Node);
+TypeRefPointer decodeDemangleNode(Demangle::NodePointer Node) {
+  using NodeKind = Demangle::Node::Kind;
+  switch (Node->getKind()) {
+    case NodeKind::Type:
+      return decodeDemangleNode(Node->getChild(0));
+    case NodeKind::BoundGenericClass:
+    case NodeKind::BoundGenericEnum:
+    case NodeKind::BoundGenericStructure: {
+      auto mangledName = Demangle::mangleNode(Node->getChild(0));
+      auto genericArgs = Node->getChild(1);
+      TypeRefVector Params;
+      for (auto genericArg : *genericArgs)
+        Params.push_back(decodeDemangleNode(genericArg));
+
+      return BoundGenericTypeRef::create(mangledName, Params);
+    }
+    case NodeKind::Class:
+    case NodeKind::Enum:
+    case NodeKind::Structure: {
+      auto mangledName = Demangle::mangleNode(Node);
+      return NominalTypeRef::create(mangledName);
+    }
+    case NodeKind::BuiltinTypeName: {
+      auto mangledName = Demangle::mangleNode(Node);
+      return BuiltinTypeRef::create(mangledName);
+    }
+    case NodeKind::ExistentialMetatype: {
+      auto instance = decodeDemangleNode(Node->getChild(0));
+      return ExistentialMetatypeTypeRef::create(instance);
+    }
+    case NodeKind::Metatype: {
+      auto instance = decodeDemangleNode(Node->getChild(0));
+      return MetatypeTypeRef::create(instance);
+    }
+    case NodeKind::Protocol: {
+      auto moduleName = Node->getChild(0)->getText();
+      auto name = Node->getChild(1)->getText();
+      return ProtocolTypeRef::create(moduleName, name);
+    }
+    case NodeKind::DependentGenericParamType: {
+      auto depth = Node->getChild(0)->getIndex();
+      auto index = Node->getChild(1)->getIndex();
+      return GenericTypeParameterTypeRef::create(index, depth);
+    }
+    case NodeKind::FunctionType: {
+      auto input = decodeDemangleNode(Node->getChild(0));
+      auto result = decodeDemangleNode(Node->getChild(1));
+      return FunctionTypeRef::create(input, result);
+    }
+    case NodeKind::ArgumentTuple:
+      return decodeDemangleNode(Node->getChild(0));
+    case NodeKind::ReturnType:
+      return decodeDemangleNode(Node->getChild(0));
+    case NodeKind::NonVariadicTuple: {
+      TypeRefVector Elements;
+      for (auto element : *Node)
+        Elements.push_back(decodeDemangleNode(element));
+      return TupleTypeRef::create(Elements);
+    }
+    case NodeKind::TupleElement:
+      return decodeDemangleNode(Node->getChild(0));
+    case NodeKind::DependentGenericType: {
+      return decodeDemangleNode(Node->getChild(1));
+    }
+    case NodeKind::DependentMemberType: {
+      auto member = decodeDemangleNode(Node->getChild(0));
+      auto base = decodeDemangleNode(Node->getChild(1));
+      return DependentMemberTypeRef::create(member, base);
+    }
+    case NodeKind::DependentAssociatedTypeRef:
+      return AssociatedTypeRef::create(Node->getText());
+    default:
+      return nullptr;
+  }
+}
+
+void TypeRef::dump() const {
+  dump(std::cerr);
+}
+
+void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
+  PrintTypeRef(OS, Indent).visit(this);
+  OS << "\n";
+}
 
 } // end namespace reflection
 } // end namespace swift

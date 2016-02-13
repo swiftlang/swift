@@ -14,8 +14,9 @@
 // camelCase names.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_BASIC_STRINGEXTRAS_HPP
-#define SWIFT_BASIC_STRINGEXTRAS_HPP
+
+#ifndef SWIFT_BASIC_STRINGEXTRAS_H
+#define SWIFT_BASIC_STRINGEXTRAS_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"

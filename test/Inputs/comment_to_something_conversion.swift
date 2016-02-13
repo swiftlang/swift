@@ -15,7 +15,7 @@ init() {}
 
 /// Aaa.  subscript(i: Int).
 subscript(i: Int) -> Int {
-// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:iC14swift_ide_test21A010_AttachToEntities9subscriptFSiSi</USR><Declaration>subscript (i: Int) -&gt; Int { get set }</Declaration><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></Other>]
+// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:iC14swift_ide_test21A010_AttachToEntities9subscriptFSiSi</USR><Declaration>subscript(i: Int) -&gt; Int { get set }</Declaration><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></Other>]
     get {
 // CHECK: {{.*}}DocCommentAsXML=none
       return 0

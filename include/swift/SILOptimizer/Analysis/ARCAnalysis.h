@@ -36,6 +36,8 @@ class SILFunction;
 
 namespace swift {
 
+using ReleaseList = llvm::SmallVector<SILInstruction *, 1>;
+
 /// \returns True if the user \p User decrements the ref count of \p Ptr.
 bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
                           AliasAnalysis *AA);
@@ -114,11 +116,10 @@ private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
   ExitKind Kind;
-  llvm::SmallMapVector<SILArgument *, SILInstruction *, 8> ArgInstMap;
+  llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
   bool HasBlock = false;
 
 public:
-
   /// Finds matching releases in the return block of the function \p F.
   ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,
                                       SILFunction *F,
@@ -129,38 +130,47 @@ public:
 
   bool hasBlock() const { return HasBlock; }
 
-  bool argumentHasRelease(SILArgument *Arg) const {
-    return ArgInstMap.find(Arg) != ArgInstMap.end();
-  }
-
-  bool argumentHasRelease(SILValue V) const {
-    auto *Arg = dyn_cast<SILArgument>(V);
-    if (!Arg)
-      return false;
-    return argumentHasRelease(Arg);
-  }
-
-  SILInstruction *releaseForArgument(SILArgument *Arg) const {
+  SILInstruction *getSingleReleaseForArgument(SILArgument *Arg) {
     auto I = ArgInstMap.find(Arg);
     if (I == ArgInstMap.end())
       return nullptr;
-    return I->second;
+    if (I->second.size() > 1)
+      return nullptr;
+    return *I->second.begin();
   }
 
-  SILInstruction *releaseForArgument(SILValue V) const {
+  SILInstruction *getSingleReleaseForArgument(SILValue V) {
     auto *Arg = dyn_cast<SILArgument>(V);
     if (!Arg)
       return nullptr;
-    return releaseForArgument(Arg);
+    return getSingleReleaseForArgument(Arg);
+  }
+
+  ReleaseList getReleasesForArgument(SILArgument *Arg) {
+    ReleaseList Releases;
+    auto I = ArgInstMap.find(Arg);
+    if (I == ArgInstMap.end())
+      return Releases;
+    return I->second; 
+  }
+
+  ReleaseList getReleasesForArgument(SILValue V) {
+    ReleaseList Releases;
+    auto *Arg = dyn_cast<SILArgument>(V);
+    if (!Arg)
+      return Releases;
+    return getReleasesForArgument(Arg);
   }
 
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
 
-  bool isReleaseMatchedToArgument(SILInstruction *Inst) const {
-    auto Pred = [&Inst](const std::pair<SILArgument *,
-                                        SILInstruction *> &P) -> bool {
-      return P.second == Inst;
+  bool isSingleReleaseMatchedToArgument(SILInstruction *Inst) {
+    auto Pred = [&Inst](std::pair<SILArgument *,
+                                  ReleaseList> &P) -> bool {
+      if (P.second.size() > 1)
+        return false;
+      return *P.second.begin() == Inst;
     };
     return std::count_if(ArgInstMap.begin(), ArgInstMap.end(), Pred);
   }

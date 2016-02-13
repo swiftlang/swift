@@ -22,9 +22,9 @@ from cmpcodesize.compare import \
 
 
 SHORTCUTS = {
-    "O": "bin/PerfTests_O",
-    "Ounchecked": "bin/PerfTests_Ounchecked",
-    "Onone": "bin/PerfTests_Onone",
+    "O": "bin/Benchmark_O",
+    "Ounchecked": "bin/Benchmark_Ounchecked",
+    "Onone": "bin/Benchmark_Onone",
     "dylib": "lib/swift/macosx/x86_64/libswiftCore.dylib",
 }
 
@@ -43,16 +43,16 @@ E.g. $HOME/swift-reference/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx
 
 How to specify files:
 1) No files:
-    Compares codesize of the PerfTests_* executables and the swiftCore dylib in the new and old build-dirs.
+    Compares codesize of the Benchmark_* executables and the swiftCore dylib in the new and old build-dirs.
     Example:
         cmpcodesize
 
 2) One or more paths relative to the build-dirs (can be a pattern):
     Compares the files in the new and old build-dirs.
     Aliases:
-        O          => bin/PerfTests_O
-        Ounchecked => bin/PerfTests_Ounchecked
-        Onone      => bin/PerfTests_Onone
+        O          => bin/Benchmark_O
+        Ounchecked => bin/Benchmark_Ounchecked
+        Onone      => bin/Benchmark_Onone
         dylib      => lib/swift/macosx/x86_64/libswiftCore.dylib
     Examples:
         cmpcodesize Onone

@@ -4,6 +4,7 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/ComputeDominanceInfo.cpp
   UtilityPasses/ComputeLoopInfo.cpp
   UtilityPasses/CFGPrinter.cpp
+  UtilityPasses/EpilogueReleaseMatcherDumper.cpp
   UtilityPasses/EscapeAnalysisDumper.cpp
   UtilityPasses/FunctionOrderPrinter.cpp
   UtilityPasses/IVInfoPrinter.cpp

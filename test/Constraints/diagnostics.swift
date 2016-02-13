@@ -718,4 +718,10 @@ func test17875634() {
   match.append(row, col)  // expected-error {{extra argument in call}}
 }
 
+// <https://github.com/apple/swift/pull/1205> Improved diagnostics for enums with associated values
+enum AssocTest {
+  case one(Int)
+}
 
+if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '==' cannot be applied to two 'AssocTest' operands}}
+// expected-note @-1 {{binary operator '==' cannot be synthesized for enums with associated values}}

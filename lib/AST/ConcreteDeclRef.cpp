@@ -25,8 +25,7 @@ ConcreteDeclRef::SpecializedDeclRef *
 ConcreteDeclRef::SpecializedDeclRef::create(
                                        ASTContext &ctx, ValueDecl *decl,
                                        ArrayRef<Substitution> substitutions) {
-  unsigned size = sizeof(SpecializedDeclRef)
-  + sizeof(Substitution) * substitutions.size();
+  size_t size = totalSizeToAlloc<Substitution>(substitutions.size());
   void *memory = ctx.Allocate(size, alignof(SpecializedDeclRef));
   return new (memory) SpecializedDeclRef(decl, substitutions);
 }

@@ -168,7 +168,7 @@ Version Version::parseCompilerVersionString(
       Diags->diagnose(Range.Start,
                       diag::version_component_not_number);
     } else {
-      llvm_unreachable("Invalid character in _compiler_version build configuration");
+      llvm_unreachable("Invalid character in _compiler_version condition");
     }
   }
 

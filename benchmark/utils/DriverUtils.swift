@@ -242,7 +242,7 @@ class SampleRunner {
   }
 }
 
-/// Invoke the benchmark entry point and return the run time in miliseconds.
+/// Invoke the benchmark entry point and return the run time in milliseconds.
 func runBench(name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
 
   var samples = [UInt64](count: c.numSamples, repeatedValue: 0)

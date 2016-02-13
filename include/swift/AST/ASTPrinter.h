@@ -60,9 +60,11 @@ public:
   /// Called before printing at the point which would be considered the location
   /// of the declaration (normally the name of the declaration).
   virtual void printDeclLoc(const Decl *D) {}
-  /// Called after printing the name of the declaration (the signature for
-  /// functions).
+  /// Called after printing the name of the declaration.
   virtual void printDeclNameEndLoc(const Decl *D) {}
+  /// Called after printing the name of a declaration, or in the case of
+  /// functions its signature.
+  virtual void printDeclNameOrSignatureEndLoc(const Decl *D) {}
   /// Called after finishing printing of a declaration.
   virtual void printDeclPost(const Decl *D) {}
 

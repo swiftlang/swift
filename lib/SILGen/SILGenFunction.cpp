@@ -665,7 +665,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
     if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
       OpenedExistential = thisArg;
     auto protocol =
-      next.getDecl()->getDeclContext()->isProtocolOrProtocolExtensionContext();
+      next.getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
     auto conformance = ProtocolConformanceRef(protocol);
     return gen.B.createWitnessMethod(loc, thisType, conformance, next,
                                      constantInfo.getSILType(),
@@ -894,4 +894,19 @@ SILGenBuilder::createAllocExistentialBox(SILLocation Loc,
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,
                                                ConcreteType,
                                                Conformances);
+}
+
+void SILGenFunction::checkForImportedUsedConformances(Type type) {
+  // Recognize _BridgedNSError, which must pull in its witness table for
+  // dynamic casts to work
+  if (auto bridgedNSErrorProtocol =
+          getASTContext().getProtocol(KnownProtocolKind::BridgedNSError)) {
+    if (auto nominalDecl = type->getAnyNominal()) {
+      SmallVector<ProtocolConformance *, 4> conformances;
+      if (nominalDecl->lookupConformance(
+              SGM.SwiftModule, bridgedNSErrorProtocol, conformances)) {
+        SGM.useConformance(ProtocolConformanceRef(conformances.front()));
+      }
+    }
+  }
 }

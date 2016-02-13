@@ -33,7 +33,7 @@ import Builtin
 // -- placeholder for vwtable pointer
 // CHECK:   i8* null,
 // -- address point
-// CHECK:   i64 1, {{.*}}* @_TMnV15generic_structs13SingleDynamic, %swift.type* null,
+// CHECK:   i64 1, {{.*}}* @_TMnV15generic_structs13SingleDynamic
 // -- field offset vector; generic parameter vector
 // CHECK:   i64 0, %swift.type* null,
 // -- tail-allocated vwtable pattern

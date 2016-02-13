@@ -52,12 +52,12 @@ NOTE(opening_angle,none,
 ERROR(extra_rbrace,none,
       "extraneous '}' at top level", ())
 
-ERROR(unexpected_config_block_terminator,none,
-      "unexpected configuration block terminator", ())
-ERROR(expected_build_configuration_expression,none,
-      "expected a build configuration expression to follow the #if clause", ())
-ERROR(extra_tokens_config_directive,none,
-      "extra tokens at the end of the build configuration directive", ())
+ERROR(unexpected_conditional_compilation_block_terminator,none,
+      "unexpected conditional compilation block terminator", ())
+ERROR(expected_conditional_compilation_expression,none,
+      "expected a condition to follow %select{#if|#elseif}0", (bool))
+ERROR(extra_tokens_conditional_compilation_directive,none,
+      "extra tokens following conditional compilation directive", ())
 
 ERROR(unexpected_line_directive,none,
       "parameterless closing #line directive "
@@ -717,9 +717,9 @@ ERROR(expected_rbrace_in_brace_stmt,none,
       "expected '}' at end of brace statement", ())
 
 /// #if Statement
-ERROR(expected_close_to_config_stmt,none,
-      "expected #else or #endif at end of configuration block", ())
-ERROR(expected_close_after_else,none,
+ERROR(expected_close_to_if_directive,none,
+      "expected #else or #endif at end of conditional compilation block", ())
+ERROR(expected_close_after_else_directive,none,
       "further conditions after #else are unreachable", ())
 
 /// Associatedtype Statement
@@ -1216,31 +1216,31 @@ ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
 
 //------------------------------------------------------------------------------
-// Build configuration parsing diagnostics
+// Conditional compilation parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(unsupported_build_config_binary_expression,none,
+ERROR(unsupported_conditional_compilation_binary_expression,none,
       "expected '&&' or '||' expression", ())
-ERROR(unsupported_build_config_unary_expression,none,
+ERROR(unsupported_conditional_compilation_unary_expression,none,
       "expected unary '!' expression", ())
-ERROR(unsupported_target_config_expression,none,
-      "unexpected target configuration expression (expected 'os', 'arch', or 'swift')",
+ERROR(unsupported_platform_condition_expression,none,
+      "unexpected platform condition (expected 'os', 'arch', or 'swift')",
       ())
-ERROR(target_config_expected_one_argument,none,
-      "expected only one argument to target configuration expression",
+ERROR(platform_condition_expected_one_argument,none,
+      "expected only one argument to platform condition",
       ())
-ERROR(unsupported_target_config_runtime_argument,none,
-      "unexpected argument for the '_runtime' target configuration, "
+ERROR(unsupported_platform_runtime_condition_argument,none,
+      "unexpected argument for the '_runtime' condition; "
       "expected '_Native' or '_ObjC'", ())
-ERROR(unsupported_target_config_argument,none,
-      "unexpected target configuration argument: expected %0",
+ERROR(unsupported_platform_condition_argument,none,
+      "unexpected platform condition argument: expected %0",
       (StringRef))
 ERROR(unexpected_version_comparison_operator,none,
       "expected '>=' prefix operator on a version requirement",
       ())
-ERROR(unsupported_config_conditional_expression_type,none,
-      "unexpected configuration expression type", ())
-ERROR(unsupported_config_integer,none,
-      "'%0' is not a valid configuration option, use '%1'",
+ERROR(unsupported_conditional_compilation_expression_type,none,
+      "invalid conditional compilation expression", ())
+ERROR(unsupported_conditional_compilation_integer,none,
+      "'%0' is not a valid conditional compilation expression, use '%1'",
       (StringRef, StringRef))
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
@@ -1255,7 +1255,7 @@ ERROR(compiler_version_component_out_of_range,none,
       (unsigned))
 ERROR(empty_version_string,none,
       "version requirement is empty", ())
-WARNING(unknown_build_config,none,
+WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
 

@@ -419,12 +419,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   /// \brief Record the location of this declaration, which is about to
-  /// be printed.
+  /// be printed, marking the name and signature end locations.
   template<typename FnTy>
-  void recordDeclLoc(Decl *decl, const FnTy &Fn) {
+  void recordDeclLoc(Decl *decl, const FnTy &NameFn,
+                     llvm::function_ref<void()> ParamFn = []{}) {
     Printer.callPrintDeclLoc(decl);
-    Fn();
+    NameFn();
     Printer.printDeclNameEndLoc(decl);
+    ParamFn();
+    Printer.printDeclNameOrSignatureEndLoc(decl);
   }
 
   void printSourceRange(CharSourceRange Range, ASTContext &Ctx) {
@@ -1219,7 +1222,7 @@ void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
       // For a protocol extension, print only the where clause; the
       // generic parameter list is implicit. For other nominal types,
       // print the generic parameters.
-      if (decl->isProtocolOrProtocolExtensionContext())
+      if (decl->getAsProtocolOrProtocolExtensionContext())
         printWhereClause(gp->getRequirements());
       else
         printGenericParams(gp);
@@ -2008,11 +2011,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         Printer << "func ";
       }
       recordDeclLoc(decl,
-        [&]{
+        [&]{ // Name
           if (!decl->hasName())
             Printer << "<anonymous>";
           else
             Printer.printName(decl->getName());
+        }, [&] { // Parameters
           if (decl->isGeneric()) {
             printGenericParams(decl->getGenericParams());
           }
@@ -2087,7 +2091,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printAttributes(decl);
   printAccessibility(decl);
   recordDeclLoc(decl, [&]{
-    Printer << "subscript ";
+    Printer << "subscript";
+  }, [&] { // Parameters
     printParameterList(decl->getIndices(), /*Curried=*/false,
                        /*isAPINameByDefault*/[](unsigned)->bool{return false;});
   });
@@ -2125,7 +2130,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
         Printer << "!";
         break;
       }
-
+    }, [&] { // Parameters
       if (decl->isGeneric())
         printGenericParams(decl->getGenericParams());
 
@@ -2145,7 +2150,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printAttributes(decl);
   recordDeclLoc(decl,
     [&]{
-      Printer << "deinit ";
+      Printer << "deinit";
     });
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {

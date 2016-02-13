@@ -322,8 +322,8 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  if(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE)
-    list(APPEND swift_flags "-assert-config" "Release")
+  if(SWIFT_STDLIB_ENABLE_RESILIENCE AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
   endif()
 
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
@@ -333,8 +333,10 @@ function(_compile_swift_files dependency_target_out_var_name)
   # FIXME: Cleaner way to do this?
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
-        "-nostdimport" "-parse-stdlib" "-module-name" "Swift"
-        "-Xfrontend" "-sil-serialize-all")
+        "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
+    if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
+      list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
+    endif()
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
@@ -784,15 +786,15 @@ function(_add_swift_library_single target name)
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
-      set(SWIFTLIB_SINGLE_C_COMPILE_FLAGS "${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}" "-fembed-bitcode")
-      set(SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}" "-embed-bitcode")
-      set(SWIFTLIB_SINGLE_LINK_FLAGS "${SWIFTLIB_SINGLE_LINK_FLAGS}" "-Xlinker -bitcode_bundle -Xlinker -bitcode_hide_symbols -Xlinker -lto_library -Xlinker ${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-embed-bitcode")
+      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-bitcode_hide_symbols" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
     endif()
   endif()
 
   if (SWIFT_COMPILER_VERSION)
     if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-      set(SWIFTLIB_SINGLE_LINK_FLAGS "${SWIFTLIB_SINGLE_LINK_FLAGS}" "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
+      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
     endif()
   endif()
 

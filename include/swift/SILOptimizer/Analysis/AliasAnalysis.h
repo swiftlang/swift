@@ -22,12 +22,14 @@
 using swift::RetainObserveKind;
 
 namespace {
-  /// A cache for AliasAnalysis.
-  /// This struct represents the argument list to the method 'alias'.
-  /// The two SILValue pointers are mapped to size_t indices because we need
-  /// an efficient way to invalidate them (the mechanism is described below).
-  /// The Type arguments are translated to void* because their
-  /// underlying storage is opaque pointers that never goes away.
+
+  /// A key used for the AliasAnalysis cache.
+  ///
+  /// This struct represents the argument list to the method 'alias'.  The two
+  /// SILValue pointers are mapped to size_t indices because we need an
+  /// efficient way to invalidate them (the mechanism is described below). The
+  /// Type arguments are translated to void* because their underlying storage is
+  /// opaque pointers that never goes away.
   struct AliasKeyTy {
     // The SILValue pair:
     size_t V1, V2;
@@ -35,11 +37,12 @@ namespace {
     void *T1, *T2;
   };
 
-  /// A cache for MemoryBehavior Analysis.
-  /// The two SILValue pointers are mapped to size_t indices because we need
-  /// an efficient way to invalidate them (the mechanism is described below).
-  /// The RetainObserveKind represents the inspection mode for the memory
-  /// behavior analysis.
+  /// A key used for the MemoryBehavior Analysis cache.
+  ///
+  /// The two SILValue pointers are mapped to size_t indices because we need an
+  /// efficient way to invalidate them (the mechanism is described below).  The
+  /// RetainObserveKind represents the inspection mode for the memory behavior
+  /// analysis.
   struct MemBehaviorKeyTy {
     // The SILValue pair:
     size_t V1, V2;
@@ -100,11 +103,13 @@ private:
   llvm::DenseMap<TBAACacheKey, bool> TypesMayAliasCache;
 
   /// AliasAnalysis value cache.
+  ///
   /// The alias() method uses this map to cache queries.
   llvm::DenseMap<AliasKeyTy, AliasResult> AliasCache;
 
   using MemoryBehavior = SILInstruction::MemoryBehavior;
   /// MemoryBehavior value cache.
+  ///
   /// The computeMemoryBehavior() method uses this map to cache queries.
   llvm::DenseMap<MemBehaviorKeyTy, MemoryBehavior> MemoryBehaviorCache;
 
@@ -136,7 +141,7 @@ private:
   virtual void handleDeleteNotification(ValueBase *I) override {
     // The pointer I is going away.  We can't scan the whole cache and remove
     // all of the occurrences of the pointer. Instead we remove the pointer
-    // from the cache the translates pointers to indices.
+    // from the cache that translates pointers to indices.
     AliasValueBaseToIndex.invalidateValue(I);
     MemoryBehaviorValueBaseToIndex.invalidateValue(I);
   }

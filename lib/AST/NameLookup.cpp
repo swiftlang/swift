@@ -225,11 +225,11 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // If one declaration is in a protocol or extension thereof and the
         // other is not, prefer the one that is not.
         if ((bool)firstDecl->getDeclContext()
-              ->isProtocolOrProtocolExtensionContext()
+              ->getAsProtocolOrProtocolExtensionContext()
               != (bool)secondDecl->getDeclContext()
-                   ->isProtocolOrProtocolExtensionContext()) {
+                   ->getAsProtocolOrProtocolExtensionContext()) {
           if (firstDecl->getDeclContext()
-                ->isProtocolOrProtocolExtensionContext()) {
+                ->getAsProtocolOrProtocolExtensionContext()) {
             shadowed.insert(firstDecl);
             break;
           } else {
@@ -433,7 +433,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           isCascadingUse = AFD->isCascadingContextForLookup(false);
 
         if (AFD->getExtensionType()) {
-          if (AFD->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+          if (AFD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
             ExtendedType = AFD->getDeclContext()->getProtocolSelf()
                              ->getArchetype();
 
@@ -479,13 +479,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (!isCascadingUse.hasValue())
           isCascadingUse = ACE->isCascadingContextForLookup(false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
-        if (ED->isProtocolOrProtocolExtensionContext()) {
+        if (ED->getAsProtocolOrProtocolExtensionContext()) {
           ExtendedType = ED->getProtocolSelf()->getArchetype();
         } else {
           ExtendedType = ED->getExtendedType();
         }
 
-        BaseDecl = ED->isNominalTypeOrNominalTypeExtensionContext();
+        BaseDecl = ED->getAsNominalTypeOrNominalTypeExtensionContext();
         MetaBaseDecl = BaseDecl;
         if (!isCascadingUse.hasValue())
           isCascadingUse = ED->isCascadingContextForLookup(false);

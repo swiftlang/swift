@@ -33,7 +33,7 @@ c_object_p = POINTER(c_void_p)
 
 callbacks = {}
 
-### Structures and Utility Classes ###
+# Structures and Utility Classes
 
 class CachedProperty(object):
     """Decorator that lazy-loads the value of a property.

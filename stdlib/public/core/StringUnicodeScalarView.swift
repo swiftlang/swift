@@ -28,7 +28,7 @@ public func <(
 
 extension String {
   /// A collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value) that
-  /// encode a `String` .
+  /// encodes a `String` value.
   public struct UnicodeScalarView : CollectionType, CustomStringConvertible, CustomDebugStringConvertible {
     init(_ _core: _StringCore) {
       self._core = _core
@@ -201,8 +201,8 @@ extension String {
       var _generator: IndexingGenerator<_StringCore>!
     }
 
-    /// Return a *generator* over the `UnicodeScalar`s that comprise
-    /// this *sequence*.
+    /// Returns a generator over the `UnicodeScalar`s that comprise
+    /// this sequence.
     ///
     /// - Complexity: O(1).
     @warn_unused_result
@@ -353,7 +353,7 @@ extension String.UnicodeScalarIndex {
     self.init(characterIndex._base._position, unicodeScalars._core)
   }
 
-  /// Return the position in `utf8` that corresponds exactly
+  /// Returns the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf8)!.indices`.
@@ -362,7 +362,7 @@ extension String.UnicodeScalarIndex {
     return String.UTF8View.Index(self, within: utf8)
   }
 
-  /// Return the position in `utf16` that corresponds exactly
+  /// Returns the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf16)!.indices`.
@@ -373,7 +373,7 @@ extension String.UnicodeScalarIndex {
     return String.UTF16View.Index(self, within: utf16)
   }
 
-  /// Return the position in `characters` that corresponds exactly
+  /// Returns the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.unicodeScalars.indices`.

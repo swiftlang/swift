@@ -19,7 +19,8 @@ func testInstanceTypeFactoryMethodInherited() {
   _ = NSObjectFactorySub() // okay, prefers init method
   _ = NSObjectFactorySub(integer: 1)
   _ = NSObjectFactorySub(double: 314159)
-  _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}} {{26-31=integer}}
+  _ = NSObjectFactorySub(float: 314159) // expected-error{{argument labels '(float:)' do not match any available overloads}} 
+  // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{argument labels '(buildingWidgets:)' do not match any available overloads}}
   // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   _ = a

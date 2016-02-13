@@ -178,8 +178,9 @@ T : UnsignedIntegerType, U : _SignedIntegerType
 %   Self = self_ty.stdlib_name
 %   BuiltinName = self_ty.builtin_name
 %   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
+%   Article = 'An' if bits == 8 else 'A'
 
-/// A ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
+/// ${Article} ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
 public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'},
@@ -403,7 +404,7 @@ extension ${Self} : RandomAccessIndexType {
 extension ${Self} {
 % for Method,op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
   /// ${Method.capitalize()} `lhs` and `rhs`, returning a result and a
-  /// `Bool` that is true iff the operation caused an arithmetic
+  /// `Bool` that is `true` iff the operation caused an arithmetic
   /// overflow.
   @_transparent public
   static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
@@ -415,7 +416,7 @@ extension ${Self} {
 % for Method,op in [('divide', 'div'), ('remainder', 'rem')]:
   /// Divide `lhs` and `rhs`, returning
   /// ${'a result' if op == 'div' else 'the remainder'} and a `Bool`
-  /// that is true iff the operation caused an arithmetic overflow.
+  /// that is `true` iff the operation caused an arithmetic overflow.
   @_transparent public
   static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
     if rhs == 0 {

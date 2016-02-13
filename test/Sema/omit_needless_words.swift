@@ -2,8 +2,8 @@
 
 class C1 {
   init(tasteString: String) { } // expected-warning{{'init(tasteString:)' could be named 'init(taste:)'}}{{8-8=taste }}
-  func processWithString(string: String, toInt: Int) { } // expected-warning{{'processWithString(_:toInt:)' could be named 'processWith(_:to:)'}}{{8-25=processWith}}{{42-42=to }}
-  func processWithInt(value: Int) { } // expected-warning{{'processWithInt' could be named 'processWith'}}{{8-22=processWith}}
+  func processWithString(string: String, toInt: Int) { } // expected-warning{{'processWithString(_:toInt:)' could be named 'process(with:to:)'}}{{8-25=process}}{{42-42=to }}
+  func processWithInt(value: Int) { } // expected-warning{{'processWithInt' could be named 'process(with:)'}}{{8-22=process}}
 }
 
 extension String {
@@ -13,8 +13,8 @@ extension String {
 
 func callSites(s: String) {
   let c1 = C1(tasteString: "blah") // expected-warning{{'init(tasteString:)' could be named 'init(taste:)'}}{{15-26=taste}}
-  c1.processWithString("a", toInt: 1) // expected-warning{{'processWithString(_:toInt:)' could be named 'processWith(_:to:)'}}{{6-23=processWith}}{{29-34=to}}
-  c1.processWithInt(5) // expected-warning{{'processWithInt' could be named 'processWith'}}{{6-20=processWith}}
+  c1.processWithString("a", toInt: 1) // expected-warning{{'processWithString(_:toInt:)' could be named 'process(with:to:)'}}{{6-23=process}}{{29-34=to}}
+  c1.processWithInt(5) // expected-warning{{'processWithInt' could be named 'process(with:)'}}{{6-20=process}}
   _ = String.randomString // expected-warning{{'randomString' could be named 'random'}}{{14-26=random}}
   _ = s.wonkycasedString // expected-warning{{'wonkycasedString' could be named 'wonkycased'}}{{9-25=wonkycased}}
 }

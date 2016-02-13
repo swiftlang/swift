@@ -138,16 +138,12 @@ namespace {
 /// A helper class for implementing existential type infos that
 /// store an existential value of some sort.
 template <class Derived, class Base>
-class ExistentialTypeInfoBase : public Base {
+class ExistentialTypeInfoBase : public Base,
+    private llvm::TrailingObjects<Derived, ProtocolEntry> {
+  friend class llvm::TrailingObjects<Derived, ProtocolEntry>;
+
   /// The number of non-trivial protocols for this existential.
   unsigned NumStoredProtocols;
-
-  ProtocolEntry *getStoredProtocolsBuffer() {
-    return reinterpret_cast<ProtocolEntry *>(&asDerived() + 1);
-  }
-  const ProtocolEntry *getStoredProtocolsBuffer() const {
-    return reinterpret_cast<const ProtocolEntry *>(&asDerived() + 1);
-  }
 
 protected:
   const Derived &asDerived() const {
@@ -162,9 +158,8 @@ protected:
                           As &&...args)
       : Base(std::forward<As>(args)...),
         NumStoredProtocols(protocols.size())  {
-    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      new (&getStoredProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
-    }
+    std::uninitialized_copy(protocols.begin(), protocols.end(),
+                            this->template getTrailingObjects<ProtocolEntry>());
   }
 
 public:
@@ -172,8 +167,8 @@ public:
   static const Derived *
   create(ArrayRef<ProtocolEntry> protocols, As &&...args)
   {
-    void *buffer = operator new(sizeof(Derived) +
-                                protocols.size() * sizeof(ProtocolEntry));
+    void *buffer =
+        operator new(ExistentialTypeInfoBase::template totalSizeToAlloc<ProtocolEntry>(protocols.size()));
     return new (buffer) Derived(protocols, std::forward<As>(args)...);
   }
 
@@ -186,8 +181,8 @@ public:
   /// type are not know to implement any protocols, although we do
   /// still know how to manipulate them.
   ArrayRef<ProtocolEntry> getStoredProtocols() const {
-    return ArrayRef<ProtocolEntry>(getStoredProtocolsBuffer(),
-                                   NumStoredProtocols);
+    return {this->template getTrailingObjects<ProtocolEntry>(),
+            NumStoredProtocols};
   }
 
   /// Given an existential object, find the witness table
@@ -269,7 +264,7 @@ public:
 /// t here is an ArchetypeType.
 ///
 /// This is used for both ProtocolTypes and ProtocolCompositionTypes.
-class OpaqueExistentialTypeInfo :
+class OpaqueExistentialTypeInfo final :
     public ExistentialTypeInfoBase<OpaqueExistentialTypeInfo,
              IndirectTypeInfo<OpaqueExistentialTypeInfo, FixedTypeInfo>> {
 
@@ -471,7 +466,7 @@ public:
 };
 
 /// A type implementation for 'weak' existential types.
-class WeakClassExistentialTypeInfo :
+class WeakClassExistentialTypeInfo final :
     public AddressOnlyClassExistentialTypeInfoBase<WeakClassExistentialTypeInfo,
                                                    WeakTypeInfo> {
 public:
@@ -557,7 +552,7 @@ public:
 };
 
 /// A type implementation for address-only @unowned existential types.
-class AddressOnlyUnownedClassExistentialTypeInfo :
+class AddressOnlyUnownedClassExistentialTypeInfo final :
     public AddressOnlyClassExistentialTypeInfoBase<
                                     AddressOnlyUnownedClassExistentialTypeInfo,
                                                    FixedTypeInfo> {
@@ -892,7 +887,7 @@ public:
 };
 
 /// A type implementation for loadable [unowned] class existential types.
-class LoadableUnownedClassExistentialTypeInfo
+class LoadableUnownedClassExistentialTypeInfo final
   : public ScalarExistentialTypeInfoBase<
                                       LoadableUnownedClassExistentialTypeInfo,
                                          LoadableTypeInfo> {
@@ -976,7 +971,7 @@ public:
 };
 
 /// A type implementation for @unowned(unsafe) class existential types.
-class UnmanagedClassExistentialTypeInfo
+class UnmanagedClassExistentialTypeInfo final
   : public ScalarExistentialTypeInfoBase<UnmanagedClassExistentialTypeInfo,
                                          LoadableTypeInfo> {
 public:
@@ -1013,7 +1008,7 @@ public:
 /// Class existentials can be represented directly as an aggregation
 /// of a refcounted pointer plus witness tables instead of using an indirect
 /// buffer.
-class ClassExistentialTypeInfo
+class ClassExistentialTypeInfo final
   : public ScalarExistentialTypeInfoBase<ClassExistentialTypeInfo,
                                          ReferenceTypeInfo>
 {
@@ -1208,7 +1203,7 @@ public:
 };
 
 /// A type implementation for existential metatypes.
-class ExistentialMetatypeTypeInfo
+class ExistentialMetatypeTypeInfo final
   : public ScalarExistentialTypeInfoBase<ExistentialMetatypeTypeInfo,
                                          LoadableTypeInfo> {
   const LoadableTypeInfo &MetatypeTI;

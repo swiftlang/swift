@@ -58,20 +58,19 @@ public func < (lhs: Bit, rhs: Bit) -> Bool {
 }
 
 extension Bit : IntegerArithmeticType {
-  static func _withOverflow(
-    intResult: Int, overflow: Bool
+  static func _withOverflow(value : (intResult: Int, overflow: Bool)
   ) -> (Bit, overflow: Bool) {
-    if let bit = Bit(rawValue: intResult) {
-      return (bit, overflow: overflow)
-    } else {
-      let bitRaw = intResult % 2 + (intResult < 0 ? 2 : 0)
-      let bit = Bit(rawValue: bitRaw)!
-      return (bit, overflow: true)
+    if let bit = Bit(rawValue: value.intResult) {
+      return (bit, overflow: value.overflow)
     }
+
+    let bitRaw = value.intResult % 2 + (value.intResult < 0 ? 2 : 0)
+    let bit = Bit(rawValue: bitRaw)!
+    return (bit, overflow: true)
   }
 
   /// Add `lhs` and `rhs`, returning a result and a `Bool` that is
-  /// true iff the operation caused an arithmetic overflow.
+  /// `true` iff the operation caused an arithmetic overflow.
   public static func addWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
@@ -79,7 +78,7 @@ extension Bit : IntegerArithmeticType {
   }
 
   /// Subtract `lhs` and `rhs`, returning a result and a `Bool` that is
-  /// true iff the operation caused an arithmetic overflow.
+  /// `true` iff the operation caused an arithmetic overflow.
   public static func subtractWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
@@ -87,7 +86,7 @@ extension Bit : IntegerArithmeticType {
   }
 
   /// Multiply `lhs` and `rhs`, returning a result and a `Bool` that is
-  /// true iff the operation caused an arithmetic overflow.
+  /// `true` iff the operation caused an arithmetic overflow.
   public static func multiplyWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
@@ -95,7 +94,7 @@ extension Bit : IntegerArithmeticType {
   }
 
   /// Divide `lhs` and `rhs`, returning a result and a `Bool` that is
-  /// true iff the operation caused an arithmetic overflow.
+  /// `true` iff the operation caused an arithmetic overflow.
   public static func divideWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {
@@ -103,7 +102,7 @@ extension Bit : IntegerArithmeticType {
   }
 
   /// Divide `lhs` and `rhs`, returning the remainder and a `Bool` that is
-  /// true iff the operation caused an arithmetic overflow.
+  /// `true` iff the operation caused an arithmetic overflow.
   public static func remainderWithOverflow(
     lhs: Bit, _ rhs: Bit
   ) -> (Bit, overflow: Bool) {

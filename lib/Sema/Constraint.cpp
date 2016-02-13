@@ -34,7 +34,8 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
     Nested(constraints), Locator(locator)
 {
   assert(kind == ConstraintKind::Disjunction);
-  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+  std::uninitialized_copy(typeVars.begin(), typeVars.end(),
+                          getTypeVariablesBuffer().begin());
 }
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
@@ -409,29 +410,10 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   llvm_unreachable("bad conversion restriction kind");
 }
 
-Fix Fix::getRelabelTuple(ConstraintSystem &cs, FixKind kind,
-                         ArrayRef<Identifier> names) {
-  assert(isRelabelTupleKind(kind) && "Not a tuple-relabel fix");
-  Fix result(kind, cs.RelabelTupleNames.size());
-  auto &allocator = cs.getAllocator();
-
-  // Copy the names and indices.
-  Identifier *namesCopy = allocator.Allocate<Identifier>(names.size());
-  memcpy(namesCopy, names.data(), names.size() * sizeof(Identifier));
-  cs.RelabelTupleNames.push_back({namesCopy, names.size()});
-
-  return result;
-}
-
 Fix Fix::getForcedDowncast(ConstraintSystem &cs, Type toType) {
   unsigned index = cs.FixedTypes.size();
   cs.FixedTypes.push_back(toType);
   return Fix(FixKind::ForceDowncast, index);
-}
-
-ArrayRef<Identifier> Fix::getRelabelTupleNames(ConstraintSystem &cs) const {
-  assert(isRelabelTuple());
-  return cs.RelabelTupleNames[Data];
 }
 
 Type Fix::getTypeArgument(ConstraintSystem &cs) const {
@@ -451,12 +433,6 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: add address-of";
   case FixKind::RemoveNullaryCall:
     return "fix: remove nullary call";
-  case FixKind::TupleToScalar:
-    return "fix: tuple-to-scalar";
-  case FixKind::ScalarToTuple:
-    return "fix: scalar-to-tuple";
-  case FixKind::RelabelCallTuple:
-    return "fix: relabel call tuple";
   case FixKind::OptionalToBoolean:
     return "fix: convert optional to boolean";
   case FixKind::FromRawToInit:
@@ -471,19 +447,13 @@ StringRef Fix::getName(FixKind kind) {
 }
 
 void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {
-  Out << "[" << getName(getKind());
-
-  if (isRelabelTuple() && cs) {
-    Out << " to ";
-    for (auto name : getRelabelTupleNames(*cs))
-      Out << name << ":";
-  }
+  Out << '[' << getName(getKind());
 
   if (getKind() == FixKind::ForceDowncast && cs) {
     Out << " as! ";
     Out << getTypeArgument(*cs).getString();
   }
-  Out << "]";
+  Out << ']';
 }
 
 void Fix::dump(ConstraintSystem *cs) const {
@@ -564,8 +534,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, locator, typeVars);
 }
@@ -582,8 +551,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
   }
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(type, choice, locator, typeVars);
 }
@@ -602,8 +570,7 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, restriction, first, second, locator,
                               typeVars);
@@ -622,8 +589,7 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
   uniqueTypeVariables(typeVars);
 
   // Create the constraint.
-  unsigned size = sizeof(Constraint)
-  + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
 }
@@ -675,8 +641,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
 
   // Create the disjunction constraint.
   uniqueTypeVariables(typeVars);
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,
                               cs.allocateCopy(constraints), locator, typeVars);

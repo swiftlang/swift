@@ -211,7 +211,10 @@ public:
   void emitTypeMetadataRecords();
 
   /// Emit field type records for nominal types for reflection purposes.
-  void emitReflectionMetadataRecords();
+  void emitFieldTypeMetadataRecords();
+
+  /// Emit assocated type references for nominal types for reflection purposes.
+  void emitAssociatedTypeMetadataRecords();
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -352,6 +355,7 @@ public:
     llvm::IntegerType *IntPtrTy;
     llvm::IntegerType *MetadataKindTy;
     llvm::IntegerType *OnceTy;
+    llvm::IntegerType *FarRelativeAddressTy;
   };
   llvm::IntegerType *ObjCBoolTy;       /// i8 or i1
   union {
@@ -579,12 +583,14 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
-  llvm::Constant *emitReflectionMetadataRecords();
+  llvm::Constant *emitFieldTypeMetadataRecords();
+  llvm::Constant *emitAssociatedTypeMetadataRecords();
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
-  StringRef getReflectionMetadataSectionName();
-  StringRef getReflectionStringsSectionName();
-  StringRef getReflectionTypeRefSectionName();
+  std::string getFieldTypeMetadataSectionName();
+  std::string getAssociatedTypeMetadataSectionName();
+  std::string getReflectionStringsSectionName();
+  std::string getReflectionTypeRefSectionName();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -777,11 +783,12 @@ public:
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
   llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                        bool isIndirect,
-                                        bool isPattern,
-                                        bool isConstant,
-                                        llvm::Constant *init,
-                                        llvm::StringRef section = {});
+                                  bool isIndirect,
+                                  bool isPattern,
+                                  bool isConstant,
+                                  llvm::Constant *init,
+                                  std::unique_ptr<llvm::GlobalVariable> replace,
+                                  llvm::StringRef section = {});
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,

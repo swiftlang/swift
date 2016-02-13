@@ -193,9 +193,17 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   bytes += pattern->AddressPoint;
   ClassMetadata *metadata = reinterpret_cast<ClassMetadata*>(bytes);
   assert(metadata->isTypeMetadata());
-
+  
   // Overwrite the superclass field.
   metadata->SuperClass = superclass;
+  // Adjust the relative reference to the nominal type descriptor.
+  if (!metadata->isArtificialSubclass()) {
+    auto patternBytes =
+      reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
+      pattern->AddressPoint;
+    metadata->setDescription(
+        reinterpret_cast<const ClassMetadata*>(patternBytes)->getDescription());
+  }
 
   // Adjust the class object extents.
   if (extraPrefixSize) {
@@ -207,7 +215,7 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   return metadata;
 }
 
-Metadata *
+ValueMetadata *
 swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
                                           const void *arguments) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
@@ -224,7 +232,17 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 
   // Okay, move to the address point.
   bytes += pattern->AddressPoint;
-  Metadata *metadata = reinterpret_cast<Metadata*>(bytes);
+  auto *metadata = reinterpret_cast<ValueMetadata*>(bytes);
+  
+  // Adjust the relative references to the nominal type descriptor and
+  // parent type.
+  auto patternBytes =
+    reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
+    pattern->AddressPoint;
+  auto patternMetadata = reinterpret_cast<const ValueMetadata*>(patternBytes);
+  metadata->Description = patternMetadata->Description.get();
+  metadata->Parent = patternMetadata->Parent.get();
+  
   return metadata;
 }
 

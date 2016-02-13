@@ -1246,7 +1246,7 @@ struct EnumTypeDescriptor;
 /// descriptor is shared for all instantiations of the generic type.
 struct NominalTypeDescriptor {
   /// The mangled name of the nominal type, with no generic parameters.
-  RelativeDirectPointer<char> Name;
+  RelativeDirectPointer<const char> Name;
   
   /// The following fields are kind-dependent.
   union {
@@ -1266,7 +1266,7 @@ struct NominalTypeDescriptor {
       
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
-      RelativeDirectPointer<char, /*nullable*/ true> FieldNames;
+      RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
       
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
@@ -1290,7 +1290,7 @@ struct NominalTypeDescriptor {
       
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
-      RelativeDirectPointer<char, /*nullable*/ true> FieldNames;
+      RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
       
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
@@ -1313,7 +1313,7 @@ struct NominalTypeDescriptor {
       /// The names of the cases. A doubly-null-terminated list of strings,
       /// whose length is NumNonEmptyCases + NumEmptyCases. Cases are named in
       /// tag order, non-empty cases first, followed by empty cases.
-      RelativeDirectPointer<char, /*nullable*/ true> CaseNames;
+      RelativeDirectPointer<const char, /*nullable*/ true> CaseNames;
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// CaseNames. Only types for payload cases are provided.
@@ -1372,20 +1372,19 @@ typedef void (*ClassIVarDestroyer)(HeapObject *);
 struct ClassMetadata : public HeapMetadata {
   ClassMetadata() = default;
   constexpr ClassMetadata(const HeapMetadata &base,
-                          const ClassMetadata *superClass,
-                          uintptr_t data,
-                          ClassFlags flags,
-                          const NominalTypeDescriptor *description,
-                          ClassIVarDestroyer ivarDestroyer,
-                          uintptr_t size, uintptr_t addressPoint,
-                          uintptr_t alignMask,
-                          uintptr_t classSize, uintptr_t classAddressPoint)
+                const ClassMetadata *superClass,
+                uintptr_t data,
+                ClassFlags flags,
+                ClassIVarDestroyer ivarDestroyer,
+                uintptr_t size, uintptr_t addressPoint,
+                uintptr_t alignMask,
+                uintptr_t classSize, uintptr_t classAddressPoint)
     : HeapMetadata(base), SuperClass(superClass),
       CacheData{nullptr, nullptr}, Data(data),
       Flags(flags), InstanceAddressPoint(addressPoint),
       InstanceSize(size), InstanceAlignMask(alignMask),
       Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
-      Description(description), IVarDestroyer(ivarDestroyer) {}
+      Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   const ClassMetadata *SuperClass;
@@ -1443,7 +1442,8 @@ private:
   /// if this is an artificial subclass.  We currently provide no
   /// supported mechanism for making a non-artificial subclass
   /// dynamically.
-  const NominalTypeDescriptor *Description;
+  FarRelativeDirectPointer<const NominalTypeDescriptor,
+                           /*nullable*/ true> Description;
 
   /// A function for destroying instance variables, used to clean up
   /// after an early return from a constructor.
@@ -1461,6 +1461,10 @@ public:
     assert(isTypeMetadata());
     assert(!isArtificialSubclass());
     return Description;
+  }
+  
+  void setDescription(const NominalTypeDescriptor *description) {
+    Description = description;
   }
 
   ClassIVarDestroyer getIVarDestroyer() const {
@@ -1713,14 +1717,40 @@ struct ForeignClassMetadata : public ForeignTypeMetadata {
   }
 };
 
-/// The structure of type metadata for structs.
-struct StructMetadata : public Metadata {
+/// The common structure of metadata for structs and enums.
+struct ValueMetadata : public Metadata {
+  ValueMetadata(MetadataKind Kind, const NominalTypeDescriptor *description,
+                const Metadata *parent)
+    : Metadata(Kind), Description(description), Parent(parent)
+  {}
+
   /// An out-of-line description of the type.
-  const NominalTypeDescriptor *Description;
+  FarRelativeDirectPointer<const NominalTypeDescriptor> Description;
 
   /// The parent type of this member type, or null if this is not a
   /// member type.
-  const Metadata *Parent;
+  FarRelativeIndirectablePointer<const Metadata, /*nullable*/ true> Parent;
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Struct
+      || metadata->getKind() == MetadataKind::Enum
+      || metadata->getKind() == MetadataKind::Optional;
+  }
+  
+  /// Retrieve the generic arguments of this type.
+  const Metadata * const *getGenericArgs() const {
+    if (Description->GenericParams.NumParams == 0)
+      return nullptr;
+
+    const void* const *asWords = reinterpret_cast<const void * const *>(this);
+    asWords += Description->GenericParams.Offset;
+    return reinterpret_cast<const Metadata * const *>(asWords);
+  }
+};
+
+/// The structure of type metadata for structs.
+struct StructMetadata : public ValueMetadata {
+  using ValueMetadata::ValueMetadata;
   
   /// Get a pointer to the field offset vector, if present, or null.
   const uintptr_t *getFieldOffsets() const {
@@ -1740,29 +1770,14 @@ struct StructMetadata : public Metadata {
     return getter(this);
   }
 
-  /// Retrieve the generic arguments of this struct.
-  const Metadata * const *getGenericArgs() const {
-    if (Description->GenericParams.NumParams == 0)
-      return nullptr;
-
-    const void* const *asWords = reinterpret_cast<const void * const *>(this);
-    asWords += Description->GenericParams.Offset;
-    return reinterpret_cast<const Metadata * const *>(asWords);
-  }
-
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::Struct;
   }
 };
 
 /// The structure of type metadata for enums.
-struct EnumMetadata : public Metadata {
-  /// An out-of-line description of the type.
-  const NominalTypeDescriptor *Description;
-  
-  /// The parent type of this member type, or null if this is not a
-  /// member type.
-  const Metadata *Parent;
+struct EnumMetadata : public ValueMetadata {
+  using ValueMetadata::ValueMetadata;
 
   /// True if the metadata records the size of the payload area.
   bool hasPayloadSize() const {
@@ -1786,16 +1801,6 @@ struct EnumMetadata : public Metadata {
     size_t *asWords = reinterpret_cast<size_t *>(this);
     asWords += offset;
     return *asWords;
-  }
-
-  /// Retrieve the generic arguments of this enum.
-  const Metadata * const *getGenericArgs() const {
-    const void* const *asWords = reinterpret_cast<const void * const *>(this);
-    if (Description->GenericParams.NumParams == 0)
-      return nullptr;
-
-    asWords += Description->GenericParams.Offset;
-    return reinterpret_cast<const Metadata * const *>(asWords);
   }
 
   static bool classof(const Metadata *metadata) {
@@ -2215,7 +2220,7 @@ struct GenericWitnessTable {
                               /*nullable*/ true> Protocol;
 
   /// The pattern.
-  RelativeDirectPointer<WitnessTable> Pattern;
+  RelativeDirectPointer<const WitnessTable> Pattern;
 
   /// The instantiation function, which is called after the template is copied.
   RelativeDirectPointer<void(WitnessTable *instantiatedTable,
@@ -2240,7 +2245,7 @@ private:
   // Some description of the type that is resolvable at runtime.
   union {
     /// A direct reference to the metadata.
-    RelativeDirectPointer<Metadata> DirectType;
+    RelativeDirectPointer<const Metadata> DirectType;
 
     /// The nominal type descriptor for a resilient or generic type.
     RelativeDirectPointer<NominalTypeDescriptor> TypeDescriptor;
@@ -2327,7 +2332,7 @@ private:
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    RelativeDirectPointer<WitnessTable> WitnessTable;
+    RelativeDirectPointer<const WitnessTable> WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type. The function may return null if a specific instance does not
@@ -2502,7 +2507,7 @@ swift_allocateGenericClassMetadata(GenericMetadata *pattern,
 
 // Callback to allocate a generic struct/enum metadata object.
 SWIFT_RUNTIME_EXPORT
-extern "C" Metadata *
+extern "C" ValueMetadata *
 swift_allocateGenericValueMetadata(GenericMetadata *pattern,
                                    const void *arguments);
 

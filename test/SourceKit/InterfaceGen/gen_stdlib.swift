@@ -38,3 +38,24 @@ var x: Int
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
 // CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps17SignedIntegerType">SignedIntegerType</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
+
+// RUN: %sourcekitd-test -req=module-groups -module Swift | FileCheck -check-prefix=GROUP1 %s
+// GROUP1: <GROUPS>
+// GROUP1: Algorithm
+// GROUP1: Assert
+// GROUP1: Character
+// GROUP1: Collection
+// GROUP1: FlatMap
+// GROUP1: OutputStream
+// GROUP1: String
+// GROUP1: Zip
+// GROUP1: <\GROUPS>
+
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Zip > %t.zip.response
+// RUN: FileCheck -check-prefix=CHECK-ZIP -input-file %t.zip.response %s
+// CHECK-ZIP: public func zip<Sequence1 : SequenceType, Sequence2 : SequenceType>(sequence1: Sequence1, _ sequence2: Sequence2) -> Zip2Sequence<Sequence1, Sequence2>
+// CHECK-ZIP: public struct Zip2Generator<Generator1 : GeneratorType, Generator2 : GeneratorType> : GeneratorType {
+// CHECK-ZIP: public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType> : SequenceType {
+// Zip group cannot include Int
+// CHECK-ZIP-NOT: struct Int : SignedIntegerType, Comparable, Equatable {
+// CHECK-ZIP-NOT: extension String.UTF16View.Index {

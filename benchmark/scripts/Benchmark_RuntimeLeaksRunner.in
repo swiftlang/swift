@@ -13,7 +13,6 @@
 # ===----------------------------------------------------------------------===//
 
 import os
-import re
 import sys
 import json
 import subprocess
@@ -64,6 +63,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def __init__(self, binary, xfail_list):
         perf_test_driver.BenchmarkDriver.__init__(self, binary, xfail_list,
                                                  enable_parallel=True)
+
     def prepare_input(self, name):
         return {}
 
@@ -75,8 +75,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             p = subprocess.Popen([data['path'], "--run-all", "--num-samples=2",
                                   "--num-iters={}".format(2), data['test_name']],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            status = p.wait()
-            output = p.stdout.readlines()
+            p.wait()
             error_out = p.stderr.readlines()
         except:
             print("Child Process Failed! (%s,%s)" % (data['path'], data['test_name']))

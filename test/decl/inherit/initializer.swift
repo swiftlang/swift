@@ -58,7 +58,8 @@ class NotInherited1 : D {
 
 func testNotInherited1() {
   var n1 = NotInherited1(int: 5)
-  var n2 = NotInherited1(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}} {{26-32=float}}
+  var n2 = NotInherited1(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'NotInherited1' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
 }
 
 class NotInherited1Sub : NotInherited1 {
@@ -70,7 +71,8 @@ class NotInherited1Sub : NotInherited1 {
 func testNotInherited1Sub() {
   var n1 = NotInherited1Sub(int: 5)
   var n2 = NotInherited1Sub(float: 3.14159)
-  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}} {{29-35=float}}
+  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'NotInherited1Sub' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
 }
 
 // Having a stored property without an initial value prevents

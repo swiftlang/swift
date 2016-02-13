@@ -131,7 +131,7 @@ def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
-  HelpText<"Specifies one or more build configuration options">;
+  HelpText<"Marks a conditional compilation flag as true">;
 
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
   HelpText<"Add directory to framework search path">;
@@ -290,7 +290,7 @@ def gline_tables_only : Flag<["-"], "gline-tables-only">,
 def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the assert_configuration replacement. "
-           "Possible values are Debug, Release, Replacement.">;
+           "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
 
 // File types
 

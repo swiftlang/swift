@@ -500,21 +500,22 @@ void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   }
 }
 
-void Parser::skipUntilConfigBlockClose() {
+void Parser::skipUntilConditionalBlockClose() {
   while (Tok.isNot(tok::pound_else, tok::pound_elseif, tok::pound_endif,
                    tok::eof)) {
     skipSingle();
   }
 }
 
-bool Parser::parseConfigEndIf(SourceLoc &Loc) {
+bool Parser::parseEndIfDirective(SourceLoc &Loc) {
   Loc = Tok.getLoc();
-  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt)) {
+  if (parseToken(tok::pound_endif, diag::expected_close_to_if_directive)) {
     Loc = PreviousLoc;
-    skipUntilConfigBlockClose();
+    skipUntilConditionalBlockClose();
     return true;
   } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
-    diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+    diagnose(Tok.getLoc(),
+             diag::extra_tokens_conditional_compilation_directive);
   return false;
 }
 
@@ -659,11 +660,17 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       RightLoc = Tok.getLoc();
       return Status;
     }
+    SourceLoc SepLoc = Tok.getLoc();
     if (consumeIf(SeparatorK)) {
-      if (AllowSepAfterLast && Tok.is(RightK))
+      if (Tok.is(RightK)) {
+        if (!AllowSepAfterLast) {
+          diagnose(Tok, diag::unexpected_separator,
+                   SeparatorK == tok::comma ? "," : ";")
+            .fixItRemove(SourceRange(SepLoc));
+        }
         break;
-      else
-        continue;
+      }
+      continue;
     }
     if (!OptionalSep) {
       // If we're in a comma-separated list and the next token starts a new
@@ -779,20 +786,23 @@ SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
 }
 
-ConfigParserState swift::operator&&(ConfigParserState lhs,
-                                     ConfigParserState rhs) {
-  return ConfigParserState(lhs.isConditionActive() && rhs.isConditionActive(),
-                           ConfigExprKind::Binary);
+ConditionalCompilationExprState
+swift::operator&&(ConditionalCompilationExprState lhs,
+                  ConditionalCompilationExprState rhs) {
+  return {lhs.isConditionActive() && rhs.isConditionActive(),
+          ConditionalCompilationExprKind::Binary};
 }
 
-ConfigParserState swift::operator||(ConfigParserState lhs,
-                                    ConfigParserState rhs) {
-  return ConfigParserState(lhs.isConditionActive() || rhs.isConditionActive(),
-                           ConfigExprKind::Binary);
+ConditionalCompilationExprState
+swift::operator||(ConditionalCompilationExprState lhs,
+                  ConditionalCompilationExprState rhs) {
+  return {lhs.isConditionActive() || rhs.isConditionActive(),
+          ConditionalCompilationExprKind::Binary};
 }
 
-ConfigParserState swift::operator!(ConfigParserState Result) {
-  return ConfigParserState(!Result.isConditionActive(), Result.getKind());
+ConditionalCompilationExprState
+swift::operator!(ConditionalCompilationExprState state) {
+  return {!state.isConditionActive(), state.getKind()};
 }
 
 /// Parse a stringified Swift declaration name, e.g. "init(frame:)".

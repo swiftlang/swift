@@ -50,6 +50,17 @@ llvm::cl::opt<bool>
 SILPrintNoColor("sil-print-no-color", llvm::cl::init(""),
                 llvm::cl::desc("Don't use color when printing SIL"));
 
+llvm::cl::opt<bool>
+SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
+                llvm::cl::desc("Fully demangle symbol names in SIL output"));
+
+static std::string demangleSymbol(StringRef Name) {
+  if (SILFullDemangle)
+    return demangleSymbolAsString(Name);
+  return demangleSymbolAsString(Name,
+                    Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+}
+
 struct ID {
   enum ID_Kind {
     SILBasicBlock, SILUndef, SSAValue
@@ -612,14 +623,23 @@ public:
 
     // Print inlined-at location, if any.
     if (DS) {
+      SILFunction *InlinedF = DS->getInlinedFunction();
       for (auto *CS : reversed(DS->flattenedInlineTree())) {
-        *this << ": perf_inlined_at ";
-        auto CallSite = CS->Loc;//DS->InlinedCallSite->Loc;
+        *this << ": ";
+        if (InlinedF) {
+          *this << demangleSymbol(InlinedF->getName());
+        } else {
+          *this << '?';
+        }
+        *this << " perf_inlined_at ";
+        auto CallSite = CS->Loc;
         if (!CallSite.isNull())
           CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
         else
           *this << "?";
+
+        InlinedF = CS->getInlinedFunction();
       }
     }
   }
@@ -627,7 +647,7 @@ public:
   void print(SILValue V) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(V))
       *this << "  // function_ref "
-            << demangleSymbolAsString(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getReferencedFunction()->getName())
             << "\n";
 
     *this << "  ";
@@ -1570,7 +1590,7 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
                         bool SortedSIL) const {
-  OS << "// " << demangleSymbolAsString(getName()) << '\n';
+  OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
 
@@ -1665,7 +1685,7 @@ void SILFunction::printName(raw_ostream &OS) const {
 
 /// Pretty-print a global variable to the designated stream.
 void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
-  OS << "// " << demangleSymbolAsString(getName()) << '\n';
+  OS << "// " << demangleSymbol(getName()) << '\n';
   
   OS << "sil_global ";
   printLinkage(OS, getLinkage(), isDefinition());
@@ -1912,7 +1932,7 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "  ";
     entry.first.print(OS);
     OS << ": " << entry.second->getName()
-       << "\t// " << demangleSymbolAsString(entry.second->getName()) << "\n";
+       << "\t// " << demangleSymbol(entry.second->getName()) << "\n";
   }
   OS << "}\n\n";
 }
@@ -1951,7 +1971,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       if (methodWitness.Witness) {
         methodWitness.Witness->printName(OS);
         OS << "\t// "
-           << demangleSymbolAsString(methodWitness.Witness->getName());
+           << demangleSymbol(methodWitness.Witness->getName());
       } else {
         OS << "nil";
       }
@@ -2030,7 +2050,7 @@ void SILDefaultWitnessTable::dump() const {
 void SILCoverageMap::print(llvm::raw_ostream &OS, bool ShouldSort,
                            bool Verbose) const {
   OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
-     << " " << getHash() << " {\t// " << demangleSymbolAsString(getName())
+     << " " << getHash() << " {\t// " << demangleSymbol(getName())
      << "\n";
   if (ShouldSort)
     std::sort(MappedRegions, MappedRegions + NumMappedRegions,

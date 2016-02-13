@@ -532,7 +532,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     // FIXME: shouldn't this just be
     // ctor->getDeclContext()->getDeclaredInterfaceType()?
-    if (ctor->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+    if (ctor->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
       funcTy = ctor->getDeclContext()->getProtocolSelf()->getDeclaredType();
     } else {
       funcTy = ctor->getExtensionType()->getAnyNominal()

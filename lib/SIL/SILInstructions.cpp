@@ -56,7 +56,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation *Loc, SILType elementType,
                                SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
                      elementType.getAddressType()),
-      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+      VarInfo(Var, getTrailingObjects<char>()) {}
 
 AllocStackInst *AllocStackInst::create(SILDebugLocation *Loc,
                                        SILType elementType, SILFunction &F,
@@ -82,7 +82,7 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation *Loc, SILType ElementType,
     : AllocationInst(ValueKind::AllocBoxInst, Loc,
                      SILType::getPrimitiveObjectType(
                        SILBoxType::get(ElementType.getSwiftRValueType()))),
-      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+      VarInfo(Var, getTrailingObjects<char>()) {}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation *Loc, SILType ElementType,
                                    SILFunction &F, SILDebugVariable Var) {
@@ -99,7 +99,7 @@ VarDecl *AllocBoxInst::getDecl() const {
 DebugValueInst::DebugValueInst(SILDebugLocation *DebugLoc, SILValue Operand,
                                SILDebugVariable Var)
     : UnaryInstructionBase(DebugLoc, Operand),
-      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+      VarInfo(Var, getTrailingObjects<char>()) {}
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation *DebugLoc,
                                        SILValue Operand, SILModule &M,
@@ -111,7 +111,7 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation *DebugLoc,
 DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation *DebugLoc,
                                        SILValue Operand, SILDebugVariable Var)
     : UnaryInstructionBase(DebugLoc, Operand),
-      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+      VarInfo(Var, getTrailingObjects<char>()) {}
 
 DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation *DebugLoc,
                                                SILValue Operand, SILModule &M,
@@ -321,8 +321,8 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation *Loc, SILType Ty,
                                        const llvm::APInt &Value)
     : LiteralInst(ValueKind::IntegerLiteralInst, Loc, Ty),
       numBits(Value.getBitWidth()) {
-  memcpy(this + 1, Value.getRawData(),
-         Value.getNumWords() * sizeof(llvm::integerPart));
+  std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
+                            getTrailingObjects<llvm::integerPart>());
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation *Loc,
@@ -358,17 +358,16 @@ IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return APInt(numBits,
-               {reinterpret_cast<const llvm::integerPart *>(this + 1),
-                 getWordsForBitWidth(numBits)});
+  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+                         getWordsForBitWidth(numBits)});
 }
 
 FloatLiteralInst::FloatLiteralInst(SILDebugLocation *Loc, SILType Ty,
                                    const APInt &Bits)
     : LiteralInst(ValueKind::FloatLiteralInst, Loc, Ty),
       numBits(Bits.getBitWidth()) {
-  memcpy(this + 1, Bits.getRawData(),
-         Bits.getNumWords() * sizeof(llvm::integerPart));
+        std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
+                                  getTrailingObjects<llvm::integerPart>());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation *Loc, SILType Ty,
@@ -398,9 +397,8 @@ FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
 }
 
 APInt FloatLiteralInst::getBits() const {
-  return APInt(numBits,
-               {reinterpret_cast<const llvm::integerPart *>(this + 1),
-                 getWordsForBitWidth(numBits)});
+  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+                         getWordsForBitWidth(numBits)});
 }
 
 APFloat FloatLiteralInst::getValue() const {
@@ -412,7 +410,7 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation *Loc, StringRef Text,
                                      Encoding encoding, SILType Ty)
     : LiteralInst(ValueKind::StringLiteralInst, Loc, Ty), Length(Text.size()),
       TheEncoding(encoding) {
-  memcpy(this + 1, Text.data(), Text.size());
+  memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
 }
 
 StringLiteralInst *StringLiteralInst::create(SILDebugLocation *Loc,
@@ -1258,19 +1256,15 @@ InitExistentialMetatypeInst::InitExistentialMetatypeInst(
     ArrayRef<ProtocolConformanceRef> conformances)
     : UnaryInstructionBase(Loc, metatype, existentialMetatypeType),
       NumConformances(conformances.size()) {
-  if (conformances.empty())
-    return;
-  auto offset = reinterpret_cast<ProtocolConformanceRef*>(this + 1);
-  memcpy(offset, &conformances[0],
-         conformances.size() * sizeof(ProtocolConformanceRef));
+  std::uninitialized_copy(conformances.begin(), conformances.end(),
+                          getTrailingObjects<ProtocolConformanceRef>());
 }
 
 InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
     SILDebugLocation *Loc, SILType existentialMetatypeType, SILValue metatype,
     ArrayRef<ProtocolConformanceRef> conformances, SILFunction *F) {
   SILModule &M = F->getModule();
-  unsigned size = sizeof(InitExistentialMetatypeInst);
-  size += conformances.size() * sizeof(ProtocolConformanceRef);
+  unsigned size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
 
   void *buffer = M.allocateInst(size, alignof(InitExistentialMetatypeInst));
   for (ProtocolConformanceRef conformance : conformances)
@@ -1282,9 +1276,5 @@ InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
 
 ArrayRef<ProtocolConformanceRef>
 InitExistentialMetatypeInst::getConformances() const {
-  // The first conformance is going to be at *this[1];
-  auto *FirstConformance =
-    reinterpret_cast<ProtocolConformanceRef const *>(this + 1);
-  // Construct the protocol conformance list from the range of our conformances.
-  return ArrayRef<ProtocolConformanceRef>(FirstConformance, NumConformances);
+  return {getTrailingObjects<ProtocolConformanceRef>(), NumConformances};
 }

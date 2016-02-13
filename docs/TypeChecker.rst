@@ -650,7 +650,7 @@ Comparing Solutions
 The solver explores a potentially large solution space, and it is
 possible that it will find multiple solutions to the constraint system
 as given. Such cases are not necessarily ambiguities, because the
-solver can then compare the solutions to to determine whether one of
+solver can then compare the solutions to determine whether one of
 the solutions is better than all of the others. To do so, it computes
 a "score" for each solution based on a number of factors:
 

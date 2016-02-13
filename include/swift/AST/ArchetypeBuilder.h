@@ -431,6 +431,10 @@ class ArchetypeBuilder::PotentialArchetype {
   /// the concrete type.
   unsigned RecursiveConcreteType : 1;
 
+  /// Whether we have detected recursion during the substitution of
+  /// the superclass type.
+  unsigned RecursiveSuperclassType : 1;
+
   /// Whether we have renamed this (nested) type due to typo correction.
   unsigned Renamed : 1;
 
@@ -442,7 +446,8 @@ class ArchetypeBuilder::PotentialArchetype {
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
     : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
       IsRecursive(false), Invalid(false), SubstitutingConcreteType(false),
-      RecursiveConcreteType(false), Renamed(false)
+      RecursiveConcreteType(false), RecursiveSuperclassType(false),
+      Renamed(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -453,7 +458,7 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
       Representative(this), IsRecursive(false), Invalid(false),
       SubstitutingConcreteType(false), RecursiveConcreteType(false),
-      Renamed(false)
+      RecursiveSuperclassType(false), Renamed(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -466,7 +471,8 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
       Invalid(false), SubstitutingConcreteType(false),
-      RecursiveConcreteType(false), Renamed(false)
+      RecursiveConcreteType(false), RecursiveSuperclassType(false),
+      Renamed(false)
   {
     EquivalenceClass.push_back(this);
   }

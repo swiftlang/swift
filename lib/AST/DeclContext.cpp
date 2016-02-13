@@ -39,7 +39,7 @@ ASTContext &DeclContext::getASTContext() const {
 }
 
 NominalTypeDecl *
-DeclContext::isNominalTypeOrNominalTypeExtensionContext() const {
+DeclContext::getAsNominalTypeOrNominalTypeExtensionContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
@@ -73,31 +73,31 @@ DeclContext::isNominalTypeOrNominalTypeExtensionContext() const {
   }
 }
 
-ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
+ClassDecl *DeclContext::getAsClassOrClassExtensionContext() const {
   return dyn_cast_or_null<ClassDecl>(
-           isNominalTypeOrNominalTypeExtensionContext());
+           getAsNominalTypeOrNominalTypeExtensionContext());
 }
 
-EnumDecl *DeclContext::isEnumOrEnumExtensionContext() const {
+EnumDecl *DeclContext::getAsEnumOrEnumExtensionContext() const {
   return dyn_cast_or_null<EnumDecl>(
-           isNominalTypeOrNominalTypeExtensionContext());
+           getAsNominalTypeOrNominalTypeExtensionContext());
 }
 
-ProtocolDecl *DeclContext::isProtocolOrProtocolExtensionContext() const {
+ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
   return dyn_cast_or_null<ProtocolDecl>(
-           isNominalTypeOrNominalTypeExtensionContext());
+           getAsNominalTypeOrNominalTypeExtensionContext());
 }
 
-ProtocolDecl *DeclContext::isProtocolExtensionContext() const {
+ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
   if (getContextKind() != DeclContextKind::ExtensionDecl)
     return nullptr;
 
   return dyn_cast_or_null<ProtocolDecl>(
-           isNominalTypeOrNominalTypeExtensionContext());
+           getAsNominalTypeOrNominalTypeExtensionContext());
 }
 
 GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
-  assert(isProtocolOrProtocolExtensionContext() && "not a protocol");
+  assert(getAsProtocolOrProtocolExtensionContext() && "not a protocol");
   return getGenericParamsOfContext()->getParams().front();
 }
 
@@ -176,7 +176,7 @@ Type DeclContext::getDeclaredTypeInContext() const {
 
 Type DeclContext::getDeclaredInterfaceType() const {
   // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-  if (auto nominal = isNominalTypeOrNominalTypeExtensionContext())
+  if (auto nominal = getAsNominalTypeOrNominalTypeExtensionContext())
     return nominal->getDeclaredInterfaceType();
   return Type();
 }

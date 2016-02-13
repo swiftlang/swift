@@ -805,7 +805,7 @@ namespace {
           decl->getAttrs().hasAttribute<DynamicAttr>() ||
           !decl->getMaterializeForSetFunc() ||
           isa<StructDecl>(decl->getDeclContext()) ||
-          decl->getDeclContext()->isProtocolExtensionContext()) {
+          decl->getDeclContext()->getAsProtocolExtensionContext()) {
         return std::move(*this).LogicalPathComponent::getMaterialized(gen,
                                                         loc, base, accessKind);
       }

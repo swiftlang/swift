@@ -3,6 +3,6 @@ add_swift_library(swiftSwiftExperimental SHARED IS_STDLIB
   # filename.
   SwiftExperimental.swift
 
-  SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all -parse-stdlib
+  SWIFT_COMPILE_FLAGS ${STDLIB_SIL_SERIALIZE_ALL} -parse-stdlib
   INSTALL_IN_COMPONENT stdlib-experimental)
 

@@ -14,6 +14,7 @@
 #define SWIFT_LLVMPASSES_PASSESFWD_H
 
 namespace llvm {
+  class ModulePass;
   class FunctionPass;
   class ImmutablePass;
   class PassRegistry;
@@ -23,12 +24,14 @@ namespace llvm {
   void initializeSwiftARCOptPass(PassRegistry &);
   void initializeSwiftARCContractPass(PassRegistry &);
   void initializeSwiftStackPromotionPass(PassRegistry &);
+  void initializeInlineTreePrinterPass(PassRegistry &);
 }
 
 namespace swift {
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCContractPass();
   llvm::FunctionPass *createSwiftStackPromotionPass();
+  llvm::ModulePass *createInlineTreePrinterPass();
   llvm::ImmutablePass *createSwiftAAWrapperPass();
   llvm::ImmutablePass *createSwiftRCIdentityPass();
 } // end namespace swift

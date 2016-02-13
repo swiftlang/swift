@@ -13,7 +13,6 @@
 #ifndef SWIFT_SIL_MANGLE_H
 #define SWIFT_SIL_MANGLE_H
 
-#include "llvm/ADT/DenseMap.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/Decl.h"
@@ -21,6 +20,8 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILFunction.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
@@ -90,7 +91,7 @@ protected:
 /// specific specialization kind.
 template <typename SubType>
 class SpecializationMangler : public SpecializationManglerBase {
-  SubType *asImpl() { return reinterpret_cast<SubType *>(this); }
+  SubType *asImpl() { return static_cast<SubType *>(this); }
 public:
 
   ~SpecializationMangler() = default;

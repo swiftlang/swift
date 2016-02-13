@@ -12,9 +12,9 @@
 
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/SIL/Linker.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "Linker.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -281,7 +281,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
   if (context->isExtensionContext())
     return SILFunction::NotRelevant;
 
-  auto *classType = context->isClassOrClassExtensionContext();
+  auto *classType = context->getAsClassOrClassExtensionContext();
   if (!classType || classType->isFinal())
     return SILFunction::NotRelevant;
 
