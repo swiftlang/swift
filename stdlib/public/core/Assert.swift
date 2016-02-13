@@ -35,7 +35,7 @@ public func assert(
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _assertionFailed("assertion failed", message(), file, line,
         flags: _fatalErrorFlags())
     }
@@ -66,7 +66,7 @@ public func require(
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _assertionFailed("precondition failed", message(), file, line,
         flags: _fatalErrorFlags())
     }
@@ -161,7 +161,7 @@ public func _require(
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _fatalErrorMessage("fatal error", message, file, line,
         flags: _fatalErrorFlags())
     }
@@ -174,10 +174,9 @@ public func _require(
 @_transparent @noreturn
 public func _requirementFailure(
   message: StaticString = StaticString(),
-  file: StaticString = #file, line: UInt = #line) {
-
-  _require(false, message, file:file, line: line)
-
+  file: StaticString = #file, line: UInt = #line
+) {
+  _require(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }
 
@@ -191,7 +190,7 @@ public func _overflowChecked<T>(
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
-    if _branchHint(error, false) {
+    if _branchHint(error, expected: false) {
       _fatalErrorMessage("fatal error", "Overflow/underflow", file, line,
         flags: _fatalErrorFlags())
     }
@@ -216,7 +215,7 @@ public func _stdlibAssert(
 ) {
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
+    if !_branchHint(condition(), expected: true) {
       _fatalErrorMessage("fatal error", message, file, line,
         flags: _fatalErrorFlags())
     }
@@ -245,7 +244,7 @@ public func _sanityCheck(
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), true) {
+  if !_branchHint(condition(), expected: true) {
     _fatalErrorMessage("fatal error", message, file, line,
       flags: _fatalErrorFlags())
   }

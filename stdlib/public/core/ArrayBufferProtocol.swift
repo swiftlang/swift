@@ -44,8 +44,9 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
   @warn_unused_result
-  mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-    -> _ContiguousArrayBuffer<Element>?
+  mutating func requestUniqueMutableBackingBuffer(
+    minimumCapacity minimumCapacity: Int
+  ) -> _ContiguousArrayBuffer<Element>?
 
   /// Returns true iff this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.

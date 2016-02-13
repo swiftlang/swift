@@ -723,7 +723,7 @@ ERROR(string_index_not_integer,none,
       (Type))
 NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
-     "str.startIndex.advancedBy(n), or a projection like str.utf8", ())
+     "str.startIndex.advanced(by: n), or a projection like str.utf8", ())
 
 ERROR(invalid_c_function_pointer_conversion_expr,none,
       "a C function pointer can only be formed from a reference to a 'func' or "

@@ -22,7 +22,7 @@ struct S<A: Collection where A.Index == Int> : Collection {
   }
   
   func iterator() -> IndexingIterator<S> {
-    return IndexingIterator(self)
+    return IndexingIterator(_elements: self)
   }
   
   var base: A

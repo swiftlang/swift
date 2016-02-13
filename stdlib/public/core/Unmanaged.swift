@@ -35,7 +35,7 @@ public struct Unmanaged<Instance : AnyObject> {
       value != nil,
       "attempt to create an Unmanaged instance from a null pointer")
 
-    return Unmanaged(_private: unsafeBitCast(value, Instance.self))
+    return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 
   /// Create an unmanaged reference with an unbalanced retain.

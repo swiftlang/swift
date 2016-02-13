@@ -1252,19 +1252,19 @@ tests.test("Literals") {
   // Testing against the official Int types so as not to depend on
   // unimplemented stuff.
   let a: UInt8 = 0b1_0_11_0_111
-  expectEqual(unsafeBitCast(a, Swift.UInt8.self), 0b1_0_11_0_111)
+  expectEqual(unsafeBitCast(a, to: Swift.UInt8.self), 0b1_0_11_0_111)
 
   let b: Int16 = 183
-  expectEqual(unsafeBitCast(b, Swift.Int16.self), 0b1_0_11_0_111)
+  expectEqual(unsafeBitCast(b, to: Swift.Int16.self), 0b1_0_11_0_111)
 
   let c: Int16 = -183
-  expectEqual(unsafeBitCast(c, Swift.Int16.self), -183)
+  expectEqual(unsafeBitCast(c, to: Swift.Int16.self), -183)
 
   let d: Int8 = 127
-  expectEqual(unsafeBitCast(d, Swift.Int8.self), 127)
+  expectEqual(unsafeBitCast(d, to: Swift.Int8.self), 127)
 
   let e: UInt8 = 255
-  expectEqual(unsafeBitCast(e, Swift.UInt8.self), 255)
+  expectEqual(unsafeBitCast(e, to: Swift.UInt8.self), 255)
 }
 
 tests.test("Signed Literal Trap") {

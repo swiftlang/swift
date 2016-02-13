@@ -23,13 +23,13 @@ public struct Character :
   // representations.  In the small representation, the unused bytes
   // are filled with 0xFF.
   //
-  // If the grapheme cluster can be represented as Small, it
+  // If the grapheme cluster can be represented as `.small`, it
   // should be represented as such.
   internal enum Representation {
     // A _StringBuffer whose first grapheme cluster is self.
     // NOTE: may be more than 1 Character long.
-    case Large(_StringBuffer._Storage)
-    case Small(Builtin.Int63)
+    case large(_StringBuffer._Storage)
+    case small(Builtin.Int63)
   }
 
   /// Construct a `Character` containing just the given `scalar`.
@@ -44,7 +44,7 @@ public struct Character :
 
     UTF8.encode(scalar, output: output)
     asInt |= (~0) << shift
-    _representation = .Small(Builtin.trunc_Int64_Int63(asInt._value))
+    _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
 
   @effects(readonly)
@@ -63,7 +63,8 @@ public struct Character :
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1) {
+    isASCII: Builtin.Int1
+  ) {
     self = Character(
       String(
         _builtinExtendedGraphemeClusterLiteral: start,
@@ -101,17 +102,17 @@ public struct Character :
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
     if _fastPath(
       count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
-      _representation = .Small(Builtin.trunc_Int64_Int63(initialUTF8._value))
+      _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
       if let native = s._core.nativeBuffer
               where native.start == UnsafeMutablePointer(s._core._baseAddress) {
-        _representation = .Large(native._storage)
+        _representation = .large(native._storage)
         return
       }
       var nativeString = ""
       nativeString.append(s)
-      _representation = .Large(nativeString._core.nativeBuffer!._storage)
+      _representation = .large(nativeString._core.nativeBuffer!._storage)
     }
   }
 
@@ -279,19 +280,19 @@ extension String {
   /// Construct an instance containing just the given `Character`.
   public init(_ c: Character) {
     switch c._representation {
-    case let .Small(_63bits):
+    case let .small(_63bits):
       let value = Character._smallValue(_63bits)
       let smallUTF8 = Character._SmallUTF8(value)
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
-    case let .Large(value):
+    case let .large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
       self = buf[buf.startIndex..<buf.startIndex.successor()]
     }
   }
 }
 
-/// .Small characters are stored in an Int63 with their UTF-8 representation,
+/// `.small` characters are stored in an Int63 with their UTF-8 representation,
 /// with any unused bytes set to 0xFF. ASCII characters will have all bytes set
 /// to 0xFF except for the lowest byte, which will store the ASCII value. Since
 /// 0x7FFFFFFFFFFFFF80 or greater is an invalid UTF-8 sequence, we know if a
@@ -307,7 +308,7 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
 @warn_unused_result
 public func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
-  case let (.Small(lbits), .Small(rbits)) where
+  case let (.small(lbits), .small(rbits)) where
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
     && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
     return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
@@ -321,7 +322,7 @@ public func ==(lhs: Character, rhs: Character) -> Bool {
 @warn_unused_result
 public func <(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
-  case let (.Small(lbits), .Small(rbits)) where
+  case let (.small(lbits), .small(rbits)) where
     // Note: This is consistent with Foundation but unicode incorrect.
     // See String._lessThanASCII.
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))

@@ -102,7 +102,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices =
           Array(
-            c.startIndex.advancedBy(numericCast(test.numberToRemove)) ..<
+            c.startIndex.advanced(by: numericCast(test.numberToRemove)) ..<
             c.endIndex
           )
         c.removeFirst(test.numberToRemove)
@@ -248,7 +248,7 @@ extension TestSuite {
         let survivingIndices =
           Array(
             c.startIndex ..<
-            c.endIndex.advancedBy(numericCast(-test.numberToRemove))
+            c.endIndex.advanced(by: numericCast(-test.numberToRemove))
           )
         c.removeLast(test.numberToRemove)
         expectEqualSequence(

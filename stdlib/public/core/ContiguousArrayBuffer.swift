@@ -34,6 +34,8 @@ internal final class _EmptyArrayStorage
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
+  // FIXME(ABI): remove 'Void' arguments here and elsewhere in this file, they
+  // are a workaround for an old compiler limitation.
   @warn_unused_result
   override func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
     return 0
@@ -49,7 +51,7 @@ internal final class _EmptyArrayStorage
 #endif
 
   @warn_unused_result
-  override func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
+  override func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     return false
   }
 
@@ -159,8 +161,8 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// safety; for example, the destructor has static knowledge that
   /// all of the elements can be destroyed as `Element`.
   @warn_unused_result
-  override func canStoreElementsOfDynamicType(
-    proposedElementType: Any.Type
+  override func canStoreElements(
+    ofDynamicType proposedElementType: Any.Type
   ) -> Bool {
 #if _runtime(_ObjC)
     return proposedElementType is Element.Type
@@ -191,8 +193,8 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// method, you must either initialize the `count` elements at the
   /// result's `.firstElementAddress` or set the result's `.count`
   /// to zero.
-  public init(count: Int, minimumCapacity: Int) {
-    let realMinimumCapacity = Swift.max(count, minimumCapacity)
+  public init(uninitializedCount: Int, minimumCapacity: Int) {
+    let realMinimumCapacity = Swift.max(uninitializedCount, minimumCapacity)
     if realMinimumCapacity == 0 {
       self = _ContiguousArrayBuffer<Element>()
     }
@@ -201,7 +203,8 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
         _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
         minimumCapacity: realMinimumCapacity)
 
-      _initStorageHeader(count, capacity: __bufferPointer.capacity)
+      _initStorageHeader(
+        count: uninitializedCount, capacity: __bufferPointer.capacity)
 
       _fixLifetime(__bufferPointer)
     }
@@ -219,7 +222,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     __bufferPointer = ManagedBufferPointer(
       _uncheckedUnsafeBufferObject: storage)
 
-    _initStorageHeader(count, capacity: count)
+    _initStorageHeader(count: count, capacity: count)
 
     _fixLifetime(__bufferPointer)
   }
@@ -232,7 +235,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Initialize the body part of our storage.
   ///
   /// - Warning: does not initialize elements
-  func _initStorageHeader(count: Int, capacity: Int) {
+  internal func _initStorageHeader(count count: Int, capacity: Int) {
 #if _runtime(_ObjC)
     let verbatim = _isBridgedVerbatimToObjectiveC(Element.self)
 #else
@@ -290,9 +293,9 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   @warn_unused_result
-  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-    -> _ContiguousArrayBuffer<Element>?
-  {
+  public mutating func requestUniqueMutableBackingBuffer(
+    minimumCapacity minimumCapacity: Int
+  ) -> _ContiguousArrayBuffer<Element>? {
     if _fastPath(isUniquelyReferenced() && capacity >= minimumCapacity) {
       return self
     }
@@ -462,8 +465,8 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   
   /// Return true iff we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
-  func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
-    return _storage.canStoreElementsOfDynamicType(proposedElementType)
+  func canStoreElements(ofDynamicType proposedElementType: Any.Type) -> Bool {
+    return _storage.canStoreElements(ofDynamicType: proposedElementType)
   }
 
   /// Return true if the buffer stores only elements of type `U`.
@@ -511,7 +514,7 @@ public func += <
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
-      count: newCount,
+      uninitializedCount: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
     newLHS.firstElementAddress.moveInitializeFrom(
@@ -604,9 +607,8 @@ internal func _copyCollectionToNativeArrayBuffer<
   }
 
   let result = _ContiguousArrayBuffer<C.Iterator.Element>(
-    count: numericCast(count),
-    minimumCapacity: 0
-  )
+    uninitializedCount: count,
+    minimumCapacity: 0)
 
   var p = result.firstElementAddress
   var i = source.startIndex
@@ -637,8 +639,9 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     if initialCapacity == 0 {
       result = _ContiguousArrayBuffer()
     } else {
-      result = _ContiguousArrayBuffer(count: initialCapacity,
-                                      minimumCapacity: 0)
+      result = _ContiguousArrayBuffer(
+        uninitializedCount: initialCapacity,
+        minimumCapacity: 0)
     }
 
     p = result.firstElementAddress
@@ -651,8 +654,8 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     if remainingCapacity == 0 {
       // Reallocate.
       let newCapacity = max(_growArrayCapacity(result.capacity), 1)
-      var newResult = _ContiguousArrayBuffer<Element>(count: newCapacity,
-                                                      minimumCapacity: 0)
+      var newResult = _ContiguousArrayBuffer<Element>(
+        uninitializedCount: newCapacity, minimumCapacity: 0)
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
       newResult.firstElementAddress.moveInitializeFrom(

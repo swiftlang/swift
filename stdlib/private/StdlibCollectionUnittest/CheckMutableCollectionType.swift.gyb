@@ -142,11 +142,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+      index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+        index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -157,11 +157,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+      index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+        index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -459,11 +459,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+      index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+        index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -474,11 +474,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+      index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+        index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }

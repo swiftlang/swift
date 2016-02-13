@@ -50,7 +50,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
   ) -> Observation {
     let nsd = raceData.nsd
     let v: AnyObject? = nsd.object(forKey: key)
-    return Observation(unsafeBitCast(v, UInt.self))
+    return Observation(unsafeBitCast(v, to: UInt.self))
   }
 
   func evaluateObservations(
@@ -90,10 +90,10 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
     let objcPairs = NSMutableArray()
     slurpFastEnumerationOfDictionaryFromObjCImpl(nsd, nsd, objcPairs)
     return Observation(
-      unsafeBitCast(objcPairs[0], UInt.self),
-      unsafeBitCast(objcPairs[1], UInt.self),
-      unsafeBitCast(objcPairs[2], UInt.self),
-      unsafeBitCast(objcPairs[3], UInt.self))
+      unsafeBitCast(objcPairs[0], to: UInt.self),
+      unsafeBitCast(objcPairs[1], to: UInt.self),
+      unsafeBitCast(objcPairs[2], to: UInt.self),
+      unsafeBitCast(objcPairs[3], to: UInt.self))
   }
 
   func evaluateObservations(

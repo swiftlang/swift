@@ -1755,7 +1755,7 @@ public func checkComparable<T : Comparable>(
 /// Test that the elements of `instances` satisfy the semantic
 /// requirements of `Strideable`, using `advanceOracle` and
 /// 'distanceOracle' to generate expectations about the results of
-/// `advancedBy` and `distanceTo` from pairs of positions in
+/// `advanced(by:)` and `distance(to:)` from pairs of positions in
 /// `instances` and `strides`.
 ///
 /// - Note: `oracle` is also checked for conformance to the
@@ -1783,16 +1783,16 @@ public func checkStrideable<
   
   for i in instances.indices {
     let x = instances[i]
-    expectEqual(x, x.advancedBy(0))
+    expectEqual(x, x.advanced(by: 0))
     
     for j in strides.indices {
       let y = strides[j]
-      expectEqual(advanceOracle(i, j), x.advancedBy(y))
+      expectEqual(advanceOracle(i, j), x.advanced(by: y))
     }
 
     for j in instances.indices {
       let y = instances[j]
-      expectEqual(distanceOracle(i, j), x.distanceTo(y))
+      expectEqual(distanceOracle(i, j), x.distance(to: y))
     }
   }
 }
@@ -1835,12 +1835,12 @@ internal func _checkIncrementalAdvance<
   ${TRACE}
 ) {
   for i in instances {
-    let d = sign > 0 ? i.distanceTo(limit) : -limit.distanceTo(i)
+    let d = sign > 0 ? i.distance(to: limit) : -limit.distance(to: i)
 
     var offset: Instances.Iterator.Element.Distance = 0
     for _ in 0...(d * sign).toIntMax() {
-      let j = i.advancedBy(offset)
-      let k = i.advancedBy(offset + sign, limit: limit)
+      let j = i.advanced(by: offset)
+      let k = i.advanced(by: offset + sign, limit: limit)
       let jAtLimit = offset == d
       if jAtLimit {
         expectEqual(limit, j, ${trace})
@@ -1912,7 +1912,7 @@ public func checkBidirectionalIndex<
 /// Test that the elements of `instances` satisfy the semantic
 /// requirements of `RandomAccessIndex`, using 
 /// `advanceOracle` and 'distanceOracle' to generate expectations
-/// about the results of `advancedBy` and `distanceTo` from pairs of
+/// about the results of `advanced(by:)` and `distance(to:)` from pairs of
 /// positions in `instances` and `distances`.
 ///
 /// - Preconditions:
@@ -2073,8 +2073,8 @@ public func check${traversal}Collection<
       resiliencyChecks: resiliencyChecks, sameValue: sameValue)
   }
 
-  // advances up to 1 positions without passing endIndex.  Don't use
-  // advancedBy(n) to do this because it's under test here.
+  // Advances up to 1 positions without passing endIndex.  Don't use
+  // advanced(by: n) to do this because it's under test here.
   let next = { $0 == collection.endIndex ? $0 : $0.successor() }
 
   // advances up to 5 positions without passing endIndex.  Picking a
@@ -2290,7 +2290,7 @@ public func checkSliceableWithBidirectionalIndex<
 % end
 
 public func nthIndex<C: Collection>(x: C, _ n: Int) -> C.Index {
-  return x.startIndex.advancedBy(numericCast(n))
+  return x.startIndex.advanced(by: numericCast(n))
 }
 
 public func nth<C: Collection>(x: C, _ n: Int) -> C.Iterator.Element {
@@ -2411,9 +2411,9 @@ public func expectEqualsUnordered<
     -> ExpectedComparisonResult
 ) {
   let x: [Expected.Iterator.Element] =
-    expected.sorted(compose(compare, { $0.isLT() }))
+    expected.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
-    actual.sorted(compose(compare, { $0.isLT() }))
+    actual.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
 }
@@ -2477,8 +2477,11 @@ public func expectEqualsUnordered<
     return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
   }
 
-  let x: [(T, T)] = Array(expected).sorted(comparePairLess)
-  let y: [(T, T)] = Array(actual.map{($0.0, $0.1)}).sorted(comparePairLess)
+  let x: [(T, T)] =
+    expected.sorted(isOrderedBefore: comparePairLess)
+  let y: [(T, T)] =
+    actual.map { ($0.0, $0.1) }
+      .sorted(isOrderedBefore: comparePairLess)
 
   func comparePairEquals(lhs: (T, T), rhs: (key: T, value: T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1

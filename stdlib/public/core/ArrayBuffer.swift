@@ -38,7 +38,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Requires: The elements actually have dynamic type `U`, and `U`
   ///   is a class or `@objc` existential.
   @warn_unused_result
-  func castToBufferOf<U>(_: U.Type) -> _ArrayBuffer<U> {
+  internal func cast<U>(toBufferOf _: U.Type) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
     return _ArrayBuffer<U>(storage: _storage)
@@ -53,8 +53,8 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Requires: `U` is a class or `@objc` existential derived from `Element`.
   @warn_unused_result
-  func downcastToBufferWithDeferredTypeCheckOf<U>(
-    _: U.Type
+  internal func downcast<U>(
+    toBufferWithDeferredTypeCheckOf _: U.Type
   ) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
@@ -130,9 +130,9 @@ extension _ArrayBuffer {
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns `nil`.
   @warn_unused_result
-  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-    -> NativeBuffer?
-  {
+  public mutating func requestUniqueMutableBackingBuffer(
+    minimumCapacity minimumCapacity: Int
+  ) -> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
       let b = _native
       if _fastPath(b.capacity >= minimumCapacity) {
@@ -170,7 +170,7 @@ extension _ArrayBuffer {
   @inline(never)
   internal func _typeCheckSlowPath(index: Int) {
     if _fastPath(_isNative) {
-      let element: AnyObject = castToBufferOf(AnyObject.self)._native[index]
+      let element: AnyObject = cast(toBufferOf: AnyObject.self)._native[index]
       _require(
         element is Element,
         "Down-casted Array element failed to match the target type")
@@ -254,7 +254,7 @@ extension _ArrayBuffer {
       // No contiguous storage found; we must allocate
       let boundsCount = bounds.count
       let result = _ContiguousArrayBuffer<Element>(
-        count: boundsCount, minimumCapacity: 0)
+        uninitializedCount: boundsCount, minimumCapacity: 0)
 
       // Tell Cocoa to copy the objects into our storage
       cocoa.buffer.getObjects(
@@ -344,7 +344,7 @@ extension _ArrayBuffer {
     if _fastPath(wasNativeTypeChecked) {
       return _nativeTypeChecked[i]
     }
-    return unsafeBitCast(_getElementSlowPath(i), Element.self)
+    return unsafeBitCast(_getElementSlowPath(i), to: Element.self)
   }
 
   @inline(never)
@@ -360,7 +360,7 @@ extension _ArrayBuffer {
       // have to do it here.
       _native._checkValidSubscript(i)
       
-      element = castToBufferOf(AnyObject.self)._native[i]
+      element = cast(toBufferOf: AnyObject.self)._native[i]
       _require(
         element is Element,
         "Down-casted Array element failed to match the target type")

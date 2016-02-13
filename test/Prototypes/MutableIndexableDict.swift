@@ -414,11 +414,6 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
   var _buffer: Buffer {
     return _owner.buffer
   }
-
-  // Satisfying Sequence
-  func iterator() -> IndexingIterator<_Self> {
-    return IndexingIterator(self)
-  }
 }
 
 func == <K: Equatable, V: Equatable>(

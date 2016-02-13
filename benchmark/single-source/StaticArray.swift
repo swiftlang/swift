@@ -62,7 +62,6 @@ struct StaticArray<T : StaticArrayProtocol> : StaticArrayProtocol, MutableCollec
   }
 
   typealias Iterator = IndexingIterator<StaticArray>
-  func iterator() -> Iterator { return Iterator(self) }
 }
 
 typealias SA2Int   = StaticArray<A0<Int>>

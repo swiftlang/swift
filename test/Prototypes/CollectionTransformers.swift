@@ -54,11 +54,11 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
 ) -> [Range<Index>] {
   let startIndex = range.startIndex
   let endIndex = range.endIndex
-  let length = startIndex.distanceTo(endIndex).toIntMax()
+  let length = startIndex.distance(to: endIndex).toIntMax()
   if length < 2 {
     return [ range ]
   }
-  let middle = startIndex.advancedBy(Index.Distance(length / 2))
+  let middle = startIndex.advanced(by: Index.Distance(length / 2))
   return [startIndex ..< middle, middle ..< endIndex]
 }
 
@@ -370,7 +370,7 @@ final class _ForkJoinWorkDeque<T> {
     return _dequeMutex.withLock {
       let result = _deque.first
       if _deque.count > 0 {
-        _deque.removeAt(0)
+        _deque.remove(at: 0)
       }
       return result
     }
@@ -676,9 +676,9 @@ final public class ForkJoinPool {
           _workDequesMutex.withLock {
             let i = _runningThreads.indexOf { $0 === thread }!
             ForkJoinPool._threadRegistry[thread._tid!] = nil
-            _runningThreads.removeAt(i)
-            _submissionQueues.removeAt(i)
-            _workDeques.removeAt(i)
+            _runningThreads.remove(at: i)
+            _submissionQueues.remove(at: i)
+            _workDeques.remove(at: i)
           }
         }
       }

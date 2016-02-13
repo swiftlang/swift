@@ -122,14 +122,14 @@ ${ArrayTy}Traps.test("${'insert(_:at:)/%s' % index}")
 %   end
 
 %   for index in -1, 1, 2:
-${ArrayTy}Traps.test("${'removeAt(_:)/%s' % index}")
+${ArrayTy}Traps.test("${'remove(at:)/%s' % index}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = [42]
   expectCrashLater()
-  a.removeAt(${index})
+  a.remove(at: ${index})
 }
 %   end
 % end

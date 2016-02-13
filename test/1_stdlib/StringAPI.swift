@@ -318,7 +318,7 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    acceptor[donor.startIndex.advancedBy(1)..<donor.startIndex.advancedBy(5)])
+    acceptor[donor.startIndex.advanced(by: 1)..<donor.startIndex.advanced(by: 5)])
 }
 
 var CStringTests = TestSuite("CStringTests")

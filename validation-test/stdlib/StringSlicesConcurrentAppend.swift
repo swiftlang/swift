@@ -20,7 +20,7 @@ var StringTestSuite = TestSuite("String")
 
 extension String {
   var bufferID: UInt {
-    return unsafeBitCast(_core._owner, UInt.self)
+    return unsafeBitCast(_core._owner, to: UInt.self)
   }
   var capacityInBytes: Int {
     return _core.nativeBuffer!.capacity

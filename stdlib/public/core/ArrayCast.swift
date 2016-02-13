@@ -21,18 +21,18 @@
 // rdar://problem/18881196
 
 internal enum _ValueOrReference {
-  case Reference, Value
+  case reference, value
 
   internal init<T>(_: T.Type) {
-    self = _isClassOrObjCExistential(T.self) ? .Reference : .Value
+    self = _isClassOrObjCExistential(T.self) ? .reference : .value
   }
 }
 
 internal enum _BridgeStyle {
-  case Verbatim, Explicit
+  case verbatim, explicit
 
   internal init<T>(_: T.Type) {
-   self = _isBridgedVerbatimToObjectiveC(T.self) ? .Verbatim : .Explicit
+   self = _isBridgedVerbatimToObjectiveC(T.self) ? .verbatim : .explicit
   }
 }
 
@@ -50,31 +50,31 @@ public func _arrayForceCast<SourceElement, TargetElement>(
   switch (
     _ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)
   ) {
-  case (.Reference, .Verbatim):
+  case (.reference, .verbatim):
     let native = source._buffer.requestNativeBuffer()
     
     if _fastPath(native != nil) {
       if _fastPath(native!.storesOnlyElementsOfType(TargetElement.self)) {
         // A native buffer that is known to store only elements of the
         // TargetElement can be used directly
-        return Array(source._buffer.castToBufferOf(TargetElement.self))
+        return Array(source._buffer.cast(toBufferOf: TargetElement.self))
       }
       // Other native buffers must use deferred element type checking
       return Array(
-        source._buffer.downcastToBufferWithDeferredTypeCheckOf(
-          TargetElement.self))
+        source._buffer.downcast(
+          toBufferWithDeferredTypeCheckOf: TargetElement.self))
     }
     // All non-native buffers use deferred element typechecking
     return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
     
-  case (.Reference, .Explicit):
+  case (.reference, .explicit):
     let result: [TargetElement]? = _arrayConditionalBridgeElements(source)
     _require(result != nil, "array cannot be bridged from Objective-C")
     return result!
     
-  case (.Value, .Verbatim):
+  case (.value, .verbatim):
     var buf = _ContiguousArrayBuffer<TargetElement>(
-      count: source.count, minimumCapacity: 0)
+      uninitializedCount: source.count, minimumCapacity: 0)
     
     let _: Void = buf.withUnsafeMutableBufferPointer {
       var p = $0.baseAddress
@@ -83,13 +83,13 @@ public func _arrayForceCast<SourceElement, TargetElement>(
         _require(
           bridged != nil, "array element cannot be bridged to Objective-C")
         // FIXME: should be an unsafeDowncast.
-        p.initializePointee(unsafeBitCast(bridged!, TargetElement.self))
+        p.initializePointee(unsafeBitCast(bridged!, to: TargetElement.self))
         p += 1
       }
     }
     return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
     
-  case (.Value, .Explicit):
+  case (.value, .explicit):
     _sanityCheckFailure(
       "Force-casting between Arrays of value types not prevented at compile-time"
     )
@@ -118,7 +118,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
     
     if _fastPath(native != nil) {
       if native!.storesOnlyElementsOfType(TargetElement.self) {
-        return Array(a._buffer.castToBufferOf(TargetElement.self))
+        return Array(a._buffer.cast(toBufferOf: TargetElement.self))
       }
       return nil
     }
@@ -133,7 +133,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
         }
       }
     }
-    return Array(a._buffer.castToBufferOf(TargetElement.self))
+    return Array(a._buffer.cast(toBufferOf: TargetElement.self))
   }
   return []
 }
@@ -151,7 +151,7 @@ internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(TargetElement.self))
   
   let buf = _ContiguousArrayBuffer<TargetElement>(
-    count: source.count, minimumCapacity: 0)
+    uninitializedCount: source.count, minimumCapacity: 0)
   
   var p = buf.firstElementAddress
   
@@ -159,7 +159,7 @@ ElementwiseBridging:
   repeat {
     for object: SourceElement in source {
       let value = Swift._conditionallyBridgeFromObjectiveC(
-        unsafeBitCast(object, AnyObject.self), TargetElement.self)
+        unsafeBitCast(object, to: AnyObject.self), TargetElement.self)
       if _slowPath(value == nil) {
         break ElementwiseBridging
       }
@@ -187,12 +187,12 @@ public func _arrayConditionalCast<SourceElement, TargetElement>(
   source: [SourceElement]
 ) -> [TargetElement]? {
   switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
-  case (.Value, _): 
+  case (.value, _):
     _sanityCheckFailure(
       "Conditional cast from array of value types not prevented at compile-time")
-  case (.Reference, .Verbatim):
+  case (.reference, .verbatim):
     return _arrayConditionalDownCastElements(source)
-  case (.Reference, .Explicit):
+  case (.reference, .explicit):
     return _arrayConditionalBridgeElements(source)
   }
 }

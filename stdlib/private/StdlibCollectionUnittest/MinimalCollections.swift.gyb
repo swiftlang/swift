@@ -239,7 +239,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
     case RemoveAtIndex(let index):
-      result.removeAt(index)
+      result.remove(at: index)
 
       let invalidIndices = index..<result.endIndex
       result.replaceSubrange(
@@ -711,11 +711,11 @@ public struct ${DefaultedIndex}: ${StrictIndex} {
   }
 
 % if Traversal == 'RandomAccess':
-  public func distanceTo(n: ${DefaultedIndex}) -> Distance {
+  public func distance(to n: ${DefaultedIndex}) -> Distance {
     return n.base - base
   }
 
-  public func advancedBy(n: Distance) -> ${DefaultedIndex} {
+  public func advanced(by n: Distance) -> ${DefaultedIndex} {
     return ${DefaultedIndex}(base + n)
   }
 % end
@@ -774,12 +774,12 @@ public struct MinimalRandomAccessIndex : RandomAccessIndex {
       position: position - 1, startIndex: startIndex, endIndex: endIndex)
   }
 
-  public func distanceTo(other: MinimalRandomAccessIndex) -> Int {
+  public func distance(to other: MinimalRandomAccessIndex) -> Int {
     _expectCompatibleIndices(self, other)
     return other.position - position
   }
 
-  public func advancedBy(n: Int) -> MinimalRandomAccessIndex {
+  public func advanced(by n: Int) -> MinimalRandomAccessIndex {
     let newPosition = position + n
     expectLE(startIndex, newPosition)
     expectGE(
@@ -1026,11 +1026,11 @@ extension ${Protocol} where Index : _MinimalIndex {
 
   public subscript(i: ${Index}) -> Element {
     get {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       return base[i]
     }
     set {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       base[i] = newValue
     }
   }
@@ -1102,11 +1102,11 @@ public struct ${Self}<T> : RangeReplaceableCollection {
 
   public subscript(i: ${Index}) -> T {
     get {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       return elements[i.position]
     }
     set {
-      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
+      _expectCompatibleIndices(self.startIndex.advanced(by: i.position), i)
       elements[i.position] = newValue
     }
   }
@@ -1165,9 +1165,9 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     }
   }
 
-  public mutating func removeAt(i: ${Index}) -> T {
+  public mutating func remove(at i: ${Index}) -> T {
     _willMutate(.RemoveAtIndex(index: i._offset))
-    return elements.removeAt(i.position)
+    return elements.remove(at: i.position)
   }
 
   public mutating func removeLast() -> T {
@@ -1364,8 +1364,8 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       subRange.startIndex, rangeEnd: subRange.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
     base.replaceSubrange(subRange, with: newElements)
-    startIndex = base.startIndex.advancedBy(startOffset)
-    endIndex = base.startIndex.advancedBy(endOffset)
+    startIndex = base.startIndex.advanced(by: startOffset)
+    endIndex = base.startIndex.advanced(by: endOffset)
   }
 }
 

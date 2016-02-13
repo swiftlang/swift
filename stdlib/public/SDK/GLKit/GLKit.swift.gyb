@@ -59,7 +59,7 @@ def defineSubscript(Type, limit):
 extension GLKMatrix${size} {
   public typealias _Tuple = (${ ', '.join(['Float'] * (size * size)) })
   public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
+    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
   }
   % for i in xrange(0, size):
   %   for j in xrange(0, size):
@@ -75,7 +75,7 @@ extension GLKMatrix${size} {
 extension GLKVector${size} {
   public typealias _Tuple = (${ ', '.join(['Float'] * size) })
   public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
+    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
   }
 
   % for (names, minSize) in vectorElementNames:
@@ -94,7 +94,7 @@ extension GLKVector${size} {
 extension GLKQuaternion {
   public typealias _Tuple = (Float, Float, Float, Float)
   public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
+    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
   }
   
   public var v: GLKVector3 {

@@ -70,7 +70,8 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   @warn_unused_result
   public func min(
 %   if preds:
-    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
+    @noescape isOrderedBefore isOrderedBefore:
+      (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = iterator()
@@ -92,7 +93,8 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   @warn_unused_result
   public func max(
 %   if preds:
-    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
+    @noescape isOrderedBefore isOrderedBefore:
+      (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = iterator()

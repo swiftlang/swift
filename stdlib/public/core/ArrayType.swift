@@ -65,7 +65,7 @@ protocol _ArrayProtocol
   /// - Complexity: Worst case O(N).
   ///
   /// - Requires: `count > index`.
-  mutating func removeAt(index: Int) -> Iterator.Element
+  mutating func remove(at index: Int) -> Iterator.Element
 
   //===--- implementation detail  -----------------------------------------===//
 

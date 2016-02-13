@@ -48,7 +48,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
 
   /// Construct an instance that uniquely identifies the metatype `x`.
   public init(_ x: Any.Type) {
-    self._value = unsafeBitCast(x, Builtin.RawPointer.self)
+    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
 

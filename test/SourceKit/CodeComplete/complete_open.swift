@@ -7,7 +7,7 @@ func foo() {
 
 // RUN: %sourcekitd-test -req=complete.open -pos=4:5 %s -- %s | FileCheck %s
 // CHECK: key.results: [
-// CHECK:   key.name: "advancedBy
+// CHECK:   key.name: "advanced
 // ...
 // CHECK:   key.name: "bigEndian"
 // CHECK: ],
@@ -19,15 +19,15 @@ func foo() {
 // RUN:   == -req=complete.open -pos=4:5 %s -- %s \
 // RUN:   == -req=complete.close -pos=4:5 %s -- %s > %t.close
 // RUN: FileCheck -check-prefix=CLOSE %s < %t.close
-// CLOSE:   key.name: "advancedBy
-// CLOSE:   key.name: "advancedBy
+// CLOSE:   key.name: "advanced
+// CLOSE:   key.name: "advanced
 
 // RUN: %sourcekitd-test -req=complete.open -pos=4:5 %s -- %s \
 // RUN:   == -req=complete.open -pos=3:1 %s -- %s > %t.open2diff
 // RUN: FileCheck -check-prefix=OPEN2DIFF %s < %t.open2diff
-// OPEN2DIFF: key.name: "advancedBy
+// OPEN2DIFF: key.name: "advanced
 // OPEN2DIFF: key.name: "foo()
-// OPEN2DIFF-NOT: key.name: "advancedBy
+// OPEN2DIFF-NOT: key.name: "advanced
 
 // RUN: not %sourcekitd-test -req=complete.open -pos=4:5 %s -- %s \
 // RUN:   == -req=complete.open -pos=4:5 %s -- %s 2> %t.open2

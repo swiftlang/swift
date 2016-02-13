@@ -463,7 +463,7 @@ func _uint64ToString(
 @warn_unused_result
 func _rawPointerToString(value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
-    UInt64(unsafeBitCast(value, UInt.self)), radix: 16, uppercase: false)
+    UInt64(unsafeBitCast(value, to: UInt.self)), radix: 16, uppercase: false)
   for _ in 0..<(2 * sizeof(Builtin.RawPointer) - result.utf16.count) {
     result = "0" + result
   }

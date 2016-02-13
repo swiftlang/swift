@@ -524,7 +524,7 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   var collection = MinimalRandomAccessMutableCollection(
     elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
   var i = collection.startIndex
-  var j = i.advancedBy(5)
+  var j = i.advanced(by: 5)
   collection[i..<j].sort()
   expectEqualSequence(
     [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
@@ -660,7 +660,7 @@ CollectionTypeTests.test("indexOf/ContinueSearch") {
     let foundIndices = c._test_indicesOf(MinimalEquatableValue(1))
     expectEqualSequence(
       [ 0, 2, 4 ],
-      foundIndices.map { c.startIndex.distanceTo($0) })
+      foundIndices.map { c.startIndex.distance(to: $0) })
   }
 }
 
@@ -675,32 +675,32 @@ CollectionTypeTests.test("Collection/split/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// prefixThrough()
+// prefix(through:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("Collection/prefixThrough/dispatch") {
+CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.prefixThrough(1)
+  tester.prefix(through: 1)
   expectCustomizable(tester, tester.log.prefixThrough)
 }
 
 //===----------------------------------------------------------------------===//
-// prefixUpTo()
+// prefix(upTo:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("Collection/prefixUpTo/dispatch") {
+CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  tester.prefixUpTo(1)
+  tester.prefix(upTo: 1)
   expectCustomizable(tester, tester.log.prefixUpTo)
 }
 
 //===----------------------------------------------------------------------===//
-// suffixFrom()
+// suffix(from:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("Collection/suffixFrom/dispatch") {
+CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.suffixFrom(1)
+  tester.suffix(from: 1)
   expectCustomizable(tester, tester.log.suffixFrom)
 }
 

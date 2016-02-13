@@ -61,7 +61,7 @@ internal struct _CocoaArrayWrapper : Collection {
     
     return contiguousCount >= subRange.endIndex
     ? unsafeBitCast(
-      enumerationState.itemsPtr, UnsafeMutablePointer<AnyObject>.self
+      enumerationState.itemsPtr, to: UnsafeMutablePointer<AnyObject>.self
       ) + subRange.startIndex
     : nil
   }

@@ -47,7 +47,8 @@ func equalsUnordered<T : Comparable>(
   func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
     return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
   }
-  return lhs.sorted(comparePair).elementsEqual(rhs.sorted(comparePair)) {
+  return lhs.sorted(isOrderedBefore: comparePair)
+    .elementsEqual(rhs.sorted(isOrderedBefore: comparePair)) {
     (lhs: (T, T), rhs: (T, T)) -> Bool in
     lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
@@ -580,7 +581,7 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), NSDictionary.self)
+    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
 
   assert(isNativeNSDictionary(bridged))
 
@@ -591,7 +592,7 @@ func getBridgedEmptyNSDictionary() -> NSDictionary {
   let d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), NSDictionary.self)
+    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -805,7 +806,7 @@ func _checkArrayFastEnumerationImpl(
       (value: AnyObject) in
       actualContents.append(ExpectedArrayElement(
         value: convertValue(value),
-        valueIdentity: unsafeBitCast(value, UInt.self)))
+        valueIdentity: unsafeBitCast(value, to: UInt.self)))
     }
 
     useEnumerator(a, makeEnumerator(), sink)
@@ -937,7 +938,7 @@ func _checkSetFastEnumerationImpl(
       (value: AnyObject) in
       actualContents.append(ExpectedSetElement(
         value: convertMember(value),
-        valueIdentity: unsafeBitCast(value, UInt.self)))
+        valueIdentity: unsafeBitCast(value, to: UInt.self)))
     }
 
     useEnumerator(s, makeEnumerator(), sink)
@@ -1157,8 +1158,8 @@ func _checkDictionaryFastEnumerationImpl(
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),
         value: convertValue(value),
-        keyIdentity: unsafeBitCast(key, UInt.self),
-        valueIdentity: unsafeBitCast(value, UInt.self)))
+        keyIdentity: unsafeBitCast(key, to: UInt.self),
+        valueIdentity: unsafeBitCast(value, to: UInt.self)))
     }
 
     useEnumerator(d, makeEnumerator(), sink)

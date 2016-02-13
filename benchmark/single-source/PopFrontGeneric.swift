@@ -36,7 +36,7 @@ func _arrayReplace<B: _ArrayBufferProtocol, C: Collection
   let insertCount = numericCast(newValues.count) as Int
   let growth = insertCount - eraseCount
 
-  if target.requestUniqueMutableBackingBuffer(oldCount + growth) != nil {
+  if target.requestUniqueMutableBackingBuffer(minimumCapacity: oldCount + growth) != nil {
     target.replace(subRange: subRange, with: insertCount, elementsOf: newValues)
   }
   else {

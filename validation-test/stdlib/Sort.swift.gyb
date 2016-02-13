@@ -76,9 +76,6 @@ class OffsetCollection : MutableCollection {
     get { return data[i - startIndex] }
     set { data[i - startIndex] = newValue }
   }
-  func iterator() -> IndexingIterator<[Int]> {
-    return IndexingIterator<[Int]>(data)
-  }
   func toArray() -> [Int] {
     return data
   }
@@ -110,7 +107,11 @@ Algorithm.test("${t}/sorted/${name}") {
   var sortedAry2 = ${t}<Int>()
 
   // Similar test for sorting with predicate
-  sortedAry1 = ary.sorted(${comparePredicate})
+%       if comparePredicate:
+  sortedAry1 = ary.sorted(isOrderedBefore: ${comparePredicate})
+%       else:
+  sortedAry1 = ary.sorted()
+%       end
   expectSortedCollection(sortedAry1, ary)
 
   // Check that sorting works well on intervals

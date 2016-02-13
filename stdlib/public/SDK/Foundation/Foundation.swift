@@ -145,7 +145,7 @@ extension String : _ObjectiveCBridgeable {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
     // equivalent.)
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSString.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSString.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -462,7 +462,7 @@ extension Array : _ObjectiveCBridgeable {
     // and watchOS.
     self = Array(
       _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copy(), _NSArrayCore.self))
+        unsafeBitCast(_cocoaArray.copy(), to: _NSArrayCore.self))
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
@@ -475,7 +475,7 @@ extension Array : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSArray {
-    return unsafeBitCast(self._buffer._asCocoaArray(), NSArray.self)
+    return unsafeBitCast(self._buffer._asCocoaArray(), to: NSArray.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -487,7 +487,8 @@ extension Array : _ObjectiveCBridgeable {
       "array element type is not bridged to Objective-C")
 
     // If we have the appropriate native storage already, just adopt it.
-    if let native = Array._bridgeFromObjectiveCAdoptingNativeStorage(source) {
+    if let native =
+        Array._bridgeFromObjectiveCAdoptingNativeStorageOf(source) {
       result = native
       return
     }
@@ -549,7 +550,7 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(withZone: nil), _NSDictionary.self))
+        unsafeBitCast(_cocoaDictionary.copy(withZone: nil), to: _NSDictionary.self))
   }
 }
 
@@ -609,14 +610,14 @@ extension Dictionary : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSDictionary.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSDictionary.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     d: NSDictionary,
     inout result: Dictionary?
   ) {
-    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorage(
+    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
         d as AnyObject) {
       result = native
       return
@@ -625,7 +626,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d, _NSDictionary.self))
+        _cocoaDictionary: unsafeBitCast(d, to: _NSDictionary.self))
       return
     }
 
@@ -761,7 +762,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copy(withZone: nil), _NSSet.self))
+        unsafeBitCast(_cocoaSet.copy(withZone: nil), to: _NSSet.self))
   }
 }
 
@@ -868,19 +869,19 @@ extension Set : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSSet.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)
   }
 
   public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: Set?) {
     if let native =
-      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
+      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorageOf(s as AnyObject) {
 
       result = native
       return
     }
 
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      result = Set<Element>(_cocoaSet: unsafeBitCast(s, _NSSet.self))
+      result = Set<Element>(_cocoaSet: unsafeBitCast(s, to: _NSSet.self))
       return
     }
 
@@ -1064,7 +1065,7 @@ func _convertNSErrorToErrorProtocol(error: NSError?) -> ErrorProtocol {
 @_silgen_name("swift_convertErrorProtocolToNSError")
 public // COMPILER_INTRINSIC
 func _convertErrorProtocolToNSError(error: ErrorProtocol) -> NSError {
-  return unsafeDowncast(_bridgeErrorProtocolToNSError(error))
+  return unsafeDowncast(_bridgeErrorProtocolToNSError(error), to: NSError.self)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1312,7 +1313,7 @@ extension NSCoder {
     if let theClasses = classes {
       classesAsNSObjects =
         Set(IteratorSequence(NSFastEnumerationIterator(theClasses)).map {
-          unsafeBitCast($0, NSObject.self)
+          unsafeBitCast($0, to: NSObject.self)
         })
     }
     return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)

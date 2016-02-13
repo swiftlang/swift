@@ -71,13 +71,16 @@ struct _HeapBuffer<Value, Element> : Equatable {
 
   @warn_unused_result
   static func _valueOffset() -> Int {
-    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+    return _roundUp(
+      sizeof(_HeapObject.self),
+      toAlignment: alignof(Value.self))
   }
 
   @warn_unused_result
   static func _elementOffset() -> Int {
-    return _roundUpToAlignment(_valueOffset() + sizeof(Value.self),
-        alignof(Element.self))
+    return _roundUp(
+      _valueOffset() + sizeof(Value.self),
+      toAlignment: alignof(Element.self))
   }
 
   @warn_unused_result

@@ -47,7 +47,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   ) -> Observation {
     let nsa = raceData.nsa
     let v: AnyObject = nsa.object(at: 0)
-    return Observation(unsafeBitCast(v, UInt.self))
+    return Observation(unsafeBitCast(v, to: UInt.self))
   }
 
   func evaluateObservations(
@@ -86,10 +86,10 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
     let objcValues = NSMutableArray()
     slurpFastEnumerationOfArrayFromObjCImpl(nsa, nsa, objcValues)
     return Observation(
-      unsafeBitCast(objcValues[0], UInt.self),
-      unsafeBitCast(objcValues[1], UInt.self),
-      unsafeBitCast(objcValues[2], UInt.self),
-      unsafeBitCast(objcValues[3], UInt.self))
+      unsafeBitCast(objcValues[0], to: UInt.self),
+      unsafeBitCast(objcValues[1], to: UInt.self),
+      unsafeBitCast(objcValues[2], to: UInt.self),
+      unsafeBitCast(objcValues[3], to: UInt.self))
   }
 
   func evaluateObservations(

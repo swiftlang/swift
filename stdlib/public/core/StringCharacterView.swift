@@ -272,10 +272,10 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// - Complexity: Amortized O(1).
   public mutating func append(c: Character) {
     switch c._representation {
-    case .Small(let _63bits):
+    case .small(let _63bits):
       let bytes = Character._smallValue(_63bits)
       _core.appendContentsOf(Character._SmallUTF16(bytes))
-    case .Large(_):
+    case .large(_):
       _core.append(String(c)._core)
     }
   }

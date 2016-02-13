@@ -143,7 +143,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 @warn_unused_result
 public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, AnyObject.self)
+    return unsafeBitCast(x, to: AnyObject.self)
   }
   return _bridgeNonVerbatimToObjectiveC(x)
 }
@@ -162,7 +162,7 @@ public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
 func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
 {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, AnyObject.self)
+    return unsafeBitCast(x, to: AnyObject.self)
   }
   guard let bridged = _bridgeNonVerbatimToObjectiveC(x) else {
     _requirementFailure(
@@ -375,14 +375,14 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       _stdlibAssert(!_isNull)
       // Autorelease the object reference.
       typealias OptionalAnyObject = AnyObject?
-      Builtin.retain(unsafeBitCast(newValue, OptionalAnyObject.self))
-      Builtin.autorelease(unsafeBitCast(newValue, OptionalAnyObject.self))
+      Builtin.retain(unsafeBitCast(newValue, to: OptionalAnyObject.self))
+      Builtin.autorelease(unsafeBitCast(newValue, to: OptionalAnyObject.self))
       // Trivially assign it as an OpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
       let p = UnsafeMutablePointer<OpaquePointer>(
         UnsafeMutablePointer<Pointee>(self))
-        p.pointee = unsafeBitCast(newValue, OpaquePointer.self)
+        p.pointee = unsafeBitCast(newValue, to: OpaquePointer.self)
     }
   }
 

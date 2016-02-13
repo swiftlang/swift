@@ -106,7 +106,7 @@ DictionaryTraps.test("RemoveInvalidIndex1")
   var d = Dictionary<Int, Int>()
   let index = d.startIndex
   expectCrashLater()
-  d.removeAt(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex2")
@@ -117,7 +117,7 @@ DictionaryTraps.test("RemoveInvalidIndex2")
   var d = Dictionary<Int, Int>()
   let index = d.endIndex
   expectCrashLater()
-  d.removeAt(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex3")
@@ -128,7 +128,7 @@ DictionaryTraps.test("RemoveInvalidIndex3")
   var d = [ 10: 1010, 20: 1020, 30: 1030 ]
   let index = d.endIndex
   expectCrashLater()
-  d.removeAt(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex4")
@@ -138,10 +138,10 @@ DictionaryTraps.test("RemoveInvalidIndex4")
   .code {
   var d = [ 10: 1010 ]
   let index = d.indexForKey(10)!
-  d.removeAt(index)
+  d.remove(at: index)
   expectEmpty(d[10])
   expectCrashLater()
-  d.removeAt(index)
+  d.remove(at: index)
 }
 
 class TestObjCKeyTy : NSObject {

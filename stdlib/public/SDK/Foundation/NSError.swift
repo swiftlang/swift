@@ -73,7 +73,7 @@ public extension __BridgedNSError where RawValue: SignedInteger {
   public final var _code: Int { return Int(rawValue.toIntMax()) }
 
   public init?(rawValue: RawValue) {
-    self = unsafeBitCast(rawValue, Self.self)
+    self = unsafeBitCast(rawValue, to: Self.self)
   }
 
   public init?(_bridgedNSError: NSError) {
@@ -104,7 +104,7 @@ public extension __BridgedNSError where RawValue: UnsignedInteger {
   }
 
   public init?(rawValue: RawValue) {
-    self = unsafeBitCast(rawValue, Self.self)
+    self = unsafeBitCast(rawValue, to: Self.self)
   }
 
   public init?(_bridgedNSError: NSError) {

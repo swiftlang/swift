@@ -44,7 +44,7 @@ print(i)
 // CHECK: 4040
 
 func fooInOut<T>(t: T.Type) -> Any {
-  return { (inout x: T) -> () in x = unsafeBitCast((8080, 9090), T.self) }
+  return { (inout x: T) -> () in x = unsafeBitCast((8080, 9090), to: T.self) }
 }
 
 var fio = fooInOut((Int, Int).self)

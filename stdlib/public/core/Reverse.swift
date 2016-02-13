@@ -88,12 +88,12 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 
-  public func distanceTo(other: ReverseRandomAccessIndex) -> Distance {
-    return other.base.distanceTo(base)
+  public func distance(to other: ReverseRandomAccessIndex) -> Distance {
+    return other.base.distance(to: base)
   }
 
-  public func advancedBy(n: Distance) -> ReverseRandomAccessIndex {
-    return ReverseRandomAccessIndex(base.advancedBy(-n))
+  public func advanced(by n: Distance) -> ReverseRandomAccessIndex {
+    return ReverseRandomAccessIndex(base.advanced(by: -n))
   }
 }
 

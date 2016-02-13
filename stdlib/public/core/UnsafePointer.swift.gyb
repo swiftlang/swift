@@ -451,12 +451,12 @@ public struct ${Self}<Pointee>
   }
 
   /// Return `end - self`.
-  public func distanceTo(x: ${Self}) -> Int {
+  public func distance(to x: ${Self}) -> Int {
     return x - self
   }
 
   /// Return `self + n`.
-  public func advancedBy(n: Int) -> ${Self} {
+  public func advanced(by n: Int) -> ${Self} {
     return self + n
   }
 }

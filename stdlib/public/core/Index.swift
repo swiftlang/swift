@@ -142,7 +142,7 @@ public protocol ForwardIndex : _Incrementable {
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`abs(n)`) otherwise
   @warn_unused_result
-  func advancedBy(n: Distance) -> Self
+  func advanced(by n: Distance) -> Self
 
   /// Return the result of advancing `self` by `n` positions, or until it
   /// equals `limit`.
@@ -160,7 +160,7 @@ public protocol ForwardIndex : _Incrementable {
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`abs(n)`) otherwise
   @warn_unused_result
-  func advancedBy(n: Distance, limit: Self) -> Self
+  func advanced(by n: Distance, limit: Self) -> Self
 
   /// Measure the distance between `self` and `end`.
   ///
@@ -173,7 +173,7 @@ public protocol ForwardIndex : _Incrementable {
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`n`) otherwise, where `n` is the function's result.
   @warn_unused_result
-  func distanceTo(end: Self) -> Distance
+  func distance(to end: Self) -> Distance
 }
 
 // advance and distance implementations
@@ -189,7 +189,7 @@ extension ForwardIndex {
     // Can't perform range checks in O(1) on forward indices.
   }
 
-  /// Do not use this method directly; call advancedBy(n) instead.
+  /// Do not use this method directly; call advanced(by: n) instead.
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance) -> Self {
@@ -204,7 +204,7 @@ extension ForwardIndex {
     return p
   }
 
-  /// Do not use this method directly; call advancedBy(n, limit) instead.
+  /// Do not use this method directly; call advanced(by: n, limit) instead.
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
@@ -221,17 +221,17 @@ extension ForwardIndex {
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance) -> Self {
+  public func advanced(by n: Distance) -> Self {
     return self._advanceForward(n)
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance, limit: Self) -> Self {
+  public func advanced(by n: Distance, limit: Self) -> Self {
     return self._advanceForward(n, limit)
   }
 
   @warn_unused_result
-  public func distanceTo(end: Self) -> Distance {
+  public func distance(to end: Self) -> Distance {
     var p = self
     var count: Distance = 0
     while p != end {
@@ -270,7 +270,7 @@ extension BidirectionalIndex {
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance) -> Self {
+  public func advanced(by n: Distance) -> Self {
     if n >= 0 {
       return _advanceForward(n)
     }
@@ -284,7 +284,7 @@ extension BidirectionalIndex {
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance, limit: Self) -> Self {
+  public func advanced(by n: Distance, limit: Self) -> Self {
     if n >= 0 {
       return _advanceForward(n, limit)
     }
@@ -322,15 +322,15 @@ public postfix func -- <T : BidirectionalIndex> (inout i: T) -> T {
 //===--- RandomAccessIndex ------------------------------------------------===//
 
 /// Used to force conformers of RandomAccessIndex to implement
-/// `advancedBy` methods and `distanceTo`.
+/// `advanced(by:)` methods and `distance(to:)`.
 public protocol _RandomAccessAmbiguity {
   associatedtype Distance : _SignedInteger = Int
 }
 
 extension _RandomAccessAmbiguity {
   @warn_unused_result
-  public func advancedBy(n: Distance) -> Self {
-    fatalError("advancedBy(n) not implemented")
+  public func advanced(by n: Distance) -> Self {
+    fatalError("advanced(by:) not implemented")
   }
 }
 
@@ -340,13 +340,13 @@ public protocol RandomAccessIndex : BidirectionalIndex, Strideable,
   _RandomAccessAmbiguity {
 
   @warn_unused_result
-  func distanceTo(other: Self) -> Distance
+  func distance(to other: Self) -> Distance
 
   @warn_unused_result
-  func advancedBy(n: Distance) -> Self
+  func advanced(by n: Distance) -> Self
 
   @warn_unused_result
-  func advancedBy(n: Distance, limit: Self) -> Self
+  func advanced(by n: Distance, limit: Self) -> Self
 }
 
 extension RandomAccessIndex {
@@ -381,12 +381,12 @@ extension RandomAccessIndex {
 
   @_transparent
   @warn_unused_result
-  public func advancedBy(n: Distance, limit: Self) -> Self {
-    let d = self.distanceTo(limit)
+  public func advanced(by n: Distance, limit: Self) -> Self {
+    let d = self.distance(to: limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
     }
-    return self.advancedBy(n)
+    return self.advanced(by: n)
   }
 }
 

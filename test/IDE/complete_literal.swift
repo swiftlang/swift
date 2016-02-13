@@ -47,7 +47,7 @@
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   appendContentsOf({#(newElements): S#})[#Void#]; name=appendContentsOf(newElements: S){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insertContentsOf({#(newElements): S#}, {#at: Index#})[#Void#]; name=insertContentsOf(newElements: S, at: Index){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   removeAt({#(i): Index#})[#Character#]; name=removeAt(i: Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   remove({#at: Index#})[#Character#]; name=remove(at: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:      lowercased()[#String#]; name=lowercased(){{$}}
 
 func giveMeAString() -> Int {

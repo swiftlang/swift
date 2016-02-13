@@ -129,9 +129,9 @@ ${partitionDocComment}
 ${orderingRequirementForPredicate}
   @warn_unused_result
   public mutating func partition(
-    isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+    @noescape isOrderedBefore isOrderedBefore:
+      (${GElement}, ${GElement}) -> Bool
   ) -> Index {
-    var isOrderedBefore = isOrderedBefore
 
 %   else:
 
@@ -152,18 +152,22 @@ ${orderingRequirementForComparable}
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
       let unsafeBufferPivot = bufferPointer.partition(
 %   if preds:
-        isOrderedBefore
+        isOrderedBefore: isOrderedBefore
 %   end
         )
-      return startIndex.advancedBy(
-        numericCast(unsafeBufferPivot - bufferPointer.startIndex))
+      return startIndex.advanced(
+        by: numericCast(unsafeBufferPivot - bufferPointer.startIndex))
     }
     if let result = maybeResult {
       return result
     }
 
 %   if preds:
-    return _partition(&self, indices, &isOrderedBefore)
+    typealias EscapingBinaryPredicate =
+      (${GElement}, ${GElement}) -> Bool
+    var escapableIsOrderedBefore =
+      unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
+    return _partition(&self, indices, &escapableIsOrderedBefore)
 %   else:
     return _partition(&self, indices)
 %   end
@@ -225,12 +229,11 @@ ${sortIsUnstableForPredicate}
 ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant="sort"' if Self == 'MutableCollection' else ''})
   public func sorted(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+    @noescape isOrderedBefore isOrderedBefore:
+      (${GElement}, ${GElement}) -> Bool
   ) -> [Iterator.Element] {
-    typealias EscapingBinaryPredicate =
-       (Iterator.Element, Iterator.Element) -> Bool
     var result = ContiguousArray(self)
-    result.sort(isOrderedBefore)
+    result.sort(isOrderedBefore: isOrderedBefore)
     return Array(result)
   }
 }
@@ -269,19 +272,20 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   public mutating func sort(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+    @noescape isOrderedBefore isOrderedBefore:
+      (${GElement}, ${GElement}) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
       (Iterator.Element, Iterator.Element) -> Bool
     let escapableIsOrderedBefore =
-      unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
+      unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
 
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(escapableIsOrderedBefore)
+      bufferPointer.sort(isOrderedBefore: escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {
@@ -290,6 +294,26 @@ ${orderingRequirementForPredicate}
   }
 }
 
+extension MutableCollection
+  where Index : RandomAccessIndex {
+
+  @swift3_migration(message="slice the collection using the range, and call partition(isOrderedBefore:)")
+  public mutating func partition(
+    range: Range<Index>,
+    isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+  ) -> Index {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension MutableCollection
+  where Index : RandomAccessIndex, ${GElement} : Comparable {
+
+  @swift3_migration(message="slice the collection using the range, and call partition()")
+  public mutating func partition(range: Range<Index>) -> Index {
+    fatalError("unavailable function can't be called")
+  }
+}
 
 % for Self in [ 'Sequence', 'MutableCollection' ]:
 extension ${Self} where Self.Iterator.Element : Comparable {
@@ -298,7 +322,7 @@ extension ${Self} where Self.Iterator.Element : Comparable {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="sorted")
+  @available(*, unavailable, renamed="sorted(isOrderedBefore:)")
   public func sort(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
@@ -319,7 +343,7 @@ extension MutableCollection
 }
 
 extension MutableCollection where Self.Index : RandomAccessIndex {
-  @available(*, unavailable, renamed="sort")
+  @available(*, unavailable, renamed="sort(isOrderedBefore:)")
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) {

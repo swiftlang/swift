@@ -42,7 +42,7 @@ OptionalTraps.test("UnwrapNone/Ounchecked")
     reason: "unwrapping nil should trap unless we are in -Ounchecked mode"))
   .code {
   var a: AnyObject? = returnNil()
-  expectEqual(0, unsafeBitCast(a!, Int.self))
+  expectEqual(0, unsafeBitCast(a!, to: Int.self))
 }
 
 runAllTests()

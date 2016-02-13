@@ -361,8 +361,8 @@ public struct _prext_ReverseRandomAccessIndex<I : RandomAccessIndex> : RandomAcc
   /// `predecessor` required to reach `other` from `self`.
   ///
   /// - Complexity: O(1).
-  public func distanceTo(other: _prext_ReverseRandomAccessIndex) -> Distance {
-    return other._base.distanceTo(_base)
+  public func distance(to other: _prext_ReverseRandomAccessIndex) -> Distance {
+    return other._base.distance(to: _base)
   }
 
   /// Return `self` offset by `n` steps.
@@ -372,8 +372,8 @@ public struct _prext_ReverseRandomAccessIndex<I : RandomAccessIndex> : RandomAcc
   ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
   /// - Complexity: O(1).
-  public func advancedBy(amount: Distance) -> _prext_ReverseRandomAccessIndex {
-    return _prext_ReverseRandomAccessIndex(_base.advancedBy(-amount))
+  public func advanced(by amount: Distance) -> _prext_ReverseRandomAccessIndex {
+    return _prext_ReverseRandomAccessIndex(_base.advanced(by: -amount))
   }
 }
 

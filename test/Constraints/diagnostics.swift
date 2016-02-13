@@ -547,7 +547,7 @@ func r22020088bar(p: r22020088P?) {
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
 func f(arguments: [String]) -> [ArraySlice<String>] {
-  return arguments.split(1, omitEmptySubsequences: false, isSeparator: { $0 == "--" })
+  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, isSeparator: { $0 == "--" })
 }
 
 
@@ -714,7 +714,7 @@ func r23272739(contentType: String) {
 func r23641896() {
   var g = "Hello World"
   g.replaceSubrange(0...2, with: "ce")  // expected-error {{String may not be indexed with 'Int', it has variable size elements}}
-  // expected-note @-1 {{consider using an existing high level algorithm, str.startIndex.advancedBy(n), or a projection like str.utf8}}
+  // expected-note @-1 {{consider using an existing high level algorithm, str.startIndex.advanced(by: n), or a projection like str.utf8}}
 
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 

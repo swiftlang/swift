@@ -18,63 +18,63 @@ public protocol Strideable : Comparable {
   /// A type that can represent the distance between two values of `Self`.
   associatedtype Stride : SignedNumber
 
-  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
   ///
   /// - Complexity: O(1).
   ///
-  /// - SeeAlso: `RandomAccessIndex`'s `distanceTo`, which provides a
+  /// - SeeAlso: `RandomAccessIndex`'s `distance(to:)`, which provides a
   ///   stronger semantic guarantee.
   @warn_unused_result
-  func distanceTo(other: Self) -> Stride
+  func distance(to other: Self) -> Stride
 
-  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// Returns a `Self` `x` such that `self.distance(to: x)` approximates
   /// `n`.
   ///
   /// - Complexity: O(1).
   ///
-  /// - SeeAlso: `RandomAccessIndex`'s `advancedBy`, which
+  /// - SeeAlso: `RandomAccessIndex`'s `advanced(by:)`, which
   ///   provides a stronger semantic guarantee.
   @warn_unused_result
-  func advancedBy(n: Stride) -> Self
+  func advanced(by n: Stride) -> Self
 }
 
 
 /// Compare two `Strideable`s.
 public func < <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distanceTo(y) > 0
+  return x.distance(to: y) > 0
 }
 
 public func == <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distanceTo(y) == 0
+  return x.distance(to: y) == 0
 }
 
 @warn_unused_result
 public func + <T : Strideable>(lhs: T, rhs: T.Stride) -> T {
-  return lhs.advancedBy(rhs)
+  return lhs.advanced(by: rhs)
 }
 
 @warn_unused_result
 public func + <T : Strideable>(lhs: T.Stride, rhs: T) -> T {
-  return rhs.advancedBy(lhs)
+  return rhs.advanced(by: lhs)
 }
 
 @warn_unused_result
 public func - <T : Strideable>(lhs: T, rhs: T.Stride) -> T {
-  return lhs.advancedBy(-rhs)
+  return lhs.advanced(by: -rhs)
 }
 
 @warn_unused_result
 public func - <T : Strideable>(lhs: T, rhs: T) -> T.Stride {
-  return rhs.distanceTo(lhs)
+  return rhs.distance(to: lhs)
 }
 
 public func += <T : Strideable>(inout lhs: T, rhs: T.Stride) {
-  lhs = lhs.advancedBy(rhs)
+  lhs = lhs.advanced(by: rhs)
 }
 
 public func -= <T : Strideable>(inout lhs: T, rhs: T.Stride) {
-  lhs = lhs.advancedBy(-rhs)
+  lhs = lhs.advanced(by: -rhs)
 }
 
 //===--- Deliberately-ambiguous operators for UnsignedIntegerTypes --------===//

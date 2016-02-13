@@ -173,14 +173,15 @@ public protocol Sequence {
   ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
+  /// - Parameter omittingEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   satisfying `isSeparator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplit >= 0`
+  /// - Requires: `maxSplits >= 0`
   @warn_unused_result
-  func split(maxSplits: Int, omitEmptySubsequences: Bool,
+  func split(
+    maxSplits maxSplits: Int, omittingEmptySubsequences: Bool,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
@@ -390,16 +391,16 @@ extension Sequence {
   ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
+  /// - Parameter omittingEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   satisfying `isSeparator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplit >= 0`
+  /// - Requires: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    maxSplits: Int = Int.max,
-    omitEmptySubsequences: Bool = true,
+    maxSplits maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
     _require(maxSplits >= 0, "Must take zero or more splits")
@@ -407,7 +408,7 @@ extension Sequence {
     var subSequence: [Iterator.Element] = []
 
     func appendSubsequence() -> Bool {
-      if subSequence.isEmpty && omitEmptySubsequences {
+      if subSequence.isEmpty && omittingEmptySubsequences {
         return false
       }
       result.append(AnySequence(subSequence))
@@ -504,24 +505,26 @@ extension Sequence where Iterator.Element : Equatable {
   ///
   /// - Parameter maxSplits: The maximum number of `SubSequence`s to
   ///   return, minus 1.
-  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
+  ///   If `maxSplits + 1` `SubSequence`s are returned, the last one is
   ///   a suffix of `self` containing *all* the elements of `self` following the
   ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
+  /// - Parameter omittingEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   equal to `separator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplit >= 0`
+  /// - Requires: `maxSplits >= 0`
   @warn_unused_result
   public func split(
     separator: Iterator.Element,
     maxSplits: Int = Int.max,
-    omitEmptySubsequences: Bool = true
+    omittingEmptySubsequences: Bool = true
   ) -> [AnySequence<Iterator.Element>] {
-    return split(maxSplits, omitEmptySubsequences: omitEmptySubsequences,
+    return split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
       isSeparator: { $0 == separator })
   }
 }
@@ -658,7 +661,7 @@ extension Sequence {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @available(*, unavailable, message="call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   func split(maxSplit: Int, allowEmptySlices: Bool,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
@@ -667,7 +670,7 @@ extension Sequence {
 }
 
 extension Sequence where Iterator.Element : Equatable {
-  @available(*, unavailable, message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @available(*, unavailable, message="call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   public func split(
     separator: Iterator.Element,
     maxSplit: Int = Int.max,

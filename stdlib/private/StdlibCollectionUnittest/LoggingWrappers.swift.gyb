@@ -167,9 +167,9 @@ public struct LoggingRangeReplaceableCollection<
     base.insert(newElement, at: i)
   }
 
-  public mutating func removeAt(index: Base.Index) -> Base.Iterator.Element {
+  public mutating func remove(at index: Base.Index) -> Base.Iterator.Element {
     Log.removeAt[selfType] += 1
-    return base.removeAt(index)
+    return base.remove(at: index)
   }
 
   public mutating func _customRemoveLast() -> Base.Iterator.Element? {
@@ -344,20 +344,20 @@ public struct Logging${Kind}<
   }
 %   end
 
-  public func distanceTo(end: Logging${Kind}<Base>) -> Base.Distance {
+  public func distance(to end: Logging${Kind}<Base>) -> Base.Distance {
     Log.distanceTo[selfType] += 1
-    return base.distanceTo(end.base)
+    return base.distance(to: end.base)
   }
 
-  public func advancedBy(n: Base.Distance) -> Logging${Kind}<Base> {
+  public func advanced(by n: Base.Distance) -> Logging${Kind}<Base> {
     Log.advancedBy[selfType] += 1
-    return Logging${Kind}(base.advancedBy(n))
+    return Logging${Kind}(base.advanced(by: n))
   }
 
-  public func advancedBy(n: Base.Distance, limit: Logging${Kind}<Base>)
+  public func advanced(by n: Base.Distance, limit: Logging${Kind}<Base>)
     -> Logging${Kind} {
     Log.advancedByWithLimit[selfType] += 1
-    return Logging${Kind}(base.advancedBy(n, limit: limit.base))
+    return Logging${Kind}(base.advanced(by: n, limit: limit.base))
   }
 }
 
@@ -503,31 +503,32 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   }
 
   public func split(
-    maxSplits: Int = Int.max,
-    omitEmptySubsequences: Bool = true,
+    maxSplits maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.SubSequence] {
     Log.split[selfType] += 1
-    return try base.split(maxSplits,
-      omitEmptySubsequences: omitEmptySubsequences,
+    return try base.split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
       isSeparator: isSeparator)
   }
 
 %   if Kind == 'Collection' or Kind == 'MutableCollection':
 
-  public func prefixUpTo(end: Index) -> Base.SubSequence {
+  public func prefix(upTo end: Index) -> Base.SubSequence {
     Log.prefixUpTo[selfType] += 1
-    return base.prefixUpTo(end)
+    return base.prefix(upTo: end)
   }
 
-  public func suffixFrom(start: Index) -> Base.SubSequence {
+  public func suffix(from start: Index) -> Base.SubSequence {
     Log.suffixFrom[selfType] += 1
-    return base.suffixFrom(start)
+    return base.suffix(from: start)
   }
 
-  public func prefixThrough(position: Index) -> Base.SubSequence {
+  public func prefix(through position: Index) -> Base.SubSequence {
     Log.prefixThrough[selfType] += 1
-    return base.prefixThrough(position)
+    return base.prefix(through: position)
   }
 
 %   end

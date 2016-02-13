@@ -193,7 +193,7 @@ ArrayTestSuite.test("${array_type}/appendNonUnique") {
     x.append(1)
     expectTrue(x.capacity == capacity)
     let z = x
-    x.removeAt(0)
+    x.remove(at: 0)
   }
 }
 
@@ -844,8 +844,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
   var bridgedBack: NSArray = _convertArrayToNSArray(a)
 
   expectEqual(
-    unsafeBitCast(nsa, Int.self),
-    unsafeBitCast(bridgedBack, Int.self))
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
 
   _fixLifetime(nsa)
   _fixLifetime(a)
@@ -858,8 +858,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
   var bridgedBack: NSArray = _convertArrayToNSArray(a)
 
   expectNotEqual(
-    unsafeBitCast(nsa, Int.self),
-    unsafeBitCast(bridgedBack, Int.self))
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
 
   _fixLifetime(nsa)
   _fixLifetime(a)
@@ -881,8 +881,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   let bridgedBack: NSArray = _convertArrayToNSArray(a)
 
   expectEqual(
-    unsafeBitCast(nsa, Int.self),
-    unsafeBitCast(bridgedBack, Int.self))
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
 
   _fixLifetime(nsa)
   _fixLifetime(a)
@@ -910,8 +910,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
   let bridgedBack: NSArray = _convertArrayToNSArray(a)
 
   expectNotEqual(
-    unsafeBitCast(nsa, Int.self),
-    unsafeBitCast(bridgedBack, Int.self))
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
 
   _fixLifetime(nsa)
   _fixLifetime(a)
@@ -976,20 +976,20 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
 
   var v: AnyObject = a.object(at: 0)
   expectEqual(10, (v as! TestObjCValueTy).value)
-  let idValue0 = unsafeBitCast(v, UInt.self)
+  let idValue0 = unsafeBitCast(v, to: UInt.self)
 
   v = a.object(at: 1)
   expectEqual(20, (v as! TestObjCValueTy).value)
-  let idValue1 = unsafeBitCast(v, UInt.self)
+  let idValue1 = unsafeBitCast(v, to: UInt.self)
 
   v = a.object(at: 2)
   expectEqual(30, (v as! TestObjCValueTy).value)
-  let idValue2 = unsafeBitCast(v, UInt.self)
+  let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
   }
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -1036,20 +1036,20 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
 
   var v: AnyObject = buffer[0]
   expectEqual(10, (v as! TestObjCValueTy).value)
-  let idValue0 = unsafeBitCast(v, UInt.self)
+  let idValue0 = unsafeBitCast(v, to: UInt.self)
 
   v = buffer[1]
   expectEqual(20, (v as! TestObjCValueTy).value)
-  let idValue1 = unsafeBitCast(v, UInt.self)
+  let idValue1 = unsafeBitCast(v, to: UInt.self)
 
   v = buffer[2]
   expectEqual(30, (v as! TestObjCValueTy).value)
-  let idValue2 = unsafeBitCast(v, UInt.self)
+  let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
   }
 
   buffer.deallocateCapacity(3)
@@ -1061,7 +1061,8 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
 ArrayTestSuite.test("BridgedToObjC/Verbatim/copyWithZone") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
   let copy: AnyObject = a.copy(withZone: nil)
-  expectEqual(unsafeBitCast(a, UInt.self), unsafeBitCast(copy, UInt.self))
+  expectEqual(
+    unsafeBitCast(a, to: UInt.self), unsafeBitCast(copy, to: UInt.self))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/FastEnumeration/UseFromSwift/Empty") {
@@ -1147,15 +1148,15 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
 
   var v: AnyObject = a[0]
   expectEqual(10, (v as! TestObjCValueTy).value)
-  let idValue0 = unsafeBitCast(v, UInt.self)
+  let idValue0 = unsafeBitCast(v, to: UInt.self)
 
   v = a[1]
   expectEqual(20, (v as! TestObjCValueTy).value)
-  let idValue1 = unsafeBitCast(v, UInt.self)
+  let idValue1 = unsafeBitCast(v, to: UInt.self)
 
   v = a[2]
   expectEqual(30, (v as! TestObjCValueTy).value)
-  let idValue2 = unsafeBitCast(v, UInt.self)
+  let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   // Bridge back to native array.
   var native: [TestObjCValueTy] = _convertNSArrayToArray(a)
@@ -1169,9 +1170,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
-  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), UInt.self))
-  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), UInt.self))
-  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), UInt.self))
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -1180,7 +1181,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
   // Bridge back to native array.
   var native: [TestObjCValueTy] = _convertNSArrayToArray(
     getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3))
-  let identity1 = unsafeBitCast(native, UInt.self)
+  let identity1 = unsafeBitCast(native, to: UInt.self)
 
   // Mutate elements, but don't change count.
   native[0] = TestObjCValueTy(110)
@@ -1188,7 +1189,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
   native[2] = TestObjCValueTy(130)
 
   // Expect no reallocations.
-  expectEqual(identity1, unsafeBitCast(native, UInt.self))
+  expectEqual(identity1, unsafeBitCast(native, to: UInt.self))
 }
 
 //===----------------------------------------------------------------------===//
@@ -1247,20 +1248,20 @@ ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
 
   var v: AnyObject = a.object(at: 0)
   expectEqual(10, (v as! TestObjCValueTy).value)
-  let idValue0 = unsafeBitCast(v, UInt.self)
+  let idValue0 = unsafeBitCast(v, to: UInt.self)
 
   v = a.object(at: 1)
   expectEqual(20, (v as! TestObjCValueTy).value)
-  let idValue1 = unsafeBitCast(v, UInt.self)
+  let idValue1 = unsafeBitCast(v, to: UInt.self)
 
   v = a.object(at: 2)
   expectEqual(30, (v as! TestObjCValueTy).value)
-  let idValue2 = unsafeBitCast(v, UInt.self)
+  let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
   }
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
@@ -1308,20 +1309,20 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
 
   var v: AnyObject = buffer[0]
   expectEqual(10, (v as! TestObjCValueTy).value)
-  let idValue0 = unsafeBitCast(v, UInt.self)
+  let idValue0 = unsafeBitCast(v, to: UInt.self)
 
   v = buffer[1]
   expectEqual(20, (v as! TestObjCValueTy).value)
-  let idValue1 = unsafeBitCast(v, UInt.self)
+  let idValue1 = unsafeBitCast(v, to: UInt.self)
 
   v = buffer[2]
   expectEqual(30, (v as! TestObjCValueTy).value)
-  let idValue2 = unsafeBitCast(v, UInt.self)
+  let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
   }
 
   buffer.deallocateCapacity(3)
@@ -1334,7 +1335,9 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
 ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
   let copy: AnyObject = a.copy(withZone: nil)
-  expectEqual(unsafeBitCast(a, UInt.self), unsafeBitCast(copy, UInt.self))
+  expectEqual(
+    unsafeBitCast(a, to: UInt.self),
+    unsafeBitCast(copy, to: UInt.self))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/FastEnumeration/UseFromSwift/Empty") {
@@ -1438,15 +1441,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
 
   var v: AnyObject = a[0]
   expectEqual(10, (v as! TestObjCValueTy).value)
-  let idValue0 = unsafeBitCast(v, UInt.self)
+  let idValue0 = unsafeBitCast(v, to: UInt.self)
 
   v = a[1]
   expectEqual(20, (v as! TestObjCValueTy).value)
-  let idValue1 = unsafeBitCast(v, UInt.self)
+  let idValue1 = unsafeBitCast(v, to: UInt.self)
 
   v = a[2]
   expectEqual(30, (v as! TestObjCValueTy).value)
-  let idValue2 = unsafeBitCast(v, UInt.self)
+  let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   // Bridge back to native array with a cast.
   var native: [TestObjCValueTy] = _convertNSArrayToArray(a)
@@ -1460,9 +1463,9 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
-  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), UInt.self))
-  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), UInt.self))
-  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), UInt.self))
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -1472,15 +1475,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
 
   var v: AnyObject = a[0]
   expectEqual(10, (v as! TestObjCValueTy).value)
-  let idValue0 = unsafeBitCast(v, UInt.self)
+  let idValue0 = unsafeBitCast(v, to: UInt.self)
 
   v = a[1]
   expectEqual(20, (v as! TestObjCValueTy).value)
-  let idValue1 = unsafeBitCast(v, UInt.self)
+  let idValue1 = unsafeBitCast(v, to: UInt.self)
 
   v = a[2]
   expectEqual(30, (v as! TestObjCValueTy).value)
-  let idValue2 = unsafeBitCast(v, UInt.self)
+  let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   // Bridge back to native array.
   var native: [TestBridgedValueTy] = _convertNSArrayToArray(a)
@@ -1494,9 +1497,9 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
-  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), UInt.self))
-  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), UInt.self))
-  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), UInt.self))
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -1505,7 +1508,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
   // Bridge back to native array.
   var native: [TestBridgedValueTy] = _convertNSArrayToArray(
     getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3))
-  let identity1 = unsafeBitCast(native, UInt.self)
+  let identity1 = unsafeBitCast(native, to: UInt.self)
 
   // Mutate elements, but don't change count.
   native[0] = TestBridgedValueTy(110)
@@ -1513,7 +1516,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
   native[2] = TestBridgedValueTy(130)
 
   // Expect no reallocations.
-  expectEqual(identity1, unsafeBitCast(native, UInt.self))
+  expectEqual(identity1, unsafeBitCast(native, to: UInt.self))
 }
 
 //===----------------------------------------------------------------------===//
@@ -1531,8 +1534,8 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.RoundtripThroughSwiftArray") {
     let bridgedBack = _convertArrayToNSArray(a)
 
     expectEqual(
-      unsafeBitCast(nsa, Int.self),
-      unsafeBitCast(bridgedBack, Int.self))
+      unsafeBitCast(nsa, to: Int.self),
+      unsafeBitCast(bridgedBack, to: Int.self))
 
     _fixLifetime(nsa)
     _fixLifetime(a)
@@ -1544,8 +1547,8 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.RoundtripThroughSwiftArray") {
     let bridgedBack: NSArray = a as NSArray
 
     expectEqual(
-      unsafeBitCast(nsa, Int.self),
-      unsafeBitCast(bridgedBack, Int.self))
+      unsafeBitCast(nsa, to: Int.self),
+      unsafeBitCast(bridgedBack, to: Int.self))
 
     _fixLifetime(nsa)
     _fixLifetime(a)
@@ -1601,10 +1604,6 @@ final class EvilCollection : Collection {
       require(i >= 0 && i < _count, evilBoundsError)
     }
     return TestValueTy(i)
-  }
-
-  func iterator() -> IndexingIterator<EvilCollection> {
-    return IndexingIterator(self)
   }
 }
 

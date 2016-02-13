@@ -62,13 +62,13 @@ func sortResultIgnored<
   var array = array // expected-warning {{variable 'array' was never mutated; consider changing to 'let' constant}}
 
   sequence.sorted() // expected-warning {{result of call to 'sorted()' is unused}}
-  sequence.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted' is unused}}
+  sequence.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(isOrderedBefore:)' is unused}}
 
   mutableCollection.sorted() // expected-warning {{result of call to non-mutating function 'sorted()' is unused; use 'sort()' to mutate in-place}} {{21-27=sort}}
-  mutableCollection.sorted { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sorted' is unused; use 'sort' to mutate in-place}} {{21-27=sort}}
+  mutableCollection.sorted { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sorted(isOrderedBefore:)' is unused; use 'sort(isOrderedBefore:)' to mutate in-place}} {{21-27=sort}}
 
   array.sorted() // expected-warning {{result of call to non-mutating function 'sorted()' is unused; use 'sort()' to mutate in-place}} {{9-15=sort}}
-  array.sorted { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sorted' is unused; use 'sort' to mutate in-place}} {{9-15=sort}}
+  array.sorted { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sorted(isOrderedBefore:)' is unused; use 'sort(isOrderedBefore:)' to mutate in-place}} {{9-15=sort}}
 }
 
 struct GoodForwardIndex1 : ForwardIndex {
@@ -134,10 +134,10 @@ struct GoodRandomAccessIndex1 : RandomAccessIndex {
   func predecessor() -> GoodRandomAccessIndex1 {
     fatalError("not implemented")
   }
-  func distanceTo(other: GoodRandomAccessIndex1) -> Int {
+  func distance(to other: GoodRandomAccessIndex1) -> Int {
     fatalError("not implemented")
   }
-  func advancedBy(n: Int) -> GoodRandomAccessIndex1 {
+  func advanced(by n: Int) -> GoodRandomAccessIndex1 {
     fatalError("not implemented")
   }
 }
@@ -152,10 +152,10 @@ struct GoodRandomAccessIndex2 : RandomAccessIndex {
   func predecessor() -> GoodRandomAccessIndex2 {
     fatalError("not implemented")
   }
-  func distanceTo(other: GoodRandomAccessIndex2) -> Int32 {
+  func distance(to other: GoodRandomAccessIndex2) -> Int32 {
     fatalError("not implemented")
   }
-  func advancedBy(n: Int32) -> GoodRandomAccessIndex2 {
+  func advanced(by n: Int32) -> GoodRandomAccessIndex2 {
     fatalError("not implemented")
   }
   typealias Distance = Int32
@@ -187,7 +187,7 @@ struct BadRandomAccessIndex2 : RandomAccessIndex {
   func predecessor() -> BadRandomAccessIndex2 {
     fatalError("not implemented")
   }
-  func distanceTo(other: GoodRandomAccessIndex1) -> Int {
+  func distance(to other: GoodRandomAccessIndex1) -> Int {
     fatalError("not implemented")
   }
 }
@@ -204,7 +204,7 @@ struct BadRandomAccessIndex3 : RandomAccessIndex {
   func predecessor() -> BadRandomAccessIndex3 {
     fatalError("not implemented")
   }
-  func advancedBy(n: Int) -> GoodRandomAccessIndex1 {
+  func advanced(by n: Int) -> GoodRandomAccessIndex1 {
     fatalError("not implemented")
   }
 }

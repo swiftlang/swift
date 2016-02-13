@@ -293,9 +293,9 @@ public func vfork() -> Int32 {
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 public var SIG_DFL: sig_t? { return nil }
-public var SIG_IGN: sig_t { return unsafeBitCast(1, sig_t.self) }
-public var SIG_ERR: sig_t { return unsafeBitCast(-1, sig_t.self) }
-public var SIG_HOLD: sig_t { return unsafeBitCast(5, sig_t.self) }
+public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
+public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
+public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
 #else
 internal var _ignore = _UnsupportedPlatformError()
 #endif

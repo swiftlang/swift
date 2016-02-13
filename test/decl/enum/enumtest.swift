@@ -236,8 +236,8 @@ struct distance { var v : Int }
 func - (lhs: distance, rhs: distance) -> distance {}
 
 extension Int {
-  func km() -> distance {}
-  func cm() -> distance {}
+  func km() -> enumtest.distance {}
+  func cm() -> enumtest.distance {}
 }
 
 func units(x: Int) -> distance {

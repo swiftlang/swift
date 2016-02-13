@@ -25,7 +25,7 @@ public func run_PopFrontArray(N: Int) {
       a.appendContentsOf(orig)
       while a.count != 0 {
         result += a[0]
-        a.removeAt(0)
+        a.remove(at: 0)
       }
       CheckResults(result == arrayCount, "IncorrectResults in StringInterpolation: \(result) != \(arrayCount)")
     }

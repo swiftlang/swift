@@ -473,7 +473,7 @@ extension String : Hashable {
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
     let cocoaString = unsafeBitCast(
-      self._bridgeToObjectiveCImpl(), _NSStringCore.self)
+      self._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
 
     // If we have an ASCII string, we do not need to normalize.
     if self._core.isASCII {
@@ -713,9 +713,9 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAt(i: Index) -> Character {
+  public mutating func remove(at i: Index) -> Character {
     return withMutableCharacters {
-      (inout v: CharacterView) in v.removeAt(i)
+      (inout v: CharacterView) in v.remove(at: i)
     }
   }
 

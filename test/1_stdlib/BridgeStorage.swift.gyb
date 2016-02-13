@@ -96,7 +96,7 @@ func expectTagged(s: NSString, _ expected: Bool) -> NSString {
 
   let taggedStringsSupported = osSupportsTaggedStrings && mask != 0
 
-  let tagged = unsafeBitCast(s, UInt.self) & mask != 0
+  let tagged = unsafeBitCast(s, to: UInt.self) & mask != 0
 
   if taggedStringsSupported  &&  expected == tagged {
     // okay

@@ -61,10 +61,6 @@ struct X : Collection {
     return msg.endIndex
   }
   subscript(i: Index) -> Element { return msg[i] }
-
-  func iterator() -> IndexingIterator<X> {
-    return IndexingIterator(self)
-  }
 }
 
 var foobar = X("foobar")

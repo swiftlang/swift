@@ -17,10 +17,6 @@ public struct OneToAThousand : Collection {
     return i.value
   }
 
-  public func iterator() -> IndexingIterator<OneToAThousand> {
-    return IndexingIterator(self)
-  }
-
   public init() {}
 }
 

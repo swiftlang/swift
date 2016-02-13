@@ -347,8 +347,8 @@ addressing the same collection, and the ability to advance an index by
 a (possibly negative) number of steps::
 
   public protocol RandomAccessIndexType : BidirectionalIndexType {
-    func distanceTo(other: Self) -> Distance
-    func advancedBy(n: Distance) -> Self
+    func distance(to other: Self) -> Distance
+    func advanced(by n: Distance) -> Self
   }
 
 From these methods, the standard library derives several other

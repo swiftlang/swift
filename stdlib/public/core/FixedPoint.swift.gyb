@@ -388,12 +388,12 @@ extension ${Self} : RandomAccessIndex {
   }
 
   @_transparent public
-  func distanceTo(other: ${Self}) -> ${Self}.Distance {
+  func distance(to other: ${Self}) -> ${Self}.Distance {
     return numericCast((numericCast(other) as IntMax) &- numericCast(self))
   }
 
   @_transparent public
-  func advancedBy(n: ${Self}.Distance) -> ${Self} {
+  func advanced(by n: ${Self}.Distance) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) &+ numericCast(n))
   }
 }

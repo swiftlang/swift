@@ -75,7 +75,7 @@ public struct StaticString
     _require(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, UInt.self)))
+    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, to: UInt.self)))
   }
 
   /// If `self` stores a pointer to ASCII or UTF-8 code units, the
@@ -151,7 +151,10 @@ public struct StaticString
     unicodeScalar: Builtin.Int32
   ) {
     self._startPtrOrData =
-      unsafeBitCast(UInt(UInt32(unicodeScalar)), OpaquePointer.self)._rawValue
+      unsafeBitCast(
+        UInt(UInt32(unicodeScalar)),
+        to: OpaquePointer.self
+      )._rawValue
     self._utf8CodeUnitCount = 0._builtinWordValue
     self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
       ? (0x3 as UInt8)._value

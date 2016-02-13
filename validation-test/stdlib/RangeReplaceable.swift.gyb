@@ -48,9 +48,9 @@ RangeReplaceableTestSuite.test("insertContentsOf/dispatch") {
   expectCustomizable(tester, tester.log.insertContentsOf)
 }
 
-RangeReplaceableTestSuite.test("removeAt/dispatch") {
+RangeReplaceableTestSuite.test("remove(at:)/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.removeAt(tester.base.startIndex)
+  tester.remove(at: tester.base.startIndex)
   expectCustomizable(tester, tester.log.removeAt)
 }
 

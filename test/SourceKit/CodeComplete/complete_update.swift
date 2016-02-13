@@ -10,11 +10,11 @@ func foo() {
 // RUN:   == -req=complete.update -pos=4:5 %s -- %s \
 // RUN:   == -req=complete.update -pos=4:5 %s -- %s > %t.update
 // RUN: FileCheck %s < %t.update
-// CHECK:   key.name: "advancedBy
+// CHECK:   key.name: "advanced
 // CHECK: key.kind: source.lang.swift.codecomplete.group
-// CHECK:   key.name: "advancedBy
+// CHECK:   key.name: "advanced
 // CHECK: key.kind: source.lang.swift.codecomplete.group
-// CHECK:   key.name: "advancedBy
+// CHECK:   key.name: "advanced
 // CHECK: key.kind: source.lang.swift.codecomplete.group
 
 // RUN: cat %t.open %t.open %t.open > %t.check

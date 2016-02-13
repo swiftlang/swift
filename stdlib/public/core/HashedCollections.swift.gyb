@@ -222,7 +222,7 @@ internal protocol _HashStorage {
   func maybeGet(key: Key) -> Value?
 
   mutating func updateValue(value: Value, forKey: Key) -> Value?
-  mutating func removeAt(index: Index) -> SequenceElement
+  mutating func remove(at index: Index) -> SequenceElement
   mutating func removeValueForKey(key: Key) -> Value?
   mutating func removeAll(keepingCapacity keepCapacity: Bool)
   var count: Int { get }
@@ -269,7 +269,7 @@ internal struct _UnmanagedAnyObjectArray {
       return _reinterpretCastToAnyObject(value[i])
     }
     nonmutating set(newValue) {
-      value[i] = unsafeBitCast(newValue, Int.self)
+      value[i] = unsafeBitCast(newValue, to: Int.self)
     }
   }
 }
@@ -380,8 +380,8 @@ public struct Set<Element : Hashable> :
   }
 
   /// Remove the element at the given `position`.
-  public mutating func removeAt(position: Index) -> Element {
-    return _variantStorage.removeAt(position)
+  public mutating func remove(at position: Index) -> Element {
+    return _variantStorage.remove(at: position)
   }
 
   /// Erase all the elements.  If `keepCapacity` is `true`, existing
@@ -395,7 +395,7 @@ public struct Set<Element : Hashable> :
   /// - Requires: `!isEmpty`.
   public mutating func removeFirst() -> Element {
     _require(!isEmpty, "can't removeFirst from an empty Set")
-    return removeAt(startIndex)
+    return remove(at: startIndex)
   }
 
   /// The number of members in the set.
@@ -802,7 +802,7 @@ public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
 
   var builder = _SetBuilder<BaseValue>(count: source.count)
   for member in source {
-    builder.add(member: unsafeBitCast(member, BaseValue.self))
+    builder.add(member: unsafeBitCast(member, to: BaseValue.self))
   }
   return builder.take()
 }
@@ -827,12 +827,12 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   for member in source {
     var bridgedMember: ObjCValue
     if valueBridgesDirectly {
-      bridgedMember = unsafeBitCast(member, ObjCValue.self)
+      bridgedMember = unsafeBitCast(member, to: ObjCValue.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(member)
       _require(bridged != nil,
       "set member cannot be bridged to Objective-C")
-      bridgedMember = unsafeBitCast(bridged!, ObjCValue.self)
+      bridgedMember = unsafeBitCast(bridged!, to: ObjCValue.self)
     }
     result.insert(bridgedMember)
   }
@@ -857,12 +857,12 @@ public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>)
   case _VariantSetStorage.Native(let nativeOwner):
     return Set(
     _immutableCocoaSet:
-    unsafeBitCast(nativeOwner, _NSSet.self))
+    unsafeBitCast(nativeOwner, to: _NSSet.self))
 
   case _VariantSetStorage.Cocoa(let cocoaStorage):
     return Set(
     _immutableCocoaSet:
-    unsafeBitCast(cocoaStorage, _NSSet.self))
+    unsafeBitCast(cocoaStorage, to: _NSSet.self))
   }
 }
 
@@ -1087,8 +1087,8 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAt(index: Index) -> Element {
-    return _variantStorage.removeAt(index)
+  public mutating func remove(at index: Index) -> Element {
+    return _variantStorage.remove(at: index)
   }
 
   /// Remove a given key and the associated value from the dictionary.
@@ -1344,7 +1344,8 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
-    result[unsafeBitCast(k, BaseKey.self)] = unsafeBitCast(v, BaseValue.self)
+    result[unsafeBitCast(k, to: BaseKey.self)] =
+      unsafeBitCast(v, to: BaseValue.self)
   }
   return result
 }
@@ -1386,22 +1387,22 @@ public func _dictionaryBridgeToObjectiveC<
     // Bridge the key
     var bridgedKey: ObjCKey
     if keyBridgesDirectly {
-      bridgedKey = unsafeBitCast(key, ObjCKey.self)
+      bridgedKey = unsafeBitCast(key, to: ObjCKey.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(key)
       _require(bridged != nil, "dictionary key cannot be bridged to Objective-C")
-      bridgedKey = unsafeBitCast(bridged!, ObjCKey.self)
+      bridgedKey = unsafeBitCast(bridged!, to: ObjCKey.self)
     }
 
     // Bridge the value
     var bridgedValue: ObjCValue
     if valueBridgesDirectly {
-      bridgedValue = unsafeBitCast(value, ObjCValue.self)
+      bridgedValue = unsafeBitCast(value, to: ObjCValue.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(value)
       _require(bridged != nil,
           "dictionary value cannot be bridged to Objective-C")
-      bridgedValue = unsafeBitCast(bridged!, ObjCValue.self)
+      bridgedValue = unsafeBitCast(bridged!, to: ObjCValue.self)
     }
 
     result[bridgedKey] = bridgedValue
@@ -1441,12 +1442,12 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
     // Dictionary will not mutate storage with reference count greater than 1.
     return Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(nativeOwner, _NSDictionary.self))
+        unsafeBitCast(nativeOwner, to: _NSDictionary.self))
 
   case .Cocoa(let cocoaStorage):
     return Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(cocoaStorage, _NSDictionary.self))
+        unsafeBitCast(cocoaStorage, to: _NSDictionary.self))
   }
 }
 
@@ -2211,7 +2212,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       "don't call mutating methods on _Native${Self}Storage")
   }
 
-  internal mutating func removeAt(index: Index) -> SequenceElement {
+  internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
@@ -2573,7 +2574,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     @warn_unused_result
     get {
       if let ref = _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-        return unsafeDowncast(ref) as BridgedNativeStorage.StorageImpl
+        return unsafeDowncast(ref, to: BridgedNativeStorage.StorageImpl.self)
       }
       return nil
     }
@@ -2878,7 +2879,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
-  internal mutating func removeAt(index: Index) -> SequenceElement {
+  internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
@@ -3382,7 +3383,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     return result
   }
 
-  internal mutating func removeAt(index: Index) -> SequenceElement {
+  internal mutating func remove(at index: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return nativeRemoveAt(index._nativeIndex)
     }
@@ -4076,7 +4077,7 @@ extension ${Self} {
   /// - Complexity: Amortized O(1)
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
-    return removeAt(startIndex)
+    return remove(at: startIndex)
   }
 }
 
@@ -4103,7 +4104,7 @@ extension ${Self} {
   }
 
   @warn_unused_result
-  public static func _bridgeFromObjectiveCAdoptingNativeStorage(
+  public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     s: AnyObject
   ) -> ${Self}<${TypeParameters}>? {
     if let nativeOwner =

@@ -99,15 +99,18 @@ public class ManagedBuffer<Value, Element>
   /// generate an initial `Value`.
   public final class func create(
     minimumCapacity: Int,
-    initialValue: (ManagedProtoBuffer<Value,Element>) -> Value
-  ) -> ManagedBuffer<Value,Element> {
+    initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
+  ) -> ManagedBuffer<Value, Element> {
 
     let p = ManagedBufferPointer<Value,Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
-      initialValue: { buffer, _ in initialValue(unsafeDowncast(buffer)) })
+      initialValue: { buffer, _ in
+        initialValue(
+          unsafeDowncast(buffer, to: ManagedProtoBuffer<Value, Element>.self))
+      })
 
-    return unsafeDowncast(p.buffer)
+    return unsafeDowncast(p.buffer, to: ManagedBuffer<Value, Element>.self)
   }
 
   /// Destroy the stored Value.
@@ -406,7 +409,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the stored `Value`
   internal static var _valueOffset: Int {
-    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+    return _roundUp(
+      sizeof(_HeapObject.self),
+      toAlignment: alignof(Value.self))
   }
 
   /// An **unmanaged** pointer to the storage for the `Value`
@@ -425,8 +430,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the `Element` storage
   internal static var _elementOffset: Int {
-    return _roundUpToAlignment(
-      _valueOffset + sizeof(Value.self), alignof(Element.self))
+    return _roundUp(
+      _valueOffset + sizeof(Value.self),
+      toAlignment: alignof(Element.self))
   }
 
   internal var _nativeBuffer: Builtin.NativeObject

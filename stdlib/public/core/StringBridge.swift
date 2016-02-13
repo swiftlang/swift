@@ -58,7 +58,7 @@ func _cocoaStringToSwiftString_NonASCII(
     count: length,
     elementShift: 1,
     hasCocoaBuffer: true,
-    owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self)))
+    owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self)))
 }
 
 /// Loading Foundation initializes these function variables
@@ -173,7 +173,7 @@ extension String {
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,
-      owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self))
+      owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self))
   }
 }
 

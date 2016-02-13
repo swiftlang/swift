@@ -66,42 +66,42 @@ var OpaquePointerTestSuite = TestSuite("OpaquePointer")
 
 ${SelfName}TestSuite.test("convertFromNil") {
   let ptr: ${SelfType} = nil
-  expectEqual(0, unsafeBitCast(ptr, Int.self))
+  expectEqual(0, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initNoArgs") {
   let ptr: ${SelfType} = nil
-  expectEqual(0, unsafeBitCast(ptr, Int.self))
+  expectEqual(0, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromOpaquePointer") {
   let other = OpaquePointer(bitPattern: 0x12345678)
   let ptr = UnsafePointer<Float>(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromUnsafePointer") {
   let other = UnsafePointer<Double>(bitPattern: 0x12345678)
   let ptr = ${SelfType}(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
   let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
   let ptr = ${SelfType}(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromInteger") {
   if true {
     let word: Int = 0x12345678
     let ptr = ${SelfType}(bitPattern: word)
-    expectEqual(word, unsafeBitCast(ptr, Int.self))
+    expectEqual(word, unsafeBitCast(ptr, to: Int.self))
   }
   if true {
     let uword: UInt = 0x12345678
     let ptr = ${SelfType}(bitPattern: uword)
-    expectEqual(uword, unsafeBitCast(ptr, UInt.self))
+    expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
   }
 }
 

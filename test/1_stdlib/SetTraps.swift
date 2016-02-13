@@ -27,7 +27,7 @@ SetTraps.test("RemoveInvalidIndex1")
   var s = Set<Int>()
   let index = s.startIndex
   expectCrashLater()
-  s.removeAt(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveInvalidIndex2")
@@ -38,7 +38,7 @@ SetTraps.test("RemoveInvalidIndex2")
   var s = Set<Int>()
   let index = s.endIndex
   expectCrashLater()
-  s.removeAt(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveInvalidIndex3")
@@ -49,7 +49,7 @@ SetTraps.test("RemoveInvalidIndex3")
   var s: Set<Int> = [ 10, 20, 30 ]
   let index = s.endIndex
   expectCrashLater()
-  s.removeAt(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveInvalidIndex4")
@@ -59,10 +59,10 @@ SetTraps.test("RemoveInvalidIndex4")
   .code {
   var s: Set<Int> = [ 10 ]
   let index = s.indexOf(10)!
-  s.removeAt(index)
+  s.remove(at: index)
   expectFalse(s.contains(10))
   expectCrashLater()
-  s.removeAt(index)
+  s.remove(at: index)
 }
 
 SetTraps.test("RemoveFirstFromEmpty")

@@ -184,8 +184,8 @@ func checkRoundTripThroughCharacter(s: String) {
 }
 
 func isSmallRepresentation(s: String) -> Bool {
-  switch(Character(s)._representation) {
-    case .Small:
+  switch Character(s)._representation {
+    case .small:
       return true
     default:
       return false

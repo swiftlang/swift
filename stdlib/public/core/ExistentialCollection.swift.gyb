@@ -314,16 +314,16 @@ internal protocol _ForwardIndexBoxProtocol : class {
   func _unbox<T : ForwardIndex>() -> T?
 
   @warn_unused_result
-  func _distanceTo(other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance
+  func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance
 
-  // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
+  // FIXME: Can't return Self from _advanced(by:) pending <rdar://20181253>
   @warn_unused_result
-  func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol
+  func _advanced(by distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol
 
   @warn_unused_result
-  func _advancedBy(
-    distance: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxProtocol
+  func _advanced(
+    by distance: AnyForwardIndex.Distance,
+    limit: _ForwardIndexBoxProtocol
   ) -> _ForwardIndexBoxProtocol
 }
 
@@ -343,27 +343,27 @@ internal class _ForwardIndexBox<
   }
 
   func unsafeUnbox(other: _ForwardIndexBoxProtocol) -> BaseIndex {
-    return (unsafeDowncast(other) as _ForwardIndexBox).base
+    return unsafeDowncast(other, to: _ForwardIndexBox.self).base
   }
 
   func equals(other: _ForwardIndexBoxProtocol) -> Bool {
     return base == unsafeUnbox(other)
   }
 
-  func _distanceTo(other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance {
-    return numericCast(base.distanceTo(unsafeUnbox(other)))
+  func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance {
+    return numericCast(base.distance(to: unsafeUnbox(other)))
   }
 
-  func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol {
-    return self.dynamicType.init(base.advancedBy(numericCast(n)))
+  func _advanced(by n: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol {
+    return self.dynamicType.init(base.advanced(by: numericCast(n)))
   }
 
-  func _advancedBy(
-    n: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxProtocol
+  func _advanced(
+    by n: AnyForwardIndex.Distance,
+    limit: _ForwardIndexBoxProtocol
   ) -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(
-      base.advancedBy(numericCast(n), limit: unsafeUnbox(limit)))
+      base.advanced(by: numericCast(n), limit: unsafeUnbox(limit)))
   }
 
   func _unbox<T : ForwardIndex>() -> T? {
@@ -371,7 +371,7 @@ internal class _ForwardIndexBox<
       _sanityCheck(BaseIndex.self is T.Type)
       // This bit cast is really nothing as we have proven they are
       // the same type.
-      return unsafeBitCast(base, T.self)
+      return unsafeBitCast(base, to: T.self)
     }
     return nil
   }
@@ -478,16 +478,16 @@ public struct ${Self} : ${Traversal}Index {
   % end
 
   % if Traversal == 'RandomAccess':
-  public func distanceTo(other: ${Self}) -> Distance {
-    return _box._distanceTo(other._box)
+  public func distance(to other: ${Self}) -> Distance {
+    return _box._distance(to: other._box)
   }
 
-  public func advancedBy(amount: Distance) -> ${Self} {
-    return ${Self}(_box._advancedBy(amount))
+  public func advanced(by amount: Distance) -> ${Self} {
+    return ${Self}(_box._advanced(by: amount))
   }
 
-  public func advancedBy(amount: Distance, limit: ${Self}) -> ${Self} {
-    return ${Self}(_box._advancedBy(amount, limit._box))
+  public func advanced(by amount: Distance, limit: ${Self}) -> ${Self} {
+    return ${Self}(_box._advanced(by: amount, limit: limit._box))
   }
   % end
 
@@ -506,11 +506,11 @@ public struct ${Self} : ${Traversal}Index {
   // is unchanged, it must appear mutable to the optimizer.
   internal var _box: _${Traversal}IndexBoxProtocol
 
-  public func _distanceTo(other: ${Self}) -> ${Self}.Distance {
+  public func _distance(to other: ${Self}) -> ${Self}.Distance {
     require(
       self._typeID == other._typeID,
       "distance: base index types differ.")
-    return self._box._distanceTo(other._box)
+    return self._box._distance(to: other._box)
   }
 }
 

@@ -324,10 +324,11 @@ public struct ${Self}<Element>
     // _getOwnerWithSemanticLabel_native hinders optimization.
     return Builtin.castToNativeObject(_buffer.owner)
   }
-  
+
+  // FIXME(ABI): move to an initalizer on _Buffer.
   static internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      count: buffer.count, minimumCapacity: buffer.count)
+      uninitializedCount: buffer.count, minimumCapacity: buffer.count)
     buffer._uninitializedCopy(
       buffer.indices, target: newBuffer.firstElementAddress)
     buffer = _Buffer(newBuffer, shiftedToStartIndex: buffer.startIndex)
@@ -496,7 +497,7 @@ extension ${Self} : _ArrayProtocol {
 
   /// Construct from an arbitrary sequence of `Element`s.
   public init<
-    S: Sequence where S.Iterator.Element == _Buffer.Element
+    S : Sequence where S.Iterator.Element == Element
   >(_ s: S) {
     self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
       shiftedToStartIndex: 0))
@@ -515,9 +516,11 @@ extension ${Self} : _ArrayProtocol {
   }
 
   @inline(never)
-  internal static func _allocateBufferUninitialized(count: Int) -> _Buffer {
+  internal static func _allocateBufferUninitialized(
+    minimumCapacity minimumCapacity: Int
+  ) -> _Buffer {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      count: 0, minimumCapacity: count)
+      uninitializedCount: 0, minimumCapacity: minimumCapacity)
     return _Buffer(newBuffer, shiftedToStartIndex: 0)
   }
 
@@ -531,7 +534,7 @@ extension ${Self} : _ArrayProtocol {
       // Creating a buffer instead of calling reserveCapacity saves doing an
       // unnecessary uniqueness check. We disable inlining here to curb code
       // growth.
-      _buffer = ${Self}._allocateBufferUninitialized(count)
+      _buffer = ${Self}._allocateBufferUninitialized(minimumCapacity: count)
     }
     _buffer.count = count
   }
@@ -564,7 +567,9 @@ extension ${Self} : _ArrayProtocol {
       storage is _ContiguousArrayStorage<Element>, "Invalid array storage type")
     
     let innerBuffer = _ContiguousArrayBuffer<Element>(
-      count: count, storage: unsafeDowncast(storage))
+      count: count,
+      storage: unsafeDowncast(
+        storage, to: _ContiguousArrayStorage<Element>.self))
     
     return (
       Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
@@ -618,10 +623,11 @@ extension ${Self} : _ArrayProtocol {
   /// - Complexity: O(`self.count`).
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
-    if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
+    if _buffer.requestUniqueMutableBackingBuffer(
+      minimumCapacity: minimumCapacity) == nil {
 
       let newBuffer = _ContiguousArrayBuffer<Element>(
-        count: count, minimumCapacity: minimumCapacity)
+        uninitializedCount: count, minimumCapacity: minimumCapacity)
 
       _buffer._uninitializedCopy(
         _buffer.indices, target: newBuffer.firstElementAddress)
@@ -634,7 +640,7 @@ extension ${Self} : _ArrayProtocol {
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
   @inline(never)
-  internal mutating func _copyToNewBuffer(oldCount: Int) {
+  internal mutating func _copyToNewBuffer(oldCount oldCount: Int) {
     let newCount = oldCount + 1
     var newBuffer = Optional(
       _forceCreateUniqueMutableBuffer(
@@ -646,16 +652,18 @@ extension ${Self} : _ArrayProtocol {
   @_semantics("array.make_mutable")
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _copyToNewBuffer(_buffer.count)
+      _copyToNewBuffer(oldCount: _buffer.count)
     }
   }
 
   @_semantics("array.mutate_unknown")
-  internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
+  internal mutating func _reserveCapacityAssumingUniqueBuffer(
+    oldCount oldCount: Int
+  ) {
     _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
-      _copyToNewBuffer(oldCount)
+      _copyToNewBuffer(oldCount: oldCount)
     }
   }
 
@@ -677,7 +685,7 @@ extension ${Self} : _ArrayProtocol {
   public mutating func append(newElement: Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
-    _reserveCapacityAssumingUniqueBuffer(oldCount)
+    _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
     _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
   }
 
@@ -733,7 +741,7 @@ extension ${Self} : _ArrayProtocol {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAt(index: Int) -> Element {
+  public mutating func remove(at index: Int) -> Element {
     let result = self[index]
     self.replaceSubrange(index..<(index + 1), with: EmptyCollection())
     return result
@@ -910,6 +918,7 @@ internal struct _InitializeMemoryFromCollection<
   var newValues: C
 }
 
+// FIXME(ABI): add argument labels.
 @inline(never)
 internal func _arrayOutOfPlaceReplace<
   B : _ArrayBufferProtocol, C : Collection
@@ -935,6 +944,7 @@ internal func _arrayOutOfPlaceReplace<
 /// A _stdlibAssert check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
+// FIXME(ABI): add argument labels.
 internal func _expectEnd<C : Collection>(i: C.Index, _ s: C) {
   _stdlibAssert(
     i == s.endIndex,
@@ -969,7 +979,9 @@ extension ${Self} {
     let insertCount = numericCast(newElements.count) as Int
     let growth = insertCount - eraseCount
 
-    if self._buffer.requestUniqueMutableBackingBuffer(oldCount + growth) != nil {
+    if self._buffer.requestUniqueMutableBackingBuffer(
+      minimumCapacity: oldCount + growth) != nil {
+
       self._buffer.replace(
         subRange: subRange, with: insertCount, elementsOf: newElements)
     } else {
@@ -1072,7 +1084,7 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol
       ? _growArrayCapacity(source.capacity) : source.capacity)
 
   return _ContiguousArrayBuffer(
-    count: countForBuffer, minimumCapacity: minimumCapacity)
+    uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
 }
 
 internal protocol _PointerFunction {
@@ -1113,7 +1125,9 @@ internal func _arrayOutOfPlaceUpdate<
   let newEnd = newStart + newCount
 
   // Check to see if we have storage we can move from
-  if let backing = source.requestUniqueMutableBackingBuffer(sourceCount) {
+  if let backing = source.requestUniqueMutableBackingBuffer(
+    minimumCapacity: sourceCount) {
+
     let sourceStart = source.firstElementAddress
     let oldStart = sourceStart + headCount
 
@@ -1184,7 +1198,9 @@ internal func _arrayReserve<
   let requiredCapacity = max(count, minimumCapacity)
 
   if _fastPath(
-      buffer.requestUniqueMutableBackingBuffer(requiredCapacity) != nil) {
+      buffer.requestUniqueMutableBackingBuffer(
+        minimumCapacity: requiredCapacity) != nil
+  ) {
     return
   }
 
@@ -1316,7 +1332,7 @@ public func != <Element : Equatable>(
 public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
   // FIXME: Dynamic casting is currently not possible without the objc runtime:
   // rdar://problem/18801510
-  return Array(a._buffer.castToBufferOf(Base.self))
+  return Array(a._buffer.cast(toBufferOf: Base.self))
 }
 #endif
 
@@ -1328,7 +1344,7 @@ extension Array {
   // Note: this function exists here so that Foundation doesn't have
   // to know Array's implementation details.
   @warn_unused_result
-  public static func _bridgeFromObjectiveCAdoptingNativeStorage(
+  public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     source: AnyObject
   ) -> Array? {
     if let deferred = source as? _SwiftDeferredNSArray {
@@ -1383,7 +1399,7 @@ extension ${Self} {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="removeAt")
+  @available(*, unavailable, renamed="remove")
   public mutating func removeAtIndex(index: Int) -> Element {
     fatalError("unavailable function can't be called")
   }

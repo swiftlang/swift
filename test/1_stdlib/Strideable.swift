@@ -67,18 +67,18 @@ struct R : RandomAccessIndex {
   func predecessor() -> R {
     return R(x - 1)
   }
-  func distanceTo(rhs: R) -> Int {
+  func distance(to rhs: R) -> Int {
     return rhs.x - x
   }
-  func advancedBy(n: Int) -> R {
+  func advanced(by n: Int) -> R {
     return R(x + n)
   }
-  func advancedBy(n: Int, limit: R) -> R {
-    let d = distanceTo(limit)
+  func advanced(by n: Int, limit: R) -> R {
+    let d = distance(to: limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
     }
-    return self.advancedBy(n)
+    return self.advanced(by: n)
   }
 }
 

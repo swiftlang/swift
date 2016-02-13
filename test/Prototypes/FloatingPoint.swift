@@ -859,7 +859,7 @@ public protocol FloatingPointInterchange: FloatingPoint {
 extension FloatingPointInterchange {
   public init(littleEndian encoding: BitPattern) {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
-    self = unsafeBitCast(encoding, Self.self)
+    self = unsafeBitCast(encoding, to: Self.self)
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -869,7 +869,7 @@ extension FloatingPointInterchange {
   }
   public var littleEndian: BitPattern {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(powerpc64le)
-    return unsafeBitCast(self, BitPattern.self)
+    return unsafeBitCast(self, to: BitPattern.self)
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -880,7 +880,7 @@ extension FloatingPointInterchange {
 }
 
 extension Float : BinaryFloatingPoint, FloatingPointInterchange {
-  var _representation: UInt32 { return unsafeBitCast(self, UInt32.self) }
+  var _representation: UInt32 { return unsafeBitCast(self, to: UInt32.self) }
   public typealias SignificandBits = UInt32
   public typealias BitPattern = UInt32
   public static var _fractionalBitCount: UInt { return 23 }
@@ -892,7 +892,7 @@ extension Float : BinaryFloatingPoint, FloatingPointInterchange {
     let sign = SignificandBits(signbit ? 1 : 0) << 31
     let exponent = SignificandBits(exponentBitPattern) << 23
     let _representation = sign | exponent | significandBitPattern
-    self = unsafeBitCast(_representation, Float.self)
+    self = unsafeBitCast(_representation, to: Float.self)
   }
   public init<T: BinaryFloatingPoint>(_ other: T) {
     // rdar://16980851 #if does not work with 'switch'
@@ -929,7 +929,7 @@ extension Float : BinaryFloatingPoint, FloatingPointInterchange {
 }
 
 extension Double : BinaryFloatingPoint {
-  var _representation: UInt64 { return unsafeBitCast(self, UInt64.self) }
+  var _representation: UInt64 { return unsafeBitCast(self, to: UInt64.self) }
   public typealias SignificandBits = UInt64
   public static var _fractionalBitCount: UInt { return 52 }
   public static var _exponentBitCount: UInt { return 11 }
@@ -940,7 +940,7 @@ extension Double : BinaryFloatingPoint {
     let sign = SignificandBits(signbit ? 1 : 0) << 63
     let exponent = SignificandBits(exponentBitPattern) << 52
     let _representation = sign | exponent | significandBitPattern
-    self = unsafeBitCast(_representation, Double.self)
+    self = unsafeBitCast(_representation, to: Double.self)
   }
   public init<T: BinaryFloatingPoint>(_ other: T) {
     // rdar://16980851 #if does not work with 'switch' cases
@@ -992,7 +992,7 @@ extension Float80 : BinaryFloatingPoint {
   }
   
   var _representation: _Float80Representation {
-    return unsafeBitCast(self, _Float80Representation.self)
+    return unsafeBitCast(self, to: _Float80Representation.self)
   }
   
   //  Public requirements
@@ -1046,7 +1046,7 @@ extension Float80 : BinaryFloatingPoint {
     var significand = significandBitPattern
     if exponent != 0 { significand |= Float80._integralBitMask }
     let representation =  _Float80Representation(explicitSignificand: significand, signAndExponent: sign|exponent)
-    self = unsafeBitCast(representation, Float80.self)
+    self = unsafeBitCast(representation, to: Float80.self)
   }
   
   public init<T: BinaryFloatingPoint>(_ other: T) {

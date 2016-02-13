@@ -39,7 +39,7 @@ public struct CollectionOfOne<Element> : Collection {
 
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
-    self.element = element
+    self._element = element
   }
 
   /// The position of the first element.
@@ -59,7 +59,7 @@ public struct CollectionOfOne<Element> : Collection {
   ///
   /// - Complexity: O(1).
   public func iterator() -> IteratorOverOne<Element> {
-    return IteratorOverOne(_elements: element)
+    return IteratorOverOne(_elements: _element)
   }
 
   /// Access the element at `position`.
@@ -67,7 +67,7 @@ public struct CollectionOfOne<Element> : Collection {
   /// - Requires: `position == 0`.
   public subscript(position: Int) -> Element {
     _require(position == 0, "Index out of range")
-    return element
+    return _element
   }
 
   /// Return the number of elements (always one).
@@ -75,12 +75,12 @@ public struct CollectionOfOne<Element> : Collection {
     return 1
   }
 
-  let element: Element
+  internal let _element: Element
 }
 
 extension CollectionOfOne : CustomReflectable {
   public var customMirror: Mirror {
-    return Mirror(self, children: ["element": element])
+    return Mirror(self, children: ["element": _element])
   }
 }
 

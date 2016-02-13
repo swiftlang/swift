@@ -133,7 +133,7 @@ public protocol RangeReplaceableCollection : Collection {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func removeAt(i: Index) -> Iterator.Element
+  mutating func remove(at i: Index) -> Iterator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
   /// want to replace the default implementation.
@@ -229,7 +229,7 @@ extension RangeReplaceableCollection {
     replaceSubrange(i..<i, with: newElements)
   }
 
-  public mutating func removeAt(index: Index) -> Iterator.Element {
+  public mutating func remove(at index: Index) -> Iterator.Element {
     _require(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
     replaceSubrange(index...index, with: EmptyCollection())
@@ -245,7 +245,7 @@ extension RangeReplaceableCollection {
     _require(n >= 0, "number of elements to remove should be non-negative")
     _require(count >= numericCast(n),
       "can't remove more items from a collection than it has")
-    let end = startIndex.advancedBy(numericCast(n))
+    let end = startIndex.advanced(by: numericCast(n))
     removeSubrange(startIndex..<end)
   }
 
@@ -290,7 +290,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
     _require(n >= 0, "number of elements to remove should be non-negative")
     _require(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[startIndex.advancedBy(numericCast(n))..<endIndex]
+    self = self[startIndex.advanced(by: numericCast(n))..<endIndex]
   }
 }
 
@@ -320,7 +320,7 @@ extension RangeReplaceableCollection
 
   @warn_unused_result
   public mutating func _customRemoveLast(n: Int) -> Bool {
-    self = self[startIndex..<endIndex.advancedBy(numericCast(-n))]
+    self = self[startIndex..<endIndex.advanced(by: numericCast(-n))]
     return true
   }
 }
@@ -335,7 +335,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
     if let result = _customRemoveLast() {
       return result
     }
-    return removeAt(endIndex.predecessor())
+    return remove(at: endIndex.predecessor())
   }
 
   /// Remove the last `n` elements.
@@ -351,7 +351,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
       return
     }
     let end = endIndex
-    removeSubrange(end.advancedBy(numericCast(-n))..<end)
+    removeSubrange(end.advanced(by: numericCast(-n))..<end)
   }
 }
 

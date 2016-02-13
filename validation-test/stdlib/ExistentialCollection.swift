@@ -82,7 +82,7 @@ tests.test("AnyIterator") {
 let initialCallCounts = [
   "successor": 0, "predecessor": 0,
   "_successorInPlace": 0, "_predecessorInPlace": 0,
-  "advancedBy": 0, "distanceTo": 0
+  "advanced(by:)": 0, "distance(to:)": 0
 ]
 
 var callCounts = initialCallCounts
@@ -120,14 +120,14 @@ struct InstrumentedIndex<I : RandomAccessIndex> : RandomAccessIndex {
     base._predecessorInPlace()
   }
   
-  func advancedBy(distance: Distance) -> InstrumentedIndex {
-    callCounts["advancedBy"]! += 1
-    return InstrumentedIndex(base.advancedBy(distance))
+  func advanced(by distance: Distance) -> InstrumentedIndex {
+    callCounts["advanced(by:)"]! += 1
+    return InstrumentedIndex(base.advanced(by: distance))
   }
   
-  func distanceTo(other: InstrumentedIndex) -> Distance {
-    callCounts["distanceTo"]! += 1
-    return base.distanceTo(other.base)
+  func distance(to other: InstrumentedIndex) -> Distance {
+    callCounts["distance(to:)"]! += 1
+    return base.distance(to: other.base)
   }
 }
 

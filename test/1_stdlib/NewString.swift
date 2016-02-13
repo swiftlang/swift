@@ -11,7 +11,7 @@ import Swift
 func hex(x: UInt64) -> String { return String(x, radix:16) }
 
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + hex(UInt64(unsafeBitCast(x, UInt.self)))
+  return "@0x" + hex(UInt64(unsafeBitCast(x, to: UInt.self)))
 }
 
 func hexAddr(x: AnyObject?) -> String {
@@ -82,7 +82,7 @@ func nonASCII() {
   // Offset of each character:     0 2 3 4 5 7 9 11
   var nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
   // CHECK-NEXT: has UTF-16: true
-  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, CFString.self)) != nil)")
+  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, to: CFString.self)) != nil)")
 
   // CHECK: --- UTF-16 basic round-tripping ---
   print("--- UTF-16 basic round-tripping ---")
@@ -104,8 +104,8 @@ func nonASCII() {
 
   // Slicing the String does not allocate
   // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
-  let i2 = newNSUTF16.startIndex.advancedBy(2)
-  let i8 = newNSUTF16.startIndex.advancedBy(6)
+  let i2 = newNSUTF16.startIndex.advanced(by: 2)
+  let i8 = newNSUTF16.startIndex.advanced(by: 6)
   print("  \(repr(newNSUTF16[i2..<i8]))")
 
   // Representing a slice as an NSString requires a new object
@@ -128,7 +128,7 @@ func ascii() {
   // treating it as an opaque NSString.
   var nsASCII = NSString(utf8String: "foobar")!
   // CHECK-NEXT: has UTF-16: false
-  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, CFString.self)) != nil)")
+  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, to: CFString.self)) != nil)")
 
   // CHECK: --- ASCII basic round-tripping ---
   print("--- ASCII basic round-tripping ---")
@@ -147,8 +147,8 @@ func ascii() {
   // CHECK: --- ASCII slicing ---
   print("--- ASCII slicing ---")
 
-  let i3 = newNSASCII.startIndex.advancedBy(3)
-  let i6 = newNSASCII.startIndex.advancedBy(6)
+  let i3 = newNSASCII.startIndex.advanced(by: 3)
+  let i6 = newNSASCII.startIndex.advanced(by: 6)
   
   // Slicing the String
   print("  \(repr(newNSASCII[i3..<i6]))")

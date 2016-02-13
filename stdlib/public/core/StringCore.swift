@@ -245,7 +245,7 @@ public struct _StringCore {
   public var nativeBuffer: _StringBuffer? {
     if !hasCocoaBuffer {
       return _owner.map {
-        unsafeBitCast($0, _StringBuffer.self)
+        unsafeBitCast($0, to: _StringBuffer.self)
       }
     }
     return nil
@@ -256,7 +256,7 @@ public struct _StringCore {
   public var cocoaBuffer: _CocoaString? {
     if hasCocoaBuffer {
       return _owner.map {
-        unsafeBitCast($0, _CocoaString.self)
+        unsafeBitCast($0, to: _CocoaString.self)
       }
     }
     return nil

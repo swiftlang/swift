@@ -28,15 +28,15 @@ internal enum RangeSelection {
       case .LeftEdge: return collection.startIndex..<collection.startIndex
       case .RightEdge: return collection.endIndex..<collection.endIndex
       case .Middle:
-        let start = collection.startIndex.advancedBy(collection.count / 4)
-        let end = collection.startIndex.advancedBy(3 * collection.count / 4)
+        let start = collection.startIndex.advanced(by: collection.count / 4)
+        let end = collection.startIndex.advanced(by: 3 * collection.count / 4)
         return start...end
       case .LeftHalf:
         let start = collection.startIndex
-        let end = start.advancedBy(collection.count / 2)
+        let end = start.advanced(by: collection.count / 2)
         return start..<end
       case .RightHalf:
-        let start = collection.startIndex.advancedBy(collection.count / 2)
+        let start = collection.startIndex.advanced(by: collection.count / 2)
         let end = collection.endIndex
         return start..<end
     }
@@ -52,9 +52,9 @@ internal enum IndexSelection {
   internal func indexIn<C : Collection>(collection: C) -> C.Index {
     switch self {
       case .Start: return collection.startIndex
-      case .Middle: return collection.startIndex.advancedBy(collection.count / 2)
+      case .Middle: return collection.startIndex.advanced(by: collection.count / 2)
       case .End: return collection.endIndex
-      case .Last: return collection.startIndex.advancedBy(collection.count - 1)
+      case .Last: return collection.startIndex.advanced(by: collection.count - 1)
     }
   }
 }
@@ -167,7 +167,7 @@ internal struct RemoveAtIndexTest {
     self.indexSelection = indexSelection
     self.expectedRemovedElement = expectedRemovedElement
     self.expectedCollection = expectedCollection
-    self.loc = SourceLoc(file, line, comment: "removeAt() test data")
+    self.loc = SourceLoc(file, line, comment: "remove(at:) test data")
   }
 }
 
@@ -657,10 +657,10 @@ self.test("\(testNamePrefix).insertContentsOf()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// removeAt()
+// remove(at:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).removeAt()/semantics") {
+self.test("\(testNamePrefix).remove(at:)/semantics") {
   let tests: [RemoveAtIndexTest] = [
     RemoveAtIndexTest(
       collection: [1010],
@@ -689,7 +689,7 @@ self.test("\(testNamePrefix).removeAt()/semantics") {
 
   for test in tests {
     var c = makeWrappedCollection(test.collection)
-    let removedElement = c.removeAt(test.indexSelection.indexIn(c))
+    let removedElement = c.remove(at: test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expectedCollection,
       c.map { extractValue($0).value },

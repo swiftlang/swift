@@ -75,7 +75,7 @@ public func strideofValue<T>(_:T) -> Int {
 }
 
 @warn_unused_result
-func _roundUpToAlignment(offset: Int, _ alignment: Int) -> Int {
+internal func _roundUp(offset: Int, toAlignment alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   _sanityCheck(alignment > 0)
   _sanityCheck(_isPowerOf2(alignment))
@@ -103,7 +103,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///
 @_transparent
 @warn_unused_result
-public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
+public func unsafeBitCast<T, U>(x: T, to: U.Type) -> U {
   _require(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
@@ -113,13 +113,13 @@ public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
 @_transparent
 @warn_unused_result
 public func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
-  return unsafeBitCast(x, AnyObject.self)
+  return unsafeBitCast(x, to: AnyObject.self)
 }
 
 @_transparent
 @warn_unused_result
 func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
-  return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
+  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
@@ -131,7 +131,7 @@ func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
 @_transparent
 @warn_unused_result
 func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
-  return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
+  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
@@ -144,7 +144,7 @@ func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 /// `nil` or they both represent the same type.
 @warn_unused_result
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  return unsafeBitCast(t0, Int.self) == unsafeBitCast(t1, Int.self)
+  return unsafeBitCast(t0, to: Int.self) == unsafeBitCast(t1, to: Int.self)
 }
 
 /// Return `false` iff `t0` is identical to `t1`; i.e. if they are both
@@ -214,7 +214,7 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 /// optional references.
 @_transparent
 @warn_unused_result
-public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
+public func _unsafeReferenceCast<T, U>(x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
 
@@ -230,7 +230,7 @@ public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
 ///   checking is still performed in debug builds.
 @_transparent
 @warn_unused_result
-public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
+public func unsafeDowncast<T : AnyObject>(x: AnyObject, to: T.Type) -> T {
   _stdlibAssert(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
@@ -239,8 +239,9 @@ public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
 @warn_unused_result
 public func _getUnsafePointerToStoredProperties(x: AnyObject)
   -> UnsafeMutablePointer<UInt8> {
-  let storedPropertyOffset = _roundUpToAlignment(
-    sizeof(_HeapObject.self), alignof(Optional<AnyObject>.self))
+  let storedPropertyOffset = _roundUp(
+    sizeof(_HeapObject.self),
+    toAlignment: alignof(Optional<AnyObject>.self))
   return UnsafeMutablePointer<UInt8>(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
 }
@@ -256,7 +257,7 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 @_transparent
 @_semantics("branchhint")
 @warn_unused_result
-internal func _branchHint<C : Boolean>(actual: C, _ expected: Bool)
+internal func _branchHint<C : Boolean>(actual: C, expected: Bool)
   -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
 }
@@ -266,7 +267,7 @@ internal func _branchHint<C : Boolean>(actual: C, _ expected: Bool)
 @_semantics("fastpath")
 @warn_unused_result
 public func _fastPath<C: Boolean>(x: C) -> Bool {
-  return _branchHint(x.boolValue, true)
+  return _branchHint(x.boolValue, expected: true)
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
@@ -274,7 +275,7 @@ public func _fastPath<C: Boolean>(x: C) -> Bool {
 @_semantics("slowpath")
 @warn_unused_result
 public func _slowPath<C : Boolean>(x: C) -> Bool {
-  return _branchHint(x.boolValue, false)
+  return _branchHint(x.boolValue, expected: false)
 }
 
 //===--- Runtime shim wrappers --------------------------------------------===//
@@ -462,8 +463,8 @@ internal func _makeBridgeObject(
 public // @testable
 func _getSuperclass(t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
-    swift_class_getSuperclass(unsafeBitCast(t, OpaquePointer.self)),
-    AnyClass.self)
+    swift_class_getSuperclass(unsafeBitCast(t, to: OpaquePointer.self)),
+    to: AnyClass.self)
 }
 
 /// Return the superclass of `t`, if any.  The result is `nil` if `t` is

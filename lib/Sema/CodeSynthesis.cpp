@@ -1488,7 +1488,8 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 
   Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc,
                                                        /*Implicit=*/true);
-  className = new (tc.Context) ParenExpr(loc, className, loc, false);
+  className = TupleExpr::createImplicit(
+    tc.Context, {className}, {tc.Context.Id_className});
   className->setImplicit();
   Expr *call = new (tc.Context) CallExpr(fn, className, /*Implicit=*/true);
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),

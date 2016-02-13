@@ -101,6 +101,7 @@ IDENTIFIER(stringInterpolationSegment)
 IDENTIFIER(arrayLiteral)
 IDENTIFIER(dictionaryLiteral)
 IDENTIFIER_(getBuiltinLogicValue)
+IDENTIFIER(className)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

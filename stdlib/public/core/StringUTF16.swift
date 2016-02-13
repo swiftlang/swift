@@ -206,21 +206,21 @@ public func < (
 
 extension String.UTF16View.Index {
   @warn_unused_result
-  public func distanceTo(end: String.UTF16View.Index)
+  public func distance(to end: String.UTF16View.Index)
     -> String.UTF16View.Index.Distance {
-    return self._offset.distanceTo(end._offset)
+    return self._offset.distance(to: end._offset)
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance) -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: self._offset.advancedBy(n))
+  public func advanced(by n: Distance) -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset: self._offset.advanced(by: n))
   }
 
   @warn_unused_result
-  public func advancedBy(n: Distance, limit: String.UTF16View.Index)
+  public func advanced(by n: Distance, limit: String.UTF16View.Index)
     -> String.UTF16View.Index {
     return String.UTF16View.Index(
-      _offset: self._offset.advancedBy(n, limit: limit._offset))
+      _offset: self._offset.advanced(by: n, limit: limit._offset))
   }
 }
 

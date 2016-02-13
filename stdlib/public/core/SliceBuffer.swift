@@ -130,9 +130,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   //===--- Non-essential bits ---------------------------------------------===//
 
   @warn_unused_result
-  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-    -> NativeBuffer?
-  {
+  public mutating func requestUniqueMutableBackingBuffer(
+    minimumCapacity minimumCapacity: Int
+  ) -> NativeBuffer? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && isUniquelyReferenced()) {
       if capacity >= minimumCapacity {
@@ -337,7 +337,7 @@ extension _SliceBuffer {
     }
 
     let result = _ContiguousArrayBuffer<Element>(
-      count: count,
+      uninitializedCount: count,
       minimumCapacity: 0)
     result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
     return result

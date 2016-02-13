@@ -17,11 +17,11 @@
 func foo() {
   let x = 1
   x.#^INT_DOT^#
-  // INT_DOT: {{^}}advancedBy(n:
+  // INT_DOT: {{^}}advanced(by:
   // INT_DOT: {{^}}bigEndian{{$}}
   // INT_DOT: {{^}}byteSwapped{{$}}
   // INT_DOT: {{^}}description{{$}}
-  // INT_DOT: {{^}}distanceTo(other: Int){{$}}
+  // INT_DOT: {{^}}distance(to: Int){{$}}
   // INT_DOT: {{^}}hashValue{{$}}
   // INT_DOT: {{^}}littleEndian{{$}}
   // INT_DOT: {{^}}predecessor(){{$}}

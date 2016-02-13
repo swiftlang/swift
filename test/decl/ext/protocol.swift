@@ -850,7 +850,7 @@ public protocol ReallyRaw : RawRepresentable {
 
 public extension ReallyRaw where RawValue: SignedInteger {
   public init?(rawValue: RawValue) {
-    self = unsafeBitCast(rawValue, Self.self)
+    self = unsafeBitCast(rawValue, to: Self.self)
   }
 }
 

@@ -211,7 +211,7 @@ sanePointerString.deallocateCapacity(1)
 
 // Don't crash on types with opaque metadata. rdar://problem/19791252
 // CHECK-NEXT: (Opaque Value)
-var rawPointer = unsafeBitCast(0 as Int, Builtin.RawPointer.self)
+var rawPointer = unsafeBitCast(0 as Int, to: Builtin.RawPointer.self)
 dump(rawPointer)
 
 // CHECK-LABEL: and now our song is done

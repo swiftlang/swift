@@ -740,7 +740,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
       if let ref =
         _stdlib_atomicLoadARCRef(object: raceData.atomicReferencePtr) {
         let dummy = ref as! DummyObject
-        observation.data2 = unsafeBitCast(ref, UInt.self)
+        observation.data2 = unsafeBitCast(ref, to: UInt.self)
         observation.data3 = dummy.payload
       }
     }

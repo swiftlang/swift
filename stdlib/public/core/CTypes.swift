@@ -124,7 +124,7 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   ///     let str1 = Unmanaged<CFString>(bitPattern: bits).object
   @_transparent
   public init<T>(bitPattern bits: Unmanaged<T>) {
-    self = unsafeBitCast(bits._value, OpaquePointer.self)
+    self = unsafeBitCast(bits._value, to: OpaquePointer.self)
   }
 
   /// Determine whether the given pointer is null.

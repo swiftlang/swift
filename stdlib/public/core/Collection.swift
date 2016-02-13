@@ -74,11 +74,11 @@ public protocol MutableIndexable {
 public struct IndexingIterator<Elements : Indexable>
  : IteratorProtocol, Sequence {
 
-  /// Create a *iterator* over the given collection.
+  /// Create an *iterator* over the given collection.
   public /// @testable
-  init(_ elements: Elements) {
-    self._elements = elements
-    self._position = elements.startIndex
+  init(_elements: Elements) {
+    self._elements = _elements
+    self._position = _elements.startIndex
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -135,7 +135,7 @@ public protocol Collection : Indexable, Sequence {
   ///   `Sequence`, but is restated here with stricter
   ///   constraints: in a `Collection`, the `SubSequence` should
   ///   also be a `Collection`.
-  associatedtype SubSequence: Indexable, Sequence = Slice<Self>
+  associatedtype SubSequence : Indexable, Sequence = Slice<Self>
 
   /// Returns the element at the given `position`.
   subscript(position: Index) -> Iterator.Element { get }
@@ -150,19 +150,19 @@ public protocol Collection : Indexable, Sequence {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  func prefixUpTo(end: Index) -> SubSequence
+  func prefix(upTo end: Index) -> SubSequence
 
   /// Returns `self[start..<endIndex]`
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  func suffixFrom(start: Index) -> SubSequence
+  func suffix(from start: Index) -> SubSequence
 
-  /// Returns `prefixUpTo(position.successor())`
+  /// Returns `prefix(upTo: position.successor())`
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  func prefixThrough(position: Index) -> SubSequence
+  func prefix(through position: Index) -> SubSequence
 
   /// Returns `true` iff `self` is empty.
   var isEmpty: Bool { get }
@@ -192,7 +192,7 @@ public protocol Collection : Indexable, Sequence {
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
   public func iterator() -> IndexingIterator<Self> {
-    return IndexingIterator(self)
+    return IndexingIterator(_elements: self)
   }
 }
 
@@ -270,7 +270,7 @@ extension Collection {
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
   public var count: Index.Distance {
-    return startIndex.distanceTo(endIndex)
+    return startIndex.distance(to: endIndex)
   }
 
   /// Customization point for `Sequence.indexOf()`.
@@ -329,7 +329,7 @@ extension Collection {
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
     _require(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = startIndex.advancedBy(numericCast(n), limit: endIndex)
+    let start = startIndex.advanced(by: numericCast(n), limit: endIndex)
     return self[start..<endIndex]
   }
 
@@ -342,7 +342,7 @@ extension Collection {
     _require(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
-    let end = startIndex.advancedBy(numericCast(amount), limit: endIndex)
+    let end = startIndex.advanced(by: numericCast(amount), limit: endIndex)
     return self[startIndex..<end]
   }
 
@@ -359,7 +359,7 @@ extension Collection {
     _require(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
-    let end = startIndex.advancedBy(numericCast(maxLength), limit: endIndex)
+    let end = startIndex.advanced(by: numericCast(maxLength), limit: endIndex)
     return self[startIndex..<end]
   }
 
@@ -377,7 +377,7 @@ extension Collection {
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let amount = Swift.max(0, numericCast(count) - maxLength)
-    let start = startIndex.advancedBy(numericCast(amount), limit: endIndex)
+    let start = startIndex.advanced(by: numericCast(amount), limit: endIndex)
     return self[start..<endIndex]
   }
 
@@ -385,7 +385,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func prefixUpTo(end: Index) -> SubSequence {
+  public func prefix(upTo end: Index) -> SubSequence {
     return self[startIndex..<end]
   }
 
@@ -393,16 +393,16 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func suffixFrom(start: Index) -> SubSequence {
+  public func suffix(from start: Index) -> SubSequence {
     return self[start..<endIndex]
   }
 
-  /// Returns `prefixUpTo(position.successor())`
+  /// Returns `prefix(upTo: position.successor())`
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func prefixThrough(position: Index) -> SubSequence {
-    return prefixUpTo(position.successor())
+  public func prefix(through position: Index) -> SubSequence {
+    return prefix(upTo: position.successor())
   }
 
   /// Returns the maximal `SubSequence`s of `self`, in order, that
@@ -415,16 +415,16 @@ extension Collection {
   ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
+  /// - Parameter omittingEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   satisfying `isSeparator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplit >= 0`
+  /// - Requires: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    maxSplits: Int = Int.max,
-    omitEmptySubsequences: Bool = true,
+    maxSplits maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     _require(maxSplits >= 0, "Must take zero or more splits")
@@ -433,7 +433,7 @@ extension Collection {
     var subSequenceStart: Index = startIndex
 
     func appendSubsequence(end end: Index) -> Bool {
-      if subSequenceStart == end && omitEmptySubsequences {
+      if subSequenceStart == end && omittingEmptySubsequences {
         return false
       }
       result.append(self[subSequenceStart..<end])
@@ -460,7 +460,7 @@ extension Collection {
       subSequenceEnd._successorInPlace()
     }
 
-    if subSequenceStart != cachedEndIndex || !omitEmptySubsequences {
+    if subSequenceStart != cachedEndIndex || !omittingEmptySubsequences {
       result.append(self[subSequenceStart..<cachedEndIndex])
     }
 
@@ -474,25 +474,27 @@ extension Collection where Iterator.Element : Equatable {
   ///
   /// - Parameter maxSplits: The maximum number of `SubSequence`s to
   ///   return, minus 1.
-  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
+  ///   If `maxSplits + 1` `SubSequence`s are returned, the last one is
   ///   a suffix of `self` containing *all* the elements of `self` following the
   ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
+  /// - Parameter omittingEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   equal to `separator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplit >= 0`
+  /// - Requires: `maxSplits >= 0`
   @warn_unused_result
   public func split(
     separator: Iterator.Element,
     maxSplits: Int = Int.max,
-    omitEmptySubsequences: Bool = true
+    omittingEmptySubsequences: Bool = true
   ) -> [SubSequence] {
-  return split(maxSplits, omitEmptySubsequences: omitEmptySubsequences,
-      isSeparator: { $0 == separator })
+  return split(
+    maxSplits: maxSplits,
+    omittingEmptySubsequences: omittingEmptySubsequences,
+    isSeparator: { $0 == separator })
   }
 }
 
@@ -505,7 +507,7 @@ extension Collection where Index : BidirectionalIndex {
   public func dropLast(n: Int) -> SubSequence {
     _require(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    let end = endIndex.advancedBy(numericCast(-n), limit: startIndex)
+    let end = endIndex.advanced(by: numericCast(-n), limit: startIndex)
     return self[startIndex..<end]
   }
 
@@ -522,7 +524,7 @@ extension Collection where Index : BidirectionalIndex {
     _require(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let start = endIndex.advancedBy(numericCast(-maxLength), limit: startIndex)
+    let start = endIndex.advanced(by: numericCast(-maxLength), limit: startIndex)
     return self[start..<endIndex]
   }
 }
@@ -550,7 +552,7 @@ extension Collection where SubSequence == Self {
     _require(n >= 0, "number of elements to remove should be non-negative")
     _require(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[startIndex.advancedBy(numericCast(n))..<endIndex]
+    self = self[startIndex.advanced(by: numericCast(n))..<endIndex]
   }
 }
 
@@ -580,7 +582,7 @@ extension Collection
     _require(n >= 0, "number of elements to remove should be non-negative")
     _require(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[startIndex..<endIndex.advancedBy(numericCast(-n))]
+    self = self[startIndex..<endIndex.advanced(by: numericCast(-n))]
   }
 }
 
@@ -745,7 +747,7 @@ extension Collection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, message="Please use split(_:omitEmptySubsequences:isSeparator:) instead")
+  @available(*, unavailable, message="Please use split(_:omittingEmptySubsequences:isSeparator:) instead")
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
@@ -756,7 +758,7 @@ extension Collection {
 }
 
 extension Collection where Iterator.Element : Equatable {
-  @available(*, unavailable, message="Please use split(_:maxSplits:omitEmptySubsequences:) instead")
+  @available(*, unavailable, message="Please use split(_:maxSplits:omittingEmptySubsequences:) instead")
   public func split(
     separator: Iterator.Element,
     maxSplit: Int = Int.max,

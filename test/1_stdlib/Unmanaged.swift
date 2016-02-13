@@ -43,7 +43,7 @@ UnmanagedTests.test("unsafeBitCast(Unmanaged, Int)") {
     0,
     unsafeBitCast(
       Unmanaged.passUnretained(ref) as Unmanaged<AnyObject>,
-      Int.self))
+      to: Int.self))
   _fixLifetime(ref)
 }
 

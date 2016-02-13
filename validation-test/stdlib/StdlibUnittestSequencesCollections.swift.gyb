@@ -192,7 +192,7 @@ ${Self}TestSuite.test("append()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.endIndex
   c1.append(OpaqueValue(4040))
-  let i2 = c1.startIndex.advancedBy(3)
+  let i2 = c1.startIndex.advanced(by: 3)
 
   expectCrashLater()
   _ = i1 == i2
@@ -203,7 +203,7 @@ ${Self}TestSuite.test("appendContentsOf()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.endIndex
   c1.appendContentsOf([ 4040, 5050 ].map(OpaqueValue.init))
-  let i2 = c1.startIndex.advancedBy(3)
+  let i2 = c1.startIndex.advanced(by: 3)
 
   expectCrashLater()
   _ = i1 == i2
@@ -212,11 +212,11 @@ ${Self}TestSuite.test("appendContentsOf()/IndexInvalidation") {
 
 ${Self}TestSuite.test("replaceSubrange()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
-  let i1 = c1.startIndex.advancedBy(1)
+  let i1 = c1.startIndex.advanced(by: 1)
   c1.replaceSubrange(
-    i1..<i1.advancedBy(2),
+    i1..<i1.advanced(by: 2),
     with: [ 4040, 5050 ].map(OpaqueValue.init))
-  let i2 = c1.startIndex.advancedBy(1)
+  let i2 = c1.startIndex.advanced(by: 1)
 
   expectCrashLater()
   _ = i1 == i2
@@ -225,9 +225,9 @@ ${Self}TestSuite.test("replaceSubrange()/IndexInvalidation") {
 
 ${Self}TestSuite.test("insert()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
-  let i1 = c1.startIndex.advancedBy(1)
+  let i1 = c1.startIndex.advanced(by: 1)
   c1.insert(OpaqueValue(4040), at: i1)
-  let i2 = c1.startIndex.advancedBy(1)
+  let i2 = c1.startIndex.advanced(by: 1)
 
   expectCrashLater()
   _ = i1 == i2
@@ -236,20 +236,20 @@ ${Self}TestSuite.test("insert()/IndexInvalidation") {
 
 ${Self}TestSuite.test("insertContentsOf()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
-  let i1 = c1.startIndex.advancedBy(1)
+  let i1 = c1.startIndex.advanced(by: 1)
   c1.insertContentsOf([ 4040, 5050 ].map(OpaqueValue.init), at: i1)
-  let i2 = c1.startIndex.advancedBy(1)
+  let i2 = c1.startIndex.advanced(by: 1)
 
   expectCrashLater()
   _ = i1 == i2
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("removeAt()/IndexInvalidation") {
+${Self}TestSuite.test("remove(at:)/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.startIndex
-  c1.removeAt(c1.startIndex.advancedBy(1))
-  let i2 = c1.startIndex.advancedBy(1)
+  c1.remove(at: c1.startIndex.advanced(by: 1))
+  let i2 = c1.startIndex.advanced(by: 1)
 
   expectCrashLater()
   _ = i1 == i2
@@ -269,9 +269,9 @@ ${Self}TestSuite.test("removeLast()/IndexInvalidation") {
 
 ${Self}TestSuite.test("removeSubrange()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
-  let i1 = c1.startIndex.advancedBy(1)
-  c1.removeSubrange(i1..<i1.advancedBy(1))
-  let i2 = c1.startIndex.advancedBy(1)
+  let i1 = c1.startIndex.advanced(by: 1)
+  c1.removeSubrange(i1..<i1.advanced(by: 1))
+  let i2 = c1.startIndex.advanced(by: 1)
 
   expectCrashLater()
   _ = i1 == i2

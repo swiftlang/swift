@@ -103,7 +103,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       enumerationState.itemsPtr = unsafeBitCast(
         objects.baseAddress,
-        AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
+        to: AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
       enumerationState.state = 1
       state.pointee = enumerationState
       return objects.count
@@ -142,7 +142,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   internal var _heapBufferBridged: HeapBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, HeapBufferStorage.self)
+      return unsafeBitCast(ref, to: HeapBufferStorage.self)
     }
     return nil
   }
@@ -191,9 +191,9 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
         if !_stdlib_atomicInitializeARCRef(
           object: _heapBufferBridgedPtr, desired: objects.storage!) {
 
-          // Another thread won the race.  Throw out our buffer
-          let storage: HeapBufferStorage = unsafeDowncast(objects.storage!)
-          _destroyBridgedStorage(storage)
+          // Another thread won the race.  Throw out our buffer.
+          _destroyBridgedStorage(
+            unsafeDowncast(objects.storage!, to: HeapBufferStorage.self))
         }
         continue // Try again
       }
@@ -261,9 +261,9 @@ internal class _ContiguousArrayStorageBase
   }
 #endif
 
-  func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
+  func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     _sanityCheckFailure(
-      "Concrete subclasses must implement canStoreElementsOfDynamicType")
+      "Concrete subclasses must implement canStoreElements(ofDynamicType:)")
   }
 
   /// A type that every element in the array is.
