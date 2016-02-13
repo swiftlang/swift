@@ -437,7 +437,7 @@ public struct ${Self} : ${Traversal}Index {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: ${Traversal}Index>(_ base: BaseIndex) {
+  public init<BaseIndex : ${Traversal}Index>(_ base: BaseIndex) {
     _box = _${Traversal}IndexBox(base)
   }
 
@@ -558,7 +558,7 @@ public protocol AnyCollectionProtocol : Collection {
 /// Return true iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func === <
-  L: AnyCollectionProtocol, R: AnyCollectionProtocol
+  L : AnyCollectionProtocol, R : AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs._underlyingCollectionID == rhs._underlyingCollectionID
 }
@@ -566,7 +566,7 @@ public func === <
 /// Returns false iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func !== <
-  L: AnyCollectionProtocol, R: AnyCollectionProtocol
+  L : AnyCollectionProtocol, R : AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs._underlyingCollectionID != rhs._underlyingCollectionID
 }
@@ -591,7 +591,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   public init<
     C : Collection
     where
-    C.Index: ${SubTraversal}Index, C.Iterator.Element == Element
+    C.Index : ${SubTraversal}Index, C.Iterator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
