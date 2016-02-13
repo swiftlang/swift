@@ -40,12 +40,12 @@ func testNormal() {
   let positiveNormal: TestFloat = 42.0
   checkNormal(positiveNormal)
   _require(!positiveNormal.isSignMinus)
-  _require(positiveNormal.floatingPointClass == .PositiveNormal)
+  _require(positiveNormal.floatingPointClass == .positiveNormal)
 
   let negativeNormal: TestFloat = -42.0
   checkNormal(negativeNormal)
   _require(negativeNormal.isSignMinus)
-  _require(negativeNormal.floatingPointClass == .NegativeNormal)
+  _require(negativeNormal.floatingPointClass == .negativeNormal)
 
   _require(positiveNormal == positiveNormal)
   _require(negativeNormal == negativeNormal)
@@ -77,12 +77,12 @@ func testZero() {
   let plusZero = noinlinePlusZero()
   checkZero(plusZero)
   _require(!plusZero.isSignMinus)
-  _require(plusZero.floatingPointClass == .PositiveZero)
+  _require(plusZero.floatingPointClass == .positiveZero)
 
   let minusZero = noinlineMinusZero()
   checkZero(minusZero)
   _require(minusZero.isSignMinus)
-  _require(minusZero.floatingPointClass == .NegativeZero)
+  _require(minusZero.floatingPointClass == .negativeZero)
 
   _require(plusZero == 0.0)
   _require(plusZero == plusZero)
@@ -134,7 +134,7 @@ func testSubnormal() {
   }
   checkSubnormal(positiveSubnormal)
   _require(!positiveSubnormal.isSignMinus)
-  _require(positiveSubnormal.floatingPointClass == .PositiveSubnormal)
+  _require(positiveSubnormal.floatingPointClass == .positiveSubnormal)
   _require(positiveSubnormal != 0.0)
 
   var negativeSubnormal: TestFloat = -1.0
@@ -143,7 +143,7 @@ func testSubnormal() {
   }
   checkSubnormal(negativeSubnormal)
   _require(negativeSubnormal.isSignMinus)
-  _require(negativeSubnormal.floatingPointClass == .NegativeSubnormal)
+  _require(negativeSubnormal.floatingPointClass == .negativeSubnormal)
   _require(negativeSubnormal != -0.0)
 
   print("testSubnormal done")
@@ -174,22 +174,22 @@ func testInf() {
   var stdlibPlusInf = TestFloat.infinity
   checkInf(stdlibPlusInf)
   _require(!stdlibPlusInf.isSignMinus)
-  _require(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
+  _require(stdlibPlusInf.floatingPointClass == .positiveInfinity)
 
   var stdlibMinusInf = -TestFloat.infinity
   checkInf(stdlibMinusInf)
   _require(stdlibMinusInf.isSignMinus)
-  _require(stdlibMinusInf.floatingPointClass == .NegativeInfinity)
+  _require(stdlibMinusInf.floatingPointClass == .negativeInfinity)
 
   var computedPlusInf = 1.0 / noinlinePlusZero()
   checkInf(computedPlusInf)
   _require(!computedPlusInf.isSignMinus)
-  _require(computedPlusInf.floatingPointClass == .PositiveInfinity)
+  _require(computedPlusInf.floatingPointClass == .positiveInfinity)
 
   var computedMinusInf = -1.0 / noinlinePlusZero()
   checkInf(computedMinusInf)
   _require(computedMinusInf.isSignMinus)
-  _require(computedMinusInf.floatingPointClass == .NegativeInfinity)
+  _require(computedMinusInf.floatingPointClass == .negativeInfinity)
 
   _require(stdlibPlusInf == computedPlusInf)
   _require(stdlibMinusInf == computedMinusInf)
@@ -219,7 +219,7 @@ func checkNaN(nan: TestFloat) {
 func checkQNaN(qnan: TestFloat) {
   checkNaN(qnan)
   _require(!qnan.isSignaling)
-  _require(qnan.floatingPointClass == .QuietNaN)
+  _require(qnan.floatingPointClass == .quietNaN)
 }
 
 func testNaN() {

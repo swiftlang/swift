@@ -21,16 +21,16 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 /// The set of possible IEEE 754 "classes"
 public enum FloatingPointClassification {
-  case SignalingNaN
-  case QuietNaN
-  case NegativeInfinity
-  case NegativeNormal
-  case NegativeSubnormal
-  case NegativeZero
-  case PositiveZero
-  case PositiveSubnormal
-  case PositiveNormal
-  case PositiveInfinity
+  case signalingNaN
+  case quietNaN
+  case negativeInfinity
+  case negativeNormal
+  case negativeSubnormal
+  case negativeZero
+  case positiveZero
+  case positiveSubnormal
+  case positiveNormal
+  case positiveInfinity
 }
 
 /// A set of common requirements for Swift's floating point types.

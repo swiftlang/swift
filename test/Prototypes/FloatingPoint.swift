@@ -496,12 +496,12 @@ extension FloatingPoint {
   }
   
   public var floatingPointClass: FloatingPointClassification {
-    if isSignaling { return .SignalingNaN }
-    if isNaN { return .QuietNaN }
-    if isInfinite { return signbit ? .NegativeInfinity : .PositiveInfinity }
-    if isNormal { return signbit ? .NegativeNormal : .PositiveNormal }
-    if isSubnormal { return signbit ? .NegativeSubnormal : .PositiveSubnormal }
-    return signbit ? .NegativeZero : .PositiveZero
+    if isSignaling { return .signalingNaN }
+    if isNaN { return .quietNaN }
+    if isInfinite { return signbit ? .negativeInfinity : .positiveInfinity }
+    if isNormal { return signbit ? .negativeNormal : .positiveNormal }
+    if isSubnormal { return signbit ? .negativeSubnormal : .positiveSubnormal }
+    return signbit ? .negativeZero : .positiveZero
   }
   
   public func totalOrderMagnitude(other: Self) -> Bool {
@@ -1083,32 +1083,32 @@ extension Float80 : BinaryFloatingPoint {
 /// The set of IEEE-754 floating-point "classes".  Every floating-point datum
 /// belongs to exactly one of these classes.
 public enum FloatingPointClassification {
-  case SignalingNaN
-  case QuietNaN
-  case NegativeInfinity
-  case NegativeNormal
-  case NegativeSubnormal
-  case NegativeZero
-  case PositiveZero
-  case PositiveSubnormal
-  case PositiveNormal
-  case PositiveInfinity
+  case signalingNaN
+  case quietNaN
+  case negativeInfinity
+  case negativeNormal
+  case negativeSubnormal
+  case negativeZero
+  case positiveZero
+  case positiveSubnormal
+  case positiveNormal
+  case positiveInfinity
 }
 
 extension FloatingPointClassification : Equatable {}
 
 public func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> Bool {
   switch (lhs, rhs) {
-  case (.SignalingNaN, .SignalingNaN),
-  (.QuietNaN, .QuietNaN),
-  (.NegativeInfinity, .NegativeInfinity),
-  (.NegativeNormal, .NegativeNormal),
-  (.NegativeSubnormal, .NegativeSubnormal),
-  (.NegativeZero, .NegativeZero),
-  (.PositiveZero, .PositiveZero),
-  (.PositiveSubnormal, .PositiveSubnormal),
-  (.PositiveNormal, .PositiveNormal),
-  (.PositiveInfinity, .PositiveInfinity):
+  case (.signalingNaN, .signalingNaN),
+  (.quietNaN, .quietNaN),
+  (.negativeInfinity, .negativeInfinity),
+  (.negativeNormal, .negativeNormal),
+  (.negativeSubnormal, .negativeSubnormal),
+  (.negativeZero, .negativeZero),
+  (.positiveZero, .positiveZero),
+  (.positiveSubnormal, .positiveSubnormal),
+  (.positiveNormal, .positiveNormal),
+  (.positiveInfinity, .positiveInfinity):
     return true
   default:
     return false

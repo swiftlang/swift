@@ -339,23 +339,23 @@ extension ${Self} /* : FloatingPoint */ {
         let significand = __getSignificand()
         // This is either +/-inf or NaN.
         if significand == 0 {
-          return isSignMinus ? .NegativeInfinity : .PositiveInfinity
+          return isSignMinus ? .negativeInfinity : .positiveInfinity
         }
         let isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
-        return isQNaN ? .QuietNaN : .SignalingNaN
+        return isQNaN ? .quietNaN : .signalingNaN
       }
 
       // OK, the number is finite.
       let isMinus = isSignMinus
       if biasedExponent != 0 {
-        return isMinus ? .NegativeNormal : .PositiveNormal
+        return isMinus ? .negativeNormal : .positiveNormal
       }
 
       // Exponent is zero.
       if __getSignificand() == 0 {
-        return isMinus ? .NegativeZero : .PositiveZero
+        return isMinus ? .negativeZero : .positiveZero
       }
-      return isMinus ? .NegativeSubnormal : .PositiveSubnormal
+      return isMinus ? .negativeSubnormal : .positiveSubnormal
     }
   }
 }
