@@ -594,7 +594,7 @@ extension String {
   /// `encoding`, without any allocations.  Does not NULL-terminate.
   ///
   /// - Parameter buffer: A buffer into which to store the bytes from
-  ///   the receiver. The returned bytes are not NULL-terminated.
+  ///   the receiver. The returned bytes are not NUL-terminated.
   ///
   /// - Parameter maxBufferCount: The maximum number of bytes to write
   ///   to buffer.
