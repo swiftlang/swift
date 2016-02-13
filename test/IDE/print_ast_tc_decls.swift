@@ -192,7 +192,7 @@ struct d0100_FooStruct {
 
   class NestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class NestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit {{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -268,7 +268,7 @@ extension d0100_FooStruct {
 
   class ExtNestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class ExtNestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit {{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -585,7 +585,7 @@ struct d0200_EscapedIdentifiers {
 
   class `class` {}
 // PASS_COMMON-NEXT: {{^}}  class `class` {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit {{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -596,7 +596,7 @@ struct d0200_EscapedIdentifiers {
   class `extension` : `class` {}
 // PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
-// PASS_COMMON: {{^}}    @objc deinit {{$}}
+// PASS_COMMON: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    {{(override )?}}init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -981,7 +981,7 @@ class d1100_ExplicitDestructor1 {
 // PASS_COMMON-LABEL: d1100_ExplicitDestructor1
 
   deinit {}
-// PASS_COMMON: {{^}}  @objc deinit {{$}}
+// PASS_COMMON: {{^}}  @objc deinit{{$}}
 }
 
 //===---

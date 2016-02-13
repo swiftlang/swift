@@ -70,6 +70,10 @@ public class SubscriptCursorTest {
   }
 }
 
+class C3 {
+  deinit { }
+}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -236,3 +240,10 @@ public class SubscriptCursorTest {
 // CHECK28: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
 // CHECK28: <decl.function.subscript>public <decl.name>subscript</decl.name>(i: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
 
+// RUN: %sourcekitd-test -req=cursor -pos=74:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK29
+// CHECK29: source.lang.swift.decl.function.destructor (74:3-74:9)
+// CHECK29-NEXT: deinit
+// CHECK29-NEXT: s:FC11cursor_info2C3d
+// CHECK29-NEXT: C3 -> ()
+// CHECK29-NEXT: <Declaration>deinit</Declaration>
+// CHECK29-NEXT: <decl.function.destructor><decl.name>deinit</decl.name></decl.function.destructor>

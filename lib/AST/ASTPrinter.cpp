@@ -2150,7 +2150,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printAttributes(decl);
   recordDeclLoc(decl,
     [&]{
-      Printer << "deinit ";
+      Printer << "deinit";
     });
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {
