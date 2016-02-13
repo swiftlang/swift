@@ -669,15 +669,13 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   assert(CounterIt != RegionCounterMap.end() &&
          "cannot increment non-existent counter");
 
-  auto Int8PtrTy = SGM.Types.getLoweredType(BuiltinRawPointerType(C));
+  auto Int8PtrTy = SGM.Types.getLoweredType(C.TheUnsafeValueBufferType);
   auto Int32Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(64, C));
 
   SILLocation Loc = getLocation(Node);
 
-  const SourceManager &SM = SGM.M.getASTContext().SourceMgr;
-  StringRef Filename =
-      SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+  StringRef Filename = SGM.SwiftModule->getModuleFilename();
   std::string NameValue = llvm::getPGOFuncName(
       CurrentFuncName, llvm::GlobalValue::LinkOnceAnyLinkage, Filename);
 
@@ -686,7 +684,7 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
       // that it's uniqued appropriately across TUs.
       Builder.createGlobalAddr(
           Loc,
-          SILGlobalVariable::create(&SGM.M, SILLinkage::Private,
+          SILGlobalVariable::create(SGM.M, SILLinkage::Private,
                                     /*IsFragile=*/false, NameValue, Int8PtrTy)),
       Builder.createIntegerLiteral(Loc, Int64Ty, FunctionHash),
       Builder.createIntegerLiteral(Loc, Int32Ty, NumRegionCounters),
