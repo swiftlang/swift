@@ -116,7 +116,7 @@ static int doDumpReflectionSections(std::string BinaryFilename,
 
   if (associatedTypeSectionRef.getObject() == nullptr) {
     std::cerr << BinaryFilename;
-    std::cerr << " doesn't have a associated type reflection section!\n";
+    std::cerr << " doesn't have an associated type reflection section!\n";
     return EXIT_FAILURE;
   }
 

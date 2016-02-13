@@ -213,7 +213,7 @@ public:
   /// Emit field type records for nominal types for reflection purposes.
   void emitFieldTypeMetadataRecords();
 
-  /// Emit assocated type references for nominal types for reflection purposes.
+  /// Emit associated type references for nominal types for reflection purposes.
   void emitAssociatedTypeMetadataRecords();
 
   /// Emit everything which is reachable from already emitted IR.
