@@ -48,7 +48,7 @@ enum class DeclRefKind {
 };
 
 /// Identifier - This is an instance of a uniqued identifier created by
-/// ASTContext.  It just wraps a nul-terminated "const char*".
+/// ASTContext.  It just wraps a null-terminated "const char*".
 class Identifier {
   friend class ASTContext;
   const char *Pointer;

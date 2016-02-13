@@ -94,7 +94,7 @@ struct String {
     : String(ptr, strlen(ptr))
   {}
 
-  /// Create a Swift String from two concatenated nul-terminated strings.
+  /// Create a Swift String from two concatenated null-terminated strings.
   explicit String(const char *ptr1, const char *ptr2) {
     size_t len1 = strlen(ptr1);
     size_t len2 = strlen(ptr2);

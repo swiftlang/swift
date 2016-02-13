@@ -48,7 +48,7 @@ class Lexer {
 
   /// Pointer to one past the end character of the buffer, even in a lexer
   /// that scans a subrange of the buffer.  Because the buffer is always
-  /// NUL-terminated, this points to the NUL terminator.
+  /// NULL-terminated, this points to the NUL terminator.
   const char *BufferEnd;
 
   /// Pointer to the artificial EOF that is located before BufferEnd.  Useful
