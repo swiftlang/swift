@@ -296,5 +296,7 @@
 
 // CHECK-OMIT-NEEDLESS-WORDS: func add(_: AnyObject)
 
+// CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
+
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws
