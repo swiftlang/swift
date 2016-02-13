@@ -508,7 +508,7 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
     if (firstWord == "By") {
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
-      if (getPartOfSpeech(nextWord) == PartOfSpeech::Gerund) {
+      if (nextWord.endswith("ing")) {
         return toLowercaseWord(newName.substr(firstWord.size()), scratch);
       }
     }
@@ -911,6 +911,11 @@ static bool priorWordExtendsPreposition(StringRef preceding,
   // best matching
   if (camel_case::sameWordIgnoreFirstCase(preceding, "best") &&
       camel_case::sameWordIgnoreFirstCase(preposition, "matching"))
+    return true;
+
+  // according to
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "according") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "to"))
     return true;
 
   return false;

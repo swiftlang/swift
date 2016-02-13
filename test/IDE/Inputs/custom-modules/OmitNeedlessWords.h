@@ -19,4 +19,5 @@
 -(void)exportPresetsBestMatchingString:(nonnull NSString *)string;
 -(void)isCompatibleWithString:(nonnull NSString *)string;
 -(void)addObjectValue:(nonnull id)object;
+-(nonnull OmitNeedlessWords *)wordsBySlobbering:(nonnull NSString *)string;
 @end
