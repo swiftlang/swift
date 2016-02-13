@@ -6180,13 +6180,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     return true;
   }
 
-  case FixKind::TupleToScalar: 
-  case FixKind::ScalarToTuple:
-    return diagnoseArgumentLabelError(affected,
-                                      fix.first.getRelabelTupleNames(*this),
-                           /*isSubscript=*/locator->getPath().back().getKind()
-                           == ConstraintLocator::SubscriptIndex);
-    
   case FixKind::OptionalToBoolean: {
     // If we're implicitly trying to treat an optional type as a boolean,
     // let the user know that they should be testing for a value manually

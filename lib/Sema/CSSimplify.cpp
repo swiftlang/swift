@@ -4284,23 +4284,6 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
     return matchTypes(InOutType::get(type1->getRValueType()), type2,
                       matchKind, subFlags, locator);
 
-  case FixKind::TupleToScalar:
-    return matchTypes(type1->castTo<TupleType>()->getElementType(0),
-                      type2, matchKind, subFlags, 
-                      locator.withPathElement(
-                        LocatorPathElt::getTupleElement(0)));
-
-  case FixKind::ScalarToTuple: {
-    auto tuple2 = type2->castTo<TupleType>();
-    int scalarFieldIdx = tuple2->getElementForScalarInit();
-    assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
-    const auto &elt = tuple2->getElement(scalarFieldIdx);
-    auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
-    return matchTypes(type1, scalarFieldTy, matchKind, subFlags,
-                      locator.withPathElement(
-                        ConstraintLocator::ScalarToTuple));
-  }
-
   case FixKind::OptionalToBoolean:
     // The actual semantics are handled elsewhere.
     return SolutionKind::Solved;
