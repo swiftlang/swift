@@ -669,6 +669,7 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   assert(CounterIt != RegionCounterMap.end() &&
          "cannot increment non-existent counter");
 
+  auto Int8PtrTy = SGM.Types.getLoweredType(BuiltinRawPointerType(C));
   auto Int32Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(64, C));
 
