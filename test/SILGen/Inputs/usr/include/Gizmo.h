@@ -96,7 +96,7 @@ struct NSRect NSMakeRect(double, double, double, double);
 struct NSRect NSInsetRect(struct NSRect, double, double);
 NSString *NSStringFromRect(struct NSRect r);
 
-typedef  NS_ENUM(NSInteger, NSRuncingOptions) {
+typedef NS_ENUM(NSInteger, NSRuncingOptions) {
   NSRuncingMince = 123,
   NSRuncingQuinceSliced = 4567,
   NSRuncingQuinceJulienned = 5678,

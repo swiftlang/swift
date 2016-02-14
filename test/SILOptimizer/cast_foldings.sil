@@ -84,7 +84,7 @@ sil @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
 // CHECK-NEXT: store %{{.*}} to %0 : $*AClass
 sil @function_ref_cast_promote : $@convention(thin) (@out AClass, @in AnyObject) -> () {
 bb0(%0 : $*AClass, %1 : $*AnyObject):
-  unchecked_ref_cast_addr  AnyObject in %1 : $*AnyObject to AClass in %0 : $*AClass
+  unchecked_ref_cast_addr AnyObject in %1 : $*AnyObject to AClass in %0 : $*AClass
   %4 = tuple ()
   return %4 : $()
 }
@@ -98,7 +98,7 @@ bb0:
   %1 = alloc_stack $S
   store %0 to %1 : $*S
   %4 = alloc_stack $AnyObject
-  unchecked_ref_cast_addr  S in %1 : $*S to AnyObject in %4 : $*AnyObject
+  unchecked_ref_cast_addr S in %1 : $*S to AnyObject in %4 : $*AnyObject
   %6 = load %4 : $*AnyObject
   dealloc_stack %4 : $*AnyObject
   dealloc_stack %1 : $*S
