@@ -143,6 +143,10 @@ WARNING(lex_editor_placeholder_in_playground,none,
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
+WARNING(inout_as_attr_deprecated,none,
+        "'inout' as parameter attribute is deprecated, prefix type with it instead.",
+        ())
+
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
 
