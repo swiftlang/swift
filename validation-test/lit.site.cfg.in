@@ -20,6 +20,8 @@ config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
+else:
+    config.available_features.add('no_asan')
 
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
