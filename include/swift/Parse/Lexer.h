@@ -140,7 +140,7 @@ public:
   ///   need to take a LangOptions explicitly.
   /// \param InSILMode - whether we're parsing a SIL source file.
   ///   Unlike language options, this does affect primitive lexing, which
-  ///   means that APIs like getLofForEndOfToken really ought to take
+  ///   means that APIs like getLocForEndOfToken really ought to take
   ///   this flag; it's just that we don't care that much about fidelity
   ///   when parsing SIL files.
   Lexer(const LangOptions &Options,
