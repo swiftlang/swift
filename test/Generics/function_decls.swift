@@ -35,3 +35,10 @@ public class A<X> {
   public func f10(x:Int) {}
   public func f11<T, U>(x:X, y:T) {} //expected-error{{generic parameter 'U' is not used in function signature}}
 }
+
+protocol P { associatedtype A }
+
+// FIXME: only emit this diagnostic once
+func f12<T : P>(x: T) -> T.A<Int> {}
+// expected-error @-1 {{cannot specialize non-generic type 'T.A'}}
+// expected-error @-2 {{cannot specialize non-generic type 'T.A'}}
