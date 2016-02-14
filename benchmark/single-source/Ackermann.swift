@@ -15,7 +15,7 @@
 import TestsUtils
 
 func ackermann(M : Int, _ N : Int) -> Int {
-  if (M == 0) { return  N + 1 }
+  if (M == 0) { return N + 1 }
   if (N == 0) { return ackermann(M - 1, 1) }
   return ackermann(M - 1, ackermann(M, N - 1))
 }
@@ -25,7 +25,7 @@ func Ackermann(M : Int, _ N : Int) -> Int {
   // This if prevents optimizer from computing return value of Ackermann(3,9)
   // at compile time.
   if False() { return 0 }
-  if (M == 0) { return  N + 1 }
+  if (M == 0) { return N + 1 }
   if (N == 0) { return ackermann(M - 1, 1) }
   return ackermann(M - 1, ackermann(M, N - 1))
 }
