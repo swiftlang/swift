@@ -24,6 +24,15 @@
 import StdlibUnittest
 import class_change_stored_to_computed
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+import SwiftPrivatePthreadExtras
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var ChangeStoredToComputedTest = TestSuite("ChangeStoredToComputed")
 
 ChangeStoredToComputedTest.test("ChangeStoredToComputed") {
