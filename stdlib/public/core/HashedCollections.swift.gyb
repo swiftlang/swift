@@ -562,7 +562,8 @@ public struct Set<Element : Hashable> :
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Set<Element> {
     let other = sequence as? Set<Element> ?? Set(sequence)
-    var newSet = Set<Element>()
+    var newSet = Set<Element>(
+      minimumCapacity: min(self.count, sequence.underestimateCount()))
     for member in self {
       if other.contains(member) {
         newSet.insert(member)
