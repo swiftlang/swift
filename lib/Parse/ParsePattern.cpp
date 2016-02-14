@@ -186,9 +186,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status |= makeParserCodeCompletionStatus();
       }
     }
-
+    SourceLoc depercatedInoutLoc;
     // ('inout' | 'let' | 'var')?
     if (Tok.is(tok::kw_inout)) {
+      depercatedInoutLoc = Tok.getLoc();
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::InOut;
     } else if (Tok.is(tok::kw_let)) {
@@ -244,6 +245,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
       // (':' type)?
       if (consumeIf(tok::colon)) {
+
+        SourceLoc colonLoc = Tok.getLoc();
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
@@ -253,14 +256,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (type.isParseError() && !type.hasCodeCompletion())
           param.isInvalid = true;
        
-        // Only allow 'inout' before the parameter name.
         if (auto InOutTy = dyn_cast_or_null<InOutTypeRepr>(param.Type)) {
-          SourceLoc InOutLoc = InOutTy->getInOutLoc();
-          SourceLoc NameLoc = param.FirstNameLoc;
-          diagnose(InOutLoc, diag::inout_must_appear_before_param)
-              .fixItRemove(InOutLoc)
-              .fixItInsert(NameLoc, "inout ");
+          param.SpecifierKind = ParsedParameter::InOut;
+          param.LetVarInOutLoc = colonLoc;
           param.Type = InOutTy->getBase();
+          if (depercatedInoutLoc.isValid()) {
+            diagnose(depercatedInoutLoc, diag::inout_as_attr_deprecated)
+              .fixItRemove(depercatedInoutLoc);
+          }
+        } else {
+          if (depercatedInoutLoc.isValid()) {
+            diagnose(depercatedInoutLoc, diag::inout_as_attr_deprecated)
+              .fixItRemove(depercatedInoutLoc)
+              .fixItInsert(colonLoc, "inout ");
+          }
         }
       }
     } else {
