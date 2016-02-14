@@ -522,9 +522,9 @@ while [[ "$1" ]] ; do
             if [[ "${dashless}" == *=* ]] ; then              # if there's an '=', the value
                 value="${dashless#*=}"                        #   is everything after the first '='
             elif [[ "$2" ]] && [[ "${2:0:1}" != "-" ]] ; then # else if the next parameter exists
-                value="$2"                                    #    but isn't  an option, use that
+                value="$2"                                    #   but isn't an option, use that
                 shift
-            else                                             # otherwise, the value is 1
+            else                                              # otherwise, the value is 1
                 value=1
             fi
 

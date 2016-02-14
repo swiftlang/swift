@@ -32,7 +32,7 @@ struct Single {
 }
 
 // CHECK-LABEL: sil @SingleTest
-sil @SingleTest : $@convention(method) (@inout  Single, Int) -> Single {
+sil @SingleTest : $@convention(method) (@inout Single, Int) -> Single {
 bb0(%0 : $*Single, %1 : $Int):
   %4 = alloc_box $Single
   %4a = project_box %4 : $@box Single

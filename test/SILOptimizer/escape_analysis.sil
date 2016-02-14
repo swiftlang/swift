@@ -939,7 +939,7 @@ bb0(%0 : $AnyObject):
 // CHECK-NEXT:  End
 sil @test_unchecked_ref_cast_addr : $@convention(thin) <T, U> (@out U, @in T, @thick U.Type) -> () {
 bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
-  unchecked_ref_cast_addr  T in %1 : $*T to U in %0 : $*U
+  unchecked_ref_cast_addr T in %1 : $*T to U in %0 : $*U
   %5 = tuple ()
   return %5 : $()
 }
