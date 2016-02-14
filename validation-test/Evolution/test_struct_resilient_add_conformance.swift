@@ -20,27 +20,11 @@
 // RUN: %target-run %t/after_after
 
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize_none
 
 import StdlibUnittest
 import struct_resilient_add_conformance
 
 var StructResilientAddConformanceTest = TestSuite("StructResilientAddConformance")
-
-// FIXME: Once we have availability information for conformances, we can
-// make this non-generic as long as we're careful to never directly
-// reference an unavailable conformance table symbol
-@inline(never) func workWithPointLike<T>(t: T) {
-  if getVersion() > 0 {
-    var p = t as! PointLike
-    p.x = 30
-    p.y = 40
-    expectEqual(p.x, 30)
-    expectEqual(p.y, 40)
-  } else {
-    expectEqual(t is PointLike, false)
-  }
-}
 
 StructResilientAddConformanceTest.test("AddConformance") {
   var t = AddConformance()
@@ -52,7 +36,11 @@ StructResilientAddConformanceTest.test("AddConformance") {
     expectEqual(t.y, 20)
   }
 
-  workWithPointLike(t)
+  if (getVersion() == 0) {
+    expectEqual(workWithPointLike(t), 0)
+  } else {
+    expectEqual(workWithPointLike(t), 200)
+  }
 }
 
 #if AFTER
