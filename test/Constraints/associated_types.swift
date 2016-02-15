@@ -4,18 +4,18 @@ protocol Runcible {
   associatedtype Runcee
 }
 
-class Mince { 
-  init() {} 
+class Mince {
+  init() {}
 }
 
 class Spoon : Runcible {
-  init() {} 
+  init() {}
 
   typealias Runcee = Mince
 }
 
 class Owl<T:Runcible> {
-  init() {} 
+  init() {}
 
   func eat(what: T.Runcee, with: T) { }
 }
@@ -30,4 +30,10 @@ func owl2() -> Owl<Spoon> {
 
 func owl3() {
   Owl<Spoon>().eat(Mince(), with:Spoon())
+}
+
+// "Can't access associated types through class-constrained generic parameters"
+// (https://bugs.swift.org/browse/SR-726)
+func spoon<S: Spoon>(s: S) {
+  let _: S.Runcee? = nil
 }
