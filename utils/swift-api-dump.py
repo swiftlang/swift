@@ -56,9 +56,9 @@ def create_parser():
     default_swift_ide_test = '%s/swift-ide-test' % (script_path)
     
     parser = argparse.ArgumentParser(
-        description="Determines the effects of omitting 'needless' words from imported APIs",
-        prog='omit-needless-words.py',
-        usage='python omit-needless-words.py -m AppKit')
+        description="Dumps imported Swift APIs for a module or SDK",
+        prog='swift-api-dump.py',
+        usage='python swift-api-dump.py -s iphoneos')
     parser.add_argument('-m', '--module', help='The module name.')
     parser.add_argument('-j', '--jobs', type=int, help='The number of parallel jobs to execute')
     parser.add_argument('-s', '--sdk', nargs='+', required=True, help="The SDKs to use.")
@@ -188,7 +188,7 @@ def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target,
     return results
 
 def main():
-    source_filename = 'omit-needless-words.swift'
+    source_filename = 'swift-api-dump.swift'
     parser = create_parser()
     args = parser.parse_args()
 
