@@ -23,7 +23,7 @@
 ///
 /// 1. Our set operations are purely additive. Given a set, one can only add
 /// elements to it. One can not remove elements to it. This means we only
-/// support construction of sets from arrays and concatentation of pointer sets.
+/// support construction of sets from arrays and concatenation of pointer sets.
 ///
 /// 2. Our sets must always be ordered and be able to be iterated over
 /// efficiently in that order.
