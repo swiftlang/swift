@@ -1,1 +1,1 @@
-func foo(x: Int) {}
+func 🐶🐮(x: Int) {}

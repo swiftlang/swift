@@ -342,7 +342,9 @@ public:
 
   void visitString(StringRef Str) {
     OS << '\"';
-    OS.write_escaped(Str);
+    // Avoid raw_ostream's write_escaped, we don't want to escape unicode
+    // characters because it will be invalid JSON.
+    writeEscaped(Str, OS);
     OS << '\"';
   }
 
@@ -354,6 +356,30 @@ public:
     }
   }
 };
+}
+
+void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
+  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
+    unsigned char c = Str[i];
+
+    switch (c) {
+    case '\\':
+      OS << '\\' << '\\';
+      break;
+    case '\t':
+      OS << '\\' << 't';
+      break;
+    case '\n':
+      OS << '\\' << 'n';
+      break;
+    case '"':
+      OS << '\\' << '"';
+      break;
+    default:
+      OS << c;
+      break;
+    }
+  }
 }
 
 static void printError(sourcekitd_response_t Err, raw_ostream &OS) {
