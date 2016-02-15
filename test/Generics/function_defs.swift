@@ -75,8 +75,8 @@ protocol Overload {
   associatedtype B
   func getA() -> A
   func getB() -> B
-  func f1(_: A) -> A // expected-note{{found this candidate}}
-  func f1(_: B) -> B // expected-note{{found this candidate}}
+  func f1(_: A) -> A
+  func f1(_: B) -> B
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
   func f3(_: Int) -> Int // expected-note {{found this candidate}}
@@ -106,7 +106,8 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{ambiguous reference to member 'f1'}}
+  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
+  // expected-note @-1 {{overloads for 'f1' exist with these partially matching parameter lists: (Self.A), (Self.B)}}
                                                         
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3
@@ -132,7 +133,7 @@ protocol Subscriptable {
   func getIndex() -> Index
   func getValue() -> Value
 
-  subscript (index : Index) -> Value { get set } // expected-note{{found this candidate}}
+  subscript (index : Index) -> Value { get set }
 }
 
 protocol IntSubscriptable {
@@ -140,7 +141,7 @@ protocol IntSubscriptable {
 
   func getElement() -> ElementType
 
-  subscript (index : Int) -> ElementType { get  } // expected-note{{found this candidate}}
+  subscript (index : Int) -> ElementType { get  }
 }
 
 func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
@@ -153,7 +154,8 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   element = t[17]
   t[42] = element // expected-error{{cannot assign through subscript: subscript is get-only}}
 
-  t[value] = 17 // expected-error{{ambiguous reference to member 'subscript'}}
+  // Suggests the Int form because we prefer concrete matches to generic matches in diagnosis.
+  t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'Int'}}
 }
 
 //===----------------------------------------------------------------------===//
