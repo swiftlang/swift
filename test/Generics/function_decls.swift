@@ -38,7 +38,4 @@ public class A<X> {
 
 protocol P { associatedtype A }
 
-// FIXME: only emit this diagnostic once
-func f12<T : P>(x: T) -> T.A<Int> {}
-// expected-error @-1 {{cannot specialize non-generic type 'T.A'}}
-// expected-error @-2 {{cannot specialize non-generic type 'T.A'}}
+func f12<T : P>(x: T) -> T.A<Int> {} //expected-error{{cannot specialize non-generic type 'T.A'}}{{29-34=}}

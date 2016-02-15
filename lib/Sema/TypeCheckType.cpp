@@ -395,6 +395,7 @@ Type TypeChecker::applyGenericArguments(Type type, SourceLoc loc,
     if (!type->is<ErrorType>())
       diagnose(loc, diag::not_a_generic_type, type)
           .fixItRemove(generic->getAngleBrackets());
+    generic->setInvalid();
     return type;
   }
 
