@@ -2118,6 +2118,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       Printer << "init";
+    }, [&] { // Signature
       switch (decl->getFailability()) {
       case OTK_None:
         break;
@@ -2130,7 +2131,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
         Printer << "!";
         break;
       }
-    }, [&] { // Parameters
+
       if (decl->isGeneric())
         printGenericParams(decl->getGenericParams());
 

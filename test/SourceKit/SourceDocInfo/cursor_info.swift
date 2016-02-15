@@ -71,7 +71,10 @@ public class SubscriptCursorTest {
 }
 
 class C3 {
-  deinit { }
+  deinit {}
+  init!(x: Int) { return nil }
+  init?(y: Int) { return nil }
+  init(z: Int) throws {}
 }
 
 // RUN: rm -rf %t.tmp
@@ -247,3 +250,27 @@ class C3 {
 // CHECK29-NEXT: C3 -> ()
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
 // CHECK29-NEXT: <decl.function.destructor><decl.name>deinit</decl.name></decl.function.destructor>
+
+// RUN: %sourcekitd-test -req=cursor -pos=75:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK30
+// CHECK30: source.lang.swift.decl.function.constructor (75:3-75:16)
+// CHECK30-NEXT: init(x:)
+// CHECK30-NEXT: s:FC11cursor_info2C3cFT1xSi_GSQS0__
+// CHECK30-NEXT: C3.Type -> (x: Int) -> C3!
+// CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK30-NEXT: <decl.function.constructor><decl.name>init</decl.name>!(x: <ref.struct usr="s:Si">Int</ref.struct>)</decl.function.constructor>
+
+// RUN: %sourcekitd-test -req=cursor -pos=76:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK31
+// CHECK31: source.lang.swift.decl.function.constructor (76:3-76:16)
+// CHECK31-NEXT: init(y:)
+// CHECK31-NEXT: s:FC11cursor_info2C3cFT1ySi_GSqS0__
+// CHECK31-NEXT: C3.Type -> (y: Int) -> C3?
+// CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK31-NEXT: <decl.function.constructor><decl.name>init</decl.name>?(y: <ref.struct usr="s:Si">Int</ref.struct>)</decl.function.constructor>
+
+// RUN: %sourcekitd-test -req=cursor -pos=77:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK32
+// CHECK32: source.lang.swift.decl.function.constructor (77:3-77:15)
+// CHECK32-NEXT: init(z:)
+// CHECK32-NEXT: s:FC11cursor_info2C3cFzT1zSi_S0_
+// CHECK32-NEXT: C3.Type -> (z: Int) throws -> C3
+// CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
+// CHECK32-NEXT: <decl.function.constructor><decl.name>init</decl.name>(z: <ref.struct usr="s:Si">Int</ref.struct>) throws</decl.function.constructor>
