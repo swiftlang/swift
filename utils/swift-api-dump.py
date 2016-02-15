@@ -73,7 +73,7 @@ def create_parser():
     parser = argparse.ArgumentParser(
         description="Dumps imported Swift APIs for a module or SDK",
         prog='swift-api-dump.py',
-        usage='python swift-api-dump.py -s iphoneos')
+        usage='%(prog)s -s iphoneos')
     parser.add_argument('-m', '--module', help='The module name.')
     parser.add_argument('-j', '--jobs', type=int, help='The number of parallel jobs to execute')
     parser.add_argument('-s', '--sdk', nargs='+', required=True, help="The SDKs to use.")
