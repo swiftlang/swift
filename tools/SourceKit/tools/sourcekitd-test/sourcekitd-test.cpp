@@ -106,6 +106,7 @@ static sourcekitd_uid_t KeyUnpopular;
 static sourcekitd_uid_t KeyTypeInterface;
 static sourcekitd_uid_t KeyModuleGroups;
 
+static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestIndex;
 static sourcekitd_uid_t RequestCodeComplete;
 static sourcekitd_uid_t RequestCodeCompleteOpen;
@@ -201,6 +202,7 @@ static int skt_main(int argc, const char **argv) {
 
   semaSemaphore = dispatch_semaphore_create(0);
 
+  RequestProtocolVersion = sourcekitd_uid_get_from_cstr("source.request.protocol_version");
   RequestIndex = sourcekitd_uid_get_from_cstr("source.request.indexsource");
   RequestCodeComplete = sourcekitd_uid_get_from_cstr("source.request.codecomplete");
   RequestCodeCompleteOpen = sourcekitd_uid_get_from_cstr("source.request.codecomplete.open");
@@ -373,6 +375,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     llvm::errs() << "request is not set\n";
     llvm::cl::PrintHelpMessage();
     return 1;
+
+  case SourceKitRequest::ProtocolVersion:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
+    break;
 
   case SourceKitRequest::Index:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndex);
@@ -636,6 +642,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       KeepResponseAlive = true;
       break;
 
+    case SourceKitRequest::ProtocolVersion:
     case SourceKitRequest::Index:
     case SourceKitRequest::CodeComplete:
     case SourceKitRequest::CodeCompleteOpen:

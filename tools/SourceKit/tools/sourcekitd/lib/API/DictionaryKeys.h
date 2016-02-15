@@ -19,6 +19,8 @@ namespace SourceKit {
 
 namespace sourcekitd {
 
+extern SourceKit::UIdent KeyVersionMajor;
+extern SourceKit::UIdent KeyVersionMinor;
 extern SourceKit::UIdent KeyResults;
 extern SourceKit::UIdent KeyRequest;
 extern SourceKit::UIdent KeyCompilerArgs;

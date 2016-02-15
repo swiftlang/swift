@@ -39,6 +39,10 @@ namespace sourcekitd {
 using llvm::Optional;
 using llvm::None;
 
+// The IPC protocol version. This can be queried via a request.
+static const unsigned ProtocolMajorVersion = 1;
+static const unsigned ProtocolMinorVersion = 0;
+
 enum class CustomBufferKind {
   TokenAnnotationsArray,
   DocSupportAnnotationArray,

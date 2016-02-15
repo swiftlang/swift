@@ -32,6 +32,8 @@ using llvm::StringRef;
 using llvm::raw_ostream;
 
 
+UIdent sourcekitd::KeyVersionMajor("key.version_major");;
+UIdent sourcekitd::KeyVersionMinor("key.version_minor");;
 UIdent sourcekitd::KeyResults("key.results");
 UIdent sourcekitd::KeyRequest("key.request");
 UIdent sourcekitd::KeyCompilerArgs("key.compilerargs");
@@ -127,6 +129,8 @@ UIdent sourcekitd::KeyModuleGroups("key.modulegroups");
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
 static UIdent *OrderedKeys[] = {
+  &KeyVersionMajor,
+  &KeyVersionMinor,
   &KeyResults,
   &KeyRequest,
   &KeyNotification,
