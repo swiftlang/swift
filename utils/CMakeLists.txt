@@ -8,12 +8,8 @@ swift_install_in_component(editor-integration
     FILES swift-mode.el
     DESTINATION "share/emacs/site-lisp")
 
-swift_install_in_component(editor-integration
-    FILES swift-mode.el
-    DESTINATION "share/emacs/site-lisp")
-
 swift_install_in_component(tools
-    TARGETS swift-api-dump.py
+    FILES swift-api-dump.py
     RUNTIME DESTINATION bin)
 
 # Create a symlink for swift-api-dump.py in the bin directory

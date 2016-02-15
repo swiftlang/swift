@@ -1,8 +1,23 @@
 #!/usr/bin/env python
 
-# This tool helps dump the APIs of imported modules for a module, SDK,
-# or set of SDKs. It is primarily useful in determining the effect of
-# changes to the Clang importer.
+# This tool dumps imported Swift APIs to help validate changes in the
+# Clang importer and its heuristics. One can execute it to dump the
+# API of a given module within a particular SDK, e.g., UIKit from the
+# iOS SDK as seen in Swift 3 after the "grand renaming":
+#
+#   /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -m UIKit -s iphoneos
+#
+# The -3 argument indicates that we're using the Swift 3 Clang
+# importer rules. The "-m" argument can be omitted, in which case the
+# script will collect all of the frameworks in the named SDK(s) and
+# dump their APIs.
+#
+# One can supply multiple SDKs, written as a list. For example, to
+# dump the API for all frameworks across OS X, iOS, watchOS, and tvOS,
+# with the Swift 3 rules, use:
+#
+#  /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -s macosx iphoneos watchos appletvos
+#
 
 from __future__ import print_function
 
@@ -10,6 +25,7 @@ import argparse
 import multiprocessing
 import os
 import re
+import sys
 import subprocess
 import sys
 
@@ -54,7 +70,7 @@ def create_parser():
     script_path = os.path.dirname(sys.argv[0])
     script_path = os.path.abspath(script_path)
     default_swift_ide_test = '%s/swift-ide-test' % (script_path)
-    
+
     parser = argparse.ArgumentParser(
         description="Dumps imported Swift APIs for a module or SDK",
         prog='swift-api-dump.py',
