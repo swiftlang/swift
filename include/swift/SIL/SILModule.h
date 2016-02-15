@@ -113,6 +113,7 @@ private:
   /// Lookup table for SIL functions. This needs to be declared before \p
   /// functions so that the destructor of \p functions is called first.
   llvm::StringMap<SILFunction *> FunctionTable;
+  llvm::StringMap<SILFunction *> ZombieFunctionTable;
 
   /// The list of SILFunctions in the module.
   FunctionListType functions;
@@ -225,6 +226,11 @@ public:
 
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F);
+
+  /// Specialization can cause a function that was erased before by dead function
+  /// elimination to become alive again. If this happens we need to remove it
+  /// from the list of zombies.
+  void removeFromZombieList(StringRef Name);
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
