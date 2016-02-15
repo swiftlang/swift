@@ -87,10 +87,17 @@ for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to proto
 func f6<T:P2>(g: Void -> T) -> (c: Int, i: T) {
   return (c: 0, i: g())
 }
+
 func f7() -> (c: Int, v: A) {
   let g: Void -> A = { return A() }
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
+
+func f8<T:P2>(n: T, _ f: (T) -> T) {}
+f8(3, f4) // expected-error {{in argument type '(Int) -> Int', 'Int' does not conform to expected type 'P2'}}
+typealias Tup = (Int, Double)
+func f9(x: Tup) -> Tup { return x }
+f8((1,2.0), f9) // expected-error {{in argument type '(Tup) -> Tup', 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -643,7 +650,7 @@ let a = safeAssign // expected-error {{generic parameter 'T' could not be inferr
 
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
 func foo() -> [Int] {
-  return Array <Int> (count: 1) { // expected-error {{cannot invoke initializer for type 'Array<Int>' with an argument list of type '(count: Int, () -> _)'}}
+  return Array <Int> (count: 1) { // expected-error {{cannot invoke initializer for type 'Array<Int>' with an argument list of type '(count: Int, () -> Int)'}}
     // expected-note @-1 {{expected an argument list of type '(count: Int, repeatedValue: Element)'}}
     return 1
   }

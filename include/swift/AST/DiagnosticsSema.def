@@ -287,6 +287,9 @@ ERROR(cannot_convert_argument_value,none,
       (Type,Type))
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
+ERROR(cannot_convert_partial_argument_value_protocol,none,
+      "in argument type %0, %1 does not conform to expected type %2", (Type, Type, Type))
+
 ERROR(cannot_convert_argument_value_nil,none,
       "nil is not compatible with expected argument type %0", (Type))
 
