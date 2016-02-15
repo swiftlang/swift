@@ -153,6 +153,9 @@ public:
   /// array of the generic parameters for the innermost generic type.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
 
+  GenericSignature *partialSubstGenericArgs(ModuleDecl *M, ArrayRef<Type> args,
+                                            TypeSubstitutionMap &subs) const;
+
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();

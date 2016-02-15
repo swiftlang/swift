@@ -727,8 +727,11 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
   auto CalleeCanType = F->getLoweredFunctionType();
-  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(
-    Module, Module.getSwiftModule(), NewSubstList);
+  auto SubstCalleeCanType = CalleeCanType;
+  if (!NewSubstList.empty()) {
+    SubstCalleeCanType = SubstCalleeCanType->partialSubstGenericArgs(
+      Module, Module.getSwiftModule(), NewSubstList);
+  }
 
   // Collect arguments from the apply instruction.
   auto Arguments = SmallVector<SILValue, 4>();

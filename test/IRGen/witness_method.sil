@@ -15,7 +15,7 @@ entry(%0: $*T, %1: $@thick T.Type):
 
   // CHECK-i386:   [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 4
   // CHECK-x86_64: [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 8
-  // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*)*
+  // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*, i8**)*
   // CHECK: call void [[METHOD]]
   %m = witness_method $T, #DefCon.init!allocator.1 : $@convention(witness_method) <U: DefCon> (@out U, @thick U.Type) -> ()
   %z = apply %m<T>(%0, %1) : $@convention(witness_method) <V: DefCon> (@out V, @thick V.Type) -> ()
@@ -35,7 +35,7 @@ struct ImplementsDerived : Derived {
 sil @testInheritedConformance : $@convention(thin) (@in ImplementsDerived) -> () {
 entry(%0: $*ImplementsDerived):
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** @_TWPV14witness_method17ImplementsDerivedS_4BaseS_
-  // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*)*
+  // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, i8**)*
   // CHECK: call void [[METHOD]]
   %m = witness_method $ImplementsDerived, #Base.foo!1 : $@convention(witness_method) <U: Base> (@in_guaranteed U) -> ()
   %z = apply %m<ImplementsDerived>(%0) : $@convention(witness_method) <V: Base> (@in_guaranteed V) -> ()
