@@ -479,9 +479,42 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
   findMatchingReleases(&*BB);
 }
 
+bool
+ConsumedArgToEpilogueReleaseMatcher::
+isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
+  // We use projection path to analyze the relation.
+  auto POp = ProjectionPath::getProjectionPath(Base, Derived);
+  // We can not build a projection path from the base to the derived, bail out.
+  // and return true so that we can stop the epilogue walking sequence.
+  if (!POp.hasValue())
+    return true;
+
+  for (auto &R : Insts) {
+    SILValue ROp = R->getOperand(0);
+    auto PROp = ProjectionPath::getProjectionPath(Base, ROp); 
+    if (!PROp.hasValue())
+      return true;
+    // If Op is a part of ROp or Rop is a part of Op. then we have seen
+    // a redundant release.
+    if (!PROp.getValue().hasNonEmptySymmetricDifference(POp.getValue()))
+      return true;
+  }
+  return false;
+}
+
 void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     SILBasicBlock *BB) {
-
+  // Iterate over the instructions post-order and find releases associated with
+  // each arguments.
+  //
+  // Break on these conditions.
+  //
+  // 1. An instruction that can use ref count values.
+  //
+  // 2. A release that can not be mapped to any @owned argument.
+  //
+  // 3. A release thats mapped to an argument which already has a release that 
+  // overlaps with this release.
   for (auto II = std::next(BB->rbegin()), IE = BB->rend(); II != IE; ++II) {
     // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
@@ -533,7 +566,7 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     //
     // If we are seeing a redundant release we have exited the return value
     // sequence, so break.
-    if (ProjectionTree::isRedundantRelease(Iter->second, Arg, OrigOp)) 
+    if (isRedundantRelease(Iter->second, Arg, OrigOp)) 
       break;
     
     // We've seen part of this base, but this is a part we've have not seen.

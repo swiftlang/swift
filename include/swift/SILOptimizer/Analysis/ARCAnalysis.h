@@ -119,6 +119,15 @@ private:
   llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
   bool HasBlock = false;
 
+  /// Return true if we have seen releases to part or all of \p Derived in
+  /// \p Insts.
+  /// 
+  /// NOTE: This function relies on projections to analyze the relation
+  /// between the releases values in \p Insts and \p Derived, it also bails
+  /// out and return true if projection path can not be formed between Base
+  /// and any one the released values.
+  bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
+
 public:
   /// Finds matching releases in the return block of the function \p F.
   ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,
