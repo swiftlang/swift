@@ -109,7 +109,7 @@ bool LoopARCSequenceDataflowEvaluator::processLoopTopDown(const LoopRegion *R) {
 
     // Then perform the dataflow.
     NestingDetected |= SubregionData.processTopDown(
-        AA, RCFI, LRFI, DecToIncStateMap, RegionStateInfo);
+        AA, RCFI, LRFI, DecToIncStateMap, RegionStateInfo, SetFactory);
   }
 
   return NestingDetected;
@@ -218,7 +218,7 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
     // Then perform the region optimization.
     NestingDetected |= SubregionData.processBottomUp(
         AA, RCFI, LRFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-        IncToDecStateMap, RegionStateInfo);
+        IncToDecStateMap, RegionStateInfo, SetFactory);
     --End;
   }
 
@@ -237,7 +237,7 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
     // Then perform the region optimization.
     NestingDetected |= SubregionData.processBottomUp(
         AA, RCFI, LRFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-        IncToDecStateMap, RegionStateInfo);
+        IncToDecStateMap, RegionStateInfo, SetFactory);
   }
 
   return NestingDetected;
@@ -253,9 +253,9 @@ LoopARCSequenceDataflowEvaluator::LoopARCSequenceDataflowEvaluator(
     ProgramTerminationFunctionInfo *PTFI,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
-    : F(F), AA(AA), LRFI(LRFI), SLI(SLI), RCFI(RCFI),
-      DecToIncStateMap(DecToIncStateMap), IncToDecStateMap(IncToDecStateMap),
-      ConsumedArgToReleaseMap(RCFI, &F) {
+    : Allocator(), SetFactory(Allocator), F(F), AA(AA), LRFI(LRFI), SLI(SLI),
+      RCFI(RCFI), DecToIncStateMap(DecToIncStateMap),
+      IncToDecStateMap(IncToDecStateMap), ConsumedArgToReleaseMap(RCFI, &F) {
   for (auto *R : LRFI->getRegions()) {
     bool AllowsLeaks = false;
     if (R->isBlock())
@@ -285,7 +285,28 @@ void LoopARCSequenceDataflowEvaluator::summarizeLoop(
   RegionStateInfo[R]->summarize(LRFI, RegionStateInfo);
 }
 
+void LoopARCSequenceDataflowEvaluator::summarizeSubregionBlocks(
+    const LoopRegion *R) {
+  for (unsigned SubregionID : R->getSubregions()) {
+    auto *Subregion = LRFI->getRegion(SubregionID);
+    if (!Subregion->isBlock())
+      continue;
+    RegionStateInfo[Subregion]->summarizeBlock(Subregion->getBlock());
+  }
+}
+
 void LoopARCSequenceDataflowEvaluator::clearLoopState(const LoopRegion *R) {
   for (unsigned SubregionID : R->getSubregions())
     getARCState(LRFI->getRegion(SubregionID)).clear();
+}
+
+void LoopARCSequenceDataflowEvaluator::addInterestingInst(SILInstruction *I) {
+  auto *Region = LRFI->getRegion(I->getParent());
+  RegionStateInfo[Region]->addInterestingInst(I);
+}
+
+void LoopARCSequenceDataflowEvaluator::removeInterestingInst(
+    SILInstruction *I) {
+  auto *Region = LRFI->getRegion(I->getParent());
+  RegionStateInfo[Region]->removeInterestingInst(I);
 }
