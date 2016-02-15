@@ -128,6 +128,10 @@ private:
   /// and any one the released values.
   bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
 
+  /// Return true if we have a release instruction for all the reference
+  /// sematics part of \p Base.
+  bool releaseAllNonTrivials(ReleaseList Insts, SILValue Base);
+
 public:
   /// Finds matching releases in the return block of the function \p F.
   ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,

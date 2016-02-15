@@ -748,6 +748,60 @@ ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
   } while (!Worklist.empty());
 }
 
+bool ProjectionPath::
+hasUncoveredNonTrivials(SILType B, SILModule *Mod, ProjectionPathSet &CPaths) {
+  llvm::SmallVector<ProjectionPath, 4> Worklist, Paths;
+  // Push an empty projection path to get started.
+  ProjectionPath P(B);
+  Worklist.push_back(P);
+  do {
+    // Get the next level projections based on current projection's type.
+    ProjectionPath PP = Worklist.pop_back_val();
+ 
+    // If this path is part of the covered path, then continue.
+    if (CPaths.find(PP) != CPaths.end())
+      continue;
+      
+    // Get the current type to process.
+    SILType Ty = PP.getMostDerivedType(*Mod);
+
+    // Get the first level projection of the current type.
+    llvm::SmallVector<Projection, 4> Projections;
+    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // There is at least one projection path that leads to a type with
+    // reference semantics.
+    if (Ty.getClassOrBoundGenericClass()) {
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // Keep expanding the location.
+    for (auto &P : Projections) {
+      ProjectionPath X(B);
+      X.append(PP);
+      assert(PP.getMostDerivedType(*Mod) == X.getMostDerivedType(*Mod));
+      X.append(P);
+      Worklist.push_back(X);
+    }
+    // Keep iterating if the worklist is not empty.
+  } while (!Worklist.empty());
+
+  // Check whether any path leads to a non-trivial type.
+  for (auto &X : Paths) {
+    if (!X.getMostDerivedType(*Mod).isTrivial(*Mod))
+       return true;
+  }   
+  return false;
+}
+
 bool
 Projection::operator<(const Projection &Other) const {
   // If we have a nominal kind...

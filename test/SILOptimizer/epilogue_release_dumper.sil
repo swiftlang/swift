@@ -27,6 +27,12 @@ struct baz {
   init()
 }
 
+struct boo {
+  var tbaz = baz()
+  var a = 0
+  init()
+}
+
 // CHECK-LABEL: START: sil @single_release_foo
 // CHECK: [[IN1:%.*]] = argument of bb0 : $foo
 // CHECK: strong_release [[IN1]] : $foo
@@ -80,7 +86,7 @@ bb0(%0 : $baz):
 //
 // CHECK-LABEL: START: sil @exploded_release_with_interfering_uses
 // CHECK: [[IN1:%.*]] = argument of bb0 : $baz
-// CHECK: strong_release
+// CHECK-NOT: strong_release
 // CHECK: END: sil @exploded_release_with_interfering_uses
 sil @exploded_release_with_interfering_uses : $@convention(thin) (@owned baz) -> () {
 bb0(%0 : $baz):
@@ -97,7 +103,6 @@ bb0(%0 : $baz):
 //
 // CHECK-LABEL: START: sil @exploded_release_with_overlapping_releases
 // CHECK: [[IN1:%.*]] = argument of bb0 : $baz
-// CHECK: strong_release
 // CHECK-NOT: strong_release
 // CHECK: END: sil @exploded_release_with_overlapping_releases
 sil @exploded_release_with_overlapping_releases : $@convention(thin) (@owned baz) -> () {
@@ -138,4 +143,76 @@ bb0(%0 : $foo, %1 : $bar):
   strong_release %1 : $bar
   %3 = tuple ()
   return %3 : $()
+}
+
+// Make sure we stop at the redundant release.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_redundant_releases
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK: release_value [[IN1]]
+// CHECK: END: sil @exploded_release_with_redundant_releases
+sil @exploded_release_with_redundant_releases : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  strong_release %2 : $foo
+  release_value  %0 : $baz
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we have an uncovered value type.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_uncovered_value_semantics
+// CHECK: [[IN0:%.*]] = argument of bb0 : $boo
+// CHECK: release_value
+// CHECK: release_value
+// CHECK: END: sil @exploded_release_with_uncovered_value_semantics
+sil @exploded_release_with_uncovered_value_semantics : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  release_value  %3 : $foo
+  release_value  %4 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we have an uncovered reference type.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_uncovered_reference_semantics
+// CHECK: [[IN1:%.*]] = argument of bb0 : $boo
+// CHECK-NOT: release_value
+// CHECK: END: sil @exploded_release_with_uncovered_reference_semantics
+sil @exploded_release_with_uncovered_reference_semantics : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  release_value  %3 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we have an uncovered reference type due to overlapping release.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_uncovered_reference_semantics_overlapping_release
+// CHECK: [[IN1:%.*]] = argument of bb0 : $boo
+// CHECK-NOT: release_value
+// CHECK: END: sil @exploded_release_with_uncovered_reference_semantics_overlapping_release
+sil @exploded_release_with_uncovered_reference_semantics_overlapping_release : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  release_value  %4 : $foo
+  release_value  %3 : $foo
+  release_value  %3 : $foo
+  %5 = tuple ()
+  return %5 : $()
 }

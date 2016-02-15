@@ -502,6 +502,25 @@ isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
   return false;
 }
 
+bool
+ConsumedArgToEpilogueReleaseMatcher::
+releaseAllNonTrivials(ReleaseList Insts, SILValue Base) {
+  // Reason about whether all parts are released.
+  SILModule *Mod = &(*Insts.begin())->getModule();
+
+  // These are the list of SILValues that are actually released.
+  ProjectionPathSet Paths;
+  for (auto &I : Insts) {
+    auto PP = ProjectionPath::getProjectionPath(Base, I->getOperand(0));
+    if (!PP)
+      return false;
+    Paths.insert(PP.getValue());
+  } 
+
+  // Is there an uncovered non-trivial type.
+  return !ProjectionPath::hasUncoveredNonTrivials(Base->getType(), Mod, Paths);
+}
+
 void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     SILBasicBlock *BB) {
   // Iterate over the instructions post-order and find releases associated with
@@ -573,6 +592,17 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     // Record it. 
     Iter->second.push_back(Target);
   }
+
+  // If we can not find a releases for all parts with reference semantics
+  // that means we did not find all releases for the base.
+  llvm::DenseSet<SILArgument *> ArgToRemove;
+  for (auto &Arg : ArgInstMap) {
+    if (!releaseAllNonTrivials(Arg.second, Arg.first))
+      ArgToRemove.insert(Arg.first);
+  }
+
+  for (auto &X : ArgToRemove) 
+    ArgInstMap.erase(ArgInstMap.find(X));
 }
 
 //===----------------------------------------------------------------------===//
