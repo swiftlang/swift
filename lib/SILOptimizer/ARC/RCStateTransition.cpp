@@ -160,7 +160,7 @@ bool RCStateTransition::merge(const RCStateTransition &Other) {
   if (!isMutator())
     return true;
 
-  Mutators = Mutators->concat(Other.Mutators);
+  Mutators = Mutators->merge(Other.Mutators);
 
   return true;
 }

@@ -12,32 +12,32 @@ TEST(ImmutableSortedSet, OneElementSets) {
   unsigned *ptr1 = (unsigned *)3;
   auto *OneEltSet1 = F.get(ptr1);
   EXPECT_EQ(OneEltSet1, F.get(ptr1));
-  EXPECT_EQ(OneEltSet1, F.concat(OneEltSet1, OneEltSet1));
+  EXPECT_EQ(OneEltSet1, F.merge(OneEltSet1, OneEltSet1));
 
   unsigned *ptr2 = (unsigned *)2;
   auto *OneEltSet2 = F.get(ptr2);
   EXPECT_EQ(OneEltSet2, F.get(ptr2));
-  EXPECT_EQ(OneEltSet2, F.concat(OneEltSet2, OneEltSet2));
+  EXPECT_EQ(OneEltSet2, F.merge(OneEltSet2, OneEltSet2));
   EXPECT_NE(OneEltSet2, OneEltSet1);
 
-  auto *Concat1 = F.concat(OneEltSet1, OneEltSet2);
-  auto *Concat2 = F.concat(OneEltSet2, OneEltSet1);
-  EXPECT_NE(OneEltSet1, Concat1);
-  EXPECT_NE(OneEltSet2, Concat1);
-  EXPECT_EQ(Concat1, Concat2);
-  EXPECT_EQ(Concat1, F.concat(Concat1, Concat1));
-  EXPECT_EQ(Concat2, F.concat(Concat2, Concat2));
-  EXPECT_EQ(Concat1, F.concat(Concat1, OneEltSet1));
-  EXPECT_EQ(Concat1, F.concat(Concat1, OneEltSet2));
+  auto *Merge1 = F.merge(OneEltSet1, OneEltSet2);
+  auto *Merge2 = F.merge(OneEltSet2, OneEltSet1);
+  EXPECT_NE(OneEltSet1, Merge1);
+  EXPECT_NE(OneEltSet2, Merge1);
+  EXPECT_EQ(Merge1, Merge2);
+  EXPECT_EQ(Merge1, F.merge(Merge1, Merge1));
+  EXPECT_EQ(Merge2, F.merge(Merge2, Merge2));
+  EXPECT_EQ(Merge1, F.merge(Merge1, OneEltSet1));
+  EXPECT_EQ(Merge1, F.merge(Merge1, OneEltSet2));
 
-  EXPECT_EQ(Concat1->size(), 2U);
-  EXPECT_FALSE(Concat1->empty());
-  EXPECT_EQ(*Concat1->begin(), (unsigned *)2);
-  EXPECT_EQ(*std::next(Concat1->begin()), (unsigned *)3);
+  EXPECT_EQ(Merge1->size(), 2U);
+  EXPECT_FALSE(Merge1->empty());
+  EXPECT_EQ(*Merge1->begin(), (unsigned *)2);
+  EXPECT_EQ(*std::next(Merge1->begin()), (unsigned *)3);
 
   EXPECT_EQ(F.getEmptySet(), F.getEmptySet());
-  EXPECT_EQ(OneEltSet1, F.concat(F.getEmptySet(), OneEltSet1));
-  EXPECT_EQ(OneEltSet1, F.concat(OneEltSet1, F.getEmptySet()));
+  EXPECT_EQ(OneEltSet1, F.merge(F.getEmptySet(), OneEltSet1));
+  EXPECT_EQ(OneEltSet1, F.merge(OneEltSet1, F.getEmptySet()));
 }
 
 TEST(ImmutablePointerSet, MultipleElementSets) {
@@ -60,7 +60,7 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
   EXPECT_FALSE(TwoEltSet->count(Ptr4));
   EXPECT_FALSE(TwoEltSet->count(Ptr5));
 
-  auto *ThreeEltSet = F.concat(F.get(Ptr4), TwoEltSet);
+  auto *ThreeEltSet = F.merge(F.get(Ptr4), TwoEltSet);
   EXPECT_FALSE(ThreeEltSet->empty());
   EXPECT_EQ(ThreeEltSet->size(), 3u);
   EXPECT_NE(*ThreeEltSet, *TwoEltSet);
@@ -69,7 +69,7 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
   EXPECT_TRUE(ThreeEltSet->count(Ptr3));
   EXPECT_TRUE(ThreeEltSet->count(Ptr4));
   EXPECT_FALSE(ThreeEltSet->count(Ptr5));
-  EXPECT_EQ(ThreeEltSet, F.concat(TwoEltSet, ThreeEltSet));
+  EXPECT_EQ(ThreeEltSet, F.merge(TwoEltSet, ThreeEltSet));
 
   ArrayRef<unsigned *> Data2 = {Ptr3, Ptr4, Ptr5};
   auto *PartialOverlapSet = F.get(Data2);
@@ -83,7 +83,7 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
   EXPECT_NE(*PartialOverlapSet, *ThreeEltSet);
   EXPECT_NE(*PartialOverlapSet, *TwoEltSet);
 
-  auto *MixOfThreeAndPartialOverlap = ThreeEltSet->concat(PartialOverlapSet);
+  auto *MixOfThreeAndPartialOverlap = ThreeEltSet->merge(PartialOverlapSet);
   EXPECT_FALSE(MixOfThreeAndPartialOverlap->empty());
   EXPECT_EQ(MixOfThreeAndPartialOverlap->size(), 4u);
   EXPECT_TRUE(MixOfThreeAndPartialOverlap->count(Ptr1));

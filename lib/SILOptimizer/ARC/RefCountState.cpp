@@ -340,7 +340,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   Partial |= Other.Partial;
   if (*InsertPts != *Other.InsertPts) {
     Partial = true;
-    InsertPts = InsertPts->concat(Other.InsertPts);
+    InsertPts = InsertPts->merge(Other.InsertPts);
   }
 
   DEBUG(llvm::dbgs() << "            Partial: " << (Partial ? "yes" : "no")
@@ -628,7 +628,7 @@ bool TopDownRefCountState::handleDecrement(
   switch (LatState) {
   case LatticeState::Incremented:
     LatState = LatticeState::MightBeDecremented;
-    InsertPts = SetFactory.concat(InsertPts, NewInsertPt);
+    InsertPts = SetFactory.merge(InsertPts, NewInsertPt);
     return true;
   case LatticeState::None:
   case LatticeState::MightBeDecremented:
@@ -793,7 +793,7 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   Partial |= Other.Partial;
   if (*InsertPts != *Other.InsertPts) {
     Partial = true;
-    InsertPts = InsertPts->concat(Other.InsertPts);
+    InsertPts = InsertPts->merge(Other.InsertPts);
   }
 
   DEBUG(llvm::dbgs() << "            Partial: " << (Partial ? "yes" : "no")

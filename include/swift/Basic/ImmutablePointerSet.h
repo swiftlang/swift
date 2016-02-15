@@ -126,13 +126,13 @@ public:
     }
   }
 
-  ImmutablePointerSet<T> *concat(ImmutablePointerSet<T> *Other) {
+  ImmutablePointerSet<T> *merge(ImmutablePointerSet<T> *Other) {
     if (empty())
       return Other;
     if (Other->empty())
       return this;
     assert(Other->ParentFactory.get() == ParentFactory.get());
-    return ParentFactory.get()->concat(this, Other);
+    return ParentFactory.get()->merge(this, Other);
   }
 };
 
@@ -199,7 +199,7 @@ public:
     return NewNode;
   }
 
-  PtrSet *concat(PtrSet *S1, ArrayRef<PtrTy> S2) {
+  PtrSet *merge(PtrSet *S1, ArrayRef<PtrTy> S2) {
     if (S1->empty())
       return get(S2);
 
@@ -245,7 +245,7 @@ public:
     return NewNode;
   }
 
-  PtrSet *concat(PtrSet *S1, PtrSet *S2) {
+  PtrSet *merge(PtrSet *S1, PtrSet *S2) {
     // If either S1 or S2 are the empty PtrSet, just return S2 or S1.
     if (S1->empty())
       return S2;
