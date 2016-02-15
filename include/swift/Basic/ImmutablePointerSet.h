@@ -81,19 +81,18 @@ public:
   ImmutablePointerSet &operator=(ImmutablePointerSet &&) = default;
 
   bool operator==(const ImmutablePointerSet<T> &P) const {
-    // If both are empty, they must be equivalent.
-    if (empty() && P.empty())
-      return true;
-    // Ok, at least one is non-empty. If either are empty at this point, then we
-    // are comparing a non-empty set with an empty set, i.e. they do not equal.
-    if (empty() || P.empty())
+    // If this and P have different sizes, we can not be equivalent.
+    if (size() != P.size())
       return false;
 
-    // Ok, both sets are not empty. Compare their profiles.
-    llvm::FoldingSetNodeID ID1, ID2;
-    Profile(ID1);
-    P.Profile(ID2);
-    return ID1 == ID2;
+    // Ok, we now know that both have the same size. If one is empty, the other
+    // must be as well, implying equality.
+    if (empty())
+      return true;
+
+    // Ok, both sets are not empty and the same number of elements. Compare
+    // element wise.
+    return std::equal(begin(), end(), P.begin());
   }
 
   bool operator!=(const ImmutablePointerSet<T> &P) const {

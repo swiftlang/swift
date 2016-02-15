@@ -2,7 +2,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Allocator.h"
 #include "gtest/gtest.h"
-#include <vector>
 
 using namespace swift;
 
@@ -50,9 +49,7 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
   unsigned *Ptr3 = (unsigned *)3;
   unsigned *Ptr4 = (unsigned *)5;
   unsigned *Ptr5 = (unsigned *)6;
-  std::vector<unsigned *> Data1;
-  Data1.push_back(Ptr1);
-  Data1.push_back(Ptr2);
+  ArrayRef<unsigned *> Data1 = {Ptr1, Ptr2};
 
   auto *TwoEltSet = F.get(Data1);
   EXPECT_FALSE(TwoEltSet->empty());
@@ -74,7 +71,7 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
   EXPECT_FALSE(ThreeEltSet->count(Ptr5));
   EXPECT_EQ(ThreeEltSet, F.concat(TwoEltSet, ThreeEltSet));
 
-  std::vector<unsigned *> Data2 = {Ptr3, Ptr4, Ptr5};
+  ArrayRef<unsigned *> Data2 = {Ptr3, Ptr4, Ptr5};
   auto *PartialOverlapSet = F.get(Data2);
   EXPECT_FALSE(PartialOverlapSet->empty());
   EXPECT_EQ(PartialOverlapSet->size(), 3u);

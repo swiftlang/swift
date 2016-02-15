@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include <cassert>
 #include <functional>
@@ -103,9 +104,25 @@ inline void for_each3(const Container1 &c1, const Container2 &c2,
 
 /// The equivalent of std::for_each, but visits the set union of two sorted
 /// lists without allocating additional memory.
+///
+/// This has the following requirements:
+///
+/// 1. The ranges must be sorted.
+/// 2. The elements must have the same type.
+/// 3. There are no duplicate elements.
+/// 4. All elements must be comparable with std::less.
 template <typename InputIt1, typename InputIt2, typename BinaryFunction>
 inline void set_union_for_each(InputIt1 I1, InputIt1 E1, InputIt2 I2,
                                InputIt2 E2, BinaryFunction f) {
+  static_assert(
+      std::is_same<
+        typename std::iterator_traits<InputIt1>::value_type,
+        typename std::iterator_traits<InputIt2>::value_type
+      >::value,
+      "Expected both iterator types to have the same underlying value type");
+
+  using RefTy = typename std::iterator_traits<InputIt1>::reference;
+
   while (true) {
     // If we have reached the end of either list, visit the rest of the other
     // list, We do not need to worry about duplicates since each array we know
@@ -121,14 +138,14 @@ inline void set_union_for_each(InputIt1 I1, InputIt1 E1, InputIt2 I2,
     }
 
     // If I1 < I2, then visit I1 and continue.
-    if (*I1 < *I2) {
+    if (std::less<RefTy>()(*I1, *I2)) {
       f(*I1);
       ++I1;
       continue;
     }
 
     // If I2 < I1, visit I2 and continue.
-    if (*I2 < *I1) {
+    if (std::less<RefTy>()(*I2, *I1)) {
       f(*I2);
       ++I2;
       continue;
@@ -143,9 +160,23 @@ inline void set_union_for_each(InputIt1 I1, InputIt1 E1, InputIt2 I2,
 }
 
 /// A container adapter for set_union_for_each.
-template <typename Container1, typename Container2, typename BinaryFunction>
-inline void set_union_for_each(Container1 &&C1, Container2 &&C2,
-                               BinaryFunction f) {
+///
+/// To see the requirements upon the containers, please see the iterator based
+/// set_union_for_each.
+template <typename Container1, typename Container2, typename UnaryFunction>
+inline void set_union_for_each(const Container1 &C1, const Container2 &C2,
+                               UnaryFunction f) {
+  // Make sure that our iterators have the same value type.
+  static_assert(
+      std::is_same<
+        typename std::iterator_traits<
+          typename Container1::iterator
+        >::value_type,
+        typename std::iterator_traits<
+          typename Container2::iterator
+        >::value_type
+      >::value,
+      "Expected both containers to have the same iterator value type");
   set_union_for_each(C1.begin(), C1.end(), C2.begin(), C2.end(), f);
 }
 
@@ -625,6 +656,8 @@ void sortUnique(
 /// otherwise.
 template <typename IterTy>
 inline bool is_sorted_and_uniqued(IterTy II, IterTy IE) {
+  using RefTy = typename std::iterator_traits<IterTy>::reference;
+
   // The empty list is always sorted and uniqued.
   if (II == IE)
     return true;
@@ -640,14 +673,13 @@ inline bool is_sorted_and_uniqued(IterTy II, IterTy IE) {
     // If LastI is greater than II then we know that our array is not sorted. If
     // LastI equals II, then we know that our array is not unique. If both of
     // those are conditions are false, then visit the next iterator element.
-    if (*LastI < *II) {
-      LastI = II;
-      ++II;
-      continue;
+    if (std::greater_equal<RefTy>()(*LastI, *II)) {
+      // Return false otherwise.
+      return false;
     }
 
-    // Return false otherwise.
-    return false;
+    LastI = II;
+    ++II;
   }
 
   // Success!
@@ -655,7 +687,7 @@ inline bool is_sorted_and_uniqued(IterTy II, IterTy IE) {
 }
 
 template <typename Container>
-inline bool is_sorted_and_uniqued(Container &&C) {
+inline bool is_sorted_and_uniqued(const Container &C) {
   return is_sorted_and_uniqued(C.begin(), C.end());
 }
 
