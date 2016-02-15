@@ -137,7 +137,7 @@ DictionaryTraps.test("RemoveInvalidIndex4")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = [ 10: 1010 ]
-  let index = d.indexForKey(10)!
+  let index = d.index(forKey: 10)!
   d.remove(at: index)
   expectEmpty(d[10])
   expectCrashLater()
