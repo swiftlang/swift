@@ -513,8 +513,8 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
   //
   // 2. A release that can not be mapped to any @owned argument.
   //
-  // 3. A release thats mapped to an argument which already has a release that 
-  // overlaps with this release.
+  // 3. A release that is mapped to an argument which already has a release
+  // that overlaps with this release.
   for (auto II = std::next(BB->rbegin()), IE = BB->rend(); II != IE; ++II) {
     // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
