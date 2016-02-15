@@ -1,4 +1,4 @@
-//===--- GlobalARCPairingAnalysis.cpp - Global ARC Retain Release Pairing -===//
+//===--- ARCMatchingSet.cpp - ARC Matching Set Builder --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
