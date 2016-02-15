@@ -374,15 +374,6 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
   if (BaseType != RHS.BaseType)
     return false;
 
-  // We assume that the two paths must be non-empty.
-  //
-  // I believe that we assume this since in the code that uses this we check for
-  // full differences before we use this code path.
-  //
-  // TODO: Is this necessary.
-  if (empty() || RHS.empty())
-    return false;
-
   // Otherwise, we have a common base and perhaps some common subpath.
   auto LHSIter = Path.begin();
   auto RHSIter = RHS.Path.begin();
@@ -443,9 +434,9 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
   if (BaseType != RHS.BaseType)
     return SubSeqRelation_t::Unknown;
 
-  // If either path is empty, we can not prove anything, return Unknown.
-  if (empty() || RHS.empty())
-    return SubSeqRelation_t::Unknown;
+  // If both paths are empty, return Equal.
+  if (empty() && RHS.empty())
+    return SubSeqRelation_t::Equal;
 
   auto LHSIter = begin();
   auto RHSIter = RHS.begin();
