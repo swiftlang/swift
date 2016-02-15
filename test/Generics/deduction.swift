@@ -56,7 +56,7 @@ func useSwap(xi: Int, yi: Float) {
   mySwap(x, x) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
     // expected-error @-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{13-13=&}}
   
-  mySwap(&x, &y) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'inout _'}}
+  mySwap(&x, &y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {
@@ -208,14 +208,14 @@ func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<  // expected-note {{in call to function 'rangeOfIsBefore'}}
+func rangeOfIsBefore<
   R : GeneratorType where R.Element : IsBefore
 >(range : R) { }
 
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{generic parameter 'R' could not be inferred}}
+  rangeOfIsBefore(da.generate()) // expected-error{{ambiguous reference to member 'generate()'}}
 }
 
 //===----------------------------------------------------------------------===//

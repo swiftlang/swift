@@ -902,17 +902,6 @@ public:
   replaceValueUsesWithLeafUses(SILBuilder &B, SILLocation Loc,
                                llvm::SmallVectorImpl<SILValue> &Leafs);
  
-
-  /// Return true if we have seen releases to part or all of \p Derived in
-  /// \p Insts.
-  /// 
-  /// NOTE: This function relies on projections to analyze the relation
-  /// between the releases values in \p Insts and \p Derived, it also bails
-  /// out and return true if projection path can not be formed between Base
-  /// and any one the released values.
-  static bool
-  isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
-
 private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&

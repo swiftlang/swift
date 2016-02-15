@@ -395,6 +395,7 @@ Type TypeChecker::applyGenericArguments(Type type, SourceLoc loc,
     if (!type->is<ErrorType>())
       diagnose(loc, diag::not_a_generic_type, type)
           .fixItRemove(generic->getAngleBrackets());
+    generic->setInvalid();
     return type;
   }
 
@@ -969,16 +970,6 @@ static Type resolveNestedIdentTypeComponent(
                                                            parentRange,
                                                            comp);
     assert(memberType && "Received null dependent member type");
-
-    if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
-      // FIXME: Highlight generic arguments and introduce a Fix-It to
-      // remove them.
-      if (diagnoseErrors)
-        TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
-
-      // Drop the arguments.
-    }
-
     // If we know what type declaration we're referencing, store it.
     if (auto typeDecl = memberType->getDirectlyReferencedTypeDecl()) {
       comp->setValue(typeDecl);

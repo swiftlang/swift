@@ -374,15 +374,6 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
   if (BaseType != RHS.BaseType)
     return false;
 
-  // We assume that the two paths must be non-empty.
-  //
-  // I believe that we assume this since in the code that uses this we check for
-  // full differences before we use this code path.
-  //
-  // TODO: Is this necessary.
-  if (empty() || RHS.empty())
-    return false;
-
   // Otherwise, we have a common base and perhaps some common subpath.
   auto LHSIter = Path.begin();
   auto RHSIter = RHS.Path.begin();
@@ -443,9 +434,9 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
   if (BaseType != RHS.BaseType)
     return SubSeqRelation_t::Unknown;
 
-  // If either path is empty, we can not prove anything, return Unknown.
-  if (empty() || RHS.empty())
-    return SubSeqRelation_t::Unknown;
+  // If both paths are empty, return Equal.
+  if (empty() && RHS.empty())
+    return SubSeqRelation_t::Equal;
 
   auto LHSIter = begin();
   auto RHSIter = RHS.begin();
@@ -1471,27 +1462,4 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
     std::copy(NewNodes.begin(), NewNodes.end(), std::back_inserter(Worklist));
     NewNodes.clear();
   }
-}
-
-bool
-ProjectionTree::
-isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
-  // We use projection path to analyze the relation.
-  auto POp = ProjectionPath::getProjectionPath(Base, Derived);
-  // We can not build a projection path from the base to the derived, bail out.
-  // and return true so that we can stop the epilogue walking sequence.
-  if (!POp.hasValue())
-    return true;
-
-  for (auto &R : Insts) {
-    SILValue ROp = R->getOperand(0);
-    auto PROp = ProjectionPath::getProjectionPath(Base, ROp); 
-    if (!PROp.hasValue())
-      return true;
-    // If Op is a part of ROp or Rop is a part of Op. then we have seen
-    // a redundant release.
-    if (!PROp.getValue().hasNonEmptySymmetricDifference(POp.getValue()))
-      return true;
-  }
-  return false;
 }

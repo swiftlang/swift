@@ -155,6 +155,8 @@ SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
 
 std::string getRuntimeLibPath();
 
+void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
+
 static inline sourcekitd_variant_t makeNullVariant() {
   return {{ 0, 0, 0 }};
 }

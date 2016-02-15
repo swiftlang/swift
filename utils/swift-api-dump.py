@@ -1,14 +1,30 @@
 #!/usr/bin/env python
 
-# This tool helps assess the impact of automatically applying
-# heuristics that omit 'needless' words from APIs imported from Clang
-# into Swift.
+# This tool dumps imported Swift APIs to help validate changes in the
+# Clang importer and its heuristics. One can execute it to dump the
+# API of a given module within a particular SDK, e.g., UIKit from the
+# iOS SDK as seen in Swift 3 after the "grand renaming":
+#
+#   /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -m UIKit -s iphoneos
+#
+# The -3 argument indicates that we're using the Swift 3 Clang
+# importer rules. The "-m" argument can be omitted, in which case the
+# script will collect all of the frameworks in the named SDK(s) and
+# dump their APIs.
+#
+# One can supply multiple SDKs, written as a list. For example, to
+# dump the API for all frameworks across OS X, iOS, watchOS, and tvOS,
+# with the Swift 3 rules, use:
+#
+#  /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -s macosx iphoneos watchos appletvos
+#
 
 from __future__ import print_function
 
 import argparse
 import os
 import re
+import sys
 import subprocess
 import multiprocessing
 
@@ -50,19 +66,25 @@ SKIPPED_FRAMEWORKS = {
 }
 
 def create_parser():
+    script_path = os.path.dirname(sys.argv[0])
+    script_path = os.path.abspath(script_path)
+    default_swift_ide_test = '%s/swift-ide-test' % (script_path)
+
     parser = argparse.ArgumentParser(
-        description="Determines the effects of omitting 'needless' words from imported APIs",
-        prog='omit-needless-words.py',
-        usage='python omit-needless-words.py -m AppKit')
+        description="Dumps imported Swift APIs for a module or SDK",
+        prog='swift-api-dump.py',
+        usage='python swift-api-dump.py -s iphoneos')
     parser.add_argument('-m', '--module', help='The module name.')
     parser.add_argument('-j', '--jobs', type=int, help='The number of parallel jobs to execute')
     parser.add_argument('-s', '--sdk', nargs='+', required=True, help="The SDKs to use.")
     parser.add_argument('-t', '--target', help="The target triple to use.")
-    parser.add_argument('-i', '--swift-ide-test', default='swift-ide-test', help="The swift-ide-test executable.")
+    parser.add_argument('-i', '--swift-ide-test', default=default_swift_ide_test, help="The swift-ide-test executable.")
     parser.add_argument('-3', '--swift-3', action='store_true', help="Use Swift 3 transformation")
     parser.add_argument('-o', '--output-dir', default=os.getcwd(), help='Directory to which the output will be emitted.')
     parser.add_argument('-q', '--quiet', action='store_true', help='Suppress printing of status messages.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print extra information.')
+    parser.add_argument('-F', '--framework-dir', action='append', help='Add additional framework directories')
+    parser.add_argument('-I', '--include-dir', action='append', help='Add additional include directories')
     return parser
 
 def output_command_result_to_file(command_args, filename):
@@ -203,11 +225,19 @@ def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module, target,
     return results
 
 def main():
-    source_filename = 'omit-needless-words.swift'
+    source_filename = 'swift-api-dump.swift'
     parser = create_parser()
     args = parser.parse_args()
 
     cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments']
+
+    # Add -F / -I arguments.
+    if args.framework_dir:
+        for path in args.framework_dir:
+            cmd_common = cmd_common + ['-F', path]
+    if args.include_dir:
+        for path in args.include_dir:
+            cmd_common = cmd_common + ['-I', path]
 
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
