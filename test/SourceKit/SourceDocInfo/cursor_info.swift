@@ -77,6 +77,12 @@ class C3 {
   init(z: Int) throws {}
 }
 
+struct S2<T, U where T == U> {
+  func foo<V, W where V == W> (closure: ()->()) -> ()->() { return closure }
+}
+class C4<T, U where T == U> {}
+enum E1<T, U where T == U> {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -274,3 +280,35 @@ class C3 {
 // CHECK32-NEXT: C3.Type -> (z: Int) throws -> C3
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
 // CHECK32-NEXT: <decl.function.constructor><decl.name>init</decl.name>(z: <ref.struct usr="s:Si">Int</ref.struct>) throws</decl.function.constructor>
+
+// RUN: %sourcekitd-test -req=cursor -pos=80:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK33
+// CHECK33: source.lang.swift.decl.struct (80:8-80:10)
+// CHECK33-NEXT: S2
+// CHECK33-NEXT: s:V11cursor_info2S2
+// CHECK33-NEXT: S2.Type
+// CHECK33-NEXT: <Declaration>struct S2&lt;T, U&gt;</Declaration>
+// CHECK33-NEXT: <decl.struct>struct <decl.name>S2</decl.name>&lt;T, U&gt;</decl.struct>
+
+// RUN: %sourcekitd-test -req=cursor -pos=81:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK34
+// CHECK34: source.lang.swift.decl.function.method.instance (81:8-81:48)
+// CHECK34-NEXT: foo(_:)
+// CHECK34-NEXT: s:FV11cursor_info2S23foou0_rFFT_T_FT_T_
+// CHECK34-NEXT: <T, U> (S2<T, U>) -> <V, W> (() -> ()) -> () -> ()
+// CHECK34-NEXT: <Declaration>func foo&lt;V, W&gt;(closure: () -&gt; ()) -&gt; () -&gt; ()</Declaration>
+// CHECK34-NEXT: <decl.function.method.instance>func <decl.name>foo</decl.name>&lt;V, W&gt;(closure: () -&gt; ()) -&gt; () -&gt; ()</decl.function.method.instance>
+
+// RUN: %sourcekitd-test -req=cursor -pos=83:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK35
+// CHECK35: source.lang.swift.decl.class (83:7-83:9)
+// CHECK35-NEXT: C4
+// CHECK35-NEXT: s:C11cursor_info2C4
+// CHECK35-NEXT: C4.Type
+// CHECK35-NEXT: <Declaration>class C4&lt;T, U&gt;</Declaration>
+// CHECK35-NEXT: <decl.class>class <decl.name>C4</decl.name>&lt;T, U&gt;</decl.class>
+
+// RUN: %sourcekitd-test -req=cursor -pos=84:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK36
+// CHECK36: source.lang.swift.decl.enum (84:6-84:8)
+// CHECK36-NEXT: E1
+// CHECK36-NEXT: s:O11cursor_info2E1
+// CHECK36-NEXT: E1.Type
+// CHECK36-NEXT: <Declaration>enum E1&lt;T, U&gt;</Declaration>
+// CHECK36-NEXT: <decl.enum>enum <decl.name>E1</decl.name>&lt;T, U&gt;</decl.enum>

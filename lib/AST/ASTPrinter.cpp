@@ -584,7 +584,7 @@ private:
   void printAccessors(AbstractStorageDecl *ASD);
   void printMembersOfDecl(Decl * NTD, bool needComma = false);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false);
-  void printNominalDeclName(NominalTypeDecl *decl);
+  void printNominalDeclGenericParams(NominalTypeDecl *decl);
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
@@ -1215,8 +1215,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
   Printer << "}";
 }
 
-void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
-  Printer.printName(decl->getName());
+void PrintAST::printNominalDeclGenericParams(NominalTypeDecl *decl) {
   if (auto gp = decl->getGenericParams()) {
     if (!isa<ProtocolDecl>(decl)) {
       // For a protocol extension, print only the where clause; the
@@ -1607,7 +1606,9 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
       Printer << "enum ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
   }
@@ -1630,7 +1631,9 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
       Printer << "struct ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
   }
@@ -1653,7 +1656,9 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       Printer << "class ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
 
     printInherited(decl);
@@ -1678,7 +1683,9 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
       Printer << "protocol ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
 
     // Figure out whether we need an explicit 'class' in the inheritance.
