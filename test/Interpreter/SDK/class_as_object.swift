@@ -19,7 +19,7 @@ for obj: AnyObject in classes {
 // CHECK-NEXT: NSString
 // CHECK-NEXT: NSNumber
 
-print(NSObject.conformsTo(NSCopying.self))
+print(NSObject.conforms(to: NSCopying.self))
 // CHECK-NEXT: false
-print(NSString.conformsTo(NSCopying.self))
+print(NSString.conforms(to: NSCopying.self))
 // CHECK-NEXT: true

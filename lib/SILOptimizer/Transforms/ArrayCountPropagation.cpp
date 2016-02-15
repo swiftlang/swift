@@ -180,7 +180,7 @@ bool ArrayAllocation::propagateCountToUsers() {
       HasChanged = true;
     }
 
-    if (HasChanged && hasNoUsesExceptDebug(Count))
+    if (HasChanged && onlyHaveDebugUses(Count))
       DeadArrayCountCalls.push_back(Count);
   }
   return HasChanged;

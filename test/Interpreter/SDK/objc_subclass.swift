@@ -23,15 +23,15 @@ class SuperString : NSString {
     return len
   }
 
-  override func characterAt(n: Int) -> unichar {
+  override func character(at n: Int) -> unichar {
     return unichar(0x30 + n)
   }
 
-  override func substringWith(r: NSRange) -> String {
+  override func substring(withRange r: NSRange) -> String {
     if (r.location == 0) {
       return SuperString(r.length) as String
     }
-    return super.substringWith(r)
+    return super.substring(withRange: r)
   }
 }
 
@@ -40,9 +40,9 @@ print(SuperString(10))
 // CHECK: 0123456789
 print(NSString(string: SuperString(10) as String))
 // CHECK: 012
-print(SuperString(10).substringWith(NSRange(location: 0, length: 3)))
+print(SuperString(10).substring(withRange: NSRange(location: 0, length: 3)))
 // CHECK: 345
-print(SuperString(10).substringWith(NSRange(location: 3, length: 3)))
+print(SuperString(10).substring(withRange: NSRange(location: 3, length: 3)))
 
 class X {
   var label: String

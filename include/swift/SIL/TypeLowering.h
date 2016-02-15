@@ -151,12 +151,6 @@ public:
     return !isAddressOnly();
   }
   
-  /// True if the type was successfully lowered, false if there was an error
-  /// during type lowering.
-  virtual bool isValid() const {
-    return true;
-  }
-  
   /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
@@ -360,7 +354,6 @@ protected:
 };
 
 /// Type and lowering information about a constant function.
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
 struct SILConstantInfo {
   /// The formal type of the constant, still curried.  For a normal
   /// function, this is just its declared type; for a getter or
@@ -404,7 +397,6 @@ struct SILConstantInfo {
     return !(lhs == rhs);
   }
 };
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
 
 /// Different ways in which a function can capture context.
 enum class CaptureKind {
@@ -530,9 +522,6 @@ class TypeConverter {
   
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
   
-  /// The set of recursive types we've already diagnosed.
-  llvm::DenseSet<NominalTypeDecl *> RecursiveNominalTypes;
-
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
   

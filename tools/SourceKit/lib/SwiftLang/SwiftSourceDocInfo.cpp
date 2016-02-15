@@ -299,6 +299,14 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
   unsigned DeclEnd = SS.size();
 
+  unsigned GroupBegin = SS.size();
+  {
+    llvm::raw_svector_ostream OS(SS);
+    if (auto OP = VD->getGroupName())
+      OS << OP.getValue();
+  }
+  unsigned GroupEnd = SS.size();
+
   SmallVector<std::pair<unsigned, unsigned>, 4> OverUSROffs;
 
   ide::walkOverriddenDecls(VD,
@@ -379,6 +387,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
                                    DocCommentEnd-DocCommentBegin);
   StringRef AnnotatedDecl = StringRef(SS.begin()+DeclBegin,
                                       DeclEnd-DeclBegin);
+  StringRef GroupName = StringRef(SS.begin() + GroupBegin, GroupEnd - GroupBegin);
 
   llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
   StringRef Filename;
@@ -420,6 +429,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.Filename = Filename;
   Info.OverrideUSRs = OverUSRs;
   Info.AnnotatedRelatedDeclarations = AnnotatedRelatedDecls;
+  Info.GroupName = GroupName;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = ASTPrinter::printTypeInterface(Ty, VD->getDeclContext(),
                                                       TypeInterface) ?

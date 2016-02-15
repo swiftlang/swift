@@ -19,7 +19,7 @@ func test_NSCoder_decodeTopLevelObject(coder: NSCoder) throws {
 }
 
 func test_NSCoder_decodeObjectForKey(coder: NSCoder, key: String) {
-  var r = coder.decodeObjectForKey(key)
+  var r = coder.decodeObject(forKey: key)
   expectType(Optional<AnyObject>.self, &r)
 }
 
@@ -41,7 +41,7 @@ func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
 
 
 func test_NSKeyedUnarchiver_unarchiveObjectWithData(data: NSData) {
-  var r = NSKeyedUnarchiver.unarchiveObjectWith(data)
+  var r = NSKeyedUnarchiver.unarchiveObject(withData: data)
   expectType(Optional<AnyObject>.self, &r)
 }
 
@@ -59,7 +59,7 @@ func test_NSKeyedUnarchiver_unarchiveObjectWithData_error(data: NSData) throws {
 func test_NSKeyedUnarchiver_decodeObjectForKey(
   archiver: NSKeyedUnarchiver, key: String
 ) {
-  var r = archiver.decodeObjectForKey(key)
+  var r = archiver.decodeObject(forKey: key)
   expectType(Optional<AnyObject>.self, &r)
 }
 

@@ -115,8 +115,7 @@ if(PYTHONINTERP_FOUND)
     set(SWIFT_ASAN_BUILD TRUE)
   endif()
 
-  set(TEST_MODES optimize_none optimize optimize_unchecked)
-
+  set(TEST_MODES optimize_none optimize optimize_unchecked non_executable)
 
   foreach(SDK ${SWIFT_SDKS})
     foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
@@ -148,11 +147,15 @@ if(PYTHONINTERP_FOUND)
         if(NOT TEST_MODE STREQUAL "optimize_none")
           if(TEST_MODE STREQUAL "optimize")
             set(test_mode_target_suffix "-optimize")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=executable_test")
+            list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
           endif()
           if(TEST_MODE STREQUAL "optimize_unchecked")
             set(test_mode_target_suffix "-optimize-unchecked")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=executable_test")
+            list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
+          endif()
+          if(TEST_MODE STREQUAL "non_executable")
+            set(test_mode_target_suffix "-non-executable")
+            list(APPEND LIT_ARGS "--param" "run_only_tests=non_executable_tests")
           endif()
           list(APPEND LIT_ARGS "--param" "swift_test_mode=${TEST_MODE}")
         endif()
@@ -202,9 +205,10 @@ if(PYTHONINTERP_FOUND)
 
         if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
           set(command_profdata_merge_start
-            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" start
-                -o "${swift_test_results_dir}"
-                -l "${swift_test_results_dir}/profdata_merge.log")
+            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
+                -l "${swift_test_results_dir}/profdata_merge.log"
+                start
+                -o "${swift_test_results_dir}")
           set(command_profdata_merge_stop
             COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
         else()
@@ -258,6 +262,9 @@ if(PYTHONINTERP_FOUND)
     endif()
     if(TEST_MODE STREQUAL "optimize_unchecked")
       set(test_mode_target_suffix "-optimize-unchecked")
+    endif()
+    if(TEST_MODE STREQUAL "non_executable")
+      set(test_mode_target_suffix "-non-executable")
     endif()
 
     add_custom_target(check-swift${test_mode_target_suffix}

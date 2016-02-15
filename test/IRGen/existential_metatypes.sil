@@ -49,7 +49,7 @@ bb0(%0 : $*Float):
   return %3 : $Int
 }
 
-// CHECK: define void @test0()
+// CHECK: define{{( protected)?}} void @test0()
 sil @test0 : $@convention(thin) () -> () {
 bb0:
   // CHECK:      [[V:%.*]] = alloca { %swift.type*, i8** }, align 8
@@ -86,7 +86,7 @@ bb0(%0 : $@thick Kindable.Type):
   return %2 : $()
 }
 
-// CHECK: define void @test1(i64, i64)
+// CHECK: define{{( protected)?}} void @test1(i64, i64)
 sil @test1 : $@convention(thin) (Optional<Kindable.Type>) -> () {
 bb0(%0 : $Optional<Kindable.Type>):
   // CHECK:     [[TYPE:%.*]] = inttoptr i64 %0 to %swift.type*

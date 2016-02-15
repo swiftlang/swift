@@ -1,3 +1,4 @@
+// DUPLICATE-OF: 10659-swift-printingdiagnosticconsumer-handlediagnostic.timeout.swift
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
 

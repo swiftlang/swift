@@ -1462,6 +1462,11 @@ namespace index_block {
     BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
+  using GroupNamesLayout = BCGenericRecordLayout<
+    BCFixed<4>,  // record ID
+    BCBlob       // actual names
+  >;
+
   using ObjCMethodTableLayout = BCRecordLayout<
     OBJC_METHODS,  // record ID
     BCVBR<16>,     // table offset within the blob (see below)
@@ -1478,6 +1483,7 @@ namespace index_block {
 namespace comment_block {
   enum RecordKind {
     DECL_COMMENTS = 1,
+    GROUP_NAMES = 2,
   };
 
   using DeclCommentListLayout = BCRecordLayout<
@@ -1485,6 +1491,12 @@ namespace comment_block {
     BCVBR<16>,     // table offset within the blob (see below)
     BCBlob         // map from Decl IDs to comments
   >;
+
+  using GroupNamesLayout = BCRecordLayout<
+    GROUP_NAMES,    // record ID
+    BCBlob          // actual names
+  >;
+
 } // namespace comment_block
 
 } // end namespace serialization

@@ -33,8 +33,8 @@ func asString(ns: NSString) -> String { return ns as String }
 FoundationTestSuite.test("NSString") {
   var str = "Hello"
   var nsStr = str as NSString
-  assert(nsStr.compare(str).rawValue == NSComparisonResult.OrderedSame.rawValue)
-  assert(nsStr.compare(str) == NSComparisonResult.OrderedSame)
+  assert(nsStr.compare(str).rawValue == NSComparisonResult.orderedSame.rawValue)
+  assert(nsStr.compare(str) == NSComparisonResult.orderedSame)
   nsStr = "World"
   str = nsStr as String
   // FIXME: Shouldn't need coercion here to resolve ambiguity. <rdar://problem/14637688>
@@ -214,17 +214,17 @@ FoundationTestSuite.test("NSRectEdge/constants") {
   //
   // It is valid to hardcode the value in the test.  The way they are currently
   // defined in the SDK makes them ABI for Objective-C code.
-  expectEqual(0, CGRectEdge(rectEdge: NSRectEdge.MinX).rawValue)
-  expectEqual(0, NSRectEdge(rectEdge: CGRectEdge.MinXEdge).rawValue)
+  expectEqual(0, CGRectEdge(rectEdge: NSRectEdge.minX).rawValue)
+  expectEqual(0, NSRectEdge(rectEdge: CGRectEdge.minXEdge).rawValue)
 
-  expectEqual(1, CGRectEdge(rectEdge: NSRectEdge.MinY).rawValue)
-  expectEqual(1, NSRectEdge(rectEdge: CGRectEdge.MinYEdge).rawValue)
+  expectEqual(1, CGRectEdge(rectEdge: NSRectEdge.minY).rawValue)
+  expectEqual(1, NSRectEdge(rectEdge: CGRectEdge.minYEdge).rawValue)
 
-  expectEqual(2, CGRectEdge(rectEdge: NSRectEdge.MaxX).rawValue)
-  expectEqual(2, NSRectEdge(rectEdge: CGRectEdge.MaxXEdge).rawValue)
+  expectEqual(2, CGRectEdge(rectEdge: NSRectEdge.maxX).rawValue)
+  expectEqual(2, NSRectEdge(rectEdge: CGRectEdge.maxXEdge).rawValue)
 
-  expectEqual(3, CGRectEdge(rectEdge: NSRectEdge.MaxY).rawValue)
-  expectEqual(3, NSRectEdge(rectEdge: CGRectEdge.MaxYEdge).rawValue)
+  expectEqual(3, CGRectEdge(rectEdge: NSRectEdge.maxY).rawValue)
+  expectEqual(3, NSRectEdge(rectEdge: CGRectEdge.maxYEdge).rawValue)
 }
 #endif
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 protocol Fooable {
   init()
@@ -408,13 +408,10 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]
 // CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
-// CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]
 // CHECK: function_ref (extension in guaranteed_self):guaranteed_self.SequenceDefaults._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
-// CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
-// CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT]]
-// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]])
-// CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]
+// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[GUARANTEED_COPY_STACK_SLOT]])
+// CHECK: destroy_addr [[GUARANTEED_COPY_STACK_SLOT]]
 
 class Z {}
 
@@ -425,7 +422,7 @@ public struct FakeArray {
 public struct FakeElement {}
 
 public protocol FakeGeneratorProtocol {
-  typealias Element
+  associatedtype Element
 }
 
 extension FakeGenerator : FakeGeneratorProtocol {
@@ -433,8 +430,8 @@ extension FakeGenerator : FakeGeneratorProtocol {
 }
 
 public protocol SequenceDefaults {
-  typealias Element
-  typealias Generator : FakeGeneratorProtocol
+  associatedtype Element
+  associatedtype Generator : FakeGeneratorProtocol
 }
 
 extension SequenceDefaults {

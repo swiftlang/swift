@@ -22,14 +22,14 @@ struct FooEnum3 : RawRepresentable, Equatable {
 var FooEnum3X: FooEnum3 { get }
 var FooEnum3Y: FooEnum3 { get }
 enum FooComparisonResult : Int {
-    case OrderedAscending
-    case OrderedSame
-    case OrderedDescending
+    case orderedAscending
+    case orderedSame
+    case orderedDescending
 }
 struct FooRuncingOptions : OptionSet {
     init(rawValue rawValue: Int)
-    static var EnableMince: FooRuncingOptions { get }
-    static var EnableQuince: FooRuncingOptions { get }
+    static var enableMince: FooRuncingOptions { get }
+    static var enableQuince: FooRuncingOptions { get }
 }
 struct FooStruct1 {
     var x: Int32
@@ -3239,21 +3239,21 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.entities: [
       {
         key.kind: source.lang.swift.decl.enumelement,
-        key.name: "OrderedAscending",
+        key.name: "orderedAscending",
         key.usr: "c:@E@FooComparisonResult@FooOrderedAscending",
         key.offset: 653,
         key.length: 21
       },
       {
         key.kind: source.lang.swift.decl.enumelement,
-        key.name: "OrderedSame",
+        key.name: "orderedSame",
         key.usr: "c:@E@FooComparisonResult@FooOrderedSame",
         key.offset: 679,
         key.length: 16
       },
       {
         key.kind: source.lang.swift.decl.enumelement,
-        key.name: "OrderedDescending",
+        key.name: "orderedDescending",
         key.usr: "c:@E@FooComparisonResult@FooOrderedDescending",
         key.offset: 700,
         key.length: 22
@@ -3305,14 +3305,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.decl.var.static,
-        key.name: "EnableMince",
+        key.name: "enableMince",
         key.usr: "c:@E@FooRuncingOptions@FooRuncingEnableMince",
         key.offset: 801,
         key.length: 49
       },
       {
         key.kind: source.lang.swift.decl.var.static,
-        key.name: "EnableQuince",
+        key.name: "enableQuince",
         key.usr: "c:@E@FooRuncingOptions@FooRuncingEnableQuince",
         key.offset: 855,
         key.length: 50

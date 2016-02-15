@@ -32,7 +32,6 @@
 
 namespace swift {
 
-class ClassDecl;
 class SILFunction;
 class SILModule;
 class NormalProtocolConformance;
@@ -203,6 +202,8 @@ private:
   /// Private constructor for making SILWitnessTable declarations.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
                   NormalProtocolConformance *Conformance);
+
+  void addWitnessTable();
 
 public:
   /// Create a new SILWitnessTable definition with the given entries.

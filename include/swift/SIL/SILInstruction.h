@@ -17,10 +17,6 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
-#include "llvm/ADT/ilist_node.h"
-#include "llvm/ADT/ilist.h"
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/APInt.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/SIL/Consumption.h"
@@ -29,6 +25,11 @@
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILValue.h"
+#include "llvm/ADT/ilist_node.h"
+#include "llvm/ADT/ilist.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
@@ -428,7 +429,9 @@ public:
 
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
-class AllocStackInst : public AllocationInst {
+class AllocStackInst final : public AllocationInst,
+    private llvm::TrailingObjects<AllocStackInst, char> {
+  friend TrailingObjects;
   friend class SILBuilder;
   TailAllocatedDebugVariable VarInfo;
 
@@ -445,7 +448,7 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   SILDebugVariable getVarInfo() const {
-    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+    return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
   void setArgNo(unsigned N) { VarInfo.setArgNo(N); }
 
@@ -527,7 +530,9 @@ public:
 /// pointer with Builtin.NativeObject type.  The second return value
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
-class AllocBoxInst : public AllocationInst {
+class AllocBoxInst final : public AllocationInst,
+    private llvm::TrailingObjects<AllocBoxInst, char> {
+  friend TrailingObjects;
   friend class SILBuilder;
 
   TailAllocatedDebugVariable VarInfo;
@@ -550,7 +555,7 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   SILDebugVariable getVarInfo() const {
-    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+    return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -1139,7 +1144,9 @@ public:
 
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an IntegerLiteralExpr.
-class IntegerLiteralInst : public LiteralInst {
+class IntegerLiteralInst final : public LiteralInst,
+    private llvm::TrailingObjects<IntegerLiteralInst, llvm::integerPart> {
+  friend TrailingObjects;
   friend class SILBuilder;
 
   unsigned numBits;
@@ -1167,7 +1174,9 @@ public:
 
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
-class FloatLiteralInst : public LiteralInst {
+class FloatLiteralInst final : public LiteralInst,
+    private llvm::TrailingObjects<FloatLiteralInst, llvm::integerPart> {
+  friend TrailingObjects;
   friend class SILBuilder;
 
   unsigned numBits;
@@ -1197,7 +1206,9 @@ public:
 /// StringLiteralInst - Encapsulates a string constant, as defined originally by
 /// a StringLiteralExpr.  This produces the address of the string data as a
 /// Builtin.RawPointer.
-class StringLiteralInst : public LiteralInst {
+class StringLiteralInst final : public LiteralInst,
+    private llvm::TrailingObjects<StringLiteralInst, char> {
+  friend TrailingObjects;
   friend class SILBuilder;
 
 public:
@@ -1221,7 +1232,7 @@ private:
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
   StringRef getValue() const {
-    return {reinterpret_cast<char const *>(this + 1), Length};
+    return {getTrailingObjects<char>(), Length};
   }
 
   /// getEncoding - Return the desired encoding of the text.
@@ -1414,7 +1425,10 @@ public:
 
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
-class DebugValueInst : public UnaryInstructionBase<ValueKind::DebugValueInst> {
+class DebugValueInst final
+  : public UnaryInstructionBase<ValueKind::DebugValueInst>,
+    private llvm::TrailingObjects<DebugValueInst, char> {
+  friend TrailingObjects;
   friend class SILBuilder;
   TailAllocatedDebugVariable VarInfo;
 
@@ -1429,14 +1443,16 @@ public:
   VarDecl *getDecl() const;
   /// Return the debug variable information attached to this instruction.
   SILDebugVariable getVarInfo() const {
-    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+    return VarInfo.get(getDecl(), getTrailingObjects<char>());
   }
 };
 
 /// Define the start or update to a symbolic variable value (for address-only
 /// types) .
 class DebugValueAddrInst
-  : public UnaryInstructionBase<ValueKind::DebugValueAddrInst> {
+  : public UnaryInstructionBase<ValueKind::DebugValueAddrInst>,
+    private llvm::TrailingObjects<DebugValueInst, char> {
+  friend TrailingObjects;
   friend class SILBuilder;
   TailAllocatedDebugVariable VarInfo;
 
@@ -1452,7 +1468,7 @@ public:
   VarDecl *getDecl() const;
   /// Return the debug variable information attached to this instruction.
   SILDebugVariable getVarInfo() const {
-    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+    return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
 };
 
@@ -3103,9 +3119,12 @@ public:
 /// InitExistentialMetatypeInst - Given a metatype reference and a set
 /// of conformances, creates an existential metatype value referencing
 /// the metatype.
-class InitExistentialMetatypeInst
-  : public UnaryInstructionBase<ValueKind::InitExistentialMetatypeInst>
+class InitExistentialMetatypeInst final
+  : public UnaryInstructionBase<ValueKind::InitExistentialMetatypeInst>,
+    private llvm::TrailingObjects<InitExistentialMetatypeInst,
+                                  ProtocolConformanceRef>
 {
+  friend TrailingObjects;
   friend class SILBuilder;
 
   unsigned NumConformances;
@@ -3948,6 +3967,8 @@ class SwitchEnumInstBase : public TermInst {
   // - `NumCases + HasDefault` SILSuccessor records, referencing the
   //   destinations for each case, ending with the default destination if
   //   present.
+  // FIXME: This should use llvm::TrailingObjects, but it has subclasses
+  // (which are empty, of course).
 
   EnumElementDecl **getCaseBuf() {
     return reinterpret_cast<EnumElementDecl**>(this + 1);

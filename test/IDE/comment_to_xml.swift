@@ -5,5 +5,6 @@
 // RUN: FileCheck %S/../Inputs/comment_to_something_conversion.swift < %t.txt
 // RUN: FileCheck %s -check-prefix=WRONG < %t.txt
 
+// REQUIRES: no_asan
 // WRONG-NOT: CommentXMLInvalid
 

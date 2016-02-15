@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 infix operator <~> {}
 
@@ -213,28 +213,15 @@ struct ConformingAOStruct : X {
 }
 func <~>(x: ConformingAOStruct, y: ConformingAOStruct) -> ConformingAOStruct { return x }
 
-// TODO: The extra abstraction change in these generic witnesses leads to a
-// bunch of redundant temporaries that could be avoided by a more sophisticated
-// abstraction difference implementation.
-
 struct ConformsWithMoreGeneric : X, Y {
   mutating
   func selfTypes<E>(x x: E) -> E { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @inout ConformsWithMoreGeneric) -> () {
   // CHECK:       bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric):
-  // CHECK-NEXT:    %3 = load %1 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    // function_ref
-  // CHECK-NEXT:    %4 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric9selfTypes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %5 = alloc_stack $ConformsWithMoreGeneric
-  // CHECK-NEXT:    store %3 to %5 : $*ConformsWithMoreGeneric
-  // CHECK-NEXT:    %7 = alloc_stack $ConformsWithMoreGeneric
-  // CHECK-NEXT:    %8 = apply %4<ConformsWithMoreGeneric>(%7, %5, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %9 = load %7 : $*ConformsWithMoreGeneric
-  // CHECK-NEXT:    store %9 to %0 : $*ConformsWithMoreGeneric
-  // CHECK-NEXT:    %11 = tuple ()
-  // CHECK-NEXT:    dealloc_stack %7 : $*ConformsWithMoreGeneric
-  // CHECK-NEXT:    dealloc_stack %5 : $*ConformsWithMoreGeneric
-  // CHECK-NEXT:    return %11 : $()
+  // CHECK-NEXT:    [[WITNESS_FN:%.*]] = function_ref @_TFV9witnesses23ConformsWithMoreGeneric9selfTypes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<ConformsWithMoreGeneric>(%0, %1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    return [[RESULT]] : $()
   // CHECK-NEXT:  }
   func loadable<F>(x x: F) -> F { return x }
   mutating
@@ -261,38 +248,25 @@ struct ConformsWithMoreGeneric : X, Y {
   func classes<I>(x x: I) -> I { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <A2 where A2 : Classes> (@owned A2, @inout ConformsWithMoreGeneric) -> @owned A2 {
   // CHECK:       bb0(%0 : $A2, %1 : $*ConformsWithMoreGeneric):
+  // CHECK-NEXT:    [[RESULT_BOX:%.*]] = alloc_stack $A2
+  // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $A2
+  // CHECK-NEXT:    store %0 to [[SELF_BOX]] : $*A2
   // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes
-  // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %3 = alloc_stack $A2
-  // CHECK-NEXT:    store %0 to %3 : $*A2
-  // CHECK-NEXT:    %5 = alloc_stack $A2
-  // CHECK-NEXT:    %6 = apply %2<A2>(%5, %3, %1) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %7 = load %5 : $*A2
-  // CHECK-NEXT:    dealloc_stack %5 : $*A2
-  // CHECK-NEXT:    dealloc_stack %3 : $*A2
-  // CHECK-NEXT:    return %7 : $A2
+  // CHECK-NEXT:    [[WITNESS_FN:%.*]] = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<A2>([[RESULT_BOX]], [[SELF_BOX]], %1) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    [[RESULT:%.*]] = load [[RESULT_BOX]] : $*A2
+  // CHECK-NEXT:    dealloc_stack [[SELF_BOX]] : $*A2
+  // CHECK-NEXT:    dealloc_stack [[RESULT_BOX]] : $*A2
+  // CHECK-NEXT:    return [[RESULT]] : $A2
   // CHECK-NEXT:  }
 }
 func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @thick ConformsWithMoreGeneric.Type) -> () {
 // CHECK:       bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric, %3 : $@thick ConformsWithMoreGeneric.Type):
-// CHECK-NEXT:    %4 = load %1 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    %5 = load %2 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    %6 = function_ref @_TZF9witnessesoi3ltg{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
-// CHECK-NEXT:    %7 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    store %4 to %7 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    %9 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    store %5 to %9 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    %11 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    %12 = apply %6<ConformsWithMoreGeneric, ConformsWithMoreGeneric>(%11, %7, %9) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
-// CHECK-NEXT:    %13 = load %11 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    store %13 to %0 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    %15 = tuple ()
-// CHECK-NEXT:    dealloc_stack %11 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    dealloc_stack %9 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    dealloc_stack %7 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    return %15 : $()
+// CHECK-NEXT:    [[WITNESS_FN:%.*]] = function_ref @_TZF9witnessesoi3ltg{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<ConformsWithMoreGeneric, ConformsWithMoreGeneric>(%0, %1, %2) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+// CHECK-NEXT:    return [[RESULT]] : $()
 // CHECK-NEXT:  }
 
 protocol LabeledRequirement {

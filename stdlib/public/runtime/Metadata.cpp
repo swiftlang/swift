@@ -193,9 +193,17 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   bytes += pattern->AddressPoint;
   ClassMetadata *metadata = reinterpret_cast<ClassMetadata*>(bytes);
   assert(metadata->isTypeMetadata());
-
+  
   // Overwrite the superclass field.
   metadata->SuperClass = superclass;
+  // Adjust the relative reference to the nominal type descriptor.
+  if (!metadata->isArtificialSubclass()) {
+    auto patternBytes =
+      reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
+      pattern->AddressPoint;
+    metadata->setDescription(
+        reinterpret_cast<const ClassMetadata*>(patternBytes)->getDescription());
+  }
 
   // Adjust the class object extents.
   if (extraPrefixSize) {
@@ -207,7 +215,7 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   return metadata;
 }
 
-Metadata *
+ValueMetadata *
 swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
                                           const void *arguments) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
@@ -224,7 +232,17 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 
   // Okay, move to the address point.
   bytes += pattern->AddressPoint;
-  Metadata *metadata = reinterpret_cast<Metadata*>(bytes);
+  auto *metadata = reinterpret_cast<ValueMetadata*>(bytes);
+  
+  // Adjust the relative references to the nominal type descriptor and
+  // parent type.
+  auto patternBytes =
+    reinterpret_cast<const char*>(pattern->getMetadataTemplate()) +
+    pattern->AddressPoint;
+  auto patternMetadata = reinterpret_cast<const ValueMetadata*>(patternBytes);
+  metadata->Description = patternMetadata->Description.get();
+  metadata->Parent = patternMetadata->Parent.get();
+  
   return metadata;
 }
 
@@ -1726,6 +1744,7 @@ getMetatypeValueWitnesses(const Metadata *instanceType) {
 }
 
 /// \brief Fetch a uniqued metadata for a metatype type.
+SWIFT_RUNTIME_EXPORT
 extern "C" const MetatypeMetadata *
 swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
@@ -1837,6 +1856,7 @@ getExistentialMetatypeValueWitnesses(ExistentialMetatypeState &EM,
 }
 
 /// \brief Fetch a uniqued metadata for a metatype type.
+SWIFT_RUNTIME_EXPORT
 extern "C" const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
@@ -2425,6 +2445,7 @@ Metadata::getClassObject() const {
 }
 
 #ifndef NDEBUG
+SWIFT_RUNTIME_EXPORT
 extern "C"
 void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
                                             const void *runtimeValue,
@@ -2457,6 +2478,7 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 }
 #endif
 
+SWIFT_RUNTIME_EXPORT
 extern "C"
 void swift_initializeSuperclass(ClassMetadata *theClass,
                                 bool copyFieldOffsetVectors) {
@@ -2469,12 +2491,6 @@ void swift_initializeSuperclass(ClassMetadata *theClass,
 #endif
 }
 
-namespace llvm { namespace hashing { namespace detail {
-  // An extern variable expected by LLVM's hashing templates. We don't link any
-  // LLVM libs into the runtime, so define this here.
-  size_t fixed_seed_override = 0;
-} } }
-
 /*** Protocol witness tables *************************************************/
 
 namespace {
@@ -2482,10 +2498,19 @@ namespace {
   public:
     static const char *getName() { return "WitnessTableCache"; }
 
-    WitnessTableCacheEntry(size_t numArguments) {}
+    WitnessTableCacheEntry(size_t numArguments) {
+      assert(numArguments == getNumArguments());
+    }
 
     static constexpr size_t getNumArguments() {
       return 1;
+    }
+
+    /// Advance the address point to the end of the private storage area.
+    WitnessTable *get(GenericWitnessTable *genericTable) const {
+      return reinterpret_cast<WitnessTable *>(
+          const_cast<void **>(getData<void *>()) +
+          genericTable->WitnessTablePrivateSizeInWords);
     }
   };
 }
@@ -2505,35 +2530,120 @@ static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
   return lazyCache->get();
 }
 
+/// If there's no initializer, no private storage, and all requirements
+/// are present, we don't have to instantiate anything; just return the
+/// witness table template.
+///
+/// Most of the time IRGen should be able to determine this statically;
+/// the one case is with resilient conformances, where the resilient
+/// protocol has not yet changed in a way that's incompatible with the
+/// conformance.
+static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
+  if (genericTable->Instantiator.isNull() &&
+      genericTable->WitnessTablePrivateSizeInWords == 0 &&
+      (genericTable->Protocol.isNull() ||
+       genericTable->WitnessTableSizeInWords -
+       genericTable->Protocol->MinimumWitnessTableSizeInWords ==
+       genericTable->Protocol->DefaultWitnessTableSizeInWords)) {
+    return true;
+  }
+
+  return false;
+}
+
+/// Instantiate a brand new witness table for a resilient or generic
+/// protocol conformance.
+static WitnessTableCacheEntry *
+allocateWitnessTable(GenericWitnessTable *genericTable,
+                     MetadataAllocator &allocator,
+                     const void *args[],
+                     size_t numGenericArgs) {
+
+  // Number of bytes for any private storage used by the conformance itself.
+  size_t privateSize = genericTable->WitnessTablePrivateSizeInWords * sizeof(void *);
+
+  size_t minWitnessTableSize, expectedWitnessTableSize;
+  size_t actualWitnessTableSize = genericTable->WitnessTableSizeInWords * sizeof(void *);
+
+  auto protocol = genericTable->Protocol.get();
+
+  if (protocol != nullptr && protocol->Flags.isResilient()) {
+    // The protocol and conforming type are in different resilience domains.
+    // Allocate the witness table with the correct size, and fill in default
+    // requirements at the end as needed.
+    minWitnessTableSize = (protocol->MinimumWitnessTableSizeInWords *
+                           sizeof(void *));
+    expectedWitnessTableSize = ((protocol->MinimumWitnessTableSizeInWords +
+                                 protocol->DefaultWitnessTableSizeInWords) *
+                                sizeof(void *));
+    assert(actualWitnessTableSize >= minWitnessTableSize &&
+           actualWitnessTableSize <= expectedWitnessTableSize);
+  } else {
+    // The protocol and conforming type are in the same resilience domain.
+    // Trust that the witness table template already has the correct size.
+    minWitnessTableSize = expectedWitnessTableSize = actualWitnessTableSize;
+  }
+
+  // Create a new entry for the cache.
+  auto entry = WitnessTableCacheEntry::allocate(
+      allocator, args, numGenericArgs,
+      privateSize + expectedWitnessTableSize);
+
+  char *fullTable = entry->getData<char>();
+
+  // Zero out the private storage area.
+  memset(fullTable, 0, privateSize);
+
+  // Advance the address point; the private storage area is accessed via
+  // negative offsets.
+  auto *table = entry->get(genericTable);
+
+  // Fill in the provided part of the requirements from the pattern.
+  memcpy(table, (void * const *) &*genericTable->Pattern,
+         actualWitnessTableSize);
+
+  // If this is a resilient conformance, copy in the rest.
+  if (protocol != nullptr && protocol->Flags.isResilient()) {
+    memcpy((char *) table + actualWitnessTableSize,
+           (char *) protocol->getDefaultWitnesses() +
+              (actualWitnessTableSize - minWitnessTableSize),
+           expectedWitnessTableSize - actualWitnessTableSize);
+  }
+
+  return entry;
+}
+
+SWIFT_RUNTIME_EXPORT
 extern "C" const WitnessTable *
 swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                                     const Metadata *type,
                                     void * const *instantiationArgs) {
-  // Search the cache.
+  if (doesNotRequireInstantiation(genericTable)) {
+    return genericTable->Pattern;
+  }
+
+  // If type is not nullptr, the witness table depends on the substituted
+  // conforming type, so use that are the key.
   constexpr const size_t numGenericArgs = 1;
   const void *args[] = { type };
+
   auto &cache = getCache(genericTable);
   auto entry = cache.findOrAdd(args, numGenericArgs,
     [&]() -> WitnessTableCacheEntry* {
-      // Create a new entry for the cache.
-      auto entry = WitnessTableCacheEntry::allocate(cache.getAllocator(),
-                                                    args, numGenericArgs,
-                        genericTable->WitnessTableSizeInWords * sizeof(void*));
+      // Allocate the witness table and fill it in.
+      auto entry = allocateWitnessTable(genericTable,
+                                        cache.getAllocator(),
+                                        args, numGenericArgs);
 
-      auto *table = entry->getData<WitnessTable>();
-      memcpy((void**) table, (void* const *) &*genericTable->Pattern,
-             genericTable->WitnessTableSizeInWordsToCopy * sizeof(void*));
-      bzero((void**) table + genericTable->WitnessTableSizeInWordsToCopy,
-            (genericTable->WitnessTableSizeInWords
-              - genericTable->WitnessTableSizeInWordsToCopy) * sizeof(void*));
-
-      // Call the instantiation function.
+      // Call the instantiation function to initialize
+      // dependent associated type metadata.
       if (!genericTable->Instantiator.isNull()) {
-        genericTable->Instantiator(table, type, instantiationArgs);
+        genericTable->Instantiator(entry->get(genericTable),
+                                   type, instantiationArgs);
       }
 
       return entry;
     });
 
-  return entry->getData<WitnessTable>();
+  return entry->get(genericTable);
 }

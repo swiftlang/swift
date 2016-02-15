@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(x: ErrorProtocol) { }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials18test_type_loweringFPs13ErrorProtocol_T_ : $@convention(thin) (@owned ErrorProtocol) -> () {

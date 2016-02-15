@@ -40,7 +40,7 @@ class NonContiguousNSString : NSString {
     super.init()
   }
 
-  @objc override func copy(zone zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:) override func copy(withZone zone: NSZone) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -50,7 +50,7 @@ class NonContiguousNSString : NSString {
     return _value.count
   }
 
-  @objc override func characterAt(index: Int) -> unichar {
+  @objc override func character(at index: Int) -> unichar {
     return _value[index]
   }
 
@@ -273,7 +273,7 @@ func expectLocalizedEquality(
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
 
@@ -322,14 +322,14 @@ NSStringAPIs.test("capitalizedStringWith(_:)") {
 }
 
 NSStringAPIs.test("caseInsensitiveCompare(_:)") {
-  expectEqual(NSComparisonResult.OrderedSame,
+  expectEqual(NSComparisonResult.orderedSame,
       "abCD".caseInsensitiveCompare("AbCd"))
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "abCD".caseInsensitiveCompare("AbCdE"))
 
-  expectEqual(NSComparisonResult.OrderedSame,
+  expectEqual(NSComparisonResult.orderedSame,
       "абвг".caseInsensitiveCompare("АбВг"))
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "абВГ".caseInsensitiveCompare("АбВгД"))
 }
 
@@ -337,41 +337,41 @@ NSStringAPIs.test("commonPrefixWith(_:options:)") {
   expectEqual("ab",
       "abcd".commonPrefixWith("abdc", options: []))
   expectEqual("abC",
-      "abCd".commonPrefixWith("abce", options: .CaseInsensitiveSearch))
+      "abCd".commonPrefixWith("abce", options: .caseInsensitiveSearch))
 
   expectEqual("аб",
       "абвг".commonPrefixWith("абгв", options: []))
   expectEqual("абВ",
-      "абВг".commonPrefixWith("абвд", options: .CaseInsensitiveSearch))
+      "абВг".commonPrefixWith("абвд", options: .caseInsensitiveSearch))
 }
 
 NSStringAPIs.test("compare(_:options:range:locale:)") {
-  expectEqual(NSComparisonResult.OrderedSame,
+  expectEqual(NSComparisonResult.orderedSame,
       "abc".compare("abc"))
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "абв".compare("где"))
 
-  expectEqual(NSComparisonResult.OrderedSame,
-      "abc".compare("abC", options: .CaseInsensitiveSearch))
-  expectEqual(NSComparisonResult.OrderedSame,
-      "абв".compare("абВ", options: .CaseInsensitiveSearch))
+  expectEqual(NSComparisonResult.orderedSame,
+      "abc".compare("abC", options: .caseInsensitiveSearch))
+  expectEqual(NSComparisonResult.orderedSame,
+      "абв".compare("абВ", options: .caseInsensitiveSearch))
 
   do {
     let s = "abcd"
     let r = s.startIndex.successor()..<s.endIndex
-    expectEqual(NSComparisonResult.OrderedSame,
+    expectEqual(NSComparisonResult.orderedSame,
         s.compare("bcd", range: r))
   }
   do {
     let s = "абвг"
     let r = s.startIndex.successor()..<s.endIndex
-    expectEqual(NSComparisonResult.OrderedSame,
+    expectEqual(NSComparisonResult.orderedSame,
         s.compare("бвг", range: r))
   }
 
-  expectEqual(NSComparisonResult.OrderedSame,
+  expectEqual(NSComparisonResult.orderedSame,
       "abc".compare("abc", locale: NSLocale.current()))
-  expectEqual(NSComparisonResult.OrderedSame,
+  expectEqual(NSComparisonResult.orderedSame,
       "абв".compare("абв", locale: NSLocale.current()))
 }
 
@@ -567,7 +567,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
   do {
     var substrings: [String] = []
     s.enumerateSubstringsIn(startIndex..<endIndex,
-      options: NSStringEnumerationOptions.ByComposedCharacterSequences) {
+      options: NSStringEnumerationOptions.byComposedCharacterSequences) {
       (substring: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, inout stop: Bool)
     in
@@ -580,7 +580,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
   do {
     var substrings: [String] = []
     s.enumerateSubstringsIn(startIndex..<endIndex,
-      options: [.ByComposedCharacterSequences, .SubstringNotRequired]) {
+      options: [.byComposedCharacterSequences, .substringNotRequired]) {
       (substring_: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, inout stop: Bool)
     in
@@ -903,30 +903,30 @@ NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)")
 }
 
 NSStringAPIs.test("localizedCaseInsensitiveCompare(_:)") {
-  expectEqual(NSComparisonResult.OrderedSame,
+  expectEqual(NSComparisonResult.orderedSame,
       "abCD".localizedCaseInsensitiveCompare("AbCd"))
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "abCD".localizedCaseInsensitiveCompare("AbCdE"))
 
-  expectEqual(NSComparisonResult.OrderedSame,
+  expectEqual(NSComparisonResult.orderedSame,
       "абвг".localizedCaseInsensitiveCompare("АбВг"))
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "абВГ".localizedCaseInsensitiveCompare("АбВгД"))
 }
 
 NSStringAPIs.test("localizedCompare(_:)") {
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "abCD".localizedCompare("AbCd"))
 
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "абвг".localizedCompare("АбВг"))
 }
 
 NSStringAPIs.test("localizedStandardCompare(_:)") {
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "abCD".localizedStandardCompare("AbCd"))
 
-  expectEqual(NSComparisonResult.OrderedAscending,
+  expectEqual(NSComparisonResult.orderedAscending,
       "абвг".localizedStandardCompare("АбВг"))
 }
 
@@ -1109,7 +1109,7 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
     do {
       let s = "абвклмнабвклмн"
       let r = s.rangeOfCharacterFrom(charset,
-          options: .BackwardsSearch)!
+          options: .backwardsSearch)!
       expectEqual(s.startIndex.advancedBy(9), r.startIndex)
       expectEqual(s.startIndex.advancedBy(10), r.endIndex)
     }
@@ -1408,23 +1408,23 @@ NSStringAPIs.test("folding(options:locale:)") {
     return { loc in s.folding(options: options, locale: loc) }
   }
   
-  expectLocalizedEquality("abcd", fwo("abCD", .CaseInsensitiveSearch), "en")
+  expectLocalizedEquality("abcd", fwo("abCD", .caseInsensitiveSearch), "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
   expectLocalizedEquality(
-    "\u{0069}\u{0307}", fwo("\u{0130}", .CaseInsensitiveSearch), "en")
+    "\u{0069}\u{0307}", fwo("\u{0130}", .caseInsensitiveSearch), "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
   expectLocalizedEquality(
-    "\u{0069}", fwo("\u{0130}", .CaseInsensitiveSearch), "tr")
+    "\u{0069}", fwo("\u{0130}", .caseInsensitiveSearch), "tr")
 
   expectLocalizedEquality(
-    "example123", fwo("ｅｘａｍｐｌｅ１２３", .WidthInsensitiveSearch), "en")
+    "example123", fwo("ｅｘａｍｐｌｅ１２３", .widthInsensitiveSearch), "en")
 }
 
 NSStringAPIs.test("byPaddingToLength(_:withString:startingAtIndex:)") {
@@ -1560,11 +1560,11 @@ NSStringAPIs.test("replacingOccurrencesOf(_:withString:options:range:)") {
     "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingOccurrencesOf(
       "\u{1F601}", withString: "\u{1F602}\u{1F603}",
-      options: NSStringCompareOptions.LiteralSearch))
+      options: NSStringCompareOptions.literalSearch))
 
   expectEqual(s, s.replacingOccurrencesOf(
     "\u{3058}", withString: "xyz",
-    options: NSStringCompareOptions.LiteralSearch))
+    options: NSStringCompareOptions.literalSearch))
 
   //
   // Use non-default 'range:'
@@ -1574,12 +1574,12 @@ NSStringAPIs.test("replacingOccurrencesOf(_:withString:options:range:)") {
     "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
     s.replacingOccurrencesOf(
       "\u{1F601}", withString: "\u{1F602}\u{1F603}",
-      options: NSStringCompareOptions.LiteralSearch,
+      options: NSStringCompareOptions.literalSearch,
       range: s.startIndex..<s.startIndex.advancedBy(1)))
 
   expectEqual(s, s.replacingOccurrencesOf(
       "\u{1F601}", withString: "\u{1F602}\u{1F603}",
-      options: NSStringCompareOptions.LiteralSearch,
+      options: NSStringCompareOptions.literalSearch,
       range: s.startIndex.advancedBy(1)..<s.startIndex.advancedBy(3)))
 }
 

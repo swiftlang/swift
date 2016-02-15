@@ -634,7 +634,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                          Ctx.getIdentifier("copy"),
                                          DeclNameLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
-  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_zone },
+  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_withZone },
                           { SourceLoc() }, SourceLoc(), false, true);
 
   //- (id)copyWithZone:(NSZone *)zone;

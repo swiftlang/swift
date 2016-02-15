@@ -76,16 +76,16 @@ internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return Bool(x)
 }
 
-public func ~=(x: NSObject, y: NSObject) -> Bool {
+public func ~=(x: Object, y: Object) -> Bool {
   return true
 }
 
-extension NSObject : Equatable, Hashable {
+extension Object : Equatable, Hashable {
   public var hashValue: Int {
     return hash
   }
 }
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
+public func == (lhs: Object, rhs: Object) -> Bool {
   return lhs.isEqual(rhs)
 }

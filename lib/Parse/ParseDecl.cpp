@@ -245,6 +245,9 @@ bool Parser::parseTopLevel() {
   } else if (Tok.is(tok::kw_sil_witness_table)) {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseSILWitnessTable();
+  } else if (Tok.is(tok::kw_sil_default_witness_table)) {
+    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
+    parseSILDefaultWitnessTable();
   } else if (Tok.is(tok::kw_sil_coverage_map)) {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseSILCoverageMap();
@@ -2255,7 +2258,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     KindLoc = consumeToken();
   }
 
-  SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath;
+  std::vector<std::pair<Identifier, SourceLoc>> ImportPath;
   do {
     if (Tok.is(tok::code_complete)) {
       consumeToken();

@@ -22,4 +22,3 @@ func test() {
   case Zero: break // no-error
   } // expected-error {{switch must be exhaustive, consider adding a default clause}}
 }
-

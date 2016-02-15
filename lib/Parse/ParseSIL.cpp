@@ -4117,6 +4117,87 @@ bool Parser::parseSILWitnessTable() {
   return false;
 }
 
+/// decl-sil-default-witness ::= 'sil_default_witness_table' 
+///                              identifier minimum-witness-table-size
+///                              decl-sil-default-witness-body
+/// decl-sil-default-witness-body:
+///   '{' sil-default-witness-entry* '}'
+/// sil-default-witness-entry:
+///   'method' SILDeclRef ':' @SILFunctionName
+bool Parser::parseSILDefaultWitnessTable() {
+  consumeToken(tok::kw_sil_default_witness_table);
+  SILParser WitnessState(*this);
+  
+  Scope S(this, ScopeKind::TopLevel);
+  // We should use WitnessTableBody. This ensures that the generic params
+  // are visible.
+  Optional<Scope> BodyScope;
+  BodyScope.emplace(this, ScopeKind::FunctionBody);
+
+  // Parse the protocol.
+  ProtocolDecl *protocol = parseProtocolDecl(*this, WitnessState);
+
+  // Parse the minimum witness table size.
+  unsigned minimumWitnessTableSize;
+  if (WitnessState.parseInteger(
+          minimumWitnessTableSize,
+          diag::sil_invalid_minimum_witness_table_size))
+    return true;
+
+  // Parse the body.
+  SourceLoc LBraceLoc = Tok.getLoc();
+  consumeToken(tok::l_brace);
+
+  // We need to turn on InSILBody to parse SILDeclRef.
+  Lexer::SILBodyRAII Tmp(*L);
+
+  // Parse the entry list.
+  std::vector<SILDefaultWitnessTable::Entry> witnessEntries;
+  if (Tok.isNot(tok::r_brace)) {
+    do {
+      Identifier EntryKeyword;
+      SourceLoc KeywordLoc;
+      if (parseIdentifier(EntryKeyword, KeywordLoc,
+            diag::expected_tok_in_sil_instr, "method"))
+        return true;
+
+      if (EntryKeyword.str() != "method") {
+        diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "method");
+        return true;
+      }
+
+      SILDeclRef Ref;
+      Identifier FuncName;
+      SourceLoc FuncLoc;
+      if (WitnessState.parseSILDeclRef(Ref) ||
+          parseToken(tok::colon, diag::expected_sil_witness_colon))
+        return true;
+      
+      if (parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+          WitnessState.parseSILIdentifier(FuncName, FuncLoc,
+                                      diag::expected_sil_value_name))
+        return true;
+
+      SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
+      if (!Func) {
+        diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
+        return true;
+      }
+      witnessEntries.push_back(SILDefaultWitnessTable::Entry{ Ref, Func });
+    } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
+  }
+
+  SourceLoc RBraceLoc;
+  parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                     LBraceLoc);
+  
+  SILDefaultWitnessTable::create(*SIL->M, protocol,
+                                 minimumWitnessTableSize,
+                                 witnessEntries);
+  BodyScope.reset();
+  return false;
+}
+
 llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
     llvm::coverage::CounterExpressionBuilder &Builder) {
   if (P.Tok.is(tok::integer_literal)) {

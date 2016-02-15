@@ -541,6 +541,7 @@ void Serializer::writeDocBlockInfoBlock() {
 
   BLOCK(COMMENT_BLOCK);
   BLOCK_RECORD(comment_block, DECL_COMMENTS);
+  BLOCK_RECORD(comment_block, GROUP_NAMES);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -3413,6 +3414,8 @@ namespace {
 struct DeclCommentTableData {
   StringRef Brief;
   RawComment Raw;
+  uint32_t Group;
+  uint32_t Order;
 };
 
 class DeclCommentTableInfo {
@@ -3432,16 +3435,22 @@ public:
   std::pair<unsigned, unsigned>
   EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
     uint32_t keyLength = key.size();
+    const unsigned numLen = 4;
 
     // Data consists of brief comment length and brief comment text,
-    uint32_t dataLength = 4 + data.Brief.size();
+    uint32_t dataLength = numLen + data.Brief.size();
     // number of raw comments,
-    dataLength += 4;
+    dataLength += numLen;
     // for each raw comment: column number of the first line, length of each
     // raw comment and its text.
     for (auto C : data.Raw.Comments)
-      dataLength += 4 + 4 + C.RawText.size();
+      dataLength += numLen + numLen + C.RawText.size();
 
+    // Group Id.
+    dataLength += numLen;
+
+    // Source order.
+    dataLength += numLen;
     endian::Writer<little> writer(out);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
@@ -3463,19 +3472,87 @@ public:
       writer.write<uint32_t>(C.RawText.size());
       out << C.RawText;
     }
+    writer.write<uint32_t>(data.Group);
+    writer.write<uint32_t>(data.Order);
   }
 };
 
 } // end unnamed namespace
 
+class DeclGroupNameContext {
+  struct GroupNameCollector {
+    const std::string NullGroupName = "";
+    const bool Enable;
+    GroupNameCollector(bool Enable) : Enable(Enable) {}
+    virtual ~GroupNameCollector() = default;
+    virtual StringRef getGroupNameInternal(const ValueDecl *VD) = 0;
+    StringRef getGroupName(const ValueDecl *VD) {
+      return Enable ? getGroupNameInternal(VD) : StringRef(NullGroupName);
+    };
+  };
+
+  // FIXME: Implement better name collectors.
+  struct GroupNameCollectorFromFileName : public GroupNameCollector {
+    GroupNameCollectorFromFileName(bool Enable) : GroupNameCollector(Enable) {}
+    StringRef getGroupNameInternal(const ValueDecl *VD) override {
+      auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
+      if (!PathOp.hasValue())
+        return NullGroupName;
+      return llvm::sys::path::stem(StringRef(VD->getASTContext().SourceMgr.
+        getIdentifierForBuffer(PathOp.getValue())));
+    }
+  };
+
+  llvm::MapVector<StringRef, unsigned> Map;
+  std::vector<StringRef> ViewBuffer;
+  std::unique_ptr<GroupNameCollector> pNameCollector;
+
+public:
+  DeclGroupNameContext(bool Enable) :
+    pNameCollector(new GroupNameCollectorFromFileName(Enable)) {}
+  uint32_t getGroupSequence(const ValueDecl *VD) {
+    return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
+                                     Map.size())).first->second;
+  }
+
+  ArrayRef<StringRef> getOrderedGroupNames() {
+    ViewBuffer.clear();
+    for(auto It = Map.begin(); It != Map.end(); ++ It) {
+      ViewBuffer.push_back(It->first);
+    }
+    return llvm::makeArrayRef(ViewBuffer);
+  }
+};
+
+static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
+                            ArrayRef<StringRef> Names) {
+  llvm::SmallString<32> Blob;
+  llvm::raw_svector_ostream BlobStream(Blob);
+  endian::Writer<little> Writer(BlobStream);
+  Writer.write<uint32_t>(Names.size());
+  for (auto N : Names) {
+    Writer.write<uint32_t>(N.size());
+    BlobStream << N;
+  }
+  BlobStream.str();
+  SmallVector<uint64_t, 8> Scratch;
+  GroupNames.emit(Scratch, Blob);
+}
+
 static void writeDeclCommentTable(
     const comment_block::DeclCommentListLayout &DeclCommentList,
-    const SourceFile *SF, const Module *M) {
+    const SourceFile *SF, const Module *M,
+    DeclGroupNameContext &GroupContext) {
 
   struct DeclCommentTableWriter : public ASTWalker {
     llvm::BumpPtrAllocator Arena;
     llvm::SmallString<512> USRBuffer;
     llvm::OnDiskChainedHashTableGenerator<DeclCommentTableInfo> generator;
+    DeclGroupNameContext &GroupContext;
+    unsigned SourceOrder = 0;
+
+    DeclCommentTableWriter(DeclGroupNameContext &GroupContext) :
+      GroupContext(GroupContext) {}
 
     StringRef copyString(StringRef String) {
       char *Mem = static_cast<char *>(Arena.Allocate(String.size(), 1));
@@ -3502,12 +3579,14 @@ static void writeDeclCommentTable(
       }
 
       generator.insert(copyString(USRBuffer.str()),
-                       { VD->getBriefComment(), Raw });
+                       { VD->getBriefComment(), Raw,
+                         GroupContext.getGroupSequence(VD),
+                         SourceOrder ++ });
       return true;
     }
   };
 
-  DeclCommentTableWriter Writer;
+  DeclCommentTableWriter Writer(GroupContext);
 
   ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
   for (auto nextFile : files)
@@ -3812,9 +3891,16 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 
+static bool isStdlibModule(ModuleOrSourceFile DC) {
+  if (auto M = DC.dyn_cast<ModuleDecl*>()) {
+    return M->isStdlibModule();
+  }
+  return false;
+}
+
 void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
   Serializer S{MODULE_DOC_SIGNATURE, DC};
-
+  bool isStdlib = isStdlibModule(DC);
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
 
@@ -3823,9 +3909,13 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
     S.writeDocHeader();
     {
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
-
+      DeclGroupNameContext GroupContext(isStdlib);
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
-      writeDeclCommentTable(DeclCommentList, S.SF, S.M);
+      writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
+      comment_block::GroupNamesLayout GroupNames(S.Out);
+
+      // FIXME: Multi-file compilation may cause group id collision.
+      writeGroupNames(GroupNames, GroupContext.getOrderedGroupNames());
     }
   }
 

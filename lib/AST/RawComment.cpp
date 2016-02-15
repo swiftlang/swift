@@ -149,7 +149,7 @@ RawComment Decl::getRawComment() const {
   // Ask the parent module.
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
-    if (Optional<BriefAndRawComment> C = Unit->getCommentForDecl(this)) {
+    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
       llvm::markup::MarkupContext MC;
       Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
@@ -159,6 +159,26 @@ RawComment Decl::getRawComment() const {
 
   // Give up.
   return RawComment();
+}
+
+Optional<StringRef> Decl::getGroupName() const {
+
+  // We can only get group information from deserialized module files.
+  if (auto *Unit =
+      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    return Unit->getGroupNameForDecl(this);
+  }
+  return None;
+}
+
+Optional<unsigned> Decl::getSourceOrder() const {
+
+  // We can only get source orders from deserialized module files.
+  if (auto *Unit =
+      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    return  Unit->getSourceOrderForDecl(this);
+  }
+  return None;
 }
 
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,

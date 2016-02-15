@@ -184,7 +184,7 @@ extension String {
   /// by concatenating them with a path separator between each pair.
   @available(*, unavailable, message="Use fileURLWithPathComponents on NSURL instead.")
   public static func pathWithComponents(components: [String]) -> String {
-    return NSString.pathWithComponents(components)
+    return NSString.path(withComponents: components)
   }
 
   //===--------------------------------------------------------------------===//
@@ -278,7 +278,7 @@ extension String {
   /// using the specified locale.
   @warn_unused_result
   public func capitalizedStringWith(locale: NSLocale?) -> String {
-    return _ns.capitalizedStringWith(locale) as String
+    return _ns.capitalizedString(withLocale: locale) as String
   }
 
   // - (NSComparisonResult)caseInsensitiveCompare:(NSString *)aString
@@ -306,7 +306,7 @@ extension String {
   @warn_unused_result
   public func commonPrefixWith(
     aString: String, options: NSStringCompareOptions) -> String {
-    return _ns.commonPrefixWith(aString, options: options)
+    return _ns.commonPrefix(withString: aString, options: options)
   }
 
   // - (NSComparisonResult)
@@ -374,8 +374,8 @@ extension String {
     let result = outputName._withBridgeObject(&nsOutputName) {
       outputName in matchesIntoArray._withBridgeObject(&nsMatches) {
         matchesIntoArray in
-        self._ns.completePathInto(
-          outputName, caseSensitive: caseSensitive,
+        self._ns.completePath(
+          into: outputName, caseSensitive: caseSensitive,
           matchesInto: matchesIntoArray, filterTypes: filterTypes
         )
       }
@@ -403,7 +403,7 @@ extension String {
     separator: NSCharacterSet
   ) -> [String] {
     // FIXME: two steps due to <rdar://16971181>
-    let nsa = _ns.componentsSeparatedByCharactersIn(separator) as NSArray
+    let nsa = _ns.componentsSeparatedByCharacters(in: separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
     return _convertNSArrayToArray(nsa)
@@ -415,7 +415,7 @@ extension String {
   /// Returns an array containing substrings from the `String`
   /// that have been divided by a given separator.
   public func componentsSeparatedBy(separator: String) -> [String] {
-    let nsa = _ns.componentsSeparatedBy(separator) as NSArray
+    let nsa = _ns.componentsSeparated(by: separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
     return _convertNSArrayToArray(nsa)
@@ -480,7 +480,7 @@ extension String {
 
   /// Enumerates all the lines in a string.
   public func enumerateLines(body: (line: String, inout stop: Bool) -> ()) {
-    _ns.enumerateLinesUsing {
+    _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
       var stop_ = false
@@ -513,8 +513,8 @@ extension String {
     _ body:
       (String, Range<Index>, Range<Index>, inout Bool) -> ()
   ) {
-    _ns.enumerateLinguisticTagsIn(
-      _toNSRange(range),
+    _ns.enumerateLinguisticTags(
+      in: _toNSRange(range),
       scheme: tagScheme,
       options: opts,
       orthography: orthography != nil ? orthography! : nil
@@ -548,7 +548,7 @@ extension String {
       enclosingRange: Range<Index>, inout Bool
     ) -> ()
   ) {
-    _ns.enumerateSubstringsIn(_toNSRange(range), options: opts) {
+    _ns.enumerateSubstrings(in: _toNSRange(range), options: opts) {
       var stop_ = false
 
       body(substring: $0,
@@ -1004,7 +1004,7 @@ extension String {
   /// containing a given range.
   @warn_unused_result
   public func lineRangeFor(aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.lineRangeFor(_toNSRange(aRange)))
+    return _range(_ns.lineRange(forRange: _toNSRange(aRange)))
   }
 
   // - (NSArray *)
@@ -1026,8 +1026,8 @@ extension String {
   ) -> [String] {
     var nsTokenRanges: NSArray? = nil
     let result = tokenRanges._withBridgeObject(&nsTokenRanges) {
-      self._ns.linguisticTagsIn(
-        _toNSRange(range), scheme: tagScheme, options: opts,
+      self._ns.linguisticTags(
+        in: _toNSRange(range), scheme: tagScheme, options: opts,
         orthography: orthography != nil ? orthography! : nil, tokenRanges: $0) as NSArray
     }
 
@@ -1086,7 +1086,7 @@ extension String {
   /// locale.
   @warn_unused_result
   public func lowercaseStringWith(locale: NSLocale?) -> String {
-    return _ns.lowercaseStringWith(locale)
+    return _ns.lowercaseString(withLocale: locale)
   }
 
   // - (NSUInteger)maximumLengthOfBytesUsingEncoding:(NSStringEncoding)enc
@@ -1105,7 +1105,7 @@ extension String {
   /// paragraph or paragraphs containing a given range.
   @warn_unused_result
   public func paragraphRangeFor(aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.paragraphRangeFor(_toNSRange(aRange)))
+    return _range(_ns.paragraphRange(forRange: _toNSRange(aRange)))
   }
 
   // @property NSArray* pathComponents
@@ -1183,8 +1183,8 @@ extension String {
     range aRange: Range<Index>? = nil
   ) -> Range<Index>? {
     return _optionalRange(
-      _ns.rangeOfCharacterFrom(
-        aSet, options: mask,
+      _ns.rangeOfCharacter(
+        from: aSet, options: mask,
         range: _toNSRange(aRange ?? self.characters.indices)))
   }
 
@@ -1196,7 +1196,7 @@ extension String {
   public
   func rangeOfComposedCharacterSequenceAt(anIndex: Index) -> Range<Index> {
     return _range(
-      _ns.rangeOfComposedCharacterSequenceAt(anIndex._utf16Index))
+      _ns.rangeOfComposedCharacterSequence(at: anIndex._utf16Index))
   }
 
   // - (NSRange)rangeOfComposedCharacterSequencesForRange:(NSRange)range
@@ -1211,7 +1211,7 @@ extension String {
     // I think users will be able to observe differences in the input
     // and output ranges due (if nothing else) to locale changes
     return _range(
-      _ns.rangeOfComposedCharacterSequencesFor(_toNSRange(range)))
+      _ns.rangeOfComposedCharacterSequences(forRange: _toNSRange(range)))
   }
 
   // - (NSRange)rangeOfString:(NSString *)aString
@@ -1241,16 +1241,16 @@ extension String {
     locale: NSLocale? = nil
   ) -> Range<Index>? {
     return _optionalRange(
-      locale != nil ? _ns.rangeOf(
-        aString, options: mask,
+      locale != nil ? _ns.range(
+        of: aString, options: mask,
         range: _toNSRange(searchRange ?? self.characters.indices),
         locale: locale
       )
-      : searchRange != nil ? _ns.rangeOf(
-        aString, options: mask, range: _toNSRange(searchRange!)
+      : searchRange != nil ? _ns.range(
+        of: aString, options: mask, range: _toNSRange(searchRange!)
       )
-      : !mask.isEmpty ? _ns.rangeOf(aString, options: mask)
-      : _ns.rangeOf(aString)
+      : !mask.isEmpty ? _ns.range(of: aString, options: mask)
+      : _ns.range(of: aString)
     )
   }
 
@@ -1282,7 +1282,7 @@ extension String {
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func localizedStandardRangeOf(string: String) -> Range<Index>? {
-    return _optionalRange(_ns.localizedStandardRangeOf(string))
+    return _optionalRange(_ns.localizedStandardRange(of: string))
   }
 
   // @property NSStringEncoding smallestEncoding;
@@ -1323,7 +1323,7 @@ extension String {
     // <rdar://problem/17901698> Docs for -[NSString
     // stringByAddingPercentEncodingWithAllowedCharacters] don't precisely
     // describe when return value is nil
-    return _ns.addingPercentEncodingWithAllowedCharacters(
+    return _ns.addingPercentEncoding(withAllowedCharacters:
       allowedCharacters
     )
   }
@@ -1424,7 +1424,7 @@ extension String {
   public func folding(
     options options: NSStringCompareOptions = [], locale: NSLocale?
   ) -> String {
-    return _ns.folding(options: options, locale: locale)
+    return _ns.folding(options, locale: locale)
   }
 
   // - (NSString *)stringByPaddingToLength:(NSUInteger)newLength
@@ -1438,8 +1438,8 @@ extension String {
   public func byPaddingToLength(
     newLength: Int, withString padString: String, startingAt padIndex: Int
   ) -> String {
-    return _ns.byPaddingToLength(
-      newLength, withString: padString, startingAt: padIndex)
+    return _ns.byPadding(
+      toLength: newLength, withString: padString, startingAt: padIndex)
   }
 
   // @property NSString* stringByRemovingPercentEncoding;
@@ -1461,8 +1461,8 @@ extension String {
   public func replacingCharactersIn(
     range: Range<Index>, withString replacement: String
   ) -> String {
-    return _ns.replacingCharactersIn(
-      _toNSRange(range), withString: replacement)
+    return _ns.replacingCharacters(
+      in: _toNSRange(range), withString: replacement)
   }
 
   // - (NSString *)
@@ -1486,12 +1486,12 @@ extension String {
     range searchRange: Range<Index>? = nil
   ) -> String {
     return (searchRange != nil) || (!options.isEmpty)
-    ? _ns.replacingOccurrencesOf(
-      target,
+    ? _ns.replacingOccurrences(
+      of: target,
       withString: replacement, options: options,
       range: _toNSRange(searchRange ?? self.characters.indices)
     )
-    : _ns.replacingOccurrencesOf(target, withString: replacement)
+    : _ns.replacingOccurrences(of: target, withString: replacement)
   }
 
   // - (NSString *)
@@ -1531,7 +1531,7 @@ extension String {
   /// the `String` characters contained in a given character set.
   @warn_unused_result
   public func byTrimmingCharactersIn(set: NSCharacterSet) -> String {
-    return _ns.byTrimmingCharactersIn(set)
+    return _ns.byTrimmingCharacters(in: set)
   }
 
   // - (NSArray *)stringsByAppendingPaths:(NSArray *)paths
@@ -1540,7 +1540,7 @@ extension String {
   /// to the `String` each string in a given array.
   @available(*, unavailable, message="map over paths with URLByAppendingPathComponent instead.")
   public func stringsByAppendingPaths(paths: [String]) -> [String] {
-    return _ns.stringsByAppendingPaths(paths)
+    fatalError("This function is not available")
   }
 
   // - (NSString *)substringFromIndex:(NSUInteger)anIndex
@@ -1549,7 +1549,7 @@ extension String {
   /// `String` from the one at a given index to the end.
   @warn_unused_result
   public func substringFrom(index: Index) -> String {
-    return _ns.substringFrom(index._utf16Index)
+    return _ns.substring(from: index._utf16Index)
   }
 
   // - (NSString *)substringToIndex:(NSUInteger)anIndex
@@ -1558,7 +1558,7 @@ extension String {
   /// `String` up to, but not including, the one at a given index.
   @warn_unused_result
   public func substringTo(index: Index) -> String {
-    return _ns.substringTo(index._utf16Index)
+    return _ns.substring(to: index._utf16Index)
   }
 
   // - (NSString *)substringWithRange:(NSRange)aRange
@@ -1567,7 +1567,7 @@ extension String {
   /// `String` that lie within a given range.
   @warn_unused_result
   public func substringWith(aRange: Range<Index>) -> String {
-    return _ns.substringWith(_toNSRange(aRange))
+    return _ns.substring(withRange: _toNSRange(aRange))
   }
 
   // @property (readonly, copy) NSString *localizedUppercaseString NS_AVAILABLE(10_11, 9_0);
@@ -1586,7 +1586,7 @@ extension String {
   /// locale.
   @warn_unused_result
   public func uppercaseStringWith(locale: NSLocale?) -> String {
-    return _ns.uppercaseStringWith(locale)
+    return _ns.uppercaseString(withLocale: locale)
   }
 
   //===--- Omitted due to redundancy with "utf8" property -----------------===//
@@ -1604,8 +1604,8 @@ extension String {
     path: String, atomically useAuxiliaryFile:Bool,
     encoding enc: NSStringEncoding
   ) throws {
-    try self._ns.writeToFile(
-      path, atomically: useAuxiliaryFile, encoding: enc)
+    try self._ns.write(
+      toFile: path, atomically: useAuxiliaryFile, encoding: enc)
   }
 
   // - (BOOL)
@@ -1620,8 +1620,8 @@ extension String {
     url: NSURL, atomically useAuxiliaryFile: Bool,
     encoding enc: NSStringEncoding
   ) throws {
-    try self._ns.writeTo(
-      url, atomically: useAuxiliaryFile, encoding: enc)
+    try self._ns.write(
+      to: url, atomically: useAuxiliaryFile, encoding: enc)
   }
 
   // - (nullable NSString *)stringByApplyingTransform:(NSString *)transform reverse:(BOOL)reverse NS_AVAILABLE(10_11, 9_0);
@@ -1668,7 +1668,7 @@ extension String {
   @warn_unused_result
   public func localizedCaseInsensitiveContains(other: String) -> Bool {
     let r = self.rangeOf(
-      other, options: .CaseInsensitiveSearch, locale: NSLocale.current()
+      other, options: .caseInsensitiveSearch, locale: NSLocale.current()
     ) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.localizedCaseInsensitiveContains(other))

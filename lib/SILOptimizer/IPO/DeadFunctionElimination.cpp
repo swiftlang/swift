@@ -14,7 +14,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/PatternMatch.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -239,6 +238,11 @@ protected:
         DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() << "\n");
         ensureAlive(&F);
       }
+
+      if (!F.shouldOptimize()) {
+        DEBUG(llvm::dbgs() << "  anchor a no optimization function: " << F.getName() << "\n");
+        ensureAlive(&F);
+      }
     }
 
     for (SILGlobalVariable &G : Module->getSILGlobalList()) {
@@ -338,6 +342,18 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         addImplementingFunction(mi, F, nullptr);
         if (tableIsAlive || !F->isDefinition())
           ensureAlive(mi, nullptr, nullptr);
+      }
+    }
+
+    // Check default witness methods.
+    for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
+      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+        SILFunction *F = entry.getWitness();
+        auto *fd = cast<AbstractFunctionDecl>(entry.getRequirement().getDecl());
+
+        MethodInfo *mi = getMethodInfo(fd);
+        addImplementingFunction(mi, F, nullptr);
+        ensureAlive(mi, nullptr, nullptr);
       }
     }
   }

@@ -74,6 +74,7 @@ static NSOperatingSystemVersion operatingSystemVersionFromPlist() {
 
 /// Return the version of the operating system currently running for use in
 /// API availability queries.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" NSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() {
   static NSOperatingSystemVersion version = ([]{
     // Use -[NSProcessInfo.operatingSystemVersion] when present

@@ -80,7 +80,7 @@ enum __PrivNSEnum : Int {
 enum NSEnum : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
-  case __PrivA
+  case __privA
   case B
 }
 struct __PrivNSOptions : OptionSet {
@@ -91,7 +91,7 @@ struct __PrivNSOptions : OptionSet {
 struct NSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
-  static var __PrivA: NSOptions { get }
+  static var __privA: NSOptions { get }
   static var B: NSOptions { get }
 }
 @available(*, unavailable, renamed="__PrivCFType", message="Not available in Swift")

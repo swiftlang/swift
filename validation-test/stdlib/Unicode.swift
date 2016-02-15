@@ -2143,7 +2143,7 @@ class NonContiguousNSString : NSString {
     self.init(encoded)
   }
 
-  @objc override func copy(zone zone: NSZone) -> AnyObject {
+  @objc override func copy(withZone zone: NSZone) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -2153,7 +2153,7 @@ class NonContiguousNSString : NSString {
     return _value.count
   }
 
-  @objc override func characterAt(index: Int) -> unichar {
+  @objc override func character(at index: Int) -> unichar {
     return _value[index]
   }
 
@@ -2276,7 +2276,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytesNoCopy(
       kCFAllocatorDefault, bytes, bytes.count,
-      CFStringBuiltInEncodings.MacRoman.rawValue, false, kCFAllocatorNull)
+      CFStringBuiltInEncodings.macRoman.rawValue, false, kCFAllocatorNull)
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.
@@ -2299,7 +2299,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
   do {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytes(kCFAllocatorDefault,
-        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.rawValue, false)
+        bytes, bytes.count, CFStringBuiltInEncodings.macRoman.rawValue, false)
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.

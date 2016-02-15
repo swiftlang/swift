@@ -49,7 +49,7 @@ public typealias _SwiftNSZone = OpaquePointer
 /// A shadow for the `NSCopying` protocol.
 @objc
 public protocol _NSCopying : _ShadowProtocol {
-  func copy(zone zone: _SwiftNSZone) -> AnyObject
+  func copy(withZone zone: _SwiftNSZone) -> AnyObject
 }
 
 /// A shadow for the "core operations" of NSArray.
@@ -99,7 +99,7 @@ public protocol _NSDictionaryCore :
 
   // We also override the following methods for efficiency.
 
-  func copy(zone zone: _SwiftNSZone) -> AnyObject
+  func copy(withZone zone: _SwiftNSZone) -> AnyObject
 
   func getObjects(objects: UnsafeMutablePointer<AnyObject>,
     andKeys keys: UnsafeMutablePointer<AnyObject>)
@@ -147,7 +147,7 @@ public protocol _NSSetCore :
 
   // We also override the following methods for efficiency.
 
-  func copy(zone zone: _SwiftNSZone) -> AnyObject
+  func copy(withZone zone: _SwiftNSZone) -> AnyObject
 
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumeratingWith(

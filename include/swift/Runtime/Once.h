@@ -37,6 +37,7 @@ typedef std::once_flag swift_once_t;
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
 /// extent of type swift_once_t.
+SWIFT_RUNTIME_EXPORT
 extern "C"
 void swift_once(swift_once_t *predicate, void (*fn)(void *));
 

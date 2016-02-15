@@ -27,5 +27,6 @@ TYPEREF(Metatype, TypeRef)
 TYPEREF(ExistentialMetatype, TypeRef)
 TYPEREF(GenericTypeParameter, TypeRef)
 TYPEREF(DependentMember, TypeRef)
+TYPEREF(Associated, TypeRef)
 
 #undef TYPEREF

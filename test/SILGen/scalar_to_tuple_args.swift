@@ -1,10 +1,10 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 func inoutWithDefaults(inout x: Int, y: Int = 0, z: Int = 0) {}
-func inoutWithCallerSideDefaults(inout x: Int, y: Int = __LINE__) {}
+func inoutWithCallerSideDefaults(inout x: Int, y: Int = #line) {}
 
 func scalarWithDefaults(x: Int, y: Int = 0, z: Int = 0) {}
-func scalarWithCallerSideDefaults(x: Int, y: Int = __LINE__) {}
+func scalarWithCallerSideDefaults(x: Int, y: Int = #line) {}
 
 func tupleWithDefaults(x x: (Int, Int), y: Int = 0, z: Int = 0) {}
 

@@ -485,6 +485,9 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     run_tests_group.add_argument("-T", "--validation-test",
         help="run the validation test suite (implies --test)",
         action="store_true")
+    run_tests_group.add_argument("-B", "--benchmark",
+        help="run the Swift Benchmark Suite after building",
+        action="store_true")
 
     parser.add_argument("-o", "--test-optimized",
         help="run the test suite in optimized mode too (implies --test)",
@@ -494,6 +497,10 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         title="Run build")
     run_build_group.add_argument("-S", "--skip-build",
         help="generate build directory only without building",
+        action="store_true")
+
+    run_build_group.add_argument("--skip-build-benchmarks",
+        help="skip building Swift Benchmark Suite",
         action="store_true")
 
     parser.add_argument("-i", "--ios",
@@ -654,6 +661,11 @@ the number of parallel build jobs to use""",
             "--skip-test-validation"
         ]
 
+    if not args.benchmark:
+        build_script_impl_inferred_args += [
+            "--skip-test-benchmarks"
+        ]
+
     if not args.test_optimized:
         build_script_impl_inferred_args += [
             "--skip-test-optimized"
@@ -705,6 +717,11 @@ the number of parallel build jobs to use""",
     if not args.build_libdispatch:
         build_script_impl_inferred_args += [
             "--skip-build-libdispatch"
+        ]
+
+    if args.skip_build_benchmarks:
+        build_script_impl_inferred_args += [
+            "--skip-build-benchmarks"
         ]
 
     if args.skip_build:

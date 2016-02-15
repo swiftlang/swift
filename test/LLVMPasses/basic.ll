@@ -139,7 +139,7 @@ define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
   ret void
 }
 
-; CHECK-LABEL: define void @swift_fixLifetimeTest
+; CHECK-LABEL: define{{( protected)?}} void @swift_fixLifetimeTest
 ; CHECK: swift_retain
 ; CHECK: swift_fixLifetime
 ; CHECK: swift_release

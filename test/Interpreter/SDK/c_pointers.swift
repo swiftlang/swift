@@ -95,7 +95,7 @@ autoreleasepool {
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
 class DumbString: NSString {
-  override func characterAt(x: Int) -> unichar { _requirementFailure("nope") }
+  override func character(at x: Int) -> unichar { _requirementFailure("nope") }
   override var length: Int { return 0 }
 
   convenience init(contentsOfFile s: String, encoding: NSStringEncoding) throws {

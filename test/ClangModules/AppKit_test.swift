@@ -5,12 +5,12 @@
 import AppKit
 
 class MyDocument : NSDocument {
-  override func readFrom(URL: NSURL, ofType type: String) throws {
-    try super.readFrom(URL, ofType: type)
+  override func read(from URL: NSURL, ofType type: String) throws {
+    try super.read(from: URL, ofType: type)
   }
 
-  override func writeTo(URL: NSURL, ofType type: String) throws {
-    try super.writeTo(URL, ofType: type)
+  override func write(to URL: NSURL, ofType type: String) throws {
+    try super.write(to: URL, ofType: type)
   }
 }
 
@@ -18,7 +18,7 @@ func test(URL: NSURL, controller: NSDocumentController) {
   try! NSDocument(contentsOf: URL, ofType: "") // expected-warning{{unused}}
   try! MyDocument(contentsOf: URL, ofType: "")
 
-  try! controller.makeDocumentWithContentsOf(URL, ofType: "")
+  try! controller.makeDocumentWithContents(of: URL, ofType: "")
 }
 
 extension NSBox {

@@ -114,7 +114,7 @@ func test9(g: Gizmo) {
 }
 
 func test10(g: Gizmo, r: Rect) {
-  Gizmo.runWith(r, andGizmo:g);
+  Gizmo.run(r, andGizmo:g);
 }
 
 // Force the emission of the Rect metadata.

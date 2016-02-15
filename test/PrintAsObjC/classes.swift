@@ -91,7 +91,7 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 // CHECK-NEXT: @end
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
   var description: String { return "me" }
-  @objc(conformsToProtocol:) func conformsTo(_: Protocol) -> Bool { return false }
+  @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
   @objc(isKindOfClass:) func isKindOf(aClass: AnyClass) -> Bool { return false }
 }
 
@@ -236,7 +236,7 @@ typealias AliasForNSRect = NSRect
   func emptyArray() -> NSArray { return NSArray() }
   func maybeArray() -> NSArray? { return nil }
 
-  func someEnum() -> NSRuncingMode { return .Mince }
+  func someEnum() -> NSRuncingMode { return .mince }
 
   func zone() -> NSZone { return nil }
 

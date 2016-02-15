@@ -227,12 +227,12 @@ class GenericNativeSwift<T> {}
 
 var native: AnyObject = NativeSwift()
 
-if native.respondsTo(".cxx_construct") {
+if native.responds(to: ".cxx_construct") {
   print("SwiftObject has nontrivial constructor")
 } else {
   print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
-if native.respondsTo(".cxx_destruct") {
+if native.responds(to: ".cxx_destruct") {
   print("SwiftObject has nontrivial destructor")
 } else {
   print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
@@ -240,12 +240,12 @@ if native.respondsTo(".cxx_destruct") {
 
 native = GenericNativeSwift<Int>()
 
-if native.respondsTo(".cxx_construct") {
+if native.responds(to: ".cxx_construct") {
   print("SwiftObject has nontrivial constructor")
 } else {
   print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
-if native.respondsTo(".cxx_destruct") {
+if native.responds(to: ".cxx_destruct") {
   print("SwiftObject has nontrivial destructor")
 } else {
   print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor

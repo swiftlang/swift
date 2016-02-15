@@ -118,7 +118,7 @@ func makeGenericMetatypes() {
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes6OneArgVS_3Foo_() [[NOUNWIND_READNONE_OPT:#[0-9]+]]
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes6OneArg(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
-// CHECK-LABEL: define %swift.type* @_TMaV17generic_metatypes6OneArg(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes6OneArg(%swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -134,7 +134,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes7TwoArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]])
 
-// CHECK-LABEL: define %swift.type* @_TMaV17generic_metatypes7TwoArgs(%swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes7TwoArgs(%swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -152,7 +152,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes9ThreeArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE]]
 
-// CHECK-LABEL: define %swift.type* @_TMaV17generic_metatypes9ThreeArgs(%swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes9ThreeArgs(%swift.type*, %swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -172,7 +172,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes8FourArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]]) [[NOUNWIND_READNONE]]
 
-// CHECK-LABEL: define %swift.type* @_TMaV17generic_metatypes8FourArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes8FourArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -194,7 +194,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes8FiveArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE]]
 
-// CHECK-LABEL: define %swift.type* @_TMaV17generic_metatypes8FiveArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes8FiveArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start

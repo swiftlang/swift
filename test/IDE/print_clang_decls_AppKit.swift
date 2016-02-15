@@ -19,8 +19,8 @@
 
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
-// APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
-// APPKIT-NEXT: func ancestorSharedWith(aView: NSView) -> NSView?
+// APPKIT-NEXT: func isDescendant(of aView: NSView) -> Bool
+// APPKIT-NEXT: func ancestorShared(withView aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }

@@ -2404,7 +2404,7 @@ bool ArgumentSplitter::createNewArguments() {
     return false;
 
   // Get the first level projection for the struct or tuple type.
-  Projection::getFirstLevelProjections(Arg, Mod, Projections);
+  Projection::getFirstLevelProjections(Arg->getType(), Mod, Projections);
 
   // We do not want to split arguments with less than 2 projections.
   if (Projections.size() < 2)
@@ -2414,7 +2414,7 @@ bool ArgumentSplitter::createNewArguments() {
   // projections.
   if (std::count_if(Projections.begin(), Projections.end(),
                     [&](const Projection &P) {
-                      return !P.getType().isTrivial(Mod);
+                      return !P.getType(Ty, Mod).isTrivial(Mod);
                     }) < 2)
     return false;
 
@@ -2426,7 +2426,7 @@ bool ArgumentSplitter::createNewArguments() {
   // old one.
   llvm::SmallVector<SILValue, 4> NewArgumentValues;
   for (auto &P : Projections) {
-    auto *NewArg = ParentBB->createBBArg(P.getType(), nullptr);
+    auto *NewArg = ParentBB->createBBArg(P.getType(Ty, Mod), nullptr);
     // This is unfortunate, but it feels wrong to put in an API into SILBuilder
     // that only takes in arguments.
     //
@@ -2459,7 +2459,7 @@ bool ArgumentSplitter::createNewArguments() {
 
   // If we only had such users of Agg and Agg is dead now (ignoring debug
   // instructions), remove it.
-  if (hasNoUsesExceptDebug(Agg))
+  if (onlyHaveDebugUses(Agg))
     eraseFromParentWithDebugInsts(Agg);
 
   return true;

@@ -1255,13 +1255,13 @@ class ParallelArrayDictionary : NSDictionary {
     fatalError("init(coder:) not implemented by ParallelArrayDictionary")
   }
 
-  @objc override func copy(zone zone: NSZone) -> AnyObject {
+  @objc override func copy(withZone zone: NSZone) -> AnyObject {
     // Ensure that copying this dictionary does not produce a CoreFoundation
     // object.
     return self
   }
 
-  override func countByEnumeratingWith(
+  override func countByEnumerating(
       state: UnsafeMutablePointer<NSFastEnumerationState>,
       objects: AutoreleasingUnsafeMutablePointer<AnyObject?>, count: Int) -> Int {
     var theState = state.pointee
@@ -1275,7 +1275,7 @@ class ParallelArrayDictionary : NSDictionary {
     return 0
   }
 
-  override func objectFor(aKey: AnyObject) -> AnyObject? {
+  override func object(forKey aKey: AnyObject) -> AnyObject? {
     return value
   }
 
@@ -1317,14 +1317,14 @@ class CustomImmutableNSDictionary : NSDictionary {
     fatalError("init(coder:) not implemented by CustomImmutableNSDictionary")
   }
 
-  @objc override func copy(zone zone: NSZone) -> AnyObject {
+  @objc override func copy(withZone zone: NSZone) -> AnyObject {
     ++CustomImmutableNSDictionary.timesCopyWithZoneWasCalled
     return self
   }
 
-  override func objectFor(aKey: AnyObject) -> AnyObject? {
+  override func object(forKey aKey: AnyObject) -> AnyObject? {
     ++CustomImmutableNSDictionary.timesObjectForKeyWasCalled
-    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).objectFor(aKey)
+    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).object(forKey: aKey)
   }
 
   override func keyEnumerator() -> NSEnumerator {
@@ -1357,7 +1357,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
 
   // Delete the key from the NSMutableDictionary.
   assert(nsd[TestObjCKeyTy(10)] != nil)
-  nsd.removeObjectFor(TestObjCKeyTy(10))
+  nsd.removeObject(forKey: TestObjCKeyTy(10))
   assert(nsd[TestObjCKeyTy(10)] == nil)
 
   // Find an existing key, again.
@@ -1382,7 +1382,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 
   // Delete the key from the NSMutableDictionary.
   assert(nsd[TestBridgedKeyTy(10)] != nil)
-  nsd.removeObjectFor(TestBridgedKeyTy(10))
+  nsd.removeObject(forKey: TestBridgedKeyTy(10))
   assert(nsd[TestBridgedKeyTy(10)] == nil)
 
   // Find an existing key, again.
@@ -2539,29 +2539,29 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.Count") {
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  var v: AnyObject? = d.objectFor(TestObjCKeyTy(10))
+  var v: AnyObject? = d.object(forKey: TestObjCKeyTy(10))
   expectEqual(1010, (v as! TestObjCValueTy).value)
   let idValue10 = unsafeBitCast(v, UInt.self)
 
-  v = d.objectFor(TestObjCKeyTy(20))
+  v = d.object(forKey: TestObjCKeyTy(20))
   expectEqual(1020, (v as! TestObjCValueTy).value)
   let idValue20 = unsafeBitCast(v, UInt.self)
 
-  v = d.objectFor(TestObjCKeyTy(30))
+  v = d.object(forKey: TestObjCKeyTy(30))
   expectEqual(1030, (v as! TestObjCValueTy).value)
   let idValue30 = unsafeBitCast(v, UInt.self)
 
-  expectEmpty(d.objectFor(TestObjCKeyTy(40)))
+  expectEmpty(d.object(forKey: TestObjCKeyTy(40)))
 
   for i in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
-      d.objectFor(TestObjCKeyTy(10)), UInt.self))
+      d.object(forKey: TestObjCKeyTy(10)), UInt.self))
 
     expectEqual(idValue20, unsafeBitCast(
-      d.objectFor(TestObjCKeyTy(20)), UInt.self))
+      d.object(forKey: TestObjCKeyTy(20)), UInt.self))
 
     expectEqual(idValue30, unsafeBitCast(
-      d.objectFor(TestObjCKeyTy(30)), UInt.self))
+      d.object(forKey: TestObjCKeyTy(30)), UInt.self))
   }
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -2578,7 +2578,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
     var dataPairs = Array<(Int, Int)>()
     var identityPairs = Array<(UInt, UInt)>()
     while let key = enumerator.nextObject() {
-      let value: AnyObject = d.objectFor(key)!
+      let value: AnyObject = d.object(forKey: key)!
 
       let dataPair =
         ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
@@ -2702,7 +2702,7 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.objectFor(key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2809,7 +2809,7 @@ DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.objectFor(key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2839,7 +2839,7 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.objectFor(key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2875,7 +2875,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
 
   var pairs = Array<(key: Int, value: Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.objectFor(key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -3439,13 +3439,13 @@ class MockDictionaryWithCustomCount : NSDictionary {
     fatalError("init(coder:) not implemented by MockDictionaryWithCustomCount")
   }
 
-  @objc override func copy(zone zone: NSZone) -> AnyObject {
+  @objc override func copy(withZone zone: NSZone) -> AnyObject {
     // Ensure that copying this dictionary produces an object of the same
     // dynamic type.
     return self
   }
 
-  override func objectFor(aKey: AnyObject) -> AnyObject? {
+  override func object(forKey aKey: AnyObject) -> AnyObject? {
     expectUnreachable()
     return NSObject()
   }

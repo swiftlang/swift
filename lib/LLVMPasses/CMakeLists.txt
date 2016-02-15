@@ -3,6 +3,7 @@ add_swift_library(swiftLLVMPasses
   LLVMSwiftRCIdentity.cpp
   LLVMARCOpts.cpp
   LLVMARCContract.cpp
+  LLVMInlineTree.cpp
   LLVMStackPromotion.cpp
   )
 

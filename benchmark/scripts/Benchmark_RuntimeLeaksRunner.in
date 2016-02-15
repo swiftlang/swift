@@ -1,0 +1,108 @@
+#!/usr/bin/env python
+
+# ===--- Benchmark_RuntimeLeaksRunner.in ----------------------------------===//
+#
+#  This source file is part of the Swift.org open source project
+#
+#  Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+#  Licensed under Apache License v2.0 with Runtime Library Exception
+#
+#  See http://swift.org/LICENSE.txt for license information
+#  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ===----------------------------------------------------------------------===//
+
+import os
+import sys
+import json
+import subprocess
+
+sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
+
+import perf_test_driver
+
+# This is a hacked up XFAIL list. It should really be a json file, but it will
+# work for now. Add in the exact name of the pass to XFAIL.
+XFAIL_LIST = [
+]
+
+# A list of Functions mapped to the number of globals in that function. These
+# show up as leaks. But we can count them, whitelist them, and then ignore them.
+FUNC_TO_GLOBAL_COUNTS = {
+    'Ackermann': {"swift_count": 1, "objc_count": 0},
+    'AngryPhonebook': {"swift_count": 1, "objc_count": 0},
+    'GlobalClass': {'swift_count': 1, 'objc_count': 0},
+    'Histogram': {'swift_count': 1, 'objc_count': 0},
+    'Phonebook': {'swift_count': 1, 'objc_count': 0},
+    'RC4': {'swift_count': 1, 'objc_count': 0},
+    'RGBHistogram': {'swift_count': 1, 'objc_count': 0},
+    'SortStrings': {'swift_count': 1, 'objc_count': 0},
+    'TwoSum': {'swift_count': 1, 'objc_count': 0},
+}
+
+# Global objective-c classes created by various frameworks. We do not care about these.
+IGNORABLE_GLOBAL_OBJC_CLASSES = set([
+    '__NSPlaceholderDate',
+    'NSCache',
+    '__NSPlaceholderTimeZone',
+    'NSPlaceholderNumber',
+    'NSPlaceholderString',
+    '__NSPlaceholderArray',
+    '__NSPlaceholderDictionary',
+    '_NSPlaceholderData',
+    '_NSJSONReader'
+])
+
+class LeaksRunnerResult(perf_test_driver.Result):
+
+    def __init__(self, name, status):
+        perf_test_driver.Result.__init__(self, name, status, "", XFAIL_LIST)
+
+class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
+
+    def __init__(self, binary, xfail_list):
+        perf_test_driver.BenchmarkDriver.__init__(self, binary, xfail_list,
+                                                 enable_parallel=True)
+
+    def prepare_input(self, name):
+        return {}
+
+    def process_input(self, data):
+        test_name = '({},{})'.format(data['opt'], data['test_name'])
+        print "Running {}...".format(test_name)
+        sys.stdout.flush()
+        try:
+            p = subprocess.Popen([data['path'], "--run-all", "--num-samples=2",
+                                  "--num-iters={}".format(2), data['test_name']],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p.wait()
+            error_out = p.stderr.readlines()
+        except:
+            print("Child Process Failed! (%s,%s)" % (data['path'], data['test_name']))
+            return LeaksRunnerResult(test_name, True)
+
+        try:
+            # We grab the second line since swift globals get lazily created in the
+            # first iteration.
+            d = json.loads(error_out[1])
+            d['objc_objects'] = [x for x in d['objc_objects'] if x not in IGNORABLE_GLOBAL_OBJC_CLASSES]
+            d['objc_count'] = len(d['objc_objects'])
+
+            # Subtract out known global counts.
+            if data['test_name'] in FUNC_TO_GLOBAL_COUNTS:
+                d['swift_count'] -= FUNC_TO_GLOBAL_COUNTS[data['test_name']]['swift_count']
+                d['objc_count'] -= FUNC_TO_GLOBAL_COUNTS[data['test_name']]['objc_count']
+
+            return LeaksRunnerResult(test_name, (d['objc_count'] + d['swift_count']) > 0)
+        except:
+            print "Failed parse output! (%s,%s)" % (data['path'], data['test_name'])
+            return LeaksRunnerResult(test_name, True)
+
+SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+
+if __name__ == "__main__":
+    l = LeaksRunnerBenchmarkDriver(SWIFT_BIN_DIR, XFAIL_LIST)
+    if l.run():
+        sys.exit(0)
+    else:
+        sys.exit(-1)

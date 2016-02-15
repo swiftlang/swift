@@ -325,12 +325,12 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreak3) {
 };
 
 typedef NS_ENUM(NSInteger, NSPrefixWordBreakCustom) {
-  PrefixWordBreakProblemCase __attribute__((swift_name("ProblemCase"))),
+  PrefixWordBreakProblemCase __attribute__((swift_name("problemCase"))),
   NSPrefixWordBreakDeprecatedGoodCase __attribute__((deprecated)),
 };
 
 typedef NS_ENUM(NSInteger, NSPrefixWordBreak2Custom) {
-  PrefixWordBreak2ProblemCase __attribute__((swift_name("ProblemCase"))),
+  PrefixWordBreak2ProblemCase __attribute__((swift_name("problemCase"))),
   PrefixWordBreak2DeprecatedBadCase __attribute__((deprecated)),
   NSPrefixWordBreak2DeprecatedGoodCase __attribute__((deprecated)),
   NSPrefixWordBreak2GoodCase,
@@ -338,11 +338,11 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreak2Custom) {
 
 typedef NS_ENUM(NSInteger, NSPrefixWordBreakReversedCustom) {
   NSPrefixWordBreakReversedDeprecatedGoodCase __attribute__((deprecated)),
-  PrefixWordBreakReversedProblemCase __attribute__((swift_name("ProblemCase"))),
+  PrefixWordBreakReversedProblemCase __attribute__((swift_name("problemCase"))),
 };
 
 typedef NS_ENUM(NSInteger, NSPrefixWordBreakReorderedCustom) {
-  PrefixWordBreakReorderedProblemCase __attribute__((swift_name("ProblemCase"))),
+  PrefixWordBreakReorderedProblemCase __attribute__((swift_name("problemCase"))),
   NSPrefixWordBreakReorderedGoodCase,
   PrefixWordBreakReorderedDeprecatedBadCase __attribute__((deprecated)),
   NSPrefixWordBreakReorderedDeprecatedGoodCase __attribute__((deprecated)),
@@ -350,7 +350,7 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreakReorderedCustom) {
 
 typedef NS_ENUM(NSInteger, NSPrefixWordBreakReordered2Custom) {
   PrefixWordBreakReordered2DeprecatedBadCase __attribute__((deprecated)),
-  PrefixWordBreakReordered2ProblemCase __attribute__((swift_name("ProblemCase"))),
+  PrefixWordBreakReordered2ProblemCase __attribute__((swift_name("problemCase"))),
   NSPrefixWordBreakReordered2GoodCase,
   NSPrefixWordBreakReordered2DeprecatedGoodCase __attribute__((deprecated)),
 };

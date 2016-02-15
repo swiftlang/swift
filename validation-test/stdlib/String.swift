@@ -122,8 +122,7 @@ StringTests.test("ForeignIndexes/Valid") {
 
 StringTests.test("ForeignIndexes/UnexpectedCrash")
   .xfail(
-    .Custom({ true },
-    reason: "<rdar://problem/18029290> String.Index caches the grapheme " +
+    .Always("<rdar://problem/18029290> String.Index caches the grapheme " +
       "cluster size, but it is not always correct to use"))
   .code {
 
@@ -243,7 +242,7 @@ StringTests.test("_splitFirst") {
 }
 
 StringTests.test("hasPrefix")
-  .skip(.LinuxAny(reason: "hasPrefix unavailable"))
+  .skip(.NativeRuntime("String.hasPrefix undefined without _runtime(_ObjC)"))
   .code {
 #if _runtime(_ObjC)
   expectFalse("".hasPrefix(""))
@@ -615,7 +614,7 @@ func asciiString<
 }
 
 StringTests.test("stringCoreExtensibility")
-  .skip(.LinuxAny(reason: "Foundation dependency"))
+  .skip(.NativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
   let ascii = UTF16.CodeUnit(UnicodeScalar("X").value)
@@ -656,7 +655,7 @@ StringTests.test("stringCoreExtensibility")
 }
 
 StringTests.test("stringCoreReserve")
-  .skip(.LinuxAny(reason: "Foundation dependency"))
+  .skip(.NativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
   for k in 0...5 {
@@ -913,7 +912,7 @@ StringTests.test("Conversions") {
 // Check the internal functions are correct for ASCII values
 StringTests.test(
   "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y")
-  .skip(.LinuxAny(reason: "String._compareASCII defined when _runtime(_ObjC)"))
+  .skip(.NativeRuntime("String._compareASCII undefined without _runtime(_ObjC)"))
   .code {
 #if _runtime(_ObjC)
   let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
@@ -1066,7 +1065,7 @@ StringTests.test("unicodeViews") {
 // Validate that index conversion does something useful for Cocoa
 // programmers.
 StringTests.test("indexConversion")
-  .skip(.LinuxAny(reason: "Foundation dependency"))
+  .skip(.NativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
   let re : NSRegularExpression
@@ -1079,12 +1078,12 @@ StringTests.test("indexConversion")
 
   var matches: [String] = []
   
-  re.enumerateMatchesIn(
-    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
+  re.enumerateMatches(
+    in: s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
   ) {
     result, flags, stop
   in
-    let r = result!.rangeAt(1)
+    let r = result!.range(at: 1)
     let start = String.UTF16Index(_offset: r.location)
     let end = String.UTF16Index(_offset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)

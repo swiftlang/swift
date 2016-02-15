@@ -38,6 +38,15 @@ static std::string mangleConstant(NormalProtocolConformance *C) {
 
 }
 
+void SILWitnessTable::addWitnessTable() {
+  // Make sure we have not seen this witness table yet.
+  assert(Mod.WitnessTableMap.find(Conformance) ==
+         Mod.WitnessTableMap.end() && "Attempting to create duplicate "
+         "witness table.");
+  Mod.WitnessTableMap[Conformance] = this;
+  Mod.witnessTables.push_back(this);
+}
+
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
                         NormalProtocolConformance *Conformance,
@@ -53,12 +62,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, IsFragile,
                                            Name.str(), Conformance, entries);
 
-  // Make sure we have not seen this witness table yet.
-  assert(M.WitnessTableLookupCache.find(Conformance) ==
-         M.WitnessTableLookupCache.end() && "Attempting to create duplicate "
-         "witness table.");
-  M.WitnessTableLookupCache[Conformance] = wt;
-  M.witnessTables.push_back(wt);
+  wt->addWitnessTable();
 
   // Return the resulting witness table.
   return wt;
@@ -79,12 +83,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Name.str(),
                                                     Conformance);
 
-  // Update the SILModule state in light of wT.
-  assert(M.WitnessTableLookupCache.find(Conformance) ==
-         M.WitnessTableLookupCache.end() && "Attempting to create duplicate "
-         "witness table.");
-  M.WitnessTableLookupCache[Conformance] = wt;
-  M.witnessTables.push_back(wt);
+  wt->addWitnessTable();
 
   // Return the resulting witness table.
   return wt;

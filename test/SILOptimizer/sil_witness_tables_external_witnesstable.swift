@@ -17,3 +17,6 @@ func done() -> Y {
   let x = X()
   return doSomething(x)
 }
+
+// Make sure dead function elimination does not get rid of done and doSomething.
+done()

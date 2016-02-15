@@ -13,12 +13,12 @@ public func anchor() {}
 
 anchor()
 
-// CHECK-LABEL: define i32 @main
+// CHECK-LABEL: define{{( protected)?}} i32 @main
 // CHECK:         call void @runtime_registration
 // CHECK:         call void @_TF10playground6anchorFT_T_
 // CHECK:         ret void
 // CHECK:       }
 
-// CHECK-LABEL: define private void @runtime_registration
+// CHECK-LABEL: define{{( protected)?}} private void @runtime_registration
 // CHECK:         call void @swift_instantiateObjCClass({{.*}} @_TMC10playground1C
 

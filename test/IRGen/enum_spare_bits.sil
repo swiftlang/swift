@@ -58,8 +58,8 @@ sil_global @existentialntp: $ExistentialNoTaggedPointers
 sil_global @archetypeBoundToSwift: $Archetype<C>
 sil_global @archetypeBoundToObjC: $Archetype<NSObject>
 
-// CHECK: @archetypeBoundToSwift = global [[ARCHETYPE]]
-// CHECK: @archetypeBoundToObjC = global [[ARCHETYPE]]
+// CHECK: @archetypeBoundToSwift = {{(protected )?}}global [[ARCHETYPE]]
+// CHECK: @archetypeBoundToObjC = {{(protected )?}}global [[ARCHETYPE]]
 
 sil @instantiate_globals : $() -> () {
 entry:

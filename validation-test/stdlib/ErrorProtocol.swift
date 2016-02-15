@@ -38,9 +38,9 @@ struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
     let ns = raceData.error as NSError
     // Use valueForKey to bypass bridging, so we can verify that the identity
     // of the unbridged NSString object is stable.
-    let domainInt: Int = unsafeBitCast(ns.valueForKey("domain"), Int.self)
+    let domainInt: Int = unsafeBitCast(ns.value(forKey: "domain"), Int.self)
     let code: Int = ns.code
-    let userInfoInt: Int = unsafeBitCast(ns.valueForKey("userInfo"), Int.self)
+    let userInfoInt: Int = unsafeBitCast(ns.value(forKey: "userInfo"), Int.self)
     return Observation3Int(domainInt, code, userInfoInt)
   }
 

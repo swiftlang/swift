@@ -507,7 +507,7 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
 // const ProtocolWitnessTable *
 // swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
 //                              const Metadata *type,
-//                              void * const *otherData);
+//                              void * const *instantiationArgs);
 FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, RuntimeCC,
          RETURNS(WitnessTablePtrTy),
          ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),

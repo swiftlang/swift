@@ -123,12 +123,12 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
 
     // CoreLocation error domain
     let nsCL = NSError(domain: kCLErrorDomain,
-                       code: CLError.HeadingFailure.rawValue,
+                       code: CLError.headingFailure.rawValue,
                        userInfo: [:])
     let eCL: ErrorProtocol = nsCL
     let isHeadingFailure: Bool
     switch eCL {
-    case CLError.HeadingFailure:
+    case CLError.headingFailure:
       isHeadingFailure = true
     default:
       isHeadingFailure = false

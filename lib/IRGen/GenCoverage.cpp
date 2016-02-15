@@ -22,15 +22,19 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/ProfileData/InstrProf.h"
 
 using namespace swift;
 using namespace irgen;
 
 using llvm::coverage::CounterMappingRegion;
 
+// This is disabled for some reason.
+#define DISABLE_COVERAGE_MAPPING
+
+#ifndef DISABLE_COVERAGE_MAPPING
 static bool isMachO(IRGenModule &IGM) {
   return SwiftTargetInfo::get(IGM).OutputObjectFormat == llvm::Triple::MachO;
 }
@@ -38,8 +42,12 @@ static bool isMachO(IRGenModule &IGM) {
 static StringRef getCoverageSection(IRGenModule &IGM) {
   return llvm::getInstrProfCoverageSectionName(isMachO(IGM));
 }
+#endif
 
 void IRGenModule::emitCoverageMapping() {
+#ifdef DISABLE_COVERAGE_MAPPING
+  return;
+#else
   const auto &Mappings = SILMod->getCoverageMapList();
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
@@ -152,4 +160,5 @@ void IRGenModule::emitCoverageMapping() {
   CovData->setAlignment(8);
 
   addUsedGlobal(CovData);
+#endif
 }

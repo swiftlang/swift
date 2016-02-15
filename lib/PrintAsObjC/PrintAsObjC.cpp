@@ -1000,7 +1000,7 @@ private:
   void visitEnumType(EnumType *ET, Optional<OptionalTypeKind> optionalKind) {
     const EnumDecl *ED = ET->getDecl();
     maybePrintTagKeyword(ED);
-    os << ED->getName();
+    os << getNameForObjC(ED);
   }
 
   void visitClassType(ClassType *CT, Optional<OptionalTypeKind> optionalKind) {
@@ -1395,7 +1395,7 @@ public:
     assert(ED->isObjC() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      os << "enum " << ED->getName() << " : ";
+      os << "enum " << getNameForObjC(ED) << " : ";
       printer.print(ED->getRawType(), OTK_None);
       os << ";\n";
     });
@@ -1545,7 +1545,7 @@ public:
         return elem->getName().str() == "Domain";
       });
       if (!hasDomainCase) {
-        os << "static NSString * _Nonnull const " << ED->getName()
+        os << "static NSString * _Nonnull const " << getNameForObjC(ED)
            << "Domain = @\"" << M.getName() << "." << ED->getName() << "\";\n";
       }
     }

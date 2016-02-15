@@ -8,7 +8,7 @@ func _convertStringToNSString(string: String) -> NSString
 @_silgen_name("swift_NSStringToString") internal
 func _convertNSStringToString(nsstring: NSString?) -> String
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
+public func == (lhs: Object, rhs: Object) -> Bool {
   return lhs.isEqual(rhs)
 }
 
@@ -24,13 +24,13 @@ func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
 }
 
 // NSDictionary bridging entry points
-internal func _convertDictionaryToNSDictionary<Key, NSValue>(
-    d: Dictionary<Key, NSValue>
+internal func _convertDictionaryToNSDictionary<Key, Value>(
+    d: Dictionary<Key, Value>
 ) -> NSDictionary {
   return NSDictionary()
 }
 
-internal func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
+internal func _convertNSDictionaryToDictionary<K: Object, V: AnyObject>(
        d: NSDictionary?
      ) -> Dictionary<K, V> {
   return Dictionary<K, V>()
@@ -73,18 +73,18 @@ extension Int : _ObjectiveCBridgeable {
   }
   
   public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
+    return Number.self
   }
-  public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber()
+  public func _bridgeToObjectiveC() -> Number {
+    return Number()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    x: Number,
     inout result: Int?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    x: Number,
     inout result: Int?
   ) -> Bool {
     return true
@@ -169,18 +169,18 @@ extension CGFloat : _ObjectiveCBridgeable {
   }
   
   public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
+    return Number.self
   }
-  public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber()
+  public func _bridgeToObjectiveC() -> Number {
+    return Number()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    x: Number,
     inout result: CGFloat?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    x: Number,
     inout result: CGFloat?
   ) -> Bool {
     return true
@@ -193,22 +193,22 @@ extension NSRange : _ObjectiveCBridgeable {
   }
   
   public static func _getObjectiveCType() -> Any.Type {
-    return NSValue.self
+    return Value.self
   }
 
-  public func _bridgeToObjectiveC() -> NSValue {
-    return NSValue()
+  public func _bridgeToObjectiveC() -> Value {
+    return Value()
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSValue,
+    x: Value,
     inout result: NSRange?
   ) {
     result = x.rangeValue
   }
   
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSValue,
+    x: Value,
     inout result: NSRange?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)

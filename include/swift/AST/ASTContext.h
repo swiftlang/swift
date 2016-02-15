@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -160,14 +161,6 @@ public:
 typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
   TypeOrExtensionDecl;
 
-/// An entry in the protocol conformance map.
-///
-/// The pointer is the actual conformance providing the witnesses used to
-/// provide conformance. The Boolean indicates whether the type explicitly
-/// conforms to the protocol. A non-null conformance with a false Bool occurs
-/// when error recovery has suggested implicit conformance.
-typedef llvm::PointerIntPair<ProtocolConformance *, 1, bool> ConformanceEntry;
-
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
@@ -221,11 +214,6 @@ public:
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
 
-  // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr
-  // and remove the explicit delete loop in the destructor.
-  typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
-                         ConformanceEntry> ConformsToMap;
-  
   /// \brief The list of external definitions imported by this context.
   llvm::SetVector<Decl *> ExternalDefinitions;
 

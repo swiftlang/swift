@@ -60,6 +60,7 @@
 #include <memory>
 
 using namespace swift;
+using namespace importer;
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
@@ -274,6 +275,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // Enable modules.
     "-fmodules",
 
+    // Enable implicit module maps
+    "-fimplicit-module-maps",
+
     // Don't emit LLVM IR.
     "-fsyntax-only",
 
@@ -485,6 +489,10 @@ ClangImporter::create(ASTContext &ctx,
   };
 
   std::vector<std::string> invocationArgStrs;
+
+  // Clang expects this to be like an actual command line. So we need to pass in
+  // "clang" for argv[0]
+  invocationArgStrs.push_back("clang");
 
   switch (importerOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
@@ -935,9 +943,9 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   return result;
 }
 
-void ClangImporter::collectSubModuleNamesAndVisibility(
+void ClangImporter::collectSubModuleNames(
     ArrayRef<std::pair<Identifier, SourceLoc>> path,
-    std::vector<std::pair<std::string, bool>> &namesVisiblePairs) {
+    std::vector<std::string> &names) {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
@@ -954,9 +962,7 @@ void ClangImporter::collectSubModuleNamesAndVisibility(
   auto submoduleNameLength = submodule->getFullModuleName().length();
   for (auto sub : submodule->submodules()) {
     StringRef full = sub->getFullModuleName();
-    namesVisiblePairs.push_back(
-      std::make_pair(full.substr(submoduleNameLength + 1).str(),
-      isModuleImported(sub)));
+    names.push_back(full.substr(submoduleNameLength + 1).str());
   }
 }
 
@@ -1176,10 +1182,10 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
 
   // Prepopulate the set of module prefixes.
   // FIXME: Hard-coded list should move into the module map language.
-  //if (OmitNeedlessWords) {
-    //ModulePrefixes["Foundation"] = "NS";
-    //ModulePrefixes["ObjectiveC"] = "NS";
-  //}
+  if (OmitNeedlessWords && ctx.LangOpts.StripNSPrefix) {
+    ModulePrefixes["Foundation"] = "NS";
+    ModulePrefixes["ObjectiveC"] = "NS";
+  }
 }
 
 
@@ -1359,235 +1365,6 @@ ClangImporter::Implementation::exportName(Identifier name) {
     return clang::DeclarationName();
 
   return ident;
-}
-
-/// \brief Returns the common prefix of two strings at camel-case word
-/// granularity.
-///
-/// For example, given "NSFooBar" and "NSFooBas", returns "NSFoo"
-/// (not "NSFooBa"). The returned StringRef is a slice of the "a" argument.
-///
-/// If either string has a non-identifier character immediately after the
-/// prefix, \p followedByNonIdentifier will be set to \c true. If both strings
-/// have identifier characters after the prefix, \p followedByNonIdentifier will
-/// be set to \c false. Otherwise, \p followedByNonIdentifier will not be
-/// changed from its initial value.
-///
-/// This is used to derive the common prefix of enum constants so we can elide
-/// it from the Swift interface.
-static StringRef getCommonWordPrefix(StringRef a, StringRef b,
-                                     bool &followedByNonIdentifier) {
-  auto aWords = camel_case::getWords(a), bWords = camel_case::getWords(b);
-  auto aI = aWords.begin(), aE = aWords.end(),
-       bI = bWords.begin(), bE = bWords.end();
-
-  unsigned prevLength = 0;
-  unsigned prefixLength = 0;
-  for ( ; aI != aE && bI != bE; ++aI, ++bI) {
-    if (*aI != *bI) {
-      followedByNonIdentifier = false;
-      break;
-    }
-
-    prevLength = prefixLength;
-    prefixLength = aI.getPosition() + aI->size();
-  }
-
-  // Avoid creating a prefix where the rest of the string starts with a number.
-  if ((aI != aE && !Lexer::isIdentifier(*aI)) ||
-      (bI != bE && !Lexer::isIdentifier(*bI))) {
-    followedByNonIdentifier = true;
-    prefixLength = prevLength;
-  }
-
-  return a.slice(0, prefixLength);
-}
-
-/// Returns the common word-prefix of two strings, allowing the second string
-/// to be a common English plural form of the first.
-///
-/// For example, given "NSProperty" and "NSProperties", the full "NSProperty"
-/// is returned. Given "NSMagicArmor" and "NSMagicArmory", only
-/// "NSMagic" is returned.
-///
-/// The "-s", "-es", and "-ies" patterns cover every plural NS_OPTIONS name
-/// in Cocoa and Cocoa Touch.
-///
-/// \see getCommonWordPrefix
-static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
-  assert(!plural.empty());
-
-  if (singular.empty())
-    return singular;
-
-  bool ignored;
-  StringRef commonPrefix = getCommonWordPrefix(singular, plural, ignored);
-  if (commonPrefix.size() == singular.size() || plural.back() != 's')
-    return commonPrefix;
-
-  StringRef leftover = singular.substr(commonPrefix.size());
-  StringRef firstLeftoverWord = camel_case::getFirstWord(leftover);
-  StringRef commonPrefixPlusWord =
-      singular.substr(0, commonPrefix.size() + firstLeftoverWord.size());
-
-  // Is the plural string just "[singular]s"?
-  plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  if (plural.empty() || plural.back() != 'e')
-    return commonPrefix;
-
-  // Is the plural string "[singular]es"?
-  plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  if (plural.empty() || !(plural.back() == 'i' && singular.back() == 'y'))
-    return commonPrefix;
-
-  // Is the plural string "[prefix]ies" and the singular "[prefix]y"?
-  plural = plural.drop_back();
-  firstLeftoverWord = firstLeftoverWord.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  return commonPrefix;
-}
-
-StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
-            clang::Sema &sema,
-            const clang::EnumDecl *decl) {
-  switch (classifyEnum(sema.getPreprocessor(), decl)) {
-  case EnumKind::Enum:
-  case EnumKind::Options:
-    // Enums are mapped to Swift enums, Options to Swift option sets, both
-    // of which attempt prefix-stripping.
-    break;
-
-  case EnumKind::Constants:
-  case EnumKind::Unknown:
-    // Nothing to do.
-    return StringRef();
-  }
-
-  // If there are no enumers, there is no prefix to compute.
-  auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
-  if (ec == ecEnd)
-    return StringRef();
-
-  // Determine whether we can cache the result.
-  // FIXME: Pass in a cache?
-  bool useCache = &sema == &getClangSema();
-
-  // If we've already computed the prefix, return it.
-  auto known = useCache ? EnumConstantNamePrefixes.find(decl)
-                        : EnumConstantNamePrefixes.end();
-  if (known != EnumConstantNamePrefixes.end())
-    return known->second;
-
-  // Determine whether the given enumerator is non-deprecated and has no
-  // specifically-provided name.
-  auto isNonDeprecatedWithoutCustomName =
-    [](const clang::EnumConstantDecl *elem) -> bool {
-      if (elem->hasAttr<clang::SwiftNameAttr>())
-        return false;
-
-      clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
-      switch (elem->getAvailability(nullptr, maxVersion)) {
-      case clang::AR_Available:
-      case clang::AR_NotYetIntroduced:
-        for (auto attr : elem->attrs()) {
-          if (auto annotate = dyn_cast<clang::AnnotateAttr>(attr)) {
-            if (annotate->getAnnotation() == "swift1_unavailable")
-              return false;
-          }
-          if (auto avail = dyn_cast<clang::AvailabilityAttr>(attr)) {
-            if (avail->getPlatform()->getName() == "swift")
-              return false;
-          }
-        }
-        return true;
-
-      case clang::AR_Deprecated:
-      case clang::AR_Unavailable:
-        return false;
-      }
-    };
-
-  // Move to the first non-deprecated enumerator, or non-swift_name'd
-  // enumerator, if present.
-  auto firstNonDeprecated = std::find_if(ec, ecEnd,
-                                         isNonDeprecatedWithoutCustomName);
-  bool hasNonDeprecated = (firstNonDeprecated != ecEnd);
-  if (hasNonDeprecated) {
-    ec = firstNonDeprecated;
-  } else {
-    // Advance to the first case without a custom name, deprecated or not.
-    while (ec != ecEnd && (*ec)->hasAttr<clang::SwiftNameAttr>())
-      ++ec;
-    if (ec == ecEnd) {
-      if (useCache)
-        EnumConstantNamePrefixes.insert({decl, StringRef()});
-      return StringRef();
-    }
-  }
-
-  // Compute the common prefix.
-  StringRef commonPrefix = (*ec)->getName();
-  bool followedByNonIdentifier = false;
-  for (++ec; ec != ecEnd; ++ec) {
-    // Skip deprecated or swift_name'd enumerators.
-    const clang::EnumConstantDecl *elem = *ec;
-    if (hasNonDeprecated) {
-      if (!isNonDeprecatedWithoutCustomName(elem))
-        continue;
-    } else {
-      if (elem->hasAttr<clang::SwiftNameAttr>())
-        continue;
-    }
-
-    commonPrefix = getCommonWordPrefix(commonPrefix, elem->getName(),
-                                       followedByNonIdentifier);
-    if (commonPrefix.empty())
-      break;
-  }
-
-  if (!commonPrefix.empty()) {
-    StringRef checkPrefix = commonPrefix;
-
-    // Account for the 'kConstant' naming convention on enumerators.
-    if (checkPrefix[0] == 'k') {
-      bool canDropK;
-      if (checkPrefix.size() >= 2)
-        canDropK = clang::isUppercase(checkPrefix[1]);
-      else
-        canDropK = !followedByNonIdentifier;
-
-      if (canDropK)
-        checkPrefix = checkPrefix.drop_front();
-    }
-
-    // Don't use importFullName() here, we want to ignore the swift_name
-    // and swift_private attributes.
-    StringRef enumNameStr = decl->getName();
-    StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
-                                                     enumNameStr);
-    size_t delta = commonPrefix.size() - checkPrefix.size();
-
-    // Account for the 'EnumName_Constant' convention on enumerators.
-    if (commonWithEnum.size() < checkPrefix.size() &&
-        checkPrefix[commonWithEnum.size()] == '_' &&
-        !followedByNonIdentifier) {
-      delta += 1;
-    }
-
-    commonPrefix = commonPrefix.slice(0, commonWithEnum.size() + delta);
-  }
-
-  if (useCache)
-    EnumConstantNamePrefixes.insert({decl, commonPrefix});
-  return commonPrefix;
 }
 
 /// Determine whether the given Clang selector matches the given
@@ -2148,7 +1925,7 @@ auto ClangImporter::Implementation::importFullName(
     // scope, depending how their enclosing enumeration is imported.
     if (isa<clang::EnumConstantDecl>(D)) {
       auto enumDecl = cast<clang::EnumDecl>(dc);
-      switch (classifyEnum(clangSema.getPreprocessor(), enumDecl)) {
+      switch (getEnumKind(enumDecl, &clangSema.getPreprocessor())) {
       case EnumKind::Enum:
       case EnumKind::Options:
         // Enums are mapped to Swift enums, Options to Swift option sets.
@@ -2397,11 +2174,15 @@ auto ClangImporter::Implementation::importFullName(
   // Perform automatic name transformations.
 
   // Enumeration constants may have common prefixes stripped.
+  bool strippedPrefix = false;
   if (isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
-    StringRef removePrefix = getEnumConstantNamePrefix(clangSema, enumDecl);
-    if (baseName.startswith(removePrefix))
+    StringRef removePrefix =
+      getEnumConstantNamePrefix(enumDecl, &clangSema.getPreprocessor());
+    if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
       baseName = baseName.substr(removePrefix.size());
+      strippedPrefix = true;
+    }
   }
 
   auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
@@ -2509,7 +2290,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // Local function to determine whether the given declaration is subject to
   // a swift_private attribute.
-  auto hasSwiftPrivate = [&clangSema](const clang::NamedDecl *D) {
+  auto hasSwiftPrivate = [&clangSema, this](const clang::NamedDecl *D) {
     if (D->hasAttr<clang::SwiftPrivateAttr>())
       return true;
 
@@ -2517,7 +2298,7 @@ auto ClangImporter::Implementation::importFullName(
     // private if the parent enum is marked private.
     if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(D)) {
       auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
-      switch (classifyEnum(clangSema.getPreprocessor(), ED)) {
+      switch (getEnumKind(ED, &clangSema.getPreprocessor())) {
         case EnumKind::Constants:
         case EnumKind::Unknown:
           if (ED->hasAttr<clang::SwiftPrivateAttr>())
@@ -2538,7 +2319,32 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords) {
+  if (OmitNeedlessWords && !result.IsSubscriptAccessor) {
+    // Check whether the module in which the declaration resides has a
+    // module prefix. If so, strip that prefix off when present.
+    if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
+        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
+      // Find the original declaration, from which we can determine
+      // the owning module.
+      const clang::Decl *owningD = D->getCanonicalDecl();
+      if (auto def = getDefinitionForClangTypeDecl(D)) {
+        if (*def)
+          owningD = *def;
+      }
+
+      std::string moduleName;
+      if (auto module = owningD->getImportedOwningModule())
+        moduleName = module->getTopLevelModuleName();
+      else
+        moduleName = owningD->getASTContext().getLangOpts().CurrentModule;
+      if (unsigned prefixLen = stripModulePrefixLength(ModulePrefixes,
+                                                       moduleName, baseName)) {
+        // Strip off the prefix.
+        baseName = baseName.substr(prefixLen);
+        strippedPrefix = true;
+      }
+    }
+
     // Objective-C properties.
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(D->getDeclContext());
@@ -2582,35 +2388,12 @@ auto ClangImporter::Implementation::importFullName(
         omitNeedlessWordsScratch);
     }
 
-    // Check whether the module in which the declaration resides has a
-    // module prefix. If so, strip that prefix off when present.
-    if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
-        D->getDeclName().getNameKind() == clang::DeclarationName::Identifier) {
-      // Find the original declaration, from which we can determine
-      // the owning module.
-      const clang::Decl *owningD = D->getCanonicalDecl();
-      if (auto def = getDefinitionForClangTypeDecl(D)) {
-        if (*def)
-          owningD = *def;
-      }
-
-      std::string moduleName;
-      if (auto module = owningD->getImportedOwningModule())
-        moduleName = module->getTopLevelModuleName();
-      else
-        moduleName = owningD->getASTContext().getLangOpts().CurrentModule;
-      if (unsigned prefixLen = stripModulePrefixLength(ModulePrefixes,
-                                                       moduleName, baseName)) {
-        // Strip off the prefix.
-        baseName = baseName.substr(prefixLen);
-
-        // If the result is a value, lowercase it.
-        if (isa<clang::ValueDecl>(D) && shouldLowercaseValueName(baseName)) {
-          baseName =
-            camel_case::toLowercaseInitialisms(baseName,
-                                               omitNeedlessWordsScratch);
-        }
-      }
+    // If the result is a value, lowercase it.
+    if (strippedPrefix && isa<clang::ValueDecl>(D) &&
+        shouldLowercaseValueName(baseName)) {
+      baseName =
+        camel_case::toLowercaseInitialisms(baseName,
+                                           omitNeedlessWordsScratch);
     }
   }
 
@@ -2825,9 +2608,9 @@ void ClangImporter::Implementation::mergePropInfoIntoAccessor(
   }
 }
 
-static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>> lookupObjCContext(api_notes::APINotesReader *reader,
-                    StringRef contextName,
-                    const clang::ObjCContainerDecl *contextDecl) {
+static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
+lookupObjCContext(api_notes::APINotesReader *reader, StringRef contextName,
+                  const clang::ObjCContainerDecl *contextDecl) {
   Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
     contextInfo;
 

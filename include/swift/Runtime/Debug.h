@@ -19,6 +19,7 @@
 
 #include <llvm/Support/Compiler.h>
 #include <stdint.h>
+#include "swift/Runtime/Config.h"
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 
@@ -101,6 +102,7 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                          const void *targetType, const char *targetName, 
                          const char *message = nullptr);
 
+SWIFT_RUNTIME_EXPORT
 extern "C"
 void swift_reportError(uint32_t flags, const char *message);
 

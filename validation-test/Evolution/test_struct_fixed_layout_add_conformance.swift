@@ -19,6 +19,9 @@
 // RUN: %target-run %t/after_before
 // RUN: %target-run %t/after_after
 
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+
 import StdlibUnittest
 import struct_fixed_layout_add_conformance
 

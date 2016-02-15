@@ -234,6 +234,7 @@ swift::fatalError(uint32_t flags, const char *format, ...)
 }
 
 // Crash when a deleted method is called by accident.
+SWIFT_RUNTIME_EXPORT
 LLVM_ATTRIBUTE_NORETURN
 extern "C" void
 swift_deletedMethodError() {

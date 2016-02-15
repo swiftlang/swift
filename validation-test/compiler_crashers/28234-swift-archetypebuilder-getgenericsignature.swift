@@ -1,3 +1,4 @@
+// DUPLICATE-OF: 28212-swift-typechecker-resolvetypeincontext.swift
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
 

@@ -30,17 +30,17 @@ var FooEnum3Y: FooEnum3 { get }
 enum FooComparisonResult : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
-  case OrderedAscending
-  case OrderedSame
-  case OrderedDescending
+  case orderedAscending
+  case orderedSame
+  case orderedDescending
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
-  static var EnableMince: FooRuncingOptions { get }
-  static var EnableQuince: FooRuncingOptions { get }
+  static var enableMince: FooRuncingOptions { get }
+  static var enableQuince: FooRuncingOptions { get }
 }
 struct FooStruct1 {
   var x: Int32
@@ -276,9 +276,9 @@ extension FooRepeatedMembers {
 enum SCNFilterMode : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
-  case None
-  case Nearest
-  case Linear
+  case none
+  case nearest
+  case linear
   @available(*, unavailable)
   case SCNNoFiltering
 }

@@ -29,7 +29,7 @@ func testEquality<A : Equatable, B : Equatable, C : Equatable>(
   @autoclosure _ message: ()->String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectEqual(equal, lhs == rhs, stackTrace: trace)
@@ -103,7 +103,7 @@ func testOrdering<A : Comparable, B : Comparable, C : Comparable>(
   @autoclosure _ message: ()->String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectEqual(ordering.isLT, lhs < rhs, stackTrace: trace)

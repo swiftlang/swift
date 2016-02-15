@@ -126,12 +126,14 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("print-annotations", SourceKitRequest::PrintAnnotations)
         .Case("print-diags", SourceKitRequest::PrintDiags)
         .Case("extract-comment", SourceKitRequest::ExtractComment)
+        .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
             << "index/complete/cursor/related-idents/syntax-map/structure/"
                "format/expand-placeholder/doc-info/sema/interface-gen/interface-gen-open/"
-               "find-usr/find-interface/open/edit/print-annotations/extract-comment\n";
+               "find-usr/find-interface/open/edit/print-annotations/extract-comment/"
+               "module-groups\n";
         return true;
       }
       break;
@@ -171,6 +173,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_module:
       ModuleName = InputArg->getValue();
+      break;
+
+    case OPT_group_name:
+      ModuleGroupName = InputArg->getValue();
       break;
 
     case OPT_header:

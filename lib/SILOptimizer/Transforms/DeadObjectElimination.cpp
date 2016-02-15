@@ -467,7 +467,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     if (PI.isValid()) {
       IndexTrieNode *ProjAddrNode = AddressNode;
       bool ProjInteriorAddr = IsInteriorAddress;
-      if (Projection::isAddrProjection(User)) {
+      if (Projection::isAddressProjection(User)) {
         if (User->getKind() == ValueKind::IndexAddrInst) {
           // Don't support indexing within an interior address.
           if (IsInteriorAddress)

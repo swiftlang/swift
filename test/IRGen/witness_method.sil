@@ -9,7 +9,7 @@ protocol DefCon {
 }
 
 
-// CHECK-LABEL: define void @defcon(%swift.opaque* noalias nocapture sret, %swift.type*, %swift.type* %T, i8** %T.DefCon) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} void @defcon(%swift.opaque* noalias nocapture sret, %swift.type*, %swift.type* %T, i8** %T.DefCon) {{.*}} {
 sil @defcon : $@convention(thin) <T: DefCon> (@out T, @thick T.Type) -> () {
 entry(%0: $*T, %1: $@thick T.Type):
 
@@ -31,7 +31,7 @@ struct ImplementsDerived : Derived {
   func foo() {}
 }
 
-// CHECK-LABEL: define void @testInheritedConformance
+// CHECK-LABEL: define{{( protected)?}} void @testInheritedConformance
 sil @testInheritedConformance : $@convention(thin) (@in ImplementsDerived) -> () {
 entry(%0: $*ImplementsDerived):
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** @_TWPV14witness_method17ImplementsDerivedS_4BaseS_

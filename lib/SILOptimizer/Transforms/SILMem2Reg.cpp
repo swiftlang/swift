@@ -319,19 +319,18 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
 
 
 static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
-  ProjectionPath projections;
+  ProjectionPath projections(val->getType());
   SILValue op = LI->getOperand();
   while (op != ASI) {
     assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
     SILInstruction *Inst = cast<SILInstruction>(op);
-    auto projection = Projection::addressProjectionForInstruction(Inst);
-    projections.push_back(projection.getValue());
+    projections.push_back(Projection(Inst));
     op = Inst->getOperand(0);
   }
   SILBuilder builder(LI);
   for (auto iter = projections.rbegin(); iter != projections.rend(); ++iter) {
     const Projection &projection = *iter;
-    val = projection.createValueProjection(builder, LI->getLoc(), val).get();
+    val = projection.createObjectProjection(builder, LI->getLoc(), val).get();
   }
   op = LI->getOperand();
   LI->replaceAllUsesWith(val);

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include <cstdint>
 #include <stdio.h>
@@ -24,6 +25,7 @@ using namespace swift;
 // Report a fatal error to system console, stderr, and crash logs.
 // <prefix>: <message>: file <file>, line <line>\n
 // The message may be omitted by passing messageLength=0.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void
 _swift_stdlib_reportFatalErrorInFile(const char *prefix, intptr_t prefixLength,
                                    const char *message, intptr_t messageLength,
@@ -42,6 +44,7 @@ _swift_stdlib_reportFatalErrorInFile(const char *prefix, intptr_t prefixLength,
 // Report a fatal error to system console, stderr, and crash logs.
 // <prefix>: <message>: file <file>, line <line>\n
 // The message may be omitted by passing messageLength=0.
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void
 _swift_stdlib_reportFatalError(const char *prefix,
                                intptr_t prefixLength,
@@ -59,6 +62,7 @@ _swift_stdlib_reportFatalError(const char *prefix,
 // Report a call to an unimplemented initializer.
 // <file>: <line>: <column>: fatal error: use of unimplemented
 // initializer '<initName>' for class 'className'
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void
 _swift_stdlib_reportUnimplementedInitializerInFile(
          const char *className, intptr_t classNameLength, const char *initName,
@@ -77,6 +81,7 @@ _swift_stdlib_reportUnimplementedInitializerInFile(
 // Report a call to an unimplemented initializer.
 // fatal error: use of unimplemented initializer '<initName>' for class
 // 'className'
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void
 _swift_stdlib_reportUnimplementedInitializer(const char *className,
                                              intptr_t classNameLength,

@@ -111,7 +111,7 @@ infix operator &>>= { associativity right precedence 90 assignment }
 public func _assertCond(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String,
-  file: StaticString = __FILE__, line: UInt = __LINE__) {
+  file: StaticString = #file, line: UInt = #line) {
   let ok = condition()
   if _isDebugAssertConfiguration() {
     require(ok, message, file: file, line: line)
@@ -1216,7 +1216,7 @@ func expectEqual<T: IntegerType>(
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   if expected != actual {
     expectationFailure(
@@ -1236,7 +1236,7 @@ func expectEqual<T: IntegerType>(
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
 % for i in 0, 1:
   expectEqual(

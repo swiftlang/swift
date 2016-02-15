@@ -23,27 +23,27 @@ using namespace llvm;
 using namespace markup;
 
 Document::Document(ArrayRef<MarkupASTNode*> Children)
-    : MarkupASTNode(ASTNodeKind::Document),
-      NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : MarkupASTNode(ASTNodeKind::Document), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Document *Document::create(MarkupContext &MC,
                            ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Document) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Document));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Document));
   return new (Mem) Document(Children);
 }
 
 BlockQuote::BlockQuote(ArrayRef<MarkupASTNode*> Children)
-    : MarkupASTNode(ASTNodeKind::BlockQuote),
-      NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : MarkupASTNode(ASTNodeKind::BlockQuote), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 BlockQuote *BlockQuote::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(BlockQuote) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(BlockQuote));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(BlockQuote));
   return new (Mem) BlockQuote(Children);
 }
 
@@ -69,60 +69,59 @@ CodeBlock *CodeBlock::create(MarkupContext &MC, StringRef LiteralContent,
 }
 
 List::List(ArrayRef<MarkupASTNode *> Children, bool IsOrdered)
-    : MarkupASTNode(ASTNodeKind::List),
-      NumChildren(Children.size()),
+    : MarkupASTNode(ASTNodeKind::List), NumChildren(Children.size()),
       Ordered(IsOrdered) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 List *List::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children,
                    bool IsOrdered) {
-  void *Mem = MC.allocate(sizeof(List) + sizeof(MarkupASTNode)
-      * Children.size(), alignof(List));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(List));
   return new (Mem) List(Children, IsOrdered);
 }
 
 Item::Item(ArrayRef<MarkupASTNode*> Children)
-    : MarkupASTNode(ASTNodeKind::Item),
-      NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : MarkupASTNode(ASTNodeKind::Item), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Item *Item::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Item) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Item));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Item));
   return new (Mem) Item(Children);
 }
 
 Link::Link(StringRef Destination, ArrayRef<MarkupASTNode *> Children)
-    : InlineContent(ASTNodeKind::Link),
-      NumChildren(Children.size()),
+    : InlineContent(ASTNodeKind::Link), NumChildren(Children.size()),
       Destination(Destination) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Link *Link::create(MarkupContext &MC, StringRef Destination,
                    ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Link) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Link));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Link));
   StringRef DestinationCopy = MC.allocateCopy(Destination);
   return new (Mem) Link(DestinationCopy, Children);
 }
 
 Image::Image(StringRef Destination, Optional<StringRef> Title,
              ArrayRef<MarkupASTNode *> Children)
-    : InlineContent(ASTNodeKind::Image),
-      NumChildren(Children.size()),
-      Destination(Destination),
-      Title(Title) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : InlineContent(ASTNodeKind::Image), NumChildren(Children.size()),
+      Destination(Destination), Title(Title) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Image *Image::create(MarkupContext &MC, StringRef Destination,
                      Optional<StringRef> Title,
                      ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Image) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Image));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Image));
   StringRef DestinationCopy = MC.allocateCopy(Destination);
   Optional<StringRef> TitleCopy;
   if (Title)
@@ -131,30 +130,30 @@ Image *Image::create(MarkupContext &MC, StringRef Destination,
 }
 
 Header::Header(unsigned Level, ArrayRef<MarkupASTNode *> Children)
-    : MarkupASTNode(ASTNodeKind::Header),
-      NumChildren(Children.size()),
+    : MarkupASTNode(ASTNodeKind::Header), NumChildren(Children.size()),
       Level(Level) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Header *Header::create(MarkupContext &MC, unsigned Level,
                        ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Header) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Header));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Header));
   return new (Mem) Header(Level, Children);
 }
 
 Paragraph::Paragraph(ArrayRef<MarkupASTNode *> Children)
     : MarkupASTNode(ASTNodeKind::Paragraph),
       NumChildren(Children.size()) {
-      std::uninitialized_copy(Children.begin(), Children.end(),
-                              getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Paragraph *Paragraph::create(MarkupContext &MC,
                              ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Paragraph) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Paragraph));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Paragraph));
   return new (Mem) Paragraph(Children);
 }
 
@@ -180,52 +179,55 @@ LineBreak *LineBreak::create(MarkupContext &MC) {
 
 Emphasis::Emphasis(ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Emphasis), NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Emphasis *Emphasis::create(MarkupContext &MC,
                            ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Emphasis) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Emphasis));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Emphasis));
   return new (Mem) Emphasis(Children);
 }
 
 Strong::Strong(ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Strong), NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Strong *Strong::create(MarkupContext &MC,
                        ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Strong) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Strong));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Strong));
   return new (Mem) Strong(Children);
 }
 
 ParamField::ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children)
-    : PrivateExtension(ASTNodeKind::ParamField),
-      Name(Name), NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : PrivateExtension(ASTNodeKind::ParamField), NumChildren(Children.size()),
+      Name(Name) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 ParamField *ParamField::create(MarkupContext &MC, StringRef Name,
                                ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(ParamField) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(ParamField));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(ParamField));
   return new (Mem) ParamField(Name, Children);
 }
 
 #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
 Id *Id::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) { \
-  void *Mem = MC.allocate(sizeof(Id) + Children.size() \
-      * sizeof(MarkupASTNode *), alignof(Id)); \
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()), \
+                          alignof(Id)); \
   return new (Mem) Id(Children); \
 } \
 \
 Id::Id(ArrayRef<MarkupASTNode *> Children) \
     : PrivateExtension(ASTNodeKind::Id), NumChildren(Children.size()) { \
-      std::uninitialized_copy(Children.begin(), Children.end(), \
-                          getChildrenBuffer()); \
+  std::uninitialized_copy(Children.begin(), Children.end(), \
+                          getTrailingObjects<MarkupASTNode *>()); \
 }
 #include "swift/Markup/SimpleFields.def"
 

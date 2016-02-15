@@ -549,7 +549,7 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(zone: nil), _NSDictionary.self))
+        unsafeBitCast(_cocoaDictionary.copy(withZone: nil), _NSDictionary.self))
   }
 }
 
@@ -632,13 +632,13 @@ extension Dictionary : _ObjectiveCBridgeable {
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
-    d.enumerateKeysAndObjectsUsing {
+    d.enumerateKeysAndObjects({
       (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
        stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(
           key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
           value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
-    }
+    })
     result = builder.take()
   }
 
@@ -702,7 +702,7 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
 
   func refresh() {
     n = 0
-    count = enumerable.countByEnumeratingWith(
+    count = enumerable.countByEnumerating(
       state._baseAddressIfContiguous,
       objects: AutoreleasingUnsafeMutablePointer(
         objects._baseAddressIfContiguous),
@@ -761,7 +761,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copy(zone: nil), _NSSet.self))
+        unsafeBitCast(_cocoaSet.copy(withZone: nil), _NSSet.self))
   }
 }
 
@@ -887,11 +887,11 @@ extension Set : _ObjectiveCBridgeable {
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
-    s.enumerateObjectsUsing {
+    s.enumerateObjects({
       (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyObjectMember, Element.self))
-    }
+    })
     result = builder.take()
   }
 
@@ -930,7 +930,7 @@ extension NSDictionary : Sequence {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
         // requires them, but we don't want to paint ourselves into a corner.
-        return (key: key, value: _dictionary.objectFor(key)!)
+        return (key: key, value: _dictionary.object(forKey: key)!)
       }
     }
 
@@ -985,7 +985,7 @@ func NSLocalizedString(key: String,
                        bundle: NSBundle = NSBundle.main(),
                        value: String = "",
                        comment: String) -> String {
-  return bundle.localizedStringForKey(key, value:value, table:tableName)
+  return bundle.localizedString(forKey: key, value:value, table:tableName)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1315,7 +1315,7 @@ extension NSCoder {
           unsafeBitCast($0, NSObject.self)
         })
     }
-    return self.__decodeObjectOfClasses(classesAsNSObjects, forKey: key)
+    return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)
   }
 
   @warn_unused_result
@@ -1383,7 +1383,7 @@ extension NSKeyedUnarchiver {
 
 extension NSURL : _FileReferenceLiteralConvertible {
   private convenience init(failableFileReferenceLiteral path: String) {
-    let fullPath = NSBundle.main().pathForResource(path, ofType: nil)!
+    let fullPath = NSBundle.main().path(forResource: path, ofType: nil)!
     self.init(fileURLWithPath: fullPath)
   }
 
@@ -1419,9 +1419,9 @@ extension NSRange : CustomPlaygroundQuickLookable {
 extension NSDate : CustomPlaygroundQuickLookable {
   var summary: String {
     let df = NSDateFormatter()
-    df.dateStyle = .MediumStyle
-    df.timeStyle = .ShortStyle
-    return df.stringFrom(self)
+    df.dateStyle = .mediumStyle
+    df.timeStyle = .shortStyle
+    return df.string(from: self)
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {

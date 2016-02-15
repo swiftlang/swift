@@ -249,7 +249,9 @@ class ProtocolDescriptorFlags {
 
     SpecialProtocolMask  = 0x000003C0U,
     SpecialProtocolShift = 6,
-    
+
+    IsResilient       =   1U <<  10U,
+
     /// Reserved by the ObjC runtime.
     _ObjCReserved        = 0xFFFF0000U,
   };
@@ -276,6 +278,9 @@ public:
   withSpecialProtocol(SpecialProtocol sp) const {
     return ProtocolDescriptorFlags((Data & ~SpecialProtocolMask)
                                      | (int_type(sp) << SpecialProtocolShift));
+  }
+  constexpr ProtocolDescriptorFlags withResilient(bool s) const {
+    return ProtocolDescriptorFlags((Data & ~IsResilient) | (s ? IsResilient : 0));
   }
   
   /// Was the protocol defined in Swift 1 or 2?
@@ -313,6 +318,9 @@ public:
                                  >> SpecialProtocolShift));
   }
   
+  /// Can new requirements with default witnesses be added resiliently?
+  bool isResilient() const { return Data & IsResilient; }
+
   int_type getIntValue() const {
     return Data;
   }

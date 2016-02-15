@@ -40,18 +40,18 @@ extension A {
 // CHECK-NOT: TY8
 // CHECK-NOT: TY9
 
-// CHECK: @_Tv7globals2g0Si = global [[INT]] zeroinitializer, align 8
-// CHECK: @_Tv7globals2g1TT_SiT__ = global <{ [[INT]] }> zeroinitializer, align 8
-// CHECK: @_Tv7globals2g2TT_SiSi_ = global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
-// CHECK: @_Tv7globals2g3Sb = global [[BOOL]] zeroinitializer, align 1
-// CHECK: @_Tv7globals2g6Sd = global [[DOUBLE]] zeroinitializer, align 8
-// CHECK: @_Tv7globals2g7Sf = global [[FLOAT]] zeroinitializer, align 4
-// CHECK: @_TZvV7globals1A3fooSi = global [[INT]] zeroinitializer, align 8
+// CHECK: @_Tv7globals2g0Si = {{(protected )?}}global [[INT]] zeroinitializer, align 8
+// CHECK: @_Tv7globals2g1TT_SiT__ = {{(protected )?}}global <{ [[INT]] }> zeroinitializer, align 8
+// CHECK: @_Tv7globals2g2TT_SiSi_ = {{(protected )?}}global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
+// CHECK: @_Tv7globals2g3Sb = {{(protected )?}}global [[BOOL]] zeroinitializer, align 1
+// CHECK: @_Tv7globals2g6Sd = {{(protected )?}}global [[DOUBLE]] zeroinitializer, align 8
+// CHECK: @_Tv7globals2g7Sf = {{(protected )?}}global [[FLOAT]] zeroinitializer, align 4
+// CHECK: @_TZvV7globals1A3fooSi = {{(protected )?}}global [[INT]] zeroinitializer, align 8
 
 // CHECK-NOT: g8
 // CHECK-NOT: g9
 
-// CHECK: define i32 @main(i32, i8**) {{.*}} {
+// CHECK: define{{( protected)?}} i32 @main(i32, i8**) {{.*}} {
 // CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @_Tv7globals2g0Si, i32 0, i32 0), align 8
 
 // FIXME: give these initializers a real mangled name

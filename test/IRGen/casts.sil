@@ -16,7 +16,7 @@ class B: A {}
 sil_vtable A {}
 sil_vtable B {}
 
-// CHECK-LABEL: define %C5casts1B* @unchecked_addr_cast(%C5casts1A** noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} %C5casts1B* @unchecked_addr_cast(%C5casts1A** noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         bitcast %C5casts1A** %0 to %C5casts1B**
 sil @unchecked_addr_cast : $(@in A) -> B {
 entry(%a : $*A):
@@ -29,7 +29,7 @@ protocol CP: class {}
 protocol CP2: class {}
 @objc protocol OP: class {}
 
-// CHECK-LABEL: define i8* @ref_to_raw_pointer_existential(%objc_object*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} i8* @ref_to_raw_pointer_existential(%objc_object*, i8**) {{.*}} {
 // CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
 // CHECK:         ret i8* [[CAST]]
 sil @ref_to_raw_pointer_existential : $@convention(thin) (@owned CP) -> Builtin.RawPointer {
@@ -38,7 +38,7 @@ entry(%p : $CP):
   return %r : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define %objc_object* @raw_pointer_to_ref_existential(i8*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} %objc_object* @raw_pointer_to_ref_existential(i8*) {{.*}} {
 // CHECK:         [[CAST:%.*]] = bitcast i8* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[CAST]]
 sil @raw_pointer_to_ref_existential : $@convention(thin) (@owned Builtin.RawPointer) -> AnyObject {
@@ -53,9 +53,9 @@ entry(%n : $Builtin.NativeObject):
   return %r : $AnyObject
 }
 
-// CHECK-LABEL: define { %objc_object*, i8** } @u_cast_to_class_existential(%objc_object*)
+// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i8** } @u_cast_to_class_existential(%objc_object*)
 // CHECK:         call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* {{%.*}}, %swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP)
-// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8*, %swift.type*, %swift.protocol*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} private { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8*, %swift.type*, %swift.protocol*) {{.*}} {
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
@@ -71,7 +71,7 @@ entry(%a : $AnyObject):
   return %p : $CP
 }
 
-// CHECK-LABEL: define { %swift.type*, i8** } @u_cast_to_existential_metatype(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} { %swift.type*, i8** } @u_cast_to_existential_metatype(%swift.type*)
 // CHECK:         call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* %1, %swift.type* %0, %swift.protocol* @_TMp5casts2CP)
 sil @u_cast_to_existential_metatype : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick CP.Type {
 entry(%a : $@thick Any.Type):
@@ -79,17 +79,17 @@ entry(%a : $@thick Any.Type):
   return %p : $@thick CP.Type
 }
 
-// CHECK-LABEL: define { %objc_object*, i8**, i8** } @u_cast_to_class_existential_2(%objc_object*)
+// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i8**, i8** } @u_cast_to_class_existential_2(%objc_object*)
 // CHECK:         call { i8*, i8**, i8** } @dynamic_cast_existential_2_unconditional(i8* {{%.*}}, %swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
-// CHECK-LABEL: define private { i8*, i8**, i8** } @dynamic_cast_existential_2_unconditional(i8*, %swift.type*, %swift.protocol*, %swift.protocol*)
+// CHECK-LABEL: define{{( protected)?}} private { i8*, i8**, i8** } @dynamic_cast_existential_2_unconditional(i8*, %swift.type*, %swift.protocol*, %swift.protocol*)
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
 // CHECK:       cont:
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %3)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
-// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont.1
-// CHECK:       cont.1:
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
+// CHECK:       cont1:
 // CHECK:         ret { i8*, i8**, i8** }
 // CHECK:       fail:
 // CHECK:         call void @llvm.trap()
@@ -99,7 +99,7 @@ entry(%a : $AnyObject):
   return %p : $protocol<CP, CP2>
 }
 
-// CHECK-LABEL: define { %objc_object*, i8**, i8** } @u_cast_to_class_existential_mixed(%objc_object*)
+// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i8**, i8** } @u_cast_to_class_existential_mixed(%objc_object*)
 // CHECK:         call %objc_object* @swift_dynamicCastObjCProtocolUnconditional
 // CHECK:         call { i8*, i8**, i8** } @dynamic_cast_existential_2_unconditional(i8* {{%.*}}, %swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
 sil @u_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
@@ -108,7 +108,7 @@ entry(%a : $AnyObject):
   return %p : $protocol<CP, OP, CP2>
 }
 
-// CHECK-LABEL: define { %swift.type*, i8**, i8** } @u_cast_to_existential_metatype_mixed(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} { %swift.type*, i8**, i8** } @u_cast_to_existential_metatype_mixed(%swift.type*)
 // CHECK:         call %swift.type* @swift_dynamicCastTypeToObjCProtocolUnconditional(%swift.type* %0, {{(i32|i64)}} 1, i8** {{%.*}})
 // CHECK:         [[CAST:%.*]] = call { i8*, i8**, i8** } @dynamic_cast_existential_2_unconditional(i8* {{.*}}, %swift.type* %0, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
 // CHECK:         [[OBJPTR:%.*]] = extractvalue { i8*, i8**, i8** } [[CAST]], 0
@@ -121,9 +121,9 @@ entry(%a : $@thick Any.Type):
 }
 
 
-// CHECK-LABEL: define { %objc_object*, i8** } @c_cast_to_class_existential(%objc_object*)
+// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i8** } @c_cast_to_class_existential(%objc_object*)
 // CHECK:         call { i8*, i8** } @dynamic_cast_existential_1_conditional(i8* {{.*}}, %swift.type* %.Type, %swift.protocol* @_TMp5casts2CP)
-// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_conditional(i8*, %swift.type*, %swift.protocol*)
+// CHECK-LABEL: define{{( protected)?}} private { i8*, i8** } @dynamic_cast_existential_1_conditional(i8*, %swift.type*, %swift.protocol*)
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
@@ -140,7 +140,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define { %swift.type*, i8** } @c_cast_to_existential_metatype(%swift.type*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} { %swift.type*, i8** } @c_cast_to_existential_metatype(%swift.type*) {{.*}} {
 // CHECK:         call { i8*, i8** } @dynamic_cast_existential_1_conditional(i8* %1, %swift.type* %0, %swift.protocol* @_TMp5casts2CP)
 sil @c_cast_to_existential_metatype : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick CP.Type {
 entry(%a : $@thick Any.Type):
@@ -151,17 +151,17 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define { %objc_object*, i8**, i8** } @c_cast_to_class_existential_2(%objc_object*)
+// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i8**, i8** } @c_cast_to_class_existential_2(%objc_object*)
 // CHECK:         call { i8*, i8**, i8** } @dynamic_cast_existential_2_conditional(i8* {{%.*}}, %swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
-// CHECK-LABEL: define private { i8*, i8**, i8** } @dynamic_cast_existential_2_conditional(i8*, %swift.type*, %swift.protocol*, %swift.protocol*)
+// CHECK-LABEL: define{{( protected)?}} private { i8*, i8**, i8** } @dynamic_cast_existential_2_conditional(i8*, %swift.type*, %swift.protocol*, %swift.protocol*)
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
 // CHECK:       cont:
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %3)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
-// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont.1
-// CHECK:       cont.1:
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
+// CHECK:       cont1:
 // CHECK:         ret { i8*, i8**, i8** }
 // CHECK:       fail:
 // CHECK:         ret { i8*, i8**, i8** } zeroinitializer
@@ -174,7 +174,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define { %objc_object*, i8**, i8** } @c_cast_to_class_existential_mixed(%objc_object*)
+// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i8**, i8** } @c_cast_to_class_existential_mixed(%objc_object*)
 // CHECK:         [[CAST:%.*]] = call %objc_object* @swift_dynamicCastObjCProtocolConditional
 // CHECK:         [[IS_NULL:%.*]] = icmp eq %objc_object* [[CAST]], null
 // CHECK:         br i1 [[IS_NULL]], label %cont, label %success
@@ -192,7 +192,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define { %swift.type*, i8**, i8** } @c_cast_to_existential_metatype_mixed(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} { %swift.type*, i8**, i8** } @c_cast_to_existential_metatype_mixed(%swift.type*)
 // CHECK:         [[OBJC_CAST:%.*]] = call %swift.type* @swift_dynamicCastTypeToObjCProtocolConditional(%swift.type* %0, {{(i32|i64)}} 1, i8** {{%.*}})
 // CHECK:         [[IS_NULL:%.*]] = icmp eq %swift.type* [[OBJC_CAST]], null
 // CHECK:         br i1 [[IS_NULL]], label %cont, label %success
@@ -207,7 +207,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define %objc_object* @checked_upcast(%C5casts1A*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} %objc_object* @checked_upcast(%C5casts1A*) {{.*}} {
 // -- Don't need to check conformance of an object to AnyObject.
 // CHECK-NOT:     call %objc_object* @swift_dynamicCastObjCProtocolConditional
 // CHECK:         phi %objc_object*
@@ -220,7 +220,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define %C5casts1A* @checked_downcast_optional({{(i32|i64)}}) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} %C5casts1A* @checked_downcast_optional({{(i32|i64)}}) {{.*}} {
 // CHECK:         [[OBJ_PTR:%.*]] = inttoptr {{(i32|i64)}} %0 to i8*
 // CHECK:         [[METADATA:%.*]] = call %swift.type* @_TMaC5casts1A()
 // CHECK:         [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
@@ -237,7 +237,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define void @checked_metatype_to_object_casts
+// CHECK-LABEL: define{{( protected)?}} void @checked_metatype_to_object_casts
 sil @checked_metatype_to_object_casts : $@convention(thin) <T> (@thick Any.Type) -> () {
 entry(%e : $@thick Any.Type):
   %a = metatype $@thin NotClass.Type
@@ -286,7 +286,7 @@ entry(%x : $OB):
   return %x : $OB
 }
 
-// CHECK-LABEL: define %C5casts1B* @checked_object_to_object_casts(%C5casts1A*)
+// CHECK-LABEL: define{{( protected)?}} %C5casts1B* @checked_object_to_object_casts(%C5casts1A*)
 // CHECK:         @swift_dynamicCastClassUnconditional
 sil @checked_object_to_object_casts : $@convention(thin) (A) -> B {
 entry(%a : $A):
@@ -294,7 +294,7 @@ entry(%a : $A):
   return %b : $B
 }
 
-// CHECK-LABEL: define %C5casts2OB* @checked_objc_object_to_object_casts(%C5casts2OA*)
+// CHECK-LABEL: define{{( protected)?}} %C5casts2OB* @checked_objc_object_to_object_casts(%C5casts2OA*)
 // CHECK:         @swift_dynamicCastClassUnconditional
 sil @checked_objc_object_to_object_casts : $@convention(thin) (OA) -> OB {
 entry(%a : $OA):

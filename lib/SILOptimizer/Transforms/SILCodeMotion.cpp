@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-codemotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Basic/BlotMapVector.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"

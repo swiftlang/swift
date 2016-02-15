@@ -144,7 +144,7 @@ func newConstruction(a: A, aproxy: AProxy) {
   b = B(bbb:b)
   b = B(forWorldDomination:())
   b = B(int: 17, andDouble : 3.14159)
-  b = B.newWith(a)
+  b = B.new(withA: a)
   B.alloc()._initFoo()
   b.notAnInit()
 
@@ -295,7 +295,7 @@ func ivars(hive: Hive) {
 
 class NSObjectable : NSObjectProtocol {
   @objc var description : String { return "" }
-  @objc(conformsToProtocol:) func conformsTo(_: Protocol) -> Bool { return false }
+  @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
   @objc(isKindOfClass:) func isKindOf(aClass: AnyClass) -> Bool { return false }
 }
 

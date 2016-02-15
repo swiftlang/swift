@@ -50,6 +50,17 @@ llvm::cl::opt<bool>
 SILPrintNoColor("sil-print-no-color", llvm::cl::init(""),
                 llvm::cl::desc("Don't use color when printing SIL"));
 
+llvm::cl::opt<bool>
+SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
+                llvm::cl::desc("Fully demangle symbol names in SIL output"));
+
+static std::string demangleSymbol(StringRef Name) {
+  if (SILFullDemangle)
+    return demangleSymbolAsString(Name);
+  return demangleSymbolAsString(Name,
+                    Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+}
+
 struct ID {
   enum ID_Kind {
     SILBasicBlock, SILUndef, SSAValue
@@ -611,22 +622,32 @@ public:
     }
 
     // Print inlined-at location, if any.
-    while (DS && DS->InlinedCallSite) {
-      *this << ": perf_inlined_at ";
-      auto CallSite = DS->InlinedCallSite->Loc;
-      if (!CallSite.isNull())
-        CallSite.getSourceLoc().print(
+    if (DS) {
+      SILFunction *InlinedF = DS->getInlinedFunction();
+      for (auto *CS : reversed(DS->flattenedInlineTree())) {
+        *this << ": ";
+        if (InlinedF) {
+          *this << demangleSymbol(InlinedF->getName());
+        } else {
+          *this << '?';
+        }
+        *this << " perf_inlined_at ";
+        auto CallSite = CS->Loc;
+        if (!CallSite.isNull())
+          CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
-      else
-        *this << "?";
-      DS = DS->Parent.dyn_cast<const SILDebugScope *>();
+        else
+          *this << "?";
+
+        InlinedF = CS->getInlinedFunction();
+      }
     }
   }
 
   void print(SILValue V) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(V))
       *this << "  // function_ref "
-            << demangleSymbolAsString(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getReferencedFunction()->getName())
             << "\n";
 
     *this << "  ";
@@ -1569,7 +1590,7 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
                         bool SortedSIL) const {
-  OS << "// " << demangleSymbolAsString(getName()) << '\n';
+  OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
 
@@ -1664,7 +1685,7 @@ void SILFunction::printName(raw_ostream &OS) const {
 
 /// Pretty-print a global variable to the designated stream.
 void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
-  OS << "// " << demangleSymbolAsString(getName()) << '\n';
+  OS << "// " << demangleSymbol(getName()) << '\n';
   
   OS << "sil_global ";
   printLinkage(OS, getLinkage(), isDefinition());
@@ -1799,6 +1820,31 @@ printSILWitnessTables(llvm::raw_ostream &OS, bool Verbose,
 }
 
 static void
+printSILDefaultWitnessTables(llvm::raw_ostream &OS, bool Verbose,
+                             bool ShouldSort,
+                        const SILModule::DefaultWitnessTableListType &WTables) {
+  if (!ShouldSort) {
+    for (const SILDefaultWitnessTable &wt : WTables)
+      wt.print(OS, Verbose);
+    return;
+  }
+
+  std::vector<const SILDefaultWitnessTable *> witnesstables;
+  witnesstables.reserve(WTables.size());
+  for (const SILDefaultWitnessTable &wt : WTables)
+    witnesstables.push_back(&wt);
+  std::sort(witnesstables.begin(), witnesstables.end(),
+    [] (const SILDefaultWitnessTable *w1,
+        const SILDefaultWitnessTable *w2) -> bool {
+      return w1->getProtocol()->getName()
+          .compare(w2->getProtocol()->getName()) == -1;
+    }
+  );
+  for (const SILDefaultWitnessTable *wt : witnesstables)
+    wt->print(OS, Verbose);
+}
+
+static void
 printSILCoverageMaps(llvm::raw_ostream &OS, bool Verbose, bool ShouldSort,
                      const SILModule::CoverageMapListType &CoverageMaps) {
   if (!ShouldSort) {
@@ -1867,6 +1913,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   printSILFunctions(OS, Verbose, ShouldSort, getFunctionList());
   printSILVTables(OS, Verbose, ShouldSort, getVTableList());
   printSILWitnessTables(OS, Verbose, ShouldSort, getWitnessTableList());
+  printSILDefaultWitnessTables(OS, Verbose, ShouldSort, getDefaultWitnessTableList());
   printSILCoverageMaps(OS, Verbose, ShouldSort, getCoverageMapList());
   
   OS << "\n\n";
@@ -1885,7 +1932,7 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "  ";
     entry.first.print(OS);
     OS << ": " << entry.second->getName()
-       << "\t// " << demangleSymbolAsString(entry.second->getName()) << "\n";
+       << "\t// " << demangleSymbol(entry.second->getName()) << "\n";
   }
   OS << "}\n\n";
 }
@@ -1924,7 +1971,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       if (methodWitness.Witness) {
         methodWitness.Witness->printName(OS);
         OS << "\t// "
-           << demangleSymbolAsString(methodWitness.Witness->getName());
+           << demangleSymbol(methodWitness.Witness->getName());
       } else {
         OS << "nil";
       }
@@ -1976,10 +2023,34 @@ void SILWitnessTable::dump() const {
   print(llvm::errs());
 }
 
+void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
+  // sil_default_witness_table <Protocol> <MinSize>
+  OS << "sil_default_witness_table"
+     << " " << getProtocol()->getName()
+     << " " << getMinimumWitnessTableSize() << " {\n";
+  
+  for (auto &witness : getEntries()) {
+    // method #declref: @function
+    OS << "  method ";
+    witness.getRequirement().print(OS);
+    OS << ": ";
+    witness.getWitness()->printName(OS);
+    OS << "\t// "
+       << demangleSymbolAsString(witness.getWitness()->getName());
+    OS << '\n';
+  }
+  
+  OS << "}\n\n";
+}
+
+void SILDefaultWitnessTable::dump() const {
+  print(llvm::errs());
+}
+
 void SILCoverageMap::print(llvm::raw_ostream &OS, bool ShouldSort,
                            bool Verbose) const {
   OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
-     << " " << getHash() << " {\t// " << demangleSymbolAsString(getName())
+     << " " << getHash() << " {\t// " << demangleSymbol(getName())
      << "\n";
   if (ShouldSort)
     std::sort(MappedRegions, MappedRegions + NumMappedRegions,
@@ -1998,4 +2069,42 @@ void SILCoverageMap::print(llvm::raw_ostream &OS, bool ShouldSort,
 
 void SILCoverageMap::dump() const {
   print(llvm::errs());
+}
+
+void SILDebugScope::flatten(const SILDebugScope *DS,
+                            SILDebugScope::InlineScopeList &List) {
+  if (DS) {
+    if (auto *CS = DS->InlinedCallSite) {
+      flatten(CS->Parent.dyn_cast<const SILDebugScope *>(), List);
+      List.push_back(CS);
+    }
+    flatten(DS->Parent.dyn_cast<const SILDebugScope *>(), List);
+  }
+}
+
+void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
+                         unsigned Indent) const {
+  OS << "{\n";
+  OS.indent(Indent);
+  Loc.getSourceLoc().print(OS, SM);
+  OS << "\n";
+  OS.indent(Indent + 2);
+  OS << " parent: ";
+  if (auto *P = Parent.dyn_cast<const SILDebugScope *>()) {
+    P->dump(SM, OS, Indent + 2);
+    OS.indent(Indent + 2);
+  }
+  else if (auto *F = Parent.dyn_cast<SILFunction *>())
+    OS << "@" << F->getName();
+  else
+    OS << "nullptr";
+
+  OS << "\n";
+  OS.indent(Indent + 2);
+  if (auto *CS = InlinedCallSite) {
+    OS << "inlinedCallSite: ";
+    CS->dump(SM, OS, Indent + 2);
+    OS.indent(Indent + 2);
+  }
+  OS << "}\n";
 }

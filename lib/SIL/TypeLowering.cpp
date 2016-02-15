@@ -395,17 +395,12 @@ namespace {
     // Tuples depend on their elements.
     RetTy visitTupleType(CanTupleType type) {
       bool hasReference = false;
-      // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currently rely on
-      // SIL lowering to catch unsupported recursive value types.
-      bool isAddressOnly = false;
       for (auto eltType : type.getElementTypes()) {
         switch (classifyType(eltType, M, Sig, Expansion)) {
         case LoweredTypeKind::Trivial:
           continue;
         case LoweredTypeKind::AddressOnly:
-          isAddressOnly = true;
-          continue;
+          return asImpl().handleAddressOnly(type);
         case LoweredTypeKind::Reference:
         case LoweredTypeKind::AggWithReference:
           hasReference = true;
@@ -414,8 +409,6 @@ namespace {
         llvm_unreachable("bad type classification");
       }
 
-      if (isAddressOnly)
-        return asImpl().handleAddressOnly(type);
       if (hasReference)
         return asImpl().handleAggWithReference(type);
       return asImpl().handleTrivial(type);
@@ -1034,17 +1027,6 @@ namespace {
       llvm_unreachable("cannot destroy an UnsafeValueBuffer!");
     }
   };
-  
-  /// A class that acts as a stand-in for improperly recursive types.
-  class RecursiveErrorProtocolLowering : public AddressOnlyTypeLowering {
-  public:
-    RecursiveErrorProtocolLowering(SILType type)
-      : AddressOnlyTypeLowering(type) {}
-    
-    bool isValid() const override {
-      return false;
-    }
-  };
 
   /// Build the appropriate TypeLowering subclass for the given type.
   class LowerType
@@ -1136,39 +1118,30 @@ namespace {
     const TypeLowering *visitTupleType(CanTupleType tupleType) {
       typedef LoadableTupleTypeLowering::Child Child;
       SmallVector<Child, 8> childElts;
-      // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currently rely on
-      // SIL lowering to catch unsupported recursive value types.
-      bool isAddressOnly = false;
       bool hasOnlyTrivialChildren = true;
 
       unsigned i = 0;
       for (auto eltType : tupleType.getElementTypes()) {
         auto &lowering = TC.getTypeLowering(eltType);
         if (lowering.isAddressOnly())
-          isAddressOnly = true;
+          return handleAddressOnly(tupleType);
         hasOnlyTrivialChildren &= lowering.isTrivial();
         childElts.push_back(Child(i, lowering));
         ++i;
       }
 
-      if (isAddressOnly)
-        return handleAddressOnly(tupleType);
       if (hasOnlyTrivialChildren)
         return handleTrivial(tupleType);
+
       return new (TC, Dependent) LoadableTupleTypeLowering(OrigType);
     }
 
     const TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
-      // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currently rely on
-      // SIL lowering to catch unsupported recursive value types.
-      bool isAddressOnly = false;
-      
+
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
       if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
-        isAddressOnly = true;
+        return handleAddressOnly(structType);
 
       // Classify the type according to its stored properties.
       bool trivial = true;
@@ -1178,8 +1151,7 @@ namespace {
         switch (classifyType(substFieldType->getCanonicalType(),
                              M, Sig, Expansion)) {
         case LoweredTypeKind::AddressOnly:
-          isAddressOnly = true;
-          break;
+          return handleAddressOnly(structType);
         case LoweredTypeKind::AggWithReference:
         case LoweredTypeKind::Reference:
           trivial = false;
@@ -1189,23 +1161,17 @@ namespace {
         }
       }
 
-      if (isAddressOnly)
-        return handleAddressOnly(structType);
       if (trivial)
         return handleTrivial(structType);
       return new (TC, Dependent) LoadableStructTypeLowering(OrigType);
     }
         
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
-      // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currently rely on
-      // SIL lowering to catch unsupported recursive value types.
-      bool isAddressOnly = false;
 
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
       if (!D->hasFixedLayout(M.getSwiftModule(), Expansion))
-        isAddressOnly = true;
+        return handleAddressOnly(enumType);
       
       // Lower Self? as if it were Whatever? and Self! as if it were Whatever!.
       if (auto genericEnum = dyn_cast<BoundGenericEnumType>(enumType)) {
@@ -1238,8 +1204,6 @@ namespace {
       // is still address only, because we don't know how many bits
       // are used for the discriminator.
       if (D->isIndirect()) {
-        if (isAddressOnly)
-          return handleAddressOnly(OrigType);
         return new (TC, Dependent) LoadableEnumTypeLowering(OrigType);
       }
 
@@ -1267,8 +1231,7 @@ namespace {
         switch (classifyType(substEltType->getCanonicalType(),
                              M, Sig, Expansion)) {
         case LoweredTypeKind::AddressOnly:
-          isAddressOnly = true;
-          break;
+          return handleAddressOnly(enumType);
         case LoweredTypeKind::AggWithReference:
         case LoweredTypeKind::Reference:
           trivial = false;
@@ -1278,8 +1241,6 @@ namespace {
         }
         
       }
-      if (isAddressOnly)
-        return handleAddressOnly(enumType);
       if (trivial)
         return handleTrivial(enumType);
       return new (TC, Dependent) LoadableEnumTypeLowering(OrigType);
@@ -1326,48 +1287,17 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
   auto found = Types.find(ck);
   if (found == Types.end())
     return nullptr;
-  // We place a null placeholder in the hashtable to catch
-  // reentrancy, which arises as a result of improper recursion.
-  // TODO: We should diagnose nonterminating recursion in Sema, and implement
-  // terminating recursive enums, instead of diagnosing here.
-  // When that Sema check is in place, we should reinstate the early-exit
-  // behavior for address-only types (marked by other TODO: items throughout
-  // this file).
-  if (auto elt = found->second)
-    return elt;
-    
-  // Try to complain about a nominal type.
-  auto nomTy = k.SubstType.getAnyNominal();
-  assert(nomTy && "non-nominal types should not be recursive");
-  
-  if (RecursiveNominalTypes.insert(nomTy).second) {
-    auto &diags = M.getASTContext().Diags;
-    if (auto *ED = dyn_cast<EnumDecl>(nomTy)) {
-      diags.diagnose(ED->getStartLoc(),
-                     diag::recursive_enum_not_indirect,
-                     nomTy->getDeclaredTypeInContext())
-      .fixItInsert(ED->getStartLoc(), "indirect ");
-    } else {
-      diags.diagnose(nomTy->getLoc(),
-                     diag::unsupported_recursive_type,
-                     nomTy->getDeclaredTypeInContext());
-    }
-  }
-  auto result = new (*this, k.isDependent()) RecursiveErrorProtocolLowering(
-                            SILType::getPrimitiveAddressType(k.SubstType));
-  found->second = result;
-  return result;
+
+  assert(found->second && "type recursion not caught in Sema");
+  return found->second;
 }
 
 void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
   if (!k.isCacheable()) return;
 
   auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
-  // TODO: Types[k] should always be null at this point, except that we
-  // rely on type lowering to discover recursive value types right now.
-  auto ck = k.getCachingKey();
-  if (!Types[ck])
-    Types[ck] = tl;
+
+  Types[k.getCachingKey()] = tl;
 }
 
 #ifndef NDEBUG
@@ -1642,11 +1572,11 @@ getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
   assert(isa<AnyFunctionType>(key.SubstType));
   assert(key.UncurryLevel == 0);
 
+#ifndef NDEBUG
   // Catch recursions.
-  // FIXME: These should be bugs, so we shouldn't need to do this in release
-  // builds.
   insert(key, nullptr);
-  
+#endif
+
   // Generic functions aren't first-class values and shouldn't end up lowered
   // through this interface.
   assert(!isa<PolymorphicFunctionType>(key.SubstType)
@@ -1670,10 +1600,10 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   assert(!find(key) && "re-entrant or already cached");
   assert(isLoweredType(key.SubstType) && "didn't lower out l-value type?");
 
+#ifndef NDEBUG
   // Catch reentrancy bugs.
-  // FIXME: These should be bugs, so we shouldn't need to do this in release
-  // builds.
   insert(key, nullptr);
+#endif
 
   CanType contextType = key.SubstType;
   // FIXME: Get expansion from SILFunction

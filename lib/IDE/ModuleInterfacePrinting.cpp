@@ -117,7 +117,7 @@ void swift::ide::printModuleInterface(Module *M,
                                       ASTPrinter &Printer,
                                       const PrintOptions &Options,
                                       const bool PrintSynthesizedExtensions) {
-  printSubmoduleInterface(M, M->getName().str(), TraversalOptions, Printer,
+  printSubmoduleInterface(M, M->getName().str(), None, TraversalOptions, Printer,
                           Options, PrintSynthesizedExtensions);
 }
 
@@ -166,6 +166,7 @@ void findExtensionsFromConformingProtocols(Decl *D,
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,
+       Optional<StringRef> GroupName,
        ModuleTraversalOptions TraversalOptions,
        ASTPrinter &Printer,
        const PrintOptions &Options,
@@ -307,6 +308,10 @@ void swift::ide::printSubmoduleInterface(
       continue;
     }
     if (FullModuleName.empty()) {
+      // If group name is given and the decl does not belong to the group, skip it.
+      if (GroupName && (!D->getGroupName() ||
+                        D->getGroupName().getValue() != GroupName.getValue()))
+        continue;
       // Add Swift decls if we are printing the top-level module.
       SwiftDecls.push_back(D);
     }
@@ -343,9 +348,15 @@ void swift::ide::printSubmoduleInterface(
   });
 
   std::sort(SwiftDecls.begin(), SwiftDecls.end(),
-            [](Decl *LHS, Decl *RHS) -> bool {
+            [&](Decl *LHS, Decl *RHS) -> bool {
     auto *LHSValue = dyn_cast<ValueDecl>(LHS);
     auto *RHSValue = dyn_cast<ValueDecl>(RHS);
+
+    // If group is specified, we order the decls by their source order.
+    if (GroupName && LHS->getSourceOrder() && RHS->getSourceOrder()) {
+      return LHS->getSourceOrder().getValue() < RHS->getSourceOrder().getValue();
+    }
+
     if (LHSValue && RHSValue) {
       StringRef LHSName = LHSValue->getName().str();
       StringRef RHSName = RHSValue->getName().str();

@@ -306,6 +306,7 @@ public:
   void editorOpenInterface(EditorConsumer &Consumer,
                            StringRef Name,
                            StringRef ModuleName,
+                           Optional<StringRef> Group,
                            ArrayRef<const char *> Args) override;
 
   void editorOpenHeaderInterface(EditorConsumer &Consumer,
@@ -354,6 +355,9 @@ public:
 
   void findInterfaceDocument(StringRef ModuleName, ArrayRef<const char *> Args,
                std::function<void(const InterfaceDocInfo &)> Receiver) override;
+
+  void findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
+               std::function<void(ArrayRef<StringRef>, StringRef Error)> Receiver) override;
 };
 
 namespace trace {

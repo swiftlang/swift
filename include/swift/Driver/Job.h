@@ -14,6 +14,7 @@
 #define SWIFT_DRIVER_JOB_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Driver/Action.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/Option/Option.h"

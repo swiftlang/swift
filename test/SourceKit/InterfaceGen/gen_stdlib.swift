@@ -34,6 +34,22 @@ var x: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: Int.Type
 // CHECK1-NEXT: Swift{{$}}
+// CHECK1-NEXT: <Group>FixedPoint</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
 // CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
+
+// RUN: %sourcekitd-test -req=module-groups -module Swift | FileCheck -check-prefix=GROUP1 %s
+// GROUP1: <GROUPS>
+// GROUP1: Algorithm
+// GROUP1: Assert
+// GROUP1: Character
+// GROUP1: Collection
+// GROUP1: FlatMap
+// GROUP1: OutputStream
+// GROUP1: String
+// GROUP1: Zip
+// GROUP1: <\GROUPS>
+
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Zip > %t.zip.response
+// RUN: diff -u %s.zip.response %t.zip.response

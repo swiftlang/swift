@@ -19,6 +19,8 @@
 // RUN: %target-run %t/after_before
 // RUN: %target-run %t/after_after
 
+// REQUIRES: executable_test
+
 // FIXME: shouldn't need -whole-module-optimization here; we need to fix the
 // frontend to merge serialized SIL functions from different translation units
 

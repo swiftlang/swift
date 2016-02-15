@@ -39,6 +39,7 @@ UIdent sourcekitd::KeyOffset("key.offset");
 UIdent sourcekitd::KeySourceFile("key.sourcefile");
 UIdent sourcekitd::KeySourceText("key.sourcetext");
 UIdent sourcekitd::KeyModuleName("key.modulename");
+UIdent sourcekitd::KeyGroupName("key.groupname");
 UIdent sourcekitd::KeyNotification("key.notification");
 UIdent sourcekitd::KeyKeyword("key.keyword");
 UIdent sourcekitd::KeyName("key.name");
@@ -120,6 +121,7 @@ UIdent sourcekitd::KeyDeprecated("key.deprecated");
 UIdent sourcekitd::KeyObsoleted("key.obsoleted");
 UIdent sourcekitd::KeyRemoveCache("key.removecache");
 UIdent sourcekitd::KeyTypeInterface("key.typeinterface");
+UIdent sourcekitd::KeyModuleGroups("key.modulegroups");
 
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.

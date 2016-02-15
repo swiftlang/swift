@@ -214,7 +214,7 @@ class BridgedVerbatimRefType {
 func withSwiftObjectCanary<T>(
   createValue: () -> T,
   _ check: (T) -> Void,
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let stackTrace = SourceLocStack(SourceLoc(file, line))
 
@@ -537,7 +537,7 @@ var nsStringCanaryCount = 0
   @objc override var length: Int {
     return 0
   }
-  @objc override func characterAt(index: Int) -> unichar {
+  @objc override func character(at index: Int) -> unichar {
     fatalError("out-of-bounds access")
   }
 }
@@ -837,7 +837,7 @@ var KVOHandle = 0
 Reflection.test("Name of metatype of artificial subclass") {
   let obj = TestArtificialSubclass()
   // Trigger the creation of a KVO subclass for TestArtificialSubclass.
-  obj.addObserver(obj, forKeyPath: "foo", options: [.New], context: &KVOHandle)
+  obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
   obj.removeObserver(obj, forKeyPath: "foo")
 
   expectEqual("\(obj.dynamicType)", "TestArtificialSubclass")

@@ -16,7 +16,7 @@ struct TestStruct {
 
 sil_vtable TestClass {}
 
-// CHECK-LABEL: define void @simple_promote
+// CHECK-LABEL: define{{( protected)?}} void @simple_promote
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
 // CHECK: [[M:%[0-9]+]] = call %swift.type* @_TMa[[C]]()
 // CHECK: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
@@ -39,7 +39,7 @@ bb0:
 // A stack promotion limit of 48 bytes allows that one of the two alloc_refs
 // can be allocated on the stack.
 
-// CHECK-LABEL: define void @exceed_limit
+// CHECK-LABEL: define{{( protected)?}} void @exceed_limit
 // CHECK: alloca {{.*}}TestClass
 // CHECK: alloca {{.*}}TestStruct
 // CHECK-NOT: alloca

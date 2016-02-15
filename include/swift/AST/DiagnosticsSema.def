@@ -1960,6 +1960,11 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
+WARNING(tuple_splat_use,none,
+        "passing %0 arguments to a callee as a single tuple value is deprecated",
+        (unsigned))
+
+
 ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
@@ -2246,6 +2251,13 @@ WARNING(no_throw_in_do_with_catch,none,
 //------------------------------------------------------------------------------
 // Type Check Types
 //------------------------------------------------------------------------------
+
+ERROR(unsupported_recursive_type,none,
+      "value type %0 cannot have a stored property that references itself",
+      (Type))
+
+ERROR(recursive_enum_not_indirect,none,
+      "recursive enum %0 is not marked 'indirect'", (Type))
 
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "

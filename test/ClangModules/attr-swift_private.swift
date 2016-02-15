@@ -16,7 +16,7 @@ import SwiftPrivateAttr
 // half of a module, or from an overlay. At that point we should test that these
 // are available in that case and /not/ in the normal import case.
 
-// CHECK-LABEL: define void @{{.+}}12testProperty
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}12testProperty
 public func testProperty(foo: Foo) {
   // CHECK: @"\01L_selector(setPrivValue:)"
   _ = foo.__privValue
@@ -27,7 +27,7 @@ public func testProperty(foo: Foo) {
 #endif
 }
 
-// CHECK-LABEL: define void @{{.+}}11testMethods
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}11testMethods
 public func testMethods(foo: Foo) {
   // CHECK: @"\01L_selector(noArgs)"
   foo.__noArgs()
@@ -37,7 +37,7 @@ public func testMethods(foo: Foo) {
   foo.__twoArgs(1, other: 2)
 }
 
-// CHECK-LABEL: define void @{{.+}}16testInitializers
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}16testInitializers
 public func testInitializers() {
   // Checked below; look for "CSo3Bar".
   _ = Bar(__noArgs: ())
@@ -46,7 +46,7 @@ public func testInitializers() {
   _ = Bar(__: 1)
 }
 
-// CHECK-LABEL: define void @{{.+}}18testFactoryMethods
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}18testFactoryMethods
 public func testFactoryMethods() {
   // CHECK: @"\01L_selector(fooWithOneArg:)"
   _ = Foo(__oneArg: 1)
@@ -63,14 +63,14 @@ public func testSubscript(foo: Foo) {
 }
 #endif
 
-// CHECK-LABEL: define void @{{.+}}12testTopLevel
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}12testTopLevel
 public func testTopLevel() {
   // Checked below; look for "PrivFooSub".
   let foo = __PrivFooSub()
   _ = foo as __PrivProto
 
   // CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_PrivProto"
-  foo.conformsTo(__PrivProto.self)
+  foo.conforms(to: __PrivProto.self)
 
   // CHECK: call void @privTest()
   __privTest()
@@ -100,9 +100,9 @@ public func testTopLevel() {
 _ = __PrivAnonymousA
 _ = __E0PrivA
 _ = __PrivE1A as __PrivE1
-_ = NSEnum.__PrivA
+_ = NSEnum.__privA
 _ = NSEnum.B
-_ = NSOptions.__PrivA
+_ = NSOptions.__privA
 _ = NSOptions.B
 
 func makeSureAnyObject(_: AnyObject) {}

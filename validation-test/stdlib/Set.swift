@@ -121,13 +121,13 @@ func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
 
 func isNativeNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NativeSetStorage").length > 0
+  return className.range(of: "NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NSSet").length > 0 ||
-    className.rangeOf("NSCFSet").length > 0
+  return className.range(of: "NSSet").length > 0 ||
+    className.range(of: "NSCFSet").length > 0
 }
 
 func getBridgedEmptyNSSet() -> NSSet {
@@ -1169,7 +1169,7 @@ class CustomImmutableNSSet : NSSet {
     fatalError("init(coder:) not implemented by CustomImmutableNSSet")
   }
 
-  @objc override func copy(zone zone: NSZone) -> AnyObject {
+  @objc override func copy(withZone zone: NSZone) -> AnyObject {
     ++CustomImmutableNSSet.timesCopyWithZoneWasCalled
     return self
   }
@@ -3415,7 +3415,7 @@ class MockSetWithCustomCount : NSSet {
     fatalError("init(coder:) not implemented by MockSetWithCustomCount")
   }
 
-  @objc override func copy(zone zone: NSZone) -> AnyObject {
+  @objc override func copy(withZone zone: NSZone) -> AnyObject {
     // Ensure that copying this set produces an object of the same
     // dynamic type.
     return self

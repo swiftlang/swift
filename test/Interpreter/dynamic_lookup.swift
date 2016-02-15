@@ -79,8 +79,8 @@ test_dynamic_lookup_myValue(Y())
 // <rdar://problem/16554056> __FUNCTION__ in deinit for NSObject subclasses crashes the compiler
 // Test __FUNCTION__
 class FUNCTION_NAME_TEST : NSObject {
-  override init() { super.init() ; print(__FUNCTION__) }
-  deinit { print(__FUNCTION__) }
+  override init() { super.init() ; print(#function) }
+  deinit { print(#function) }
 }
 
 FUNCTION_NAME_TEST()

@@ -42,8 +42,8 @@ print(array[1] as! NSString, terminator: "")
 print("!")
 
 // Selectors
-assert(NSString.instancesRespondTo("init"))
-assert(!NSString.instancesRespondTo("wobble"))
+assert(NSString.instancesRespond(to: "init"))
+assert(!NSString.instancesRespond(to: "wobble"))
 
 // Array of strings
 var array2 : NSArray = [hello, hello]

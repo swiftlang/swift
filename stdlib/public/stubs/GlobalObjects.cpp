@@ -21,8 +21,10 @@
 namespace swift {
 
 // _direct type metadata for Swift._EmptyArrayStorage
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" ClassMetadata _TMCs18_EmptyArrayStorage;
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   // HeapObject header;
   {
@@ -36,7 +38,15 @@ extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   }
 };
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride = 0;
 
 }
+
+namespace llvm { namespace hashing { namespace detail {
+  // An extern variable expected by LLVM's hashing templates. We don't link any
+  // LLVM libs into the runtime, so define this here.
+  size_t fixed_seed_override = 0;
+} } }
+

@@ -91,6 +91,7 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
 /// \brief Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
+SWIFT_RUNTIME_EXPORT
 extern "C" HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
@@ -102,6 +103,7 @@ extern "C" HeapObject* swift_bufferAllocate(
 /// optimized module is imported into a non-optimized main module.
 /// TODO: This is only a workaround. Remove this function as soon as we can
 /// get rid of the llvm SwiftStackPromotion pass.
+SWIFT_RUNTIME_EXPORT
 extern "C" HeapObject* swift_bufferAllocateOnStack(
   HeapMetadata const* bufferType, size_t size, size_t alignMask) {
   return swift::swift_allocObject(bufferType, size, alignMask);
@@ -113,9 +115,11 @@ extern "C" HeapObject* swift_bufferAllocateOnStack(
 /// optimized module is imported into a non-optimized main module.
 /// TODO: This is only a workaround. Remove this function as soon as we can
 /// get rid of the llvm SwiftStackPromotion pass.
+SWIFT_RUNTIME_EXPORT
 extern "C" void swift_bufferDeallocateFromStack(HeapObject *) {
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
 namespace {
@@ -439,6 +443,7 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 }
 
 /// Variant of the above used in constructor failure paths.
+SWIFT_RUNTIME_EXPORT
 extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
                                                   HeapMetadata const *metadata,
                                                   size_t allocatedSize,

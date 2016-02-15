@@ -110,7 +110,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     }
   }
 
-  @objc internal func copy(zone _: _SwiftNSZone) -> AnyObject {
+  @objc internal func copy(withZone _: _SwiftNSZone) -> AnyObject {
     return self
   }
 }

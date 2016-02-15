@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-module"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
-#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -122,10 +122,7 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
   // Extract the base NormalProtocolConformance.
   NormalProtocolConformance *NormalC = C->getRootNormalConformance();
 
-  SILWitnessTable *WT = SILWitnessTable::create(*this,
-                                                linkage,
-                                                NormalC);
-  return WT;
+  return SILWitnessTable::create(*this, linkage, NormalC);
 }
 
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
@@ -177,8 +174,8 @@ lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
   }
 
   // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableLookupCache.find(NormalC);
-  if (found == WitnessTableLookupCache.end()) {
+  auto found = WitnessTableMap.find(NormalC);
+  if (found == WitnessTableMap.end()) {
 #ifndef NDEBUG
     // Make sure that all witness tables are in the witness table lookup
     // cache.
@@ -214,6 +211,34 @@ lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
 
   // If we fail, just return the declaration.
   return {wT, Subs};
+}
+
+SILDefaultWitnessTable *
+SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol) {
+  // Note: we only ever look up default witness tables in the translation unit
+  // that is currently being compiled, since they SILGen generates them when it
+  // visits the protocol declaration, and IRGen emits them when emitting the
+  // protocol descriptor metadata for the protocol.
+
+  auto found = DefaultWitnessTableMap.find(Protocol);
+  if (found == DefaultWitnessTableMap.end()) {
+    assert(Protocol->hasFixedLayout() &&
+           "Resilient protocol must have a default witness table");
+    return nullptr;
+  }
+
+  assert(!Protocol->hasFixedLayout() &&
+         "Fixed-layout protocol cannot have a default witness table");
+
+  return found->second;
+}
+
+SILDefaultWitnessTable *
+SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol) {
+  assert(!Protocol->hasFixedLayout() &&
+         "Fixed-layout protocol cannot have a default witness table");
+
+  return SILDefaultWitnessTable::create(*this, Protocol);
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
@@ -517,7 +542,7 @@ void SILModule::eraseFunction(SILFunction *F) {
 
 /// Erase a global SIL variable from the module.
 void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
-  GlobalVariableTable.erase(G->getName());
+  GlobalVariableMap.erase(G->getName());
   getSILGlobalList().erase(G);
 }
 
@@ -526,8 +551,8 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
     return nullptr;
 
   // First try to look up R from the lookup table.
-  auto R = VTableLookupTable.find(C);
-  if (R != VTableLookupTable.end())
+  auto R = VTableMap.find(C);
+  if (R != VTableMap.end())
     return R->second;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
@@ -538,7 +563,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
     return nullptr;
 
   // If we succeeded, map C -> VTbl in the table and return VTbl.
-  VTableLookupTable[C] = Vtbl;
+  VTableMap[C] = Vtbl;
   return Vtbl;
 }
 

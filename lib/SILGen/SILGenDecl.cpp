@@ -1161,8 +1161,10 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances(
                     ConformanceLookupKind::All,
                     nullptr, /*sorted=*/true)) {
-      if (Types.protocolRequiresWitnessTable(c->getProtocol()) &&
-          c->isComplete() && isa<NormalProtocolConformance>(c))
+      auto *proto = c->getProtocol();
+      if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
+          isa<NormalProtocolConformance>(c) &&
+          c->isComplete())
         emitExternalWitnessTable(c);
     }
     break;
@@ -1304,7 +1306,8 @@ public:
                                                          ForDefinition))
   {
     // Not all protocols use witness tables.
-    if (!SGM.Types.protocolRequiresWitnessTable(Conformance->getProtocol()))
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
+        Conformance->getProtocol()))
       Conformance = nullptr;
   }
 
@@ -1349,9 +1352,7 @@ public:
   }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
-    // Only include the witness if the base protocol requires it.
-    if (!SGM.Types.protocolRequiresWitnessTable(baseProtocol))
-      return;
+    assert(Lowering::TypeConverter::protocolRequiresWitnessTable(baseProtocol));
 
     auto foundBaseConformance
       = Conformance->getInheritedConformances().find(baseProtocol);
@@ -1475,7 +1476,7 @@ public:
 
     for (auto *protocol : protos) {
       // Only reference the witness if the protocol requires it.
-      if (!SGM.Types.protocolRequiresWitnessTable(protocol))
+      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
         continue;
 
       ProtocolConformanceRef conformance(protocol);

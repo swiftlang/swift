@@ -484,10 +484,25 @@ void SerializedASTFile::lookupObjCMethods(
   File.lookupObjCMethods(selector, results);
 }
 
-Optional<BriefAndRawComment>
+Optional<CommentInfo>
 SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
+
+Optional<StringRef>
+SerializedASTFile::getGroupNameForDecl(const Decl *D) const {
+  return File.getGroupNameForDecl(D);
+}
+
+Optional<unsigned>
+SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
+  return File.getSourceOrderForDecl(D);
+}
+
+void
+SerializedASTFile::collectAllGroups(std::vector<StringRef> &Names) const {
+  File.collectAllGroups(Names);
+};
 
 void
 SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {

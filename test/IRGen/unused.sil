@@ -50,7 +50,7 @@ bb0:
 
 // CHECK: define linkonce_odr hidden void @qux()
 // CHECK: define hidden void @fred()
-// CHECK: define void @frieda()
+// CHECK: define{{( protected)?}} void @frieda()
 
 // NEGATIVE-NOT: @foo
 // NEGATIVE-NOT: @bar

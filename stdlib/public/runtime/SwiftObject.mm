@@ -88,6 +88,7 @@ static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
 #if __has_attribute(objc_root_class)
 __attribute__((objc_root_class))
 #endif
+SWIFT_RUNTIME_EXPORT
 @interface SwiftObject<NSObject> {
   // FIXME: rdar://problem/18950072 Clang emits ObjC++ classes as having
   // non-trivial structors if they contain any struct fields at all, regardless of
@@ -1031,6 +1032,7 @@ bool swift::classConformsToObjCProtocol(const void *theClass,
   return [((Class) theClass) conformsToProtocol: (Protocol*) protocol];
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
                                                  const Metadata *type,
                                                  size_t numProtocols,
@@ -1079,6 +1081,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
   return type;
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
                                                 const Metadata *type,
                                                 size_t numProtocols,
@@ -1125,6 +1128,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
   return type;
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {
@@ -1139,6 +1143,7 @@ extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
   return object;
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" id swift_dynamicCastObjCProtocolConditional(id object,
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {
@@ -1151,7 +1156,7 @@ extern "C" id swift_dynamicCastObjCProtocolConditional(id object,
   return object;
 }
 
-extern "C" void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
+void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   static const objc_image_info ImageInfo = {0, 0};
 
   // Ensure the superclass is realized.
@@ -1165,6 +1170,7 @@ extern "C" void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   (void)registered;
 }
 
+SWIFT_RUNTIME_EXPORT
 extern "C" Class swift_getInitializedObjCClass(Class c) {
   // Used when we have class metadata and we want to ensure a class has been
   // initialized by the Objective C runtime. We need to do this because the
@@ -1336,6 +1342,7 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 
 using ClassExtents = TwoWordPair<size_t, size_t>;
 
+SWIFT_RUNTIME_EXPORT
 extern "C"
 ClassExtents::Return
 swift_class_getInstanceExtents(const Metadata *c) {
@@ -1348,6 +1355,8 @@ swift_class_getInstanceExtents(const Metadata *c) {
 }
 
 #if SWIFT_OBJC_INTEROP
+
+SWIFT_RUNTIME_EXPORT
 extern "C"
 ClassExtents::Return
 swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
@@ -1357,6 +1366,7 @@ swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
   
   return swift_class_getInstanceExtents(c);
 }
+
 #endif
 
 const ClassMetadata *swift::getRootSuperclass() {

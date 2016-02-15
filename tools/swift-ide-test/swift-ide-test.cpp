@@ -295,6 +295,11 @@ OmitNeedlessWords("enable-omit-needless-words",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+StripNSPrefix("enable-strip-ns-prefix",
+              llvm::cl::desc("Strip the NS prefix from Foundation et al"),
+              llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -475,6 +480,11 @@ static llvm::cl::opt<bool>
 SkipUnderscoredStdlibProtocols("skip-underscored-stdlib-protocols",
                 llvm::cl::desc("Don't print protocols that start with '_'"),
                 llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+SkipDocumentationComments("skip-print-doc-comments",
+             llvm::cl::desc("Don't print documentation comments from clang module headers"),
+             llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 PrintRegularComments("print-regular-comments",
@@ -1639,7 +1649,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
       }
     }
 
-    printSubmoduleInterface(M, ModuleName, TraversalOptions, *Printer, Options,
+    printSubmoduleInterface(M, ModuleName, None, TraversalOptions, *Printer, Options,
                             SynthesizeExtensions);
   }
 
@@ -2481,6 +2491,7 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
   InitInvok.getLangOptions().OmitNeedlessWords |=
     options::OmitNeedlessWords;
+  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().OmitNeedlessWords |=
@@ -2532,6 +2543,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
     PrintOpts.PrintAccessibility = options::PrintAccessibility;
     PrintOpts.AccessibilityFilter = options::AccessibilityFilter;
+    PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
     PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
     PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;

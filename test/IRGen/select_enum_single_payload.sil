@@ -9,7 +9,7 @@ enum ManyEmptyCases {
     case C(Builtin.Int32)
 }
 
-// CHECK-LABEL: define i1 @select_enum_A(i32, i1)
+// CHECK-LABEL: define{{( protected)?}} i1 @select_enum_A(i32, i1)
 // CHECK:         [[PAYLOAD:%.*]] = icmp eq i32 %0, 0
 // CHECK:         [[EXTRA:%.*]] = and i1 %1, [[PAYLOAD]]
 // CHECK:         ret i1 [[EXTRA]]
@@ -21,7 +21,7 @@ entry(%0 : $ManyEmptyCases):
   return %6 : $Builtin.Int1
 }
 
-// CHECK-LABEL: define i1 @select_enum_B(i32, i1)
+// CHECK-LABEL: define{{( protected)?}} i1 @select_enum_B(i32, i1)
 // CHECK:         [[PAYLOAD:%.*]] = icmp eq i32 %0, 1
 // CHECK:         [[EXTRA:%.*]] = and i1 %1, [[PAYLOAD]]
 // CHECK:         ret i1 [[EXTRA]]

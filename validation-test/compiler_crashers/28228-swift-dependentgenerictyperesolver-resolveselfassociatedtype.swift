@@ -1,3 +1,4 @@
+// DUPLICATE-OF: 24394-swift-typevariabletype-implementation-getrepresentative.swift
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
 

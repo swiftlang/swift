@@ -932,7 +932,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
     if (!silBB->empty()) {
       SILInstruction &I = *silBB->begin();
       auto DS = I.getDebugScope();
-      assert(DS && (DS->getParentFunction() == IGF.CurSILFn));
+      assert(DS);
       IGF.IGM.DebugInfo->setCurrentLoc(IGF.Builder, DS, I.getLoc());
     }
   }
@@ -1437,7 +1437,7 @@ void IRGenSILFunction::emitSILFunction() {
       auto next = std::next(SILFunction::iterator(bb));
       if (next != CurSILFn->end()) {
         auto nextBB = LoweredBBs[&*next].bb;
-        assert(curBB->getNextNode() == nextBB &&
+        assert(&*std::next(curBB->getIterator()) == nextBB &&
                "lost source SIL order?");
       }
     }
@@ -1584,9 +1584,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         KeepCurrentLocation = false;
         InCleanupBlock = false;
       }
-
-      assert((!DS || (DS->getParentFunction() == CurSILFn)) &&
-             "insn belongs to a different function");
 
       // Until SILDebugScopes are properly serialized, bare functions
       // are allowed to not have a scope.
@@ -3426,11 +3423,9 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     // be wrong.
     DbgTy.unwrapLValueOrInOutType();
     StringRef Name = getVarName(i);
-    if (auto DS = i->getDebugScope()) {
-      assert(DS->getParentFunction() == CurSILFn);
+    if (auto DS = i->getDebugScope())
       emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
                                    i->getVarInfo().ArgNo);
-    }
   }
 }
 
@@ -4578,8 +4573,8 @@ findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr) {
   auto allocStack = dyn_cast<AllocStackInst>(destroyAddr->getOperand());
   if (!allocStack) return nullptr;
 
-  for (auto inst = destroyAddr->getNextNode(); !isa<TermInst>(inst);
-       inst = inst->getNextNode()) {
+  for (auto inst = &*std::next(destroyAddr->getIterator()); !isa<TermInst>(inst);
+       inst = &*std::next(inst->getIterator())) {
     // If we find a dealloc_stack of the right memory, great.
     if (auto deallocStack = dyn_cast<DeallocStackInst>(inst))
       if (deallocStack->getOperand() == allocStack)

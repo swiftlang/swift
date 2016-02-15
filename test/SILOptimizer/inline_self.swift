@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil  -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -emit-sil  -primary-file %s | FileCheck %s
 //
 // This is a .swift test because the SIL parser does not support Self.
 

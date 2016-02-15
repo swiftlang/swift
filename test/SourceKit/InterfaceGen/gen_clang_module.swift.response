@@ -40,9 +40,9 @@ public var FooEnum3Y: FooEnum3 { get }
 public enum FooComparisonResult : Int {
     
     // This is ascending
-    case OrderedAscending
-    case OrderedSame // But this is the same.
-    case OrderedDescending
+    case orderedAscending
+    case orderedSame // But this is the same.
+    case orderedDescending
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
@@ -50,8 +50,8 @@ public struct FooRuncingOptions : OptionSet {
     public init(rawValue: Int)
     
     // This is mince.
-    public static var EnableMince: FooRuncingOptions { get }
-    public static var EnableQuince: FooRuncingOptions { get } /* But this is quince */
+    public static var enableMince: FooRuncingOptions { get }
+    public static var enableQuince: FooRuncingOptions { get } /* But this is quince */
 }
 
 public struct FooStruct1 {
@@ -4098,7 +4098,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.internal,
-            key.name: "OrderedAscending",
+            key.name: "orderedAscending",
             key.offset: 1001,
             key.length: 16,
             key.nameoffset: 1001,
@@ -4116,7 +4116,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.internal,
-            key.name: "OrderedSame",
+            key.name: "orderedSame",
             key.offset: 1027,
             key.length: 11,
             key.nameoffset: 1027,
@@ -4134,7 +4134,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.internal,
-            key.name: "OrderedDescending",
+            key.name: "orderedDescending",
             key.offset: 1073,
             key.length: 17,
             key.nameoffset: 1073,
@@ -4191,7 +4191,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.static,
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
-        key.name: "EnableMince",
+        key.name: "enableMince",
         key.offset: 1244,
         key.length: 41,
         key.typename: "FooRuncingOptions",
@@ -4202,7 +4202,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.static,
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
-        key.name: "EnableQuince",
+        key.name: "enableQuince",
         key.offset: 1305,
         key.length: 42,
         key.typename: "FooRuncingOptions",

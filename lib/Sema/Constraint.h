@@ -24,6 +24,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
 
@@ -325,7 +326,10 @@ public:
 
 
 /// \brief A constraint between two type variables.
-class Constraint : public llvm::ilist_node<Constraint> {
+class Constraint final : public llvm::ilist_node<Constraint>,
+    private llvm::TrailingObjects<Constraint, TypeVariableType *> {
+  friend TrailingObjects;
+
   /// \brief The kind of constraint.
   ConstraintKind Kind : 8;
 
@@ -417,7 +421,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
-    return { reinterpret_cast<TypeVariableType **>(this + 1), NumTypeVariables };
+    return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
   }
 
 public:
@@ -485,8 +489,7 @@ public:
 
   /// Retrieve the set of type variables referenced by this constraint.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return { reinterpret_cast<TypeVariableType * const *>(this + 1), 
-             NumTypeVariables };
+    return {getTrailingObjects<TypeVariableType*>(), NumTypeVariables};
   }
 
   /// \brief Determine the classification of this constraint, providing

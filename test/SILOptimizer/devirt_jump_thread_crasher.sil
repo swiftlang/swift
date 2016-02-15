@@ -107,3 +107,47 @@ bb15:                                             // Preds: bb12
   br bb13(%54 : $())                              // id: %55
 }
 
+// CHECK-LABEL: sil @multiple_edits_in_adjacent_blocks
+// CHECK: bb0(%0 : $*Base):
+// CHECK: checked_cast_br %
+// CHECK: bb1:
+// CHECK: checked_cast_br [exact]
+// CHECK-NOT: checked_cast_br
+// CHECK: return
+sil @multiple_edits_in_adjacent_blocks : $@convention(method) (@in Base) -> () {
+bb0(%0 : $*Base):
+  %1 = load %0 : $*Base
+  checked_cast_br %1 : $Base to $Derived1, bb8, bb1
+
+bb1:
+  checked_cast_br [exact] %1 : $Base to $Derived2, bb2, bb5
+
+bb2(%6 : $Derived2):
+  %7 = upcast %6 : $Derived2 to $Base
+  debug_value %7 : $Base, let, name "self", argno 1
+  checked_cast_br [exact] %7 : $Base to $Base, bb3, bb6
+
+bb3(%10 : $Base):
+  debug_value %10 : $Base, let, name "self", argno 1
+  checked_cast_br %10 : $Base to $Derived1, bb4, bb7
+
+bb4(%13 : $Derived1):
+  debug_value %13 : $Derived1, let, name "scr"
+  br bb9
+
+bb5:
+  br bb9
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8(%14 : $Derived1):
+  br bb9
+
+bb9:
+  %20 = tuple ()
+  return %20 : $()
+}

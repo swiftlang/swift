@@ -42,6 +42,26 @@ static inline uintptr_t applyRelativeOffset(BasePtrTy *basePtr, Offset offset) {
   return base + extendOffset;
 }
 
+/// Measure the relative offset between two pointers. This measures
+/// (referent - base) using wrapping arithmetic. The result is truncated if
+/// Offset is smaller than a pointer, with an assertion that the
+/// pre-truncation result is a sign extension of the truncated result.
+template<typename Offset, typename A, typename B>
+static inline Offset measureRelativeOffset(A *referent, B *base) {
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
+
+  auto distance = (uintptr_t)referent - (uintptr_t)base;
+  // Truncate as unsigned, then wrap around to signed.
+  auto truncatedDistance =
+    (Offset)(typename std::make_unsigned<Offset>::type)distance;
+  // Assert that the truncation didn't discard any non-sign-extended bits.
+  assert((intptr_t)truncatedDistance == (intptr_t)distance
+         && "pointers are too far apart to fit in offset type");
+  return truncatedDistance;
+}
+
 } // namespace detail
 
 /// A relative reference to an object stored in memory. The reference may be
@@ -70,7 +90,34 @@ private:
     = delete;
 
 public:
+  /// Allow construction and reassignment from an absolute pointer.
+  /// These always produce a direct relative offset.
+  RelativeIndirectablePointer(ValueTy *absolute)
+  : RelativeOffsetPlusIndirect(
+      Nullable && absolute == nullptr
+        ? 0
+        : detail::measureRelativeOffset<Offset>(absolute, this)) {
+    if (!Nullable)
+      assert(absolute != nullptr &&
+             "constructing non-nullable relative pointer from null");
+  }
+  
+  RelativeIndirectablePointer &operator=(ValueTy *absolute) & {
+    if (!Nullable)
+      assert(absolute != nullptr &&
+             "constructing non-nullable relative pointer from null");
+      
+    RelativeOffsetPlusIndirect = Nullable && absolute == nullptr
+      ? 0
+      : detail::measureRelativeOffset<Offset>(absolute, this);
+    return *this;
+  }
+
   const ValueTy *get() const & {
+    static_assert(alignof(ValueTy) >= 2 && alignof(Offset) >= 2,
+                  "alignment of value and offset must be at least 2 to "
+                  "make room for indirectable flag");
+  
     // Check for null.
     if (Nullable && RelativeOffsetPlusIndirect == 0)
       return nullptr;
@@ -86,6 +133,11 @@ public:
     } else {
       return reinterpret_cast<const ValueTy *>(address);
     }
+  }
+
+  /// A zero relative offset encodes a null reference.
+  bool isNull() const & {
+    return RelativeOffsetPlusIndirect == 0;
   }
   
   operator const ValueTy* () const & {
@@ -113,16 +165,41 @@ private:
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
   RelativeDirectPointerImpl() = delete;
-  RelativeDirectPointerImpl(RelativeDirectPointerImpl &&) = delete;
-  RelativeDirectPointerImpl(const RelativeDirectPointerImpl &) = delete;
-  RelativeDirectPointerImpl &operator=(RelativeDirectPointerImpl &&)
-    = delete;
-  RelativeDirectPointerImpl &operator=(const RelativeDirectPointerImpl&)
-    = delete;
 
 public:
   using ValueTy = T;
   using PointerTy = T*;
+
+  // Allow construction and reassignment from an absolute pointer.
+  RelativeDirectPointerImpl(PointerTy absolute)
+    : RelativeOffset(Nullable && absolute == nullptr
+                       ? 0
+                       : detail::measureRelativeOffset<Offset>(absolute, this))
+  {
+    if (!Nullable)
+      assert(absolute != nullptr &&
+             "constructing non-nullable relative pointer from null");
+  }
+  explicit constexpr RelativeDirectPointerImpl(std::nullptr_t)
+  : RelativeOffset (0) {
+    static_assert(Nullable, "can't construct non-nullable pointer from null");
+  }
+  
+  RelativeDirectPointerImpl &operator=(PointerTy absolute) & {
+    if (!Nullable)
+      assert(absolute != nullptr &&
+             "constructing non-nullable relative pointer from null");
+    RelativeOffset = Nullable && absolute == nullptr
+      ? 0
+      : detail::measureRelativeOffset<Offset>(absolute, this);
+    return *this;
+  }
+  
+  // Can copy-construct by recalculating the relative offset at the new
+  // position.
+  RelativeDirectPointerImpl(const RelativeDirectPointerImpl &p) {
+    *this = p.get();
+  }
 
   PointerTy get() const & {
     // Check for null.
@@ -148,6 +225,12 @@ class RelativeDirectPointer :
   using super = RelativeDirectPointerImpl<T, Nullable, Offset>;
 public:
   using super::get;
+  using super::super;
+  
+  RelativeDirectPointer &operator=(T *absolute) & {
+    super::operator=(absolute);
+    return *this;
+  }
 
   operator typename super::PointerTy() const & {
     return this->get();
@@ -173,7 +256,13 @@ class RelativeDirectPointer<RetTy (ArgTy...), Nullable, Offset> :
   using super = RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable, Offset>;
 public:
   using super::get;
+  using super::super;
 
+  RelativeDirectPointer &operator=(RetTy (*absolute)(ArgTy...)) & {
+    super::operator=(absolute);
+    return *this;
+  }
+  
   operator typename super::PointerTy() const & {
     return this->get();
   }
@@ -223,6 +312,17 @@ public:
     return IntTy(RelativeOffsetPlusInt & getMask());
   }
 };
+
+// Type aliases for "far" relative pointers, which need to be able to reach
+// across the full address space instead of only across a single small-code-
+// model image.
+
+template<typename T, bool Nullable = false>
+using FarRelativeIndirectablePointer =
+  RelativeIndirectablePointer<T, Nullable, intptr_t>;
+
+template<typename T, bool Nullable = false>
+using FarRelativeDirectPointer = RelativeDirectPointer<T, Nullable, intptr_t>;
 
 }
 

@@ -26,6 +26,7 @@ extern SourceKit::UIdent KeyOffset;
 extern SourceKit::UIdent KeySourceFile;
 extern SourceKit::UIdent KeySourceText;
 extern SourceKit::UIdent KeyModuleName;
+extern SourceKit::UIdent KeyGroupName;
 extern SourceKit::UIdent KeyNotification;
 extern SourceKit::UIdent KeyKeyword;
 extern SourceKit::UIdent KeyName;
@@ -107,6 +108,7 @@ extern SourceKit::UIdent KeyDeprecated;
 extern SourceKit::UIdent KeyObsoleted;
 extern SourceKit::UIdent KeyRemoveCache;
 extern SourceKit::UIdent KeyTypeInterface;
+extern SourceKit::UIdent KeyModuleGroups;
 
 /// \brief Used for determining the printing order of dictionary keys.
 bool compareDictKeys(SourceKit::UIdent LHS, SourceKit::UIdent RHS);

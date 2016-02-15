@@ -27,10 +27,11 @@ class ReflectionMetadataBuilder : public ConstantBuilder<> {
 
   const uint32_t fieldRecordSize = 8;
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
-  Mangle::Mangler mangler;
 
   void addFieldDecl(const ValueDecl *value) {
     auto type = value->getInterfaceType()->getCanonicalType();
+    Mangle::Mangler mangler;
+    mangler.setModuleContext(value->getModuleContext());
     mangler.mangleType(type, 0);
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
     addRelativeAddress(mangledName);
@@ -44,7 +45,13 @@ class ReflectionMetadataBuilder : public ConstantBuilder<> {
   }
 
   void addDecl(const NominalTypeDecl *decl) {
+    auto type = decl->getDeclaredInterfaceType()->getCanonicalType();
+    Mangle::Mangler mangler;
     mangler.setModuleContext(decl->getModuleContext());
+    mangler.mangleType(type, 0);
+    auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
+    addRelativeAddress(mangledName);
+
     switch (decl->getKind()) {
     case DeclKind::Class:
     case DeclKind::Struct: {
@@ -74,7 +81,6 @@ public:
   ReflectionMetadataBuilder(IRGenModule &IGM,
       ArrayRef<const NominalTypeDecl *> NominalTypeDecls)
     : ConstantBuilder(IGM), NominalTypeDecls(NominalTypeDecls) {}
-
   void layout() {
     for (auto decl : NominalTypeDecls) {
       addDecl(decl);

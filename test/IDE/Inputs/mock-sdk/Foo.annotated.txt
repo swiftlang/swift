@@ -30,17 +30,17 @@ var <loc>FooEnum1X</loc>: <ref:Struct>FooEnum1</ref> { get }</decl>
 enum <loc>FooComparisonResult</loc> : <ref:Struct>Int</ref> {
   <decl:Constructor><loc>init?(rawValue: <ref:Struct>Int</ref>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
-  <decl:EnumElement>case <loc>OrderedAscending</loc></decl>
-  <decl:EnumElement>case <loc>OrderedSame</loc></decl>
-  <decl:EnumElement>case <loc>OrderedDescending</loc></decl>
+  <decl:EnumElement>case <loc>orderedAscending</loc></decl>
+  <decl:EnumElement>case <loc>orderedSame</loc></decl>
+  <decl:EnumElement>case <loc>orderedDescending</loc></decl>
 }</decl>
 
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
 struct <loc>FooRuncingOptions</loc> : <ref:Protocol>OptionSet</ref> {
   <decl:Constructor><loc>init(rawValue: <ref:Struct>Int</ref>)</loc></decl>
   <decl:Var>let <loc>rawValue</loc>: <ref:Struct>Int</ref></decl>
-  <decl:Var>static var <loc>EnableMince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl:Var>static var <loc>EnableQuince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl:Var>static var <loc>enableMince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl:Var>static var <loc>enableQuince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
 }</decl>
 <decl:Struct>struct <loc>FooStruct1</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
@@ -276,9 +276,9 @@ func <loc>FooCFTypeRelease(_: <ref:Class>FooCFType</ref>!)</loc></decl>
 <decl:Enum>enum <loc>SCNFilterMode</loc> : <ref:Struct>Int</ref> {
   <decl:Constructor><loc>init?(rawValue: <ref:Struct>Int</ref>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
-  <decl:EnumElement>case <loc>None</loc></decl>
-  <decl:EnumElement>case <loc>Nearest</loc></decl>
-  <decl:EnumElement>case <loc>Linear</loc></decl>
+  <decl:EnumElement>case <loc>none</loc></decl>
+  <decl:EnumElement>case <loc>nearest</loc></decl>
+  <decl:EnumElement>case <loc>linear</loc></decl>
   <decl:EnumElement>@available(*, unavailable)
   case <loc>SCNNoFiltering</loc></decl>
 }</decl>

@@ -543,7 +543,7 @@ class ModuleFile::DeclCommentTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = StringRef;
-  using data_type = BriefAndRawComment;
+  using data_type = CommentInfo;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -596,6 +596,8 @@ public:
       new (&Comments[i]) SingleRawComment(RawText, StartColumn);
     }
     result.Raw = RawComment(Comments);
+    result.Group = endian::readNext<uint32_t, little, unaligned>(data);
+    result.SourceOrder = endian::readNext<uint32_t, little, unaligned>(data);
     return result;
   }
 };
@@ -611,6 +613,21 @@ ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
     SerializedDeclCommentTable::Create(base + tableOffset,
                                        base + sizeof(uint32_t), base,
                                        DeclCommentTableInfo(*this)));
+}
+
+std::unique_ptr<ModuleFile::GroupNameTable>
+ModuleFile::readGroupTable(ArrayRef<uint64_t> Fields, StringRef BlobData) {
+  std::unique_ptr<ModuleFile::GroupNameTable> pMap(
+    new ModuleFile::GroupNameTable);
+  auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
+  unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
+  for (unsigned I = 0; I < GroupCount; I ++) {
+    auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
+    auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
+    Data += RawSize;
+    (*pMap)[I] = RawText;
+  }
+  return pMap;
 }
 
 bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
@@ -641,6 +658,9 @@ bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
       switch (kind) {
       case comment_block::DECL_COMMENTS:
         DeclCommentTable = readDeclCommentTable(scratch, blobData);
+        break;
+      case comment_block::GROUP_NAMES:
+        GroupNamesMap = readGroupTable(scratch, blobData);
         break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
@@ -1200,19 +1220,21 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isHeader())
         continue;
 
-      StringRef ModulePath, ScopePath;
-      std::tie(ModulePath, ScopePath) = Dep.RawPath.split('\0');
+      StringRef ModulePathStr = Dep.RawPath;
+      StringRef ScopePath;
+      if (Dep.isScoped())
+        std::tie(ModulePathStr, ScopePath) = ModulePathStr.rsplit('\0');
 
-      auto ModuleID = Ctx.getIdentifier(ModulePath);
-      assert(!ModuleID.empty() &&
-             "invalid module name (submodules not yet supported)");
+      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1> AccessPath;
+      while (!ModulePathStr.empty()) {
+        StringRef NextComponent;
+        std::tie(NextComponent, ModulePathStr) = ModulePathStr.split('\0');
+        AccessPath.push_back({Ctx.getIdentifier(NextComponent), SourceLoc()});
+      }
 
-      if (ModuleID == Ctx.StdlibModuleName)
+      if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
-          AccessPath;
-      AccessPath.push_back({ ModuleID, SourceLoc() });
       Module *M = Ctx.getModule(AccessPath);
 
       auto Kind = ImportKind::Module;
@@ -1226,10 +1248,15 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           // about the import kind, we cannot do better.
           Kind = ImportKind::Func;
         } else {
+          // Lookup the decl in the top-level module.
+          Module *TopLevelModule = M;
+          if (AccessPath.size() > 1)
+            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().first);
+
           SmallVector<ValueDecl *, 8> Decls;
-          M->lookupQualified(ModuleType::get(M), ScopeID,
-                             NL_QualifiedDefault | NL_KnownNoDependency,
-                             nullptr, Decls);
+          TopLevelModule->lookupQualified(
+              ModuleType::get(TopLevelModule), ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");
@@ -1482,7 +1509,7 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   getTopLevelDecls(results);
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
+Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   assert(D);
 
   // Keep these as assertions instead of early exits to ensure that we are not
@@ -1513,7 +1540,42 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
+Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
+  if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
+    return None;
+  auto Group = (*GroupNamesMap)[Id];
+  if (Group.empty())
+    return None;
+  return Group;
+}
+
+Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
+  auto Triple = getCommentForDecl(D);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return getGroupNameById(Triple.getValue().Group);
+}
+
+Optional<unsigned>
+ModuleFile::getSourceOrderForDecl(const Decl *D) const {
+  auto Triple = getCommentForDecl(D);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return Triple.getValue().SourceOrder;
+}
+
+void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
+  if (!GroupNamesMap)
+    return;
+  for (auto It = GroupNamesMap->begin(); It != GroupNamesMap->end(); ++ It) {
+    Names.push_back(It->getSecond());
+  }
+}
+
+Optional<CommentInfo>
+ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   if (!DeclCommentTable)
     return None;
 

@@ -198,9 +198,14 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
   "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
   FALSE)
 
-option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE
-    "Should the stdlib be build with assert config set to release"
+option(SWIFT_STDLIB_ENABLE_RESILIENCE
+    "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
+
+if(SWIFT_SERIALIZE_STDLIB_UNITTEST AND SWIFT_STDLIB_ENABLE_RESILIENCE)
+  message(WARNING "Ignoring SWIFT_SERIALIZE_STDLIB_UNITTEST because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
+  set(SWIFT_SERIALIZE_STDLIB_UNITTEST FALSE)
+endif()
 
 option(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
     "Generate an Xcode project suitable for IDE use, but which cannot build"
@@ -660,7 +665,7 @@ if(SWIFT_BUILD_TOOLS)
 endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
-if(SWIFT_BUILD_PERF_TESTSUITE)
+if(SWIFT_BUILD_PERF_TESTSUITE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   add_subdirectory(benchmark)
 endif()
 if(SWIFT_INCLUDE_TESTS)
@@ -690,21 +695,3 @@ if(XCODE)
   add_custom_target(Miscellaneous
       SOURCES ${SWIFT_TOPLEVEL_HEADERS})
 endif()
-
-# Configure CPack.
-set(CPACK_GENERATOR "TGZ")
-set(CPACK_PACKAGE_RELOCATABLE "false")
-set(CPACK_PACKAGE_VENDOR "LLVM Project")
-set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY "OFF")
-set(CPACK_SET_DESTDIR "ON")
-
-set(CPACK_PACKAGE_NAME "swift")
-set(CPACK_SYSTEM_NAME "macosx")
-
-# FIXME: Real version number.
-execute_process(COMMAND date "+%Y%m%d"
-  OUTPUT_VARIABLE CPACK_PACKAGE_VERSION
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-# CPack must be included *after* its configuration variables are set.
-include(CPack)

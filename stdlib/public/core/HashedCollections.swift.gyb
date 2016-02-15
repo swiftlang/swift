@@ -2512,7 +2512,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc
   @warn_unused_result
-  internal func copy(zone zone: _SwiftNSZone) -> AnyObject {
+  internal func copy(withZone zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSSet` type, which is immutable.
     return self
@@ -2546,7 +2546,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @objc
-  internal func copy(zone zone: _SwiftNSZone) -> AnyObject {
+  internal func copy(withZone zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
     return self

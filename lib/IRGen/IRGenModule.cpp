@@ -196,7 +196,9 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Int8PtrTy,              // optional objc class methods
     Int8PtrTy,              // objc properties
     Int32Ty,                // size
-    Int32Ty                 // flags
+    Int32Ty,                // flags
+    Int16Ty,                // minimum witness count
+    Int16Ty                 // default witness count
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();

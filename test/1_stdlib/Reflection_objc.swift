@@ -64,7 +64,7 @@ print("ObjC quick look objects:")
 print("ObjC enums:")
 
 // CHECK-NEXT: We cannot reflect NSComparisonResult yet
-print("We cannot reflect \(NSComparisonResult.OrderedAscending) yet")
+print("We cannot reflect \(NSComparisonResult.orderedAscending) yet")
 
 // Don't crash when introspecting framework types such as NSURL.
 // <rdar://problem/16592777>

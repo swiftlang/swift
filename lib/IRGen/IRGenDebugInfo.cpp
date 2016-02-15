@@ -194,33 +194,21 @@ static const char *getFilenameFromDC(const DeclContext *DC) {
     return nullptr;
 }
 
-
-Location getDeserializedLoc(Pattern*) { return {}; }
-Location getDeserializedLoc(Expr*)    { return {}; }
-Location getDeserializedLoc(Stmt*)    { return {}; }
-Location getDeserializedLoc(Decl* D)  {
-  Location L = {};
+SILLocation::DebugLoc getDeserializedLoc(Pattern *) { return {}; }
+SILLocation::DebugLoc getDeserializedLoc(Expr *) { return {}; }
+SILLocation::DebugLoc getDeserializedLoc(Stmt *) { return {}; }
+SILLocation::DebugLoc getDeserializedLoc(Decl *D) {
+  SILLocation::DebugLoc L;
   const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (const char *Filename = getFilenameFromDC(DC)) {
+  if (const char *Filename = getFilenameFromDC(DC))
     L.Filename = Filename;
-    L.Line = 0;
-  }
-  return L;
-}
-
-Location getLoc(SourceManager &SM, SourceLoc Loc) {
-  Location L = {};
-  if (Loc.isValid()) {
-    L.Filename = SM.getBufferIdentifierForLoc(Loc);
-    std::tie(L.Line, L.Col) = SM.getLineAndColumn(Loc);
-  }
   return L;
 }
 
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template <typename WithLoc>
-Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
-  Location L = {};
+SILLocation::DebugLoc getDebugLoc(SourceManager &SM, WithLoc *S, bool End = false) {
+  SILLocation::DebugLoc L;
   if (S == nullptr)
     return L;
 
@@ -231,37 +219,38 @@ Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
     // the module.
     return getDeserializedLoc(S);
 
-  return getLoc(SM, Loc);
+  return SILLocation::decode(Loc, SM);
 }
 
-/// \brief Return the start of the location's source range.
-static Location getStartLocation(SourceManager &SM,
-                                 Optional<SILLocation> OptLoc) {
+/// Return the start of the location's source range.
+static SILLocation::DebugLoc getStartLocation(Optional<SILLocation> OptLoc,
+                                              SourceManager &SM) {
   if (!OptLoc) return {};
-  return getLoc(SM, OptLoc->getStartSourceLoc());
+  return SILLocation::decode(OptLoc->getStartSourceLoc(), SM);
 }
 
-/// \brief Return the debug location from a SILLocation.
-static Location getDebugLocation(SourceManager &SM,
-                                 Optional<SILLocation> OptLoc) {
+/// Return the debug location from a SILLocation.
+static SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc,
+                                              SourceManager &SM) {
   if (!OptLoc || OptLoc->isInPrologue())
     return {};
-  return getLoc(SM, OptLoc->getDebugSourceLoc());
+  return OptLoc->decodeDebugLoc(SM);
 }
 
 
-/// \brief Extract the start location from a SILLocation.
+/// Extract the start location from a SILLocation.
 ///
 /// This returns a FullLocation, which contains the location that
 /// should be used for the linetable and the "true" AST location (used
 /// for, e.g., variable declarations).
-static FullLocation getLocation(SourceManager &SM,
-                                Optional<SILLocation> OptLoc) {
-  if (!OptLoc) return {};
+static FullLocation getFullLocation(Optional<SILLocation> OptLoc,
+                                    SourceManager &SM) {
+  if (!OptLoc)
+    return {};
 
   SILLocation Loc = OptLoc.getValue();
-  return { getLoc(SM, Loc.getDebugSourceLoc()),
-           getLoc(SM, Loc.getSourceLoc())};
+  return { Loc.decodeDebugLoc(SM),
+           SILLocation::decode(Loc.getSourceLoc(), SM) };
 }
 
 /// Determine whether this debug scope belongs to an explicit closure.
@@ -284,30 +273,22 @@ static bool isAbstractClosure(const SILLocation &Loc) {
   return false;
 }
 
-/// Construct an inlined-at location from a SILScope.
-llvm::MDNode *
-IRGenDebugInfo::createInlinedAt(const SILDebugScope *CallSite) {
-  if (!CallSite)
-    return nullptr;
-
-  // In SIL the inlined-at information is part of the scopes, in LLVM
-  // IR it is part of the location. Transforming the inlined-at SIL scope
-  // to a location means skipping the inlined-at scope.
-  llvm::DIScope * ParentScope;
-  if (auto *Parent = CallSite->Parent.dyn_cast<const SILDebugScope *>())
-    ParentScope = getOrCreateScope(Parent);
-  else
-    ParentScope = getOrCreateScope(CallSite);
-
+/// Construct an LLVM inlined-at location from a SILDebugScope,
+/// reversing the order in the process.
+llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
   llvm::MDNode *InlinedAt = nullptr;
-
-  // If this is itself an inlined location, recursively create the
-  // inlined-at location for it.
-  InlinedAt = createInlinedAt(CallSite->InlinedCallSite);
-
-  auto InlineLoc = getLoc(SM, CallSite->Loc.getDebugSourceLoc());
-  return llvm::DebugLoc::get(InlineLoc.Line, InlineLoc.Col, ParentScope,
-                             InlinedAt);
+  if (DS) {
+    for (auto *CS : DS->flattenedInlineTree()) {
+      // In SIL the inlined-at information is part of the scopes, in
+      // LLVM IR it is part of the location. Transforming the inlined-at
+      // SIL scope to a location means skipping the inlined-at scope.
+      auto *Parent = CS->Parent.get<const SILDebugScope *>();
+      auto *ParentScope = getOrCreateScope(Parent);
+      auto L = CS->Loc.decodeDebugLoc(SM);
+      InlinedAt = llvm::DebugLoc::get(L.Line, L.Col, ParentScope, InlinedAt);
+    }
+  }
+  return InlinedAt;
 }
 
 #ifndef NDEBUG
@@ -339,11 +320,13 @@ bool IRGenDebugInfo::lineNumberIsSane(IRBuilder &Builder, unsigned Line) {
 void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
   assert(DS && "empty scope");
-  auto *Scope = getOrCreateScope(DS);
+  // Inline info is emitted as part of the location below; extract the
+  // original scope here.
+  auto *Scope = getOrCreateScope(DS->getInlinedScope());
   if (!Scope)
     return;
 
-  Location L = getDebugLocation(SM, Loc);
+  auto L = getDebugLocation(Loc, SM);
   auto *File = getOrCreateFile(L.Filename);
   if (File->getFilename() != Scope->getFilename()) {
     // We changed files in the middle of a scope. This happens, for
@@ -380,7 +363,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   LastDebugLoc = L;
   LastScope = DS;
 
-  auto *InlinedAt = createInlinedAt(DS->InlinedCallSite);
+  auto *InlinedAt = createInlinedAt(DS);
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
   auto DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
@@ -431,7 +414,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
     return Parent;
 
   assert(DS->Parent && "lexical block must have a parent subprogram");
-  Location L = getStartLocation(SM, DS->Loc);
+  auto L = getStartLocation(DS->Loc, SM);
   llvm::DIFile *File = getOrCreateFile(L.Filename);
   auto *DScope = DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
 
@@ -578,7 +561,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
 
     // Create a Forward-declared type.
     auto *TyDecl = cast<NominalTypeDecl>(DC);
-    auto Loc = getLoc(SM, TyDecl);
+    auto Loc = getDebugLoc(SM, TyDecl);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
     auto FwdDecl = DBuilder.createForwardDecl(
@@ -669,14 +652,14 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
       Name = getName(DS->Loc);
   }
 
-  Location L = {};
+  SILLocation::DebugLoc L;
   unsigned ScopeLine = 0; /// The source line used for the function prologue.
   // Bare functions and thunks should not have any line numbers. This
   // is especially important for shared functions like reabstraction
-  // thunk helpers, where getLocation() returns an arbitrary location
+  // thunk helpers, where getFullLocation() returns an arbitrary location
   // of whichever use was emitted first.
   if (DS && (!SILFn || (!SILFn->isBare() && !SILFn->isThunk()))) {
-    auto FL = getLocation(SM, DS->Loc);
+    auto FL = getFullLocation(DS->Loc, SM);
     L = FL.Loc;
     ScopeLine = FL.LocForLinetable.Line;
   }
@@ -776,7 +759,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
     return;
   }
   auto DIMod = getOrCreateModule({D->getModulePath(), M});
-  Location L = getLoc(SM, D);
+  auto L = getDebugLoc(SM, D);
   DBuilder.createImportedModule(getOrCreateFile(L.Filename), DIMod, L.Line);
 }
 
@@ -985,7 +968,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   auto *Scope = dyn_cast<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
-  Location Loc = getLoc(SM, DbgTy.getDecl());
+  auto Loc = getDebugLoc(SM, DbgTy.getDecl());
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
@@ -1060,8 +1043,8 @@ void IRGenDebugInfo::emitVariableDeclaration(
       auto Size = Dim.SizeInBits;
       Dim = EltSizes.getNext();
       OffsetInBits +=
-        llvm::RoundUpToAlignment(Size, Dim.AlignInBits ? Dim.AlignInBits
-                                                       : SizeOfByte);
+        llvm::alignTo(Size, Dim.AlignInBits ? Dim.AlignInBits
+                      : SizeOfByte);
     }
     emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
                      Loc.Col, Scope, DS);
@@ -1082,8 +1065,9 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
                                       unsigned Col, llvm::DILocalScope *Scope,
                                       const SILDebugScope *DS) {
   // Set the location/scope of the intrinsic.
-  auto *InlinedAt = createInlinedAt(DS->InlinedCallSite);
+  auto *InlinedAt = createInlinedAt(DS);
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
+
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) && llvm::FindAllocaDbgDeclare(Storage))
     return;
@@ -1118,7 +1102,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
     // would confuse both the user and LLDB.
     return;
 
-  Location L = getStartLocation(SM, Loc);
+  auto L = getStartLocation(Loc, SM);
   auto File = getOrCreateFile(L.Filename);
 
   // Emit it as global variable of the current module.
@@ -1148,7 +1132,7 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
       Scope, Name, File, 0, SizeOfByte * DbgTy.size.getValue(),
       SizeOfByte * DbgTy.align.getValue(), OffsetInBits, Flags, Ty);
   OffsetInBits += getSizeInBits(Ty, DIRefMap);
-  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits,
+  OffsetInBits = llvm::alignTo(OffsetInBits,
                                           SizeOfByte * DbgTy.align.getValue());
   return DITy;
 }
@@ -1460,7 +1444,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Struct: {
     auto *StructTy = BaseTy->castTo<StructType>();
     auto *Decl = StructTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     return createStructType(DbgTy, Decl, StructTy, Scope,
                             getOrCreateFile(L.Filename), L.Line, SizeInBits,
                             AlignInBits, Flags,
@@ -1474,7 +1458,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // used to differentiate them from C++ and ObjC classes.
     auto *ClassTy = BaseTy->castTo<ClassType>();
     auto *Decl = ClassTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     if (auto *ClangDecl = Decl->getClangDecl()) {
       auto ClangSrcLoc = ClangDecl->getLocStart();
       clang::SourceManager &ClangSM =
@@ -1511,7 +1495,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *ProtocolTy = BaseTy->castTo<ProtocolType>();
     auto *Decl = ProtocolTy->getDecl();
     // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     auto File = getOrCreateFile(L.Filename);
     return createPointerSizedStruct(Scope,
                                     Decl ? Decl->getNameStr() : MangledName,
@@ -1520,7 +1504,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::ProtocolComposition: {
     auto *Decl = DbgTy.getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     auto File = getOrCreateFile(L.Filename);
 
     // FIXME: emit types
@@ -1533,7 +1517,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::UnboundGeneric: {
     auto *UnboundTy = BaseTy->castTo<UnboundGenericType>();
     auto *Decl = UnboundTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     return createPointerSizedStruct(Scope,
                                     Decl ? Decl->getNameStr() : MangledName,
                                     File, L.Line, Flags, MangledName);
@@ -1542,7 +1526,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BoundGenericStruct: {
     auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
     auto *Decl = StructTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     return createPointerSizedStruct(Scope,
                                     Decl ? Decl->getNameStr() : MangledName,
                                     File, L.Line, Flags, MangledName);
@@ -1551,7 +1535,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BoundGenericClass: {
     auto *ClassTy = BaseTy->castTo<BoundGenericClassType>();
     auto *Decl = ClassTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     // TODO: We may want to peek at Decl->isObjC() and set this
     // attribute accordingly.
     return createPointerSizedStruct(Scope,
@@ -1598,7 +1582,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::Archetype: {
     auto *Archetype = BaseTy->castTo<ArchetypeType>();
-    Location L = getLoc(SM, Archetype->getAssocType());
+    auto L = getDebugLoc(SM, Archetype->getAssocType());
     auto Superclass = Archetype->getSuperclass();
     auto DerivedFrom = Superclass.isNull()
                            ? nullptr
@@ -1633,7 +1617,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Metatype: {
     // Metatypes are (mostly) singleton type descriptors, often without storage.
     Flags |= llvm::DINode::FlagArtificial;
-    Location L = getLoc(SM, DbgTy.getDecl());
+    auto L = getDebugLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     return DBuilder.createStructType(
         Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
@@ -1685,7 +1669,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Enum: {
     auto *EnumTy = BaseTy->castTo<EnumType>();
     auto *Decl = EnumTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     return createEnumType(DbgTy, Decl, MangledName, Scope,
                           getOrCreateFile(L.Filename), L.Line, Flags);
   }
@@ -1693,7 +1677,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BoundGenericEnum: {
     auto *EnumTy = BaseTy->castTo<BoundGenericEnumType>();
     auto *Decl = EnumTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     return createEnumType(DbgTy, Decl, MangledName, Scope,
                           getOrCreateFile(L.Filename), L.Line, Flags);
   }
@@ -1716,7 +1700,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::WeakStorage: {
     auto *ReferenceTy = cast<ReferenceStorageType>(BaseTy);
     auto CanTy = ReferenceTy->getReferentType();
-    Location L = getLoc(SM, DbgTy.getDecl());
+    auto L = getDebugLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy),
                                   MangledName, File, L.Line, File);
@@ -1728,7 +1712,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
     auto *NameAliasTy = cast<NameAliasType>(BaseTy);
     auto *Decl = NameAliasTy->getDecl();
-    Location L = getLoc(SM, Decl);
+    auto L = getDebugLoc(SM, Decl);
     auto AliasedTy = Decl->getUnderlyingType();
     auto File = getOrCreateFile(L.Filename);
     // For NameAlias types, the DeclContext for the aliasED type is

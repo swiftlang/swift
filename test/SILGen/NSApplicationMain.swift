@@ -11,7 +11,7 @@ class MyDelegate: NSApplicationDelegate {}
 
 // CHECK-LABEL: sil @main
 // CHECK:         function_ref @NSApplicationMain
-// IR-LABEL: define i32 @main
+// IR-LABEL: define{{( protected)?}} i32 @main
 // IR:            call i32 @NSApplicationMain
 
 // Ensure that we coexist with normal references to the functions we

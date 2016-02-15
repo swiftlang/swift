@@ -469,19 +469,6 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   return cs.solveSingle().hasValue();
 }
 
-/// Count the number of default arguments in the primary clause.
-static unsigned countDefaultArguments(AbstractFunctionDecl *func) {
-  auto paramList = func->getParameterList(func->getImplicitSelfDecl() != 0);
-
-  unsigned count = 0;
-  for (auto elt : *paramList) {
-    if (elt->isDefaultArgument())
-      ++count;
-  }
-
-  return count;
-}
-
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -646,6 +633,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
       }
 
+      bool fewerEffectiveParameters = false;
       switch (checkKind) {
       case CheckAll:
         // Check whether the first type is a subtype of the second.
@@ -660,10 +648,46 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         // second type's inputs, i.e., can we forward the arguments?
         auto funcTy1 = openedType1->castTo<FunctionType>();
         auto funcTy2 = openedType2->castTo<FunctionType>();
-        cs.addConstraint(ConstraintKind::Subtype,
-                         funcTy1->getInput(),
-                         funcTy2->getInput(),
-                         locator);
+        SmallVector<CallArgParam, 4> params1 =
+          decomposeArgParamType(funcTy1->getInput());
+        SmallVector<CallArgParam, 4> params2 =
+          decomposeArgParamType(funcTy2->getInput());
+
+        unsigned numParams1 = params1.size();
+        unsigned numParams2 = params2.size();
+        if (numParams1 > numParams2) return false;
+
+        for (unsigned i = 0; i != numParams2; ++i) {
+          // If there is no corresponding argument in the first
+          // parameter list...
+          if (i >= numParams1) {
+            // We need either a default argument or a variadic
+            // argument for the first declaration to be more
+            // specialized.
+            if (!params2[i].HasDefaultArgument && !params2[i].Variadic)
+              return false;
+
+            fewerEffectiveParameters = true;
+            continue;
+          }
+
+          // Labels must match.
+          if (params1[i].Label != params2[i].Label) return false;
+
+          // If one parameter is variadic and the other is not...
+          if (params1[i].Variadic != params2[i].Variadic) {
+            // If the first parameter is the variadic one, it's not
+            // more specialized.
+            if (params1[i].Variadic) return false;
+
+            fewerEffectiveParameters = true;
+          }
+
+          // Check whether the first parameter is a subtype of the second.
+          cs.addConstraint(ConstraintKind::Subtype,
+                           params1[i].Ty, params2[i].Ty, locator);
+        }
+
         break;
       }
       }
@@ -671,29 +695,13 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // Solve the system.
       auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
 
-
       // Ban value-to-optional conversions.
       if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
         return true;
 
-      // Between two imported functions/methods, prefer one with fewer
-      // defaulted arguments.
-      //
-      // FIXME: This is a total hack; we should be comparing based on the
-      // number of default arguments at were actually used. It's only safe to
-      // do this because the count will be zero except when under the
-      // experimental InferDefaultArguments mode of the Clang importer.
-      if (isa<AbstractFunctionDecl>(decl1) && 
-          isa<AbstractFunctionDecl>(decl2) &&
-          decl1->getClangDecl() && 
-          decl2->getClangDecl()) {
-        unsigned defArgsIn1
-          = countDefaultArguments(cast<AbstractFunctionDecl>(decl1));
-        unsigned defArgsIn2
-          = countDefaultArguments(cast<AbstractFunctionDecl>(decl2));
-        if (defArgsIn1 < defArgsIn2)
-          return true;
-      }
+      // If the first function has fewer effective parameters than the
+      // second, it is more specialized.
+      if (fewerEffectiveParameters) return true;
 
       return false;
     };

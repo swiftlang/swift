@@ -15,7 +15,7 @@
 // CHECK: [[NSSIZE:%VSC6NSSize]] = type <{ %Sd, %Sd }>
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
-// CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = global %objc_class {
+// CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = {{(protected )?}}global %objc_class {
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,

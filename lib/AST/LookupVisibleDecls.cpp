@@ -521,6 +521,7 @@ static void lookupVisibleMemberDeclsImpl(
 }
 
 namespace {
+
 struct FoundDeclTy {
   ValueDecl *D;
   DeclVisibilityKind Reason;
@@ -529,13 +530,39 @@ struct FoundDeclTy {
       : D(D), Reason(Reason) {}
 
   friend bool operator==(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
+    // If this ever changes - e.g. to include Reason - be sure to also update
+    // DenseMapInfo<FoundDeclTy>::getHashValue().
     return LHS.D == RHS.D;
   }
+};
 
-  friend bool operator<(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
-    return LHS.D < RHS.D;
+} // end anonymous namespace
+
+namespace llvm {
+
+template <> struct DenseMapInfo<FoundDeclTy> {
+  static inline FoundDeclTy getEmptyKey() {
+    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalVariable};
+  }
+
+  static inline FoundDeclTy getTombstoneKey() {
+    return FoundDeclTy{reinterpret_cast<ValueDecl *>(0x1),
+                       DeclVisibilityKind::LocalVariable};
+  }
+
+  static unsigned getHashValue(const FoundDeclTy &Val) {
+    // Note: FoundDeclTy::operator== only considers D, so don't hash Reason here.
+    return llvm::hash_value(Val.D);
+  }
+
+  static bool isEqual(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
+    return LHS == RHS;
   }
 };
+
+} // end llvm namespace
+
+namespace {
 
 /// Similar to swift::conflicting, but lenient about protocol extensions which
 /// don't affect code completion's concept of overloading.

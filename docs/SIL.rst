@@ -1047,11 +1047,10 @@ instances. Derived classes inherit the witness tables of their base class.
 Witness tables are keyed by *protocol conformance*, which is a unique identifier
 for a concrete type's conformance to a protocol.
 
-- A *normal protocol conformance*
-  names a (potentially unbound generic) type, the protocol it conforms to, and
-  the module in which the type or extension declaration that provides the
-  conformance appears. These correspond 1:1 to protocol conformance declarations
-  in the source code.
+- A *normal protocol conformance* names a (potentially unbound generic) type,
+  the protocol it conforms to, and the module in which the type or extension
+  declaration that provides the conformance appears. These correspond 1:1 to
+  protocol conformance declarations in the source code.
 - If a derived class conforms to a protocol through inheritance from its base
   class, this is represented by an *inherited protocol conformance*, which
   simply references the protocol conformance for the base class.
@@ -1086,6 +1085,55 @@ Witness tables consist of the following entries:
 - *Associated type protocol entries* map a protocol requirement on an associated
   type to the protocol conformance that satisfies that requirement for the
   associated type.
+
+Default Witness Tables
+~~~~~~~~~~~~~~~~~~~~~~
+::
+
+  decl ::= sil-default-witness-table
+  sil-default-witness-table ::= 'sil_default_witness_table'
+                                identifier minimum-witness-table-size
+                                '{' sil-default-witness-entry* '}'
+  minimum-witness-table-size ::= integer
+
+SIL encodes requirements with resilient default implementations in a default
+witness table. We say a requirement has a resilient default implementation if
+the following conditions hold:
+
+- The requirement has a default implementation
+- The requirement is either the last requirement in the protocol, or all
+  subsequent requirements also have resilient default implementations
+
+The set of requirements with resilient default implementations is stored in
+protocol metadata.
+
+The minimum witness table size is the size of the witness table, in words,
+not including any requirements with resilient default implementations.
+
+Any conforming witness table must have a size between the minimum size, and
+the maximum size, which is equal to the minimum size plus the number of
+default requirements.
+
+At load time, if the runtime encounters a witness table with fewer than the
+maximum number of witnesses, the witness table is copied, with default
+witnesses copied in. This ensures that callers can always expect to find
+the correct number of requirements in each witness table, and new
+requirements can be added by the framework author, without breaking client
+code, as long as the new requirements have resilient default implementations.
+
+Default witness tables are keyed by the protocol itself. Only protocols with
+public visibility need a default witness table; private and internal protocols
+are never seen outside the module, therefore there are no resilience issues
+with adding new requirements.
+
+::
+
+  sil-default-witness-entry ::= 'method' sil-decl-ref ':' sil-function-name
+
+Default witness tables currently contain only one type of entry:
+
+- *Method entries* map a method requirement of the protocol to a SIL function
+  that implements that method in a manner suitable for all witness types.
 
 Global Variables
 ~~~~~~~~~~~~~~~~

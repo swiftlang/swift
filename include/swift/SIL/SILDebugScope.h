@@ -44,8 +44,8 @@ public:
   /// holds only the location of the call site. The parent scope will be
   /// the scope of the inlined call site.
   ///
-  /// Note that compared to the inlinedAt field in llvm::DILocation
-  /// the inlined call site chain in SILDebugScope uses the reversed order.
+  /// Note that compared to the inlinedAt chain in llvm::DILocation
+  /// SILDebugScope represents an inline tree.
   const SILDebugScope *InlinedCallSite;
 
   SILDebugScope(SILLocation Loc, SILFunction &SILFn,
@@ -70,6 +70,9 @@ public:
     assert(CallSiteScope && CalleeScope);
     assert(CalleeScope->getParentFunction()->isInlined() &&
            "function of inlined debug scope is not inlined");
+    if (InlinedCallSite)
+      assert(!InlinedCallSite->InlinedCallSite &&
+             "a call site scope cannot have an inlined call site");
   }
 
   /// Return the function this scope originated from before being inlined.
@@ -84,17 +87,36 @@ public:
     return Scope->Parent.get<SILFunction *>();
   }
 
+  /// Return this scope without inline information.
+  const SILDebugScope *getInlinedScope() const {
+    return InlinedCallSite ? Parent.get<const SILDebugScope*>() : this;
+  }
+  
   /// Return the parent function of this scope. If the scope was
   /// inlined this recursively returns the function it was inlined
   /// into.
   SILFunction *getParentFunction() const {
     if (InlinedCallSite)
-      return InlinedCallSite->getParentFunction();
+      return InlinedCallSite->Parent.get<const SILDebugScope *>()
+          ->getParentFunction();
     if (auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>())
       return ParentScope->getParentFunction();
     return Parent.get<SILFunction *>();
   }
 
+  typedef SmallVector<const SILDebugScope *, 8> InlineScopeList;
+  static void flatten(const SILDebugScope *DS, InlineScopeList &List);
+
+  // Return a flattened representation of the inline scope tree that
+  // is equivalent to the reversed inlined-at chain.
+  InlineScopeList flattenedInlineTree() const {
+    InlineScopeList List;
+    flatten(this, List);
+    return List;
+  }
+
+  void dump(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),
+            unsigned Indent = 0) const;
 };
 
 #ifndef NDEBUG

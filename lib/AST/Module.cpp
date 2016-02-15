@@ -1638,25 +1638,30 @@ StringRef LoadedFile::getFilename() const {
   return "";
 }
 
+static const clang::Module *
+getClangModule(llvm::PointerUnion<const Module *, const void *> Union) {
+  return static_cast<const clang::Module *>(Union.get<const void *>());
+}
+
 StringRef ModuleEntity::getName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->getName().str();
-  return Mod.get<const clang::Module*>()->Name;
+  return getClangModule(Mod)->Name;
 }
 
 std::string ModuleEntity::getFullName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->getName().str();
-  return Mod.get<const clang::Module*>()->getFullModuleName();
+  return getClangModule(Mod)->getFullModuleName();
 }
 
 bool ModuleEntity::isSystemModule() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->isSystemModule();
-  return Mod.get<const clang::Module*>()->IsSystem;
+  return getClangModule(Mod)->IsSystem;
 }
 
 bool ModuleEntity::isBuiltinModule() const {

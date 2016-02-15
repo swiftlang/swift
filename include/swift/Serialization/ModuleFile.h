@@ -296,6 +296,9 @@ private:
   using SerializedDeclCommentTable =
       llvm::OnDiskIterableChainedHashTable<DeclCommentTableInfo>;
 
+  using GroupNameTable = llvm::DenseMap<unsigned, StringRef>;
+
+  std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
   struct {
@@ -397,6 +400,9 @@ private:
   /// \c comment_block::DeclCommentListLayout format.
   std::unique_ptr<SerializedDeclCommentTable>
   readDeclCommentTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  std::unique_ptr<GroupNameTable>
+  readGroupTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Reads the comment block, which contains USR to comment mappings.
   ///
@@ -608,8 +614,12 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
-  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
+  Optional<StringRef> getGroupNameById(unsigned Id) const;
+  Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
+  void collectAllGroups(std::vector<StringRef> &Names) const;
+  Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 

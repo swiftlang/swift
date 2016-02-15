@@ -19,6 +19,9 @@
 // RUN: %target-run %t/after_before
 // RUN: %target-run %t/after_after
 
+// REQUIRES: executable_test
+// REQUIRES: no_asan
+
 import StdlibUnittest
 import class_change_size
 

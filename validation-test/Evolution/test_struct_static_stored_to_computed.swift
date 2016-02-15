@@ -19,6 +19,8 @@
 // RUN: %target-run %t/after_before
 // RUN: %target-run %t/after_after
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 import struct_static_stored_to_computed
 

@@ -334,16 +334,15 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
 }
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
-  Chunk *TailChunks = reinterpret_cast<Chunk *>(this + 1);
-  std::copy(Chunks.begin(), Chunks.end(), TailChunks);
+  std::uninitialized_copy(Chunks.begin(), Chunks.end(),
+                          getTrailingObjects<Chunk>());
   NumChunks = Chunks.size();
 }
 
 CodeCompletionString *CodeCompletionString::create(llvm::BumpPtrAllocator &Allocator,
                                                    ArrayRef<Chunk> Chunks) {
-  void *CCSMem = Allocator.Allocate(sizeof(CodeCompletionString) +
-                                    Chunks.size() * sizeof(CodeCompletionString::Chunk),
-                                    llvm::alignOf<CodeCompletionString>());
+  void *CCSMem = Allocator.Allocate(totalSizeToAlloc<Chunk>(Chunks.size()),
+                                    alignof(CodeCompletionString));
   return new (CCSMem) CodeCompletionString(Chunks);
 }
 
@@ -1234,7 +1233,7 @@ public:
       SmallVectorImpl<StringRef> &Keywords) override;
 
   void completePoundAvailablePlatform() override;
-  void completeImportDecl(ArrayRef<std::pair<Identifier, SourceLoc>> Path) override;
+  void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
   void completeUnresolvedMember(UnresolvedMemberExpr *E,
                                 ArrayRef<StringRef> Identifiers,
                                 bool HasReturn) override;
@@ -1603,6 +1602,12 @@ public:
     }
   }
 
+  bool isModuleLoaded(ASTContext &Ctx, clang::Module *M) {
+    return Ctx.getLoadedModule(llvm::makeArrayRef(
+      std::make_pair(Ctx.getIdentifier(M->getTopLevelModuleName()),
+                     SourceLoc())));
+  }
+
   void addImportModuleNames() {
     // FIXME: Add user-defined swift modules
     SmallVector<clang::Module*, 20> Modules;
@@ -1629,7 +1634,8 @@ public:
         Builder.addTypeAnnotation("Module");
 
         // Imported modules are not recommended.
-        Builder.setNotRecommended(ClangImporter::isModuleImported(M));
+        Builder.setNotRecommended(isModuleLoaded(CurrDeclContext->
+          getASTContext(), M));
       }
     }
   }
@@ -4004,7 +4010,7 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
 }
 
 void CodeCompletionCallbacksImpl::completeImportDecl(
-    ArrayRef<std::pair<Identifier, SourceLoc>> Path) {
+    std::vector<std::pair<Identifier, SourceLoc>> &Path) {
   Kind = CompletionKind::Import;
   CurDeclContext = P.CurDeclContext;
   DotLoc = Path.empty() ? SourceLoc() : Path.back().second;
@@ -4012,7 +4018,15 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
     return;
   auto Importer = static_cast<ClangImporter *>(CurDeclContext->getASTContext().
                                                getClangModuleLoader());
-  Importer->collectSubModuleNamesAndVisibility(Path, SubModuleNameVisibilityPairs);
+  std::vector<std::string> SubNames;
+  Importer->collectSubModuleNames(Path, SubNames);
+  ASTContext &Ctx = CurDeclContext->getASTContext();
+  for (StringRef Sub : SubNames) {
+    Path.push_back(std::make_pair(Ctx.getIdentifier(Sub), SourceLoc()));
+    SubModuleNameVisibilityPairs.push_back(
+      std::make_pair(Sub.str(), Ctx.getLoadedModule(Path)));
+    Path.pop_back();
+  }
 }
 
 void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E,

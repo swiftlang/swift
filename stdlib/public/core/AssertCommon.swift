@@ -103,7 +103,7 @@ func _reportUnimplementedInitializer(
 /// This function should be used only in the implementation of user-level
 /// assertions.
 ///
-/// This function should not be inlined because it is cold and it inlining just
+/// This function should not be inlined because it is cold and inlining just
 /// bloats code.
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
@@ -133,7 +133,7 @@ func _assertionFailed(
 /// This function should be used only in the implementation of user-level
 /// assertions.
 ///
-/// This function should not be inlined because it is cold and it inlining just
+/// This function should not be inlined because it is cold and inlining just
 /// bloats code.
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")

@@ -350,6 +350,7 @@ final class ClassNode : IntrusiveListNode {
 }
 
 struct StructNode : IntrusiveListNode { // expected-error{{non-class type 'StructNode' cannot conform to class protocol 'IntrusiveListNode'}}
+  // expected-error@-1{{value type 'StructNode' cannot have a stored property that references itself}}
   var next : StructNode
 }
 
@@ -379,6 +380,7 @@ final class GenericClassNode<T> : IntrusiveListNode {
 }
 
 struct GenericStructNode<T> : IntrusiveListNode { // expected-error{{non-class type 'GenericStructNode<T>' cannot conform to class protocol 'IntrusiveListNode'}}
+  // expected-error@-1{{value type 'GenericStructNode<T>' cannot have a stored property that references itself}}
   var next : GenericStructNode<T>
 }
 
@@ -394,6 +396,7 @@ final class ClassDNode : IntrusiveDListNode {
 
 struct StructDNode : IntrusiveDListNode { // expected-error{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveDListNode'}}
   // expected-error@-1{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveListNode'}}
+  // expected-error@-2{{value type 'StructDNode' cannot have a stored property that references itself}}
   var prev : StructDNode
   var next : StructDNode
 }

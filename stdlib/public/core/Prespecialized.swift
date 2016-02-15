@@ -88,3 +88,11 @@ struct _Prespecialize {
     return count
   }
 }
+
+// Mark with optimize.sil.never to make sure its not get
+// rid of by dead function elimination. 
+@_semantics("optimize.sil.never")
+internal func _swift_forcePrespecializations() {
+  _Prespecialize._specializeArrays()
+  _Prespecialize._specializeRanges()
+}

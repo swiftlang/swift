@@ -490,7 +490,12 @@ public:
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   SILLinkage getLinkage(IRGenModule &IGM, ForDefinition_t isDefinition) const;
-  
+
+  /// Returns true if this function or global variable is potentially defined
+  /// in a different module.
+  ///
+  bool isAvailableExternally(IRGenModule &IGM) const;
+
   /// Returns true if this function or global variable may be inlined into
   /// another module.
   ///
@@ -611,7 +616,12 @@ public:
                                   Optional<SILLocation> DebugLoc = None,
                                   StringRef DebugName = StringRef());
 
-  bool isUsed() const;
+  bool isUsed() const {
+    return ForDefinition && isUsed(Linkage, Visibility);
+  }
+  
+  static bool isUsed(llvm::GlobalValue::LinkageTypes Linkage,
+                     llvm::GlobalValue::VisibilityTypes Visibility);
 };
 
 } // end namespace irgen

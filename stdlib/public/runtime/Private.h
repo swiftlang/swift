@@ -26,6 +26,7 @@ namespace swift {
   struct ProtocolDescriptor;
 
 #if SWIFT_HAS_ISA_MASKING
+  SWIFT_RUNTIME_EXPORT
   extern "C" uintptr_t swift_isaMask;
 #endif
 

@@ -41,9 +41,9 @@ enum FooComparisonResult : Int {
   var rawValue: Int { get }
   
   // This is ascending
-  case OrderedAscending
-  case OrderedSame // But this is the same.
-  case OrderedDescending
+  case orderedAscending
+  case orderedSame // But this is the same.
+  case orderedDescending
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
@@ -52,8 +52,8 @@ struct FooRuncingOptions : OptionSet {
   let rawValue: Int
   
   // This is mince.
-  static var EnableMince: FooRuncingOptions { get }
-  static var EnableQuince: FooRuncingOptions { get } /* But this is quince */
+  static var enableMince: FooRuncingOptions { get }
+  static var enableQuince: FooRuncingOptions { get } /* But this is quince */
 }
 
 struct FooStruct1 {
@@ -335,9 +335,9 @@ enum SCNFilterMode : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   
-  case None
-  case Nearest
-  case Linear
+  case none
+  case nearest
+  case linear
   @available(*, unavailable)
   case SCNNoFiltering // This comment should not show without decl.
 }

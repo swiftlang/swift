@@ -10,5 +10,6 @@ module SwiftShims {
   header "SwiftStddef.h"
   header "SwiftStdint.h"
   header "UnicodeShims.h"
+  header "Visibility.h"
   export *
 }

@@ -15,12 +15,12 @@ final class Foo<T: NSCoding>: NSObject, NSCoding {
   }
 
   @objc required convenience init(coder: NSCoder) {
-    let one = coder.decodeObjectForKey("one") as! T
-    let two = coder.decodeObjectForKey("two") as! T
+    let one = coder.decodeObject(forKey: "one") as! T
+    let two = coder.decodeObject(forKey :"two") as! T
     self.init(one: one, two: two)
   }
 
-  @objc(encodeWithCoder:) func encodeWith(encoder: NSCoder) {
+  @objc(encodeWithCoder:) func encode(withCoder encoder: NSCoder) {
     encoder.encode(one, forKey: "one")
     encoder.encode(two, forKey: "two")
   }
@@ -180,11 +180,11 @@ func unarchive() {
   let unarchiver = NSKeyedUnarchiver(forReadingWith: data)
 
   guard let strings
-      = unarchiver.decodeObjectForKey("strings") as? Foo<NSString> else {
+      = unarchiver.decodeObject(forKey: "strings") as? Foo<NSString> else {
     fatalError("unable to unarchive Foo<NSString>")
   }
   guard let numbers
-      = unarchiver.decodeObjectForKey("numbers") as? Foo<NSNumber> else {
+      = unarchiver.decodeObject(forKey: "numbers") as? Foo<NSNumber> else {
     fatalError("unable to unarchive Foo<NSNumber>")
   }
 
