@@ -35,3 +35,7 @@ public class A<X> {
   public func f10(x:Int) {}
   public func f11<T, U>(x:X, y:T) {} //expected-error{{generic parameter 'U' is not used in function signature}}
 }
+
+protocol P { associatedtype A }
+
+func f12<T : P>(x: T) -> T.A<Int> {} //expected-error{{cannot specialize non-generic type 'T.A'}}{{29-34=}}
