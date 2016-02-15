@@ -672,9 +672,6 @@ ERROR(extra_address_of_unsafepointer,none,
 ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
       ())
-ERROR(extra_call_nonfunction,none,
-      "invalid use of '()' to call a value of non-function type %0",
-      (Type))
 ERROR(extra_argument_labels,none,
       "extraneous argument label%select{|s}0 '%1' in %select{call|subscript}2",
       (bool, StringRef, bool))
@@ -1801,16 +1798,6 @@ ERROR(optional_used_as_boolean,none,
 ERROR(optional_used_as_true_boolean,none,
       "optional type %0 cannot be used as a boolean; "
       "test for '== nil' instead", (Type))
-
-ERROR(migrate_from_raw_to_init,none,
-      "static method 'fromRaw' has been replaced with a failable initializer "
-      "'init(rawValue:)'", ())
-ERROR(migrate_from_allZeros,none,
-      "static method 'allZeros' has been replaced with the default initializer",
-      ())
-
-ERROR(migrate_to_raw_to_raw_value,none,
-      "method 'fromRaw' has been replaced with a property 'rawValue'", ())
 
 ERROR(interpolation_missing_proto,none,
       "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",

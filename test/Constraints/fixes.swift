@@ -86,7 +86,7 @@ func maybeFn() -> (Int -> Int)? { }
 
 func extraCall() {
   var i = 7
-  i = i() // expected-error{{invalid use of '()' to call a value of non-function type 'Int'}}{{8-10=}}
+  i = i() // expected-error{{cannot call value of non-function type 'Int'}}
 
   maybeFn()(5) // expected-error{{value of optional type '(Int -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}{{12-12=!}}
 }

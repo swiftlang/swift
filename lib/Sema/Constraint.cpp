@@ -431,16 +431,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: force downcast";
   case FixKind::AddressOf:
     return "fix: add address-of";
-  case FixKind::RemoveNullaryCall:
-    return "fix: remove nullary call";
   case FixKind::OptionalToBoolean:
     return "fix: convert optional to boolean";
-  case FixKind::FromRawToInit:
-    return "fix: fromRaw(x) to init(rawValue:x)";
-  case FixKind::AllZerosToInit:
-    return "fix: x.allZeros to x()";
-  case FixKind::ToRawToRawValue:
-    return "fix: toRaw() to rawValue";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
   }

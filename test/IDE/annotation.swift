@@ -286,7 +286,7 @@ extension C12.Inn {}
 // CHECK: extension <TypeAlias@[[@LINE-4]]:11>AliasC12</TypeAlias>.<TypeAlias@[[@LINE-6]]:13>AliasInn</TypeAlias> {}
 extension AliasC12.AliasInn {}
 
-typealias  AliasPH = C12
+typealias AliasPH = C12
 func testPH(x: Int) {}
 func testPH(x: AliasPH) {}
 // CHECK: <Func@[[@LINE-1]]:6>testPH</Func>(<#T##x: AliasPH##AliasPH##C12#>)

@@ -76,7 +76,7 @@ func basictest() {
   var call3 : () = func3()()
 
   // Cannot call an integer.
-  bind_test2() // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}} {{13-15=}}
+  bind_test2() // expected-error {{cannot call value of non-function type 'Int'}}
 }
 
 // Infix operators and attribute lists.

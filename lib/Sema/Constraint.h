@@ -240,21 +240,9 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
-
-  /// Remove a no-argument call to something that is not a function.
-  RemoveNullaryCall,
   
   /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
   OptionalToBoolean,
-
-  /// Replace a use of 'fromRaw' with an initializer requirement.
-  FromRawToInit,
-
-  /// Replace a call of 'toRaw' with a reference to 'rawValue'.
-  ToRawToRawValue,
-
-  /// Replace a call of 'X.allZeros' with a reference to 'X()'.
-  AllZerosToInit,
   
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,

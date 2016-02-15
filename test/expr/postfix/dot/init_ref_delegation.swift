@@ -277,7 +277,7 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
 
   var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
-  var ci3a = x() // expected-error{{invalid use of '()' to call a value of non-function type 'T'}} {{15-17=}}
+  var ci3a = x() // expected-error{{cannot call value of non-function type 'T'}}
   var ci4a = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
 
   var cm1 = y.init(required: 0)

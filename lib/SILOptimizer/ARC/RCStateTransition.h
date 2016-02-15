@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_RCSTATETRANSITION_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_RCSTATETRANSITION_H
 
+#include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -67,7 +68,8 @@ class RCStateTransition {
   /// An RCStateTransition can represent either an RC end point (i.e. an initial
   /// or terminal RC transition) or a ptr set of Mutators.
   ValueBase *EndPoint;
-  llvm::SmallPtrSet<SILInstruction *, 2> Mutators;
+  ImmutablePointerSet<SILInstruction> *Mutators =
+      ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
   RCStateTransitionKind Kind;
 
   // Should only be constructed be default RefCountState.
@@ -77,15 +79,17 @@ public:
   ~RCStateTransition() {}
   RCStateTransition(const RCStateTransition &R);
 
-  RCStateTransition(SILInstruction *I) {
-    Kind = getRCStateTransitionKind(I);
+  RCStateTransition(ImmutablePointerSet<SILInstruction> *I) {
+    assert(I->size() == 1);
+    SILInstruction *Inst = *I->begin();
+    Kind = getRCStateTransitionKind(Inst);
     if (isRCStateTransitionEndPoint(Kind)) {
-      EndPoint = I;
+      EndPoint = Inst;
       return;
     }
 
     if (isRCStateTransitionMutator(Kind)) {
-      Mutators.insert(I);
+      Mutators = I;
       return;
     }
 
@@ -108,17 +112,17 @@ public:
   bool containsMutator(SILInstruction *I) const {
     assert(isMutator() && "This should only be called if we are of mutator "
                           "kind");
-    return Mutators.count(I);
+    return Mutators->count(I);
   }
 
-  using mutator_range = iterator_range<decltype(Mutators)::iterator>;
-  using const_mutator_range = iterator_range<decltype(Mutators)::const_iterator>;
+  using mutator_range =
+      iterator_range<std::remove_pointer<decltype(Mutators)>::type::iterator>;
 
   /// Returns a Range of Mutators. Asserts if this transition is not a mutator
   /// transition.
   mutator_range getMutators() const {
     assert(isMutator() && "This should never be called given mutators");
-    return {Mutators.begin(), Mutators.end()};
+    return {Mutators->begin(), Mutators->end()};
   }
 
   /// Return true if Inst is an instruction that causes a transition that can be
