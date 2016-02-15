@@ -83,6 +83,8 @@ def create_parser():
     parser.add_argument('-o', '--output-dir', default=os.getcwd(), help='Directory to which the output will be emitted.')
     parser.add_argument('-q', '--quiet', action='store_true', help='Suppress printing of status messages.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print extra information.')
+    parser.add_argument('-F', '--framework-dir', action='append', help='Add additional framework directories')
+    parser.add_argument('-I', '--include-dir', action='append', help='Add additional include directories')
     return parser
 
 def output_command_result_to_file(command_args, filename):
@@ -228,6 +230,14 @@ def main():
     args = parser.parse_args()
 
     cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments']
+
+    # Add -F / -I arguments.
+    if args.framework_dir:
+        for path in args.framework_dir:
+            cmd_common = cmd_common + ['-F', path]
+    if args.include_dir:
+        for path in args.include_dir:
+            cmd_common = cmd_common + ['-I', path]
 
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
