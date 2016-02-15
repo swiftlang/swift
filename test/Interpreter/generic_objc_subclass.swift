@@ -19,6 +19,10 @@ protocol PP {
   func calculateTaxes() -> Int
 }
 
+//
+// Generic subclass of an @objc class
+//
+
 class A<T> : HasHiddenIvars, P {
   var first: Int = 16
   var second: T? = nil
@@ -60,6 +64,10 @@ print(f())
 a.second = 121
 print(f())
 
+//
+// Instantiate the class with a different set of generic parameters
+//
+
 let aa = A<(Int, Int)>()
 let ff = { (aa.x, aa.y, aa.z, aa.t, aa.first, aa.second, aa.third) }
 
@@ -72,6 +80,10 @@ aa.third = 17
 
 // CHECK: (101, 0, 0, 0, 16, Optional((19, 84)), 17)
 print(ff())
+
+//
+// Concrete subclass of generic subclass of @objc class
+//
 
 class B : A<(Int, Int)> {
   override var description: String {
@@ -126,6 +138,10 @@ b.third = 17
 // CHECK: (101, 0, 0, 0, 16, Optional((19, 84)), 17)
 print(g())
 
+//
+// Generic subclass of @objc class without any generically-sized members
+//
+
 class FixedA<T> : HasHiddenIvars, P {
   var first: Int = 16
   var second: [T] = []
@@ -166,6 +182,28 @@ print(fixedF())
 // CHECK: (36, 225, 255, 2255, 16, [121], 61)
 fixedA.second = [121]
 print(fixedF())
+
+//
+// Instantiate the class with a different set of generic parameters
+//
+
+let fixedAA = FixedA<(Int, Int)>()
+let fixedFF = { (fixedAA.x, fixedAA.y, fixedAA.z, fixedAA.t, fixedAA.first, fixedAA.second, fixedAA.third) }
+
+// CHECK: (0, 0, 0, 0, 16, [], 61)
+print(fixedFF())
+
+fixedAA.x = 101
+fixedAA.second = [(19, 84)]
+fixedAA.third = 17
+
+// CHECK: (101, 0, 0, 0, 16, [(19, 84)], 17)
+print(fixedFF())
+
+//
+// Concrete subclass of generic subclass of @objc class
+// without any generically-sized members
+//
 
 class FixedB : FixedA<Int> {
   override var description: String {
