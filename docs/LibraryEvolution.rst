@@ -413,7 +413,7 @@ The description "inlineable" collectively refers to declarations marked with
 
     All of these names are provisional.
 
-Any local functions or closures within an function marked ``@inlineable`` or
+Any local functions or closures within a function marked ``@inlineable`` or
 ``@always_emit_into_client`` are themselves treated as
 ``@always_emit_into_client``. This is important in case it is necessary to
 change the inlineable function later; existing clients should not be depending
