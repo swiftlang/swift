@@ -20,82 +20,126 @@
 // indices, a tree with parent pointers has bidirectional indices, and
 // Array and Deque has random access indices.
 //
-// It turned out that in practice, every one of the non-random-access
-// indices holds a reference to the collection it traverses, or to
-// some part of it, to implement `.successor()` and `.predecessor()`.
-// This introduces extra complexity in implementations and presumably
-// translates into less-efficient code that does reference counting on
-// indices.  Indices referencing collections also conflicts with COW
-// -- a live index makes a collection non-uniquely referenced, causing
-// unnecessary copies (see `Dictionary` and `Set`, that have to use a
-// double-indirection trick to avoid these extra copies).  We should
-// consider other schemes that don't require these tricks.
+// It turned out that in practice, every implementation of the
+// non-random-access indices needs to hold a reference to the
+// collection it traverses, or to some part of it, to implement
+// `.successor()` and `.predecessor()`.  This introduces extra
+// complexity in implementations and presumably translates into
+// less-efficient code that does reference counting on indices.
 //
-// Eliminating all reference-countable members from indices implies that
-// indices need to essentially encode the path to the element within the data
-// structure.  Since one is free to choose the encoding, we think that it
-// should be possible to choose it in such a way that indices are cheaply
-// comparable.
+// Indices keeping references to collections also conflict with COW --
+// a live index makes collection's storage non-uniquely referenced,
+// causing unnecessary copies.  In the standard library, `Dictionary`
+// and `Set` have to use a double-indirection trick to avoid these
+// extra copies in these cases.
 //
-// In this new model, indices don't have any method or property
-// requirements (these APIs were moved to Collection), so index
-// protocols were eliminated.  Instead, we are introducing
-// `CollectionType`, `BidirectionalCollectionType` and
-// `RandomAccessCollectionType`.  These protocols naturally compose
-// with `MutableCollectionType` and `RangeReplaceableCollectionType`:
-//
-//     protocol SequenceType {}
-//     protocol CollectionType : SequenceType {}
-//
-//       protocol MutableCollectionType : CollectionType {}
-//       protocol RangeReplaceableCollectionType : CollectionType {}
-//
-//       protocol BidirectionalCollectionType : CollectionType {}
-//         protocol RandomAccessCollectionType : BidirectionalCollectionType {}
+// This data that we gathered from experience working with the current
+// collection protocols suggests that we should consider other schemes
+// that don't require such double-indirection tricks or other undue
+// performance burdens.
 //
 // Proposed Solution
 // =================
 //
-// Change indices so that they can't be moved forward or backward by
-// themselves (`i.successor()` is not allowed).  Then indices can
-// store the minimal amount of information only about the element
-// position in the collection.  Usually index can be represented as
-// one or a couple of integers that encode the "path" in the
-// data structure from the root to the element.  In this
-// representation, only a collection can move indices (e.g.,
-// `c.next(i)`).
+// We propose to allow implementing collections whose indices don't
+// have reference-countable stored properties.
+//
+// For the API this implies that indices can't be moved forward or
+// backward by themselves (`i.successor()` is not allowed).  Only the
+// corresponding collection instance can move indices (e.g.,
+// `c.next(i)`).  This API change reduces the requirements on the
+// amount of information indices need to store or reference.
+//
+// In this model indices can store the minimal amount of information
+// only about the element position in the collection.  Usually index
+// can be represented as one or a couple of word-sized integers that
+// efficiently encode the "path" in the data structure from the root
+// to the element.  Since one is free to choose the encoding of the
+// "path", we think that it should be possible to choose it in such a
+// way that indices are cheaply comparable.
+//
+// In the proposed model indices don't have any method or property
+// requirements (these APIs were moved to Collection), so index
+// protocols are eliminated.  Instead, we are introducing
+// `BidirectionalCollectionType` and `RandomAccessCollectionType`.
+// These protocols naturally compose with existing
+// `MutableCollectionType` and `RangeReplaceableCollectionType` to
+// describe the collection's capabilities:
+//
+//         protocol SequenceType {}
+//         protocol CollectionType : SequenceType {}
+//
+//           protocol MutableCollectionType : CollectionType {}
+//           protocol RangeReplaceableCollectionType : CollectionType {}
+//
+//     [new]   protocol BidirectionalCollectionType : CollectionType {}
+//     [new]   protocol RandomAccessCollectionType : BidirectionalCollectionType {}
+//
+// Analysis
+// ========
 //
 // Advantages:
-// * indices don't need to keep a reference to the collection.
-//   - indices are simpler to implement.
-//   - indices are not reference-countable, and thus cheaper to
+//
+// * Indices don't need to keep a reference to the collection.
+//   - Indices are simpler to implement.
+//   - Indices are not reference-countable, and thus cheaper to
 //     handle.
-// * the hierarchy of index protocols is removed, and instead we add
+//   - Handling indices does not cause refcounting, and does not block
+//     optimizations.
+//
+// * The hierarchy of index protocols is removed, and instead we add
 //   protocols for forward, bidirectional and random-access
-//   collections.  This is closer to how people generally talk about
-//   collections.  Writing a generic constraint for bidirectional and
-//   random-access collections becomes simpler.
+//   collections.
+//   - This is closer to how people generally talk about collections.
+//   - Writing a generic constraint for bidirectional and
+//     random-access collections becomes simpler.
+//
+// * Indices can conform to `Comparable` without incurring extra
+//   memory overhead.  Indices need to store all the necessary data
+//   anyway.
+//
+// * While this model allows to design indices that are not
+//   reference-countable, it does not prohibit defining indices that
+//   *are* reference countable.
+//   - All existing collection designs are still possible to
+//     implement, but some are less efficient than the new model allows.
+//   - If there is a specialized collection that needs
+//     reference-countable indices for algorithmic or memory
+//     efficiency, where such tradeoff is reasonable, such a
+//     collection is still possible to implement in the new model.
+//     See the discussion of trees below, the tree design (2)(c).
+//
+// Neutral as compared to the current collections:
+// * A value-typed linked list still can't conform to CollectionType.
+//   A reference-typed one can.
 //
 // Disadvantages:
-// * a value-typed linked list can't conform to CollectionType.  A
-//   reference-typed one can.
+// * Advancing an index forward or backward becomes harder -- the
+//   statement now includes two entities (collection and index):
+//
+//     j = c.next(i)    vs.    j = i.successor()
+//
+//   In practice though, we found that when the code is doing such
+//   index manipulations, the collection is typically still around
+//   stored in a variable, so the code does not need to reach out for
+//   it non-trivially.
 
 // Issues
 // ======
 //
 // 1. Conflicting requirements for `MyRange`:
 //
-// * range bounds need to be comparable and incrementable, in order for
-//   `MyRange` to conform to `MyForwardCollectionType`,
+//    * range bounds need to be comparable and incrementable, in order
+//      for `MyRange` to conform to `MyForwardCollectionType`,
 //
-// * we frequently want to use `MyRange` as a "transport" data type, just
-//   to carry a pair of indices around.  Indices are neither comparable nor
-//   incrementable.
+//    * we frequently want to use `MyRange` as a "transport" data
+//      type, just to carry a pair of indices around.  Indices are
+//      neither comparable nor incrementable.
 //
-// Possible solution: conditional conformance for `MyRange` to
-// `MyForwardCollectionType` when the bounds are comparable and
-// incrementable (when the bounds conform to
-// `MyRandomAccessCollectionType`?).
+//    Possible solution: conditional conformance for `MyRange` to
+//    `MyForwardCollectionType` when the bounds are comparable and
+//    incrementable (when the bounds conform to
+//    `MyRandomAccessCollectionType`?).
 //
 // 2. We can't specify constraints on associated types.  This forces many
 //    trivial algorithms to specify useless constraints.
