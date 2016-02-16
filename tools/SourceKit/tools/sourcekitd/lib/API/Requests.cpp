@@ -22,6 +22,8 @@
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "swift/Basic/DemangleWrappers.h"
+
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -57,6 +59,9 @@ public:
 } // anonymous namespace.
 
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
+
+static LazySKDUID RequestDemangle("source.request.demangle");
+static LazySKDUID RequestMangleSimpleClass("source.request.mangle_simple_class");
 
 static LazySKDUID RequestIndex("source.request.indexsource");
 static LazySKDUID RequestDocInfo("source.request.docinfo");
@@ -138,6 +143,9 @@ static SourceKit::Context &getGlobalContext() {
   assert(GlobalCtx);
   return *GlobalCtx;
 }
+
+static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
+                                           bool Simplified);
 
 static sourcekitd_response_t indexSource(StringRef Filename,
                                          ArrayRef<const char *> Args,
@@ -298,6 +306,18 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     dict.set(KeyVersionMajor, ProtocolMajorVersion);
     dict.set(KeyVersionMinor, ProtocolMinorVersion);
     return Rec(RB.createResponse());
+  }
+
+  if (ReqUID == RequestDemangle) {
+    SmallVector<const char *, 8> MangledNames;
+    bool Failed = Req.getStringArray(KeyNames, MangledNames, /*isOptional=*/true);
+    if (Failed) {
+      return Rec(createErrorRequestInvalid(
+                                        "'key.names' not an array of strings"));
+    }
+    int64_t Simplified = false;
+    Req.getInt64(KeySimplified, Simplified, /*isOptional=*/true);
+    return Rec(demangleNames(MangledNames, Simplified));
   }
 
   // Just accept 'source.request.buildsettings.register' for now, don't do
@@ -925,6 +945,44 @@ public:
 
   bool handleDiagnostic(const DiagnosticEntryInfo &Info) override;
 };
+}
+
+static bool isSwiftPrefixed(StringRef MangledName) {
+  if (MangledName.size() < 2)
+    return false;
+  return (MangledName[0] == '_' && MangledName[1] == 'T');
+}
+
+static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
+                                           bool Simplified) {
+  swift::Demangle::DemangleOptions DemangleOptions;
+  if (Simplified) {
+    DemangleOptions =
+      swift::Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
+  }
+
+  auto getDemangledName = [&](StringRef MangledName) -> std::string {
+    if (!isSwiftPrefixed(MangledName))
+      return std::string(); // Not a mangled name
+
+    std::string Result = swift::demangle_wrappers::demangleSymbolAsString(
+        MangledName, DemangleOptions);
+
+    if (Result == MangledName)
+      return std::string(); // Not a mangled name
+
+    return Result;
+  };
+
+  ResponseBuilder RespBuilder;
+  auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
+  for (auto MangledName : MangledNames) {
+    std::string Result = getDemangledName(MangledName);
+    auto Entry = Arr.appendDictionary();
+    Entry.set(KeyName, Result.c_str());
+  }
+
+  return RespBuilder.createResponse();
 }
 
 static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,

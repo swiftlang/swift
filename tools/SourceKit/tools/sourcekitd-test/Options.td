@@ -69,3 +69,6 @@ def print_response_as_json : Flag<["-"], "print-response-as-json">,
 
 def group_name : Separate<["-"], "group-name">,
   HelpText<"Module group name to print">;
+
+def simplified_demangling : Flag<["-"], "simplified-demangling">,
+  HelpText<"Use simplified demangling for the 'demangle' request">;

@@ -103,6 +103,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("demangle", SourceKitRequest::DemangleNames)
         .Case("index", SourceKitRequest::Index)
         .Case("complete", SourceKitRequest::CodeComplete)
         .Case("complete.open", SourceKitRequest::CodeCompleteOpen)
@@ -131,7 +132,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
-            << "version/index/complete/cursor/related-idents/syntax-map/structure/"
+            << "version/demangle/index/complete/cursor/related-idents/syntax-map/structure/"
                "format/expand-placeholder/doc-info/sema/interface-gen/interface-gen-open/"
                "find-usr/find-interface/open/edit/print-annotations/extract-comment/"
                "module-groups\n";
@@ -216,10 +217,15 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = llvm::None;
+      Inputs.push_back(InputArg->getValue());
       break;
 
     case OPT_json_request_path:
       JsonRequestPath = InputArg->getValue();
+      break;
+
+    case OPT_simplified_demangling:
+      SimplifiedDemangling = true;
       break;
 
     case OPT_UNKNOWN:

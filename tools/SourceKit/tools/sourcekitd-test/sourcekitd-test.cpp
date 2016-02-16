@@ -19,6 +19,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/FileSystem.h"
@@ -53,6 +54,10 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
 static void printModuleGroupNames(sourcekitd_variant_t Info,
                                   llvm::raw_ostream &OS);
 
+static void prepareDemangleRequest(sourcekitd_object_t Req,
+                                   const TestOptions &Opts);
+static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
+
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    StringRef Filename);
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
@@ -76,6 +81,7 @@ static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeyModuleName;
 static sourcekitd_uid_t KeyGroupName;
 static sourcekitd_uid_t KeyName;
+static sourcekitd_uid_t KeyNames;
 static sourcekitd_uid_t KeyFilePath;
 static sourcekitd_uid_t KeyModuleInterfaceName;
 static sourcekitd_uid_t KeyLength;
@@ -105,8 +111,10 @@ static sourcekitd_uid_t KeyPopular;
 static sourcekitd_uid_t KeyUnpopular;
 static sourcekitd_uid_t KeyTypeInterface;
 static sourcekitd_uid_t KeyModuleGroups;
+static sourcekitd_uid_t KeySimplified;
 
 static sourcekitd_uid_t RequestProtocolVersion;
+static sourcekitd_uid_t RequestDemangle;
 static sourcekitd_uid_t RequestIndex;
 static sourcekitd_uid_t RequestCodeComplete;
 static sourcekitd_uid_t RequestCodeCompleteOpen;
@@ -164,6 +172,7 @@ static int skt_main(int argc, const char **argv) {
   KeyModuleName = sourcekitd_uid_get_from_cstr("key.modulename");
   KeyGroupName = sourcekitd_uid_get_from_cstr("key.groupname");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
+  KeyNames = sourcekitd_uid_get_from_cstr("key.names");
   KeyFilePath = sourcekitd_uid_get_from_cstr("key.filepath");
   KeyModuleInterfaceName = sourcekitd_uid_get_from_cstr("key.module_interface_name");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
@@ -195,6 +204,7 @@ static int skt_main(int argc, const char **argv) {
   KeyUnpopular = sourcekitd_uid_get_from_cstr("key.unpopular");
   KeyTypeInterface = sourcekitd_uid_get_from_cstr("key.typeinterface");
   KeyModuleGroups = sourcekitd_uid_get_from_cstr("key.modulegroups");
+  KeySimplified = sourcekitd_uid_get_from_cstr("key.simplified");
 
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
@@ -203,6 +213,7 @@ static int skt_main(int argc, const char **argv) {
   semaSemaphore = dispatch_semaphore_create(0);
 
   RequestProtocolVersion = sourcekitd_uid_get_from_cstr("source.request.protocol_version");
+  RequestDemangle = sourcekitd_uid_get_from_cstr("source.request.demangle");
   RequestIndex = sourcekitd_uid_get_from_cstr("source.request.indexsource");
   RequestCodeComplete = sourcekitd_uid_get_from_cstr("source.request.codecomplete");
   RequestCodeCompleteOpen = sourcekitd_uid_get_from_cstr("source.request.codecomplete.open");
@@ -341,6 +352,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
 
+  if (Opts.Request == SourceKitRequest::DemangleNames)
+    Opts.SourceFile.clear();
+
   std::string SourceFile = Opts.SourceFile;
   if (!SourceFile.empty()) {
     llvm::SmallString<64> AbsSourceFile;
@@ -378,6 +392,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
+    break;
+
+  case SourceKitRequest::DemangleNames:
+    prepareDemangleRequest(Req, Opts);
     break;
 
   case SourceKitRequest::Index:
@@ -640,6 +658,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     case SourceKitRequest::Edit:
       getSemanticInfo(Info, SourceFile);
       KeepResponseAlive = true;
+      break;
+
+    case SourceKitRequest::DemangleNames:
+      printDemangleResults(sourcekitd_response_get_value(Resp), outs());
       break;
 
     case SourceKitRequest::ProtocolVersion:
@@ -1105,6 +1127,59 @@ static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
     OS << LineCol.first << ':' << LineCol.second << " - " << Length << '\n';
   }
   OS << "END RANGES\n";
+}
+
+static void prepareDemangleRequest(sourcekitd_object_t Req,
+                                   const TestOptions &Opts) {
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestDemangle);
+  if (Opts.SimplifiedDemangling)
+    sourcekitd_request_dictionary_set_int64(Req, KeySimplified, 1);
+  sourcekitd_object_t arr = sourcekitd_request_array_create(nullptr, 0);
+  sourcekitd_request_dictionary_set_value(Req, KeyNames, arr);
+
+  auto addName = [&](StringRef MangledName) {
+    sourcekitd_request_array_set_stringbuf(arr, SOURCEKITD_ARRAY_APPEND,
+                                        MangledName.data(), MangledName.size());
+  };
+
+  if (Opts.Inputs.empty()) {
+    auto input = llvm::MemoryBuffer::getSTDIN();
+    if (!input) {
+      llvm::errs() << input.getError().message() << '\n';
+      ::exit(1);
+    }
+    llvm::StringRef inputContents = input.get()->getBuffer();
+
+    // This doesn't handle Unicode symbols, but maybe that's okay.
+    llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
+    llvm::SmallVector<llvm::StringRef, 1> matches;
+    while (maybeSymbol.match(inputContents, &matches)) {
+      addName(matches.front());
+    }
+
+  } else {
+    for (llvm::StringRef name : Opts.Inputs) {
+      addName(name);
+    }
+  }
+
+  sourcekitd_request_release(arr);
+}
+
+static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS) {
+  OS << "START DEMANGLE\n";
+  sourcekitd_variant_t results =
+    sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  sourcekitd_variant_array_apply(results, ^bool(size_t index, sourcekitd_variant_t value) {
+    StringRef name = sourcekitd_variant_dictionary_get_string(value, KeyName);
+    if (name.empty())
+      OS << "<empty>";
+    else
+      OS << name;
+    OS << '\n';
+    return true;
+  });
+  OS << "END DEMANGLE\n";
 }
 
 static void initializeRewriteBuffer(StringRef Input,

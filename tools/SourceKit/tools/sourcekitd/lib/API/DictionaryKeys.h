@@ -101,6 +101,7 @@ extern SourceKit::UIdent KeyNextRequestStart;
 extern SourceKit::UIdent KeyPopular;
 extern SourceKit::UIdent KeyUnpopular;
 extern SourceKit::UIdent KeyHide;
+extern SourceKit::UIdent KeySimplified;
 
 extern SourceKit::UIdent KeyIsUnavailable;
 extern SourceKit::UIdent KeyIsDeprecated;
