@@ -91,7 +91,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
   case IRGenDebugInfoKind::LineTables:
-    CGO.setDebugInfo(clang::CodeGenOptions::codegenoptions::DebugLineTablesOnly);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
  case IRGenDebugInfoKind::Normal:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
