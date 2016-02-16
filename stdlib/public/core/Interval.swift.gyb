@@ -167,12 +167,12 @@ extension ClosedInterval {
 }
 
 extension IntervalType {
-  /// Returns `true` if `lhs` and `rhs` have a non-empty intersection.
+  /// Returns `true` iff `lhs` and `rhs` have a non-empty intersection.
   @warn_unused_result
   public func overlaps<
     I: IntervalType where I.Bound == Bound
   >(other: I) -> Bool {
-    return contains(other.start) || other.contains(start)
+    return (!other.isEmpty && contains(other.start)) || (!isEmpty && other.contains(start))
   }
 }
 
