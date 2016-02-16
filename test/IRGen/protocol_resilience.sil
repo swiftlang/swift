@@ -41,7 +41,7 @@ protocol InternalProtocol {
 }
 
 
-// CHECK-LABEL: define void @defaultC(%swift.opaque* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} void @defaultC(%swift.opaque* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
@@ -52,7 +52,7 @@ bb0(%0 : $*Self):
 }
 
 
-// CHECK-LABEL: define void @defaultD(%swift.opaque* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} void @defaultD(%swift.opaque* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {

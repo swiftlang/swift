@@ -60,7 +60,7 @@ struct SyncUp<Deliverable> : Synergy {
   }
 }
 
-// CHECK-LABEL: define void @testGenericWitnessMethod(%swift.opaque* noalias nocapture sret, %V14witness_method6SyncUp* noalias nocapture, %swift.type* %T)
+// CHECK-LABEL: define{{( protected)?}} void @testGenericWitnessMethod(%swift.opaque* noalias nocapture sret, %V14witness_method6SyncUp* noalias nocapture, %swift.type* %T)
 // CHECK: entry:
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @_TMaV14witness_method6SyncUp(%swift.type* %T)
 // CHECK:   [[WTABLE:%.*]] = call i8** @_TWaurGV14witness_method6SyncUpx_S_7SynergyS_(%swift.type* [[METADATA]])
@@ -86,7 +86,7 @@ protocol Strategy {
   func disrupt() -> GrowthHack
 }
 
-// CHECK-LABEL: define void @testArchetypeWitnessMethod(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Strategy, %swift.type* %T.GrowthHack, i8** %T.GrowthHack.Pivot)
+// CHECK-LABEL: define{{( protected)?}} void @testArchetypeWitnessMethod(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Strategy, %swift.type* %T.GrowthHack, i8** %T.GrowthHack.Pivot)
 // CHECK: entry:
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.Strategy, i32 2
 // CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
