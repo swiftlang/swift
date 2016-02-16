@@ -14,6 +14,7 @@ add_swift_executable(swift
     swiftClangImporter
     swiftOption
     clangAPINotes
+    LLVMDebugInfoCodeView
 )
 
 target_link_libraries(swift edit)
