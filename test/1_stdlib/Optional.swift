@@ -260,7 +260,7 @@ class TestStream : Streamable {
 
 func debugPrintStr<T>(a: T) -> String {
   var s = ""
-  debugPrint(a, terminator: "", toStream: &s)
+  debugPrint(a, terminator: "", to: &s)
   return s
 }
 // Optional should not conform to output stream protocols itself, but is

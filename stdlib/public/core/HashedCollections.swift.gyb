@@ -755,7 +755,7 @@ extension Set : CustomStringConvertible, CustomDebugStringConvertible {
       } else {
         result += ", "
       }
-      debugPrint(member, terminator: "", toStream: &result)
+      debugPrint(member, terminator: "", to: &result)
     }
     result += isDebug ? "])" : "]"
     return result
@@ -1289,9 +1289,9 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
       } else {
         result += ", "
       }
-      debugPrint(k, terminator: "", toStream: &result)
+      debugPrint(k, terminator: "", to: &result)
       result += ": "
-      debugPrint(v, terminator: "", toStream: &result)
+      debugPrint(v, terminator: "", to: &result)
     }
     result += "]"
     return result

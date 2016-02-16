@@ -390,7 +390,7 @@ public func expectCrashLater() {
   print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
 
   var stderr = _Stderr()
-  print("\(_stdlibUnittestStreamPrefix);expectCrash", toStream: &stderr)
+  print("\(_stdlibUnittestStreamPrefix);expectCrash", to: &stderr)
 
   _seenExpectCrash = true
 }
@@ -461,7 +461,7 @@ func _childProcess() {
     print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
 
     var stderr = _Stderr()
-    print("\(_stdlibUnittestStreamPrefix);end", toStream: &stderr)
+    print("\(_stdlibUnittestStreamPrefix);end", to: &stderr)
 
     if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
       return
@@ -515,11 +515,11 @@ struct _ParentProcess {
       _spawnChild()
     }
 
-    print("\(testSuite.name);\(testName)", toStream: &_childStdin)
+    print("\(testSuite.name);\(testName)", to: &_childStdin)
 
     let currentTest = testSuite._testByName(testName)
     if let stdinText = currentTest.stdinText {
-      print(stdinText, terminator: "", toStream: &_childStdin)
+      print(stdinText, terminator: "", to: &_childStdin)
     }
     if currentTest.stdinEndsWithEOF {
       _childStdin.close()

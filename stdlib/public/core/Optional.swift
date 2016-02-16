@@ -91,7 +91,7 @@ extension Optional : CustomDebugStringConvertible {
     switch self {
     case .Some(let value):
       var result = "Optional("
-      debugPrint(value, terminator: "", toStream: &result)
+      debugPrint(value, terminator: "", to: &result)
       result += ")"
       return result
     case .None:

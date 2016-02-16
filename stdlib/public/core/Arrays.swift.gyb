@@ -802,7 +802,7 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
       } else {
         result += ", "
       }
-      debugPrint(item, terminator: "", toStream: &result)
+      debugPrint(item, terminator: "", to: &result)
     }
 %   if Self != 'Array':
     result += isDebug ? "])" : "]"
