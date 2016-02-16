@@ -403,7 +403,8 @@ functions is referenced by a client module, its implementation is always copied
 into the client module. ``@always_emit_into_client`` functions are subject to
 the same restrictions as regular ``@inlineable`` functions, as described above.
 The description "inlineable" collectively refers to declarations marked with
-``@inlineable`` and declarations marked with ``@always_emit_into_client``.
+``@inlineable`` and declarations marked with ``@always_emit_into_client``. A
+declaration may not be both ``@inlineable`` and ``@always_emit_into_client``.
 
 .. note::
 
@@ -411,34 +412,40 @@ The description "inlineable" collectively refers to declarations marked with
 
 .. admonition:: TODO
 
-    All of these names are provisional.
+    All of these names are provisional. In particular, It Would Be Nice(tm) if
+    the final name for ``@always_emit_into_client`` was a variation of the
+    final name for ``@inlineable``.
 
-Any local functions or closures within a function marked ``@inlineable`` or
-``@always_emit_into_client`` are themselves treated as
-``@always_emit_into_client``. This is important in case it is necessary to
-change the inlineable function later; existing clients should not be depending
-on internal details of the previous implementation.
+Any local functions or closures within an inlineable function are themselves
+treated as ``@always_emit_into_client``. This is important in case it is
+necessary to change the inlineable function later; existing clients should not
+be depending on internal details of the previous implementation.
 
-``@always_emit_into_client`` is a `versioned attribute`; clients may not assume
-that the body of the function is suitable when deploying against older versions
-of the library. Local functions and closures implicitly have the same
-availability as the enclosing function's ``@always_emit_into_client`` or
-``@inlineable`` attribute. An existing ``@inlineable`` function may not be
-changed to an ``@always_emit_into_client`` function or vice versa.
+``@always_emit_into_client`` is *not* a versioned attribute, and therefore it
+may not be added to a declaration that was versioned in a previous release of a
+library. An existing ``@inlineable`` function may not be changed to an
+``@always_emit_into_client`` function or vice versa.
+
+It is a `binary-compatible source-breaking change` to completely remove a
+public entity marked ``@always_emit_into_client`` from a library. (Non-public,
+non-versioned entities may always be removed from a library; they are not part
+of its API or ABI.)
+
+Removing ``@always_emit_into_client`` from a public entity is also a
+`binary-compatible source-breaking change`, and requires updating the
+availability of that entity. Removing ``@always_emit_into_client`` from a
+non-public entity is always permitted.
 
 .. note::
 
-    If the ``@always_emit_into_client`` attribute is added to a function that
-    was available in a previous version of the library, clearly existing
-    clients will still depend on the presence of that function in the library's
-    ABI. However, allowing ``@always_emit_into_client`` to be converted into
-    ``@inlineable`` in *some* cases but not *all* makes for a more confusing
-    model with very little gain.
+    As an example, if an API is marked ``@always_emit_into_client`` in version
+    1 of a library, and the attribute is removed in version 2, the entity
+    itself must be updated to state that it is introduced in version 2. This is
+    equivalent to removing the entity and then adding a new one with the same
+    name.
 
 Although they are not a supported feature for arbitrary libraries at this time,
 `transparent`_ functions are implicitly marked ``@always_emit_into_client``.
-(Note that ``@_transparent`` is *not* a versioned attribute and cannot be added
-to a function after the fact.)
 
 .. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst
 
@@ -447,7 +454,8 @@ to a function after the fact.)
     Why have both ``@inlineable`` and ``@always_emit_into_client``? Because for
     a larger function, like ``MutableCollectionType.sort``, it may be useful to
     provide the body to clients for analysis, but not duplicate code when not
-    necessary.
+    necessary. ``@always_emit_into_client`` also may not be added to an
+    existing versioned declaration.
 
 .. admonition:: TODO
 
@@ -460,10 +468,8 @@ Default Argument Expressions
 
 Default argument expressions are implemented as ``@always_emit_into_client``
 functions and thus are subject to the same restrictions as inlineable
-functions. However, default arguments are *always* inlined into their callers
-and cannot be referenced as first-class functions, so they do not need to be
-versioned. (More explicitly, a default argument implicitly has the same
-availability as the function it is attached to.)
+functions. A default argument implicitly has the same availability as the
+function it is attached to.
 
 .. note::
 
@@ -551,7 +557,7 @@ clients to access them more efficiently. This restricts changes a fair amount:
 
 Any inlineable accessors must follow the rules for `inlineable functions`_, as
 described above. Top-level computed variables may be marked
-``@always_emit_into_client``.
+``@always_emit_into_client``, with the same restrictions as for functions.
 
 Note that if a constant's initial value expression has any observable side
 effects, including the allocation of class instances, it must not be treated
@@ -745,8 +751,8 @@ still be modified in limited ways:
 
 An initializer of a fixed-contents struct may be declared ``@inlineable`` or
 ``@always_emit_into_client`` even if it does not delegate to another
-initializer, as long as the ``@inlineable`` or ``@always_emit_into_client``
-attribute is not introduced earlier than the ``@fixed_contents`` attribute and
+initializer, as long as the ``@inlineable`` attribute, or the initializer
+itself, is not introduced earlier than the ``@fixed_contents`` attribute and
 the struct has no non-versioned stored properties.
 
 A ``@fixed_contents`` struct is *not* guaranteed to use the same layout as a C
@@ -1258,6 +1264,14 @@ Non-public conformances are never considered versioned, even if both the
 conforming type and the protocol are versioned. A conformance is considered
 public if and only if both the conforming type and protocol are public.
 
+Non-public entities declared ``@always_emit_into_client`` may not be versioned.
+
+.. admonition:: TODO
+
+    ...but we do need a way for ``@always_emit_into_client`` functions to
+    declare the minimum version of the library they can be used in, right?
+    Syntax?
+
 Entities declared ``private`` may not be versioned; the mangled name of such an
 entity includes an identifier based on the containing file, which means moving
 the declaration to another file changes the entity's mangled name. This implies
@@ -1300,8 +1314,7 @@ As the sole exception, it is safe to backdate ``@inlineable`` on a top-level
 function, a method, a subscript, or a struct or enum initializer. It is not
 safe to backdate ``@inlineable`` for a top-level variable or constant, a
 property, or a class initializer. As usual, a library author may not assume
-that a client will actually inline the call. It is not safe to backdate the
-``@always_emit_into_client`` attribute.
+that a client will actually inline the call.
 
 .. note::
 
@@ -1364,11 +1377,12 @@ outside the current module, since once it's inlined it will be.
 
 For inlineable code, the availability context is exactly the same as the
 equivalent non-inlineable code except that the assumed version of the
-containing library is the version attached to the ``@inlineable`` or
-``@always_emit_into_client`` attribute, and any `library version dependencies
-<#declaring-library-version-dependencies>`_ or minimum deployment target must
-be specified explicitly using ``@available``. Code within this context must be
-treated as if the containing library were just a normal dependency.
+containing library is the version attached to the ``@inlineable`` attribute, or
+the version of the library in which the entity was introduced, and any `library
+version dependencies <#declaring-library-version-dependencies>`_ or minimum
+deployment target must be specified explicitly using ``@available``. Code
+within this context must be treated as if the containing library were just a
+normal dependency.
 
 A versioned inlineable function still has an exported symbol in the library
 binary, which may be used when the function is referenced from a client rather
