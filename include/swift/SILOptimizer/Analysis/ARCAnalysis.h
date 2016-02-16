@@ -129,7 +129,7 @@ private:
   bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
 
   /// Return true if we have a release instruction for all the reference
-  /// sematics part of \p Base.
+  /// semantics part of \p Base.
   bool releaseAllNonTrivials(ReleaseList Insts, SILValue Base);
 
 public:

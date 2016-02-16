@@ -77,7 +77,7 @@ public:
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
 
-  /// Called before printing a synthesized extesion.
+  /// Called before printing a synthesized extension.
   virtual void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                             const NominalTypeDecl *NTD) {}
 
