@@ -106,7 +106,7 @@ struct ConformingStruct : ResilientProtocol {
   func defaultD()
 }
 
-// CHECK-LABEL: define void @noDefaultA(%V19protocol_resilience16ConformingStruct* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} void @noDefaultA(%V19protocol_resilience16ConformingStruct* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultA : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
@@ -127,7 +127,7 @@ bb0(%0 : $*ConformingStruct):
 }
 
 
-// CHECK-LABEL: define void @noDefaultB(%V19protocol_resilience16ConformingStruct* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} void @noDefaultB(%V19protocol_resilience16ConformingStruct* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultB : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
