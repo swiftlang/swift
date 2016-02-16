@@ -10,7 +10,7 @@ swift_install_in_component(editor-integration
 
 swift_install_in_component(tools
     FILES swift-api-dump.py
-    RUNTIME DESTINATION bin)
+    DESTINATION bin)
 
 # Create a symlink for swift-api-dump.py in the bin directory
 add_custom_target(swift-api-dump ALL
