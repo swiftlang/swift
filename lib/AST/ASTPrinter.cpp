@@ -703,35 +703,22 @@ void PrintAST::printAttributes(const Decl *D) {
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
   auto TheTypeLoc = TP->getTypeLoc();
   if (TheTypeLoc.hasLocation()) {
-    // If the outer typeloc is an InOutTypeRepr, print the inout before the
-    // subpattern.
-    if (auto *IOT = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
-      TheTypeLoc = TypeLoc(IOT->getBase());
-      Type T = TheTypeLoc.getType();
-      if (T) {
-        if (auto *IOT = T->getAs<InOutType>()) {
-          T = IOT->getObjectType();
-          TheTypeLoc.setType(T);
-        }
-      }
-
-      Printer << "inout ";
-    }
 
     printPattern(TP->getSubPattern());
     Printer << ": ";
+
+    if (dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
+      Printer << "inout ";
+    }
+
     printTypeLoc(TheTypeLoc);
     return;
   }
 
-  Type T = TP->getType();
-  if (auto *IOT = T->getAs<InOutType>()) {
-    T = IOT->getObjectType();
-    Printer << "inout ";
-  }
 
   printPattern(TP->getSubPattern());
   Printer << ": ";
+  Type T = TP->getType();
   T.print(Printer, Options);
 }
 
@@ -1840,30 +1827,6 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   };
 
   auto TheTypeLoc = param->getTypeLoc();
-  if (TheTypeLoc.getTypeRepr()) {
-    // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
-    // subpattern.
-    if (auto *IOTR = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
-      TheTypeLoc = TypeLoc(IOTR->getBase());
-      if (Type T = TheTypeLoc.getType()) {
-        if (auto *IOT = T->getAs<InOutType>()) {
-          TheTypeLoc.setType(IOT->getObjectType());
-        }
-      }
-
-      Printer << "inout ";
-    }
-  } else {
-    if (param->hasType())
-      TheTypeLoc = TypeLoc::withoutLoc(param->getType());
-    
-    if (Type T = TheTypeLoc.getType()) {
-      if (auto *IOT = T->getAs<InOutType>()) {
-        Printer << "inout ";
-        TheTypeLoc.setType(IOT->getObjectType());
-      }
-    }
-  }
 
   // If the parameter is autoclosure, or noescape, print it.  This is stored
   // on the type of the decl, not on the typerepr.
@@ -1880,6 +1843,30 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   }
 
   printArgName();
+
+  if (TheTypeLoc.getTypeRepr()) {
+
+    if (auto *IOTR = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
+      TheTypeLoc = TypeLoc(IOTR->getBase());
+      if (Type T = TheTypeLoc.getType()) {
+        if (auto *IOT = T->getAs<InOutType>()) {
+          TheTypeLoc.setType(IOT->getObjectType());
+        }
+      }
+
+      Printer << "inout ";
+    }
+  } else {
+    if (param->hasType())
+      TheTypeLoc = TypeLoc::withoutLoc(param->getType());
+
+    if (Type T = TheTypeLoc.getType()) {
+      if (auto *IOT = T->getAs<InOutType>()) {
+        Printer << "inout ";
+        TheTypeLoc.setType(IOT->getObjectType());
+      }
+    }
+  }
 
   auto ContainsFunc = [&] (DeclAttrKind Kind) {
     return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
@@ -2831,16 +2818,12 @@ public:
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
       Type EltType = TD.getType();
-      if (auto *IOT = EltType->getAs<InOutType>()) {
-        Printer << "inout ";
-        EltType = IOT->getObjectType();
-      }
+
 
       if (TD.hasName()) {
         Printer.printName(TD.getName(), PrintNameContext::FunctionParameter);
         Printer << ": ";
       }
-
       if (TD.isVararg()) {
         visit(TD.getVarargBaseTy());
         Printer << "...";
