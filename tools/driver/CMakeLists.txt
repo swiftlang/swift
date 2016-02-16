@@ -12,6 +12,7 @@ add_swift_executable(swift
     swiftFrontend
     swiftClangImporter
     swiftOption
+    LLVMDebugInfoCodeView
 )
 
 target_link_libraries(swift edit)

@@ -1,7 +1,7 @@
 add_swift_executable(lldb-moduleimport-test
   lldb-moduleimport-test.cpp
   LINK_LIBRARIES
-    swiftASTSectionImporter swiftFrontend swiftClangImporter
+    swiftASTSectionImporter swiftFrontend swiftClangImporter LLVMDebugInfoCodeView
     )
 
 swift_install_in_component(testsuite-tools
