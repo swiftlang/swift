@@ -1385,7 +1385,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
       auto tuple = choice.getBaseType()->castTo<TupleType>();
-      refType = tuple->getElementType(choice.getTupleIndex());
+      refType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
     }
     break;
   }
