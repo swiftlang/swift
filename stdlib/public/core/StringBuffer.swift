@@ -167,7 +167,7 @@ public struct _StringBuffer {
     return elementShift + 1
   }
 
-  // Return true iff we have the given capacity for the indicated
+  // Return `true` iff we have the given capacity for the indicated
   // substring.  This is what we need to do so that users can call
   // reserveCapacity on String and subsequently use that capacity, in
   // two separate phases.  Operations with one-phase growth should use
