@@ -601,7 +601,7 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     // SILArgument. Then we do not need to use projection to check for whether
     // all non-trivial fields are covered. This is a short-cut to avoid
     // projection for cost as well as accuracy. Projection currently does not
-    // support single incoming argument as rc-identity does whereas rc-idenity
+    // support single incoming argument as rc-identity does whereas rc-identity
     // does.
     if (Arg.second.size() == 1) {
       SILInstruction *I = *Arg.second.begin();
