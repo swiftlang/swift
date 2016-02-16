@@ -20,7 +20,7 @@ func testNSSetBridging(hive: Hive) {
   _ = hive.allBees as Set<Bee>
 }
 
-public func expectType<T>(_: T.Type, inout _ x: T) {}
+public func expectType<T>(_: T.Type, _ x: inout T) {}
 
 func testNSMutableDictionarySubscript(
   dict: NSMutableDictionary, key: NSCopying, value: AnyObject) {

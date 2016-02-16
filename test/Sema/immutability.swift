@@ -332,11 +332,12 @@ func testSelectorStyleArguments2(let x: Int,
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
+// expected-warning@-1 {{'inout' before a parameter name is deprecated, place it before the parameter type instead}}
 }
 
 
 
-func updateInt(inout x : Int) {}
+func updateInt(x : inout Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {

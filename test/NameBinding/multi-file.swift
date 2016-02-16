@@ -16,7 +16,7 @@ func test() {
   var _: Bool = 1 + 2 ~~ 3 + 4 // (1 + 2) ~~ (3 + 4)
 }
 
-func conformsToItself(inout x: P3, y: P3) {
+func conformsToItself(x: inout P3, y: P3) {
   x = y
 }
 

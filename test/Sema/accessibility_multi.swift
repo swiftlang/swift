@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse -primary-file %s %S/Inputs/accessibility_multi_other.swift -verify
 func read(value: Int) {}
-func reset(inout value: Int) { value = 0 }
+func reset(value: inout Int) { value = 0 }
 
 func testGlobals() {
   read(privateSetGlobal)

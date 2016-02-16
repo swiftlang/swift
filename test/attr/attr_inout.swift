@@ -1,8 +1,8 @@
 // RUN: %target-parse-verify-swift
 
-func f(inout x : Int) { } // okay
+func f(x : inout Int) { } // okay
 
-func h(inout _ : Int) -> (inout Int) -> (inout Int) -> Int { }
+func h(_ : inout Int) -> (inout Int) -> (inout Int) -> Int { }
 
 func ff(x: (inout Int, inout Float)) { } //  expected-error {{'inout' is only valid in parameter lists}}  
 

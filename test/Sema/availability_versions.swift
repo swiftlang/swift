@@ -497,7 +497,7 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
   
   // Inout requires access to both getter and setter
   
-  func takesInout(inout i : Int) { }
+  func takesInout(i : inout Int) { }
   
   takesInout(&o.propWithGetterOnlyAvailableOn10_51) // expected-error {{cannot pass as inout because getter for 'propWithGetterOnlyAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}

@@ -146,7 +146,7 @@ WARNING(lex_editor_placeholder_in_playground,none,
 NOTE(note_in_decl_extension,none,
      "in %select{declaration|extension}0 of %1", (bool, Identifier))
 WARNING(inout_as_attr_deprecated,none,
-        "'inout' as parameter attribute is deprecated, prefix type with it instead.",
+        "'inout' before a parameter name is deprecated, place it before the parameter type instead",
         ())
 
 ERROR(declaration_same_line_without_semi,none,

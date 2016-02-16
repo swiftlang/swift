@@ -136,7 +136,7 @@ func nameCollisions() {
   otherAlias = cfAlias // expected-error {{cannot assign value of type 'MyProblematicAliasRef?' to type 'MyProblematicAlias?'}}
   cfAlias = otherAlias // expected-error {{cannot assign value of type 'MyProblematicAlias?' to type 'MyProblematicAliasRef?'}}
 
-  func isOptionalFloat(inout _: Optional<Float>) {}
+  func isOptionalFloat(_: inout Optional<Float>) {}
   isOptionalFloat(&otherAlias) // okay
 
   var np: NotAProblem?

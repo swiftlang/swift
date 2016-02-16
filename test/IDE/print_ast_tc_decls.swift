@@ -123,8 +123,8 @@ struct d0100_FooStruct {
   func instanceFunc1(a: Int) {}
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc1(a: Int){{$}}
 
-  func instanceFunc2(a: Int, inout b: Double) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, inout b: Double){{$}}
+  func instanceFunc2(a: Int, b: inout Double) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, b: inout Double){{$}}
 
   func instanceFunc3(a: Int, let b: Double) { var a = a; a = 1; _ = a }
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
@@ -1088,14 +1088,14 @@ protocol d2600_ProtocolWithOperator1 {
 
 struct d2601_TestAssignment {}
 infix operator %%% { }
-func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
+func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
 // PASS_2500-LABEL: {{^}}infix operator %%% {
 // PASS_2500-NOT: associativity
 // PASS_2500-NOT: precedence
 // PASS_2500-NOT: assignment
-// PASS_2500: {{^}}func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
+// PASS_2500: {{^}}func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 infix operator %%< {
 // PASS_2500-LABEL: {{^}}infix operator %%< {{{$}}

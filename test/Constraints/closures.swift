@@ -140,7 +140,7 @@ func r15998821() {
   func take_closure(x : (inout Int) -> ()) { }
 
   func test1() {
-    take_closure { (inout a : Int) in
+    take_closure { (a : inout Int) in
       a = 42
     }
   }

@@ -4,7 +4,7 @@
 
 import Foundation
 
-func expectType<T>(_: T.Type, inout _ x: T) {}
+func expectType<T>(_: T.Type, _ x: inout T) {}
 
 func test_NSCoder_decodeObject(coder: NSCoder) {
   var r = coder.decodeObject()

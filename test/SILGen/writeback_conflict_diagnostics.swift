@@ -2,7 +2,7 @@
 
 
 struct MutatorStruct {
-  mutating func f(inout x : MutatorStruct) {}
+  mutating func f(x : inout MutatorStruct) {}
 }
 
 var global_property : MutatorStruct { get {} set {} }

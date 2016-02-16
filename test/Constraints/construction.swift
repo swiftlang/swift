@@ -104,9 +104,9 @@ z as Z
 
 // Construction from inouts.
 struct FooRef { }
-struct BarRef { 
-  init(inout x: FooRef) {} 
-  init(inout x: Int) {} 
+struct BarRef {
+  init(x: inout FooRef) {}
+  init(x: inout Int) {}
 }
 var f = FooRef()
 var x = 0

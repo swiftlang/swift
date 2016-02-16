@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
-func f0(inout x: Int) {}
-func f1<T>(inout x: T) {}
-func f2(inout x: X) {}
-func f2(inout x: Double) {}
+func f0(x: inout Int) {}
+func f1<T>(x: inout T) {}
+func f2(x: inout X) {}
+func f2(x: inout Double) {}
 
 class Reftype {
   var property: Double { get {} set {} }
@@ -27,10 +27,10 @@ var f : Float
 var x : X
 var y : Y
 
-func +=(inout lhs: X, rhs : X) {}
-func +=(inout lhs: Double, rhs : Double) {}
-prefix func ++(inout rhs: X) {}
-postfix func ++(inout lhs: X) {}
+func +=(lhs: inout X, rhs : X) {}
+func +=(lhs: inout Double, rhs : Double) {}
+prefix func ++(rhs: inout X) {}
+postfix func ++(lhs: inout X) {}
 
 f0(&i)
 f1(&i)
@@ -154,7 +154,7 @@ func testFooStruct() {
 
 // Don't load from explicit lvalues.
 func takesInt(x: Int) {}
-func testInOut(inout arg: Int) {
+func testInOut(arg: inout Int) {
   var x : Int
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
 }
@@ -166,7 +166,7 @@ var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not material
                  // expected-error{{'&' can only appear immediately in a call argument list}}
 
 // <rdar://problem/17133089>
-func takeArrayRef(inout x:Array<String>) { }
+func takeArrayRef(x: inout Array<String>) { }
 
 // rdar://22308291
 takeArrayRef(["asdf", "1234"]) // expected-error{{contextual type 'inout Array<String>' cannot be used with array literal}}
@@ -224,11 +224,11 @@ func rdar23131768() {
   f2 { $0 = $0 + 1 } // previously error: Cannot convert value of type '_ -> ()' to expected type '(inout Int) -> Void'
 
   func f3(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
-  f3 { (inout v: Int) -> Void in v += 1 }
+  f3 { (v: inout Int) -> Void in v += 1 }
 }
 
 // <rdar://problem/23331567> Swift: Compiler crash related to closures with inout parameter.
-func r23331567(fn: (inout x: Int) -> Void) {
+func r23331567(fn: (x: inout Int) -> Void) {
   var a = 0
   fn(x: &a)
 }
