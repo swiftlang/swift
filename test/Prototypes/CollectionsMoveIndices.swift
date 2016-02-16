@@ -123,9 +123,44 @@
 //   index manipulations, the collection is typically still around
 //   stored in a variable, so the code does not need to reach out for
 //   it non-trivially.
+//
+// * Collection's API now includes methods for advancing indices.
+//
+// Impact on the source code
+// =========================
+//
+// Code that works with `Array`, its indices (`Int`s), moves indices,
+// does not need to change at all.
+//
+// Code that operates on collections and indices, but does not move
+// indices, does not need to change at all.
+//
+// Iteration over collection's indices with `c.indices` does not
+// change:
+//
+//     for i in c.indices { ... } // No change.
+//
+// API of collection algorithms does not change, even for algorithms
+// that accept indices as parameters or return indices (e.g.,
+// `indexOf()`, `min()`, `sort()`, `prefix()`, `prefixUpTo()` etc.)
+//
+// Code that moves indices (`i.successor()`, `i.predecessor()`,
+// `i.advancedBy()`) needs to change to use a method on the
+// collection.
+//
+//     // Before:
+//     var i = c.indexOf { $0 % 2 == 0 }
+//     i = i.successor()
+//     print(c[i])
+//
+//     // After:
+//     var i = c.indexOf { $0 % 2 == 0 } // No change in algorithm API.
+//     i = c.next(i)                     // Advancing an index requires a collection instance.
+//     print(c[i])                       // No change in subscripting.
+//
 
-// Issues
-// ======
+// Implementation difficulties
+// ===========================
 //
 // 1. Conflicting requirements for `MyRange`:
 //
@@ -147,6 +182,12 @@
 //    Solution: constraints on associated types are a desirable
 //    language feature, part of the Swift generics model.  This issue
 //    will be fixed by compiler improvements.
+//
+// 3. To implement `for i in c.indices {}` efficiently, we would need some
+//    support from the optimizer for unowned references.  Either from ARC
+//    optimizer to eliminate unowned retains/releases, or support in alias
+//    analysis and a new pass to promote needless unowned references to use the
+//    original strong reference that is still in scope.
 //
 // Trees
 // =====
