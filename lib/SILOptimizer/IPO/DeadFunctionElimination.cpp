@@ -55,7 +55,7 @@ protected:
 
   llvm::SmallSetVector<SILFunction *, 16> Worklist;
 
-  llvm::SmallPtrSet<SILFunction *, 100> AliveFunctions;
+  llvm::SmallPtrSet<SILFunction *, 32> AliveFunctions;
 
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
