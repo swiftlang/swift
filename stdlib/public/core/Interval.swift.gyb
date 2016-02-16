@@ -172,7 +172,8 @@ extension IntervalType {
   public func overlaps<
     I: IntervalType where I.Bound == Bound
   >(other: I) -> Bool {
-    return (!other.isEmpty && contains(other.start)) || (!isEmpty && other.contains(start))
+    return (!other.isEmpty && contains(other.start))
+      || (!isEmpty && other.contains(start))
   }
 }
 
