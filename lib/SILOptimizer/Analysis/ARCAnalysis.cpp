@@ -597,6 +597,18 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
   // that means we did not find all releases for the base.
   llvm::DenseSet<SILArgument *> ArgToRemove;
   for (auto &Arg : ArgInstMap) {
+    // If an argument has a single release and it is rc-identical to the
+    // SILArgument. Then we do not need to use projection to check for whether
+    // all non-trivial fields are covered. This is a short-cut to avoid
+    // projection for cost as well as accuracy. Projection currently does not
+    // support single incoming argument as rc-identity does whereas rc-idenity
+    // does.
+    if (Arg.second.size() == 1) {
+      SILInstruction *I = *Arg.second.begin();
+      SILValue RV = I->getOperand(0);
+      if (Arg.first == RCFI->getRCIdentityRoot(RV))
+        continue;
+    }
     if (!releaseAllNonTrivials(Arg.second, Arg.first))
       ArgToRemove.insert(Arg.first);
   }

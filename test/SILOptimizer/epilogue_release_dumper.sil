@@ -216,3 +216,38 @@ bb0(%0 : $boo):
   %5 = tuple ()
   return %5 : $()
 }
+
+// Make sure we can match release with argument when the released value is a silargument
+// and rc-identical to the argument.
+//
+// CHECK-LABEL: START: sil @single_release_foo_with_silargument_one_incoming_value
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN2:%.*]] : $foo
+// CHECK: END: sil @single_release_foo_with_silargument_one_incoming_value
+sil @single_release_foo_with_silargument_one_incoming_value : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  br bb1(%0: $foo)
+bb1(%1 : $foo):
+  strong_release %1 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_silargument_multiple_incoming_values
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: [[IN2:%.*]] = argument of bb0 : $foo
+// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK-NOT: strong_release [[IN2]] : $foo
+// CHECK: END: sil @single_release_foo_with_silargument_multiple_incoming_values
+sil @single_release_foo_with_silargument_multiple_incoming_values : $@convention(thin) (@owned foo, @owned foo) -> () {
+bb0(%0 : $foo, %8 : $foo):
+  cond_br undef, bb1(%0: $foo), bb2(%8 : $foo)
+bb1(%1 : $foo):
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  strong_release %3 : $foo
+  %4 = tuple ()
+  return %4 : $()
+}
