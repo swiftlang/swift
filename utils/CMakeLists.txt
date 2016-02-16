@@ -10,5 +10,5 @@ swift_install_in_component(editor-integration
 
 swift_install_in_component(tools
     FILES swift-api-dump.py
-    RUNTIME DESTINATION bin)
+    DESTINATION bin)
 
