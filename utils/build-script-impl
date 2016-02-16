@@ -1675,7 +1675,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
                 if [[ $(true_false "${build_perf_testsuite_this_time}") == "TRUE" ]]; then
-                    native_swift_tools_path=$(build_directory macosx-x86_64 swift)/bin
+                    native_swift_tools_path="$(build_directory_bin macosx-x86_64 swift)"
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_EXEC:STRING="${native_swift_tools_path}/swiftc"

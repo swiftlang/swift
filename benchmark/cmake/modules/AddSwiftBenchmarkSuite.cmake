@@ -274,9 +274,9 @@ function (swift_benchmark_compile_archopts)
   list(APPEND SWIFT_BENCH_OBJFILES "${objdir}/${module_name}.o")
 
   if("${BENCH_COMPILE_ARCHOPTS_PLATFORM}" STREQUAL "macosx")
-    set(OUTPUT_EXEC "${bindir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
+    set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
   else()
-    set(OUTPUT_EXEC "${bindir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
+    set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   endif()
 
   add_custom_command(
@@ -312,9 +312,15 @@ endfunction()
 
 function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
+
   if(IS_SWIFT_BUILD)
-    set(stdlib_dependencies "swift"
-      ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
+    set(stdlib_dependencies "swift")
+    foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
+      string(FIND "${stdlib_dependency}" "Unittest" find_output)
+      if("${find_output}" STREQUAL "-1")
+        list(APPEND stdlib_dependencies "${stdlib_dependency}")
+      endif()
+    endforeach()
   endif()
 
   add_custom_target("copy-swift-stdlib-${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
@@ -322,13 +328,13 @@ function(swift_benchmark_compile)
       COMMAND
         "${CMAKE_COMMAND}" "-E" "copy_directory"
         "${SWIFT_LIBRARY_PATH}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
-        "${libswiftdir}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}")
+        "${benchmark-lib-swift-dir}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}")
 
   add_custom_target("adhoc-sign-swift-stdlib-${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
       DEPENDS "copy-swift-stdlib-${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
       COMMAND
         "codesign" "-f" "-s" "-"
-        "${libswiftdir}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}/*.dylib" "2>/dev/null")
+        "${benchmark-lib-swift-dir}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}/*.dylib" "2>/dev/null")
 
   set(platform_executables)
   foreach(arch ${${SWIFT_BENCHMARK_COMPILE_PLATFORM}_arch})
@@ -351,18 +357,18 @@ function(swift_benchmark_compile)
           TARGET "${executable_target}"
           POST_BUILD
           COMMAND
-            "mv" ${platform_executables} "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+            "mv" ${platform_executables} "${swift-bin-dir}")
 
       add_custom_target("check-${executable_target}"
-          COMMAND "${SWIFT_RUNTIME_OUTPUT_INTDIR}/Benchmark_Driver" "run"
+          COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
                   "--iterations" "3"
-          COMMAND "${SWIFT_RUNTIME_OUTPUT_INTDIR}/Benchmark_Driver" "run"
+          COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
                   "--iterations" "3"
-          COMMAND "${SWIFT_RUNTIME_OUTPUT_INTDIR}/Benchmark_Driver" "compare"
+          COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
                   "--compare-script"
