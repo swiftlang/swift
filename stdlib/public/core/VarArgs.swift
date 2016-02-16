@@ -48,7 +48,7 @@ protocol _CVarArgPassedAsDouble : CVarArgType {}
 /// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
 protocol _CVarArgAlignedType : CVarArgType {
-  /// Returns the required alignment in bytes of 
+  /// Return the required alignment in bytes of 
   /// the value returned by `_cVarArgEncoding`.
   var _cVarArgAlignment: Int { get }
 }
@@ -137,7 +137,7 @@ extension Int64 : CVarArgType, _CVarArgAlignedType {
     return _encodeBitsAsWords(self)
   }
 
-  /// Returns the required alignment in bytes of 
+  /// Return the required alignment in bytes of 
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
@@ -185,7 +185,7 @@ extension UInt64 : CVarArgType, _CVarArgAlignedType {
     return _encodeBitsAsWords(self)
   }
 
-  /// Returns the required alignment in bytes of 
+  /// Return the required alignment in bytes of 
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
@@ -258,7 +258,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
     return _encodeBitsAsWords(Double(self))
   }
 
-  /// Returns the required alignment in bytes of 
+  /// Return the required alignment in bytes of 
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
@@ -273,7 +273,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
     return _encodeBitsAsWords(self)
   }
 
-  /// Returns the required alignment in bytes of 
+  /// Return the required alignment in bytes of 
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures

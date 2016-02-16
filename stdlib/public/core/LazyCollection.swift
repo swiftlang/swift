@@ -72,12 +72,12 @@ public struct LazyCollection<Base : CollectionType>
 /// optimizations it might implement.
 extension LazyCollection : SequenceType {
   
-  /// Returns a generator over the elements of this sequence.
+  /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> Base.Generator { return _base.generate() }
   
-  /// Returns a value less than or equal to the number of elements in
+  /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).

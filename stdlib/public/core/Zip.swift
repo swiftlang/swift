@@ -81,7 +81,7 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
     (_sequence1, _sequence2) = (sequence1, sequence2)
   }
 
-  /// Returns a generator over the elements of this sequence.
+  /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")

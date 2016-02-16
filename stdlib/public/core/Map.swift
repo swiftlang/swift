@@ -45,7 +45,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   
   public typealias Elements = LazyMapSequence
   
-  /// Returns a generator over the elements of this sequence.
+  /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")
@@ -53,7 +53,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
     return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
   }
 
-  /// Returns a value less than or equal to the number of elements in
+  /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
@@ -107,7 +107,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   public var first: Element? { return _base.first.map(_transform) }
   
 
-  /// Returns a generator over the elements of this sequence.
+  /// Returns a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")
@@ -146,7 +146,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
 //===--- Support for s.lazy -----------------------------------------------===//
 
 extension LazySequenceType {
-  /// Returns a `LazyMapSequence` over this `Sequence`.  The elements of
+  /// Return a `LazyMapSequence` over this `Sequence`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @warn_unused_result
@@ -158,7 +158,7 @@ extension LazySequenceType {
 }
 
 extension LazyCollectionType {
-  /// Returns a `LazyMapCollection` over this `Collection`.  The elements of
+  /// Return a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @warn_unused_result
@@ -169,7 +169,7 @@ extension LazyCollectionType {
   }
 }
 
-/// Returns an `Array` containing the results of mapping `transform`
+/// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 @available(*, unavailable, message="call the 'map()' method on the sequence")
 public func map<C : CollectionType, T>(
@@ -178,7 +178,7 @@ public func map<C : CollectionType, T>(
   fatalError("unavailable function can't be called")
 }
 
-/// Returns an `Array` containing the results of mapping `transform`
+/// Return an `Array` containing the results of mapping `transform`
 /// over `source` and flattening the result.
 @available(*, unavailable, message="call the 'flatMap()' method on the sequence")
 public func flatMap<C : CollectionType, T>(

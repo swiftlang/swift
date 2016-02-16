@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A collection that supports replacement of an arbitrary subRange
+/// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
 @swift3_migration(renamed="RangeReplaceableCollection")
 public protocol RangeReplaceableCollectionType : CollectionType {

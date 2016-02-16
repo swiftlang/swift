@@ -12,7 +12,7 @@
 // BooleanType
 //===----------------------------------------------------------------------===//
 
-/// Returns the result of inverting `a`'s logic value.
+/// Return the result of inverting `a`'s logic value.
 @warn_unused_result
 public prefix func !<T : BooleanType>(a: T) -> Bool {
   return !a.boolValue
