@@ -129,7 +129,7 @@ public struct StaticString
     }
   }
 
-  /// Returns a `String` representing the same sequence of Unicode
+  /// Return a `String` representing the same sequence of Unicode
   /// scalar values as `self` does.
   @swift3_migration(message="use the 'String(_:)' initializer")
   @_transparent

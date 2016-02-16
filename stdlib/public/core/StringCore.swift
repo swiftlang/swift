@@ -91,7 +91,7 @@ public struct _StringCore {
     return UTF16.CodeUnit(elementShift) << 8
   }
 
-  /// Returns a pointer to the Nth element of contiguous
+  /// Return a pointer to the Nth element of contiguous
   /// storage.  Caveats: The string must have contiguous storage; the
   /// element may be 1 or 2 bytes wide, depending on elementWidth; the
   /// result may be null if the string is empty.
@@ -540,7 +540,7 @@ public struct _StringCore {
     _invariantCheck()
   }
 
-  /// Returns `true` iff the contents of this string can be
+  /// Return true iff the contents of this string can be
   /// represented as pure ASCII.
   ///
   /// - Complexity: O(N) in the worst case.

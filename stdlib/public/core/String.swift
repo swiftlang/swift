@@ -265,7 +265,7 @@ extension String : CustomDebugStringConvertible {
 }
 
 extension String {
-  /// Returns the number of code units occupied by this string
+  /// Return the number of code units occupied by this string
   /// in the given encoding.
   @warn_unused_result
   func _encodedLength<
@@ -966,7 +966,7 @@ extension String.Index {
     }
   }
 
-  /// Returns the position in `utf8` that corresponds exactly
+  /// Return the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf8).indices`.
@@ -977,7 +977,7 @@ extension String.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
 
-  /// Returns the position in `utf16` that corresponds exactly
+  /// Return the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf16).indices`.
@@ -988,7 +988,7 @@ extension String.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
 
-  /// Returns the position in `unicodeScalars` that corresponds exactly
+  /// Return the position in `unicodeScalars` that corresponds exactly
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(unicodeScalars).indices`.

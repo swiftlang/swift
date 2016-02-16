@@ -415,7 +415,7 @@ public struct Set<Element : Hashable> :
     return _variantStorage.assertingGet(position)
   }
 
-  /// Returns a generator over the members.
+  /// Return a *generator* over the members.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator")
@@ -465,7 +465,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns `true` if the set is a subset of a finite sequence as a `Set`.
+  /// Returns true if the set is a subset of a finite sequence as a `Set`.
   @warn_unused_result
   public func isSubsetOf<
     S : SequenceType where S.Generator.Element == Element
@@ -475,7 +475,7 @@ public struct Set<Element : Hashable> :
     return isSubset || isEqual
   }
 
-  /// Returns `true` if the set is a subset of a finite sequence as a `Set`
+  /// Returns true if the set is a subset of a finite sequence as a `Set`
   /// but not equal.
   @warn_unused_result
   public func isStrictSubsetOf<
@@ -486,7 +486,7 @@ public struct Set<Element : Hashable> :
     return isSubset && !isEqual
   }
 
-  /// Returns `true` if the set is a superset of a finite sequence as a `Set`.
+  /// Returns true if the set is a superset of a finite sequence as a `Set`.
   @warn_unused_result
   public func isSupersetOf<
     S : SequenceType where S.Generator.Element == Element
@@ -495,7 +495,7 @@ public struct Set<Element : Hashable> :
     return other.isSubsetOf(self)
   }
 
-  /// Returns `true` if the set is a superset of a finite sequence as a `Set`
+  /// Returns true if the set is a superset of a finite sequence as a `Set`
   /// but not equal.
   @warn_unused_result
   public func isStrictSupersetOf<
@@ -505,7 +505,7 @@ public struct Set<Element : Hashable> :
     return other.isStrictSubsetOf(self)
   }
 
-  /// Returns `true` if no members in the set are in a finite sequence as a `Set`.
+  /// Returns true if no members in the set are in a finite sequence as a `Set`.
   @warn_unused_result
   public func isDisjointWith<
     S : SequenceType where S.Generator.Element == Element
@@ -519,7 +519,7 @@ public struct Set<Element : Hashable> :
     return true
   }
 
-  /// Returns a new `Set` with items in both this set and a finite sequence.
+  /// Return a new `Set` with items in both this set and a finite sequence.
   @warn_unused_result
   public func union<
     S : SequenceType where S.Generator.Element == Element
@@ -529,7 +529,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Inserts elements of a finite sequence into this `Set`.
+  /// Insert elements of a finite sequence into this `Set`.
   public mutating func unionInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -538,7 +538,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns a new set with elements in this set that do not occur
+  /// Return a new set with elements in this set that do not occur
   /// in a finite sequence.
   @warn_unused_result
   public func subtract<
@@ -549,7 +549,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Removes all members in the set that occur in a finite sequence.
+  /// Remove all members in the set that occur in a finite sequence.
   public mutating func subtractInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -558,7 +558,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns a new set with elements common to this set and a finite sequence.
+  /// Return a new set with elements common to this set and a finite sequence.
   @warn_unused_result
   public func intersect<
     S : SequenceType where S.Generator.Element == Element
@@ -573,7 +573,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Removes any members of this set that aren't also in a finite sequence.
+  /// Remove any members of this set that aren't also in a finite sequence.
   public mutating func intersectInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -593,7 +593,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns a new set with elements that are either in the set or a finite
+  /// Return a new set with elements that are either in the set or a finite
   /// sequence but do not occur in both.
   @warn_unused_result
   public func exclusiveOr<
@@ -604,8 +604,8 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// For each element of a finite sequence, removes it from the set if it is a
-  /// common element, otherwise adds it to the set. Repeated elements of the
+  /// For each element of a finite sequence, remove it from the set if it is a
+  /// common element, otherwise add it to the set. Repeated elements of the
   /// sequence will be ignored.
   public mutating func exclusiveOrInPlace<
     S : SequenceType where S.Generator.Element == Element
@@ -1071,7 +1071,7 @@ public struct Dictionary<Key : Hashable, Value> :
     }
   }
 
-  /// Update the value stored in the dictionary for the given key, or, if the
+  /// Update the value stored in the dictionary for the given key, or, if they
   /// key does not exist, add a new key-value pair to the dictionary.
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
@@ -1099,7 +1099,7 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.removeValueForKey(key)
   }
 
-  /// Removes all elements.
+  /// Remove all elements.
   ///
   /// - Postcondition: `capacity == 0` if `keepCapacity` is `false`, otherwise
   ///   the capacity will not be decreased.
@@ -1129,7 +1129,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // `SequenceType` conformance
   //
 
-  /// Returns a generator over the (key, value) pairs.
+  /// Return a *generator* over the (key, value) pairs.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator")
@@ -3468,7 +3468,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     }
   }
 
-  /// Returns a generator over the (Key, Value) pairs.
+  /// Return a *generator* over the (Key, Value) pairs.
   ///
   /// - Complexity: O(1).
   internal func generate() -> ${Self}Generator<${TypeParameters}> {
