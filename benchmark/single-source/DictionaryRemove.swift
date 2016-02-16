@@ -31,7 +31,7 @@ public func run_DictionaryRemove(N: Int) {
         tmpDict = dict
         // Empty dictionary
         for i in 1...size {
-            tmpDict.removeValueForKey(i)
+            tmpDict.removeValue(forKey: i)
         }
         if !tmpDict.isEmpty {
             break

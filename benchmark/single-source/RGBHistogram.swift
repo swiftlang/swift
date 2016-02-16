@@ -98,7 +98,7 @@ func createSortedSparseRGBHistogram
     var histogram = Dictionary<rrggbb_t, Int>()
 
     for sample in samples {
-        let i = histogram.indexForKey(sample)
+        let i = histogram.index(forKey: sample)
         histogram[sample] = ((i != nil) ? histogram[i!].1 : 0) + 1
     }
 
