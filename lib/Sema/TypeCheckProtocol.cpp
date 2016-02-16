@@ -2179,6 +2179,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         if (((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
              !classDecl->isFinal()) &&
             !witnessCtor->isRequired() &&
+            !witnessCtor->getDeclContext()
+               ->getAsProtocolOrProtocolExtensionContext() &&
             !witnessCtor->hasClangNode()) {
           // FIXME: We're not recovering (in the AST), so the Fix-It
           // should move.
