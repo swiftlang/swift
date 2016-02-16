@@ -112,12 +112,36 @@ class AnnotatingPrinter : public StreamPrinter {
   };
   std::vector<DeclUSR> DeclUSRs;
 
+  // For members of a synthesized extension, we should append the USR of the
+  // synthesize target to the original USR.
+  std::string TargetUSR;
+
+  // A separator between the target usr and the real usr.
+  std::string Separator = "::SYNTHESIZED::";
+
 public:
   AnnotatingPrinter(SourceTextInfo &Info, llvm::raw_ostream &OS)
     : StreamPrinter(OS), Info(Info) { }
 
   ~AnnotatingPrinter() {
     assert(DeclUSRs.empty() && "unmatched printDeclLoc call ?");
+  }
+
+
+  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                    const NominalTypeDecl *Target) override {
+    // When we start print a synthesized extension, record the target's USR.
+    llvm::SmallString<64> Buf;
+    llvm::raw_svector_ostream OS(Buf);
+    if (!SwiftLangSupport::printUSR(Target, OS)) {
+      TargetUSR = OS.str();
+    }
+  }
+
+  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                     const NominalTypeDecl *Target) override {
+    // When we leave a synthesized extension, clear target's USR.
+    TargetUSR = "";
   }
 
   void printDeclLoc(const Decl *D) override {
@@ -133,6 +157,12 @@ public:
       llvm::SmallString<64> Buf;
       llvm::raw_svector_ostream OS(Buf);
       if (!SwiftLangSupport::printUSR(VD, OS)) {
+
+        // Append target's USR if this is a member of a synthesized extension.
+        if (!TargetUSR.empty()) {
+          OS << Separator;
+          OS << TargetUSR;
+        }
         StringRef USR = OS.str();
         Info.USRMap[USR] = Entry;
         DeclUSRs.emplace_back(VD, USR);
