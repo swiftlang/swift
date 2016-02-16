@@ -987,18 +987,14 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 /// and equal fixed type portions, and return by reference each archetype and
 /// the matching portion of the actual arg type where that archetype appears.
 static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actualArgType,
-                                     SmallVector<ArchetypeType *, 4> &archetypes,
-                                     SmallVector<Type, 4> &substitutions) {
+                                     TypeSubstitutionMap &archetypesMap) {
   class GenericVisitor : public TypeMatcher<GenericVisitor> {
     DeclContext *dc;
-    SmallVector<ArchetypeType *, 4> &archetypes;
-    SmallVector<Type, 4> &substitutions;
+    TypeSubstitutionMap &archetypesMap;
 
   public:
-    GenericVisitor(DeclContext *dc,
-                   SmallVector<ArchetypeType *, 4> &archetypes,
-                   SmallVector<Type, 4> &substitutions)
-    : dc(dc), archetypes(archetypes), substitutions(substitutions) {}
+    GenericVisitor(DeclContext *dc, TypeSubstitutionMap &archetypesMap)
+      : dc(dc), archetypesMap(archetypesMap) {}
     
     bool mismatch(TypeBase *paramType, TypeBase *argType) {
       return paramType->isEqual(argType);
@@ -1010,12 +1006,10 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actua
         type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
       
       if (auto archetype = type->getAs<ArchetypeType>()) {
-        for (unsigned i = 0, c = archetypes.size(); i < c; i++) {
-          if (archetypes[i]->isEqual(archetype))
-            return substitutions[i]->isEqual(argType);
-        }
-        archetypes.push_back(archetype);
-        substitutions.push_back(argType);
+        auto existing = archetypesMap[archetype];
+        if (existing)
+          return existing->isEqual(argType);
+        archetypesMap[archetype] = argType;
         return true;
       }
       return false;
@@ -1030,15 +1024,22 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actua
       if (dc && original->isTypeParameter())
         original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
       
-      if (auto archetype = original->getAs<ArchetypeType>()) {
-        archetypes.push_back(archetype);
-        substitutions.push_back(substitution->getReplacementType());
-      }
+      Type replacement = substitution->getReplacementType();
+      // If the replacement is itself an archetype, then the constraint
+      // system was asserting equivalencies between different levels of
+      // generics, rather than binding a generic to a concrete type (and we
+      // don't/won't have a concrete type). In which case, it is the
+      // replacement we are interested in, since it is the one in our current
+      // context. That generic type should equal itself.
+      if (auto ourGeneric = replacement->getAs<ArchetypeType>())
+        archetypesMap[ourGeneric] = replacement;
+      else if (auto archetype = original->getAs<ArchetypeType>())
+        archetypesMap[archetype] = replacement;
     }
     return false;
   });
   
-  GenericVisitor visitor(dc, archetypes, substitutions);
+  GenericVisitor visitor(dc, archetypesMap);
   return visitor.match(paramType, actualArgType);
 }
 
@@ -1085,17 +1086,19 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   // their type and count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
 
-  // Checking of archetypes.
-  // FIXME: For now just trying to verify applicability of arguments with only
-  // a single generic variable. Ideally we'd create a ConstraintSystem with
-  // type variables for all generics and solve it with the given argument types.
-  Type singleArchetype = nullptr;
-  Type matchingArgType = nullptr;
+  // Known mapping of archetypes in all arguments so far. An archetype may map
+  // to another archetype if the constraint system substituted one for another.
+  TypeSubstitutionMap allGenericSubstitutions;
 
-  // Number of args of generic archetype which are mismatched because
+  // Number of args of one generic archetype which are mismatched because
   // isSubstitutableFor() has failed. If all mismatches are of this type, we'll
   // return a different closeness for better diagnoses.
+  Type nonSubstitutableArchetype = nullptr;
   unsigned nonSubstitutableArgs = 0;
+  
+  // The type of failure is that multiple occurrences of the same generic are
+  // being passed arguments with different concrete types.
+  bool genericWithDifferingConcreteTypes = false;
   
   // We classify an argument mismatch as being a "near" miss if it is a very
   // likely match due to a common sort of problem (e.g. wrong flags on a
@@ -1122,74 +1125,76 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
       
       // FIXME: Right now, a "matching" overload is one with a parameter whose
       // type is identical to the argument type, or substitutable via handling
-      // of functions with a single archetype in one or more parameters.
+      // of functions with primary archetypes in one or more parameters.
       // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?
 
-      SmallVector<ArchetypeType *, 4> archetypes;
-      SmallVector<Type, 4> substitutions;
+      TypeSubstitutionMap archetypesMap;
       bool matched;
-      if (paramType->is<UnresolvedType>())
+      if (paramType->is<UnresolvedType>() || rArgType->hasTypeVariable())
         matched = false;
       else
-        matched = findGenericSubstitutions(dc, paramType, rArgType,
-                                           archetypes, substitutions);
+        matched = findGenericSubstitutions(dc, paramType, rArgType, archetypesMap);
       
-      if (matched && archetypes.size() == 0)
-        continue;
-      if (matched && archetypes.size() == 1 && !rArgType->hasTypeVariable()) {
-        auto archetype = archetypes[0];
-        auto substitution = substitutions[0];
-        
-        if (singleArchetype) {
-          if (!archetype->isEqual(singleArchetype))
-            // Multiple archetypes, too complicated.
-            return { CC_ArgumentMismatch, {}};
+      if (matched) {
+        for (auto pair : archetypesMap) {
+          auto archetype = pair.first->castTo<ArchetypeType>();
+          auto substitution = pair.second;
           
-          if (substitution->isEqual(matchingArgType)) {
-            if (nonSubstitutableArgs == 0)
-              continue;
-            ++nonSubstitutableArgs;
-            mismatchesAreNearMisses = false;
+          auto existingSubstitution = allGenericSubstitutions[archetype];
+          if (!existingSubstitution) {
+            // New substitution for this callee.
+            allGenericSubstitutions[archetype] = substitution;
+            
+            // Not yet handling nested archetypes.
+            if (!archetype->isPrimary())
+              return { CC_ArgumentMismatch, {}};
+            
+            if (!CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
+              // If we have multiple non-substitutable types, this is just a mismatched mess.
+              if (!nonSubstitutableArchetype.isNull())
+                return { CC_ArgumentMismatch, {}};
+              
+              if (auto argOptType = argType->getOptionalObjectType())
+                mismatchesAreNearMisses &= CS->TC.isSubstitutableFor(argOptType, archetype, CS->DC);
+              else
+                mismatchesAreNearMisses = false;
+              
+              nonSubstitutableArchetype = archetype;
+              nonSubstitutableArgs = 1;
+              matched = false;
+            }
           } else {
-            if (nonSubstitutableArgs == 1) {
+            // Substitution for the same archetype as in a previous argument.
+            bool isNonSubstitutableArchetype = !nonSubstitutableArchetype.isNull() &&
+                                               nonSubstitutableArchetype->isEqual(archetype);
+            if (substitution->isEqual(existingSubstitution)) {
+              if (isNonSubstitutableArchetype) {
+                ++nonSubstitutableArgs;
+                matched = false;
+              }
+            } else {
               // If we have only one nonSubstitutableArg so far, then this different
               // type might be the one that we should be substituting for instead.
               // Note that failureInfo is already set correctly for that case.
-              if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
-                mismatchesAreNearMisses = argumentMismatchIsNearMiss(matchingArgType, substitution);
-                matchingArgType = substitution;
-                continue;
+              if (isNonSubstitutableArchetype && nonSubstitutableArgs == 1 &&
+                  CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
+                mismatchesAreNearMisses = argumentMismatchIsNearMiss(existingSubstitution, substitution);
+                allGenericSubstitutions[archetype] = substitution;
+              } else {
+                genericWithDifferingConcreteTypes = true;
+                matched = false;
               }
             }
-            
-            // This substitution doesn't match a previous substitution. Set up the nearMiss
-            // and failureInfo.paramType with the expected substitution inserted.
-            // (Note that this transform assumes only a single archetype.)
-            mismatchesAreNearMisses &= argumentMismatchIsNearMiss(substitution, matchingArgType);
-            paramType = paramType.transform(([&](Type type) -> Type {
-              if (type->is<SubstitutableType>())
-                return matchingArgType;
-              return type;
-            }));
           }
-        } else {
-          matchingArgType = substitution;
-          singleArchetype = archetype;
-
-          if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC))
-            continue;
-          
-          if (auto argOptType = argType->getOptionalObjectType())
-            mismatchesAreNearMisses &= CS->TC.isSubstitutableFor(argOptType, archetype, CS->DC);
-          else
-            mismatchesAreNearMisses = false;
-          ++nonSubstitutableArgs;
         }
-      } else {
-        // Keep track of whether this argument was a near miss or not.
-        mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
       }
+      
+      if (matched)
+        continue;
+      
+      if (archetypesMap.empty())
+        mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
       
       ++mismatchingArgs;
 
@@ -1213,10 +1218,23 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   // close matches are prioritized against obviously wrong ones.
   if (mismatchingArgs == 1) {
     CandidateCloseness closeness;
-    if (singleArchetype.isNull()) {
+    if (allGenericSubstitutions.empty()) {
       closeness = mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
                                           : CC_OneArgumentMismatch;
     } else {
+      // If the failure is that different occurrences of the same generic have
+      // different concrete types, substitute in all the concrete types we've found
+      // into the failureInfo to improve diagnosis.
+      if (genericWithDifferingConcreteTypes) {
+        auto newType = failureInfo.parameterType.transform([&](Type type) -> Type {
+          if (auto archetype = type->getAs<ArchetypeType>())
+            if (auto replacement = allGenericSubstitutions[archetype])
+              return replacement;
+          return type;
+        });
+        failureInfo.parameterType = newType;
+      }
+      
       closeness = mismatchesAreNearMisses ? CC_OneGenericArgumentNearMismatch
                                           : CC_OneGenericArgumentMismatch;
     }
@@ -1589,16 +1607,15 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     return false;
   
   bool foundFailure = false;
-  SmallVector<ArchetypeType *, 4> archetypes;
-  SmallVector<Type, 4> substitutions;
+  TypeSubstitutionMap archetypesMap;
   
   if (!findGenericSubstitutions(failedArgument.declContext, failedArgument.parameterType,
-                                argType, archetypes, substitutions))
+                                argType, archetypesMap))
     return false;
 
-  for (unsigned i = 0, c = archetypes.size(); i < c; i++) {
-    auto archetype = archetypes[i];
-    auto substitution = substitutions[i];
+  for (auto pair : archetypesMap) {
+    auto archetype = pair.first->castTo<ArchetypeType>();
+    auto substitution = pair.second;
     
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
 
