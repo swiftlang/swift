@@ -88,13 +88,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   CGO.DisableFPElim = Opts.DisableFPElim;
   switch (Opts.DebugInfoKind) {
   case IRGenDebugInfoKind::None:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::NoDebugInfo);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
   case IRGenDebugInfoKind::LineTables:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::DebugLineTablesOnly);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
  case IRGenDebugInfoKind::Normal:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::FullDebugInfo);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
