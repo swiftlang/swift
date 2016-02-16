@@ -366,6 +366,47 @@ public:
   }
 };
 
+class ForeignClassTypeRef final : public TypeRef {
+  std::string Name;
+public:
+  ForeignClassTypeRef(std::string Name)
+    : TypeRef(TypeRefKind::ForeignClass), Name(Name) {}
+  static const std::shared_ptr<ForeignClassTypeRef> Unnamed;
+
+  std::string getName() const {
+    return Name;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::ForeignClass;
+  }
+};
+
+class ObjCClassTypeRef final : public TypeRef {
+  std::string Name;
+public:
+  ObjCClassTypeRef(std::string Name)
+    : TypeRef(TypeRefKind::ObjCClass), Name(Name) {}
+  static const std::shared_ptr<ObjCClassTypeRef> Unnamed;
+
+  std::string getName() const {
+    return Name;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::ObjCClass;
+  }
+};
+  
+class OpaqueTypeRef final : public TypeRef {
+public:
+  OpaqueTypeRef() : TypeRef(TypeRefKind::Opaque) {}
+  static const std::shared_ptr<OpaqueTypeRef> Opaque;
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::Opaque;
+  }
+};
+
 template <typename ImplClass, typename RetTy = void, typename... Args>
 class TypeRefVisitor {
 public:
@@ -502,6 +543,23 @@ public:
   void visitAssociatedTypeRef(const AssociatedTypeRef *AT) {
     printHeader("associated-type");
     printField("name", AT->getName());
+    OS << ')';
+  }
+
+  void visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    printHeader("foreign");
+    printField("name", F->getName());
+    OS << ')';
+  }
+
+  void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    printHeader("objective-c-class");
+    printField("name", OC->getName());
+    OS << ')';
+  }
+  
+  void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    printHeader("opaque");
     OS << ')';
   }
 };
