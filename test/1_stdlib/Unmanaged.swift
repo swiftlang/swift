@@ -16,33 +16,33 @@ import ObjectiveC
 // Check that the generic parameter is called 'Instance'.
 protocol TestProtocol1 {}
 
-extension UnsafeReference where Object : TestProtocol1 {
+extension Unmanaged where Instance : TestProtocol1 {
   var _instanceIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-var UnmanagedTests = TestSuite("UnsafeReference")
+var UnmanagedTests = TestSuite("Unmanaged")
 
-UnmanagedTests.test("init(bitPattern:)/trap")
+UnmanagedTests.test("fromOpaque()/trap")
   .skip(.Custom(
     { !_isDebugAssertConfiguration() },
     reason: "init(bitPattern:) does a _stdlibAssert() for null pointers"))
   .code {
   let null: OpaquePointer = getPointer(nil)
   expectCrashLater()
-  let unmanaged = UnsafeReference<AnyObject>(bitPattern: null)
+  let unmanaged = Unmanaged<AnyObject>.fromOpaque(null)
   _blackHole(unmanaged)
 }
 
 class FooClass {}
 
-UnmanagedTests.test("unsafeBitCast(UnsafeReference, Int)") {
+UnmanagedTests.test("unsafeBitCast(Unmanaged, Int)") {
   let ref = FooClass()
   expectNotEqual(
     0,
     unsafeBitCast(
-      UnsafeReference(withoutRetaining: ref) as UnsafeReference<AnyObject>,
+      Unmanaged.passUnretained(ref) as Unmanaged<AnyObject>,
       Int.self))
   _fixLifetime(ref)
 }

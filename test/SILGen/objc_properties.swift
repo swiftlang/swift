@@ -153,26 +153,26 @@ class Singleton : NSObject {
 }
 
 class HasUnmanaged : NSObject {
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVs15UnsafeReferencePs9AnyObject___
-  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanagedg3refGSqGVs15UnsafeReferencePs9AnyObject___
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
+  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
   // CHECK: [[RESULT:%.+]] = apply [[NATIVE]](%0)
   // CHECK-NOT: {{(retain|release)}}
   // CHECK: strong_release %0 : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
-  // CHECK: return [[RESULT]] : $Optional<UnsafeReference<AnyObject>>
+  // CHECK: return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanageds3refGSqGVs15UnsafeReferencePs9AnyObject___
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___
   // CHECK-NOT: {{(retain|release)}}
   // CHECK: strong_retain %1 : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
-  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanageds3refGSqGVs15UnsafeReferencePs9AnyObject___
+  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___
   // CHECK-NOT: {{(retain|release)}}
   // CHECK: apply [[NATIVE]](%0, %1)
   // CHECK-NOT: {{(retain|release)}}
   // CHECK: strong_release %1 : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
   // CHECK: return
-  var ref: UnsafeReference<AnyObject>?
+  var ref: Unmanaged<AnyObject>?
 }
 
 

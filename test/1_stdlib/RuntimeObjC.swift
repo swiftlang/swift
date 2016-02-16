@@ -758,9 +758,9 @@ Reflection.test("CGRect") {
   expectEqual(expected, output)
 }
 
-Reflection.test("UnsafeReference/nil") {
+Reflection.test("Unmanaged/nil") {
   var output = ""
-  var optionalURL: UnsafeReference<CFURL>? = nil
+  var optionalURL: Unmanaged<CFURL>? = nil
   dump(optionalURL, &output)
 
   let expected = "- nil\n"
@@ -768,16 +768,16 @@ Reflection.test("UnsafeReference/nil") {
   expectEqual(expected, output)
 }
 
-Reflection.test("UnsafeReference/not-nil") {
+Reflection.test("Unmanaged/not-nil") {
   var output = ""
-  var optionalURL: UnsafeReference<CFURL>? =
-    UnsafeReference(retaining: CFURLCreateWithString(nil, "http://llvm.org/", nil))
+  var optionalURL: Unmanaged<CFURL>? =
+    Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/", nil))
   dump(optionalURL, &output)
 
   let expected =
-    "▿ Optional(Swift.UnsafeReference<__ObjC.CFURL>(_storage: http://llvm.org/))\n" +
-    "  ▿ Some: Swift.UnsafeReference<__ObjC.CFURL>\n" +
-    "    - _storage: http://llvm.org/ #0\n" +
+    "▿ Optional(Swift.Unmanaged<__ObjC.CFURL>(_value: http://llvm.org/))\n" +
+    "  ▿ Some: Swift.Unmanaged<__ObjC.CFURL>\n" +
+    "    - _value: http://llvm.org/ #0\n" +
     "      - super: NSObject\n"
 
   expectEqual(expected, output)

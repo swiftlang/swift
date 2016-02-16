@@ -5,16 +5,16 @@
 import CoreCooling
 import CFAndObjC
 
-func assertUnmanaged<T: AnyObject>(t: UnsafeReference<T>) {}
+func assertUnmanaged<T: AnyObject>(t: Unmanaged<T>) {}
 func assertManaged<T: AnyObject>(t: T) {}
 
 func test0(fridge: CCRefrigerator) {
   assertManaged(fridge)
 }
 
-func test1(power: UnsafeReference<CCPowerSupply>) {
+func test1(power: Unmanaged<CCPowerSupply>) {
   assertUnmanaged(power)
-  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'UnsafeReference<CCPowerSupply>' to expected argument type 'CCPowerSupply!'}}
+  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupply>' to expected argument type 'CCPowerSupply!'}}
   assertUnmanaged(fridge)
 }
 
@@ -36,9 +36,9 @@ func test4() {
 }
 
 func test5() {
-  let power = UnsafeReference(withoutRetaining: kCCPowerStandard)
+  let power: Unmanaged<CCPowerSupply> = .passUnretained(kCCPowerStandard)
   assertUnmanaged(power)
-  _ = CCRefrigeratorCreate(power.object)
+  _ = CCRefrigeratorCreate(power.takeUnretainedValue())
 }
 
 func test6() {
@@ -57,10 +57,10 @@ func test8(f: CCRefrigerator) {
 }
 
 func test9() {
-  let fridge = CCRefrigeratorCreateMutable(kCCPowerStandard).release()
+  let fridge = CCRefrigeratorCreateMutable(kCCPowerStandard).takeRetainedValue()
   let constFridge: CCRefrigerator = fridge
   CCRefrigeratorOpen(fridge)
-  let item = CCRefrigeratorGet(fridge, 0).object
+  let item = CCRefrigeratorGet(fridge, 0).takeUnretainedValue()
   CCRefrigeratorInsert(item, fridge) // expected-error {{cannot convert value of type 'CCItem' to expected argument type 'CCMutableRefrigerator!'}}
   CCRefrigeratorInsert(constFridge, item) // expected-error {{cannot convert value of type 'CCRefrigerator' to expected argument type 'CCMutableRefrigerator!'}}
   CCRefrigeratorInsert(fridge, item)
@@ -68,7 +68,7 @@ func test9() {
 }
 
 func testProperty(k: Kitchen) {
-  k.fridge = CCRefrigeratorCreate(kCCPowerStandard).release()
+  k.fridge = CCRefrigeratorCreate(kCCPowerStandard).takeRetainedValue()
   CCRefrigeratorOpen(k.fridge)
   CCRefrigeratorClose(k.fridge)
 }
@@ -106,7 +106,7 @@ func testOutParametersGood() {
   var power: CCPowerSupply?
   CCRefrigeratorGetPowerSupplyIndirect(fridge!, &power)
 
-  var item: UnsafeReference<CCItem>?
+  var item: Unmanaged<CCItem>?
   CCRefrigeratorGetItemUnaudited(fridge!, 0, &item)
 }
 

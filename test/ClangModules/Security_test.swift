@@ -12,12 +12,12 @@ func testIntegration() {
   // Based on code in <rdar://problem/17162475>.
   let query = [kSecClass as NSString: kSecClassGenericPassword] as NSDictionary as CFDictionary
 
-  var dataTypeRef: UnsafeReference<AnyObject>? = nil
+  var dataTypeRef: Unmanaged<AnyObject>? = nil
   let status = SecItemCopyMatching(query, &dataTypeRef)
   
   if status == errSecSuccess {
     if let filledRef = dataTypeRef {
-      let str: NSString = filledRef.release() as! NSString
+      let str: NSString = filledRef.takeRetainedValue() as! NSString
       print("Got: \(str)")
     }
   }

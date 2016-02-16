@@ -114,7 +114,7 @@ enum class ImportTypeKind {
   /// \brief Import the declared type of an audited variable.
   ///
   /// This is exactly like ImportTypeKind::Variable, except it
-  /// disables wrapping CF class types in UnsafeReference.
+  /// disables wrapping CF class types in Unmanaged.
   AuditedVariable,
 
   /// \brief Import the declared type of a struct or union field.
@@ -129,7 +129,7 @@ enum class ImportTypeKind {
   /// \brief Import the result type of an audited function.
   ///
   /// This is exactly like ImportTypeKind::Result, except it
-  /// disables wrapping CF class types in UnsafeReference.
+  /// disables wrapping CF class types in Unmanaged.
   AuditedResult,
 
   /// \brief Import the type of a function parameter.
@@ -143,13 +143,13 @@ enum class ImportTypeKind {
   /// \brief Import the type of a parameter declared with
   /// \c CF_RETURNS_RETAINED.
   ///
-  /// This ensures that the parameter is not marked as UnsafeReference.
+  /// This ensures that the parameter is not marked as Unmanaged.
   CFRetainedOutParameter,
 
   /// \brief Import the type of a parameter declared with
   /// \c CF_RETURNS_NON_RETAINED.
   ///
-  /// This ensures that the parameter is not marked as UnsafeReference.
+  /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter,
 
   /// \brief Import the type pointed to by a pointer or reference.

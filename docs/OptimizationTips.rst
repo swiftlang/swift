@@ -526,16 +526,16 @@ Advice: Use unmanaged references to avoid reference counting overhead
 ---------------------------------------------------------------------
 
 In performance-critical code you can use choose to use unmanaged
-references. The ``UnsafeReference<T>`` structure allows developers to disable
+references. The ``Unmanaged<T>`` structure allows developers to disable
 automatic reference counting for a specific reference.
 
 ::
 
-    var Ref : UnsafeReference<Node> = UnsafeReference(withoutRetaining: Head)
+    var Ref : Unmanaged<Node> = Unmanaged.passUnretained(Head)
 
-    while let Next = Ref.object.next {
+    while let Next = Ref.takeUnretainedValue().next {
       ...
-      Ref = UnsafeReference(withoutRetaining: Next)
+      Ref = Unmanaged.passUnretained(Next)
     }
 
 

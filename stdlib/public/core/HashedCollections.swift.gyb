@@ -250,10 +250,10 @@ internal func _stdlib_NSObject_isEqual(lhs: AnyObject, _ rhs: AnyObject) -> Bool
 
 //===--- Hacks and workarounds --------------------------------------------===//
 
-/// Like `UnsafeMutablePointer<UnsafeReference<AnyObject>>`, or `id
+/// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
 /// __unsafe_unretained *` in Objective-C ARC.
 internal struct _UnmanagedAnyObjectArray {
-  // `UnsafeMutablePointer<UnsafeReference<AnyObject>>` fails because of:
+  // `UnsafeMutablePointer<Unmanaged<AnyObject>>` fails because of:
   // <rdar://problem/16836348> IRGen: Couldn't find conformance
 
   /// Underlying pointer, typed as an integer to escape from reference

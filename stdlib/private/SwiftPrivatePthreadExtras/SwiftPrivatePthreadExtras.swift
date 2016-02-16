@@ -53,8 +53,8 @@ internal func invokeBlockContext(
 ) -> UnsafeMutablePointer<Void> {
   // The context is passed in +1; we're responsible for releasing it.
   let contextAsOpaque = OpaquePointer(contextAsVoidPointer)
-  let context = UnsafeReference<PthreadBlockContext>(bitPattern: contextAsOpaque)
-    .release()
+  let context = Unmanaged<PthreadBlockContext>.fromOpaque(contextAsOpaque)
+    .takeRetainedValue()
 
   return context.run()
 }
@@ -68,7 +68,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   let context = PthreadBlockContextImpl(block: start_routine, arg: arg)
   // We hand ownership off to `invokeBlockContext` through its void context
   // argument.
-  let contextAsOpaque = OpaquePointer(bitPattern: UnsafeReference(retaining: context))
+  let contextAsOpaque = OpaquePointer(bitPattern: Unmanaged.passRetained(context))
   let contextAsVoidPointer = UnsafeMutablePointer<Void>(contextAsOpaque)
 
   var threadID: pthread_t = nil

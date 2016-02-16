@@ -120,11 +120,11 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// This operation does not change reference counts.
   ///
   ///     let str0: CFString = "boxcar"
-  ///     let bits = OpaquePointer(bitPattern: UnsafeReference(withoutRetaining: str0))
-  ///     let str1 = UnsafeReference<CFString>(bitPattern: bits).object
+  ///     let bits = OpaquePointer(bitPattern: Unmanaged(withoutRetaining: str0))
+  ///     let str1 = Unmanaged<CFString>(bitPattern: bits).object
   @_transparent
-  public init<T>(bitPattern bits: UnsafeReference<T>) {
-    self = unsafeBitCast(bits._storage, OpaquePointer.self)
+  public init<T>(bitPattern bits: Unmanaged<T>) {
+    self = unsafeBitCast(bits._value, OpaquePointer.self)
   }
 
   /// Determine whether the given pointer is null.
