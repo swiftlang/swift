@@ -25,6 +25,8 @@ namespace swift {
   class TypeDecl;
   class Type;
   class Pattern;
+  class ExtensionDecl;
+  class NominalTypeDecl;
   struct PrintOptions;
 
 /// Describes the context in which a name is being printed, which
@@ -45,6 +47,7 @@ class ASTPrinter {
   unsigned PendingNewlines = 0;
   const Decl *PendingDeclPreCallback = nullptr;
   const Decl *PendingDeclLocCallback = nullptr;
+  const NominalTypeDecl *SynthesizeTarget = nullptr;
 
   void printTextImpl(StringRef Text);
 
@@ -74,6 +77,14 @@ public:
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
 
+  /// Called before printing a synthesized extesion.
+  virtual void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                            const NominalTypeDecl *NTD) {}
+
+  /// Called after printing a synthesized extension.
+  virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                             const NominalTypeDecl *NTD) {}
+
   // Helper functions.
 
   ASTPrinter &operator<<(StringRef Text) {
@@ -91,6 +102,10 @@ public:
 
   void setIndent(unsigned NumSpaces) {
     CurrentIndentation = NumSpaces;
+  }
+
+  void setSynthesizedTarget(NominalTypeDecl *Target) {
+    SynthesizeTarget = Target;
   }
 
   void printNewline() {

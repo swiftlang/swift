@@ -68,6 +68,15 @@ private:
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
   }
+  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                    const NominalTypeDecl *NTD) override {
+    return OtherPrinter.printSynthesizedExtensionPre(ED, NTD);
+  }
+
+  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                     const NominalTypeDecl *NTD) override {
+    return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
+  }
 
   // Prints regular comments of the header the clang node comes from, until
   // the location of the node. Keeps track of the comments that were printed
@@ -434,9 +443,6 @@ void swift::ide::printSubmoduleInterface(
           for (auto ET : ExtensionsFromConformances) {
             if (!shouldPrint(ET, AdjustedOptions))
               continue;
-            Printer << "\n";
-            Printer << "/// Synthesized extension from ";
-            ET->getExtendedTypeLoc().getType().print(Printer, AdjustedOptions);
             Printer << "\n";
             ET->print(Printer, AdjustedOptions);
             Printer << "\n";

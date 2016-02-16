@@ -1571,6 +1571,16 @@ public:
     OS << "</decl>";
   }
 
+  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                    const NominalTypeDecl *NTD) override {
+    OS << "<synthesized>";
+  }
+
+  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                     const NominalTypeDecl *NTD) override {
+    OS << "</synthesized>";
+  }
+
   void printTypeRef(const TypeDecl *TD, Identifier Name) override {
     OS << "<ref:" << Decl::getKindName(TD->getKind()) << '>';
     StreamPrinter::printTypeRef(TD, Name);

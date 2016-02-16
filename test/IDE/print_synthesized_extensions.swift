@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule %s
-// RUN: %target-swift-ide-test -print-module -synthesize-extension -print-interface -module-to-print=print_synthesized_extensions -I %t -source-filename=%s | FileCheck %s
+// RUN: %target-swift-ide-test -print-module -annotate-print -synthesize-extension -print-interface -module-to-print=print_synthesized_extensions -I %t -source-filename=%s | FileCheck %s
 
 public protocol P1{
   associatedtype T1
@@ -47,24 +47,24 @@ public struct S1<T> : P1, P2 {
   }
 }
 
-// CHECK: /// Synthesized extension from P2
+// CHECK: <synthesized>/// Synthesized extension from P2
 // CHECK: extension S1 where T : P2 {
-// CHECK:     public func p2member()
-// CHECK: }
+// CHECK:     <decl:Func>public func <loc>p2member()</loc></decl>
+// CHECK: }</synthesized>
 
-// CHECK: /// Synthesized extension from P1
+// CHECK: <synthesized>/// Synthesized extension from P1
 // CHECK: extension S1 where T : P2 {
-// CHECK:     public func ef1(t: T)
-// CHECK:     public func ef2(t: S2)
-// CHECK: }
+// CHECK:     <decl:Func>public func <loc>ef1(t: T)</loc></decl>
+// CHECK:     <decl:Func>public func <loc>ef2(t: <ref:Struct>S2</ref>)</loc></decl>
+// CHECK: }</synthesized>
 
-// CHECK: /// Synthesized extension from P1
+// CHECK: <synthesized>/// Synthesized extension from P1
 // CHECK: extension S1 where T == P2, S2 : P3 {
-// CHECK:     public func ef3(t: P2)
-// CHECK:     public func ef4(t: P2)
-// CHECK: }
+// CHECK:     <decl:Func>public func <loc>ef3(t: <ref:Protocol>P2</ref>)</loc></decl>
+// CHECK:     <decl:Func>public func <loc>ef4(t: <ref:Protocol>P2</ref>)</loc></decl>
+// CHECK: }</synthesized>
 
-// CHECK: /// Synthesized extension from P1
+// CHECK: <synthesized>/// Synthesized extension from P1
 // CHECK: extension S1 where S2 : P3 {
-// CHECK:    public func ef5(t: S2)
-// CHECK: }
+// CHECK:     <decl:Func>public func <loc>ef5(t: <ref:Struct>S2</ref>)</loc></decl>
+// CHECK: }</synthesized>

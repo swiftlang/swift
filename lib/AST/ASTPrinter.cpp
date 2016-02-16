@@ -217,6 +217,10 @@ void PrintOptions::initArchetypeTransformerForSynthesizedExtensions(NominalTypeD
   SynthesizedTarget = D;
 }
 
+bool PrintOptions::isPrintingSynthesizedExtension() {
+  return pTransformer && SynthesizedTarget;
+}
+
 void PrintOptions::clearArchetypeTransformerForSynthesizedExtensions() {
   pTransformer = nullptr;
   SynthesizedTarget = nullptr;
@@ -301,7 +305,10 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   PendingDeclLocCallback = nullptr;
   
   if (PreD) {
-    printDeclPre(PreD);
+    if (SynthesizeTarget && PreD->getKind() == DeclKind::Extension)
+      printSynthesizedExtensionPre(cast<ExtensionDecl>(PreD), SynthesizeTarget);
+    else
+      printDeclPre(PreD);
   }
   if (LocD) {
     printDeclLoc(LocD);
@@ -636,9 +643,19 @@ public:
     if (!shouldPrint(D, true))
       return false;
 
+    bool Synthesize = Options.isPrintingSynthesizedExtension() &&
+                      D->getKind() == DeclKind::Extension;
+    if (Synthesize)
+      Printer.setSynthesizedTarget(Options.SynthesizedTarget);
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
-    Printer.printDeclPost(D);
+    if (Synthesize) {
+      Printer.setSynthesizedTarget(nullptr);
+      Printer.printSynthesizedExtensionPost(cast<ExtensionDecl>(D),
+                                            Options.SynthesizedTarget);
+    } else {
+      Printer.printDeclPost(D);
+    }
     return true;
   }
 
@@ -1415,6 +1432,8 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 }
 
 void PrintAST::printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl* ExtDecl) {
+  Printer << "/// Synthesized extension from " <<
+    ExtDecl->getExtendedType()->getAnyNominal()->getName().str() << "\n";
   printDocumentationComment(ExtDecl);
   printAttributes(ExtDecl);
   Printer << "extension ";
