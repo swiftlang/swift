@@ -13,6 +13,23 @@
 import Foundation
 @_exported import UIKit
 
+//===----------------------------------------------------------------------===//
+// UIGeometry
+//===----------------------------------------------------------------------===//
+
+public extension UIEdgeInsets {
+  static var zero: UIEdgeInsets {
+    @_transparent // @fragile
+    get { return UIEdgeInsets(top: 0.0, left: 0.0, bottom: 0.0, right: 0.0) }
+  }
+}
+
+public extension UIOffset {
+  static var zero: UIOffset {
+    @_transparent // @fragile
+    get { return UIOffset(horizontal: 0.0, vertical: 0.0) }
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Equatable types.

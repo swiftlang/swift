@@ -56,6 +56,8 @@ print("inset1 == inset2: \(inset1 == inset2)")
 // CHECK: inset1 != inset1: false
 // CHECK: inset1 == inset2: false
 
+assert(inset1 != UIEdgeInsets.zero)
+
 var offset1 = UIOffset(horizontal: 1.0, vertical: 2.0)
 var offset2 = UIOffset(horizontal: 1.0, vertical: 3.0)
 print("offset1 == offset1: \(offset1 == offset1)")
@@ -65,3 +67,13 @@ print("offset1 == offset2: \(offset1 == offset2)")
 // CHECK: offset1 != offset1: false
 // CHECK: offset1 == offset2: false
 
+assert(offset1 != UIOffset.zero)
+
+var inset0 = UIEdgeInsets(top: 0.0, left: 0.0, bottom: 0.0, right: 0.0)
+var insetDot0 = UIEdgeInsets.zero
+print("inset0 == insetDot0: \(inset0 == insetDot0)")
+// CHECK: inset0 != insetDot0: true
+
+var offset0 = UIOffset(horizontal: 0.0, vertical: 0.0)
+var offsetDot0 = UIOffset.zero
+print("offset0 == offsetDot0: \(offset0 == offsetDot0)")
