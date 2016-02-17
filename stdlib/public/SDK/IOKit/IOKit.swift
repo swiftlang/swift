@@ -121,5 +121,5 @@ internal let SYS_IOKIT        = UInt32((0x38 & 0x3f) << 26)
 internal let SUB_IOKIT_COMMON = UInt32((0 & 0xfff) << 14)
 
 internal func iokit_common_err(value: UInt32) -> IOReturn {
-    return IOReturn(bitPattern: SYS_IOKIT | SUB_IOKIT_COMMON | value)
+  return IOReturn(bitPattern: SYS_IOKIT | SUB_IOKIT_COMMON | value)
 }
