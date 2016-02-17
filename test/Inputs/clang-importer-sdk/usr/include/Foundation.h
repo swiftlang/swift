@@ -264,7 +264,7 @@ BOOL BOOLtoBOOL(BOOL b);
 typedef CGPoint NSPoint;
 typedef CGSize NSSize;
 typedef CGRect NSRect;
-
+typedef NSPoint *NSPointArray;
 
 @interface BadCollection
 - (id)objectForKeyedSubscript:(id)key;
