@@ -1025,6 +1025,14 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   llvm_unreachable("bad overloaded builtin kind");
 }
 
+/// Table of string intrinsic names indexed by enum value.
+static const char *const IntrinsicNameTable[] = {
+    "not_intrinsic",
+#define GET_INTRINSIC_NAME_TABLE
+#include "llvm/IR/Intrinsics.gen"
+#undef GET_INTRINSIC_NAME_TABLE
+};
+
 /// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
 /// removed (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
 /// or 0 if the intrinsic name doesn't match anything.
@@ -1045,11 +1053,10 @@ unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
     NameS.push_back('.');
   
   const char *Name = NameS.c_str();
-  unsigned Len = NameS.size();
-#define GET_FUNCTION_RECOGNIZER
-#include "llvm/IR/Intrinsics.gen"
-#undef GET_FUNCTION_RECOGNIZER
-  return llvm::Intrinsic::not_intrinsic;
+  ArrayRef<const char *> NameTable(&IntrinsicNameTable[1],
+                                   std::end(IntrinsicNameTable));
+  int Idx = Intrinsic::lookupLLVMIntrinsicByName(NameTable, Name);
+  return static_cast<Intrinsic::ID>(Idx + 1);
 }
 
 llvm::Intrinsic::ID
