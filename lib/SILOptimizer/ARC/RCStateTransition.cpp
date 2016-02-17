@@ -121,18 +121,6 @@ raw_ostream &llvm::operator<<(raw_ostream &os, RCStateTransitionKind Kind) {
   }
 #include "RCStateTransition.def"
 
-RCStateTransition::RCStateTransition(const RCStateTransition &R) {
-  Kind = R.Kind;
-  if (R.isEndPoint()) {
-    EndPoint = R.EndPoint;
-    return;
-  }
-
-  if (!R.isMutator())
-    return;
-  Mutators = R.Mutators;
-}
-
 bool RCStateTransition::matchingInst(SILInstruction *Inst) const {
   // We only pair mutators for now.
   if (!isMutator())
