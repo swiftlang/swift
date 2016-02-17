@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-function-signature-opts"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
@@ -41,6 +42,7 @@ using namespace swift;
 STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
 STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
+STATISTIC(NumOwnedConvertedToGuaranteedReturnValue, "Total owned args -> guaranteed return value");
 STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
 STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
@@ -222,6 +224,38 @@ struct ArgumentDescriptor {
 
     size_t explosionSize = ProjTree.liveLeafCount();
     return explosionSize >= 1 && explosionSize <= 3;
+  }
+};
+
+/// A structure that maintains all of the information about a specific
+/// SILArgument that we are tracking.
+struct ReturnValueDescriptor {
+  /// The original parameter info of this argument.
+  SILResultInfo ResultInfo;
+
+  /// If non-null, this is the release in the return block of the callee, which
+  /// is associated with this parameter if it is @owned. If the parameter is not
+  /// @owned or we could not find such a release in the callee, this is null.
+  RetainList CalleeRetain;
+
+  /// Initialize this argument descriptor with all information from A that we
+  /// use in our optimization.
+  ///
+  /// *NOTE* We cache a lot of data from the argument and maintain a reference
+  /// to the original argument. The reason why we do this is to make sure we
+  /// have access to the original argument's state if we modify the argument
+  /// when optimizing.
+  ReturnValueDescriptor() {};
+  ReturnValueDescriptor(SILResultInfo RI) : ResultInfo(RI), CalleeRetain() {}
+
+  ReturnValueDescriptor(const ReturnValueDescriptor &) = delete;
+  ReturnValueDescriptor(ReturnValueDescriptor &&) = default;
+  ReturnValueDescriptor &operator=(const ReturnValueDescriptor &) = delete;
+  ReturnValueDescriptor &operator=(ReturnValueDescriptor &&) = default;
+
+  /// \returns true if this argument's ParameterConvention is P.
+  bool hasConvention(ResultConvention R) const {
+    return ResultInfo.getConvention() == R;
   }
 };
 
@@ -424,11 +458,13 @@ namespace {
 // Helper class that analyzes the parameters of a function to
 // determine how we can modify the function signature to improve the
 // quality of the code that we generate.
-class ParameterAnalyzer {
+class SignatureAnalyzer {
   /// The function that we are analyzing.
   SILFunction *F;
 
   RCIdentityFunctionInfo *RCIA;
+
+  AliasAnalysis *AA;
 
   /// Does any call inside the given function may bind dynamic 'Self' to a
   /// generic argument of the callee.
@@ -442,12 +478,17 @@ class ParameterAnalyzer {
   /// an argument that we will use during our optimization.
   llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
 
+  /// Keep a "view" of precompiled information on the return value which we will
+  /// use during our optimization.
+  ReturnValueDescriptor ReturnDesc;
+
   llvm::BumpPtrAllocator &Allocator;
 
 public:
-  ParameterAnalyzer(SILFunction *F, RCIdentityFunctionInfo *RCIA,
+  SignatureAnalyzer(SILFunction *F, RCIdentityFunctionInfo *RCIA,
+                    AliasAnalysis *AA,
                     llvm::BumpPtrAllocator &Allocator)
-      : F(F), RCIA(RCIA), MayBindDynamicSelf(computeMayBindDynamicSelf(F)),
+      : F(F), RCIA(RCIA), AA(AA), MayBindDynamicSelf(computeMayBindDynamicSelf(F)),
         Allocator(Allocator) {}
 
   bool analyze();
@@ -458,6 +499,7 @@ public:
 
   bool shouldModifySelfArgument() const { return ShouldModifySelfArgument; }
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
+  ReturnValueDescriptor &getReturnValueDesc() { return ReturnDesc; }
   MutableArrayRef<ArgumentDescriptor> getArgDescList() { return ArgDescList; }
   SILFunction *getAnalyzedFunction() const { return F; }
 
@@ -476,14 +518,14 @@ private:
 /// A class that contains all analysis information we gather about our
 /// function. Also provides utility methods for creating the new empty function.
 class SignatureOptimizer {
-  ParameterAnalyzer &Analyzer;
+  SignatureAnalyzer &Analyzer;
 
 public:
   SignatureOptimizer() = delete;
   SignatureOptimizer(const SignatureOptimizer &) = delete;
   SignatureOptimizer(SignatureOptimizer &&) = delete;
 
-  SignatureOptimizer(ParameterAnalyzer &Analyzer) : Analyzer(Analyzer) {}
+  SignatureOptimizer(SignatureAnalyzer &Analyzer) : Analyzer(Analyzer) {}
 
   ArrayRef<ArgumentDescriptor> getArgDescList() const {
     return Analyzer.getArgDescList();
@@ -491,6 +533,10 @@ public:
 
   MutableArrayRef<ArgumentDescriptor> getArgDescList() {
     return Analyzer.getArgDescList();
+  }
+
+  ReturnValueDescriptor &getReturnValueDesc() {
+    return Analyzer.getReturnValueDesc();
   }
 
   /// Create a new empty function with the optimized signature found by this
@@ -509,7 +555,7 @@ private:
 /// This function goes through the arguments of F and sees if we have anything
 /// to optimize in which case it returns true. If we have nothing to optimize,
 /// it returns false.
-bool ParameterAnalyzer::analyze() {
+bool SignatureAnalyzer::analyze() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResult())
     return false;
@@ -525,6 +571,7 @@ bool ParameterAnalyzer::analyze() {
   // Did we decide we should optimize any parameter?
   bool ShouldOptimize = false;
 
+  // Analyze the argument information.
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor A(Allocator, Args[i]);
     bool HaveOptimizedArg = false;
@@ -582,6 +629,22 @@ bool ParameterAnalyzer::analyze() {
     ArgDescList.push_back(std::move(A));
   }
 
+  // Analyze return result information.
+  ReturnValueDescriptor RI(F->getLoweredFunctionType()->getResult());
+  if (RI.hasConvention(ResultConvention::Owned)) {
+    // We have an @owned return value, find the epilogue retains now.
+    ConsumedReturnValueToEpilogueRetainMatcher RVToReturnRetainMap(RCIA, AA, F);
+    auto Retains = RVToReturnRetainMap.getEpilogueRetains();
+    // We do not need to worry about the throw block, as the return value is only
+    // going to be used in the return block/normal block of the try_apply instruction.
+    if (!Retains.empty()) {
+      RI.CalleeRetain = Retains;
+      ShouldOptimize = true;
+      ReturnDesc = std::move(RI);
+      ++NumOwnedConvertedToGuaranteedReturnValue;
+    }
+  }
+
   return ShouldOptimize;
 }
 
@@ -589,11 +652,12 @@ bool ParameterAnalyzer::analyze() {
 //                                  Mangling
 //===----------------------------------------------------------------------===//
 
-std::string ParameterAnalyzer::getOptimizedName() const {
+std::string SignatureAnalyzer::getOptimizedName() const {
   Mangle::Mangler M;
   auto P = SpecializationPass::FunctionSignatureOpts;
   FunctionSignatureSpecializationMangler FSSM(P, M, F);
 
+  // Handle arguments' changes.
   for (unsigned i : indices(ArgDescList)) {
     const ArgumentDescriptor &Arg = ArgDescList[i];
     if (Arg.IsDead) {
@@ -612,6 +676,10 @@ std::string ParameterAnalyzer::getOptimizedName() const {
       FSSM.setArgumentSROA(i);
     }
   }
+
+  // Handle return value's change.
+  if (!ReturnDesc.CalleeRetain.empty())
+    FSSM.setReturnValueOwnedToUnowned();
 
   FSSM.mangle();
 
@@ -640,6 +708,13 @@ CanSILFunctionType SignatureOptimizer::createOptimizedSILFunctionType() {
   SILResultInfo InterfaceResult = FTy->getResult();
   auto InterfaceErrorResult = FTy->getOptionalErrorResult();
   auto ExtInfo = FTy->getExtInfo();
+
+  // Get the new return value type if necessary.
+  ReturnValueDescriptor &RV = getReturnValueDesc();
+  if (!RV.CalleeRetain.empty()) {
+    InterfaceResult = SILResultInfo(InterfaceResult.getType(),
+                                    ResultConvention::Unowned);
+  }
 
   // Don't use a method representation if we modified self.
   if (Analyzer.shouldModifySelfArgument())
@@ -705,12 +780,15 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
     SILType LoweredType = NewF->getLoweredType();
     SILType ResultType = LoweredType.getFunctionInterfaceResultType();
     SILLocation Loc = AI->getLoc();
+    SILValue ReturnValue = SILValue();
 
     // Create the new apply.
     if (ApplyInst *RealAI = dyn_cast<ApplyInst>(AI)) {
       auto *NewAI = Builder.createApply(Loc, FRI, LoweredType, ResultType,
                                         ArrayRef<Substitution>(), NewArgs,
                                         RealAI->isNonThrowing());
+      // This is the return value.
+      ReturnValue = SILValue(NewAI);
       // Replace all uses of the old apply with the new apply.
       AI->replaceAllUsesWith(NewAI);
     } else {
@@ -719,6 +797,8 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
                              ArrayRef<Substitution>(), NewArgs,
                              TAI->getNormalBB(), TAI->getErrorBB());
 
+      // This is the return value.
+      ReturnValue = TAI->getNormalBB()->getBBArg(0);
       Builder.setInsertionPoint(TAI->getErrorBB(), TAI->getErrorBB()->begin());
       // If we have any arguments that were consumed but are now guaranteed,
       // insert a release_value in the error block.
@@ -740,6 +820,13 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
       Builder.createReleaseValue(Loc, FAS.getArgument(ArgDesc.Index));
     }
 
+    // If we have converted the return value from @owned to @guaranteed,
+    // insert a retain_value at the callsite.
+    ReturnValueDescriptor &RV = Optimizer.getReturnValueDesc();
+    if (!RV.CalleeRetain.empty()) {
+      Builder.createRetainValue(Loc, ReturnValue);
+    }
+      
     // Erase the old apply and its callee.
     recursivelyDeleteTriviallyDeadInstructions(AI, true,
                                                [](SILInstruction *) {});
@@ -808,6 +895,12 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
     Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
   }
 
+  // Handle @owned to @unowned return value conversion.
+  ReturnValueDescriptor &RD = Optimizer.getReturnValueDesc();
+  if (!RD.CalleeRetain.empty()) {
+    Builder.createRetainValue(Loc, ReturnValue);
+  }
+
   // Function that are marked as @NoReturn must be followed by an 'unreachable'
   // instruction.
   if (NewF->getLoweredFunctionType()->isNoReturn()) {
@@ -870,6 +963,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 /// returns false otherwise.
 static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                                       RCIdentityFunctionInfo *RCIA,
+                                      AliasAnalysis *AA, 
                                       SILFunction *F,
                                       const ApplyList &CallSites) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
@@ -878,7 +972,7 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   assert(!CallSites.empty() && "Unexpected empty set of call sites!");
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  ParameterAnalyzer Analyzer(F, RCIA, BPA);
+  SignatureAnalyzer Analyzer(F, RCIA, AA, BPA);
   if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
@@ -917,6 +1011,13 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
       X->eraseFromParent();
     for (auto &X : A.CalleeReleaseInThrowBlock) 
       X->eraseFromParent();
+  }
+
+  // And remove all callee retains that we found and made redundant via owned
+  // to unowned conversion.
+  ReturnValueDescriptor &RD = Optimizer.getReturnValueDesc();
+  for (auto &X : RD.CalleeRetain) {
+    X->eraseFromParent();
   }
 
   // Rewrite all apply insts calling F to call NewF. Update each call site as
@@ -986,6 +1087,7 @@ public:
     SILModule *M = getModule();
     auto *BCA = getAnalysis<BasicCalleeAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    auto *AA = PM->getAnalysis<AliasAnalysis>();
     llvm::BumpPtrAllocator Allocator;
 
     DEBUG(llvm::dbgs() << "**** Optimizing Function Signatures ****\n\n");
@@ -1056,7 +1158,7 @@ public:
 
       // Otherwise, try to optimize the function signature of F.
       Changed |=
-          optimizeFunctionSignature(Allocator, RCIA->get(F), F, CallSites);
+          optimizeFunctionSignature(Allocator, RCIA->get(F), AA, F, CallSites);
     }
 
     // If we changed anything, invalidate the call graph.

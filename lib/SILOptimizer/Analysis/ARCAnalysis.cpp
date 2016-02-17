@@ -473,6 +473,11 @@ void ConsumedReturnValueToEpilogueRetainMatcher::recompute() {
     break;
   }
 
+  if (BB == F->end()) {
+    HasBlock = false;
+    return;
+  }
+  HasBlock = true;
   findMatchingRetains(&*BB);
 }
 

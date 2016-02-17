@@ -122,6 +122,7 @@ private:
   // We use a list of instructions for now so that we can keep the same interface
   // and handle exploded retain_value later.
   RetainList EpilogueRetainInsts;
+  bool HasBlock = false;
 
 public:
   /// Finds matching releases in the return block of the function \p F.
@@ -137,6 +138,8 @@ public:
 
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
+
+  bool hasBlock() const { return HasBlock; }
   
   using iterator = decltype(EpilogueRetainInsts)::iterator;
   using const_iterator = decltype(EpilogueRetainInsts)::const_iterator;
