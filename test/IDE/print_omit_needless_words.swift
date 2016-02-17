@@ -298,5 +298,14 @@
 
 // CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
 
+// Elements of C array types
+// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(_: UnsafePointer<Point>, count: Int)
+
+// Typedef ending in "Array".
+// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(_: PointArray, count: Int)
+
+// Non-parameterized Objective-C class ending in "Array".
+// CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
+
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

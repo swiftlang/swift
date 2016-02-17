@@ -1,5 +1,8 @@
 @import Foundation;
 
+@interface SEGreebieArray : NSObject
+@end
+
 @interface OmitNeedlessWords : NSObject
 -(void)jumpToUrl:(nonnull NSURL *)url;
 -(BOOL)objectIsCompatibleWithObject:(nonnull id)other;
@@ -20,4 +23,7 @@
 -(void)isCompatibleWithString:(nonnull NSString *)string;
 -(void)addObjectValue:(nonnull id)object;
 -(nonnull OmitNeedlessWords *)wordsBySlobbering:(nonnull NSString *)string;
+-(void)drawPolygonWithPoints:(const NSPoint[])points count:(NSInteger)count;
+-(void)drawFilledPolygonWithPoints:(NSPointArray)points count:(NSInteger)count;
+-(void)drawGreebies:(nonnull SEGreebieArray*)greebies;
 @end

@@ -1496,9 +1496,9 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
           decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
 }
 
-/// Determine whether this is the name of an Objective-C collection
-/// with a single element type.
-static bool isObjCCollectionName(StringRef typeName) {
+/// Determine whether this is the name of a collection with a single
+/// element type.
+static bool isCollectionName(StringRef typeName) {
   auto lastWord = camel_case::getLastWord(typeName);
   return lastWord == "Array" || lastWord == "Set";
 }
@@ -1555,10 +1555,29 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
       if (name == "NSInteger" || name == "NSUInteger" || name == "CGFloat")
         return name;
 
+      // If it's a collection name and of pointer type, call it an
+      // array of the pointee type.
+      if (isCollectionName(name)) {
+        if (auto ptrType = type->getAs<clang::PointerType>()) {
+          return OmissionTypeName(
+                   name, None, 
+                 getClangTypeNameForOmission(ctx, ptrType->getPointeeType())
+                   .Name);
+        }
+      }
+
       // Otherwise, desugar one level...
       lastTypedefName = name;
       type = typedefType->getDecl()->getUnderlyingType();
       continue;
+    }
+
+    // For array types, convert the element type and treat this an as array.
+    if (auto arrayType = dyn_cast<clang::ArrayType>(typePtr)) {
+      return OmissionTypeName(
+               "Array", None, 
+               getClangTypeNameForOmission(ctx, arrayType->getElementType())
+                 .Name);
     }
 
     // Look through reference types.
@@ -1594,8 +1613,17 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
     if (objcClass) {
       // If this isn't the name of an Objective-C collection, we're done.
       auto className = objcClass->getName();
-      if (!isObjCCollectionName(className))
+      if (!isCollectionName(className))
         return className;
+
+      // If we don't have type parameters, use the prefix of the type
+      // name as the collection element type.
+      if (objcClass && !objcClass->getTypeParamList()) {
+        unsigned lastWordSize = camel_case::getLastWord(className).size();
+        StringRef elementName =
+          className.substr(0, className.size() - lastWordSize);
+        return OmissionTypeName(className, None, elementName);
+      }
 
       // If we don't have type arguments, the collection element type
       // is "Object".
@@ -1803,7 +1831,8 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
           SwiftContext.getIdentifier(baseName), numParams,
           argumentName, isLastParameter) != DefaultArgumentKind::None;
 
-    paramTypes.push_back(getClangTypeNameForOmission(clangCtx, param->getType())
+    paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
+                                                     param->getOriginalType())
                             .withDefaultArgument(hasDefaultArg));
   }
 
