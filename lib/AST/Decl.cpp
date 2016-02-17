@@ -3316,9 +3316,20 @@ Type DeclContext::getSelfTypeInContext() const {
   return getDeclaredTypeInContext();
 }
 
+/// \brief Retrieve the interface type of 'self' for the given context.
+Type DeclContext::getSelfInterfaceType() const {
+  // For a protocol or extension thereof, the type is 'Self'.
+  if (getAsProtocolOrProtocolExtensionContext()) {
+    if (getGenericParamsOfContext() == nullptr)
+      return Type();
+    return getProtocolSelf()->getDeclaredType();
+  }
+  return getDeclaredInterfaceType();
+}
+
 /// \brief Retrieve the type of 'self' for the given context.
 /// FIXME: Can this be integrated with getSelfTypeInContext above?
-static Type getSelfTypeForContext(DeclContext *dc) {
+static Type getSelfTypeOfContext(DeclContext *dc) {
   // For a protocol or extension thereof, the type is 'Self'.
   // FIXME: Weird that we're producing an archetype for protocol Self,
   // but the declared type of the context in non-protocol cases.
@@ -3342,7 +3353,7 @@ static Type getSelfTypeForContext(DeclContext *dc) {
 ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = getSelfTypeForContext(DC);
+  auto selfType = getSelfTypeOfContext(DC);
 
   // If we have a selfType (i.e. we're not in the parser before we know such
   // things, configure it.
@@ -4123,8 +4134,10 @@ SourceRange FuncDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { StartLoc, BodyRange.End };
 
-  if (auto *B = getBody())
-    return { StartLoc, B->getEndLoc() };
+  if (auto *B = getBody()) {
+    if (!B->isImplicit())
+      return { StartLoc, B->getEndLoc() };
+  }
   if (getBodyResultTypeLoc().hasLocation() &&
       getBodyResultTypeLoc().getSourceRange().End.isValid() &&
       !this->isAccessor())

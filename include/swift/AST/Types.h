@@ -2420,21 +2420,12 @@ public:
   /// Retrieve the requirements of this polymorphic function type.
   ArrayRef<Requirement> getRequirements() const;
                               
-  /// Substitute all of the given generic arguments into this generic
-  /// function type and return the resulting non-generic type.
-  FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Type> args) const;
-
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
   ///
   /// The order of Substitutions must match the order of generic parameters.
   FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Substitution> subs);
 
-  /// Substitute the given generic arguments into this generic
-  /// function type, possibly leaving some of the generic parameters
-  /// unsubstituted, and return the resulting function type.
-  AnyFunctionType *partialSubstGenericArgs(ModuleDecl *M, ArrayRef<Type> args) const;
-                              
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getInput(), getResult(),
             getExtInfo());

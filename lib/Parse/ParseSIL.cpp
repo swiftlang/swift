@@ -3965,7 +3965,7 @@ bool Parser::parseSILWitnessTable() {
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {
-    wt = SIL->M->lookUpWitnessTable(theConformance, false).first;
+    wt = SIL->M->lookUpWitnessTable(theConformance, false);
     assert((!wt || wt->isDeclaration()) &&
            "Attempting to create duplicate witness table.");
   }

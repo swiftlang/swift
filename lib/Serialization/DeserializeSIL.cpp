@@ -1988,7 +1988,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
                           MF->readConformance(SILCursor).getConcrete());
 
   if (!existingWt)
-    existingWt = SILMod.lookUpWitnessTable(theConformance, false).first;
+    existingWt = SILMod.lookUpWitnessTable(theConformance, false);
   auto wT = existingWt;
 
   // If we have an existing witness table, verify that the conformance matches

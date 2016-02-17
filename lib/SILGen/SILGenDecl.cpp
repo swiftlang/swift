@@ -1007,6 +1007,14 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
   }
 }
 
+void SILGenFunction::visitVarDecl(VarDecl *D) {
+  // We handle emitting the variable storage when we see the pattern binding.
+  // Here we just emit the behavior witness table, if any.
+  
+  if (D->hasBehavior())
+    SGM.emitPropertyBehavior(D);
+}
+
 /// Emit a check that returns 1 if the running OS version is in
 /// the specified version range and 0 otherwise. The returned SILValue
 /// (which has type Builtin.Int1) represents the result of this check.
@@ -1365,7 +1373,7 @@ public:
 
     // Check if we already have a declaration or definition for this witness
     // table.
-    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false).first) {
+    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false)) {
       // If we have a definition already, just return it.
       //
       // FIXME: I am not sure if this is possible, if it is not change this to an
@@ -1623,11 +1631,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   auto reqtIfaceTy
     = cast<GenericFunctionType>(requirementInfo.LoweredInterfaceType);
   // Substitute the 'Self' type into the requirement to get the concrete witness
-  // type, leaving the other generic parameters open.
-  CanAnyFunctionType witnessSubstIfaceTy = cast<AnyFunctionType>(
-    reqtIfaceTy->partialSubstGenericArgs(conformance->getDeclContext()->getParentModule(),
-                                         conformance->getInterfaceType())
-               ->getCanonicalType());
+  // type, leaving the other generic parameters open
+  CanAnyFunctionType witnessSubstIfaceTy =
+    substSelfTypeIntoProtocolRequirementType(reqtIfaceTy, conformance);
 
   // If the conformance is generic, its generic parameters apply to the witness.
   GenericSignature *sig = conformance->getGenericSignature();

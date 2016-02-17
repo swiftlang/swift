@@ -215,6 +215,8 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
 
+  void emitPropertyBehavior(VarDecl *vd);
+
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
   /// Generate code for a source file of the module.
@@ -370,6 +372,12 @@ public:
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);
+
+  /// Substitute the `Self` type from a protocol conformance into a protocol
+  /// requirement's type to get the type of the witness.
+  CanAnyFunctionType
+  substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
+                                           ProtocolConformance *conformance);
 
 private:
   /// Emit the deallocator for a class that uses the objc allocator.

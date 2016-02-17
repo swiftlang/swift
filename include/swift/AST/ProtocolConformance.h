@@ -94,12 +94,19 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// The kind of protocol conformance.
   ProtocolConformanceKind Kind;
 
-  /// \brief The type that conforms to the protocol.
+  /// \brief The type that conforms to the protocol, in the context of the
+  /// conformance definition.
   Type ConformingType;
+  
+  /// \brief The interface type that conforms to the protocol.
+  Type ConformingInterfaceType;
+  
 
 protected:
-  ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
-    : Kind(kind), ConformingType(conformingType) { }
+  ProtocolConformance(ProtocolConformanceKind kind, Type conformingType,
+                      Type conformingInterfaceType)
+    : Kind(kind), ConformingType(conformingType),
+      ConformingInterfaceType(conformingInterfaceType) { }
 
 public:
   /// Determine the kind of protocol conformance.
@@ -109,7 +116,7 @@ public:
   Type getType() const { return ConformingType; }
 
   /// Get the conforming interface type.
-  Type getInterfaceType() const;
+  Type getInterfaceType() const { return ConformingInterfaceType; }
   
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const;
@@ -263,11 +270,10 @@ public:
                  const PrintOptions &PO = PrintOptions()) const;
   
   /// True if the conformance is for a property behavior instantiation.
-  ///
-  /// FIXME: When protocol conformances gain proper support for visibility,
-  /// there shouldn't be anything special about behavior conformances aside from
-  /// having private visibility.
   bool isBehaviorConformance() const;
+  
+  /// Get the property declaration for a behavior conformance, if this is one.
+  AbstractStorageDecl *getBehaviorDecl() const;
   
   void dump() const;
 
@@ -307,16 +313,14 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
-  enum {
-    IsInvalid = 1,
-    IsBehaviorConformance = 2,
-  };
+  using Context = llvm::PointerUnion<DeclContext *, AbstractStorageDecl *>;
 
   /// The declaration context containing the ExtensionDecl or
-  /// NominalTypeDecl that declared the conformance.
+  /// NominalTypeDecl that declared the conformance, or the VarDecl whose
+  /// behavior this conformance represents.
   ///
-  /// Also stores the "invalid" and "is behavior" bits.
-  llvm::PointerIntPair<DeclContext *, 2, unsigned> DCAndFlags;
+  /// Also stores the "invalid" bit.
+  llvm::PointerIntPair<Context, 1, bool> ContextAndInvalid;
 
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -342,8 +346,23 @@ class NormalProtocolConformance : public ProtocolConformance,
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state)
-    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      ProtocolAndState(protocol, state), Loc(loc), DCAndFlags(dc, 0)
+    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType,
+                          // FIXME: interface type should be passed in
+                          dc->getDeclaredInterfaceType()),
+      ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
+  {
+  }
+
+  NormalProtocolConformance(Type conformingType,
+                            Type conformingInterfaceType,
+                            ProtocolDecl *protocol,
+                            SourceLoc loc, AbstractStorageDecl *behaviorStorage,
+                            ProtocolConformanceState state)
+    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType,
+                          // FIXME: interface type should be passed in
+                          conformingInterfaceType),
+      ProtocolAndState(protocol, state), Loc(loc),
+      ContextAndInvalid(behaviorStorage, false)
   {
   }
 
@@ -358,7 +377,14 @@ public:
 
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
-  DeclContext *getDeclContext() const { return DCAndFlags.getPointer(); }
+  DeclContext *getDeclContext() const {
+    auto context = ContextAndInvalid.getPointer();
+    if (auto DC = context.dyn_cast<DeclContext *>()) {
+      return DC;
+    } else {
+      return context.get<AbstractStorageDecl *>()->getDeclContext();
+    }
+  }
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
@@ -372,26 +398,25 @@ public:
 
   /// Determine whether this conformance is invalid.
   bool isInvalid() const {
-    return DCAndFlags.getInt() & IsInvalid;
+    return ContextAndInvalid.getInt();
   }
   
-  bool isBehaviorConformance() const {
-    return DCAndFlags.getInt() & IsBehaviorConformance;
-  }
-
   /// Mark this conformance as invalid.
   void setInvalid() {
-    unsigned flags = DCAndFlags.getInt();
-    flags |= IsInvalid;
-    DCAndFlags.setInt(flags);
+    ContextAndInvalid.setInt(true);
   }
 
-  void setBehaviorConformance() {
-    unsigned flags = DCAndFlags.getInt();
-    flags |= IsBehaviorConformance;
-    DCAndFlags.setInt(flags);
+  /// True if the conformance describes a property behavior.
+  bool isBehaviorConformance() const {
+    return ContextAndInvalid.getPointer().is<AbstractStorageDecl *>();
   }
-
+  
+  /// Return the declaration using the behavior for this conformance, or null
+  /// if this isn't a behavior conformance.
+  AbstractStorageDecl *getBehaviorDecl() const {
+    return ContextAndInvalid.getPointer().dyn_cast<AbstractStorageDecl *>();
+  }
+  
   /// Retrieve the type witness substitution and type decl (if one exists)
   /// for the given associated type.
   std::pair<const Substitution &, TypeDecl *>
@@ -616,8 +641,9 @@ class InheritedProtocolConformance : public ProtocolConformance,
 
   InheritedProtocolConformance(Type conformingType,
                                ProtocolConformance *inheritedConformance)
-    : ProtocolConformance(ProtocolConformanceKind::Inherited,
-                          conformingType),
+    : ProtocolConformance(ProtocolConformanceKind::Inherited, conformingType,
+            // FIXME: interface type should be passed in
+            inheritedConformance->getDeclContext()->getDeclaredInterfaceType()),
       InheritedConformance(inheritedConformance)
   {
   }

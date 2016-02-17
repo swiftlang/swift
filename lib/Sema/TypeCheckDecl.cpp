@@ -2633,6 +2633,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   auto dc = decl->getDeclContext();
   auto behaviorSelf = conformance->getType();
+  auto behaviorInterfaceSelf = conformance->getInterfaceType();
   auto behaviorProto = conformance->getProtocol();
   auto behaviorProtoTy = ProtocolType::get(behaviorProto, TC.Context);
   
@@ -2665,9 +2666,9 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
       llvm_unreachable("unknown type context type?!");
     }
     bool conforms = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
-                                      ConformanceCheckFlags::Used,
-                                      &inherited,
-                                      blameLoc);
+                                          ConformanceCheckFlags::Used,
+                                          &inherited,
+                                          blameLoc);
     if (conforms) {
       conformance->setInheritedConformance(refinedProto, inherited);
     } else {
@@ -2710,7 +2711,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     
     // Check for required protocol conformances.
     // TODO: Handle secondary 'where' constraints on the associated types.
-    auto propTy = decl->getInterfaceType();
+    // TODO: Handle non-protocol constraints ('class', base class)
+    auto propTy = decl->getType();
     SmallVector<ProtocolConformanceRef, 4> valueConformances;
     for (auto proto : assocTy->getConformingProtocols(&TC)) {
       ProtocolConformance *valueConformance = nullptr;
@@ -2726,7 +2728,11 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                     behaviorProto->getName());
         goto next_requirement;
       }
-      valueConformances.push_back(ProtocolConformanceRef(valueConformance));
+      // FIXME: ProtocolConformanceRef should have an "error" representation
+      if (!valueConformance)
+        valueConformances.push_back(ProtocolConformanceRef(proto));
+      else
+        valueConformances.push_back(ProtocolConformanceRef(valueConformance));
     }
     
     {
@@ -2754,7 +2760,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     ProtocolConformanceRef(conformance);
   // FIXME: Additional associated types introduced by other requirements?
   Substitution interfaceSubs[] = {
-    Substitution(behaviorSelf, *selfConformance),
+    Substitution(behaviorInterfaceSelf, *selfConformance),
     Substitution(decl->getInterfaceType(), valueSub.getConformances()),
   };
   Substitution contextSubs[] = {
@@ -7026,6 +7032,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // variable.
   bool FoundMemberwiseInitializedProperty = false;
   bool SuppressDefaultInitializer = false;
+  bool SuppressMemberwiseInitializer = false;
   bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
   SmallPtrSet<CanType, 4> initializerParamTypes;
@@ -7068,6 +7075,12 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         
         FoundMemberwiseInitializedProperty = true;
       }
+      
+      // FIXME: Disable memberwise initializer if a property uses a behavior.
+      // Behaviors should be able to control whether they interact with
+      // memberwise initialization.
+      if (var->hasBehavior())
+        SuppressMemberwiseInitializer = true;
       continue;
     }
 
@@ -7097,7 +7110,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-    if (!FoundDesignatedInit && !structDecl->hasUnreferenceableStorage()) {
+    if (!FoundDesignatedInit && !SuppressMemberwiseInitializer
+        && !structDecl->hasUnreferenceableStorage()) {
       // For a struct with memberwise initialized properties, we add a
       // memberwise init.
       if (FoundMemberwiseInitializedProperty) {
