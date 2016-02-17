@@ -80,6 +80,7 @@ static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeyModuleName;
 static sourcekitd_uid_t KeyGroupName;
+static sourcekitd_uid_t KeySynthesizedExtension;
 static sourcekitd_uid_t KeyName;
 static sourcekitd_uid_t KeyNames;
 static sourcekitd_uid_t KeyFilePath;
@@ -171,6 +172,7 @@ static int skt_main(int argc, const char **argv) {
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeyModuleName = sourcekitd_uid_get_from_cstr("key.modulename");
   KeyGroupName = sourcekitd_uid_get_from_cstr("key.groupname");
+  KeySynthesizedExtension = sourcekitd_uid_get_from_cstr("key.synthesizedextensions");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
   KeyNames = sourcekitd_uid_get_from_cstr("key.names");
   KeyFilePath = sourcekitd_uid_get_from_cstr("key.filepath");
@@ -554,6 +556,8 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   case SourceKitRequest::InterfaceGen:
   case SourceKitRequest::InterfaceGenOpen:
+    sourcekitd_request_dictionary_set_int64(Req, KeySynthesizedExtension,
+                                            Opts.SynthesizedExtensions);
     if (Opts.ModuleName.empty() && Opts.HeaderPath.empty() && Opts.SourceFile.empty()) {
       llvm::errs() << "Missing '-module <module name>' or '-header <path>' or '<source-file>' \n";
       return 1;

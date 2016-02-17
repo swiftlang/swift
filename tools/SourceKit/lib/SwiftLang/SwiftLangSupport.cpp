@@ -149,6 +149,8 @@ LangSupport::createSwiftLangSupport(SourceKit::Context &SKCtx) {
   return std::unique_ptr<LangSupport>(new SwiftLangSupport(SKCtx));
 }
 
+const std::string LangSupport::SynthesizedUSRSeparator = "::SYNTHESIZED::";
+
 namespace {
 
 class UIdentVisitor : public ASTVisitor<UIdentVisitor,

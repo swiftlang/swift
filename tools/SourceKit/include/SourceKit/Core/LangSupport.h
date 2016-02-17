@@ -375,6 +375,9 @@ class LangSupport {
   virtual void anchor();
 
 public:
+  /// A separator between parts in a synthesized usr.
+  const static std::string SynthesizedUSRSeparator;
+
   virtual ~LangSupport() { }
 
   virtual void indexSource(StringRef Filename,
@@ -417,12 +420,14 @@ public:
                                    StringRef Name,
                                    StringRef ModuleName,
                                    Optional<StringRef> Group,
-                                   ArrayRef<const char *> Args) = 0;
+                                   ArrayRef<const char *> Args,
+                                   bool SynthesizedExtensions) = 0;
 
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                          StringRef Name,
                                          StringRef HeaderName,
-                                         ArrayRef<const char *> Args) = 0;
+                                         ArrayRef<const char *> Args,
+                                         bool SynthesizedExtensions) = 0;
 
   virtual void editorOpenSwiftSourceInterface(StringRef Name,
                                               StringRef SourceName,

@@ -188,11 +188,13 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    Optional<StringRef> Group, ArrayRef<const char *> Args);
+                    Optional<StringRef> Group, ArrayRef<const char *> Args,
+                    bool SynthesizedExtensions);
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
-                          ArrayRef<const char *> Args);
+                          ArrayRef<const char *> Args,
+                          bool SynthesizedExtensions);
 
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
@@ -435,7 +437,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!ModuleName.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
     Optional<StringRef> GroupName = Req.getString(KeyGroupName);
-    return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args));
+    int64_t SynthesizedExtension = false;
+    Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
+                 /*isOptional=*/true);
+    return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args,
+                                   SynthesizedExtension));
   }
 
   if (ReqUID == RequestEditorOpenHeaderInterface) {
@@ -445,7 +451,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Optional<StringRef> HeaderName = Req.getString(KeyFilePath);
     if (!HeaderName.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.filepath'"));
-    return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args));
+    int64_t SynthesizedExtension = false;
+    Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
+                 /*isOptional=*/true);
+    return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
+                                         SynthesizedExtension));
   }
 
   if (ReqUID == RequestEditorOpenSwiftSourceInterface) {
@@ -1687,13 +1697,15 @@ editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
 
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    Optional<StringRef> Group, ArrayRef<const char *> Args) {
+                    Optional<StringRef> Group, ArrayRef<const char *> Args,
+                    bool SynthesizedExtensions) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args);
+  Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args,
+                           SynthesizedExtensions);
   return EditC.createResponse();
 }
 
@@ -1725,13 +1737,15 @@ static sourcekitd_response_t editorExtractTextFromComment(StringRef Source) {
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
-                          ArrayRef<const char *> Args) {
+                          ArrayRef<const char *> Args,
+                          bool SynthesizedExtensions) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpenHeaderInterface(EditC, Name, HeaderName, Args);
+  Lang.editorOpenHeaderInterface(EditC, Name, HeaderName, Args,
+                                 SynthesizedExtensions);
   return EditC.createResponse();
 }
 
@@ -2017,6 +2031,12 @@ editorFindUSR(StringRef DocumentName, StringRef USR) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   llvm::Optional<std::pair<unsigned, unsigned>>
       Range = Lang.findUSRRange(DocumentName, USR);
+  if (!Range) {
+    // If cannot find the synthesized USR, find the actual USR instead.
+    Range = Lang.findUSRRange(DocumentName,
+                              USR.split(LangSupport::SynthesizedUSRSeparator).
+                                first);
+  }
   if (Range.hasValue()) {
     RespBuilder.getDictionary().set(KeyOffset, Range->first);
     RespBuilder.getDictionary().set(KeyLength, Range->second);

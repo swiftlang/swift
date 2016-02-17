@@ -341,6 +341,12 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   {
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printUSR(VD, OS);
+    if (BaseType){
+      if(auto Target = BaseType->getAnyNominal()) {
+        OS << LangSupport::SynthesizedUSRSeparator;
+        SwiftLangSupport::printUSR(Target, OS);
+      }
+    }
   }
   unsigned USREnd = SS.size();
 

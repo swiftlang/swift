@@ -74,7 +74,7 @@ struct TestOptions {
   bool UsedSema = false;
   bool PrintResponseAsJSON = false;
   bool SimplifiedDemangling = false;
-
+  bool SynthesizedExtensions = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
 };
 

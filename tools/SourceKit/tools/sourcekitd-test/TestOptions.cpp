@@ -228,6 +228,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       SimplifiedDemangling = true;
       break;
 
+    case OPT_synthesized_extension:
+      SynthesizedExtensions = true;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n';

@@ -307,12 +307,14 @@ public:
                            StringRef Name,
                            StringRef ModuleName,
                            Optional<StringRef> Group,
-                           ArrayRef<const char *> Args) override;
+                           ArrayRef<const char *> Args,
+                           bool SynthesizedExtensions) override;
 
   void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                  StringRef Name,
                                  StringRef HeaderName,
-                                 ArrayRef<const char *> Args) override;
+                                 ArrayRef<const char *> Args,
+                                 bool SynthesizedExtensions) override;
 
   void editorOpenSwiftSourceInterface(StringRef Name,
                                       StringRef SourceName,

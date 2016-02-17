@@ -72,3 +72,6 @@ def group_name : Separate<["-"], "group-name">,
 
 def simplified_demangling : Flag<["-"], "simplified-demangling">,
   HelpText<"Use simplified demangling for the 'demangle' request">;
+
+def synthesized_extension : Flag<["-"], "synthesized-extension">,
+  HelpText<"Print synthesized extensions when generating interface">;
