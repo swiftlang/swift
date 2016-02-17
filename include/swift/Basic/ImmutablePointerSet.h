@@ -252,6 +252,12 @@ public:
     if (S2->empty())
       return S1;
 
+    // We know that all of our PtrSets are uniqued. So if S1 and S2 are the same
+    // set, their pointers must also be the same set. In such a case, we return
+    // early returning S1 without any loss of generality.
+    if (S1 == S2)
+      return S1;
+
     llvm::FoldingSetNodeID ID;
 
     // We know that both of our pointer sets are sorted, so we can essentially
