@@ -209,6 +209,12 @@ public:
     // We assume that S2 is sorted and uniqued.
     assert(is_sorted_and_uniqued(S2));
 
+    // If S1 and S2 have the same size, do a quick check to see if they
+    // equal. If so, we can bail early and just return S1.
+    if (S1->size() == S2.size() &&
+        std::equal(S1->begin(), S1->end(), S2.begin()))
+      return S1;
+
     llvm::FoldingSetNodeID ID;
 
     // We know that both of our pointer sets are sorted, so we can essentially
