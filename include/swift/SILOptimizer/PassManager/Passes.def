@@ -65,8 +65,8 @@ PASS(ComputeLoopInfo, "compute-loop-info",
      "test loop info updating")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
-PASS(EpilogueReleaseMatcherDumper, "sil-epilogue-release-dumper",
-     "Dump epilogue releases for arguments in all functions")
+PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
+     "Dump epilogue retains for return value and releases for arguments")
 PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
      "Removes redundant overflow checks")
 PASS(DCE, "dce",

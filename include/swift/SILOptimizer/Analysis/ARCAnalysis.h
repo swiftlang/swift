@@ -36,6 +36,7 @@ class SILFunction;
 
 namespace swift {
 
+using RetainList = llvm::SmallVector<SILInstruction *, 1>;
 using ReleaseList = llvm::SmallVector<SILInstruction *, 1>;
 
 /// \returns True if the user \p User decrements the ref count of \p Ptr.
@@ -103,6 +104,58 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator Start,
                                               SILBasicBlock::iterator End,
                                               AliasAnalysis *AA);
+
+
+/// A class that attempts to match owned return value and corresponding epilogue
+/// retains for a specific function.
+///
+/// TODO: This really needs a better name.
+class ConsumedReturnValueToEpilogueRetainMatcher {
+public:
+  enum class ExitKind { Return, Throw };
+
+private:
+  SILFunction *F;
+  RCIdentityFunctionInfo *RCFI;
+  AliasAnalysis *AA;
+  ExitKind Kind;
+  // We use a list of instructions for now so that we can keep the same interface
+  // and handle exploded retain_value later.
+  RetainList EpilogueRetainInsts;
+
+public:
+  /// Finds matching releases in the return block of the function \p F.
+  ConsumedReturnValueToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
+                                             AliasAnalysis *AA,
+                                             SILFunction *F,
+                                             ExitKind Kind = ExitKind::Return);
+
+  /// Finds matching releases in the provided block \p BB.
+  void findMatchingRetains(SILBasicBlock *BB);
+
+  RetainList getEpilogueRetains() { return EpilogueRetainInsts; }
+
+  /// Recompute the mapping from argument to consumed arg.
+  void recompute();
+  
+  using iterator = decltype(EpilogueRetainInsts)::iterator;
+  using const_iterator = decltype(EpilogueRetainInsts)::const_iterator;
+  iterator begin() { return EpilogueRetainInsts.begin(); }
+  iterator end() { return EpilogueRetainInsts.end(); }
+  const_iterator begin() const { return EpilogueRetainInsts.begin(); }
+  const_iterator end() const { return EpilogueRetainInsts.end(); }
+
+  using reverse_iterator = decltype(EpilogueRetainInsts)::reverse_iterator;
+  using const_reverse_iterator = decltype(EpilogueRetainInsts)::const_reverse_iterator;
+  reverse_iterator rbegin() { return EpilogueRetainInsts.rbegin(); }
+  reverse_iterator rend() { return EpilogueRetainInsts.rend(); }
+  const_reverse_iterator rbegin() const { return EpilogueRetainInsts.rbegin(); }
+  const_reverse_iterator rend() const { return EpilogueRetainInsts.rend(); }
+
+  unsigned size() const { return EpilogueRetainInsts.size(); }
+
+  iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+};
 
 /// A class that attempts to match owned arguments and corresponding epilogue
 /// releases for a specific function.

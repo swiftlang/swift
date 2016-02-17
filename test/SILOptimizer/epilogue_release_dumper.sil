@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-epilogue-release-dumper %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-epilogue-retain-release-dumper %s | FileCheck %s
 
 import Builtin
 import Swift
@@ -250,4 +250,74 @@ bb3(%3 : $foo):
   strong_release %3 : $foo
   %4 = tuple ()
   return %4 : $()
+}
+
+// CHECK-LABEL: START: sil @single_retain_foo
+// CHECK: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @single_retain_foo
+sil @single_retain_foo : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @multiple_retain_foo
+// CHECK: retain_value [[IN1:%.*]] : $foo
+// CHECK: END: sil @multiple_retain_foo
+sil @multiple_retain_foo : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  retain_value %0 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @retain_with_interfering_uses
+// CHECK-NOT: retain_value 
+// CHECK: END: sil @retain_with_interfering_uses
+sil @retain_with_interfering_uses : $@convention(thin) (@owned baz) -> @owned baz {
+bb0(%0 : $baz):
+  %2 = struct_extract %0 : $baz, #baz.end
+  retain_value   %0 : $baz
+  strong_release %2 : $foo
+  return %0 : $baz
+}
+
+// CHECK-LABEL: START: sil @single_retain_foo_with_silargument_one_incoming_value
+// CHECK: strong_retain [[IN2:%.*]] : $foo
+// CHECK: END: sil @single_retain_foo_with_silargument_one_incoming_value
+sil @single_retain_foo_with_silargument_one_incoming_value : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  br bb1(%0: $foo)
+bb1(%1 : $foo):
+  strong_retain %1 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @single_retain_foo_with_silargument_multiple_incoming_values
+// CHECK-NOT: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @single_retain_foo_with_silargument_multiple_incoming_values
+sil @single_retain_foo_with_silargument_multiple_incoming_values : $@convention(thin) (@owned foo, @owned foo) -> @owned foo {
+bb0(%0 : $foo, %8 : $foo):
+  cond_br undef, bb1(%0: $foo), bb2(%8 : $foo)
+bb1(%1 : $foo):
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  strong_retain %3 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @exploded_retain
+// CHECK-NOT: strong_retain 
+// CHECK: END: sil @exploded_retain
+sil @exploded_retain : $@convention(thin) (@owned boo) -> @owned boo {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  strong_retain  %4 : $foo
+  strong_retain  %3 : $foo
+  return %0 : $boo
 }
