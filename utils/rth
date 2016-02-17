@@ -51,7 +51,7 @@ class ResilienceTest(object):
         return 0
 
     def set_up(self):
-        shutil.rmtree(self.tmp_dir)
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
         os.makedirs(self.after_dir)
         os.makedirs(self.before_dir)
 
