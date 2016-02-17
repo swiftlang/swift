@@ -61,7 +61,6 @@ public:
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 
 static LazySKDUID RequestDemangle("source.request.demangle");
-static LazySKDUID RequestMangleSimpleClass("source.request.mangle_simple_class");
 
 static LazySKDUID RequestIndex("source.request.indexsource");
 static LazySKDUID RequestDocInfo("source.request.docinfo");
