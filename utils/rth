@@ -31,7 +31,7 @@ class ResilienceTest(object):
         self.test_dir = test_dir
         self.test_src = test_src
         self.additional_compile_flags_library = \
-                shlex.split(additional_compile_flags_library)
+            shlex.split(additional_compile_flags_library)
 
         self.before_dir = os.path.join(self.tmp_dir, 'before')
         self.after_dir = os.path.join(self.tmp_dir, 'after')
@@ -64,7 +64,7 @@ class ResilienceTest(object):
                                   '-enable-resilience', '-D', config, '-c',
                                   self.lib_src, '-o', output_obj]
                 command = self.target_build_swift + \
-                          self.additional_compile_flags_library + compiler_flags
+                    self.additional_compile_flags_library + compiler_flags
                 verbose_print_command(command)
                 returncode = subprocess.call(command)
                 assert returncode == 0, str(command)
