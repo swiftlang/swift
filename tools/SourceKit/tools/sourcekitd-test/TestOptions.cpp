@@ -104,6 +104,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
         .Case("demangle", SourceKitRequest::DemangleNames)
+        .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)
         .Case("complete", SourceKitRequest::CodeComplete)
         .Case("complete.open", SourceKitRequest::CodeCompleteOpen)
@@ -132,7 +133,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
-            << "version/demangle/index/complete/cursor/related-idents/syntax-map/structure/"
+            << "version/demangle/mangle/index/complete/cursor/related-idents/syntax-map/structure/"
                "format/expand-placeholder/doc-info/sema/interface-gen/interface-gen-open/"
                "find-usr/find-interface/open/edit/print-annotations/extract-comment/"
                "module-groups\n";

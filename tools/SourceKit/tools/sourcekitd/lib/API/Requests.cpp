@@ -61,6 +61,7 @@ public:
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 
 static LazySKDUID RequestDemangle("source.request.demangle");
+static LazySKDUID RequestMangleSimpleClass("source.request.mangle_simple_class");
 
 static LazySKDUID RequestIndex("source.request.indexsource");
 static LazySKDUID RequestDocInfo("source.request.docinfo");
@@ -145,6 +146,9 @@ static SourceKit::Context &getGlobalContext() {
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified);
+
+static sourcekitd_response_t
+mangleSimpleClassNames(ArrayRef<std::pair<StringRef, StringRef>> ModuleClassPairs);
 
 static sourcekitd_response_t indexSource(StringRef Filename,
                                          ArrayRef<const char *> Args,
@@ -319,6 +323,33 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t Simplified = false;
     Req.getInt64(KeySimplified, Simplified, /*isOptional=*/true);
     return Rec(demangleNames(MangledNames, Simplified));
+  }
+
+  if (ReqUID == RequestMangleSimpleClass) {
+    SmallVector<std::pair<StringRef, StringRef>, 16> ModuleClassPairs;
+    sourcekitd_response_t err = nullptr;
+    bool failed = Req.dictionaryArrayApply(KeyNames, [&](RequestDict dict) {
+      Optional<StringRef> ModuleName = dict.getString(KeyModuleName);
+      if (!ModuleName.hasValue()) {
+        err = createErrorRequestInvalid("missing 'key.modulename'");
+        return true;
+      }
+      Optional<StringRef> ClassName = dict.getString(KeyName);
+      if (!ClassName.hasValue()) {
+        err = createErrorRequestInvalid("missing 'key.name'");
+        return true;
+      }
+      ModuleClassPairs.push_back(std::make_pair(*ModuleName, *ClassName));
+      return false;
+    });
+
+    if (failed) {
+      if (!err)
+        err = createErrorRequestInvalid("missing 'key.names'");
+      return Rec(err);
+    }
+
+    return Rec(mangleSimpleClassNames(ModuleClassPairs));
   }
 
   // Just accept 'source.request.buildsettings.register' for now, don't do
@@ -987,6 +1018,37 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
   auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
   for (auto MangledName : MangledNames) {
     std::string Result = getDemangledName(MangledName);
+    auto Entry = Arr.appendDictionary();
+    Entry.set(KeyName, Result.c_str());
+  }
+
+  return RespBuilder.createResponse();
+}
+
+static std::string mangleSimpleClass(StringRef moduleName,
+                                     StringRef className) {
+  using namespace swift::Demangle;
+
+  auto moduleNode = NodeFactory::create(Node::Kind::Module, moduleName);
+  auto IdNode = NodeFactory::create(Node::Kind::Identifier, className);
+  auto classNode = NodeFactory::create(Node::Kind::Class);
+  auto typeNode = NodeFactory::create(Node::Kind::Type);
+  auto typeManglingNode = NodeFactory::create(Node::Kind::TypeMangling);
+  auto globalNode = NodeFactory::create(Node::Kind::Global);
+
+  classNode->addChildren(moduleNode, IdNode);
+  typeNode->addChild(classNode);
+  typeManglingNode->addChild(typeNode);
+  globalNode->addChild(typeManglingNode);
+  return mangleNode(globalNode);
+}
+
+static sourcekitd_response_t
+mangleSimpleClassNames(ArrayRef<std::pair<StringRef, StringRef>> ModuleClassPairs) {
+  ResponseBuilder RespBuilder;
+  auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
+  for (auto &pair : ModuleClassPairs) {
+    std::string Result = mangleSimpleClass(pair.first, pair.second);
     auto Entry = Arr.appendDictionary();
     Entry.set(KeyName, Result.c_str());
   }

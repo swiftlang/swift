@@ -11,3 +11,9 @@
 // SIMPLIFIED-NEXT: Builtin.Float80
 // SIMPLIFIED-NEXT: bar
 // SIMPLIFIED-NEXT: END DEMANGLE
+
+// RUN: %sourcekitd-test -req=mangle Foo.Baru Swift.Beer | FileCheck %s -check-prefix=MANGLED
+// MANGLED:      START MANGLE
+// MANGLED-NEXT: _TtC3Foo4Baru
+// MANGLED-NEXT: _TtCs4Beer
+// MANGLED-NEXT: END MANGLE

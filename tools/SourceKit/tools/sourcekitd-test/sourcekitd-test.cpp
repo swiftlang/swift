@@ -57,6 +57,9 @@ static void printModuleGroupNames(sourcekitd_variant_t Info,
 static void prepareDemangleRequest(sourcekitd_object_t Req,
                                    const TestOptions &Opts);
 static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
+static void prepareMangleRequest(sourcekitd_object_t Req,
+                                 const TestOptions &Opts);
+static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
 
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    StringRef Filename);
@@ -116,6 +119,7 @@ static sourcekitd_uid_t KeySimplified;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
+static sourcekitd_uid_t RequestMangleSimpleClass;
 static sourcekitd_uid_t RequestIndex;
 static sourcekitd_uid_t RequestCodeComplete;
 static sourcekitd_uid_t RequestCodeCompleteOpen;
@@ -216,6 +220,7 @@ static int skt_main(int argc, const char **argv) {
 
   RequestProtocolVersion = sourcekitd_uid_get_from_cstr("source.request.protocol_version");
   RequestDemangle = sourcekitd_uid_get_from_cstr("source.request.demangle");
+  RequestMangleSimpleClass = sourcekitd_uid_get_from_cstr("source.request.mangle_simple_class");
   RequestIndex = sourcekitd_uid_get_from_cstr("source.request.indexsource");
   RequestCodeComplete = sourcekitd_uid_get_from_cstr("source.request.codecomplete");
   RequestCodeCompleteOpen = sourcekitd_uid_get_from_cstr("source.request.codecomplete.open");
@@ -354,7 +359,8 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
 
-  if (Opts.Request == SourceKitRequest::DemangleNames)
+  if (Opts.Request == SourceKitRequest::DemangleNames ||
+      Opts.Request == SourceKitRequest::MangleSimpleClasses)
     Opts.SourceFile.clear();
 
   std::string SourceFile = Opts.SourceFile;
@@ -398,6 +404,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   case SourceKitRequest::DemangleNames:
     prepareDemangleRequest(Req, Opts);
+    break;
+
+  case SourceKitRequest::MangleSimpleClasses:
+    prepareMangleRequest(Req, Opts);
     break;
 
   case SourceKitRequest::Index:
@@ -666,6 +676,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
     case SourceKitRequest::DemangleNames:
       printDemangleResults(sourcekitd_response_get_value(Resp), outs());
+      break;
+
+    case SourceKitRequest::MangleSimpleClasses:
+      printMangleResults(sourcekitd_response_get_value(Resp), outs());
       break;
 
     case SourceKitRequest::ProtocolVersion:
@@ -1170,6 +1184,37 @@ static void prepareDemangleRequest(sourcekitd_object_t Req,
   sourcekitd_request_release(arr);
 }
 
+static void prepareMangleRequest(sourcekitd_object_t Req,
+                                 const TestOptions &Opts) {
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestMangleSimpleClass);
+  sourcekitd_object_t arr = sourcekitd_request_array_create(nullptr, 0);
+  sourcekitd_request_dictionary_set_value(Req, KeyNames, arr);
+
+  auto addPair = [&](StringRef ModuleName, StringRef ClassName) {
+    sourcekitd_object_t pair =
+      sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+    sourcekitd_request_dictionary_set_stringbuf(pair, KeyModuleName,
+                                          ModuleName.data(), ModuleName.size());
+    sourcekitd_request_dictionary_set_stringbuf(pair, KeyName,
+                                            ClassName.data(), ClassName.size());
+    sourcekitd_request_array_set_value(arr, SOURCEKITD_ARRAY_APPEND, pair);
+    sourcekitd_request_release(pair);
+  };
+
+  for (StringRef pair : Opts.Inputs) {
+    auto Idx = pair.find('.');
+    if (Idx == StringRef::npos) {
+      errs() << "expected pairs with format '<module>.<class name>'\n";
+      ::exit(1);
+    }
+    StringRef moduleName = pair.substr(0, Idx);
+    StringRef className = pair.substr(Idx+1);
+    addPair(moduleName, className);
+  }
+
+  sourcekitd_request_release(arr);
+}
+
 static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS) {
   OS << "START DEMANGLE\n";
   sourcekitd_variant_t results =
@@ -1184,6 +1229,22 @@ static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS) {
     return true;
   });
   OS << "END DEMANGLE\n";
+}
+
+static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS) {
+  OS << "START MANGLE\n";
+  sourcekitd_variant_t results =
+    sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  sourcekitd_variant_array_apply(results, ^bool(size_t index, sourcekitd_variant_t value) {
+    StringRef name = sourcekitd_variant_dictionary_get_string(value, KeyName);
+    if (name.empty())
+      OS << "<empty>";
+    else
+      OS << name;
+    OS << '\n';
+    return true;
+  });
+  OS << "END MANGLE\n";
 }
 
 static void initializeRewriteBuffer(StringRef Input,

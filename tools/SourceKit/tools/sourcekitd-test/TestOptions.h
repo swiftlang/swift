@@ -23,6 +23,7 @@ enum class SourceKitRequest {
   None,
   ProtocolVersion,
   DemangleNames,
+  MangleSimpleClasses,
   Index,
   CodeComplete,
   CodeCompleteOpen,
