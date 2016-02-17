@@ -341,7 +341,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
       +  minimumCapacity * strideof(Element.self)
 
     let newBuffer: AnyObject = _swift_bufferAllocate(
-      _uncheckedBufferClass, totalSize, _My._alignmentMask)
+      bufferType: _uncheckedBufferClass,
+      size: totalSize,
+      alignmentMask: _My._alignmentMask)
 
     self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
   }
