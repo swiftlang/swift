@@ -907,6 +907,9 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
+  if (vd->hasBehavior())
+    emitPropertyBehavior(vd);
+
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
@@ -918,6 +921,12 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     if (auto setter = vd->getSetter())
       emitFunction(setter);
   }
+}
+
+void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
+  assert(vd->hasBehavior());
+  // Emit the protocol conformance to the behavior.
+  getWitnessTable(*vd->getBehavior()->Conformance);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {

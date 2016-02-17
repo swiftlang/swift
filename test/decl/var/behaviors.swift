@@ -9,8 +9,6 @@ extension behavior {
 
 struct NotABehavior {}
 
-// FIXME: get/sets should not be required
-
 var [behavior] test1: Int
 var [Main.behavior] test2: String
 
@@ -89,11 +87,7 @@ struct GSR<T>: SelfRequirement {
   var [constraints] b: GVR<T>
 }
 
-// FIXME: probably a phase order problem here that causes type checker to think
-// T doesn't conform
 extension GSR where T: ValueRequirement {
-  // expected-error@+2{{type 'T' does not conform to protocol 'ValueRequirement'}}
-  // expected-note@+1{{}}
   var [constraints] c: T
 }
 

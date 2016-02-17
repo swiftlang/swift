@@ -171,19 +171,6 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
   }
 }
 
-Type ProtocolConformance::getInterfaceType() const {
-  switch (getKind()) {
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Inherited:
-    return getDeclContext()->getDeclaredInterfaceType();
-
-  case ProtocolConformanceKind::Specialized:
-    // Assume a specialized conformance is fully applied.
-    return getType();
-  }
-  llvm_unreachable("bad ProtocolConformanceKind");
-}
-
 GenericSignature *ProtocolConformance::getGenericSignature() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:
@@ -198,6 +185,14 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
     // type variables.
     return nullptr;
   }
+}
+
+bool ProtocolConformance::isBehaviorConformance() const {
+  return getRootNormalConformance()->isBehaviorConformance();
+}
+
+AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
+  return getRootNormalConformance()->getBehaviorDecl();
 }
 
 void NormalProtocolConformance::resolveLazyInfo() const {
@@ -302,7 +297,11 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
     ArrayRef<Substitution> substitutions)
-  : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
+  : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType,
+                        // FIXME: interface type should be passed in.
+                        // assumes specialized conformance is always fully
+                        // specialized
+                        conformingType),
     GenericConformance(genericConformance),
     GenericSubstitutions(substitutions)
 {

@@ -1262,6 +1262,10 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (!mustEmitDefinition)
     return;
 
+  // Behavior conformances can't be reflected.
+  if (wt->getConformance()->isBehaviorConformance())
+    return;
+
   addProtocolConformanceRecord(wt->getConformance());
 }
 

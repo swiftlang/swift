@@ -688,9 +688,10 @@ public:
   /// Produce a new normal conformance for a property behavior.
   NormalProtocolConformance *
   getBehaviorConformance(Type conformingType,
+                         Type conformingInterfaceType,
                          ProtocolDecl *protocol,
                          SourceLoc loc,
-                         DeclContext *dc,
+                         AbstractStorageDecl *storage,
                          ProtocolConformanceState state);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol

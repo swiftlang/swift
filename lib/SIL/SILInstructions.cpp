@@ -138,7 +138,7 @@ static void declareWitnessTable(SILModule &Mod,
                                 ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) return;
   auto C = conformanceRef.getConcrete();
-  if (!Mod.lookUpWitnessTable(C, false).first)
+  if (!Mod.lookUpWitnessTable(C, false))
     Mod.createWitnessTableDeclaration(C,
         TypeConverter::getLinkageForProtocolConformance(
                                                   C->getRootNormalConformance(),
@@ -1178,6 +1178,10 @@ DynamicMethodBranchInst::create(SILDebugLocation Loc, SILValue Operand,
 SILLinkage
 TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
                                                 ForDefinition_t definition) {
+  // Behavior conformances are always private.
+  if (C->isBehaviorConformance())
+    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+  
   // If the conformance is imported from Clang, give it shared linkage.
   auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
   auto typeUnit = typeDecl->getModuleScopeContext();

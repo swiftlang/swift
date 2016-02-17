@@ -1055,9 +1055,8 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
 
 static SILLinkage getConformanceLinkage(IRGenModule &IGM,
                                         const ProtocolConformance *conf) {
-  auto wt = IGM.SILMod->lookUpWitnessTable(conf);
-  if (wt.first) {
-    return wt.first->getLinkage();
+  if (auto wt = IGM.SILMod->lookUpWitnessTable(conf)) {
+    return wt->getLinkage();
   } else {
     return SILLinkage::PublicExternal;
   }
@@ -1173,9 +1172,8 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
       return getSILGlobalVariable()->isFragile();
       
     case Kind::DirectProtocolWitnessTable: {
-      auto wt = IGM.SILMod->lookUpWitnessTable(getProtocolConformance());
-      if (wt.first) {
-        return wt.first->isFragile();
+      if (auto wt = IGM.SILMod->lookUpWitnessTable(getProtocolConformance())) {
+        return wt->isFragile();
       } else {
         return false;
       }
