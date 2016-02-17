@@ -153,10 +153,13 @@ protocol storageWithoutInit {
 extension storageWithoutInit {
   var value: Value { fatalError("") }
 
-  func initStorage() -> Int { fatalError("signature is wrong") } // expected-note {{found this candidate}}
+  func initStorage() -> Int { fatalError("signature is wrong") } // expected-note * {{found this candidate}}
 }
 
 struct Bar {
+  var [storageWithoutInit] x: Int // expected-error {{property behavior protocol has a 'storage' requirement but does not have a static 'initStorage' method with the expected type '() -> Self.Value'}}
+}
+class Bas {
   var [storageWithoutInit] x: Int // expected-error {{property behavior protocol has a 'storage' requirement but does not have a static 'initStorage' method with the expected type '() -> Self.Value'}}
 }
 
