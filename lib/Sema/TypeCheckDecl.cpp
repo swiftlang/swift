@@ -2829,6 +2829,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         for (auto found : lookup)
           TC.diagnose(found.Decl->getLoc(),
                       diag::found_candidate);
+        continue;
       }
       
       // TODO: Support storage-backed behaviors in non-type contexts.

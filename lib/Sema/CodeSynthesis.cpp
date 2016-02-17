@@ -1192,6 +1192,9 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs) {
+  assert(BehaviorStorage);
+  assert(BehaviorInitStorage);
+
   // Substitute the storage type into the conforming context.
   auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
 
