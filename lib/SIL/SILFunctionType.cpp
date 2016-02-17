@@ -258,10 +258,13 @@ enum class ConventionsKind : uint8_t {
     /// lowering information about its substitution.
     bool isPassedIndirectly(AbstractionPattern origType, CanType substType,
                             const TypeLowering &substTL) {
+      auto &mod = *M.getSwiftModule();
+
       // If the substituted type is passed indirectly, so must the
       // unsubstituted type.
       if ((origType.isTypeParameter() &&
-           !origType.requiresClass(*M.getSwiftModule()))||
+           !origType.isConcreteType(mod) &&
+           !origType.requiresClass(mod)) ||
           substTL.isPassedIndirectly()) {
         return true;
 
@@ -502,6 +505,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     }
   }
 
+  auto &mod = *M.getSwiftModule();
   auto &substResultTL = M.Types.getTypeLowering(origResultType,
                                                 substFormalResultType);
   bool hasIndirectResult;
@@ -514,7 +518,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // If the unsubstituted type is dependent, then we use the most
   // general type for the function, which involves an indirect result.
   } else if (origResultType.isTypeParameter() &&
-             !origResultType.requiresClass(*M.getSwiftModule())) {
+             !origResultType.isConcreteType(mod) &&
+             !origResultType.requiresClass(mod)) {
     hasIndirectResult = true;
 
   // If the substitution didn't change the result type, we can use the

@@ -216,6 +216,11 @@ public:
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);
 
+  /// Return the concrete type that the given dependent type is constrained to,
+  /// or the null Type if it is not the subject of a concrete same-type
+  /// constraint.
+  Type getConcreteType(Type type, ModuleDecl &mod);
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);

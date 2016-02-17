@@ -230,25 +230,28 @@ namespace {
       return M.Types.getCurGenericContext();
     }
 
-    RetTy visitGenericTypeParamType(CanGenericTypeParamType type) {
+    RetTy visitAbstractTypeParamType(CanType type) {
       if (auto genericSig = getGenericSignature()) {
-        if (genericSig->requiresClass(type, *M.getSwiftModule())) {
+        auto &mod = *M.getSwiftModule();
+        if (genericSig->requiresClass(type, mod)) {
           return asImpl().handleReference(type);
+        } else if (genericSig->isConcreteType(type, mod)) {
+          return asImpl().visit(genericSig->getConcreteType(type, mod)
+                                    ->getCanonicalType());
         } else {
           return asImpl().handleAddressOnly(type);
         }
       }
       llvm_unreachable("should have substituted dependent type into context");
+
     }
+
+    RetTy visitGenericTypeParamType(CanGenericTypeParamType type) {
+      return visitAbstractTypeParamType(type);
+    }
+
     RetTy visitDependentMemberType(CanDependentMemberType type) {
-      if (auto genericSig = getGenericSignature()) {
-        if (genericSig->requiresClass(type, *M.getSwiftModule())) {
-          return asImpl().handleReference(type);
-        } else {
-          return asImpl().handleAddressOnly(type);
-        }
-      }
-      llvm_unreachable("should have substituted dependent type into context");
+      return visitAbstractTypeParamType(type);
     }
 
     RetTy visitUnmanagedStorageType(CanUnmanagedStorageType type) {
@@ -257,15 +260,20 @@ namespace {
 
     bool hasNativeReferenceCounting(CanType type) {
       if (type->isTypeParameter()) {
+        auto &mod = *M.getSwiftModule();
         auto signature = getGenericSignature();
         assert(signature && "dependent type without generic signature?!");
-        assert(signature->requiresClass(type, *M.getSwiftModule()));
+
+        if (auto concreteType = signature->getConcreteType(type, mod))
+          return hasNativeReferenceCounting(concreteType->getCanonicalType());
+
+        assert(signature->requiresClass(type, mod));
 
         // If we have a superclass bound, recurse on that.  This should
         // always terminate: even if we allow
         //   <T, U: T, V: U, ...>
         // at some point the type-checker should prove acyclic-ness.
-        auto bound = signature->getSuperclassBound(type, *M.getSwiftModule());
+        auto bound = signature->getSuperclassBound(type, mod);
         if (bound) {
           return hasNativeReferenceCounting(bound->getCanonicalType());
         }

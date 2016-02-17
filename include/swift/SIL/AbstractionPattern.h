@@ -498,6 +498,15 @@ public:
     }
   }
 
+  /// Is this an interface type that is subject to a concrete
+  /// same-type constraint?
+  bool isConcreteType(ModuleDecl &module) const {
+    assert(isTypeParameter());
+    return (getKind() != Kind::Opaque &&
+            GenericSig != nullptr &&
+            GenericSig->isConcreteType(getType(), module));
+  }
+
   bool requiresClass(ModuleDecl &module) {
     switch (getKind()) {
     case Kind::Opaque:
