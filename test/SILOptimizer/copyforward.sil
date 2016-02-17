@@ -71,6 +71,26 @@ bb0(%0 : $*T):
   return %r1 : $()
 }
 
+//CHECK-LABEL: dont_assert_on_basic_block_arg
+//CHECK: return
+sil hidden @dont_assert_on_basic_block_arg : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T
+  br bb1(%0: $*T)
+
+bb1(%1 : $*T):
+  %l1 = alloc_stack $T
+  copy_addr %1 to [initialization] %l1 : $*T
+  %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  debug_value_addr %l1 : $*T
+  dealloc_stack %l1 : $*T
+  debug_value_addr %0 : $*T
+  destroy_addr %0 : $*T
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
 //CHECK-LABEL: forward_noinit
 //CHECK-NOT: copy_addr
 //CHECK: destroy_addr

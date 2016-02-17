@@ -93,6 +93,8 @@ static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
 /// (2) A local alloc_stack variable.
 static bool isIdentifiedSourceValue(SILValue Def) {
   if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
+    if (!Arg->isFunctionArg())
+      return false;
     // Check that the argument is passed as an in type. This means there are
     // no aliases accessible within this function scope.
     ParameterConvention Conv =  Arg->getParameterInfo().getConvention();
