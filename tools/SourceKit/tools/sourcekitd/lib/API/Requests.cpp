@@ -563,8 +563,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
 
   if (ReqUID == RequestCodeCompleteSetCustom) {
     SmallVector<CustomCompletionInfo, 16> customCompletions;
-    sourcekitd_response_t err =
-        createErrorRequestInvalid("missing 'key.results'");
+    sourcekitd_response_t err = nullptr;
     bool failed = Req.dictionaryArrayApply(KeyResults, [&](RequestDict dict) {
       CustomCompletionInfo CCInfo;
       Optional<StringRef> Name = dict.getString(KeyName);
@@ -604,8 +603,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
       return false;
     });
 
-    if (failed)
+    if (failed) {
+      if (!err)
+        err = createErrorRequestInvalid("missing 'key.results'");
       return Rec(err);
+    }
 
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     Lang.codeCompleteSetCustom(customCompletions);
