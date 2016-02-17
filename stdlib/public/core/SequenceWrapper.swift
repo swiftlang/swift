@@ -38,7 +38,7 @@ extension Sequence
   Self : _SequenceWrapper,
   Self.Iterator == Self.Base.Iterator {
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Return an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> Base.Iterator {

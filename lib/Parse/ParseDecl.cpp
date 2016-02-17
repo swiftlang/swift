@@ -262,7 +262,8 @@ bool Parser::parseTopLevel() {
   // block.
   if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
       Tok.is(tok::pound_endif)) {
-    diagnose(Tok.getLoc(), diag::unexpected_config_block_terminator);
+    diagnose(Tok.getLoc(),
+             diag::unexpected_conditional_compilation_block_terminator);
     consumeToken();
   }
 
@@ -2612,29 +2613,34 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     
-    ConfigParserState ConfigState;
+    ConditionalCompilationExprState ConfigState;
     if (isElse) {
       ConfigState.setConditionActive(!foundActive);
     } else {
-      if (Tok.isAtStartOfLine())
-        diagnose(ClauseLoc, diag::expected_build_configuration_expression);
+      if (Tok.isAtStartOfLine()) {
+        diagnose(ClauseLoc, diag::expected_conditional_compilation_expression,
+                 !Clauses.empty());
+      }
       
       // Evaluate the condition.
-      ParserResult<Expr> Configuration = parseExprSequence(diag::expected_expr,
-                                                           true, true);
-      if (Configuration.isNull())
+      ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
+                                                    /*isBasic*/true,
+                                                    /*isForDirective*/true);
+      if (Result.isNull())
         return makeParserError();
       
-      Condition = Configuration.get();
+      Condition = Result.get();
 
       // Evaluate the condition, to validate it.
-      ConfigState = evaluateConfigConditionExpr(Condition);
+      ConfigState = evaluateConditionalCompilationExpr(Condition);
     }
 
     foundActive |= ConfigState.isConditionActive();
 
-    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
-      diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
+      diagnose(Tok.getLoc(),
+               diag::extra_tokens_conditional_compilation_directive);
+    }
 
     Optional<Scope> scope;
     if (!ConfigState.isConditionActive())
@@ -2647,8 +2653,8 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       Status = parseDecl(Decls, Flags);
 
       if (Status.isError()) {
-        diagnose(Tok, diag::expected_close_to_config_stmt);
-        skipUntilConfigBlockClose();
+        diagnose(Tok, diag::expected_close_to_if_directive);
+        skipUntilConditionalBlockClose();
         break;
       }
     }
@@ -2661,11 +2667,11 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       break;
     
     if (isElse)
-      diagnose(Tok, diag::expected_close_after_else);
+      diagnose(Tok, diag::expected_close_after_else_directive);
   }
 
   SourceLoc EndLoc;
-  bool HadMissingEnd = parseConfigEndIf(EndLoc);
+  bool HadMissingEnd = parseEndIfDirective(EndLoc);
 
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),

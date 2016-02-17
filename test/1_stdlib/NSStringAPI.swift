@@ -40,7 +40,7 @@ class NonContiguousNSString : NSString {
     super.init()
   }
 
-  @objc(copyWithZone:) override func copy(withZone zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:) override func copy(with zone: NSZone) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -1654,11 +1654,11 @@ NSStringAPIs.test("byTrimmingCharactersIn(_:)") {
       NSCharacterSet(charactersIn: "\u{3058}")))
 }
 
-NSStringAPIs.test("stringsByAppendingPaths(_:)") {
-  expectEqual([], "".stringsByAppendingPaths([]))
+NSStringAPIs.test("NSString.stringsByAppendingPaths(_:)") {
+  expectEqual([], "".strings(byAppendingPaths: []))
   expectEqual(
     [ "/tmp/foo", "/tmp/bar" ],
-    "/tmp".stringsByAppendingPaths([ "foo", "bar" ]))
+    "/tmp".strings(byAppendingPaths: [ "foo", "bar" ]))
 }
 
 NSStringAPIs.test("substringFrom(_:)") {

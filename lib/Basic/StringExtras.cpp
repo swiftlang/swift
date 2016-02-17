@@ -508,7 +508,7 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
     if (firstWord == "By") {
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
-      if (getPartOfSpeech(nextWord) == PartOfSpeech::Gerund) {
+      if (nextWord.endswith("ing")) {
         return toLowercaseWord(newName.substr(firstWord.size()), scratch);
       }
     }
@@ -593,6 +593,21 @@ static StringRef omitNeedlessWords(StringRef name,
       ++nameWordRevIter;
       ++typeWordRevIter;
       continue;
+    }
+
+    // Special case: "ObjectValue" in the name matches "Object" in the
+    // type.
+    if (matchNameWordToTypeWord("Object", *typeWordRevIter) &&
+        matchNameWordToTypeWord(nameWord, "Value")) {
+      auto nextNameWordRevIter = std::next(nameWordRevIter);
+      if (nextNameWordRevIter != nameWordRevIterEnd &&
+          matchNameWordToTypeWord(*nextNameWordRevIter, "Object")) {
+        matched();
+        nameWordRevIter = nextNameWordRevIter;
+        ++nameWordRevIter;
+        ++typeWordRevIter;
+        continue;
+      }
     }
 
     // Special case: if the word in the name ends in 's', and we have
@@ -761,10 +776,6 @@ static StringRef omitNeedlessWords(StringRef name,
 
   }
 
-  // If we ended up with a vacuous name like "get" or "set", do nothing.
-  if (isVacuousName(name))
-    return origName;
-
   switch (role) {
   case NameRole::BaseName:
   case NameRole::BaseNameSelf:
@@ -773,6 +784,11 @@ static StringRef omitNeedlessWords(StringRef name,
     // do nothing.
     if (isKeyword(name))
       return origName;
+
+    // If we ended up with a vacuous name like "get" or "set", do nothing.
+    if (isVacuousName(name))
+      return origName;
+
     break;
 
   case NameRole::SubsequentParameter:
@@ -825,14 +841,6 @@ StringRef camel_case::toLowercaseInitialisms(StringRef string,
 /// splitting.
 static bool wordConflictsBeforePreposition(StringRef word,
                                            StringRef preposition) {
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
-      camel_case::sameWordIgnoreFirstCase(word, "compatible"))
-    return true;
-
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "of") &&
-      camel_case::sameWordIgnoreFirstCase(word, "kind"))
-    return true;
-
   return false;
 }
 
@@ -847,8 +855,19 @@ static bool wordConflictsAfterPreposition(StringRef word,
       return true;
   }
 
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "to") &&
-      camel_case::sameWordIgnoreFirstCase(word, "visible"))
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "to")) {
+    if (camel_case::sameWordIgnoreFirstCase(word, "visible") ||
+        camel_case::sameWordIgnoreFirstCase(word, "backing"))
+      return true;
+  }
+
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "from")) {
+    if (camel_case::sameWordIgnoreFirstCase(word, "backing"))
+      return true;
+  }
+
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "and") &&
+      camel_case::sameWordIgnoreFirstCase(word, "return"))
     return true;
 
   return false;
@@ -865,7 +884,41 @@ static bool shouldPlacePrepositionOnArgLabel(StringRef beforePreposition,
       afterPreposition == "Z")
     return false;
 
+  // The preposition "of" binds tightly to the left word, except in
+  // rare cases.
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "of")) {
+    auto following = camel_case::getFirstWord(afterPreposition);
+    if (!camel_case::sameWordIgnoreFirstCase(following, "type") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "types") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "kind") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "size") &&
+        !camel_case::sameWordIgnoreFirstCase(following, "length"))
+      return false;
+  }
+
   return true;
+}
+
+/// Determine whether the word preceding the preposition is part of an
+/// "extended" preposition, such as "compatible with".
+static bool priorWordExtendsPreposition(StringRef preceding,
+                                        StringRef preposition) {
+  // compatible with
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "compatible") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "with"))
+    return true;
+
+  // best matching
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "best") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "matching"))
+    return true;
+
+  // according to
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "according") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "to"))
+    return true;
+
+  return false;
 }
 
 /// Determine whether the preposition in a split is "vacuous", and
@@ -914,6 +967,35 @@ static bool isVacuousPreposition(StringRef beforePreposition,
   return false;
 }
 
+namespace {
+  typedef std::reverse_iterator<camel_case::WordIterator> ReverseWordIterator;
+}
+
+/// Find the last preposition in the given word.
+static ReverseWordIterator findLastPreposition(ReverseWordIterator first,
+                                               ReverseWordIterator last,
+                                               bool recursive = false) {
+  // Find the last preposition.
+  auto result =
+    std::find_if(first, last,
+                 [](StringRef word) {
+                   return getPartOfSpeech(word) == PartOfSpeech::Preposition;
+                 });
+
+  // If the preposition is "of", look for a previous preposition.
+  if (!recursive && result != last &&
+      camel_case::sameWordIgnoreFirstCase(*result, "of")) {
+    auto prevPreposition = findLastPreposition(std::next(result), last,
+                                               /*recursive=*/true);
+    if (prevPreposition != last &&
+        !camel_case::sameWordIgnoreFirstCase(*prevPreposition, "of") &&
+        !camel_case::sameWordIgnoreFirstCase(*prevPreposition, "for"))
+      return prevPreposition;
+  }
+
+  return result;
+}
+
 /// Split the base name after the last preposition, if there is one.
 static bool splitBaseNameAfterLastPreposition(
     StringRef &baseName,
@@ -921,28 +1003,14 @@ static bool splitBaseNameAfterLastPreposition(
     const OmissionTypeName &paramType) {
   // Scan backwards for a preposition.
   auto nameWords = camel_case::getWords(baseName);
-  auto nameWordRevIter = nameWords.rbegin(),
-    nameWordRevIterBegin = nameWordRevIter,
+  auto nameWordRevIterBegin = nameWords.rbegin(),
     nameWordRevIterEnd = nameWords.rend();
-  bool done = false;
-  while (nameWordRevIter != nameWordRevIterEnd && !done) {
-    switch (getPartOfSpeech(*nameWordRevIter)) {
-    case PartOfSpeech::Preposition:
-      done = true;
-      break;
 
-    case PartOfSpeech::Verb:
-    case PartOfSpeech::Gerund:
-      return false;
+  // Find the last preposition.
+  auto nameWordRevIter = findLastPreposition(nameWordRevIterBegin,
+                                             nameWordRevIterEnd);
 
-    case PartOfSpeech::Unknown:
-      ++nameWordRevIter;
-      break;
-    }
-  }
-
-  // If we ran out of words, there's nothing to split.
-  if (!done) return false;
+  if (nameWordRevIter == nameWordRevIterEnd) return false;
 
   // We found a split point.
   auto preposition = *nameWordRevIter;
@@ -959,6 +1027,15 @@ static bool splitBaseNameAfterLastPreposition(
       wordConflictsAfterPreposition(*std::prev(nameWordRevIter), preposition))
     return false;
 
+  // If the word preceding the preposition extends the preposition, it
+  // will never be dropped.
+  if (std::next(nameWordRevIter) != nameWordRevIterEnd &&
+      priorWordExtendsPreposition(*std::next(nameWordRevIter), preposition)) {
+    ++nameWordRevIter;
+    preposition = StringRef((*nameWordRevIter).begin(),
+                            preposition.size() + (*nameWordRevIter).size());
+  }
+
   // Determine whether we should drop the preposition.
   StringRef beforePreposition(baseName.begin(),
                               preposition.begin() - baseName.begin());
@@ -969,7 +1046,7 @@ static bool splitBaseNameAfterLastPreposition(
                                               afterPreposition,
                                               paramType);
 
-  // By default, put the prposition on the argument label.
+  // By default, put the preposition on the argument label.
   bool prepositionOnArgLabel =
     shouldPlacePrepositionOnArgLabel(beforePreposition, preposition,
                                      afterPreposition);
@@ -989,20 +1066,22 @@ static bool splitBaseNameAfterLastPreposition(
   }
   if (endOfBaseName == 0) return false;
 
-  // If the base name is vacuous and there are two or fewer words in
-  // the base name, don't split.
+  // If the base name is vacuous or is a keyword and there are two or
+  // fewer words in the base name, don't split.
   auto newBaseName = baseName.substr(0, endOfBaseName);
   {
     auto newWords = camel_case::getWords(newBaseName);
     auto newWordsIter = newWords.begin();
-    if (isVacuousName(*newWordsIter)) {
+    bool isKeyword = ::isKeyword(*newWordsIter);
+    bool isVacuous = isVacuousName(*newWordsIter);
+    if (isKeyword || isVacuous) {
       // Just one word?
       ++newWordsIter;
       if (newWordsIter == newWords.end()) return false;
 
-      // Or two words?
+      // Or two words, if it's vacuous.
       ++newWordsIter;
-      if (newWordsIter == newWords.end()) return false;
+      if (newWordsIter == newWords.end() && isVacuous) return false;
 
       // Okay: there is enough in the base name.
     }

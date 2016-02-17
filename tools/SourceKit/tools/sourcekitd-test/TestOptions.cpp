@@ -102,6 +102,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     switch (InputArg->getOption().getID()) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
+        .Case("version", SourceKitRequest::ProtocolVersion)
         .Case("index", SourceKitRequest::Index)
         .Case("complete", SourceKitRequest::CodeComplete)
         .Case("complete.open", SourceKitRequest::CodeCompleteOpen)
@@ -130,7 +131,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
-            << "index/complete/cursor/related-idents/syntax-map/structure/"
+            << "version/index/complete/cursor/related-idents/syntax-map/structure/"
                "format/expand-placeholder/doc-info/sema/interface-gen/interface-gen-open/"
                "find-usr/find-interface/open/edit/print-annotations/extract-comment/"
                "module-groups\n";

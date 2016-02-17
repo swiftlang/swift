@@ -106,7 +106,7 @@ public:
   void visitFinalAttr(FinalAttr *attr) {
     // Accept and remove the 'final' attribute from members of protocol
     // extensions.
-    if (D->getDeclContext()->isProtocolExtensionContext()) {
+    if (D->getDeclContext()->getAsProtocolExtensionContext()) {
       D->getAttrs().removeAttribute(attr);
     }
   }
@@ -215,7 +215,7 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
   const FuncDecl *FD = cast<FuncDecl>(D);
-  if (!FD->getDeclContext()->isClassOrClassExtensionContext() ||
+  if (!FD->getDeclContext()->getAsClassOrClassExtensionContext() ||
       FD->isStatic() || FD->isAccessor())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
 
@@ -232,14 +232,14 @@ void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
 void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = cast<VarDecl>(D);
-  if (!VD->getDeclContext()->isClassOrClassExtensionContext() ||
+  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext() ||
       VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable);
 }
 
 void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
   auto *VD = cast<VarDecl>(D);
-  if (VD->getDeclContext()->isClassOrClassExtensionContext())
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     return;
   auto ctx = VD->getDeclContext()->getDeclaredTypeInContext();
   if (ctx && ctx->getStructOrBoundGenericStruct())
@@ -292,7 +292,7 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
 void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = cast<VarDecl>(D);
-  if (!VD->getDeclContext()->isClassOrClassExtensionContext() ||
+  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext() ||
       VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
@@ -337,7 +337,7 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
 void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   // @NSManaged only applies to instance methods and properties within a class.
   if (cast<ValueDecl>(D)->isStatic() ||
-      !D->getDeclContext()->isClassOrClassExtensionContext()) {
+      !D->getDeclContext()->getAsClassOrClassExtensionContext()) {
     return diagnoseAndRemoveAttr(attr,
                                  diag::attr_NSManaged_not_instance_member);
   }
@@ -896,8 +896,8 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   // 'final' only makes sense in the context of a class
   // declaration or a protocol extension.  Reject it on global functions,
   // structs, enums, etc.
-  if (!D->getDeclContext()->isClassOrClassExtensionContext() &&
-      !D->getDeclContext()->isProtocolExtensionContext()) {
+  if (!D->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      !D->getDeclContext()->getAsProtocolExtensionContext()) {
     TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
     return;
   }
@@ -1231,7 +1231,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 bool AttributeChecker::visitAbstractAccessibilityAttr(
     AbstractAccessibilityAttr *attr) {
   DeclContext *dc = D->getDeclContext();
-  if (auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
     Accessibility typeAccess = nominal->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       auto diag = TC.diagnose(attr->getLocation(),

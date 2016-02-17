@@ -161,12 +161,29 @@ def getMinFloat(floatBits, intBits):
 }%
 
 % for bits in allFloatBits:
-%   Self = floatName(bits)
+%{
+Self = floatName(bits)
 
+if Self == 'Float':
+    SelfDocComment = '''\
+/// A single-precision floating-point value type.'''
+
+elif Self == 'Double':
+    SelfDocComment = '''\
+/// A double-precision floating-point value type.'''
+
+elif Self == 'Float80':
+    SelfDocComment = '''\
+/// An extended-precision floating-point value type.'''
+
+else:
+    raise ValueError('Unhandled float type.')
+}%
 % if bits == 80:
 #if arch(i386) || arch(x86_64)
 % end
 
+${SelfDocComment}
 public struct ${Self} {
   public // @testable
   var _value: Builtin.FPIEEE${bits}

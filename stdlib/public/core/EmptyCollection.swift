@@ -24,7 +24,7 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   /// Construct an instance.
   public init() {}
 
-  /// Return `nil`, indicating that there are no more elements.
+  /// Returns `nil`, indicating that there are no more elements.
   public mutating func next() -> Element? {
     return nil
   }
@@ -51,7 +51,7 @@ public struct EmptyCollection<Element> : Collection {
     return 0
   }
 
-  /// Returns an empty *iterator*.
+  /// Returns an empty iterator.
   ///
   /// - Complexity: O(1).
   public func iterator() -> EmptyIterator<Element> {
@@ -65,7 +65,7 @@ public struct EmptyCollection<Element> : Collection {
     _requirementFailure("Index out of range")
   }
 
-  /// Return the number of elements (always zero).
+  /// The number of elements (always zero).
   public var count: Int {
     return 0
   }

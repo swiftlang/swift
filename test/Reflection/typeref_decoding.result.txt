@@ -1,36 +1,36 @@
+FIELDS:
+=======
 TypesToReflect.Box<A>
-=====================
 (bound-generic TypesToReflect.Box
   (generic-type-parameter index=0 depth=0))
 
-- item:
+item: A
 (generic-type-parameter index=0 depth=0)
 
 TypesToReflect.C
-================
 (nominal TypesToReflect.C)
 
-- aClass:
+aClass: TypesToReflect.C
 (nominal TypesToReflect.C)
 
-- aStruct:
+aStruct: TypesToReflect.S
 (nominal TypesToReflect.S)
 
-- anEnum:
+anEnum: TypesToReflect.E
 (nominal TypesToReflect.E)
 
-- aTuple:
+aTuple: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int)
 (tuple
   (nominal TypesToReflect.C)
   (nominal TypesToReflect.S)
   (nominal TypesToReflect.E)
   (nominal Swift.Int))
 
-- aMetatype:
+aMetatype: TypesToReflect.C.Type
 (metatype
   (nominal TypesToReflect.C))
 
-- aFunction:
+aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> Swift.Int
 (function
   (tuple
     (nominal TypesToReflect.C)
@@ -40,21 +40,20 @@ TypesToReflect.C
   (nominal Swift.Int))
 
 TypesToReflect.S
-================
 (nominal TypesToReflect.S)
 
-- aClass:
+aClass: TypesToReflect.C
 (nominal TypesToReflect.C)
 
-- aStruct:
+aStruct: TypesToReflect.Box<TypesToReflect.S>
 (bound-generic TypesToReflect.Box
   (nominal TypesToReflect.S))
 
-- anEnum:
+anEnum: TypesToReflect.Box<TypesToReflect.E>
 (bound-generic TypesToReflect.Box
   (nominal TypesToReflect.E))
 
-- aTuple:
+aTuple: (TypesToReflect.C, TypesToReflect.Box<TypesToReflect.S>, TypesToReflect.Box<TypesToReflect.E>, Swift.Int)
 (tuple
   (nominal TypesToReflect.C)
   (bound-generic TypesToReflect.Box
@@ -63,11 +62,11 @@ TypesToReflect.S
     (nominal TypesToReflect.E))
   (nominal Swift.Int))
 
-- aMetatype:
+aMetatype: TypesToReflect.C.Type
 (metatype
   (nominal TypesToReflect.C))
 
-- aFunction:
+aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> Swift.Int
 (function
   (tuple
     (nominal TypesToReflect.C)
@@ -77,10 +76,9 @@ TypesToReflect.S
   (nominal Swift.Int))
 
 TypesToReflect.E
-================
 (nominal TypesToReflect.E)
 
-- Class:
+Class: (TypesToReflect.E.Type) -> (TypesToReflect.C) -> TypesToReflect.E
 (function
   (metatype
     (nominal TypesToReflect.E))
@@ -88,7 +86,7 @@ TypesToReflect.E
     (nominal TypesToReflect.C)
     (nominal TypesToReflect.E)))
 
-- Struct:
+Struct: (TypesToReflect.E.Type) -> (TypesToReflect.S) -> TypesToReflect.E
 (function
   (metatype
     (nominal TypesToReflect.E))
@@ -96,7 +94,7 @@ TypesToReflect.E
     (nominal TypesToReflect.S)
     (nominal TypesToReflect.E)))
 
-- Enum:
+Enum: (TypesToReflect.E.Type) -> (TypesToReflect.E) -> TypesToReflect.E
 (function
   (metatype
     (nominal TypesToReflect.E))
@@ -104,7 +102,7 @@ TypesToReflect.E
     (nominal TypesToReflect.E)
     (nominal TypesToReflect.E)))
 
-- Function:
+Function: (TypesToReflect.E.Type) -> ((TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> ()) -> TypesToReflect.E
 (function
   (metatype
     (nominal TypesToReflect.E))
@@ -118,7 +116,7 @@ TypesToReflect.E
       (tuple))
     (nominal TypesToReflect.E)))
 
-- Tuple:
+Tuple: (TypesToReflect.E.Type) -> (TypesToReflect.C, TypesToReflect.S, Swift.Int) -> TypesToReflect.E
 (function
   (metatype
     (nominal TypesToReflect.E))
@@ -129,7 +127,7 @@ TypesToReflect.E
       (nominal Swift.Int))
     (nominal TypesToReflect.E)))
 
-- IndirectTuple:
+IndirectTuple: (TypesToReflect.E.Type) -> (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> TypesToReflect.E
 (function
   (metatype
     (nominal TypesToReflect.E))
@@ -141,7 +139,7 @@ TypesToReflect.E
       (nominal Swift.Int))
     (nominal TypesToReflect.E)))
 
-- Metatype:
+Metatype: (TypesToReflect.E.Type) -> (TypesToReflect.E.Type) -> TypesToReflect.E
 (function
   (metatype
     (nominal TypesToReflect.E))
@@ -151,23 +149,22 @@ TypesToReflect.E
     (nominal TypesToReflect.E)))
 
 TypesToReflect.C1<A>
-====================
 (bound-generic TypesToReflect.C1
   (generic-type-parameter index=0 depth=0))
 
-- aClass:
+aClass: TypesToReflect.C1<A>
 (bound-generic TypesToReflect.C1
   (generic-type-parameter index=0 depth=0))
 
-- aStruct:
+aStruct: TypesToReflect.S1<A>
 (bound-generic TypesToReflect.S1
   (generic-type-parameter index=0 depth=0))
 
-- anEnum:
+anEnum: TypesToReflect.E1<A>
 (bound-generic TypesToReflect.E1
   (generic-type-parameter index=0 depth=0))
 
-- function:
+function: (TypesToReflect.C1<A>) -> (TypesToReflect.S1<A>) -> (TypesToReflect.E1<A>) -> Swift.Int
 (function
   (bound-generic TypesToReflect.C1
     (generic-type-parameter index=0 depth=0))
@@ -179,7 +176,7 @@ TypesToReflect.C1<A>
         (generic-type-parameter index=0 depth=0))
       (nominal Swift.Int))))
 
-- tuple:
+tuple: (TypesToReflect.C1<A>, TypesToReflect.S1<A>, TypesToReflect.E1<A>, Swift.Int)
 (tuple
   (bound-generic TypesToReflect.C1
     (generic-type-parameter index=0 depth=0))
@@ -189,27 +186,26 @@ TypesToReflect.C1<A>
     (generic-type-parameter index=0 depth=0))
   (nominal Swift.Int))
 
-- dependentMember:
+dependentMember: A
 (generic-type-parameter index=0 depth=0)
 
 TypesToReflect.C2<A>
-====================
 (bound-generic TypesToReflect.C2
   (generic-type-parameter index=0 depth=0))
 
-- aClass:
+aClass: TypesToReflect.C1<A>
 (bound-generic TypesToReflect.C1
   (generic-type-parameter index=0 depth=0))
 
-- aStruct:
+aStruct: TypesToReflect.S1<A>
 (bound-generic TypesToReflect.S1
   (generic-type-parameter index=0 depth=0))
 
-- anEnum:
+anEnum: TypesToReflect.E1<A>
 (bound-generic TypesToReflect.E1
   (generic-type-parameter index=0 depth=0))
 
-- function:
+function: (TypesToReflect.C1<A>) -> (TypesToReflect.S1<A>) -> (TypesToReflect.E1<A>) -> Swift.Int
 (function
   (bound-generic TypesToReflect.C1
     (generic-type-parameter index=0 depth=0))
@@ -221,7 +217,7 @@ TypesToReflect.C2<A>
         (generic-type-parameter index=0 depth=0))
       (nominal Swift.Int))))
 
-- tuple:
+tuple: (TypesToReflect.C2<A>, TypesToReflect.S2<A>, TypesToReflect.E2<A>, Swift.Int)
 (tuple
   (bound-generic TypesToReflect.C2
     (generic-type-parameter index=0 depth=0))
@@ -231,32 +227,31 @@ TypesToReflect.C2<A>
     (generic-type-parameter index=0 depth=0))
   (nominal Swift.Int))
 
-- primaryArchetype:
+primaryArchetype: A
 (generic-type-parameter index=0 depth=0)
 
-- dependentMember1:
+dependentMember1: A.Inner
 (dependent-member
   (associated-type name=Inner)
   (generic-type-parameter index=0 depth=0))
 
 TypesToReflect.C3<A>
-====================
 (bound-generic TypesToReflect.C3
   (generic-type-parameter index=0 depth=0))
 
-- aClass:
+aClass: TypesToReflect.C3<A>
 (bound-generic TypesToReflect.C3
   (generic-type-parameter index=0 depth=0))
 
-- aStruct:
+aStruct: TypesToReflect.S3<A>
 (bound-generic TypesToReflect.S3
   (generic-type-parameter index=0 depth=0))
 
-- anEnum:
+anEnum: TypesToReflect.E3<A>
 (bound-generic TypesToReflect.E3
   (generic-type-parameter index=0 depth=0))
 
-- function:
+function: (TypesToReflect.C3<A>) -> (TypesToReflect.S3<A>) -> (TypesToReflect.E3<A>) -> Swift.Int
 (function
   (bound-generic TypesToReflect.C3
     (generic-type-parameter index=0 depth=0))
@@ -268,7 +263,7 @@ TypesToReflect.C3<A>
         (generic-type-parameter index=0 depth=0))
       (nominal Swift.Int))))
 
-- tuple:
+tuple: (TypesToReflect.C3<A>, TypesToReflect.S3<A>, TypesToReflect.E3<A>, Swift.Int)
 (tuple
   (bound-generic TypesToReflect.C3
     (generic-type-parameter index=0 depth=0))
@@ -278,41 +273,45 @@ TypesToReflect.C3<A>
     (generic-type-parameter index=0 depth=0))
   (nominal Swift.Int))
 
-- primaryArchetype:
+primaryArchetype: A
 (generic-type-parameter index=0 depth=0)
 
-- dependentMember1:
+dependentMember1: A.Outer
 (dependent-member
   (associated-type name=Outer)
   (generic-type-parameter index=0 depth=0))
 
-- dependentMember2:
+dependentMember2: A.Outer.Inner
 (dependent-member
   (associated-type name=Inner)
   (dependent-member
     (associated-type name=Outer)
     (generic-type-parameter index=0 depth=0)))
 
+TypesToReflect.C4<A, B>
+(bound-generic TypesToReflect.C4
+  (generic-type-parameter index=0 depth=0)
+  (generic-type-parameter index=1 depth=0))
+
 TypesToReflect.S1<A>
-====================
 (bound-generic TypesToReflect.S1
   (generic-type-parameter index=0 depth=0))
 
-- aClass:
+aClass: TypesToReflect.C1<A>
 (bound-generic TypesToReflect.C1
   (generic-type-parameter index=0 depth=0))
 
-- aStruct:
+aStruct: TypesToReflect.Box<TypesToReflect.S1<A>>
 (bound-generic TypesToReflect.Box
   (bound-generic TypesToReflect.S1
     (generic-type-parameter index=0 depth=0)))
 
-- anEnum:
+anEnum: TypesToReflect.Box<TypesToReflect.E1<A>>
 (bound-generic TypesToReflect.Box
   (bound-generic TypesToReflect.E1
     (generic-type-parameter index=0 depth=0)))
 
-- function:
+function: (TypesToReflect.C1<A>) -> (TypesToReflect.S1<A>) -> (TypesToReflect.E1<A>) -> Swift.Int
 (function
   (bound-generic TypesToReflect.C1
     (generic-type-parameter index=0 depth=0))
@@ -324,7 +323,7 @@ TypesToReflect.S1<A>
         (generic-type-parameter index=0 depth=0))
       (nominal Swift.Int))))
 
-- tuple:
+tuple: (TypesToReflect.C1<A>, TypesToReflect.Box<TypesToReflect.S1<A>>, TypesToReflect.Box<TypesToReflect.E1<A>>, Swift.Int)
 (tuple
   (bound-generic TypesToReflect.C1
     (generic-type-parameter index=0 depth=0))
@@ -336,29 +335,28 @@ TypesToReflect.S1<A>
       (generic-type-parameter index=0 depth=0)))
   (nominal Swift.Int))
 
-- primaryArchetype:
+primaryArchetype: A
 (generic-type-parameter index=0 depth=0)
 
 TypesToReflect.S2<A>
-====================
 (bound-generic TypesToReflect.S2
   (generic-type-parameter index=0 depth=0))
 
-- aClass:
+aClass: TypesToReflect.C2<A>
 (bound-generic TypesToReflect.C2
   (generic-type-parameter index=0 depth=0))
 
-- aStruct:
+aStruct: TypesToReflect.Box<TypesToReflect.S2<A>>
 (bound-generic TypesToReflect.Box
   (bound-generic TypesToReflect.S2
     (generic-type-parameter index=0 depth=0)))
 
-- anEnum:
+anEnum: TypesToReflect.Box<TypesToReflect.E2<A>>
 (bound-generic TypesToReflect.Box
   (bound-generic TypesToReflect.E2
     (generic-type-parameter index=0 depth=0)))
 
-- function:
+function: (TypesToReflect.C2<A>) -> (TypesToReflect.S2<A>) -> (TypesToReflect.E2<A>) -> Swift.Int
 (function
   (bound-generic TypesToReflect.C2
     (generic-type-parameter index=0 depth=0))
@@ -370,7 +368,7 @@ TypesToReflect.S2<A>
         (generic-type-parameter index=0 depth=0))
       (nominal Swift.Int))))
 
-- tuple:
+tuple: (TypesToReflect.C2<A>, TypesToReflect.Box<TypesToReflect.S2<A>>, TypesToReflect.Box<TypesToReflect.E2<A>>, Swift.Int)
 (tuple
   (bound-generic TypesToReflect.C2
     (generic-type-parameter index=0 depth=0))
@@ -382,34 +380,33 @@ TypesToReflect.S2<A>
       (generic-type-parameter index=0 depth=0)))
   (nominal Swift.Int))
 
-- primaryArchetype:
+primaryArchetype: A
 (generic-type-parameter index=0 depth=0)
 
-- dependentMember1:
+dependentMember1: A.Inner
 (dependent-member
   (associated-type name=Inner)
   (generic-type-parameter index=0 depth=0))
 
 TypesToReflect.S3<A>
-====================
 (bound-generic TypesToReflect.S3
   (generic-type-parameter index=0 depth=0))
 
-- aClass:
+aClass: TypesToReflect.C3<A>
 (bound-generic TypesToReflect.C3
   (generic-type-parameter index=0 depth=0))
 
-- aStruct:
+aStruct: TypesToReflect.Box<TypesToReflect.S3<A>>
 (bound-generic TypesToReflect.Box
   (bound-generic TypesToReflect.S3
     (generic-type-parameter index=0 depth=0)))
 
-- anEnum:
+anEnum: TypesToReflect.Box<TypesToReflect.E3<A>>
 (bound-generic TypesToReflect.Box
   (bound-generic TypesToReflect.E3
     (generic-type-parameter index=0 depth=0)))
 
-- function:
+function: (TypesToReflect.C3<A>) -> (TypesToReflect.S3<A>) -> (TypesToReflect.E3<A>) -> Swift.Int
 (function
   (bound-generic TypesToReflect.C3
     (generic-type-parameter index=0 depth=0))
@@ -421,7 +418,7 @@ TypesToReflect.S3<A>
         (generic-type-parameter index=0 depth=0))
       (nominal Swift.Int))))
 
-- tuple:
+tuple: (TypesToReflect.C3<A>, TypesToReflect.Box<TypesToReflect.S3<A>>, TypesToReflect.Box<TypesToReflect.E3<A>>, Swift.Int)
 (tuple
   (bound-generic TypesToReflect.C3
     (generic-type-parameter index=0 depth=0))
@@ -433,27 +430,31 @@ TypesToReflect.S3<A>
       (generic-type-parameter index=0 depth=0)))
   (nominal Swift.Int))
 
-- primaryArchetype:
+primaryArchetype: A
 (generic-type-parameter index=0 depth=0)
 
-- dependentMember1:
+dependentMember1: A.Outer
 (dependent-member
   (associated-type name=Outer)
   (generic-type-parameter index=0 depth=0))
 
-- dependentMember2:
+dependentMember2: A.Outer.Inner
 (dependent-member
   (associated-type name=Inner)
   (dependent-member
     (associated-type name=Outer)
     (generic-type-parameter index=0 depth=0)))
 
+TypesToReflect.S4<A, B>
+(bound-generic TypesToReflect.S4
+  (generic-type-parameter index=0 depth=0)
+  (generic-type-parameter index=1 depth=0))
+
 TypesToReflect.E1<A>
-====================
 (bound-generic TypesToReflect.E1
   (generic-type-parameter index=0 depth=0))
 
-- Class:
+Class: <A> (TypesToReflect.E1<A>.Type) -> (TypesToReflect.C1<A>) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -464,7 +465,7 @@ TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-- Struct:
+Struct: <A> (TypesToReflect.E1<A>.Type) -> (TypesToReflect.S1<A>) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -475,7 +476,7 @@ TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-- Enum:
+Enum: <A> (TypesToReflect.E1<A>.Type) -> (TypesToReflect.E1<A>) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -486,7 +487,7 @@ TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-- Int:
+Int: <A> (TypesToReflect.E1<A>.Type) -> (Swift.Int) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -496,7 +497,7 @@ TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-- Function:
+Function: <A> (TypesToReflect.E1<A>.Type) -> ((A) -> TypesToReflect.E1<A>) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -509,7 +510,7 @@ TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-- Tuple:
+Tuple: <A> (TypesToReflect.E1<A>.Type) -> (TypesToReflect.C1<A>, TypesToReflect.S1<A>, Swift.Int) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -524,7 +525,7 @@ TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-- Primary:
+Primary: <A> (TypesToReflect.E1<A>.Type) -> (A) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -534,7 +535,7 @@ TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-- Metatype:
+Metatype: <A> (TypesToReflect.E1<A>.Type) -> (A.Type) -> TypesToReflect.E1<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E1
@@ -546,11 +547,10 @@ TypesToReflect.E1<A>
       (generic-type-parameter index=0 depth=0))))
 
 TypesToReflect.E2<A>
-====================
 (bound-generic TypesToReflect.E2
   (generic-type-parameter index=0 depth=0))
 
-- Class:
+Class: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (TypesToReflect.C2<A>) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -561,7 +561,7 @@ TypesToReflect.E2<A>
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-- Struct:
+Struct: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (TypesToReflect.S2<A>) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -572,7 +572,7 @@ TypesToReflect.E2<A>
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-- Enum:
+Enum: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (TypesToReflect.E2<A>) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -583,7 +583,7 @@ TypesToReflect.E2<A>
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-- Function:
+Function: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> ((A.Type) -> TypesToReflect.E1<A>) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -597,7 +597,7 @@ TypesToReflect.E2<A>
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-- Tuple:
+Tuple: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (TypesToReflect.C2<A>, TypesToReflect.S2<A>, Swift.Int) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -612,7 +612,7 @@ TypesToReflect.E2<A>
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-- Primary:
+Primary: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (A) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -622,7 +622,7 @@ TypesToReflect.E2<A>
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-- DependentMemberInner:
+DependentMemberInner: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (A.Inner) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -634,7 +634,7 @@ TypesToReflect.E2<A>
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-- ExistentialMetatype:
+ExistentialMetatype: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (A.Type) -> TypesToReflect.E2<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E2
@@ -646,11 +646,10 @@ TypesToReflect.E2<A>
       (generic-type-parameter index=0 depth=0))))
 
 TypesToReflect.E3<A>
-====================
 (bound-generic TypesToReflect.E3
   (generic-type-parameter index=0 depth=0))
 
-- Class:
+Class: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (TypesToReflect.C3<A>) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -661,7 +660,7 @@ TypesToReflect.E3<A>
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-- Struct:
+Struct: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (TypesToReflect.S3<A>) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -672,7 +671,7 @@ TypesToReflect.E3<A>
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-- Enum:
+Enum: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (TypesToReflect.E3<A>) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -683,7 +682,7 @@ TypesToReflect.E3<A>
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-- Function:
+Function: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> ((A.Type.Type) -> TypesToReflect.E1<A>) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -698,7 +697,7 @@ TypesToReflect.E3<A>
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-- Tuple:
+Tuple: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (TypesToReflect.C3<A>, TypesToReflect.S3<A>, Swift.Int) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -713,7 +712,7 @@ TypesToReflect.E3<A>
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-- Primary:
+Primary: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (A) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -723,7 +722,7 @@ TypesToReflect.E3<A>
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-- DependentMemberOuter:
+DependentMemberOuter: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (A.Outer) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -735,7 +734,7 @@ TypesToReflect.E3<A>
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-- DependentMemberInner:
+DependentMemberInner: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (A.Outer.Inner) -> TypesToReflect.E3<A>
 (function
   (metatype
     (bound-generic TypesToReflect.E3
@@ -748,4 +747,53 @@ TypesToReflect.E3<A>
         (generic-type-parameter index=0 depth=0)))
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
+
+TypesToReflect.E4<A, B>
+(bound-generic TypesToReflect.E4
+  (generic-type-parameter index=0 depth=0)
+  (generic-type-parameter index=1 depth=0))
+
+
+ASSOCIATED TYPES:
+=================
+TypesToReflect.Box<A> : Swift.AnyObject.Protocol
+TypesToReflect.C : Swift.AnyObject.Protocol
+TypesToReflect.C1<A> : Swift.AnyObject.Protocol
+TypesToReflect.C1<A> : TypesToReflect.ClassBoundP.Protocol
+typealias Inner = A
+(generic-type-parameter index=0 depth=0)
+
+TypesToReflect.C2<A> : Swift.AnyObject.Protocol
+TypesToReflect.C3<A> : Swift.AnyObject.Protocol
+TypesToReflect.C4<A, B> : TypesToReflect.P1.Protocol
+typealias Inner = A
+(generic-type-parameter index=0 depth=0)
+
+TypesToReflect.C4<A, B> : TypesToReflect.P2.Protocol
+typealias Outer = A
+(generic-type-parameter index=0 depth=0)
+
+TypesToReflect.S4<A, B> : TypesToReflect.P1.Protocol
+typealias Inner = A
+(generic-type-parameter index=0 depth=0)
+
+TypesToReflect.S4<A, B> : TypesToReflect.P2.Protocol
+typealias Outer = A
+(generic-type-parameter index=0 depth=0)
+
+TypesToReflect.E4<A, B> : TypesToReflect.P1.Protocol
+typealias Inner = A
+(generic-type-parameter index=0 depth=0)
+
+TypesToReflect.E4<A, B> : TypesToReflect.P2.Protocol
+typealias Outer = B
+(generic-type-parameter index=1 depth=0)
+
+TypesToReflect.E4<A, B> : TypesToReflect.P3.Protocol
+typealias First = A
+(generic-type-parameter index=0 depth=0)
+
+typealias Second = B
+(generic-type-parameter index=1 depth=0)
+
 

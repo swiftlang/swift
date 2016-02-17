@@ -410,29 +410,10 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   llvm_unreachable("bad conversion restriction kind");
 }
 
-Fix Fix::getRelabelTuple(ConstraintSystem &cs, FixKind kind,
-                         ArrayRef<Identifier> names) {
-  assert(isRelabelTupleKind(kind) && "Not a tuple-relabel fix");
-  Fix result(kind, cs.RelabelTupleNames.size());
-  auto &allocator = cs.getAllocator();
-
-  // Copy the names and indices.
-  Identifier *namesCopy = allocator.Allocate<Identifier>(names.size());
-  memcpy(namesCopy, names.data(), names.size() * sizeof(Identifier));
-  cs.RelabelTupleNames.push_back({namesCopy, names.size()});
-
-  return result;
-}
-
 Fix Fix::getForcedDowncast(ConstraintSystem &cs, Type toType) {
   unsigned index = cs.FixedTypes.size();
   cs.FixedTypes.push_back(toType);
   return Fix(FixKind::ForceDowncast, index);
-}
-
-ArrayRef<Identifier> Fix::getRelabelTupleNames(ConstraintSystem &cs) const {
-  assert(isRelabelTuple());
-  return cs.RelabelTupleNames[Data];
 }
 
 Type Fix::getTypeArgument(ConstraintSystem &cs) const {
@@ -450,41 +431,21 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: force downcast";
   case FixKind::AddressOf:
     return "fix: add address-of";
-  case FixKind::RemoveNullaryCall:
-    return "fix: remove nullary call";
-  case FixKind::TupleToScalar:
-    return "fix: tuple-to-scalar";
-  case FixKind::ScalarToTuple:
-    return "fix: scalar-to-tuple";
-  case FixKind::RelabelCallTuple:
-    return "fix: relabel call tuple";
   case FixKind::OptionalToBoolean:
     return "fix: convert optional to boolean";
-  case FixKind::FromRawToInit:
-    return "fix: fromRaw(x) to init(rawValue:x)";
-  case FixKind::AllZerosToInit:
-    return "fix: x.allZeros to x()";
-  case FixKind::ToRawToRawValue:
-    return "fix: toRaw() to rawValue";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
   }
 }
 
 void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {
-  Out << "[" << getName(getKind());
-
-  if (isRelabelTuple() && cs) {
-    Out << " to ";
-    for (auto name : getRelabelTupleNames(*cs))
-      Out << name << ":";
-  }
+  Out << '[' << getName(getKind());
 
   if (getKind() == FixKind::ForceDowncast && cs) {
     Out << " as! ";
     Out << getTypeArgument(*cs).getString();
   }
-  Out << "]";
+  Out << ']';
 }
 
 void Fix::dump(ConstraintSystem *cs) const {

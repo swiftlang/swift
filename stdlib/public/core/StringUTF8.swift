@@ -374,7 +374,7 @@ extension String.UTF8View.Index {
     self.init(utf8._core, _utf16Offset: characterIndex._base._position)
   }
 
-  /// Return the position in `utf16` that corresponds exactly
+  /// Returns the position in `utf16` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `String(utf16)!.utf8.indices`.
@@ -385,7 +385,7 @@ extension String.UTF8View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
 
-  /// Return the position in `unicodeScalars` that corresponds exactly
+  /// Returns the position in `unicodeScalars` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of
@@ -397,7 +397,7 @@ extension String.UTF8View.Index {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
 
-  /// Return the position in `characters` that corresponds exactly
+  /// Returns the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.utf8.indices`.

@@ -11,17 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 /// Encapsulates iteration state and interface for iteration over a
-/// *sequence*.
+/// sequence.
 ///
-/// - Note: While it is safe to copy an *iterator*, advancing one
+/// - Note: While it is safe to copy an iterator, advancing one
 ///   copy may invalidate the others.
 ///
 /// Any code that uses multiple iterators (or `for`...`in` loops)
-/// over a single *sequence* should have static knowledge that the
-/// specific *sequence* is multi-pass, either because its concrete
-/// type is known or because it is constrained to `Collection`.
+/// over a single sequence should have static knowledge that the
+/// specific sequence is multi-pass, either because its concrete
+/// type is known or because it is constrained to `CollectionType`.
 /// Also, the iterators must be obtained by distinct calls to the
-/// *sequence's* `iterator()` method, rather than by copying.
+/// sequence's `iterator()` method, rather than by copying.
 public protocol IteratorProtocol {
   /// The type of element traversed by `self`.
   associatedtype Element
@@ -42,7 +42,7 @@ public protocol IteratorProtocol {
 ///
 /// `Sequence` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
-/// ensure non-destructive iteration, constrain your *sequence* to
+/// ensure non-destructive iteration, constrain your sequence to
 /// `Collection`.
 ///
 /// As a consequence, it is not possible to run multiple `for` loops
@@ -67,6 +67,7 @@ public protocol Sequence {
   //typealias Generator = ()
 
   /// A type that provides the *sequence*'s iteration interface and
+  /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   associatedtype Iterator : IteratorProtocol
 
@@ -77,19 +78,19 @@ public protocol Sequence {
   /// A type that represents a subsequence of some of the elements.
   associatedtype SubSequence
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @warn_unused_result
   func iterator() -> Iterator
 
-  /// Return a value less than or equal to the number of elements in
+  /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
   var underestimatedCount: Int { get }
 
-  /// Return an `Array` containing the results of mapping `transform`
+  /// Returns an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
   /// - Complexity: O(N).
@@ -98,7 +99,7 @@ public protocol Sequence {
     @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T]
 
-  /// Return an `Array` containing the elements of `self`,
+  /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   func filter(
@@ -306,7 +307,7 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Return an `Array` containing the results of mapping `transform`
+  /// Returns an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
   /// - Complexity: O(N).
@@ -331,7 +332,7 @@ extension Sequence {
     return Array(result)
   }
 
-  /// Return an `Array` containing the elements of `self`,
+  /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   public func filter(
@@ -451,7 +452,7 @@ extension Sequence {
     return result
   }
 
-  /// Return a value less than or equal to the number of elements in
+  /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).

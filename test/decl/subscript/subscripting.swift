@@ -193,8 +193,7 @@ func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscr
   value = ovl[(i, j)]
   ovl[(i, j)] = value
 
-  value = ovl[(i, j, i)] // expected-error{{cannot subscript a value of type 'OverloadedSubscript' with an index of type '(Int, Int, Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(Int)'}}
+  value = ovl[(i, j, i)] // expected-error{{cannot convert value of type '(Int, Int, Int)' to expected argument type 'Int'}}
 
   ret[i] // expected-error{{ambiguous use of 'subscript'}}
 
@@ -254,8 +253,7 @@ func testSubscript1(s2 : SubscriptTest2) {
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
   
   
-  let b = s2[1, "foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(Int, String)'}}
-  // expected-note @-1 {{expected an argument list of type '(String, String)'}}
+  let b = s2[1, "foo"] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 }
 
 // sr-114 & rdar://22007370

@@ -257,6 +257,8 @@ struct PrintOptions {
 
   void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
 
+  bool isPrintingSynthesizedExtension();
+
   void clearArchetypeTransformerForSynthesizedExtensions();
 
   /// Retrieve the print options that are suitable to print the testable interface.

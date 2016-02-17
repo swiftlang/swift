@@ -63,7 +63,7 @@ IDENTIFIER(toRaw)
 IDENTIFIER(Type)
 IDENTIFIER(value)
 IDENTIFIER_WITH_NAME(value_, "_value")
-IDENTIFIER(withZone)
+IDENTIFIER(with)
 
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")

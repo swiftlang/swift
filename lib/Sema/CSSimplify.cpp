@@ -506,42 +506,13 @@ static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
                    Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
-  /// Listener used to produce failures if they should be produced.
-  class Listener : public MatchCallArgumentListener {
-    ConstraintSystem &CS;
-    Type ArgType;
-    Type ParamType;
-    ConstraintLocatorBuilder &Locator;
-
-  public:
-    Listener(ConstraintSystem &cs, Type argType, Type paramType,
-             ConstraintLocatorBuilder &locator)
-      : CS(cs), ArgType(argType), ParamType(paramType), Locator(locator) { }
-
-    bool relabelArguments(ArrayRef<Identifier> newNames) override {
-      if (!CS.shouldAttemptFixes()) {
-        // FIXME: record why this failed. We have renaming.
-        return true;
-      }
-
-      // Add a fix for the name. This is only responsible for recording the fix.
-      auto result = CS.simplifyFixConstraint(
-                      Fix::getRelabelTuple(CS, FixKind::RelabelCallTuple,
-                                           newNames),
-                      ArgType, ParamType,
-                      TypeMatchKind::ArgumentTupleConversion,
-                      ConstraintSystem::TMF_None,
-                      Locator);
-      return result != ConstraintSystem::SolutionKind::Solved;
-    }
-  };
   
   // In the empty existential parameter case, we don't need to decompose the
   // arguments.
   if (paramType->isEmptyExistentialComposition()) {
-    if (argType->is<InOutType>()) {
+    if (argType->is<InOutType>())
       return ConstraintSystem::SolutionKind::Error;
-    }
+
     // If the param type is an empty existential composition, the function can
     // only have one argument. Check if exactly one argument was passed to this
     // function, otherwise we obviously have a mismatch
@@ -560,7 +531,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   auto params = decomposeArgParamType(paramType);
 
   // Match up the call arguments to the parameters.
-  Listener listener(cs, argType, paramType, locator);
+  MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
   if (constraints::matchCallArguments(args, params,
                                       hasTrailingClosure(locator),
@@ -2599,26 +2570,6 @@ ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
   return SolutionKind::Solved;
 }
 
-/// If the given type conforms to the RawRepresentable protocol,
-/// return its underlying raw type.
-static Type getRawRepresentableValueType(TypeChecker &tc, DeclContext *dc, 
-                                         Type type) {
-  auto proto = tc.Context.getProtocol(KnownProtocolKind::RawRepresentable);
-  if (!proto)
-    return nullptr;
-
-  if (type->hasTypeVariable())
-    return nullptr;
-
-  ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(type, proto, dc,
-                             ConformanceCheckFlags::InExpression, &conformance))
-    return nullptr;
-
-  return tc.getWitnessType(type, proto, conformance, tc.Context.Id_RawValue,
-                           diag::broken_raw_representable_requirement);
-}
-
 /// Retrieve the argument labels that are provided for a member
 /// reference at the given locator.
 static Optional<ArrayRef<Identifier>> 
@@ -3168,7 +3119,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                         baseTy, constraint.getLocator(),
                         /*includeInaccessibleMembers*/false);
   
-  DeclName name = constraint.getMember();
   Type memberTy = constraint.getSecondType();
 
   switch (result.OverallResult) {
@@ -3222,62 +3172,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     instanceTy = MTT->getInstanceType();
   
   // Value member lookup has some hacks too.
-  Type rawValueType;
-  if (shouldAttemptFixes() && name == TC.Context.Id_fromRaw &&
-      (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
-    // Replace a reference to ".fromRaw" with a reference to init(rawValue:).
-    // FIXME: This is temporary.
-    
-    // Record this fix.
-    if (recordFix(FixKind::FromRawToInit, constraint.getLocator()))
-      return SolutionKind::Error;
-      
-    // Form the type that "fromRaw" would have had and bind the
-    // member type to it.
-    Type fromRawType = FunctionType::get(ParenType::get(TC.Context,
-                                                        rawValueType),
-                                         OptionalType::get(instanceTy));
-    addConstraint(ConstraintKind::Bind, memberTy, fromRawType,
-                  constraint.getLocator());
-    
-    return SolutionKind::Solved;
-  }
-  
-  if (shouldAttemptFixes() && name == TC.Context.Id_toRaw &&
-      (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
-    // Replace a call to "toRaw" with a reference to rawValue.
-    // FIXME: This is temporary.
-    
-    // Record this fix.
-    if (recordFix(FixKind::ToRawToRawValue, constraint.getLocator()))
-      return SolutionKind::Error;
-    
-    // Form the type that "toRaw" would have had and bind the member
-    // type to it.
-    Type toRawType = FunctionType::get(TupleType::getEmpty(TC.Context),
-                                       rawValueType);
-    addConstraint(ConstraintKind::Bind, memberTy, toRawType,
-                  constraint.getLocator());
-    
-    return SolutionKind::Solved;
-  }
-  
-  if (shouldAttemptFixes() && name.isSimpleName(getASTContext().Id_allZeros) &&
-      (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
-    // Replace a reference to "X.allZeros" with a reference to X().
-    // FIXME: This is temporary.
-    
-    // Record this fix.
-    if (recordFix(FixKind::AllZerosToInit, constraint.getLocator()))
-      return SolutionKind::Error;
-    
-    // Form the type that "allZeros" would have had and bind the
-    // member type to it.
-    addConstraint(ConstraintKind::Bind, memberTy, rawValueType,
-                  constraint.getLocator());
-    return SolutionKind::Solved;
-  }
-  
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
     
@@ -3531,20 +3425,6 @@ retry:
     type2 = objectType2;
     desugar2 = type2->getDesugaredType();
     goto retry;
-  }
-
-  // If this is a '()' call, drop the call.
-  if (func1->getInput()->isEqual(TupleType::getEmpty(getASTContext()))) {
-    // We don't bother with a 'None' case, because at this point we won't get
-    // a better diagnostic from that case.
-    if (recordFix(FixKind::RemoveNullaryCall, getConstraintLocator(locator)))
-      return SolutionKind::Error;
-
-    return matchTypes(func1->getResult(), type2,
-                      TypeMatchKind::BindType,
-                      flags | TMF_ApplyingFix | TMF_GenerateConstraints,
-                      locator.withPathElement(
-                        ConstraintLocator::FunctionResult));
   }
 
   return SolutionKind::Error;
@@ -4280,23 +4160,17 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyFixConstraint(Fix fix,
-                                        Type type1, Type type2,
-                                        TypeMatchKind matchKind,
-                                        unsigned flags,
+ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
+                                        TypeMatchKind matchKind, unsigned flags,
                                         ConstraintLocatorBuilder locator) {
-  if (recordFix(fix, locator)) {
+  if (recordFix(fix, locator))
     return SolutionKind::Error;
-  }
 
   // Try with the fix.
   unsigned subFlags = flags | TMF_ApplyingFix | TMF_GenerateConstraints;
   switch (fix.getKind()) {
   case FixKind::None:
     return matchTypes(type1, type2, matchKind, subFlags, locator);
-
-  case FixKind::RemoveNullaryCall:
-    llvm_unreachable("Always applied directly");
 
   case FixKind::ForceOptional:
     // Assume that '!' was applied to the first type.
@@ -4313,32 +4187,11 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
     return matchTypes(InOutType::get(type1->getRValueType()), type2,
                       matchKind, subFlags, locator);
 
-  case FixKind::TupleToScalar:
-    return matchTypes(type1->castTo<TupleType>()->getElementType(0),
-                      type2, matchKind, subFlags, 
-                      locator.withPathElement(
-                        LocatorPathElt::getTupleElement(0)));
-
-  case FixKind::ScalarToTuple: {
-    auto tuple2 = type2->castTo<TupleType>();
-    int scalarFieldIdx = tuple2->getElementForScalarInit();
-    assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
-    const auto &elt = tuple2->getElement(scalarFieldIdx);
-    auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
-    return matchTypes(type1, scalarFieldTy, matchKind, subFlags,
-                      locator.withPathElement(
-                        ConstraintLocator::ScalarToTuple));
-  }
-
-  case FixKind::RelabelCallTuple:
   case FixKind::OptionalToBoolean:
     // The actual semantics are handled elsewhere.
     return SolutionKind::Solved;
 
-  case FixKind::FromRawToInit:
-  case FixKind::ToRawToRawValue:
   case FixKind::CoerceToCheckedCast:
-  case FixKind::AllZerosToInit:
     llvm_unreachable("handled elsewhere");
   }
 }

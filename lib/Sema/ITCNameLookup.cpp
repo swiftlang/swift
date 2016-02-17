@@ -51,7 +51,7 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
   case DeclContextKind::ExtensionDecl: {
     auto ext = cast<ExtensionDecl>(dc);
     // FIXME: bind the extension. We currently assume this is done.
-    nominal = ext->isNominalTypeOrNominalTypeExtensionContext();
+    nominal = ext->getAsNominalTypeOrNominalTypeExtensionContext();
     if (!nominal) return true;
     break;
   }
@@ -88,7 +88,7 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
 void IterativeTypeChecker::processQualifiedLookupInDeclContext(
        TypeCheckRequest::DeclContextLookupPayloadType payload,
        UnsatisfiedDependency unsatisfiedDependency) {
-  auto nominal = payload.DC->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = payload.DC->getAsNominalTypeOrNominalTypeExtensionContext();
   assert(nominal && "Only nominal types are handled here");
 
   // For classes, we need the superclass (if any) to support qualified lookup.

@@ -240,30 +240,9 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
-
-  /// Remove a no-argument call to something that is not a function.
-  RemoveNullaryCall,
-
-  /// Relabel a tuple due to a tuple-to-scalar conversion.
-  TupleToScalar,
-
-  /// Relabel a tuple due to a scalar-to-tuple conversion.
-  ScalarToTuple,
-
-  /// Relabel a tuple due to a call
-  RelabelCallTuple,
   
   /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
   OptionalToBoolean,
-
-  /// Replace a use of 'fromRaw' with an initializer requirement.
-  FromRawToInit,
-
-  /// Replace a call of 'toRaw' with a reference to 'rawValue'.
-  ToRawToRawValue,
-
-  /// Replace a call of 'X.allZeros' with a reference to 'X()'.
-  AllZerosToInit,
   
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
@@ -284,32 +263,14 @@ public:
   Fix() : Kind(FixKind::None), Data(0) { }
   
   Fix(FixKind kind) : Kind(kind), Data(0) { 
-    assert(!isRelabelTuple() && "Use getRelabelTuple()");
     assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
   }
-
-  /// Produce a new fix that relabels a tuple.
-  static Fix getRelabelTuple(ConstraintSystem &cs, FixKind kind,
-                             ArrayRef<Identifier> names);
 
   /// Produce a new fix that performs a forced downcast to the given type.
   static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
 
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }
-
-  /// Whether the fix is a tuple-relabelling fix.
-  bool isRelabelTuple() const { return isRelabelTupleKind(getKind()); }
-
-  /// Whether the fix kind is a tuple-relabelling fix.
-  static bool isRelabelTupleKind(FixKind kind) { 
-    return kind == FixKind::TupleToScalar ||
-           kind == FixKind::ScalarToTuple ||
-           kind == FixKind::RelabelCallTuple;
-  }
-
-  /// For a relabel-tuple fix, retrieve the new names.
-  ArrayRef<Identifier> getRelabelTupleNames(ConstraintSystem &cs) const;
 
   /// If this fix has a type argument, retrieve it.
   Type getTypeArgument(ConstraintSystem &cs) const;

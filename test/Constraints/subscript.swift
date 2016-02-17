@@ -86,4 +86,12 @@ func r23670252(dictionary: [String : AnyObject], someObject: AnyObject) {
 }
 
 
+// SR-718 - Type mismatch reported as extraneous parameter
+struct SR718 {
+  subscript(b : Int) -> Int
+    { return 0 }
+  subscript(a a : UInt) -> Int { return 0 }
+}
+
+SR718()[a: Int()] // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
 

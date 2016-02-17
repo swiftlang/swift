@@ -142,7 +142,7 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
 public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   // FIXME: should really be a CollectionType, as it is multipass
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> StrideToIterator<Element> {
@@ -168,7 +168,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 }
 
 extension Strideable {
-  /// Return the sequence of values (`self`, `self + stride`, `self +
+  /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
   @warn_unused_result
@@ -207,7 +207,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
 public struct StrideThrough<Element : Strideable> : Sequence, CustomReflectable {
   // FIXME: should really be a CollectionType, as it is multipass
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> StrideThroughIterator<Element> {
@@ -232,7 +232,7 @@ public struct StrideThrough<Element : Strideable> : Sequence, CustomReflectable 
 }
 
 extension Strideable {
-  /// Return the sequence of values (`self`, `self + stride`, `self +
+  /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression less than or equal to `end`.
   ///

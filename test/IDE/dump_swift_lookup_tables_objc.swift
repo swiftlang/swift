@@ -64,9 +64,7 @@
 // CHECK-NEXT:   instanceMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:Y:Z:]
 // CHECK-NEXT:   method:
-// CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:]
-// CHECK-NEXT:   methodWith:
-// CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:], -[NSErrorImports methodWithFloat:error:]
 // CHECK-NEXT:   objectAtIndexedSubscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 // CHECK-NEXT:   optSetter:
@@ -92,5 +90,5 @@
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT:     -[NSObject respondsToSelector:]
 
 // CHECK-OMIT-NEEDLESS-WORDS: Base name -> entry mappings:
-// CHECK-OMIT-NEEDLESS-WORDS:   methodWith:
-// CHECK-OMIT-NEEDLESS-WORDS:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
+// CHECK-OMIT-NEEDLESS-WORDS:   method:
+// CHECK-OMIT-NEEDLESS-WORDS:     NSErrorImports: {{.*}}-[NSErrorImports methodWithFloat:error:]

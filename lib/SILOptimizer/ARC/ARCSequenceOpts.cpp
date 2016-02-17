@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "GlobalARCPairingAnalysis.h"
+#include "ARCSequenceOpts.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -78,15 +78,13 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   return B.createReleaseValue(Loc, Ptr);
 }
 
-//===----------------------------------------------------------------------===//
-//                             Mutating Callback
-//===----------------------------------------------------------------------===//
-
 // This routine takes in the ARCMatchingSet \p MatchSet and inserts new
 // increments, decrements at the insertion points and adds the old increment,
 // decrements to the delete list. Sets changed to true if anything was moved or
 // deleted.
-void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
+void ARCPairingContext::optimizeMatchingSet(
+    ARCMatchingSet &MatchSet, llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+    llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
 
   // Insert the new increments.
@@ -97,9 +95,9 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
       continue;
     }
 
-    Changed = true;
+    MadeChange = true;
     SILInstruction *NewIncrement = createIncrement(MatchSet.Ptr, InsertPt);
-    (void)NewIncrement;
+    NewInsts.push_back(NewIncrement);
     DEBUG(llvm::dbgs() << "    Inserting new increment: " << *NewIncrement
                        << "        At insertion point: " << *InsertPt);
     ++NumRefCountOpsMoved;
@@ -113,9 +111,9 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
       continue;
     }
 
-    Changed = true;
+    MadeChange = true;
     SILInstruction *NewDecrement = createDecrement(MatchSet.Ptr, InsertPt);
-    (void)NewDecrement;
+    NewInsts.push_back(NewDecrement);
     DEBUG(llvm::dbgs() << "    Inserting new NewDecrement: " << *NewDecrement
                        << "        At insertion point: " << *InsertPt);
     ++NumRefCountOpsMoved;
@@ -123,19 +121,133 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
 
   // Add the old increments to the delete list.
   for (SILInstruction *Increment : MatchSet.Increments) {
-    Changed = true;
+    MadeChange = true;
     DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
-    InstructionsToDelete.push_back(Increment);
+    DeadInsts.push_back(Increment);
     ++NumRefCountOpsRemoved;
   }
 
   // Add the old decrements to the delete list.
   for (SILInstruction *Decrement : MatchSet.Decrements) {
-    Changed = true;
+    MadeChange = true;
     DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
-    InstructionsToDelete.push_back(Decrement);
+    DeadInsts.push_back(Decrement);
     ++NumRefCountOpsRemoved;
   }
+}
+
+bool ARCPairingContext::performMatching(
+    llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+    llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
+  bool MatchedPair = false;
+
+  DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
+                     << " ****\n");
+
+  /// For each increment that we matched to a decrement, try to match it to a
+  /// decrement -> increment pair.
+  for (auto Pair : IncToDecStateMap) {
+    if (!Pair.hasValue())
+      continue;
+
+    SILInstruction *Increment = Pair->first;
+    if (!Increment)
+      continue; // blotted
+
+    DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
+    ARCMatchingSetBuilder Builder(DecToIncStateMap, IncToDecStateMap, RCIA);
+    Builder.init(Increment);
+    if (Builder.matchUpIncDecSetsForPtr()) {
+      MatchedPair |= Builder.matchedPair();
+      auto &Set = Builder.getResult();
+      for (auto *I : Set.Increments)
+        IncToDecStateMap.blot(I);
+      for (auto *I : Set.Decrements)
+        DecToIncStateMap.blot(I);
+
+      // Add the Set to the callback. *NOTE* No instruction destruction can
+      // happen here since we may remove instructions that are insertion points
+      // for other instructions.
+      optimizeMatchingSet(Set, NewInsts, DeadInsts);
+    }
+  }
+
+  return MatchedPair;
+}
+
+//===----------------------------------------------------------------------===//
+//                                  Loop ARC
+//===----------------------------------------------------------------------===//
+
+void LoopARCPairingContext::runOnLoop(SILLoop *L) {
+  auto *Region = LRFI->getRegion(L);
+  if (processRegion(Region, false, false)) {
+    // We do not recompute for now since we only look at the top function level
+    // for post dominating releases.
+    processRegion(Region, true, false);
+  }
+
+  // Now that we have finished processing the loop, summarize the loop.
+  Evaluator.summarizeLoop(Region);
+}
+
+void LoopARCPairingContext::runOnFunction(SILFunction *F) {
+  if (processRegion(LRFI->getTopLevelRegion(), false, false)) {
+    // We recompute the final post dom release since we may have moved the final
+    // post dominated releases.
+    processRegion(LRFI->getTopLevelRegion(), true, true);
+  }
+}
+
+bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
+                                          bool FreezePostDomReleases,
+                                          bool RecomputePostDomReleases) {
+  llvm::SmallVector<SILInstruction *, 8> NewInsts;
+  llvm::SmallVector<SILInstruction *, 8> DeadInsts;
+
+  // We have already summarized all subloops of this loop. Now summarize our
+  // blocks so that we only visit interesting instructions.
+  Evaluator.summarizeSubregionBlocks(Region);
+
+  bool MadeChange = false;
+  bool NestingDetected = false;
+  bool MatchedPair = false;
+
+  do {
+    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
+                                          RecomputePostDomReleases);
+    MatchedPair = Context.performMatching(NewInsts, DeadInsts);
+
+    if (!NewInsts.empty()) {
+      DEBUG(llvm::dbgs() << "Adding new interesting insts!\n");
+      do {
+        auto *I = NewInsts.pop_back_val();
+        DEBUG(llvm::dbgs() << "    " << *I);
+        Evaluator.addInterestingInst(I);
+      } while (!NewInsts.empty());
+    }
+
+    if (!DeadInsts.empty()) {
+      DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
+      do {
+        SILInstruction *I = DeadInsts.pop_back_val();
+        DEBUG(llvm::dbgs() << "    " << *I);
+        Evaluator.removeInterestingInst(I);
+        I->eraseFromParent();
+      } while (!DeadInsts.empty());
+    }
+
+    MadeChange |= MatchedPair;
+    Evaluator.clearLoopState(Region);
+    Context.DecToIncStateMap.clear();
+    Context.IncToDecStateMap.clear();
+
+    // This ensures we only ever recompute post dominating releases on the first
+    // iteration.
+    RecomputePostDomReleases = false;
+  } while (NestingDetected && MatchedPair);
+
+  return MadeChange;
 }
 
 //===----------------------------------------------------------------------===//
@@ -158,7 +270,6 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
 
   bool Changed = false;
   BlockARCPairingContext Context(F, AA, POTA, RCIA, PTFI);
-  CodeMotionOrDeleteCallback Callback;
   // Until we do not remove any instructions or have nested increments,
   // decrements...
   while (true) {
@@ -168,9 +279,9 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
     // We need to blot pointers we remove after processing an individual pointer
     // so we don't process pairs after we have paired them up. Thus we pass in a
     // lambda that performs the work for us.
-    bool ShouldRunAgain = Context.run(FreezePostDomReleases, Callback);
+    bool ShouldRunAgain = Context.run(FreezePostDomReleases);
 
-    Changed |= Callback.madeChange();
+    Changed |= Context.madeChange();
 
     // If we did not remove any instructions or have any nested increments, do
     // not perform another iteration.

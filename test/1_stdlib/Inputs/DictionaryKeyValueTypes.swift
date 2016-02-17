@@ -26,18 +26,18 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
 
 func isNativeNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.range(of: "_NativeDictionaryStorageOwner").length > 0
+  return className.rangeOf("_NativeDictionaryStorageOwner").length > 0
 }
 
 func isCocoaNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.range(of: "NSDictionary").length > 0 ||
-    className.range(of: "NSCFDictionary").length > 0
+  return className.rangeOf("NSDictionary").length > 0 ||
+    className.rangeOf("NSCFDictionary").length > 0
 }
 
 func isNativeNSArray(d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.range(of: "_SwiftDeferredNSArray").length > 0
+  return className.rangeOf("_SwiftDeferredNSArray").length > 0
 }
 
 // Compare two arrays as sets.
@@ -213,8 +213,8 @@ class TestObjCKeyTy : NSObject, NSCopying {
     serial = -serial
   }
 
-  @objc
-  func copy(withZone zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  func copy(with zone: NSZone) -> AnyObject {
     return TestObjCKeyTy(value)
   }
 
@@ -679,7 +679,7 @@ func slurpFastEnumerationFromSwift(
     }
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
-      let value: AnyObject = d.object(forKey: key)!
+      let value: AnyObject = d.object(for: key)!
       let kv = (key, value)
       sink(kv)
       itemsReturned += 1
@@ -716,7 +716,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
   slurpFastEnumerationFromSwift(
     d, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(forKey: key)!
+    let value: AnyObject = d.object(for: key)!
     let kv = (key, value)
     sink(kv)
   }

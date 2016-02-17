@@ -102,7 +102,7 @@ class Base {
 }
 
 class D1 : Base {
-    required  init() {}
+    required init() {}
     override func map() {
         v = 2
     }

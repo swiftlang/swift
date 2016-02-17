@@ -94,7 +94,7 @@ namespace irgen {
   /// witness method.
   inline unsigned getTrailingWitnessSignatureLength(IRGenModule &IGM,
                                                     CanSILFunctionType type) {
-    return 1;
+    return 2;
   }
 
   /// Add the trailing arguments necessary for calling a witness method.
@@ -104,6 +104,7 @@ namespace irgen {
 
   struct WitnessMetadata {
     llvm::Value *SelfMetadata = nullptr;
+    llvm::Value *SelfWitnessTable = nullptr;
   };
 
   /// Collect any required metadata for a witness method from the end
@@ -125,11 +126,6 @@ namespace irgen {
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
   
-  /// Add the trailing arguments necessary for calling a witness method.
-  void emitTrailingWitnessArguments(IRGenFunction &IGF,
-                                    WitnessMetadata &witnessMetadata,
-                                    Explosion &args);
-
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,

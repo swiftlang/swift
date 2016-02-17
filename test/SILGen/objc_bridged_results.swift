@@ -120,6 +120,6 @@ func testNonnullSubscript(obj: Test) -> [AnyObject] {
 func testPerformSelector(obj: NSObject) {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $NSObject, #NSObject.perform!1.foreign
   // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, %0)
-  _ = obj.perform("foo", withObject: nil)
+  _ = obj.perform("foo", with: nil)
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
 } // CHECK: {{^}$}}

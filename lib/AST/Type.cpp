@@ -32,7 +32,6 @@
 #include <functional>
 #include <iterator>
 using namespace swift;
-using llvm::Fixnum;
 
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
@@ -1350,7 +1349,7 @@ unsigned GenericTypeParamType::getDepth() const {
     return param->getDepth();
   }
 
-  auto fixedNum = ParamOrDepthIndex.get<Fixnum<31>>();
+  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
   return fixedNum >> 16;
 }
 
@@ -1359,7 +1358,7 @@ unsigned GenericTypeParamType::getIndex() const {
     return param->getIndex();
   }
 
-  auto fixedNum = ParamOrDepthIndex.get<Fixnum<31>>();
+  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
   return fixedNum & 0xFFFF;
 }
 
@@ -1373,7 +1372,7 @@ Identifier GenericTypeParamType::getName() const {
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
-  unsigned depthIndex = ParamOrDepthIndex.get<Fixnum<31>>();
+  unsigned depthIndex = ParamOrDepthIndex.get<DepthIndexTy>();
   auto cached = names.find(depthIndex);
   if (cached != names.end())
     return cached->second;
@@ -2240,15 +2239,22 @@ static Type getMemberForBaseType(Module *module,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (!archetypeParent->hasNestedType(name)) {
-      const auto parent = archetypeParent->getParent();
-      if (!parent)
-        return ErrorType::get(module->getASTContext());
-      if (parent->isSelfDerived())
-        return parent->getNestedTypeValue(name);
+    if (archetypeParent->hasNestedType(name))
+      return archetypeParent->getNestedTypeValue(name);
+
+    if (auto parent = archetypeParent->getParent()) {
+      // If the archetype doesn't have the requested type and the parent is not
+      // self derived, error out
+      return parent->isSelfDerived() ? parent->getNestedTypeValue(name)
+                                     : ErrorType::get(module->getASTContext());
     }
-    
-    return archetypeParent->getNestedTypeValue(name);
+
+    // If looking for an associated type and the archetype is constrained to a
+    // class, continue to the default associated type lookup
+    if (!assocType || !archetypeParent->getSuperclass()) {
+      // else just error out
+      return ErrorType::get(module->getASTContext());
+    }
   }
 
   // If the parent is a type variable, retrieve its member type
@@ -2412,7 +2418,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
 
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
-  if (dc->isProtocolOrProtocolExtensionContext()) {
+  if (dc->getAsProtocolOrProtocolExtensionContext()) {
     // We only substitute into archetypes for now for protocols.
     // FIXME: This seems like an odd restriction. Whatever is depending on
     // this, shouldn't.
@@ -2432,7 +2438,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
-  auto ownerNominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+  auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   while (!baseTy->is<ErrorType>() &&
          baseTy->getAnyNominal() &&
          baseTy->getAnyNominal() != ownerNominal) {

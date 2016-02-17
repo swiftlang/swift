@@ -333,7 +333,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // setter mutating if we're inside a protocol, because it seems some
   // things break otherwise -- the root cause should be fixed eventually.
   materializeForSet->setMutating(
-      setter->getDeclContext()->isProtocolOrProtocolExtensionContext() ||
+      setter->getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
       (!setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
        !storage->isSetterNonMutating()));
 
@@ -634,7 +634,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                          Ctx.getIdentifier("copy"),
                                          DeclNameLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
-  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_withZone },
+  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_with },
                           { SourceLoc() }, SourceLoc(), false, true);
 
   //- (id)copyWithZone:(NSZone *)zone;
@@ -703,7 +703,7 @@ static void maybeMarkTransparent(FuncDecl *accessor,
                                  AbstractStorageDecl *storage,
                                  TypeChecker &TC) {
   auto *nominal = storage->getDeclContext()
-      ->isNominalTypeOrNominalTypeExtensionContext();
+      ->getAsNominalTypeOrNominalTypeExtensionContext();
   if (nominal && nominal->hasFixedLayout())
     accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
@@ -847,7 +847,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
   // cases, we need to expose a materializeForSet.
   //
   // Global stored properties don't get a materializeForSet.
-  if (setter && DC->isNominalTypeOrNominalTypeExtensionContext()) {
+  if (setter && DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);
     synthesizeMaterializeForSet(materializeForSet, storage, TC);
     TC.typeCheckDecl(materializeForSet, false);
@@ -981,7 +981,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
 
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!willSet->isFinal() &&
-        VD->getDeclContext()->isClassOrClassExtensionContext())
+        VD->getDeclContext()->getAsClassOrClassExtensionContext())
       makeFinal(Ctx, willSet);
   }
   
@@ -1008,7 +1008,7 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
 
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!didSet->isFinal() &&
-        VD->getDeclContext()->isClassOrClassExtensionContext())
+        VD->getDeclContext()->getAsClassOrClassExtensionContext())
       makeFinal(Ctx, didSet);
   }
 
@@ -1233,7 +1233,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   // prevents it from being dynamically dispatched.  Note that we do this after
   // the accessors are set up, because we don't want the setter for the lazy
   // property to inherit these properties from the storage.
-  if (VD->getDeclContext()->isClassOrClassExtensionContext())
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
   Storage->setAccessibility(Accessibility::Private);
@@ -1265,13 +1265,13 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
 
   // We only need materializeForSet in polymorphic contexts:
   NominalTypeDecl *container = storage->getDeclContext()
-      ->isNominalTypeOrNominalTypeExtensionContext();
+      ->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!container) return;
 
   //   - in non-ObjC protocols, but not protocol extensions.
   if (auto protocol = dyn_cast<ProtocolDecl>(container)) {
     if (protocol->isObjC()) return;
-    if (storage->getDeclContext()->isProtocolExtensionContext()) return;
+    if (storage->getDeclContext()->getAsProtocolExtensionContext()) return;
 
   //   - in classes when the storage decl is not final and does
   //     not override a decl that requires a materializeForSet
@@ -1315,7 +1315,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
-    if (!var->getDeclContext()->isClassOrClassExtensionContext())
+    if (!var->getDeclContext()->getAsClassOrClassExtensionContext())
       getter->setMutating();
     getter->setAccessibility(var->getFormalAccess());
 
@@ -1337,7 +1337,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->isImplicit())
     return;
 
-  auto nominal = var->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = var->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominal) {
     // Fixed-layout global variables don't get accessors.
     if (var->hasFixedLayout())

@@ -36,13 +36,14 @@ import sys
 assert sys.argv[1] == '-frontend'
 
 if '-primary-file' in sys.argv:
-  primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
-  depsFile = sys.argv[sys.argv.index('-emit-reference-dependencies-path') + 1]
+    primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
+    depsFile = sys.argv[sys.argv.index(
+        '-emit-reference-dependencies-path') + 1]
 
-  # Replace the dependencies file with the input file.
-  shutil.copyfile(primaryFile, depsFile)
+    # Replace the dependencies file with the input file.
+    shutil.copyfile(primaryFile, depsFile)
 else:
-  primaryFile = None
+    primaryFile = None
 
 outputFile = sys.argv[sys.argv.index('-o') + 1]
 
@@ -52,6 +53,6 @@ with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
 if primaryFile:
-  print("Handled", os.path.basename(primaryFile))
+    print("Handled", os.path.basename(primaryFile))
 else:
-  print("Produced", os.path.basename(outputFile))
+    print("Produced", os.path.basename(outputFile))

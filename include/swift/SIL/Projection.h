@@ -24,6 +24,8 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -34,6 +36,7 @@ namespace swift {
 
 class SILBuilder;
 class ProjectionPath;
+using ProjectionPathSet = llvm::DenseSet<ProjectionPath>;
 using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
 
 enum class SubSeqRelation_t : uint8_t {
@@ -566,6 +569,11 @@ public:
                                                 SILModule *Mod,
                                                 ProjectionPathList &P);
 
+  /// Return true if the given projection paths in \p CPaths does not cover
+  /// all the fields with non-trivial semantics, false otherwise.
+  static bool hasUncoveredNonTrivials(SILType B, SILModule *Mod,
+                                      ProjectionPathSet &CPaths);
+
   /// Returns true if the two paths have a non-empty symmetric
   /// difference.
   ///
@@ -801,7 +809,7 @@ class ProjectionTree {
 
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
-  llvm::SmallVector<unsigned, 3> LeafIndices;
+  llvm::SmallVector<unsigned, 3> LiveLeafIndices;
 
   using LeafValueMapTy = llvm::DenseMap<unsigned, SILValue>;
 
@@ -881,7 +889,7 @@ public:
   }
 
   void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
-    for (unsigned LeafIndex : LeafIndices) {
+    for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
       OutArray.push_back(Node->getType());
@@ -890,7 +898,7 @@ public:
 
   /// Return the number of live leafs in the projection.
   size_t liveLeafCount() const {
-    return LeafIndices.size();
+    return LiveLeafIndices.size();
   }
 
   void createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
@@ -899,7 +907,7 @@ public:
   void
   replaceValueUsesWithLeafUses(SILBuilder &B, SILLocation Loc,
                                llvm::SmallVectorImpl<SILValue> &Leafs);
-
+ 
 private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&
@@ -942,5 +950,26 @@ private:
 };
 
 } // end swift namespace
+
+namespace llvm {
+using swift::ProjectionPath;
+/// Allow ProjectionPath to be used in DenseMap.
+template <> struct DenseMapInfo<ProjectionPath> {
+  static inline ProjectionPath getEmptyKey() {
+    return ProjectionPath(DenseMapInfo<swift::SILType>::getEmptyKey(),
+                          DenseMapInfo<swift::SILType>::getEmptyKey());
+  }
+  static inline ProjectionPath getTombstoneKey() {
+    return ProjectionPath(DenseMapInfo<swift::SILType>::getTombstoneKey(),
+                          DenseMapInfo<swift::SILType>::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(const ProjectionPath &Val) {
+    return hash_value(Val);
+  }
+  static bool isEqual(const ProjectionPath &LHS, const ProjectionPath &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif

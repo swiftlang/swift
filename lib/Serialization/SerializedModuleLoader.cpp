@@ -81,8 +81,9 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
   // FIXME: Which name should we be using here? Do we care about CPU subtypes?
   // FIXME: At the very least, don't hardcode "arch".
-  llvm::SmallString<16> archFile(ctx.LangOpts.getTargetConfigOption("arch"));
-  llvm::SmallString<16> archDocFile(ctx.LangOpts.getTargetConfigOption("arch"));
+  llvm::SmallString<16> archFile{
+      ctx.LangOpts.getPlatformConditionValue("arch")};
+  llvm::SmallString<16> archDocFile{archFile};
   if (!archFile.empty()) {
     archFile += '.';
     archFile += SERIALIZED_MODULE_EXTENSION;
@@ -492,11 +493,6 @@ SerializedASTFile::getCommentForDecl(const Decl *D) const {
 Optional<StringRef>
 SerializedASTFile::getGroupNameForDecl(const Decl *D) const {
   return File.getGroupNameForDecl(D);
-}
-
-Optional<unsigned>
-SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
-  return File.getSourceOrderForDecl(D);
 }
 
 void

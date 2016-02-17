@@ -73,7 +73,7 @@ func testBlockFinal() throws {
 
 func testNonBlockFinal() throws {
   ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
-  ErrorProne.runWithAnError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
+  ErrorProne.run(count: 0) // expected-error {{missing argument for parameter 'anError' in call}}
 }
 
 class VeryErrorProne : ErrorProne {

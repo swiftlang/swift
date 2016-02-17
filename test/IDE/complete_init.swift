@@ -52,7 +52,7 @@ protocol I : G {
 
 typealias J = A
 
-struct  K {
+struct K {
   typealias X = A
   struct Y {}
 }

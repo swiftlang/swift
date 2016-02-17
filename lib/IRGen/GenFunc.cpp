@@ -85,11 +85,13 @@
 #include "clang/AST/RecordLayout.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/CallSite.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -1725,6 +1727,36 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
+
+  // Calls to the int_instrprof_increment intrinsic are emitted during SILGen.
+  // At that stage, the function name GV used by the profiling pass is hidden.
+  // Fix the intrinsic call here by pointing it to the correct GV.
+  if (IID == llvm::Intrinsic::instrprof_increment) {
+    // Extract the function name.
+    auto *NameGEP = cast<llvm::User>(args.claimNext());
+    auto *NameGV = cast<llvm::GlobalVariable>(NameGEP->getOperand(0));
+    auto *NameC = NameGV->getInitializer();
+    StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
+
+    // Find the existing function name pointer.
+    std::string NameValue = llvm::getInstrProfNameVarPrefix();
+    NameValue += Name;
+    StringRef ProfName = StringRef(NameValue).rtrim(StringRef("\0", 1));
+    auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(ProfName);
+    assert(FuncNamePtr && "No function name pointer for counter update");
+
+    // Create a GEP into the function name.
+    llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
+    auto *FuncName = llvm::GetElementPtrInst::CreateInBounds(
+        FuncNamePtr, makeArrayRef(Indices), "", IGF.Builder.GetInsertBlock());
+
+    // Replace the placeholder value with the new GEP.
+    Explosion replacement;
+    replacement.add(FuncName);
+    replacement.add(args.claimAll());
+    args = std::move(replacement);
+  }
+
   if (IID != llvm::Intrinsic::not_intrinsic) {
     SmallVector<llvm::Type*, 4> ArgTys;
     for (auto T : IInfo.Types)
@@ -2967,10 +2999,13 @@ void CallEmission::setArgs(Explosion &arg,
   }
 
   case SILFunctionTypeRepresentation::WitnessMethod:
-    // This is basically duplicating emitTrailingWitnessArguments.
     assert(witnessMetadata);
-    assert(witnessMetadata->SelfMetadata);
-    Args.back() = witnessMetadata->SelfMetadata;
+    assert(witnessMetadata->SelfMetadata->getType() ==
+           IGF.IGM.TypeMetadataPtrTy);
+    assert(witnessMetadata->SelfWitnessTable->getType() ==
+           IGF.IGM.WitnessTablePtrTy);
+    Args.rbegin()[1] = witnessMetadata->SelfMetadata;
+    Args.rbegin()[0] = witnessMetadata->SelfWitnessTable;
     SWIFT_FALLTHROUGH;
 
   case SILFunctionTypeRepresentation::Method:
@@ -3632,12 +3667,24 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   polyArgs.transferInto(args, polyArgs.size());
 
+  // If we have a witness method call, the inner context is the
+  // witness table. Metadata for Self is derived inside the partial
+  // application thunk and doesn't need to be stored in the outer
+  // context.
+  if (origType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    assert(fnContext->getType() == IGM.Int8PtrTy);
+    llvm::Value *wtable = subIGF.Builder.CreateBitCast(
+        fnContext, IGM.WitnessTablePtrTy);
+    assert(wtable->getType() == IGM.WitnessTablePtrTy);
+    witnessMetadata.SelfWitnessTable = wtable;
+
   // Okay, this is where the callee context goes.
-  if (fnContext) {
+  } else if (fnContext) {
     // TODO: swift_context marker.
     args.add(fnContext);
 
-  // Pass a placeholder if necessary.
+  // Pass a placeholder for thin function calls.
   } else if (origType->hasErrorResult()) {
     args.add(llvm::UndefValue::get(IGM.RefCountedPtrTy));
   }
@@ -3653,7 +3700,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   if (origType->getRepresentation() ==
       SILFunctionTypeRepresentation::WitnessMethod) {
+    assert(witnessMetadata.SelfMetadata->getType() == IGM.TypeMetadataPtrTy);
     args.add(witnessMetadata.SelfMetadata);
+    assert(witnessMetadata.SelfWitnessTable->getType() == IGM.WitnessTablePtrTy);
+    args.add(witnessMetadata.SelfWitnessTable);
   }
 
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, args.claimAll());
@@ -3820,8 +3870,24 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     hasSingleSwiftRefcountedContext = Thunkable;
   }
   
-  // Include the context pointer, if any, in the function arguments.
-  if (fnContext) {
+  // If the function pointer is a witness method call, include the witness
+  // table in the context.
+  if (origType->getRepresentation() ==
+        SILFunctionTypeRepresentation::WitnessMethod) {
+    llvm::Value *wtable = fnContext;
+    assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
+
+    // TheRawPointerType lowers as i8*, not i8**.
+    args.add(IGF.Builder.CreateBitCast(wtable, IGF.IGM.Int8PtrTy));
+
+    argValTypes.push_back(SILType::getRawPointerType(IGF.IGM.Context));
+    argTypeInfos.push_back(
+         &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
+    argConventions.push_back(ParameterConvention::Direct_Unowned);
+    hasSingleSwiftRefcountedContext = No;
+
+  // Otherwise, we might have a reference-counted context pointer.
+  } else if (fnContext) {
     args.add(fnContext);
     argValTypes.push_back(SILType::getNativeObjectType(IGF.IGM.Context));
     argConventions.push_back(origType->getCalleeConvention());

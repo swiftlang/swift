@@ -56,6 +56,8 @@ public:
 };
 } // anonymous namespace.
 
+static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
+
 static LazySKDUID RequestIndex("source.request.indexsource");
 static LazySKDUID RequestDocInfo("source.request.docinfo");
 static LazySKDUID RequestCodeComplete("source.request.codecomplete");
@@ -289,6 +291,14 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
   sourcekitd_uid_t ReqUID = Req.getUID(KeyRequest);
   if (!ReqUID)
     return Rec(createErrorRequestInvalid("missing 'key.request' with UID value"));
+
+  if (ReqUID == RequestProtocolVersion) {
+    ResponseBuilder RB;
+    auto dict = RB.getDictionary();
+    dict.set(KeyVersionMajor, ProtocolMajorVersion);
+    dict.set(KeyVersionMinor, ProtocolMinorVersion);
+    return Rec(RB.createResponse());
+  }
 
   // Just accept 'source.request.buildsettings.register' for now, don't do
   // anything else.
@@ -1123,6 +1133,8 @@ static void reportCursorInfo(StringRef Filename,
       Elem.set(KeyDocFullAsXML, Info.DocComment);
     if (!Info.AnnotatedDeclaration.empty())
       Elem.set(KeyAnnotatedDecl, Info.AnnotatedDeclaration);
+    if (!Info.FullyAnnotatedDeclaration.empty())
+      Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDeclaration);
     if (!Info.ModuleName.empty())
       Elem.set(KeyModuleName, Info.ModuleName);
     if (!Info.GroupName.empty())

@@ -22,85 +22,174 @@
 // indices, a tree with parent pointers has bidirectional indices, and
 // Array and Deque has random access indices.
 //
-// It turned out that in practice, every one of the non-random-access
-// indices holds a reference to the collection it traverses, or to
-// some part of it, to implement `.successor()` and `.predecessor()`.
-// This introduces extra complexity in implementations and presumably
-// translates into less-efficient code that does reference counting on
-// indices.  Indices referencing collections also conflicts with COW
-// -- a live index makes a collection non-uniquely referenced, causing
-// unnecessary copies (see `Dictionary` and `Set`, that have to use a
-// double-indirection trick to avoid these extra copies).  We should
-// consider other schemes that don't require these tricks.
+// It turned out that in practice, every implementation of the
+// non-random-access indices needs to hold a reference to the
+// collection it traverses, or to some part of it, to implement
+// `.successor()` and `.predecessor()`.  This introduces extra
+// complexity in implementations and presumably translates into
+// less-efficient code that does reference counting on indices.
 //
-// Eliminating all reference-countable members from indices implies that
-// indices need to essentially encode the path to the element within the data
-// structure.  Since one is free to choose the encoding, we think that it
-// should be possible to choose it in such a way that indices are cheaply
-// comparable.
+// Indices keeping references to collections also conflict with COW --
+// a live index makes collection's storage non-uniquely referenced,
+// causing unnecessary copies.  In the standard library, `Dictionary`
+// and `Set` have to use a double-indirection trick to avoid these
+// extra copies in these cases.
 //
-// In this new model, indices don't have any method or property
-// requirements (these APIs were moved to Collection), so index
-// protocols were eliminated.  Instead, we are introducing
-// `CollectionType`, `BidirectionalCollectionType` and
-// `RandomAccessCollectionType`.  These protocols naturally compose
-// with `MutableCollectionType` and `RangeReplaceableCollectionType`:
-//
-//     protocol SequenceType {}
-//     protocol CollectionType : SequenceType {}
-//
-//       protocol MutableCollectionType : CollectionType {}
-//       protocol RangeReplaceableCollectionType : CollectionType {}
-//
-//       protocol BidirectionalCollectionType : CollectionType {}
-//         protocol RandomAccessCollectionType : BidirectionalCollectionType {}
+// This data that we gathered from experience working with the current
+// collection protocols suggests that we should consider other schemes
+// that don't require such double-indirection tricks or other undue
+// performance burdens.
 //
 // Proposed Solution
 // =================
 //
-// Change indices so that they can't be moved forward or backward by
-// themselves (`i.successor()` is not allowed).  Then indices can
-// store the minimal amount of information only about the element
-// position in the collection.  Usually index can be represented as
-// one or a couple of integers that encode the "path" in the
-// data structure from the root to the element.  In this
-// representation, only a collection can move indices (e.g.,
-// `c.next(i)`).
+// We propose to allow implementing collections whose indices don't
+// have reference-countable stored properties.
+//
+// For the API this implies that indices can't be moved forward or
+// backward by themselves (`i.successor()` is not allowed).  Only the
+// corresponding collection instance can move indices (e.g.,
+// `c.next(i)`).  This API change reduces the requirements on the
+// amount of information indices need to store or reference.
+//
+// In this model indices can store the minimal amount of information
+// only about the element position in the collection.  Usually index
+// can be represented as one or a couple of word-sized integers that
+// efficiently encode the "path" in the data structure from the root
+// to the element.  Since one is free to choose the encoding of the
+// "path", we think that it should be possible to choose it in such a
+// way that indices are cheaply comparable.
+//
+// In the proposed model indices don't have any method or property
+// requirements (these APIs were moved to Collection), so index
+// protocols are eliminated.  Instead, we are introducing
+// `BidirectionalCollectionType` and `RandomAccessCollectionType`.
+// These protocols naturally compose with existing
+// `MutableCollectionType` and `RangeReplaceableCollectionType` to
+// describe the collection's capabilities:
+//
+//         protocol SequenceType {}
+//         protocol CollectionType : SequenceType {}
+//
+//           protocol MutableCollectionType : CollectionType {}
+//           protocol RangeReplaceableCollectionType : CollectionType {}
+//
+//     [new]   protocol BidirectionalCollectionType : CollectionType {}
+//     [new]   protocol RandomAccessCollectionType : BidirectionalCollectionType {}
+//
+// Analysis
+// ========
 //
 // Advantages:
-// * indices don't need to keep a reference to the collection.
-//   - indices are simpler to implement.
-//   - indices are not reference-countable, and thus cheaper to
+//
+// * Indices don't need to keep a reference to the collection.
+//   - Indices are simpler to implement.
+//   - Indices are not reference-countable, and thus cheaper to
 //     handle.
-// * the hierarchy of index protocols is removed, and instead we add
+//   - Handling indices does not cause refcounting, and does not block
+//     optimizations.
+//
+// * The hierarchy of index protocols is removed, and instead we add
 //   protocols for forward, bidirectional and random-access
-//   collections.  This is closer to how people generally talk about
-//   collections.  Writing a generic constraint for bidirectional and
-//   random-access collections becomes simpler.
+//   collections.
+//   - This is closer to how people generally talk about collections.
+//   - Writing a generic constraint for bidirectional and
+//     random-access collections becomes simpler.
+//
+// * Indices can conform to `Comparable` without incurring extra
+//   memory overhead.  Indices need to store all the necessary data
+//   anyway.
+//
+// * While this model allows to design indices that are not
+//   reference-countable, it does not prohibit defining indices that
+//   *are* reference countable.
+//   - All existing collection designs are still possible to
+//     implement, but some are less efficient than the new model allows.
+//   - If there is a specialized collection that needs
+//     reference-countable indices for algorithmic or memory
+//     efficiency, where such tradeoff is reasonable, such a
+//     collection is still possible to implement in the new model.
+//     See the discussion of trees below, the tree design (2)(c).
+//
+// Neutral as compared to the current collections:
+// * A value-typed linked list still can't conform to CollectionType.
+//   A reference-typed one can.
 //
 // Disadvantages:
-// * a value-typed linked list can't conform to CollectionType.  A
-//   reference-typed one can.
+// * Advancing an index forward or backward becomes harder -- the
+//   statement now includes two entities (collection and index):
+//
+//     j = c.next(i)    vs.    j = i.successor()
+//
+//   In practice though, we found that when the code is doing such
+//   index manipulations, the collection is typically still around
+//   stored in a variable, so the code does not need to reach out for
+//   it non-trivially.
+//
+// * Collection's API now includes methods for advancing indices.
+//
+// Impact on the source code
+// =========================
+//
+// Code that works with `Array`, its indices (`Int`s), moves indices,
+// does not need to change at all.
+//
+// Code that operates on collections and indices, but does not move
+// indices, does not need to change at all.
+//
+// Iteration over collection's indices with `c.indices` does not
+// change:
+//
+//     for i in c.indices { ... } // No change.
+//
+// API of collection algorithms does not change, even for algorithms
+// that accept indices as parameters or return indices (e.g.,
+// `indexOf()`, `min()`, `sort()`, `prefix()`, `prefixUpTo()` etc.)
+//
+// Code that moves indices (`i.successor()`, `i.predecessor()`,
+// `i.advancedBy()`) needs to change to use a method on the
+// collection.
+//
+//     // Before:
+//     var i = c.indexOf { $0 % 2 == 0 }
+//     i = i.successor()
+//     print(c[i])
+//
+//     // After:
+//     var i = c.indexOf { $0 % 2 == 0 } // No change in algorithm API.
+//     i = c.next(i)                     // Advancing an index requires a collection instance.
+//     print(c[i])                       // No change in subscripting.
+//
 
-// Issues
-// ======
+// Implementation difficulties
+// ===========================
 //
 // 1. Conflicting requirements for `MyRange`:
 //
-// * range bounds need to be comparable and incrementable, in order for
-//   `MyRange` to conform to `MyForwardCollectionType`,
+//    * range bounds need to be comparable and incrementable, in order
+//      for `MyRange` to conform to `MyForwardCollectionType`,
 //
-// * we frequently want to use `MyRange` as a "transport" data type, just
-//   to carry a pair of indices around.  Indices are neither comparable nor
-//   incrementable.
+//    * we frequently want to use `MyRange` as a "transport" data
+//      type, just to carry a pair of indices around.  Indices are
+//      neither comparable nor incrementable.
 //
-// Possible solution: conditional conformance for `MyRange` to
-// `MyForwardCollectionType` when the bounds are comparable and
-// incrementable (when the bounds conform to
-// `MyRandomAccessCollectionType`?).
+//    Possible solution: conditional conformance for `MyRange` to
+//    `MyForwardCollectionType` when the bounds are comparable and
+//    incrementable (when the bounds conform to
+//    `MyRandomAccessCollectionType`?).
 //
 // 2. We can't specify constraints on associated types.  This forces many
 //    trivial algorithms to specify useless constraints.
+//
+//    Solution: constraints on associated types are a desirable
+//    language feature, part of the Swift generics model.  This issue
+//    will be fixed by compiler improvements.
+//
+// 3. To implement `for i in c.indices {}` efficiently, we would need some
+//    support from the optimizer for unowned references.  Either from ARC
+//    optimizer to eliminate unowned retains/releases, or support in alias
+//    analysis and a new pass to promote needless unowned references to use the
+//    original strong reference that is still in scope.
 //
 // Trees
 // =====
@@ -152,18 +241,26 @@
 //    reuse, then the tree nodes can't have parent pointers (a node
 //    can have multiple different parents in different trees).  This
 //    means that it is not possible to advance an index in O(1).  If
-//    we need to go up the tree while advancing the index, we would
-//    need to traverse the tree starting from the root in O(log n).
+//    we need to go up the tree while advancing the index, without
+//    parent pointers we would need to traverse the tree starting from
+//    the root in O(log n).
+//
 //    Thus, index has to essentially store a path through the tree
 //    from the root to the node (it is usually possible to encode this
 //    path in a 64-bit number).  Since the index stores the path,
 //    subscripting on such an index would also cost O(log n).
 //
-//    We should note that even though the operations mentioned cost
-//    O(log n), the base of the logarithm would be typically large
-//    (e.g., 32), and the size of the machine memory is limited.
-//    Thus, we could treat the complexity as effectively constant for
-//    all practical purposes.
+//    We should note that persistent trees typically use B-trees, so
+//    the base of the logarithm would be typically large (e.g., 32).
+//    We also know that the size of the RAM is limited.  Thus, we
+//    could treat the O(log n) complexity as effectively constant for
+//    all practical purposes.  But the constant factor will be much
+//    larger than in other designs.
+//
+//    Swift's collection index model does not change anything as
+//    compared to other languages.  The important point is that the
+//    proposed index model allows such implementations of persistent
+//    collections.
 //
 // 2. Trees with O(1) subscripting and advancing.
 //
@@ -210,6 +307,17 @@
 //        extra data structure would only increase the constant factor
 //        on memory overhead.
 //
+//                                      | (1)      | (2)(a)  | (2)(b)
+// -------------------------------------+----------+---------+-------
+//                          memory-safe | Yes      | Yes     | Yes
+//    indices are not reference-counted | Yes      | Yes     | Yes
+//                         shares nodes | Yes      | No      | No
+//             subscripting on an index | O(log n) | O(1)    | O(1)
+//                   advancing an index | O(log n) | O(1)    | O(1)
+// deleting does not invalidate indices | No       | No      | Yes
+// requires extra O(n) storage just ... |          |         |
+//                    for safety checks | No       | No      | Yes
+//
 // Each of the designs discussed above has its uses, but the intuition
 // is that (2)(a) is the one most commonly needed in practice.  (2)(a)
 // does not have the desired index invalidation properties.  There is
@@ -217,6 +325,17 @@
 // property, and they can be provided as methods on the collection,
 // for example removeAll(in: Range<Index>) and
 // removeAll(_: (Element)->Bool).
+//
+// If we were to allow reference-counted indices (basically, the
+// current collections model), then an additional design is possible
+// -- let's call it (2)(c) for the purpose of discussion.  This design
+// would be like (2)(b), but won't require extra storage that is used
+// only for safety checks.  Instead, every index would pay a RC
+// penalty and carry a strong reference to the tree node.
+//
+// Note that (2)(c) is still technically possible to implement in the
+// new collection index model, it just goes against a goal of having
+// indices free of reference-counted stored properties.
 
 infix operator ...* { associativity none precedence 135 }
 infix operator ..<* { associativity none precedence 135 }

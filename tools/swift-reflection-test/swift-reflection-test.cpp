@@ -20,8 +20,11 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/CommandLine.h"
 
+#include <iostream>
+
 using llvm::dyn_cast;
 using llvm::StringRef;
+using llvm::ArrayRef;
 using namespace llvm::object;
 
 using namespace swift;
@@ -32,7 +35,7 @@ namespace {
 
 enum class ActionType {
   None,
-  DumpReflectionSection,
+  DumpReflectionSections
 };
 
 } // end anonymous namespace
@@ -41,10 +44,9 @@ namespace options {
 static llvm::cl::opt<ActionType>
 Action(llvm::cl::desc("Mode:"),
        llvm::cl::values(
-         clEnumValN(ActionType::DumpReflectionSection,
-                    "dump-reflection-section",
-                    "Dump the reflection binary section after decoding "
-                    "property and case records."),
+         clEnumValN(ActionType::DumpReflectionSections,
+                    "dump-reflection-sections",
+                    "Dump the field reflection section"),
          clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -59,83 +61,87 @@ Architecture("arch", llvm::cl::desc("Architecture to inspect in the binary"),
 
 static void guardError(std::error_code error) {
   if (!error) return;
-  llvm::errs() << "swift-reflection-test error: " << error.message() << "\n";
+  std::cerr << "swift-reflection-test error: " << error.message() << "\n";
   exit(EXIT_FAILURE);
 }
 
 static llvm::object::SectionRef
-getReflectionSectionRef(const ObjectFile *objectFile) {
+getSectionRef(const ObjectFile *objectFile,
+              ArrayRef<StringRef> anySectionNames) {
   for (auto section : objectFile->sections()) {
     StringRef sectionName;
     section.getName(sectionName);
-    if (sectionName.equals("__swift3_reflect") ||
-        sectionName.equals(".swift3_reflect")) {
-      return section;
+    for (auto desiredName : anySectionNames) {
+      if (sectionName.equals(desiredName)) {
+        return section;
+      }
     }
   }
   return llvm::object::SectionRef();
 }
 
 static llvm::object::SectionRef
-getReflectionSectionRef(const Binary *binaryFile, StringRef arch) {
+getSectionRef(const Binary *binaryFile, StringRef arch,
+              ArrayRef<StringRef> anySectionNames) {
   if (auto objectFile = dyn_cast<ObjectFile>(binaryFile))
-    return getReflectionSectionRef(objectFile);
+    return getSectionRef(objectFile, anySectionNames);
   if (auto machoUniversal = dyn_cast<MachOUniversalBinary>(binaryFile)) {
     const auto objectOrError = machoUniversal->getObjectForArch(arch);
     guardError(objectOrError.getError());
-    return getReflectionSectionRef(objectOrError.get().get());
+    return getSectionRef(objectOrError.get().get(), anySectionNames);
   }
   return SectionRef();
 }
 
-static int doDumpReflectionSection(StringRef BinaryFilename, StringRef arch) {
+static int doDumpReflectionSections(std::string BinaryFilename,
+                                    StringRef arch) {
   auto binaryOrError = llvm::object::createBinary(BinaryFilename);
   guardError(binaryOrError.getError());
 
   const auto binary = binaryOrError.get().getBinary();
 
-  auto reflectionSectionRef = getReflectionSectionRef(binary, arch);
+  auto fieldSectionRef = getSectionRef(binary, arch, {
+    "__swift3_fieldmd", ".swift3_fieldmd"
+  });
 
-  if (reflectionSectionRef.getObject() == nullptr) {
-    llvm::errs() << BinaryFilename;
-    llvm::errs() << " doesn't have a swift3_reflect section!\n";
+  if (fieldSectionRef.getObject() == nullptr) {
+    std::cerr << BinaryFilename;
+    std::cerr << " doesn't have a field reflection section!\n";
     return EXIT_FAILURE;
   }
 
-  StringRef sectionContents;
-  reflectionSectionRef.getContents(sectionContents);
+  auto associatedTypeSectionRef = getSectionRef(binary, arch, {
+    "__swift3_assocty", ".swift3_assocty"
+  });
 
-  const ReflectionSection section {
-    BinaryFilename,
-    reinterpret_cast<const void *>(sectionContents.begin()),
-    reinterpret_cast<const void *>(sectionContents.end())
+  if (associatedTypeSectionRef.getObject() == nullptr) {
+    std::cerr << BinaryFilename;
+    std::cerr << " doesn't have an associated type reflection section!\n";
+    return EXIT_FAILURE;
+  }
+
+  StringRef fieldSectionContents;
+  fieldSectionRef.getContents(fieldSectionContents);
+
+  const FieldSection fieldSection {
+    BinaryFilename.c_str(),
+    reinterpret_cast<const void *>(fieldSectionContents.begin()),
+    reinterpret_cast<const void *>(fieldSectionContents.end())
   };
 
-  ReflectionContext RC;
+  StringRef associatedTypeSectionContents;
+  associatedTypeSectionRef.getContents(associatedTypeSectionContents);
 
-  for (const auto &descriptor : section) {
-    auto typeName = demangleTypeAsString(descriptor.getMangledTypeName());
-    auto mangledTypeName = descriptor.getMangledTypeName();
-    auto demangleTree = demangleTypeAsNode(mangledTypeName);
-    auto TR = decodeDemangleNode(RC, demangleTree);
-    llvm::outs() << typeName << '\n';
-    for (size_t i = 0; i < typeName.size(); ++i)
-      llvm::outs() << '=';
-    llvm::outs() << '\n';
+  const AssociatedTypeSection associatedTypeSection {
+    BinaryFilename.c_str(),
+    reinterpret_cast<const void *>(associatedTypeSectionContents.begin()),
+    reinterpret_cast<const void *>(associatedTypeSectionContents.end())
+  };
 
-    TR->dump(llvm::outs());
-    llvm::outs() << "\n";
-
-    for (auto &field : descriptor.getFieldRecords()) {
-      auto fieldDemangleTree = demangleTypeAsNode(field.getMangledTypeName());
-      auto fieldTR = decodeDemangleNode(RC, fieldDemangleTree);
-      auto fieldName = field.getFieldName();
-      llvm::outs() << "- " << fieldName << ":\n";
-
-      fieldTR->dump(llvm::outs());
-      llvm::outs() << "\n";
-    }
-  }
+  MemoryReader Reader;
+  Reader.addReflectionInfo({fieldSection, associatedTypeSection});
+  ReflectionContext RC(Reader);
+  RC.dumpAllSections(std::cout);
 
   return EXIT_SUCCESS;
 }
@@ -143,9 +149,9 @@ static int doDumpReflectionSection(StringRef BinaryFilename, StringRef arch) {
 int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Test\n");
   switch (options::Action) {
-  case ActionType::DumpReflectionSection:
-    return doDumpReflectionSection(options::BinaryFilename, options::Architecture);
-    break;
+  case ActionType::DumpReflectionSections:
+    return doDumpReflectionSections(options::BinaryFilename,
+                                    options::Architecture);
   case ActionType::None:
     llvm::cl::PrintHelpMessage();
     return EXIT_FAILURE;

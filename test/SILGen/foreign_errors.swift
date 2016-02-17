@@ -135,10 +135,10 @@ func testArgs() throws {
 // CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.consume!1.foreign : ErrorProne.Type -> (AnyObject!) throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AnyObject>, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Bool
 
 func testBridgedResult() throws {
-  let array = try ErrorProne.collectionWithCount(0)
+  let array = try ErrorProne.collection(withCount: 0)
 }
 // CHECK: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error ErrorProtocol {
-// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.collectionWithCount!1.foreign : ErrorProne.Type -> (Int) throws -> [AnyObject] , $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
+// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.collection!1.foreign : ErrorProne.Type -> (withCount: Int) throws -> [AnyObject] , $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
 
 // rdar://20861374
 // Clear out the self box before delegating.

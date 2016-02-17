@@ -14,6 +14,7 @@ from __future__ import print_function
 import argparse
 import multiprocessing
 import os
+import platform
 import shutil
 import sys
 import textwrap
@@ -32,11 +33,15 @@ from SwiftBuildSupport import (
     get_preset_options,
     print_with_argv0,
     quote_shell_command,
+    WorkingDirectory,
 )
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 import swift_build_support.clang
 import swift_build_support.cmake
+import swift_build_support.debug
+import swift_build_support.ninja
+import swift_build_support.tar
 import swift_build_support.targets
 from swift_build_support.migration import migrate_impl_args
 
@@ -333,6 +338,10 @@ details of the setups of other systems or automated environments.""")
     extra_actions_group.add_argument("--export-compile-commands",
         help="generate compilation databases in addition to building",
         action="store_true")
+    extra_actions_group.add_argument("--symbols-package",
+        metavar="PATH",
+        help="if provided, an archive of the symbols directory will be "
+             "generated at this path")
 
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
     build_variant_group.add_argument("-d", "--debug",
@@ -530,6 +539,14 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
 name of the directory under $SWIFT_BUILD_ROOT where the build products will be
 placed""",
         metavar="PATH")
+    parser.add_argument("--install-prefix",
+        help="The installation prefix. This is where built Swift products "
+             "(like bin, lib, and include) will be installed.",
+        metavar="PATH",
+        default=swift_build_support.targets.install_prefix())
+    parser.add_argument("--install-symroot",
+        help="the path to install debug symbols into",
+        metavar="PATH")
 
     parser.add_argument("-j", "--jobs",
         help="""
@@ -544,6 +561,9 @@ the number of parallel build jobs to use""",
     parser.add_argument("--cmake",
                         help="the path to a CMake executable that will be "
                              "used to build Swift")
+    parser.add_argument("--show-sdks",
+                        help="print installed Xcode and SDK versions",
+                        action="store_true")
 
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
@@ -559,11 +579,26 @@ the number of parallel build jobs to use""",
         '--darwin-xcrun-toolchain',
         '--cmake',
         '--host-target',
+        '--skip-build',
+        '--show-sdks',
+        '--install-prefix',
+        '--install-symroot',
+        '--symbols-package',
     ]))
 
     if args.host_target is None:
         print_with_argv0("Unknown operating system.")
         return 1
+
+    if args.symbols_package:
+        if not os.path.isabs(args.symbols_package):
+            print('--symbols-package must be an absolute path '
+                  '(was \'{}\')'.format(args.symbols_package))
+            return 1
+        if not args.install_symroot:
+            print_with_argv0("--install-symroot is required when specifying "
+                             "--symbols-package.")
+            return 1
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -726,7 +761,32 @@ the number of parallel build jobs to use""",
 
     if args.skip_build:
         build_script_impl_inferred_args += [
-            "--skip-build"
+            "--skip-build-cmark",
+            "--skip-build-llvm",
+            "--skip-build-swift",
+            "--skip-build-osx",
+            "--skip-build-ios",
+            "--skip-build-ios-device",
+            "--skip-build-ios-simulator",
+            "--skip-build-tvos",
+            "--skip-build-tvos_device",
+            "--skip-build-tvos-simulator",
+            "--skip-build-watchos",
+            "--skip-build-watchos-device",
+            "--skip-build-watchos-simulator",
+            "--skip-build-lldb",
+            "--skip-build-llbuild",
+            "--skip-build-swiftpm",
+            "--skip-build-xctest",
+            "--skip-build-foundation",
+            "--skip-build-libdispatch",
+            "--skip-build-benchmarks",
+        ]
+
+    if platform.system() == 'Darwin':
+        build_script_impl_inferred_args += [
+            "--toolchain-prefix",
+            swift_build_support.targets.darwin_toolchain_prefix(args.install_prefix),
         ]
 
     if args.build_subdir is None:
@@ -804,6 +864,7 @@ the number of parallel build jobs to use""",
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
+        "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
         "--host-cc", host_clang.cc,
         "--host-cxx", host_clang.cxx,
@@ -826,6 +887,9 @@ the number of parallel build jobs to use""",
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant
         ]
+    if args.cmake_generator == 'Ninja' and \
+       not swift_build_support.ninja.is_ninja_installed():
+        build_script_impl_args += ["--build-ninja"]
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add
@@ -839,7 +903,32 @@ the number of parallel build jobs to use""",
     for v in ['MAKEFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET', 'IPHONEOS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
 
+    if args.show_sdks:
+        swift_build_support.debug.print_xcodebuild_versions([
+            'iphonesimulator',
+            'appletvsimulator',
+            'watchsimulator',
+        ])
+
     check_call(build_script_impl_args)
+
+    if args.symbols_package:
+        print('--- Creating symbols package ---')
+        print('-- Package file: {} --'.format(args.symbols_package))
+
+        if platform.system() == 'Darwin':
+            prefix = swift_build_support.targets.darwin_toolchain_prefix(
+                args.install_prefix)
+        else:
+            prefix = args.install_prefix
+
+        # As a security measure, `tar` normally strips leading '/' from paths
+        # it is archiving. To stay safe, we change working directories, then
+        # run `tar` without the leading '/' (we remove it ourselves to keep
+        # `tar` from emitting a warning).
+        with WorkingDirectory(args.install_symroot):
+            swift_build_support.tar.tar(source=prefix.lstrip('/'),
+                                        destination=args.symbols_package)
 
     return 0
 

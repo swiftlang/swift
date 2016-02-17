@@ -61,17 +61,30 @@ static bool isRelease(SILInstruction *I) {
   }
 }
 
+/// Returns true if LHS and RHS contain identical set of releases.
+static bool hasIdenticalReleases(ReleaseList LHS, ReleaseList RHS) {
+  llvm::DenseSet<SILInstruction *> Releases;
+  if (LHS.size() != RHS.size())
+    return false;
+  for (auto &X : LHS) 
+    Releases.insert(X);
+  for (auto &X : RHS) 
+    if (Releases.find(X) == Releases.end())
+      return false;
+  return true;
+}
+
 /// Returns .Some(I) if I is a release that is the only non-debug instruction
 /// with side-effects in the use-def graph originating from Arg. Returns
 /// .Some(nullptr), if all uses from the arg were either debug insts or do not
 /// have side-effects. Returns .None if there were any non-release instructions
 /// with side-effects in the use-def graph from Arg or if there were multiple
 /// release instructions with side-effects in the use-def graph from Arg.
-static llvm::Optional<NullablePtr<SILInstruction>>
+static llvm::Optional<ReleaseList>
 getNonTrivialNonDebugReleaseUse(SILArgument *Arg) {
   llvm::SmallVector<SILInstruction *, 8> Worklist;
   llvm::SmallPtrSet<SILInstruction *, 8> SeenInsts;
-  llvm::Optional<SILInstruction *> Result;
+  ReleaseList Result;
 
   for (Operand *I : getNonDebugUses(SILValue(Arg)))
     Worklist.push_back(I->getUser());
@@ -91,12 +104,8 @@ getNonTrivialNonDebugReleaseUse(SILArgument *Arg) {
       if (!isRelease(U))
         return None;
 
-      // If we have already seen a release of some sort, bail.
-      if (Result.hasValue())
-        return None;
-
       // Otherwise, set result to that value.
-      Result = U;
+      Result.push_back(U);
       continue;
     }
 
@@ -105,9 +114,7 @@ getNonTrivialNonDebugReleaseUse(SILArgument *Arg) {
       Worklist.push_back(I->getUser());
   }
 
-  if (!Result.hasValue())
-    return NullablePtr<SILInstruction>();
-  return NullablePtr<SILInstruction>(Result.getValue());
+  return Result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -138,11 +145,11 @@ struct ArgumentDescriptor {
   /// If non-null, this is the release in the return block of the callee, which
   /// is associated with this parameter if it is @owned. If the parameter is not
   /// @owned or we could not find such a release in the callee, this is null.
-  SILInstruction *CalleeRelease;
+  ReleaseList CalleeRelease;
 
   /// The same as CalleeRelease, but the release in the throw block, if it is a
   /// function which has a throw block.
-  SILInstruction *CalleeReleaseInThrowBlock;
+  ReleaseList CalleeReleaseInThrowBlock;
 
   /// The projection tree of this arguments.
   ProjectionTree ProjTree;
@@ -239,9 +246,9 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
   // If we cannot explode this value, handle callee release and return.
   if (!shouldExplode()) {
     DEBUG(llvm::dbgs() << "            ProjTree cannot explode arg.\n");
-    // If we found a release in the callee in the last BB on an @owned
+    // If we found releases in the callee in the last BB on an @owned
     // parameter, change the parameter to @guaranteed and continue...
-    if (CalleeRelease) {
+    if (!CalleeRelease.empty()) {
       DEBUG(llvm::dbgs() << "            Has callee release.\n");
       assert(ParameterInfo.getConvention() ==
                  ParameterConvention::Direct_Owned &&
@@ -277,8 +284,8 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
     // If Ty is guaranteed, just pass it through.
     ParameterConvention Conv = ParameterInfo.getConvention();
     if (Conv == ParameterConvention::Direct_Guaranteed) {
-      assert(!CalleeRelease && "Guaranteed parameter should not have a callee "
-                               "release.");
+      assert(CalleeRelease.empty() && "Guaranteed parameter should not have a "
+                                      "callee release.");
       SILParameterInfo NewInfo(Ty.getSwiftRValueType(),
                                ParameterConvention::Direct_Guaranteed);
       Out.push_back(NewInfo);
@@ -289,7 +296,7 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
     // guaranteed.
     assert(ParameterInfo.getConvention() == ParameterConvention::Direct_Owned &&
            "Can only transform @owned => @guaranteed in this code path");
-    if (CalleeRelease) {
+    if (!CalleeRelease.empty()) {
       SILParameterInfo NewInfo(Ty.getSwiftRValueType(),
                                ParameterConvention::Direct_Guaranteed);
       Out.push_back(NewInfo);
@@ -344,16 +351,10 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
     // do need the instruction to be non-null.
     //
     // TODO: This should not be necessary.
-    if (CalleeRelease) {
-      SILType CalleeReleaseTy = CalleeRelease->getOperand(0)->getType();
-      CalleeRelease->setOperand(
+    for (auto &X : CalleeRelease) {
+      SILType CalleeReleaseTy = X->getOperand(0)->getType();
+      X->setOperand(
           0, SILUndef::get(CalleeReleaseTy, Builder.getModule()));
-
-      // TODO: Currently we cannot mark arguments as dead if they are released
-      // in a throw block. But as soon as we can do this, we have to handle
-      // CalleeReleaseInThrowBlock as well.
-      assert(!CalleeReleaseInThrowBlock &&
-             "released arg in throw block cannot be dead");
     }
 
     // We should be able to recursively delete all of the remaining
@@ -533,7 +534,7 @@ bool ParameterAnalyzer::analyze() {
 
     // If this argument is not ABI required and has no uses except for debug
     // instructions, remove it.
-    if (!isABIRequired && OnlyRelease && OnlyRelease.getValue().isNull()) {
+    if (!isABIRequired && OnlyRelease && OnlyRelease.getValue().empty()) {
       A.IsDead = true;
       HaveOptimizedArg = true;
       ++NumDeadArgsEliminated;
@@ -542,21 +543,22 @@ bool ParameterAnalyzer::analyze() {
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     if (A.hasConvention(ParameterConvention::Direct_Owned)) {
-      if (auto *Release = ArgToReturnReleaseMap.releaseForArgument(A.Arg)) {
-        SILInstruction *ReleaseInThrow = nullptr;
+      auto Releases = ArgToReturnReleaseMap.getReleasesForArgument(A.Arg);
+      if (!Releases.empty()) {
 
         // If the function has a throw block we must also find a matching
         // release in the throw block.
-        if (!ArgToThrowReleaseMap.hasBlock() ||
-            (ReleaseInThrow = ArgToThrowReleaseMap.releaseForArgument(A.Arg))) {
+        auto ReleasesInThrow = ArgToThrowReleaseMap.getReleasesForArgument(A.Arg);
+        if (!ArgToThrowReleaseMap.hasBlock() || !ReleasesInThrow.empty()) {
 
           // TODO: accept a second release in the throw block to let the
           // argument be dead.
-          if (OnlyRelease && OnlyRelease.getValue().getPtrOrNull() == Release) {
+          if (OnlyRelease && hasIdenticalReleases(OnlyRelease.getValue(), Releases)) {
             A.IsDead = true;
           }
-          A.CalleeRelease = Release;
-          A.CalleeReleaseInThrowBlock = ReleaseInThrow;
+
+          A.CalleeRelease = Releases;
+          A.CalleeReleaseInThrowBlock = ReleasesInThrow;
           HaveOptimizedArg = true;
           ++NumOwnedConvertedToGuaranteed;
         }
@@ -600,7 +602,7 @@ std::string ParameterAnalyzer::getOptimizedName() const {
 
     // If we have an @owned argument and found a callee release for it,
     // convert the argument to guaranteed.
-    if (Arg.CalleeRelease) {
+    if (!Arg.CalleeRelease.empty()) {
       FSSM.setArgumentOwnedToGuaranteed(i);
     }
 
@@ -721,7 +723,7 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
       // If we have any arguments that were consumed but are now guaranteed,
       // insert a release_value in the error block.
       for (auto &ArgDesc : ArgDescs) {
-        if (!ArgDesc.CalleeRelease)
+        if (ArgDesc.CalleeRelease.empty())
           continue;
         Builder.createReleaseValue(Loc, FAS.getArgument(ArgDesc.Index));
       }
@@ -733,7 +735,7 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
     // If we have any arguments that were consumed but are now guaranteed,
     // insert a release_value.
     for (auto &ArgDesc : ArgDescs) {
-      if (!ArgDesc.CalleeRelease)
+      if (ArgDesc.CalleeRelease.empty())
         continue;
       Builder.createReleaseValue(Loc, FAS.getArgument(ArgDesc.Index));
     }
@@ -784,7 +786,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
     // insert a release_value in the error block.
     Builder.setInsertionPoint(ErrorBlock);
     for (auto &ArgDesc : ArgDescs) {
-      if (!ArgDesc.CalleeRelease)
+      if (ArgDesc.CalleeRelease.empty())
         continue;
       Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
     }
@@ -801,7 +803,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a release_value.
   for (auto &ArgDesc : ArgDescs) {
-    if (!ArgDesc.CalleeRelease)
+    if (ArgDesc.CalleeRelease.empty())
       continue;
     Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
   }
@@ -911,12 +913,10 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   //
   // TODO: If more stuff needs to be placed here, refactor into its own method.
   for (auto &A : Optimizer.getArgDescList()) {
-    if (A.CalleeRelease) {
-      A.CalleeRelease->eraseFromParent();
-      if (A.CalleeReleaseInThrowBlock) {
-        A.CalleeReleaseInThrowBlock->eraseFromParent();
-      }
-    }
+    for (auto &X : A.CalleeRelease) 
+      X->eraseFromParent();
+    for (auto &X : A.CalleeReleaseInThrowBlock) 
+      X->eraseFromParent();
   }
 
   // Rewrite all apply insts calling F to call NewF. Update each call site as

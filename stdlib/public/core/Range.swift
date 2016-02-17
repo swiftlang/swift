@@ -66,7 +66,8 @@ public struct RangeIterator<
 ///     func brackets<Element : ForwardIndex>(x: Range<Element>, i: Element) -> Element {
 ///       return x[i] // Just forward to subscript
 ///     }
-///     print(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
+///     print(brackets(Range<Int>(start: -99, end: 100), 0))
+///     // Prints "0"
 public struct Range<
   Element : ForwardIndex
 > : Equatable, Collection,
@@ -111,7 +112,7 @@ public struct Range<
 
   //===--------------------------------------------------------------------===//
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> RangeIterator<Element> {

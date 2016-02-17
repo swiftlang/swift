@@ -32,6 +32,8 @@ using llvm::StringRef;
 using llvm::raw_ostream;
 
 
+UIdent sourcekitd::KeyVersionMajor("key.version_major");;
+UIdent sourcekitd::KeyVersionMinor("key.version_minor");;
 UIdent sourcekitd::KeyResults("key.results");
 UIdent sourcekitd::KeyRequest("key.request");
 UIdent sourcekitd::KeyCompilerArgs("key.compilerargs");
@@ -69,6 +71,7 @@ UIdent sourcekitd::KeyDocFullAsXML("key.doc.full_as_xml");
 UIdent sourcekitd::KeyGenericParams("key.generic_params");
 UIdent sourcekitd::KeyGenericRequirements("key.generic_requirements");
 UIdent sourcekitd::KeyAnnotatedDecl("key.annotated_decl");
+UIdent sourcekitd::KeyFullyAnnotatedDecl("key.fully_annotated_decl");
 UIdent sourcekitd::KeyRelatedDecls("key.related_decls");
 UIdent sourcekitd::KeyContext("key.context");
 UIdent sourcekitd::KeyModuleImportDepth("key.moduleimportdepth");
@@ -126,6 +129,8 @@ UIdent sourcekitd::KeyModuleGroups("key.modulegroups");
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
 static UIdent *OrderedKeys[] = {
+  &KeyVersionMajor,
+  &KeyVersionMinor,
   &KeyResults,
   &KeyRequest,
   &KeyNotification,
@@ -158,6 +163,7 @@ static UIdent *OrderedKeys[] = {
   &KeyRuntimeName,
   &KeySelectorName,
   &KeyAnnotatedDecl,
+  &KeyFullyAnnotatedDecl,
   &KeyDocBrief,
   &KeyContext,
   &KeyModuleImportDepth,
@@ -340,7 +346,9 @@ public:
 
   void visitString(StringRef Str) {
     OS << '\"';
-    OS.write_escaped(Str);
+    // Avoid raw_ostream's write_escaped, we don't want to escape unicode
+    // characters because it will be invalid JSON.
+    writeEscaped(Str, OS);
     OS << '\"';
   }
 
@@ -352,6 +360,30 @@ public:
     }
   }
 };
+}
+
+void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
+  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
+    unsigned char c = Str[i];
+
+    switch (c) {
+    case '\\':
+      OS << '\\' << '\\';
+      break;
+    case '\t':
+      OS << '\\' << 't';
+      break;
+    case '\n':
+      OS << '\\' << 'n';
+      break;
+    case '"':
+      OS << '\\' << '"';
+      break;
+    default:
+      OS << c;
+      break;
+    }
+  }
 }
 
 static void printError(sourcekitd_response_t Err, raw_ostream &OS) {

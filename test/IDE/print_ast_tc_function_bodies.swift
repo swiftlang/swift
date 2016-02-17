@@ -21,7 +21,7 @@ struct FooStruct {
       instanceVar = i
     }
   }
-// CHECK-NEXT: {{^}}  subscript (i: Int) -> Double {{{$}}
+// CHECK-NEXT: {{^}}  subscript(i: Int) -> Double {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
@@ -37,7 +37,7 @@ struct FooStruct {
       instanceVar = i + j
     }
   }
-// CHECK-NEXT: {{^}}  subscript (i: Int, j: Int) -> Double {{{$}}
+// CHECK-NEXT: {{^}}  subscript(i: Int, j: Int) -> Double {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
@@ -184,7 +184,7 @@ class InClassSubscript1 {
       if true {}
     }
   }
-// CHECK: {{^}}  subscript (i: Int) -> Int {{{$}}
+// CHECK: {{^}}  subscript(i: Int) -> Int {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK: {{^}}    set {{{$}}
@@ -205,7 +205,7 @@ class InClassSubscript2 {
       if true {}
     }
   }
-// CHECK: {{^}}  subscript (i: Int) -> Int {{{$}}
+// CHECK: {{^}}  subscript(i: Int) -> Int {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
@@ -227,7 +227,7 @@ class InClassSubscript3 {
       if true {}
     }
   }
-// CHECK: {{^}}  subscript (i: Int) -> Int {{{$}}
+// CHECK: {{^}}  subscript(i: Int) -> Int {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}

@@ -217,6 +217,10 @@ void PrintOptions::initArchetypeTransformerForSynthesizedExtensions(NominalTypeD
   SynthesizedTarget = D;
 }
 
+bool PrintOptions::isPrintingSynthesizedExtension() {
+  return pTransformer && SynthesizedTarget;
+}
+
 void PrintOptions::clearArchetypeTransformerForSynthesizedExtensions() {
   pTransformer = nullptr;
   SynthesizedTarget = nullptr;
@@ -301,7 +305,10 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   PendingDeclLocCallback = nullptr;
   
   if (PreD) {
-    printDeclPre(PreD);
+    if (SynthesizeTarget && PreD->getKind() == DeclKind::Extension)
+      printSynthesizedExtensionPre(cast<ExtensionDecl>(PreD), SynthesizeTarget);
+    else
+      printDeclPre(PreD);
   }
   if (LocD) {
     printDeclLoc(LocD);
@@ -419,12 +426,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   /// \brief Record the location of this declaration, which is about to
-  /// be printed.
+  /// be printed, marking the name and signature end locations.
   template<typename FnTy>
-  void recordDeclLoc(Decl *decl, const FnTy &Fn) {
+  void recordDeclLoc(Decl *decl, const FnTy &NameFn,
+                     llvm::function_ref<void()> ParamFn = []{}) {
     Printer.callPrintDeclLoc(decl);
-    Fn();
+    NameFn();
     Printer.printDeclNameEndLoc(decl);
+    ParamFn();
+    Printer.printDeclNameOrSignatureEndLoc(decl);
   }
 
   void printSourceRange(CharSourceRange Range, ASTContext &Ctx) {
@@ -581,7 +591,7 @@ private:
   void printAccessors(AbstractStorageDecl *ASD);
   void printMembersOfDecl(Decl * NTD, bool needComma = false);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false);
-  void printNominalDeclName(NominalTypeDecl *decl);
+  void printNominalDeclGenericParams(NominalTypeDecl *decl);
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
@@ -633,9 +643,19 @@ public:
     if (!shouldPrint(D, true))
       return false;
 
+    bool Synthesize = Options.isPrintingSynthesizedExtension() &&
+                      D->getKind() == DeclKind::Extension;
+    if (Synthesize)
+      Printer.setSynthesizedTarget(Options.SynthesizedTarget);
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
-    Printer.printDeclPost(D);
+    if (Synthesize) {
+      Printer.setSynthesizedTarget(nullptr);
+      Printer.printSynthesizedExtensionPost(cast<ExtensionDecl>(D),
+                                            Options.SynthesizedTarget);
+    } else {
+      Printer.printDeclPost(D);
+    }
     return true;
   }
 
@@ -1212,14 +1232,13 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
   Printer << "}";
 }
 
-void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
-  Printer.printName(decl->getName());
+void PrintAST::printNominalDeclGenericParams(NominalTypeDecl *decl) {
   if (auto gp = decl->getGenericParams()) {
     if (!isa<ProtocolDecl>(decl)) {
       // For a protocol extension, print only the where clause; the
       // generic parameter list is implicit. For other nominal types,
       // print the generic parameters.
-      if (decl->isProtocolOrProtocolExtensionContext())
+      if (decl->getAsProtocolOrProtocolExtensionContext())
         printWhereClause(gp->getRequirements());
       else
         printGenericParams(gp);
@@ -1413,6 +1432,8 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 }
 
 void PrintAST::printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl* ExtDecl) {
+  Printer << "/// Synthesized extension from " <<
+    ExtDecl->getExtendedType()->getAnyNominal()->getName().str() << "\n";
   printDocumentationComment(ExtDecl);
   printAttributes(ExtDecl);
   Printer << "extension ";
@@ -1604,7 +1625,9 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
       Printer << "enum ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
   }
@@ -1627,7 +1650,9 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
       Printer << "struct ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
   }
@@ -1650,7 +1675,9 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       Printer << "class ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
 
     printInherited(decl);
@@ -1675,7 +1702,9 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
       Printer << "protocol ";
     recordDeclLoc(decl,
       [&]{
-        printNominalDeclName(decl);
+        Printer.printName(decl->getName());
+      }, [&]{ // Signature
+        printNominalDeclGenericParams(decl);
       });
 
     // Figure out whether we need an explicit 'class' in the inheritance.
@@ -2008,11 +2037,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         Printer << "func ";
       }
       recordDeclLoc(decl,
-        [&]{
+        [&]{ // Name
           if (!decl->hasName())
             Printer << "<anonymous>";
           else
             Printer.printName(decl->getName());
+        }, [&] { // Parameters
           if (decl->isGeneric()) {
             printGenericParams(decl->getGenericParams());
           }
@@ -2087,7 +2117,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printAttributes(decl);
   printAccessibility(decl);
   recordDeclLoc(decl, [&]{
-    Printer << "subscript ";
+    Printer << "subscript";
+  }, [&] { // Parameters
     printParameterList(decl->getIndices(), /*Curried=*/false,
                        /*isAPINameByDefault*/[](unsigned)->bool{return false;});
   });
@@ -2113,6 +2144,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       Printer << "init";
+    }, [&] { // Signature
       switch (decl->getFailability()) {
       case OTK_None:
         break;
@@ -2145,7 +2177,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printAttributes(decl);
   recordDeclLoc(decl,
     [&]{
-      Printer << "deinit ";
+      Printer << "deinit";
     });
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {

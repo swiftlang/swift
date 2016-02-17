@@ -28,7 +28,7 @@ internal struct _CollectionOf<
     _subscriptImpl = subscriptImpl
   }
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   func iterator() -> AnyIterator<T> {

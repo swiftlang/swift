@@ -38,7 +38,7 @@ class Subject<T>: Observer, Observable {
     // Observable implementation
     
     func subscribe<O: Observer where O.Value == T>(observer: O) -> Any {
-        self.onNextFunc = { (item: T) -> Void  in
+        self.onNextFunc = { (item: T) -> Void in
             observer.onNext(item)
         }
         

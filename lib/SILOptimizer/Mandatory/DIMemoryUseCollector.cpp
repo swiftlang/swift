@@ -317,7 +317,16 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
       return false;
 
     auto EltTy = MI.getElementType(i);
-    if (!SILType::getPrimitiveObjectType(EltTy).isTrivial(Module))
+
+    auto SILEltTy = EltTy;
+    // We are getting the element type from a compound type. This might not be a
+    // legal SIL type. Lower the type if it is not a legal type.
+    if (!SILEltTy->isLegalSILType())
+      SILEltTy = MI.MemoryInst->getModule()
+                     .Types.getLoweredType(EltTy, 0)
+                     .getSwiftRValueType();
+
+    if (!SILType::getPrimitiveObjectType(SILEltTy).isTrivial(Module))
       return false;
   }
   return true;

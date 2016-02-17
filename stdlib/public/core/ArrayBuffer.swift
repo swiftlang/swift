@@ -229,7 +229,8 @@ extension _ArrayBuffer {
     return result
   }
 
-  /// Returns a `_SliceBuffer` containing the elements in `bounds`.
+  /// Returns a `_SliceBuffer` containing the given sub-range of elements in
+  /// `bounds` from this buffer.
   public subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
     get {
       _typeCheck(bounds)

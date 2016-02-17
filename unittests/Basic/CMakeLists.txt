@@ -20,6 +20,7 @@ add_swift_unittest(SwiftBasicTests
   Unicode.cpp
   BlotMapVectorTest.cpp
   PointerIntEnumTest.cpp
+  ImmutablePointerSetTests.cpp
   ${generated_tests}
   )
 

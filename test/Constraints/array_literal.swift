@@ -10,7 +10,7 @@ struct DoubleList : ArrayLiteralConvertible {
   init(arrayLiteral elements: Double...) {}
 }
 
-struct  IntDict : ArrayLiteralConvertible {
+struct IntDict : ArrayLiteralConvertible {
   typealias Element = (String, Int)
   init(arrayLiteral elements: Element...) {}
 }

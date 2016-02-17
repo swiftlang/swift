@@ -59,11 +59,23 @@ private:
   void printDeclNameEndLoc(const Decl *D) override {
     return OtherPrinter.printDeclNameEndLoc(D);
   }
+  void printDeclNameOrSignatureEndLoc(const Decl *D) override {
+    return OtherPrinter.printDeclNameOrSignatureEndLoc(D);
+  }
   void printTypeRef(const TypeDecl *TD, Identifier Name) override {
     return OtherPrinter.printTypeRef(TD, Name);
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
+  }
+  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                                    const NominalTypeDecl *NTD) override {
+    return OtherPrinter.printSynthesizedExtensionPre(ED, NTD);
+  }
+
+  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                     const NominalTypeDecl *NTD) override {
+    return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
   }
 
   // Prints regular comments of the header the clang node comes from, until
@@ -347,28 +359,27 @@ void swift::ide::printSubmoduleInterface(
     return false;
   });
 
-  std::sort(SwiftDecls.begin(), SwiftDecls.end(),
-            [&](Decl *LHS, Decl *RHS) -> bool {
-    auto *LHSValue = dyn_cast<ValueDecl>(LHS);
-    auto *RHSValue = dyn_cast<ValueDecl>(RHS);
+  // If the group name is specified, we sort them according to their source order,
+  // which is the order preserved by getTopLeveDecls.
+  if (!GroupName) {
+    std::sort(SwiftDecls.begin(), SwiftDecls.end(),
+      [&](Decl *LHS, Decl *RHS) -> bool {
+        auto *LHSValue = dyn_cast<ValueDecl>(LHS);
+        auto *RHSValue = dyn_cast<ValueDecl>(RHS);
 
-    // If group is specified, we order the decls by their source order.
-    if (GroupName && LHS->getSourceOrder() && RHS->getSourceOrder()) {
-      return LHS->getSourceOrder().getValue() < RHS->getSourceOrder().getValue();
-    }
+        if (LHSValue && RHSValue) {
+          StringRef LHSName = LHSValue->getName().str();
+          StringRef RHSName = RHSValue->getName().str();
+          if (int Ret = LHSName.compare(RHSName))
+            return Ret < 0;
+          // FIXME: this is not sufficient to establish a total order for overloaded
+          // decls.
+          return LHS->getKind() < RHS->getKind();
+        }
 
-    if (LHSValue && RHSValue) {
-      StringRef LHSName = LHSValue->getName().str();
-      StringRef RHSName = RHSValue->getName().str();
-      if (int Ret = LHSName.compare(RHSName))
-        return Ret < 0;
-      // FIXME: this is not sufficient to establish a total order for overloaded
-      // decls.
-      return LHS->getKind() < RHS->getKind();
-    }
-
-    return LHS->getKind() < RHS->getKind();
-  });
+        return LHS->getKind() < RHS->getKind();
+      });
+  }
 
   ASTPrinter *PrinterToUse = &Printer;
 
@@ -432,9 +443,6 @@ void swift::ide::printSubmoduleInterface(
           for (auto ET : ExtensionsFromConformances) {
             if (!shouldPrint(ET, AdjustedOptions))
               continue;
-            Printer << "\n";
-            Printer << "/// Synthesized extension from ";
-            ET->getExtendedTypeLoc().getType().print(Printer, AdjustedOptions);
             Printer << "\n";
             ET->print(Printer, AdjustedOptions);
             Printer << "\n";

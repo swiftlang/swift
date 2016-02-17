@@ -113,7 +113,7 @@ public struct JoinSequence<
     self._separator = ContiguousArray(separator)
   }
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Return an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> JoinIterator<Base.Iterator> {

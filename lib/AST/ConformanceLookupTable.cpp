@@ -789,7 +789,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     return nullptr;
 
   NominalTypeDecl *conformingNominal
-    = conformingDC->isNominalTypeOrNominalTypeExtensionContext();
+    = conformingDC->getAsNominalTypeOrNominalTypeExtensionContext();
 
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredTypeInContext();
@@ -843,7 +843,7 @@ void ConformanceLookupTable::registerProtocolConformance(
        ProtocolConformance *conformance) {
   auto protocol = conformance->getProtocol();
   auto dc = conformance->getDeclContext();
-  auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
 
   // If there is an entry to update, do so.
   auto &dcConformances = AllConformances[dc];

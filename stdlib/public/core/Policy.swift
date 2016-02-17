@@ -142,7 +142,7 @@ public protocol AnyObject : class {}
 /// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
-/// Returns true iff `lhs` and `rhs` are references to the same object
+/// Returns `true` iff `lhs` and `rhs` are references to the same object
 /// instance (in other words, are identical pointers).
 ///
 /// - SeeAlso: `Equatable`, `==`
@@ -176,7 +176,7 @@ public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// When adopting `Equatable`, only the `==` operator is required to be
 /// implemented.  The standard library provides an implementation for `!=`.
 public protocol Equatable {
-  /// Return true if `lhs` is equal to `rhs`.
+  /// Returns `true` if `lhs` is equal to `rhs`.
   ///
   /// **Equality implies substitutability**.  When `x == y`, `x` and
   /// `y` are interchangeable in any code that only depends on their

@@ -88,14 +88,14 @@ func class_bounded_archetype_method<T : ClassBoundBinary>(x: T, y: T) {
   // CHECK: [[INHERITED:%.*]] = load i8*, i8** %T.ClassBoundBinary, align 8
   // CHECK: [[INHERITED_WTBL:%.*]] = bitcast i8* [[INHERITED]] to i8**
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[INHERITED_WTBL]], align 8
-  // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*)
-  // CHECK: call void [[WITNESS_FUNC]](%objc_object* %0, %swift.type* {{.*}})
+  // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*, i8**)
+  // CHECK: call void [[WITNESS_FUNC]](%objc_object* %0, %swift.type* {{.*}}, i8** [[INHERITED_WTBL]])
   x.classBoundBinaryMethod(y)
   // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 1
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ENTRY]], align 8
   // CHECK: call void @swift_unknownRetain(%objc_object* [[Y:%.*]])
-  // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %objc_object*, %swift.type*)
-  // CHECK: call void [[WITNESS_FUNC]](%objc_object* [[Y]], %objc_object* %0, %swift.type* {{.*}})
+  // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %objc_object*, %swift.type*, i8**)
+  // CHECK: call void [[WITNESS_FUNC]](%objc_object* [[Y]], %objc_object* %0, %swift.type* %T, i8** %T.ClassBoundBinary)
 }
 
 // CHECK-LABEL: define hidden { %objc_object*, %objc_object* } @_TF22class_bounded_generics29class_bounded_archetype_tuple{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
@@ -153,9 +153,10 @@ func class_bounded_erasure(x: ConcreteClass) -> ClassBound {
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics29class_bounded_protocol_method{{.*}}(%objc_object*, i8**) {{.*}} {
 func class_bounded_protocol_method(x: ClassBound) {
   x.classBoundMethod()
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* %0)
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_TABLE:%.*]], align 8
-  // CHECK: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*)
-  // CHECK: call void [[WITNESS_FN]](%objc_object* %0, %swift.type* {{.*}})
+  // CHECK: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*, i8**)
+  // CHECK: call void [[WITNESS_FN]](%objc_object* %0, %swift.type* [[METADATA]], i8** [[WITNESS_TABLE]])
 }
 
 // CHECK-LABEL: define hidden %C22class_bounded_generics13ConcreteClass* @_TF22class_bounded_generics28class_bounded_archetype_cast{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound)

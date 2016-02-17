@@ -38,3 +38,11 @@ public protocol Point3DLike {
 extension AddConformance : PointLike {}
 extension AddConformance : Point3DLike {}
 #endif
+
+public func workWithPointLike<T>(t: T) -> Int {
+  if let p = t as? PointLike {
+    return p.x * p.y
+  } else {
+    return 0
+  }
+}

@@ -10,17 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A protocol representing the minimal requirements of
-/// `Collection`.
+/// A type that provides subscript access to its elements.
 ///
-/// - Note: In most cases, it's best to ignore this protocol and use
-///   `Collection` instead, as it has a more complete interface.
-//
-// This protocol is almost an implementation detail of the standard
-// library; it is used to deduce things like the `SubSequence` and
-// `Iterator` type from a minimal collection, but it is also used in
-// exposed places like as a constraint on IndexingIterator.
+/// - Important: In most cases, it's best to ignore this protocol and use
+///   `CollectionType` instead, as it has a more complete interface.
 public protocol Indexable {
+  // This protocol is almost an implementation detail of the standard
+  // library; it is used to deduce things like the `SubSequence` and
+  // `Iterator` type from a minimal collection, but it is also used in
+  // exposed places like as a constraint on `IndexingIterator`.
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -59,6 +58,7 @@ public protocol Indexable {
   subscript(position: Index) -> _Element { get }
 }
 
+/// A type that supports subscript assignment to a mutable collection.
 public protocol MutableIndexable {
   associatedtype Index : ForwardIndex
 
@@ -96,11 +96,11 @@ public struct IndexingIterator<Elements : Indexable>
   internal var _position: Elements.Index
 }
 
-/// A multi-pass *sequence* with addressable positions.
+/// A multi-pass sequence with addressable positions.
 ///
 /// Positions are represented by an associated `Index` type.  Whereas
-/// an arbitrary *sequence* may be consumed as it is traversed, a
-/// *collection* is multi-pass: any element may be revisited merely by
+/// an arbitrary sequence may be consumed as it is traversed, a
+/// collection is multi-pass: any element may be revisited merely by
 /// saving its index.
 ///
 /// The sequence view of the elements is identical to the collection
@@ -111,7 +111,7 @@ public struct IndexingIterator<Elements : Indexable>
 ///       let x = self[i]
 ///     }
 public protocol Collection : Indexable, Sequence {
-  /// A type that provides the *sequence*'s iteration interface and
+  /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   ///
   /// By default, a `Collection` satisfies `Sequence` by
@@ -295,7 +295,7 @@ extension Collection {
 //===----------------------------------------------------------------------===//
 
 extension Collection {
-  /// Return an `Array` containing the results of mapping `transform`
+  /// Returns an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
   /// - Complexity: O(N).
@@ -727,7 +727,7 @@ internal func _writeBackMutableSlice<
 @available(*, unavailable, message="Bit enum has been deprecated. Please use Int instead.")
 public enum Bit {}
 
-@available(*, unavailable, renamed="CollectionDefaultIterator")
+@available(*, unavailable, renamed="IndexingIterator")
 public struct IndexingGenerator<Elements : Indexable> {}
 
 @available(*, unavailable, renamed="Collection")
@@ -771,7 +771,7 @@ extension Collection where Iterator.Element : Equatable {
 public typealias MutableCollectionType = MutableCollection
 
 @available(*, unavailable, message="PermutationGenerator has been removed in Swift 3")
-public struct PermutationGenerator<C: Collection> {}
+public struct PermutationGenerator<C : Collection, Indices : Sequence> {}
 
 @available(*, unavailable, message="Please use 'Collection where SubSequence : MutableCollection'")
 public typealias MutableSliceable = Collection

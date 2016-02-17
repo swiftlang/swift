@@ -374,15 +374,6 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
   if (BaseType != RHS.BaseType)
     return false;
 
-  // We assume that the two paths must be non-empty.
-  //
-  // I believe that we assume this since in the code that uses this we check for
-  // full differences before we use this code path.
-  //
-  // TODO: Is this necessary.
-  if (empty() || RHS.empty())
-    return false;
-
   // Otherwise, we have a common base and perhaps some common subpath.
   auto LHSIter = Path.begin();
   auto RHSIter = RHS.Path.begin();
@@ -443,9 +434,9 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
   if (BaseType != RHS.BaseType)
     return SubSeqRelation_t::Unknown;
 
-  // If either path is empty, we can not prove anything, return Unknown.
-  if (empty() || RHS.empty())
-    return SubSeqRelation_t::Unknown;
+  // If both paths are empty, return Equal.
+  if (empty() && RHS.empty())
+    return SubSeqRelation_t::Equal;
 
   auto LHSIter = begin();
   auto RHSIter = RHS.begin();
@@ -755,6 +746,60 @@ ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
 
     // Keep iterating if the worklist is not empty.
   } while (!Worklist.empty());
+}
+
+bool ProjectionPath::
+hasUncoveredNonTrivials(SILType B, SILModule *Mod, ProjectionPathSet &CPaths) {
+  llvm::SmallVector<ProjectionPath, 4> Worklist, Paths;
+  // Push an empty projection path to get started.
+  ProjectionPath P(B);
+  Worklist.push_back(P);
+  do {
+    // Get the next level projections based on current projection's type.
+    ProjectionPath PP = Worklist.pop_back_val();
+ 
+    // If this path is part of the covered path, then continue.
+    if (CPaths.find(PP) != CPaths.end())
+      continue;
+      
+    // Get the current type to process.
+    SILType Ty = PP.getMostDerivedType(*Mod);
+
+    // Get the first level projection of the current type.
+    llvm::SmallVector<Projection, 4> Projections;
+    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // There is at least one projection path that leads to a type with
+    // reference semantics.
+    if (Ty.getClassOrBoundGenericClass()) {
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // Keep expanding the location.
+    for (auto &P : Projections) {
+      ProjectionPath X(B);
+      X.append(PP);
+      assert(PP.getMostDerivedType(*Mod) == X.getMostDerivedType(*Mod));
+      X.append(P);
+      Worklist.push_back(X);
+    }
+    // Keep iterating if the worklist is not empty.
+  } while (!Worklist.empty());
+
+  // Check whether any path leads to a non-trivial type.
+  for (auto &X : Paths) {
+    if (!X.getMostDerivedType(*Mod).isTrivial(*Mod))
+       return true;
+  }   
+  return false;
 }
 
 bool
@@ -1177,7 +1222,7 @@ ProjectionTree::computeExplodedArgumentValue(
   // Construct the leaf index to leaf value map.
   llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;
   for (unsigned i = 0; i < LeafValues.size(); ++i) {
-    LeafIndexToValue[LeafIndices[i]] = LeafValues[i];
+    LeafIndexToValue[LiveLeafIndices[i]] = LeafValues[i];
   }
 
   // Compute the full root node debug node by walking down the projection tree.
@@ -1251,8 +1296,8 @@ ProjectionTree::computeUsesAndLiveness(SILValue Base) {
     if (!Node->IsLive)
       continue;
 
-    // Otherwise we have a live leaf, add its index to our LeafIndices list.
-    LeafIndices.push_back(Node->getIndex());
+    // Otherwise we have a live leaf, add its index to our LiveLeafIndices list.
+    LiveLeafIndices.push_back(Node->getIndex());
   }
 
 #ifndef NDEBUG
@@ -1351,7 +1396,7 @@ void
 ProjectionTree::
 replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
                              llvm::SmallVectorImpl<SILValue> &Leafs) {
-  assert(Leafs.size() == LeafIndices.size() && "Leafs and leaf indices must "
+  assert(Leafs.size() == LiveLeafIndices.size() && "Leafs and leaf indices must "
          "equal in size.");
 
   NewAggregateBuilderMap AggBuilderMap(Builder, Loc);
@@ -1362,11 +1407,11 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
   // For each Leaf we have as input...
   for (unsigned i = 0, e = Leafs.size(); i != e; ++i) {
     SILValue Leaf = Leafs[i];
-    ProjectionTreeNode *Node = getNode(LeafIndices[i]);
+    ProjectionTreeNode *Node = getNode(LiveLeafIndices[i]);
 
     DEBUG(llvm::dbgs() << "    Visiting leaf: " << Leaf);
 
-    assert(Node->IsLive && "Unexpected dead node in LeafIndices!");
+    assert(Node->IsLive && "Unexpected dead node in LiveLeafIndices!");
 
     // Otherwise replace all uses at this level of the tree with uses of the
     // Leaf value.

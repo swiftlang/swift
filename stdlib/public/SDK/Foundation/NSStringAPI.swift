@@ -162,7 +162,7 @@ extension String {
   public static func localizedNameOfStringEncoding(
     encoding: NSStringEncoding
   ) -> String {
-    return NSString.localizedNameOfStringEncoding(encoding)
+    return NSString.localizedNameOf(stringEncoding: encoding)
   }
 
   // + (instancetype)localizedStringWithFormat:(NSString *)format, ...
@@ -252,7 +252,7 @@ extension String {
   /// information.
   @warn_unused_result
   public func canBeConvertedToEncoding(encoding: NSStringEncoding) -> Bool {
-    return _ns.canBeConvertedToEncoding(encoding)
+    return _ns.canBeConverted(toEncoding: encoding)
   }
 
   // @property NSString* capitalizedString
@@ -278,7 +278,7 @@ extension String {
   /// using the specified locale.
   @warn_unused_result
   public func capitalizedStringWith(locale: NSLocale?) -> String {
-    return _ns.capitalizedString(withLocale: locale) as String
+    return _ns.capitalizedString(with: locale) as String
   }
 
   // - (NSComparisonResult)caseInsensitiveCompare:(NSString *)aString
@@ -306,7 +306,7 @@ extension String {
   @warn_unused_result
   public func commonPrefixWith(
     aString: String, options: NSStringCompareOptions) -> String {
-    return _ns.commonPrefix(withString: aString, options: options)
+    return _ns.commonPrefix(with: aString, options: options)
   }
 
   // - (NSComparisonResult)
@@ -429,7 +429,7 @@ extension String {
   public func cStringUsingEncoding(encoding: NSStringEncoding) -> [CChar]? {
     return withExtendedLifetime(_ns) {
       (s: NSString) -> [CChar]? in
-      _persistCString(s.cStringUsingEncoding(encoding))
+      _persistCString(s.cString(usingEncoding: encoding))
     }
   }
 
@@ -446,8 +446,9 @@ extension String {
     encoding: NSStringEncoding,
     allowLossyConversion: Bool = false
   ) -> NSData? {
-    return _ns.dataUsingEncoding(
-      encoding, allowLossyConversion: allowLossyConversion)
+    return _ns.data(
+      usingEncoding: encoding,
+      allowLossyConversion: allowLossyConversion)
   }
 
   // @property NSString* decomposedStringWithCanonicalMapping;
@@ -690,7 +691,7 @@ extension String {
           contentsEnd in self._ns.getLineStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            forRange: _toNSRange(forRange))
+            for: _toNSRange(forRange))
         }
       }
     }
@@ -716,7 +717,7 @@ extension String {
           contentsEnd in self._ns.getParagraphStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            forRange: _toNSRange(forRange))
+            for: _toNSRange(forRange))
         }
       }
     }
@@ -995,7 +996,7 @@ extension String {
   /// `String` in a given encoding.
   @warn_unused_result
   public func lengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
-    return _ns.lengthOfBytesUsingEncoding(encoding)
+    return _ns.lengthOfBytes(usingEncoding: encoding)
   }
 
   // - (NSRange)lineRangeForRange:(NSRange)aRange
@@ -1004,7 +1005,7 @@ extension String {
   /// containing a given range.
   @warn_unused_result
   public func lineRangeFor(aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.lineRange(forRange: _toNSRange(aRange)))
+    return _range(_ns.lineRange(for: _toNSRange(aRange)))
   }
 
   // - (NSArray *)
@@ -1086,7 +1087,7 @@ extension String {
   /// locale.
   @warn_unused_result
   public func lowercaseStringWith(locale: NSLocale?) -> String {
-    return _ns.lowercaseString(withLocale: locale)
+    return _ns.lowercaseString(with: locale)
   }
 
   // - (NSUInteger)maximumLengthOfBytesUsingEncoding:(NSStringEncoding)enc
@@ -1096,7 +1097,7 @@ extension String {
   @warn_unused_result
   public
   func maximumLengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
-    return _ns.maximumLengthOfBytesUsingEncoding(encoding)
+    return _ns.maximumLengthOfBytes(usingEncoding: encoding)
   }
 
   // - (NSRange)paragraphRangeForRange:(NSRange)aRange
@@ -1105,7 +1106,7 @@ extension String {
   /// paragraph or paragraphs containing a given range.
   @warn_unused_result
   public func paragraphRangeFor(aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.paragraphRange(forRange: _toNSRange(aRange)))
+    return _range(_ns.paragraphRange(for: _toNSRange(aRange)))
   }
 
   // @property NSArray* pathComponents
@@ -1211,7 +1212,7 @@ extension String {
     // I think users will be able to observe differences in the input
     // and output ranges due (if nothing else) to locale changes
     return _range(
-      _ns.rangeOfComposedCharacterSequences(forRange: _toNSRange(range)))
+      _ns.rangeOfComposedCharacterSequences(for: _toNSRange(range)))
   }
 
   // - (NSRange)rangeOfString:(NSString *)aString
@@ -1241,16 +1242,17 @@ extension String {
     locale: NSLocale? = nil
   ) -> Range<Index>? {
     return _optionalRange(
-      locale != nil ? _ns.range(
-        of: aString, options: mask,
+      locale != nil ? _ns.rangeOf(
+        aString,
+        options: mask,
         range: _toNSRange(searchRange ?? self.characters.indices),
         locale: locale
       )
-      : searchRange != nil ? _ns.range(
-        of: aString, options: mask, range: _toNSRange(searchRange!)
+      : searchRange != nil ? _ns.rangeOf(
+        aString, options: mask, range: _toNSRange(searchRange!)
       )
-      : !mask.isEmpty ? _ns.range(of: aString, options: mask)
-      : _ns.range(of: aString)
+      : !mask.isEmpty ? _ns.rangeOf(aString, options: mask)
+      : _ns.rangeOf(aString)
     )
   }
 
@@ -1282,7 +1284,7 @@ extension String {
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func localizedStandardRangeOf(string: String) -> Range<Index>? {
-    return _optionalRange(_ns.localizedStandardRange(of: string))
+    return _optionalRange(_ns.localizedStandardRangeOf(string))
   }
 
   // @property NSStringEncoding smallestEncoding;
@@ -1338,7 +1340,7 @@ extension String {
   public func addingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
-    return _ns.addingPercentEscapesUsingEncoding(encoding)
+    return _ns.addingPercentEscapes(usingEncoding: encoding)
   }
 
   // - (NSString *)stringByAppendingFormat:(NSString *)format, ...
@@ -1438,8 +1440,8 @@ extension String {
   public func byPaddingToLength(
     newLength: Int, withString padString: String, startingAt padIndex: Int
   ) -> String {
-    return _ns.byPadding(
-      toLength: newLength, withString: padString, startingAt: padIndex)
+    return _ns.padding(
+      toLength: newLength, with: padString, startingAt: padIndex)
   }
 
   // @property NSString* stringByRemovingPercentEncoding;
@@ -1461,8 +1463,7 @@ extension String {
   public func replacingCharactersIn(
     range: Range<Index>, withString replacement: String
   ) -> String {
-    return _ns.replacingCharacters(
-      in: _toNSRange(range), withString: replacement)
+    return _ns.replacingCharacters(in: _toNSRange(range), with: replacement)
   }
 
   // - (NSString *)
@@ -1486,12 +1487,13 @@ extension String {
     range searchRange: Range<Index>? = nil
   ) -> String {
     return (searchRange != nil) || (!options.isEmpty)
-    ? _ns.replacingOccurrences(
-      of: target,
-      withString: replacement, options: options,
+    ? _ns.replacingOccurrencesOf(
+      target,
+      with: replacement,
+      options: options,
       range: _toNSRange(searchRange ?? self.characters.indices)
     )
-    : _ns.replacingOccurrences(of: target, withString: replacement)
+    : _ns.replacingOccurrencesOf(target, with: replacement)
   }
 
   // - (NSString *)
@@ -1504,7 +1506,7 @@ extension String {
   public func replacingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
-    return _ns.replacingPercentEscapesUsingEncoding(encoding)
+    return _ns.replacingPercentEscapes(usingEncoding: encoding)
   }
 
   // @property NSString* stringByResolvingSymlinksInPath;
@@ -1531,7 +1533,7 @@ extension String {
   /// the `String` characters contained in a given character set.
   @warn_unused_result
   public func byTrimmingCharactersIn(set: NSCharacterSet) -> String {
-    return _ns.byTrimmingCharacters(in: set)
+    return _ns.trimmingCharacters(in: set)
   }
 
   // - (NSArray *)stringsByAppendingPaths:(NSArray *)paths
@@ -1567,7 +1569,7 @@ extension String {
   /// `String` that lie within a given range.
   @warn_unused_result
   public func substringWith(aRange: Range<Index>) -> String {
-    return _ns.substring(withRange: _toNSRange(aRange))
+    return _ns.substring(with: _toNSRange(aRange))
   }
 
   // @property (readonly, copy) NSString *localizedUppercaseString NS_AVAILABLE(10_11, 9_0);
@@ -1586,7 +1588,7 @@ extension String {
   /// locale.
   @warn_unused_result
   public func uppercaseStringWith(locale: NSLocale?) -> String {
-    return _ns.uppercaseString(withLocale: locale)
+    return _ns.uppercaseString(with: locale)
   }
 
   //===--- Omitted due to redundancy with "utf8" property -----------------===//

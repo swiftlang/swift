@@ -21,6 +21,7 @@ namespace sourcekitd_test {
 
 enum class SourceKitRequest {
   None,
+  ProtocolVersion,
   Index,
   CodeComplete,
   CodeCompleteOpen,

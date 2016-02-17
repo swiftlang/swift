@@ -18,7 +18,7 @@
 #define SWIFT_AST_LAZYRESOLVER_H
 
 #include "swift/AST/TypeLoc.h"
-#include "llvm/ADT/Fixnum.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
 
@@ -160,7 +160,7 @@ public:
 /// A placeholder for either an array or a member loader.
 template <typename T>
 class LazyLoaderArray {
-  using LengthTy = llvm::Fixnum<31>;
+  using LengthTy = llvm::PointerEmbeddedInt<size_t, 31>;
   PointerUnion<LengthTy, LazyMemberLoader *> lengthOrLoader;
   uint64_t data = 0;
 public:

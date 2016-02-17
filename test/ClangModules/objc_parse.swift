@@ -30,15 +30,15 @@ func treatBAsA(b: B) -> A {
 
 // Instance method invocation
 func instanceMethods(b: B) {
-  var i = b.method(1, withFloat:2.5)
-  i = i + b.method(1, withDouble:2.5)
+  var i = b.method(1, with: 2.5 as Float)
+  i = i + b.method(1, with: 2.5 as Double)
 
   // BOOL
   b.setEnabled(true)
 
   // SEL
-  b.perform(#selector(NSObject.isEqual(_:)), withObject:b)
-  if let result = b.perform(#selector(B.getAsProto), withObject:nil) {
+  b.perform(#selector(NSObject.isEqual(_:)), with: b)
+  if let result = b.perform(#selector(B.getAsProto), with: nil) {
     _ = result.takeUnretainedValue()
   }
 
@@ -64,7 +64,7 @@ func instanceMethods(b: B) {
 func classMethods(b: B, other: NSObject) {
   var i = B.classMethod()
   i += B.classMethod(1)
-  i += B.classMethod(1, withInt:2)
+  i += B.classMethod(1, with: 2)
 
   i += b.classMethod() // expected-error{{static member 'classMethod' cannot be used on instance of type 'B'}}
 
@@ -144,7 +144,7 @@ func newConstruction(a: A, aproxy: AProxy) {
   b = B(bbb:b)
   b = B(forWorldDomination:())
   b = B(int: 17, andDouble : 3.14159)
-  b = B.new(withA: a)
+  b = B.new(with: a)
   B.alloc()._initFoo()
   b.notAnInit()
 
@@ -185,8 +185,8 @@ func checkHive(hive: Hive, b: Bee) {
 func testProtocols(b: B, bp: BProto) {
   var bp2 : BProto = b
   var b2 : B = bp // expected-error{{cannot convert value of type 'BProto' to specified type 'B'}}
-  bp.method(1, withFloat:2.5)
-  bp.method(1, withDouble:2.5) // expected-error{{incorrect argument label in call (have '_:withDouble:', expected '_:withFloat:')}} {{16-26=withFloat}}
+  bp.method(1, with: 2.5 as Float)
+  bp.method(1, withFoo: 2.5) // expected-error{{incorrect argument label in call (have '_:withFoo:', expected '_:with:')}}
   bp2 = b.getAsProto()
 
   var c1 : Cat1Proto = b
@@ -197,18 +197,18 @@ func testProtocols(b: B, bp: BProto) {
 
 // Methods only defined in a protocol
 func testProtocolMethods(b: B, p2m: P2.Type) {
-  b.otherMethod(1, withFloat:3.14159)
+  b.otherMethod(1, with: 3.14159)
   b.p2Method()
-  b.initViaP2(3.14159, second:3.14159) // expected-error{{value of type 'B' has no member 'initViaP2'}}
+  b.initViaP2(3.14159, second: 3.14159) // expected-error{{value of type 'B' has no member 'initViaP2'}}
 
   // Imported constructor.
-  var b2 = B(viaP2: 3.14159, second:3.14159)
+  var b2 = B(viaP2: 3.14159, second: 3.14159)
 
   p2m.init(viaP2:3.14159, second: 3.14159)
 }
 
 func testId(x: AnyObject) {
-  x.perform!("foo:", withObject: x) // expected-warning{{no method declared with Objective-C selector 'foo:'}}
+  x.perform!("foo:", with: x) // expected-warning{{no method declared with Objective-C selector 'foo:'}}
 
   x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)

@@ -13,7 +13,7 @@ x1.new_method(<, left: 0, right: 1)
 
 struct Test<T> {
   init() {}
-  func  recursive(x x : T)  {
+  func recursive(x x : T)  {
     return recursive(x: x)
   }
 }

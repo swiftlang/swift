@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/StringExtras.h"
 
 using namespace swift;
 using namespace constraints;
@@ -783,8 +784,9 @@ namespace {
   /// candidates that could be called, or the one concrete decl that will be
   /// called if not ambiguous.
   class CalleeCandidateInfo {
-    ConstraintSystem *CS;
   public:
+    ConstraintSystem *const CS;
+
     /// This is the name of the callee as extracted from the call expression.
     /// This can be empty in cases like calls to closure exprs.
     std::string declName;
@@ -854,17 +856,13 @@ namespace {
     UncurriedCandidate operator[](unsigned i) const {
       return candidates[i];
     }
-    
+
     /// Given a set of parameter lists from an overload group, and a list of
     /// arguments, emit a diagnostic indicating any partially matching
     /// overloads.
     void suggestPotentialOverloads(SourceLoc loc, bool isResult = false);
 
-    /// If the candidate set has been narrowed down to a specific structural
-    /// problem, e.g. that there are too few parameters specified or that
-    /// argument labels don't match up, diagnose that error and return true.
-    bool diagnoseAnyStructuralArgumentError(Expr *fnExpr, Expr *argExpr);
-    
+
     /// If the candidate set has been narrowed to a single parameter or single
     /// archetype that has argument type errors, diagnose that error and
     /// return true.
@@ -989,18 +987,14 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 /// and equal fixed type portions, and return by reference each archetype and
 /// the matching portion of the actual arg type where that archetype appears.
 static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actualArgType,
-                                     SmallVector<ArchetypeType *, 4> &archetypes,
-                                     SmallVector<Type, 4> &substitutions) {
+                                     TypeSubstitutionMap &archetypesMap) {
   class GenericVisitor : public TypeMatcher<GenericVisitor> {
     DeclContext *dc;
-    SmallVector<ArchetypeType *, 4> &archetypes;
-    SmallVector<Type, 4> &substitutions;
+    TypeSubstitutionMap &archetypesMap;
 
   public:
-    GenericVisitor(DeclContext *dc,
-                   SmallVector<ArchetypeType *, 4> &archetypes,
-                   SmallVector<Type, 4> &substitutions)
-    : dc(dc), archetypes(archetypes), substitutions(substitutions) {}
+    GenericVisitor(DeclContext *dc, TypeSubstitutionMap &archetypesMap)
+      : dc(dc), archetypesMap(archetypesMap) {}
     
     bool mismatch(TypeBase *paramType, TypeBase *argType) {
       return paramType->isEqual(argType);
@@ -1012,12 +1006,10 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actua
         type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
       
       if (auto archetype = type->getAs<ArchetypeType>()) {
-        for (unsigned i = 0, c = archetypes.size(); i < c; i++) {
-          if (archetypes[i]->isEqual(archetype))
-            return substitutions[i]->isEqual(argType);
-        }
-        archetypes.push_back(archetype);
-        substitutions.push_back(argType);
+        auto existing = archetypesMap[archetype];
+        if (existing)
+          return existing->isEqual(argType);
+        archetypesMap[archetype] = argType;
         return true;
       }
       return false;
@@ -1032,15 +1024,22 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actua
       if (dc && original->isTypeParameter())
         original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
       
-      if (auto archetype = original->getAs<ArchetypeType>()) {
-        archetypes.push_back(archetype);
-        substitutions.push_back(substitution->getReplacementType());
-      }
+      Type replacement = substitution->getReplacementType();
+      // If the replacement is itself an archetype, then the constraint
+      // system was asserting equivalencies between different levels of
+      // generics, rather than binding a generic to a concrete type (and we
+      // don't/won't have a concrete type). In which case, it is the
+      // replacement we are interested in, since it is the one in our current
+      // context. That generic type should equal itself.
+      if (auto ourGeneric = replacement->getAs<ArchetypeType>())
+        archetypesMap[ourGeneric] = replacement;
+      else if (auto archetype = original->getAs<ArchetypeType>())
+        archetypesMap[archetype] = replacement;
     }
     return false;
   });
   
-  GenericVisitor visitor(dc, archetypes, substitutions);
+  GenericVisitor visitor(dc, archetypesMap);
   return visitor.match(paramType, actualArgType);
 }
 
@@ -1087,17 +1086,19 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   // their type and count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
 
-  // Checking of archetypes.
-  // FIXME: For now just trying to verify applicability of arguments with only
-  // a single generic variable. Ideally we'd create a ConstraintSystem with
-  // type variables for all generics and solve it with the given argument types.
-  Type singleArchetype = nullptr;
-  Type matchingArgType = nullptr;
+  // Known mapping of archetypes in all arguments so far. An archetype may map
+  // to another archetype if the constraint system substituted one for another.
+  TypeSubstitutionMap allGenericSubstitutions;
 
-  // Number of args of generic archetype which are mismatched because
+  // Number of args of one generic archetype which are mismatched because
   // isSubstitutableFor() has failed. If all mismatches are of this type, we'll
   // return a different closeness for better diagnoses.
+  Type nonSubstitutableArchetype = nullptr;
   unsigned nonSubstitutableArgs = 0;
+  
+  // The type of failure is that multiple occurrences of the same generic are
+  // being passed arguments with different concrete types.
+  bool genericWithDifferingConcreteTypes = false;
   
   // We classify an argument mismatch as being a "near" miss if it is a very
   // likely match due to a common sort of problem (e.g. wrong flags on a
@@ -1123,69 +1124,80 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         continue;
       
       // FIXME: Right now, a "matching" overload is one with a parameter whose
-      // type is identical to the argument type, or substitutable via
-      // rudimentary handling of functions with a single archetype in one or
-      // more parameters.
+      // type is identical to the argument type, or substitutable via handling
+      // of functions with primary archetypes in one or more parameters.
       // We can still do something more sophisticated with this.
       // FIXME: Use TC.isConvertibleTo?
 
-      SmallVector<ArchetypeType *, 4> archetypes;
-      SmallVector<Type, 4> substitutions;
+      TypeSubstitutionMap archetypesMap;
       bool matched;
-      if (paramType->is<UnresolvedType>())
+      if (paramType->is<UnresolvedType>() || rArgType->hasTypeVariable())
         matched = false;
       else
-        matched = findGenericSubstitutions(dc, paramType, rArgType,
-                                           archetypes, substitutions);
+        matched = findGenericSubstitutions(dc, paramType, rArgType, archetypesMap);
       
-      if (matched && archetypes.size() == 0)
-        continue;
-      if (matched && archetypes.size() == 1 && !rArgType->hasTypeVariable()) {
-        auto archetype = archetypes[0];
-        auto substitution = substitutions[0];
-        
-        if (singleArchetype) {
-          if (!archetype->isEqual(singleArchetype))
-            // Multiple archetypes, too complicated.
-            return { CC_ArgumentMismatch, {}};
+      if (matched) {
+        for (auto pair : archetypesMap) {
+          auto archetype = pair.first->castTo<ArchetypeType>();
+          auto substitution = pair.second;
           
-          if (substitution->isEqual(matchingArgType)) {
-            if (nonSubstitutableArgs == 0)
-              continue;
-            ++nonSubstitutableArgs;
-            // Fallthrough, this is nonsubstitutable, so mismatches as well.
+          auto existingSubstitution = allGenericSubstitutions[archetype];
+          if (!existingSubstitution) {
+            // New substitution for this callee.
+            allGenericSubstitutions[archetype] = substitution;
+            
+            // Not yet handling nested archetypes.
+            if (!archetype->isPrimary())
+              return { CC_ArgumentMismatch, {}};
+            
+            if (!CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
+              // If we have multiple non-substitutable types, this is just a mismatched mess.
+              if (!nonSubstitutableArchetype.isNull())
+                return { CC_ArgumentMismatch, {}};
+              
+              if (auto argOptType = argType->getOptionalObjectType())
+                mismatchesAreNearMisses &= CS->TC.isSubstitutableFor(argOptType, archetype, CS->DC);
+              else
+                mismatchesAreNearMisses = false;
+              
+              nonSubstitutableArchetype = archetype;
+              nonSubstitutableArgs = 1;
+              matched = false;
+            }
           } else {
-            if (nonSubstitutableArgs == 0) {
-              paramType = matchingArgType;
-              // Fallthrough as mismatched arg, comparing nearness to archetype
-              // bound type.
-            } else if (nonSubstitutableArgs == 1) {
+            // Substitution for the same archetype as in a previous argument.
+            bool isNonSubstitutableArchetype = !nonSubstitutableArchetype.isNull() &&
+                                               nonSubstitutableArchetype->isEqual(archetype);
+            if (substitution->isEqual(existingSubstitution)) {
+              if (isNonSubstitutableArchetype) {
+                ++nonSubstitutableArgs;
+                matched = false;
+              }
+            } else {
               // If we have only one nonSubstitutableArg so far, then this different
               // type might be the one that we should be substituting for instead.
               // Note that failureInfo is already set correctly for that case.
-              if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
-                mismatchesAreNearMisses = argumentMismatchIsNearMiss(matchingArgType, substitution);
-                matchingArgType = substitution;
-                continue;
+              if (isNonSubstitutableArchetype && nonSubstitutableArgs == 1 &&
+                  CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
+                mismatchesAreNearMisses = argumentMismatchIsNearMiss(existingSubstitution, substitution);
+                allGenericSubstitutions[archetype] = substitution;
+              } else {
+                genericWithDifferingConcreteTypes = true;
+                matched = false;
               }
             }
           }
-        } else {
-          matchingArgType = substitution;
-          singleArchetype = archetype;
-
-          if (CS->TC.isSubstitutableFor(substitution, archetype, CS->DC)) {
-            continue;
-          }
-          ++nonSubstitutableArgs;
         }
       }
       
+      if (matched)
+        continue;
+      
+      if (archetypesMap.empty())
+        mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
+      
       ++mismatchingArgs;
-      
-      // Keep track of whether this argument was a near miss or not.
-      mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
-      
+
       failureInfo.argumentNumber = argNo;
       failureInfo.parameterType = paramType;
       if (paramType->hasTypeParameter())
@@ -1198,17 +1210,31 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
-  if (candArgs[0].Ty->is<InOutType>() && !actualArgs[0].Ty->isLValueType())
+  Type firstArg = actualArgs[0].Ty;
+  if (candArgs[0].Ty->is<InOutType>() && !(firstArg->isLValueType() || firstArg->is<InOutType>()))
     return { CC_NonLValueInOut, {}};
   
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
   if (mismatchingArgs == 1) {
     CandidateCloseness closeness;
-    if (singleArchetype.isNull()) {
+    if (allGenericSubstitutions.empty()) {
       closeness = mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
                                           : CC_OneArgumentMismatch;
     } else {
+      // If the failure is that different occurrences of the same generic have
+      // different concrete types, substitute in all the concrete types we've found
+      // into the failureInfo to improve diagnosis.
+      if (genericWithDifferingConcreteTypes) {
+        auto newType = failureInfo.parameterType.transform([&](Type type) -> Type {
+          if (auto archetype = type->getAs<ArchetypeType>())
+            if (auto replacement = allGenericSubstitutions[archetype])
+              return replacement;
+          return type;
+        });
+        failureInfo.parameterType = newType;
+      }
+      
       closeness = mismatchesAreNearMisses ? CC_OneGenericArgumentNearMismatch
                                           : CC_OneGenericArgumentMismatch;
     }
@@ -1568,199 +1594,6 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   }
 }
 
-
-/// If the candidate set has been narrowed down to a specific structural
-/// problem, e.g. that there are too few parameters specified or that argument
-/// labels don't match up, diagnose that error and return true.
-bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
-                                                             Expr *argExpr) {
-  // If we are invoking a constructor and there are absolutely no candidates,
-  // then they must all be private.
-  if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
-    if (!MTT->getInstanceType()->is<TupleType>() &&
-        (size() == 0 ||
-         (size() == 1 && candidates[0].getDecl() &&
-          isa<ProtocolDecl>(candidates[0].getDecl())))) {
-      CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
-                      MTT->getInstanceType());
-      return true;
-    }
-  }
-  
-  
-  // TODO: We only handle the situation where there is exactly one candidate
-  // here.
-  if (size() != 1)
-    return false;
-  
-  
-  auto args = decomposeArgParamType(argExpr->getType());
-
-  auto argTy = candidates[0].getArgumentType();
-  if (!argTy) return false;
-
-  auto params = decomposeArgParamType(argTy);
-
-  // It is a somewhat common error to try to access an instance method as a
-  // curried member on the type, instead of using an instance, e.g. the user
-  // wrote:
-  //
-  //   Foo.doThing(42, b: 19)
-  //
-  // instead of:
-  //
-  //   myFoo.doThing(42, b: 19)
-  //
-  // Check for this situation and handle it gracefully.
-  if (params.size() == 1 && candidates[0].getDecl() &&
-      candidates[0].getDecl()->isInstanceMember() &&
-      candidates[0].level == 0) {
-    if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
-      if (isa<TypeExpr>(UDE->getBase())) {
-        auto baseType = candidates[0].getArgumentType();
-        
-        // If the base is an implicit self type reference, and we're in a
-        // property initializer, then the user wrote something like:
-        //
-        //   class Foo { let val = initFn() }
-        //
-        // which runs in type context, not instance context.  Produce a tailored
-        // diagnostic since this comes up and is otherwise non-obvious what is
-        // going on.
-        if (UDE->getBase()->isImplicit() && isa<Initializer>(CS->DC) &&
-            CS->DC->getParent()->getDeclaredTypeOfContext()->isEqual(baseType)){
-          CS->TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
-                          UDE->getName());
-          return true;
-        }
-        
-        // Otherwise, complain about use of instance value on type.
-        CS->TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
-                        baseType, UDE->getName())
-          .highlight(UDE->getBase()->getSourceRange());
-        return true;
-      }
-  }
-  
-  // We only handle structural errors here.
-  if (closeness != CC_ArgumentLabelMismatch &&
-      closeness != CC_ArgumentCountMismatch)
-    return false;
-  
-  SmallVector<Identifier, 4> correctNames;
-  unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
-  unsigned extraArgIdx = ~0U, missingParamIdx = ~0U;
-  
-  // If we have a single candidate that failed to match the argument list,
-  // attempt to use matchCallArguments to diagnose the problem.
-  struct OurListener : public MatchCallArgumentListener {
-    SmallVectorImpl<Identifier> &correctNames;
-    unsigned &OOOArgIdx, &OOOPrevArgIdx;
-    unsigned &extraArgIdx, &missingParamIdx;
-    
-  public:
-    OurListener(SmallVectorImpl<Identifier> &correctNames,
-                unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx,
-                unsigned &extraArgIdx, unsigned &missingParamIdx)
-    : correctNames(correctNames),
-    OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx),
-    extraArgIdx(extraArgIdx), missingParamIdx(missingParamIdx) {}
-    void extraArgument(unsigned argIdx) override {
-      extraArgIdx = argIdx;
-    }
-    void missingArgument(unsigned paramIdx) override {
-      missingParamIdx = paramIdx;
-    }
-    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override{
-      OOOArgIdx = argIdx;
-      OOOPrevArgIdx = prevArgIdx;
-    }
-    bool relabelArguments(ArrayRef<Identifier> newNames) override {
-      correctNames.append(newNames.begin(), newNames.end());
-      return true;
-    }
-  } listener(correctNames, OOOArgIdx, OOOPrevArgIdx,
-             extraArgIdx, missingParamIdx);
-  
-  // Use matchCallArguments to determine how close the argument list is (in
-  // shape) to the specified candidates parameters.  This ignores the
-  // concrete types of the arguments, looking only at the argument labels.
-  SmallVector<ParamBinding, 4> paramBindings;
-  if (!matchCallArguments(args, params, hasTrailingClosure,
-                          /*allowFixes:*/true, listener, paramBindings))
-    return false;
-  
-  
-  // If we are missing a parameter, diagnose that.
-  if (missingParamIdx != ~0U) {
-    Identifier name = params[missingParamIdx].Label;
-    auto loc = argExpr->getStartLoc();
-    if (name.empty())
-      CS->TC.diagnose(loc, diag::missing_argument_positional,
-                      missingParamIdx+1);
-    else
-      CS->TC.diagnose(loc, diag::missing_argument_named, name);
-    return true;
-  }
-  
-  if (extraArgIdx != ~0U) {
-    auto name = args[extraArgIdx].Label;
-    Expr *arg = argExpr;
-    auto tuple = dyn_cast<TupleExpr>(argExpr);
-    if (tuple)
-      arg = tuple->getElement(extraArgIdx);
-    auto loc = arg->getLoc();
-    if (tuple && extraArgIdx == tuple->getNumElements()-1 &&
-        tuple->hasTrailingClosure())
-      CS->TC.diagnose(loc, diag::extra_trailing_closure_in_call)
-        .highlight(arg->getSourceRange());
-    else if (params.empty())
-      CS->TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-        .highlight(argExpr->getSourceRange());
-    else if (name.empty())
-      CS->TC.diagnose(loc, diag::extra_argument_positional)
-        .highlight(arg->getSourceRange());
-    else
-      CS->TC.diagnose(loc, diag::extra_argument_named, name)
-        .highlight(arg->getSourceRange());
-    return true;
-  }
-  
-  // If this is an argument label mismatch, then diagnose that error now.
-  if (!correctNames.empty() &&
-      CS->diagnoseArgumentLabelError(argExpr, correctNames,
-                                     /*isSubscript=*/false))
-    return true;
-  
-  // If we have an out-of-order argument, diagnose it as such.
-  if (OOOArgIdx != ~0U && isa<TupleExpr>(argExpr)) {
-    auto tuple = cast<TupleExpr>(argExpr);
-    Identifier first = tuple->getElementName(OOOArgIdx);
-    Identifier second = tuple->getElementName(OOOPrevArgIdx);
-    
-    SourceLoc diagLoc;
-    if (!first.empty())
-      diagLoc = tuple->getElementNameLoc(OOOArgIdx);
-    else
-      diagLoc = tuple->getElement(OOOArgIdx)->getStartLoc();
-    
-    if (!second.empty()) {
-      CS->TC.diagnose(diagLoc, diag::argument_out_of_order, first, second)
-        .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
-        .highlight(SourceRange(tuple->getElementNameLoc(OOOPrevArgIdx),
-                               tuple->getElement(OOOPrevArgIdx)->getEndLoc()));
-      return true;
-    }
-    
-    CS->TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed, first,
-                    OOOPrevArgIdx)
-      .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
-      .highlight(tuple->getElement(OOOPrevArgIdx)->getSourceRange());
-    return true;
-  }
-  return false;
-}
-
 /// If the candidate set has been narrowed to a single parameter or single
 /// archetype that has argument type errors, diagnose that error and
 /// return true.
@@ -1774,23 +1607,36 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     return false;
   
   bool foundFailure = false;
-  SmallVector<ArchetypeType *, 4> archetypes;
-  SmallVector<Type, 4> substitutions;
+  TypeSubstitutionMap archetypesMap;
   
   if (!findGenericSubstitutions(failedArgument.declContext, failedArgument.parameterType,
-                                argType, archetypes, substitutions))
+                                argType, archetypesMap))
     return false;
 
-  for (unsigned i = 0, c = archetypes.size(); i < c; i++) {
-    auto archetype = archetypes[i];
-    auto argType = substitutions[i];
+  for (auto pair : archetypesMap) {
+    auto archetype = pair.first->castTo<ArchetypeType>();
+    auto substitution = pair.second;
     
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
+
+    // Check for optional near miss.
+    if (auto argOptType = substitution->getOptionalObjectType()) {
+      if (CS->TC.isSubstitutableFor(argOptType, archetype, CS->DC)) {
+        CS->TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional, argType);
+        foundFailure = true;
+        continue;
+      }
+    }
     
     for (auto proto : archetype->getConformsTo()) {
-      if (!CS->TC.conformsToProtocol(argType, proto, CS->DC, ConformanceCheckOptions(TR_InExpression))) {
-        CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
-                        argType, proto->getDeclaredType());
+      if (!CS->TC.conformsToProtocol(substitution, proto, CS->DC, ConformanceCheckOptions(TR_InExpression))) {
+        if (substitution->isEqual(argType)) {
+          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
+                          substitution, proto->getDeclaredType());
+        } else {
+          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_partial_argument_value_protocol,
+                          argType, substitution, proto->getDeclaredType());
+        }
         foundFailure = true;
       }
     }
@@ -1842,7 +1688,11 @@ enum TCCFlags {
   /// Re-type-check the given subexpression even if the expression has already
   /// been checked already.  The client is asserting that infinite recursion is
   /// not possible because it has relaxed a constraint on the system.
-  TCC_ForceRecheck = 0x02
+  TCC_ForceRecheck = 0x02,
+    
+  /// tell typeCheckExpression that it is ok to produce an ambiguous result,
+  /// it can just fill in holes with UnresolvedType and we'll deal with it.
+  TCC_AllowUnresolvedTypeVariables = 0x04
 };
 
 typedef OptionSet<TCCFlags> TCCOptions;
@@ -1911,7 +1761,13 @@ public:
 
   /// Special magic to handle inout exprs and tuples in argument lists.
   Expr *typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
-                                        const CalleeCandidateInfo &candidates);
+                                        const CalleeCandidateInfo &candidates,
+                                            TCCOptions options = TCCOptions());
+
+  /// Diagnose common failures due to applications of an argument list to an
+  /// ApplyExpr or SubscriptExpr.
+  bool diagnoseParameterErrors(CalleeCandidateInfo &CCI, Expr *fnExpr,
+                               Expr *argExpr);
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -2969,7 +2825,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // If there is no contextual type available, tell typeCheckExpression that it
   // is ok to produce an ambiguous result, it can just fill in holes with
   // UnresolvedType and we'll deal with it.
-  if (!convertType)
+  if (!convertType || options.contains(TCC_AllowUnresolvedTypeVariables))
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
@@ -3357,7 +3213,8 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 /// Special magic to handle inout exprs and tuples in argument lists.
 Expr *FailureDiagnosis::
 typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
-                                    const CalleeCandidateInfo &candidates) {
+                                    const CalleeCandidateInfo &candidates,
+                                    TCCOptions options) {
   // Grab one of the candidates (if present) and get its input list to help
   // identify operators that have implicit inout arguments.
   Type exampleInputType;
@@ -3391,7 +3248,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   if (!TE) {
     // If the argument isn't a tuple, it is some scalar value for a
     // single-argument call.
-    TCCOptions options;
     if (exampleInputType && exampleInputType->is<InOutType>())
       options |= TCC_AllowLValue;
 
@@ -3464,7 +3320,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
         unsigned inArgNo = sources[i];
         auto actualType = argTypeTT->getElementType(i);
 
-        TCCOptions options;
         if (actualType->is<InOutType>())
           options |= TCC_AllowLValue;
 
@@ -3529,7 +3384,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     exampleInputTuple = exampleInputType->getAs<TupleType>();
 
   for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-    TCCOptions options;
     if (exampleInputTuple && i < exampleInputTuple->getNumElements() &&
         exampleInputTuple->getElementType(i)->is<InOutType>())
       options |= TCC_AllowLValue;
@@ -3548,6 +3402,424 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
                            TE->getRParenLoc(), TE->hasTrailingClosure(),
                            TE->isImplicit(), TT);
 }
+
+
+/// Diagnose an argument labeling issue, returning true if we successfully
+/// diagnosed the issue.
+static bool diagnoseArgumentLabelError(Expr *expr,
+                                       ArrayRef<Identifier> newNames,
+                                       bool isSubscript, ConstraintSystem &CS) {
+  
+  auto tuple = dyn_cast<TupleExpr>(expr);
+  if (!tuple) {
+    if (newNames[0].empty()) {
+      // This is probably a conversion from a value of labeled tuple type to
+      // a scalar.
+      // FIXME: We want this issue to disappear completely when single-element
+      // labelled tuples go away.
+      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
+        int scalarFieldIdx = tupleTy->getElementForScalarInit();
+        if (scalarFieldIdx >= 0) {
+          auto &field = tupleTy->getElement(scalarFieldIdx);
+          if (field.hasName()) {
+            llvm::SmallString<16> str;
+            str = ".";
+            str += field.getName().str();
+            CS.TC.diagnose(expr->getStartLoc(),
+                           diag::extra_named_single_element_tuple,
+                           field.getName().str())
+            .fixItInsertAfter(expr->getEndLoc(), str);
+            return true;
+          }
+        }
+      }
+      
+      // We don't know what to do with this.
+      return false;
+    }
+    
+    // This is a scalar-to-tuple conversion. Add the name.  We "know"
+    // that we're inside a ParenExpr, because ParenExprs are required
+    // by the syntax and locator resolution looks through on level of
+    // them.
+    
+    // Look through the paren expression, if there is one.
+    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
+      expr = parenExpr->getSubExpr();
+    
+    llvm::SmallString<16> str;
+    str += newNames[0].str();
+    str += ": ";
+    CS.TC.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false,
+                   str.substr(0, str.size()-1), isSubscript)
+    .fixItInsert(expr->getStartLoc(), str);
+    return true;
+  }
+  
+  // Figure out how many extraneous, missing, and wrong labels are in
+  // the call.
+  unsigned numExtra = 0, numMissing = 0, numWrong = 0;
+  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
+  
+  llvm::SmallString<16> missingBuffer;
+  llvm::SmallString<16> extraBuffer;
+  for (unsigned i = 0; i != n; ++i) {
+    Identifier oldName;
+    if (i < tuple->getNumElements())
+      oldName = tuple->getElementName(i);
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
+    
+    if (oldName == newName ||
+        (tuple->hasTrailingClosure() && i == tuple->getNumElements()-1))
+      continue;
+    
+    if (oldName.empty()) {
+      ++numMissing;
+      missingBuffer += newName.str();
+      missingBuffer += ":";
+    } else if (newName.empty()) {
+      ++numExtra;
+      extraBuffer += oldName.str();
+      extraBuffer += ':';
+    } else
+      ++numWrong;
+  }
+  
+  // Emit the diagnostic.
+  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
+  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
+  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
+  Optional<InFlightDiagnostic> diagOpt;
+  
+  // If we had any wrong labels, or we have both missing and extra labels,
+  // emit the catch-all "wrong labels" diagnostic.
+  bool plural = (numMissing + numExtra + numWrong) > 1;
+  if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
+    for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      auto haveName = tuple->getElementName(i);
+      if (haveName.empty())
+        haveBuffer += '_';
+      else
+        haveBuffer += haveName.str();
+      haveBuffer += ':';
+    }
+    
+    for (auto expected : newNames) {
+      if (expected.empty())
+        expectedBuffer += '_';
+      else
+        expectedBuffer += expected.str();
+      expectedBuffer += ':';
+    }
+    
+    StringRef haveStr = haveBuffer;
+    StringRef expectedStr = expectedBuffer;
+    diagOpt.emplace(CS.TC.diagnose(expr->getLoc(), diag::wrong_argument_labels,
+                                   plural, haveStr, expectedStr, isSubscript));
+  } else if (numMissing > 0) {
+    StringRef missingStr = missingBuffer;
+    diagOpt.emplace(CS.TC.diagnose(expr->getLoc(),diag::missing_argument_labels,
+                                   plural, missingStr, isSubscript));
+  } else {
+    assert(numExtra > 0);
+    StringRef extraStr = extraBuffer;
+    diagOpt.emplace(CS.TC.diagnose(expr->getLoc(), diag::extra_argument_labels,
+                                   plural, extraStr, isSubscript));
+  }
+  
+  // Emit Fix-Its to correct the names.
+  auto &diag = *diagOpt;
+  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+    Identifier oldName = tuple->getElementName(i);
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
+    
+    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
+      continue;
+    
+    if (newName.empty()) {
+      // Delete the old name.
+      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
+                            tuple->getElement(i)->getStartLoc());
+      continue;
+    }
+    
+    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
+    llvm::SmallString<16> newStr;
+    if (newNameIsReserved)
+      newStr += "`";
+    newStr += newName.str();
+    if (newNameIsReserved)
+      newStr += "`";
+    
+    if (oldName.empty()) {
+      // Insert the name.
+      newStr += ": ";
+      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
+      continue;
+    }
+    
+    // Change the name.
+    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
+  }
+  
+  return true;
+}
+
+
+
+/// Emit a class of diagnostics that we only know how to generate when there is
+/// exactly one candidate we know about.  Return true if an error is emitted.
+static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
+                                            Expr *fnExpr, Expr *argExpr) {
+  // We only handle the situation where there is exactly one candidate here.
+  if (CCI.size() != 1)
+    return false;
+
+  auto candidate = CCI[0];
+  auto &TC = CCI.CS->TC;
+
+  auto argTy = candidate.getArgumentType();
+  if (!argTy) return false;
+
+  auto params = decomposeArgParamType(argTy);
+  auto args = decomposeArgParamType(argExpr->getType());
+
+  // It is a somewhat common error to try to access an instance method as a
+  // curried member on the type, instead of using an instance, e.g. the user
+  // wrote:
+  //
+  //   Foo.doThing(42, b: 19)
+  //
+  // instead of:
+  //
+  //   myFoo.doThing(42, b: 19)
+  //
+  // Check for this situation and handle it gracefully.
+  if (params.size() == 1 && candidate.getDecl() &&
+      candidate.getDecl()->isInstanceMember() &&
+      candidate.level == 0) {
+    if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
+      if (isa<TypeExpr>(UDE->getBase())) {
+        auto baseType = candidate.getArgumentType();
+        auto DC = CCI.CS->DC;
+
+        // If the base is an implicit self type reference, and we're in a
+        // property initializer, then the user wrote something like:
+        //
+        //   class Foo { let val = initFn() }
+        //
+        // which runs in type context, not instance context.  Produce a tailored
+        // diagnostic since this comes up and is otherwise non-obvious what is
+        // going on.
+        if (UDE->getBase()->isImplicit() && isa<Initializer>(DC) &&
+            DC->getParent()->getDeclaredTypeOfContext()->isEqual(baseType)){
+          TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
+                          UDE->getName());
+          return true;
+        }
+
+        // Otherwise, complain about use of instance value on type.
+        TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
+                    baseType, UDE->getName())
+          .highlight(UDE->getBase()->getSourceRange());
+        return true;
+      }
+  }
+
+  // We only handle structural errors here.
+  if (CCI.closeness != CC_ArgumentLabelMismatch &&
+      CCI.closeness != CC_ArgumentCountMismatch)
+    return false;
+
+  SmallVector<Identifier, 4> correctNames;
+  unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
+  unsigned extraArgIdx = ~0U, missingParamIdx = ~0U;
+
+  // If we have a single candidate that failed to match the argument list,
+  // attempt to use matchCallArguments to diagnose the problem.
+  struct OurListener : public MatchCallArgumentListener {
+    SmallVectorImpl<Identifier> &correctNames;
+    unsigned &OOOArgIdx, &OOOPrevArgIdx;
+    unsigned &extraArgIdx, &missingParamIdx;
+
+  public:
+    OurListener(SmallVectorImpl<Identifier> &correctNames,
+                unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx,
+                unsigned &extraArgIdx, unsigned &missingParamIdx)
+    : correctNames(correctNames),
+    OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx),
+    extraArgIdx(extraArgIdx), missingParamIdx(missingParamIdx) {}
+    void extraArgument(unsigned argIdx) override {
+      extraArgIdx = argIdx;
+    }
+    void missingArgument(unsigned paramIdx) override {
+      missingParamIdx = paramIdx;
+    }
+    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override{
+      OOOArgIdx = argIdx;
+      OOOPrevArgIdx = prevArgIdx;
+    }
+    bool relabelArguments(ArrayRef<Identifier> newNames) override {
+      correctNames.append(newNames.begin(), newNames.end());
+      return true;
+    }
+  } listener(correctNames, OOOArgIdx, OOOPrevArgIdx,
+             extraArgIdx, missingParamIdx);
+
+  // Use matchCallArguments to determine how close the argument list is (in
+  // shape) to the specified candidates parameters.  This ignores the
+  // concrete types of the arguments, looking only at the argument labels.
+  SmallVector<ParamBinding, 4> paramBindings;
+  if (!matchCallArguments(args, params, CCI.hasTrailingClosure,
+                          /*allowFixes:*/true, listener, paramBindings))
+    return false;
+
+
+  // If we are missing a parameter, diagnose that.
+  if (missingParamIdx != ~0U) {
+    Identifier name = params[missingParamIdx].Label;
+    auto loc = argExpr->getStartLoc();
+    if (name.empty())
+      TC.diagnose(loc, diag::missing_argument_positional,
+                  missingParamIdx+1);
+    else
+      TC.diagnose(loc, diag::missing_argument_named, name);
+    return true;
+  }
+
+  if (extraArgIdx != ~0U) {
+    auto name = args[extraArgIdx].Label;
+    Expr *arg = argExpr;
+    auto tuple = dyn_cast<TupleExpr>(argExpr);
+    if (tuple)
+      arg = tuple->getElement(extraArgIdx);
+    auto loc = arg->getLoc();
+    if (tuple && extraArgIdx == tuple->getNumElements()-1 &&
+        tuple->hasTrailingClosure())
+      TC.diagnose(loc, diag::extra_trailing_closure_in_call)
+        .highlight(arg->getSourceRange());
+    else if (params.empty())
+      TC.diagnose(loc, diag::extra_argument_to_nullary_call)
+        .highlight(argExpr->getSourceRange());
+    else if (name.empty())
+      TC.diagnose(loc, diag::extra_argument_positional)
+        .highlight(arg->getSourceRange());
+    else
+      TC.diagnose(loc, diag::extra_argument_named, name)
+        .highlight(arg->getSourceRange());
+    return true;
+  }
+
+  // If this is an argument label mismatch, then diagnose that error now.
+  if (!correctNames.empty() &&
+      diagnoseArgumentLabelError(argExpr, correctNames,
+                                 /*isSubscript=*/isa<SubscriptExpr>(fnExpr),
+                                 *CCI.CS))
+    return true;
+
+  // If we have an out-of-order argument, diagnose it as such.
+  if (OOOArgIdx != ~0U && isa<TupleExpr>(argExpr)) {
+    auto tuple = cast<TupleExpr>(argExpr);
+    Identifier first = tuple->getElementName(OOOArgIdx);
+    Identifier second = tuple->getElementName(OOOPrevArgIdx);
+
+    SourceLoc diagLoc;
+    if (!first.empty())
+      diagLoc = tuple->getElementNameLoc(OOOArgIdx);
+    else
+      diagLoc = tuple->getElement(OOOArgIdx)->getStartLoc();
+
+    if (!second.empty()) {
+      TC.diagnose(diagLoc, diag::argument_out_of_order, first, second)
+        .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
+        .highlight(SourceRange(tuple->getElementNameLoc(OOOPrevArgIdx),
+                               tuple->getElement(OOOPrevArgIdx)->getEndLoc()));
+      return true;
+    }
+
+    TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed, first,
+                OOOPrevArgIdx)
+      .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
+      .highlight(tuple->getElement(OOOPrevArgIdx)->getSourceRange());
+    return true;
+  }
+
+  return false;
+}
+
+/// If the candidate set has been narrowed down to a specific structural
+/// problem, e.g. that there are too few parameters specified or that argument
+/// labels don't match up, diagnose that error and return true.
+bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
+                                               Expr *fnExpr, Expr *argExpr) {
+  // If we are invoking a constructor and there are absolutely no candidates,
+  // then they must all be private.
+  if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
+    if (!MTT->getInstanceType()->is<TupleType>() &&
+        (CCI.size() == 0 ||
+         (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
+          isa<ProtocolDecl>(CCI.candidates[0].getDecl())))) {
+      CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
+                      MTT->getInstanceType());
+      return true;
+    }
+  }
+
+  // Do all the stuff that we only have implemented when there is a single
+  // candidate.
+  if (diagnoseSingleCandidateFailures(CCI, fnExpr, argExpr))
+    return true;
+
+  // If we have a failure where the candidate set differs on exactly one
+  // argument, and where we have a consistent mismatch across the candidate set
+  // (often because there is only one candidate in the set), then diagnose this
+  // as a specific problem of passing something of the wrong type into a
+  // parameter.
+  if ((CCI.closeness == CC_OneArgumentMismatch ||
+       CCI.closeness == CC_OneArgumentNearMismatch ||
+       CCI.closeness == CC_OneGenericArgumentMismatch ||
+       CCI.closeness == CC_OneGenericArgumentNearMismatch ||
+       CCI.closeness == CC_GenericNonsubstitutableMismatch) &&
+      CCI.failedArgument.isValid()) {
+    // Map the argument number into an argument expression.
+    TCCOptions options = TCC_ForceRecheck;
+    if (CCI.failedArgument.parameterType->is<InOutType>())
+      options |= TCC_AllowLValue;
+
+    Expr *badArgExpr;
+    if (auto *TE = dyn_cast<TupleExpr>(argExpr))
+      badArgExpr = TE->getElement(CCI.failedArgument.argumentNumber);
+    else if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+      assert(CCI.failedArgument.argumentNumber == 0 &&
+             "Unexpected argument #");
+      badArgExpr = PE->getSubExpr();
+    } else {
+      assert(CCI.failedArgument.argumentNumber == 0 &&
+             "Unexpected argument #");
+      badArgExpr = argExpr;
+    }
+
+    // It could be that the argument doesn't conform to an archetype.
+    if (CCI.diagnoseGenericParameterErrors(badArgExpr))
+      return true;
+    
+    // Re-type-check the argument with the expected type of the candidate set.
+    // This should produce a specific and tailored diagnostic saying that the
+    // type mismatches with expectations.
+    Type paramType = CCI.failedArgument.parameterType;
+    if (!typeCheckChildIndependently(badArgExpr, paramType,
+                                     CTP_CallArgument, options))
+      return true;
+  }
+  
+  return false;
+}
+
+
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // FIXME: Why isn't this passing TCC_AllowLValue?  It seems that this could
@@ -3596,6 +3868,9 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
                                                        Type(), calleeInfo);
   if (!indexExpr) return true;
+
+  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr))
+    return true;
 
   auto indexType = indexExpr->getType();
 
@@ -3655,6 +3930,9 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
     return true;
   }
+
+  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr))
+    return true;
 
   // Diagnose some simple and common errors.
   if (calleeInfo.diagnoseSimpleErrors(SE->getLoc()))
@@ -3803,8 +4081,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Filter the candidate list based on the argument we may or may not have.
   calleeInfo.filterContextualMemberList(callExpr->getArg());
 
-  if (calleeInfo.diagnoseAnyStructuralArgumentError(callExpr->getFn(),
-                                                    callExpr->getArg()))
+  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
+                              callExpr->getArg()))
     return true;
   
   Type argType;  // Type of the argument list, if knowable.
@@ -3822,59 +4100,24 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
-  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(),
-                                                     argType, calleeInfo);
+  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(), argType,
+                                                     calleeInfo,
+                                                     TCC_AllowUnresolvedTypeVariables);
   if (!argExpr)
     return true; // already diagnosed.
 
   calleeInfo.filterList(argExpr->getType());
 
-  if (calleeInfo.diagnoseAnyStructuralArgumentError(callExpr->getFn(), argExpr))
+  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr))
     return true;
 
-  // If we have a failure where the candidate set differs on exactly one
-  // argument, and where we have a consistent mismatch across the candidate set
-  // (often because there is only one candidate in the set), then diagnose this
-  // as a specific problem of passing something of the wrong type into a
-  // parameter.
-  if ((calleeInfo.closeness == CC_OneArgumentMismatch ||
-       calleeInfo.closeness == CC_OneArgumentNearMismatch ||
-       calleeInfo.closeness == CC_OneGenericArgumentMismatch ||
-       calleeInfo.closeness == CC_OneGenericArgumentNearMismatch ||
-       calleeInfo.closeness == CC_GenericNonsubstitutableMismatch) &&
-      calleeInfo.failedArgument.isValid()) {
-    // Map the argument number into an argument expression.
-    TCCOptions options = TCC_ForceRecheck;
-    if (calleeInfo.failedArgument.parameterType->is<InOutType>())
-      options |= TCC_AllowLValue;
-    
-    Expr *badArgExpr;
-    if (auto *TE = dyn_cast<TupleExpr>(argExpr))
-      badArgExpr = TE->getElement(calleeInfo.failedArgument.argumentNumber);
-    else if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
-      assert(calleeInfo.failedArgument.argumentNumber == 0 &&
-             "Unexpected argument #");
-      badArgExpr = PE->getSubExpr();
-    } else {
-      assert(calleeInfo.failedArgument.argumentNumber == 0 &&
-             "Unexpected argument #");
-      badArgExpr = argExpr;
-    }
-
-    // Re-type-check the argument with the expected type of the candidate set.
-    // This should produce a specific and tailored diagnostic saying that the
-    // type mismatches with expectations.
-    Type paramType = calleeInfo.failedArgument.parameterType;
-    if (!typeCheckChildIndependently(badArgExpr, paramType,
-                                     CTP_CallArgument, options))
-      return true;
-
-    // If that fails, it could be that the argument doesn't conform to an
-    // archetype.
-    if (calleeInfo.diagnoseGenericParameterErrors(badArgExpr))
-      return true;
-  }
-      
+  // Force recheck of the arg expression because we allowed unresolved types
+  // before, and that turned out not to help, and now we want any diagnoses
+  // from disallowing them.
+  argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(), argType,
+                                                calleeInfo, TCC_ForceRecheck);
+  if (!argExpr)
+    return true; // already diagnosed.
   
   // Diagnose some simple and common errors.
   if (calleeInfo.diagnoseSimpleErrors(callExpr->getLoc()))
@@ -3973,8 +4216,19 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       .highlight(lhsExpr->getSourceRange())
       .highlight(rhsExpr->getSourceRange());
     }
-    
-    calleeInfo.suggestPotentialOverloads(callExpr->getLoc());
+
+    if (lhsType->isEqual(rhsType) &&
+        isNameOfStandardComparisonOperator(overloadName) &&
+        lhsType->is<EnumType>() &&
+        !lhsType->getAs<EnumType>()->getDecl()
+          ->hasOnlyCasesWithoutAssociatedValues()) {
+      diagnose(callExpr->getLoc(),
+               diag::no_binary_op_overload_for_enum_with_payload,
+               overloadName);
+    } else {
+      calleeInfo.suggestPotentialOverloads(callExpr->getLoc());
+    }
+
     return true;
   }
   
@@ -4821,8 +5075,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     for (auto &arg : arguments)
       expectedNames.push_back(arg.Label);
 
-    return CS->diagnoseArgumentLabelError(argExpr, expectedNames,
-                                          /*isSubscript*/false);
+    return diagnoseArgumentLabelError(argExpr, expectedNames,
+                                      /*isSubscript*/false, *CS);
   }
     
   case CC_GeneralMismatch:        // Something else is wrong.

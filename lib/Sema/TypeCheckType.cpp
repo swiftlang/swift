@@ -247,7 +247,7 @@ Type TypeChecker::resolveTypeInContext(
   // type.
   auto ownerDC = typeDecl->getDeclContext();
   bool nonTypeOwner = !ownerDC->isTypeContext();
-  auto ownerNominal = ownerDC->isNominalTypeOrNominalTypeExtensionContext();
+  auto ownerNominal = ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
   auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
   DeclContext *typeParent = nullptr;
   assert((ownerNominal || nonTypeOwner) &&
@@ -260,7 +260,7 @@ Type TypeChecker::resolveTypeInContext(
     // a generic type with no generic arguments or a non-generic type, use the
     // type within the context.
     if (nominalType) {
-      if (parentDC->isNominalTypeOrNominalTypeExtensionContext() == nominalType)
+      if (parentDC->getAsNominalTypeOrNominalTypeExtensionContext() == nominalType)
         return resolver->resolveTypeOfContext(parentDC);
       if (!parentDC->isModuleScopeContext() && !isa<TopLevelCodeDecl>(parentDC))
         continue;
@@ -286,7 +286,7 @@ Type TypeChecker::resolveTypeInContext(
     // reference to this associated type is our own `Self`. If we can't resolve
     // the associated type during this iteration, try again on the next.
     if (assocType) {
-      if (auto proto = parentDC->isProtocolOrProtocolExtensionContext()) {
+      if (auto proto = parentDC->getAsProtocolOrProtocolExtensionContext()) {
         auto assocProto = assocType->getProtocol();
         if (proto == assocProto || proto->inheritsFrom(assocProto)) {
           // If the associated type is from our own protocol or we inherit from
@@ -342,7 +342,7 @@ Type TypeChecker::resolveTypeInContext(
       if (fromType->getAnyNominal() == ownerNominal) {
         // If we are referring into a protocol or extension thereof,
         // the base type is the 'Self'.
-        if (ownerDC->isProtocolOrProtocolExtensionContext()) {
+        if (ownerDC->getAsProtocolOrProtocolExtensionContext()) {
           auto selfTy = ownerDC->getProtocolSelf()->getDeclaredType()
                           ->castTo<GenericTypeParamType>();
           fromType = resolver->resolveGenericTypeParamType(selfTy);
@@ -374,7 +374,7 @@ Type TypeChecker::resolveTypeInContext(
   // Substitute in the appropriate type for 'Self'.
   // FIXME: We shouldn't have to guess here; the caller should tell us.
   Type fromType;
-  if (typeParent->isProtocolOrProtocolExtensionContext())
+  if (typeParent->getAsProtocolOrProtocolExtensionContext())
     fromType = typeParent->getProtocolSelf()->getArchetype();
   else
     fromType = resolver->resolveTypeOfContext(typeParent);
@@ -395,6 +395,7 @@ Type TypeChecker::applyGenericArguments(Type type, SourceLoc loc,
     if (!type->is<ErrorType>())
       diagnose(loc, diag::not_a_generic_type, type)
           .fixItRemove(generic->getAngleBrackets());
+    generic->setInvalid();
     return type;
   }
 
@@ -568,7 +569,7 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
   while (dc->isLocalContext())
     dc = dc->getParent();
 
-  if (auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext())
+  if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
     return nominal;
 
   return nullptr;
@@ -756,7 +757,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                                   comp->getIdLoc() })))
         return nullptr;
 
-      auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext();
+      auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
       SmallVector<ValueDecl *, 4> decls;
       if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
                               comp->getIdentifier(),
@@ -969,16 +970,6 @@ static Type resolveNestedIdentTypeComponent(
                                                            parentRange,
                                                            comp);
     assert(memberType && "Received null dependent member type");
-
-    if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
-      // FIXME: Highlight generic arguments and introduce a Fix-It to
-      // remove them.
-      if (diagnoseErrors)
-        TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
-
-      // Drop the arguments.
-    }
-
     // If we know what type declaration we're referencing, store it.
     if (auto typeDecl = memberType->getDirectlyReferencedTypeDecl()) {
       comp->setValue(typeDecl);

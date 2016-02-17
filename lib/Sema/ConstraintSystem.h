@@ -30,7 +30,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -949,9 +948,6 @@ private:
   /// Each fix is paired with a locator that describes where the fix occurs.
   SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
 
-  /// The names used in relabel-tuple fixes.
-  std::vector<ArrayRef<Identifier>> RelabelTupleNames;
-
   /// Types used in fixes.
   std::vector<Type> FixedTypes;
 
@@ -1295,11 +1291,6 @@ public:
   /// invalid, emit a detailed error about the condition.
   void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
-  
-  /// Diagnose an argument labeling issue, returning true if we successfully
-  /// diagnosed the issue.
-  bool diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
-                                  bool isSubscript);
   
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be

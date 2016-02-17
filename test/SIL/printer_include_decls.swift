@@ -22,7 +22,7 @@ class Foo {
     }
     set {}
   }
-// CHECK: subscript (x: Int, y: Int) -> Int
+// CHECK: subscript(x: Int, y: Int) -> Int
 
   final var x : Int
 // CHECK: var x: Int

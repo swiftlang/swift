@@ -13,8 +13,10 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
@@ -477,10 +479,62 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
   findMatchingReleases(&*BB);
 }
 
+bool
+ConsumedArgToEpilogueReleaseMatcher::
+isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
+  // We use projection path to analyze the relation.
+  auto POp = ProjectionPath::getProjectionPath(Base, Derived);
+  // We can not build a projection path from the base to the derived, bail out.
+  // and return true so that we can stop the epilogue walking sequence.
+  if (!POp.hasValue())
+    return true;
+
+  for (auto &R : Insts) {
+    SILValue ROp = R->getOperand(0);
+    auto PROp = ProjectionPath::getProjectionPath(Base, ROp); 
+    if (!PROp.hasValue())
+      return true;
+    // If Op is a part of ROp or Rop is a part of Op. then we have seen
+    // a redundant release.
+    if (!PROp.getValue().hasNonEmptySymmetricDifference(POp.getValue()))
+      return true;
+  }
+  return false;
+}
+
+bool
+ConsumedArgToEpilogueReleaseMatcher::
+releaseAllNonTrivials(ReleaseList Insts, SILValue Base) {
+  // Reason about whether all parts are released.
+  SILModule *Mod = &(*Insts.begin())->getModule();
+
+  // These are the list of SILValues that are actually released.
+  ProjectionPathSet Paths;
+  for (auto &I : Insts) {
+    auto PP = ProjectionPath::getProjectionPath(Base, I->getOperand(0));
+    if (!PP)
+      return false;
+    Paths.insert(PP.getValue());
+  } 
+
+  // Is there an uncovered non-trivial type.
+  return !ProjectionPath::hasUncoveredNonTrivials(Base->getType(), Mod, Paths);
+}
+
 void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     SILBasicBlock *BB) {
-  for (auto II = std::next(BB->rbegin()), IE = BB->rend();
-       II != IE; ++II) {
+  // Iterate over the instructions post-order and find releases associated with
+  // each arguments.
+  //
+  // Break on these conditions.
+  //
+  // 1. An instruction that can use ref count values.
+  //
+  // 2. A release that can not be mapped to any @owned argument.
+  //
+  // 3. A release that is mapped to an argument which already has a release
+  // that overlaps with this release.
+  for (auto II = std::next(BB->rbegin()), IE = BB->rend(); II != IE; ++II) {
     // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
       // And the object cannot use values in a manner that will keep the object
@@ -490,31 +544,77 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
 
       // Otherwise, we need to stop computing since we do not want to reduce the
       // lifetime of objects.
-      return;
+      break;
     }
 
     // Ok, we have a release_value or strong_release. Grab Target and find the
     // RC identity root of its operand.
     SILInstruction *Target = &*II;
-    SILValue Op = RCFI->getRCIdentityRoot(Target->getOperand(0));
+    SILValue OrigOp = Target->getOperand(0);
+    SILValue Op = RCFI->getRCIdentityRoot(OrigOp);
+
+    // Check whether this is a SILArgument.
+    auto *Arg = dyn_cast<SILArgument>(Op);
+    // If this is not a SILArgument, maybe it is a part of a SILArgument.
+    // This is possible after we expand release instructions in SILLowerAgg pass.
+    if (!Arg) { 
+      Arg = dyn_cast<SILArgument>(stripValueProjections(OrigOp));
+    }
 
     // If Op is not a consumed argument, we must break since this is not an Op
     // that is a part of a return sequence. We are being conservative here since
     // we could make this more general by allowing for intervening non-arg
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
-    auto *Arg = dyn_cast<SILArgument>(Op);
     if (!Arg || !Arg->isFunctionArg() ||
         !Arg->hasConvention(ParameterConvention::Direct_Owned))
-      return;
+      break;
 
     // Ok, we have a release on a SILArgument that is direct owned. Attempt to
     // put it into our arc opts map. If we already have it, we have exited the
     // return value sequence so break. Otherwise, continue looking for more arc
     // operations.
-    if (!ArgInstMap.insert({Arg, Target}).second)
-      return;
+    auto Iter = ArgInstMap.find(Arg);
+    if (Iter == ArgInstMap.end()) {
+      ArgInstMap[Arg].push_back(Target);
+      continue;
+    }
+
+    // We've already seen at least part of this base. Check to see whether we
+    // are seeing a redundant release.
+    //
+    // If we are seeing a redundant release we have exited the return value
+    // sequence, so break.
+    if (isRedundantRelease(Iter->second, Arg, OrigOp)) 
+      break;
+    
+    // We've seen part of this base, but this is a part we've have not seen.
+    // Record it. 
+    Iter->second.push_back(Target);
   }
+
+  // If we can not find a releases for all parts with reference semantics
+  // that means we did not find all releases for the base.
+  llvm::DenseSet<SILArgument *> ArgToRemove;
+  for (auto &Arg : ArgInstMap) {
+    // If an argument has a single release and it is rc-identical to the
+    // SILArgument. Then we do not need to use projection to check for whether
+    // all non-trivial fields are covered. This is a short-cut to avoid
+    // projection for cost as well as accuracy. Projection currently does not
+    // support single incoming argument as rc-identity does whereas rc-idenity
+    // does.
+    if (Arg.second.size() == 1) {
+      SILInstruction *I = *Arg.second.begin();
+      SILValue RV = I->getOperand(0);
+      if (Arg.first == RCFI->getRCIdentityRoot(RV))
+        continue;
+    }
+    if (!releaseAllNonTrivials(Arg.second, Arg.first))
+      ArgToRemove.insert(Arg.first);
+  }
+
+  for (auto &X : ArgToRemove) 
+    ArgInstMap.erase(ArgInstMap.find(X));
 }
 
 //===----------------------------------------------------------------------===//

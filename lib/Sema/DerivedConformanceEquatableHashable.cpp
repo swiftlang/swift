@@ -302,7 +302,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->isEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
   SmallVector<ASTNode, 3> statements;
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
 

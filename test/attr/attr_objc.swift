@@ -1516,7 +1516,7 @@ class infer_subscript1 {
 
   @objc
   subscript(i: Int) -> Int {
-  // CHECK: @objc subscript (i: Int) -> Int
+  // CHECK: @objc subscript(i: Int) -> Int
     get {}
     // CHECK: @objc get {}
     set {}

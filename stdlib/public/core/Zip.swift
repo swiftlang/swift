@@ -84,7 +84,7 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
     (_sequence1, _sequence2) = (sequence1, sequence2)
   }
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> Iterator {

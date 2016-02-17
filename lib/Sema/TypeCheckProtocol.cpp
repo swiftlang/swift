@@ -1744,7 +1744,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     }
     
     // Inject the typealias into the nominal decl that conforms to the protocol.
-    if (auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       TC.computeAccessibility(nominal);
       aliasDecl->setAccessibility(nominal->getFormalAccess());
       if (nominal == DC) {
@@ -2041,7 +2041,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     if (auto *ext = dyn_cast<ExtensionDecl>(match.Witness->getDeclContext()))
-      if (!ext->isConstrainedExtension() && ext->isProtocolExtensionContext())
+      if (!ext->isConstrainedExtension() && ext->getAsProtocolExtensionContext())
         anyFromUnconstrainedExtension = true;
 
     matches.push_back(std::move(match));
@@ -2179,6 +2179,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         if (((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
              !classDecl->isFinal()) &&
             !witnessCtor->isRequired() &&
+            !witnessCtor->getDeclContext()
+               ->getAsProtocolOrProtocolExtensionContext() &&
             !witnessCtor->hasClangNode()) {
           // FIXME: We're not recovering (in the AST), so the Fix-It
           // should move.
@@ -3189,10 +3191,10 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
       // Record this value witness, popping it when we exit the current scope.
       valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
-      if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
+      if (witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
         ++numValueWitnessesInProtocolExtensions;
       defer {
-        if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
+        if (witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
           --numValueWitnessesInProtocolExtensions;
         valueWitnesses.pop_back();
       };
@@ -4130,7 +4132,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
                                             ExtensionDecl *protocolExtension) {
   using namespace constraints;
 
-  assert(protocolExtension->isProtocolExtensionContext() &&
+  assert(protocolExtension->getAsProtocolExtensionContext() &&
          "Only intended for protocol extensions");
 
   resolveExtension(protocolExtension);

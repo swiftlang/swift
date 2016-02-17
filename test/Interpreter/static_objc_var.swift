@@ -38,7 +38,7 @@ print(C.j)
 print(C.self.responds(to: Selector("setJ:")))
 
 // CHECK: Test
-C.performSelector(onMainThread: Selector("setJ:"), withObject: "Test", waitUntilDone: true)
+C.performSelector(onMainThread: Selector("setJ:"), with: "Test", waitUntilDone: true)
 print(C.j)
 
 // CHECK: OK
@@ -46,10 +46,10 @@ C.j = "OK"
 print(C.j)
 
 // CHECK: true
-print(C.self.responds(to: "k"))
+print(C.self.responds(to: Selector("k")))
 
 // CHECK: 3.14
 print(C.k)
 
 // CHECK: false
-print(C.self.responds(to: "setK:"))
+print(C.self.responds(to: Selector("setK:")))

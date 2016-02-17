@@ -34,19 +34,22 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   _ = UInt8(truncatingBitPattern: UInt(0))
   _ = UInt16(truncatingBitPattern: UInt(0))
   _ = UInt32(truncatingBitPattern: UInt(0))
-  UInt64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
+// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
   UInt(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
 
   _ = Int8(truncatingBitPattern: UInt(0))
   _ = Int16(truncatingBitPattern: UInt(0))
   _ = Int32(truncatingBitPattern: UInt(0))
-  Int64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  Int64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
+// expected-note @-1 {{overloads for 'Int64' exist with}}
   Int(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
 
   _ = UInt8(truncatingBitPattern: Int(0))
   _ = UInt16(truncatingBitPattern: Int(0))
   _ = UInt32(truncatingBitPattern: Int(0))
-  UInt64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt64(truncatingBitPattern: Int(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
+// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
   UInt(truncatingBitPattern: Int(0))   // expected-error {{}} expected-note * {{}}
 
   _ = Int8(truncatingBitPattern: Int(0))

@@ -20,10 +20,10 @@ import ObjCIRExtras
 func instanceMethods(b: B) {
   // CHECK: load i8*, i8** @"\01L_selector(method:withFloat:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
-  var i = b.method(1, withFloat:2.5)
+  var i = b.method(1, with: 2.5 as Float)
   // CHECK: load i8*, i8** @"\01L_selector(method:withDouble:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
-  i = i + b.method(1, withDouble:2.5)
+  i = i + b.method(1, with: 2.5 as Double)
 }
 
 // CHECK: define hidden void @_TF7objc_ir16extensionMethodsFT1bCSo1B_T_

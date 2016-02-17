@@ -95,6 +95,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
   else
     Module.functions.push_back(this);
 
+  Module.removeFromZombieList(Name);
+
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
   BlockList.Parent = this;

@@ -2875,7 +2875,7 @@ namespace {
 
       // Must be a method within a class or extension thereof.
       auto classDecl =
-        method->getDeclContext()->isClassOrClassExtensionContext();
+        method->getDeclContext()->getAsClassOrClassExtensionContext();
       if (!classDecl) return false;
 
       // The class must not have a superclass.
@@ -3633,7 +3633,7 @@ namespace {
 
       // If we're in a protocol, the getter thunk will be polymorphic.
       Type interfaceType;
-      if (dc->isProtocolOrProtocolExtensionContext()) {
+      if (dc->getAsProtocolOrProtocolExtensionContext()) {
         std::tie(getterType, interfaceType)
           = getProtocolMethodType(dc, getterType->castTo<AnyFunctionType>());
       }
@@ -3698,7 +3698,7 @@ namespace {
       // If we're in a protocol or extension thereof, the setter thunk
       // will be polymorphic.
       Type interfaceType;
-      if (dc->isProtocolOrProtocolExtensionContext()) {
+      if (dc->getAsProtocolOrProtocolExtensionContext()) {
         std::tie(setterType, interfaceType)
           = getProtocolMethodType(dc, setterType->castTo<AnyFunctionType>());
       }
@@ -3772,7 +3772,7 @@ namespace {
     void recordObjCOverride(SubscriptDecl *subscript) {
       // Figure out the class in which this subscript occurs.
       auto classTy =
-        subscript->getDeclContext()->isClassOrClassExtensionContext();
+        subscript->getDeclContext()->getAsClassOrClassExtensionContext();
       if (!classTy)
         return;
 
@@ -3849,7 +3849,7 @@ namespace {
         // If the declaration we're starting from is in a class, first
         // look for a class member with the appropriate selector.
         if (auto classDecl
-              = decl->getDeclContext()->isClassOrClassExtensionContext()) {
+              = decl->getDeclContext()->getAsClassOrClassExtensionContext()) {
           auto swiftSel = Impl.importSelector(sel);
           for (auto found : classDecl->lookupDirect(swiftSel, true)) {
             if (auto foundFunc = dyn_cast<FuncDecl>(found))
@@ -3954,9 +3954,9 @@ namespace {
         // Are the getter and the setter in the same type.
         getterAndSetterInSameType =
           (getter->getDeclContext()
-             ->isNominalTypeOrNominalTypeExtensionContext()
+             ->getAsNominalTypeOrNominalTypeExtensionContext()
            == setter->getDeclContext()
-               ->isNominalTypeOrNominalTypeExtensionContext());
+               ->getAsNominalTypeOrNominalTypeExtensionContext());
 
         // Whether we can update the types involved in the subscript
         // operation.

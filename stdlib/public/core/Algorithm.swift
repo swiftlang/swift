@@ -111,7 +111,7 @@ public struct EnumeratedSequence<Base : Sequence> : Sequence {
     self._base = _base
   }
 
-  /// Returns an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> EnumeratedIterator<Base.Iterator> {

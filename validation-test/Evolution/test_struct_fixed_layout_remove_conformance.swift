@@ -24,6 +24,15 @@
 import StdlibUnittest
 import struct_fixed_layout_remove_conformance
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+import SwiftPrivatePthreadExtras
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var StructFixedLayoutRemoveConformanceTest = TestSuite("StructFixedLayoutRemoveConformance")
 
 StructFixedLayoutRemoveConformanceTest.test("RemoveConformance") {

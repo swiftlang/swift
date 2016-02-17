@@ -452,7 +452,7 @@ extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
     return;
 
   // Destroy ivars
-  auto *objectMetadata = object->metadata;
+  auto *objectMetadata = _swift_getClassOfAllocated(object);
   while (objectMetadata != metadata) {
     auto classMetadata = objectMetadata->getClassObject();
     assert(classMetadata && "Not a class?");

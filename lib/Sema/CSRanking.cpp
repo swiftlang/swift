@@ -317,7 +317,7 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
   if (!dc->isTypeContext())
     return type;
 
-  auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   auto selfTy = nominal->getInterfaceType()->castTo<MetatypeType>()
                   ->getInstanceType();
   if (auto sig = nominal->getGenericSignatureOfContext())
@@ -424,13 +424,13 @@ static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
 static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
                                                DeclContext *dc1,
                                                DeclContext *dc2) {
-  assert(dc1->isProtocolExtensionContext());
-  assert(dc2->isProtocolExtensionContext());
+  assert(dc1->getAsProtocolExtensionContext());
+  assert(dc2->getAsProtocolExtensionContext());
 
   // If one of the protocols being extended inherits the other, prefer the
   // more specialized protocol.
-  auto proto1 = dc1->isProtocolExtensionContext();
-  auto proto2 = dc2->isProtocolExtensionContext();
+  auto proto1 = dc1->getAsProtocolExtensionContext();
+  auto proto2 = dc2->getAsProtocolExtensionContext();
   if (proto1 != proto2) {
     if (proto1->inheritsFrom(proto2))
       return true;
@@ -516,9 +516,9 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
       // Members of protocol extensions have special overloading rules.
       ProtocolDecl *inProtocolExtension1 = decl1->getDeclContext()
-                                             ->isProtocolExtensionContext();
+                                             ->getAsProtocolExtensionContext();
       ProtocolDecl *inProtocolExtension2 = decl2->getDeclContext()
-                                             ->isProtocolExtensionContext();
+                                             ->getAsProtocolExtensionContext();
       if (inProtocolExtension1 && inProtocolExtension2) {
         // Both members are in protocol extensions.
         // Determine whether the 'Self' type from the first protocol extension

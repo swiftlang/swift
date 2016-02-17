@@ -2416,35 +2416,16 @@ namespace {
 
         Type toType = simplifyType(expr->getType());
         
-        // Don't allow lvalues when indexing into a tuple expr.
-        // If we get any lvalues, add load exprs to convert the tuple to be all rvalues.
-        if (auto *tupleExpr = dyn_cast<TupleExpr>(base)) {
-          unsigned count = tupleExpr->getNumElements();
-          unsigned lvalues = 0;
-          auto &tc = cs.getTypeChecker();
-          SmallVector<TupleTypeElt, 4> tupleElts;
-          for (unsigned i = 0; i < count; i++) {
-            Expr *elementExpr = tupleExpr->getElement(i);
-            Type elementType = elementExpr->getType();
-            if (elementType->isLValueType()) {
-              lvalues++;
-              elementExpr->propagateLValueAccessKind(AccessKind::Read, true);
-              elementExpr = new (tc.Context) LoadExpr(elementExpr, elementType->getRValueType());
-              tupleExpr->setElement(i, elementExpr);
-            }
-            tupleElts.push_back(elementExpr->getType());
-          }
-          
-          if (lvalues > 0) {
-            auto &Context = tupleExpr->getType()->getASTContext();
-            tupleExpr->setType(TupleType::get(tupleElts, Context));
-            toType = toType->getRValueType();
-          }
-        }
+        // If the result type is an rvalue and the base contains lvalues, need a full
+        // tuple coercion to properly load & set access kind on all underlying elements
+        // before taking a single element.
+        baseTy = base->getType();
+        if (!toType->isLValueType() && baseTy->isLValueType())
+          base = coerceToType(base, baseTy->getRValueType(), cs.getConstraintLocator(base));
 
         return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
-                                          selected.choice.getTupleIndex(),
-                                          nameLoc.getBaseNameLoc(), toType);
+                                                         selected.choice.getTupleIndex(),
+                                                         nameLoc.getBaseNameLoc(), toType);
       }
 
       case OverloadChoiceKind::BaseType: {
@@ -4834,6 +4815,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::LValueToRValue: {
+      if (toType->is<TupleType>() || fromType->is<TupleType>())
+        break;
+      
       // Load from the lvalue.
       expr->propagateLValueAccessKind(AccessKind::Read);
       expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
@@ -5451,7 +5435,7 @@ TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
       !base->isStaticallyDerivedMetatype() &&
       !ctorDecl->hasClangNode() &&
       !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->isProtocolOrProtocolExtensionContext())) {
+        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
     if (SuppressDiagnostics)
       return false;
 
@@ -5616,169 +5600,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return finishApply(apply, openedType, locator);
 }
 
-/// Diagnose an argument labeling issue, returning true if we successfully
-/// diagnosed the issue.
-bool ConstraintSystem::
-diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
-                           bool isSubscript) {
-  auto tuple = dyn_cast<TupleExpr>(expr);
-  if (!tuple) {
-    if (newNames[0].empty()) {
-      // This is probably a conversion from a value of labeled tuple type to
-      // a scalar.
-      // FIXME: We want this issue to disappear completely when single-element
-      // labelled tuples go away.
-      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
-        int scalarFieldIdx = tupleTy->getElementForScalarInit();
-        if (scalarFieldIdx >= 0) {
-          auto &field = tupleTy->getElement(scalarFieldIdx);
-          if (field.hasName()) {
-            llvm::SmallString<16> str;
-            str = ".";
-            str += field.getName().str();
-            TC.diagnose(expr->getStartLoc(),
-                        diag::extra_named_single_element_tuple,
-                        field.getName().str())
-              .fixItInsertAfter(expr->getEndLoc(), str);
-            return true;
-          }
-        }
-      }
-
-      // We don't know what to do with this.
-      return false;
-    }
-
-    // This is a scalar-to-tuple conversion. Add the name.  We "know"
-    // that we're inside a ParenExpr, because ParenExprs are required
-    // by the syntax and locator resolution looks through on level of
-    // them.
-
-    // Look through the paren expression, if there is one.
-    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
-      expr = parenExpr->getSubExpr();
-
-    llvm::SmallString<16> str;
-    str += newNames[0].str();
-    str += ": ";
-    TC.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false,
-                str.substr(0, str.size()-1), isSubscript)
-      .fixItInsert(expr->getStartLoc(), str);
-    return true;
-  }
-
-  // Figure out how many extraneous, missing, and wrong labels are in
-  // the call.
-  unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
-
-  llvm::SmallString<16> missingBuffer;
-  llvm::SmallString<16> extraBuffer;
-  for (unsigned i = 0; i != n; ++i) {
-    Identifier oldName;
-    if (i < tuple->getNumElements())
-      oldName = tuple->getElementName(i);
-    Identifier newName;
-    if (i < newNames.size())
-      newName = newNames[i];
-
-    if (oldName == newName ||
-        (tuple->hasTrailingClosure() && i == tuple->getNumElements()-1))
-      continue;
-
-    if (oldName.empty()) {
-      ++numMissing;
-      missingBuffer += newName.str();
-      missingBuffer += ":";
-    } else if (newName.empty()) {
-      ++numExtra;
-      extraBuffer += oldName.str();
-      extraBuffer += ':';
-    } else
-      ++numWrong;
-  }
-
-  // Emit the diagnostic.
-  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
-  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
-  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
-  Optional<InFlightDiagnostic> diagOpt;
-
-  // If we had any wrong labels, or we have both missing and extra labels,
-  // emit the catch-all "wrong labels" diagnostic.
-  bool plural = (numMissing + numExtra + numWrong) > 1;
-  if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-    for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-      auto haveName = tuple->getElementName(i);
-      if (haveName.empty())
-        haveBuffer += '_';
-      else
-        haveBuffer += haveName.str();
-      haveBuffer += ':';
-    }
-
-    for (auto expected : newNames) {
-      if (expected.empty())
-        expectedBuffer += '_';
-      else
-        expectedBuffer += expected.str();
-      expectedBuffer += ':';
-    }
-
-    StringRef haveStr = haveBuffer;
-    StringRef expectedStr = expectedBuffer;
-    diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::wrong_argument_labels,
-                                plural, haveStr, expectedStr, isSubscript));
-  } else if (numMissing > 0) {
-    StringRef missingStr = missingBuffer;
-    diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::missing_argument_labels,
-                                plural, missingStr, isSubscript));
-  } else {
-    assert(numExtra > 0);
-    StringRef extraStr = extraBuffer;
-    diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::extra_argument_labels,
-                                plural, extraStr, isSubscript));
-  }
-
-  // Emit Fix-Its to correct the names.
-  auto &diag = *diagOpt;
-  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-    Identifier oldName = tuple->getElementName(i);
-    Identifier newName;
-    if (i < newNames.size())
-      newName = newNames[i];
-
-    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
-      continue;
-
-    if (newName.empty()) {
-      // Delete the old name.
-      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
-                            tuple->getElement(i)->getStartLoc());
-      continue;
-    }
-
-    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
-    llvm::SmallString<16> newStr;
-    if (newNameIsReserved)
-      newStr += "`";
-    newStr += newName.str();
-    if (newNameIsReserved)
-      newStr += "`";
-
-    if (oldName.empty()) {
-      // Insert the name.
-      newStr += ": ";
-      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
-      continue;
-    }
-    
-    // Change the name.
-    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
-  }
-
-  return true;
-}
 
 // Return the precedence-yielding parent of 'expr', along with the index of
 // 'expr' as the child of that parent. The precedence-yielding parent is the
@@ -6052,23 +5873,8 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                                         unsigned fixNo) {
   auto &fix = solution.Fixes[fixNo];
   
-  // Some fixes need more information from the locator itself, including
-  // tweaking the locator. Deal with those now.
+  // Some fixes need more information from the locator.
   ConstraintLocator *locator = fix.second;
-
-  // Removing a nullary call to a non-function requires us to have an
-  // 'ApplyFunction', which we strip.
-  if (fix.first.getKind() == FixKind::RemoveNullaryCall) {
-    auto anchor = locator->getAnchor();
-    auto path = locator->getPath();
-    if (!path.empty() &&
-        path.back().getKind() == ConstraintLocator::ApplyFunction) {
-      locator = getConstraintLocator(anchor, path.slice(0, path.size()-1),
-                                     locator->getSummaryFlags());
-    } else {
-      return false;
-    }
-  }
 
   // Resolve the locator to a specific expression.
   SourceRange range;
@@ -6095,16 +5901,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   switch (fix.first.getKind()) {
   case FixKind::None:
     llvm_unreachable("no-fix marker should never make it into solution");
-
-  case FixKind::RemoveNullaryCall:
-    if (auto apply = dyn_cast<ApplyExpr>(affected)) {
-      auto type = solution.simplifyType(TC, apply->getFn()->getType())
-                    ->getRValueObjectType();
-      TC.diagnose(affected->getLoc(), diag::extra_call_nonfunction, type)
-        .fixItRemove(apply->getArg()->getSourceRange());
-      return true;
-    }
-    return false;
 
   case FixKind::ForceOptional: {
     const Expr *unwrapped = affected->getValueProvidingExpr();
@@ -6181,14 +5977,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     return true;
   }
 
-  case FixKind::TupleToScalar: 
-  case FixKind::ScalarToTuple:
-  case FixKind::RelabelCallTuple:
-    return diagnoseArgumentLabelError(affected,
-                                      fix.first.getRelabelTupleNames(*this),
-                           /*isSubscript=*/locator->getPath().back().getKind()
-                           == ConstraintLocator::SubscriptIndex);
-    
   case FixKind::OptionalToBoolean: {
     // If we're implicitly trying to treat an optional type as a boolean,
     // let the user know that they should be testing for a value manually
@@ -6254,117 +6042,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       .fixItInsert(errorExpr->getStartLoc(), prefix)
       .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
     
-    return true;
-  }
-
-  case FixKind::FromRawToInit: {
-    // Chase the parent map to find the reference to 'fromRaw' and
-    // the call to it. We'll need these for the Fix-It.
-    UnresolvedDotExpr *fromRawRef = nullptr;
-    CallExpr *fromRawCall = nullptr;
-    auto parentMap = expr->getParentMap();
-    Expr *current = affected;
-    do {
-      if (!fromRawRef) {
-        // We haven't found the reference to fromRaw yet, look for it now.
-        fromRawRef = dyn_cast<UnresolvedDotExpr>(current);
-        if (fromRawRef && fromRawRef->getName() != TC.Context.Id_fromRaw)
-          fromRawRef = nullptr;
-
-        current = parentMap[current];
-        continue;
-      } 
-      
-      // We previously found the reference to fromRaw, so we're
-      // looking for the call.
-      fromRawCall = dyn_cast<CallExpr>(current);
-      if (fromRawCall)
-        break;
-      
-      current = parentMap[current];
-      continue;          
-    } while (current);
-
-    if (fromRawCall) {
-      TC.diagnose(fromRawRef->getNameLoc().getBaseNameLoc(), 
-                  diag::migrate_from_raw_to_init)
-        .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
-                                  fromRawCall->getArg()->getStartLoc()),
-                      "(rawValue: ");
-    } else {
-      // Diagnostic without Fix-It; we couldn't find what we needed.
-      TC.diagnose(affected->getLoc(), diag::migrate_from_raw_to_init);
-    }
-    return true;
-  }
-
-  case FixKind::ToRawToRawValue: {
-    // Chase the parent map to find the reference to 'toRaw' and
-    // the call to it. We'll need these for the Fix-It.
-    UnresolvedDotExpr *toRawRef = nullptr;
-    CallExpr *toRawCall = nullptr;
-    auto parentMap = expr->getParentMap();
-    Expr *current = affected;
-    do {
-      if (!toRawRef) {
-        // We haven't found the reference to toRaw yet, look for it now.
-        toRawRef = dyn_cast<UnresolvedDotExpr>(current);
-        if (toRawRef && toRawRef->getName() != TC.Context.Id_toRaw)
-          toRawRef = nullptr;
-
-        current = parentMap[current];
-        continue;
-      } 
-      
-      // We previously found the reference to toRaw, so we're
-      // looking for the call.
-      toRawCall = dyn_cast<CallExpr>(current);
-      if (toRawCall)
-        break;
-      
-      current = parentMap[current];
-      continue;          
-    } while (current);
-
-    if (toRawCall) {
-      TC.diagnose(toRawRef->getNameLoc(),
-                  diag::migrate_to_raw_to_raw_value)
-        .fixItReplace(SourceRange(toRawRef->getNameLoc().getBaseNameLoc(),
-                                  toRawCall->getArg()->getEndLoc()),
-                      "rawValue");
-    } else {
-      TC.diagnose(affected->getLoc(), diag::migrate_to_raw_to_raw_value);
-    }
-    return true;
-  }
-  case FixKind::AllZerosToInit: {
-    // Chase the parent map to find the reference to 'allZeros' and
-    // the call to it. We'll need these for the Fix-It.
-    UnresolvedDotExpr *allZerosRef = nullptr;
-    auto parentMap = expr->getParentMap();
-    Expr *current = affected;
-    do {
-      // We haven't found the reference to allZeros yet, look for it now.
-      if ((allZerosRef = dyn_cast<UnresolvedDotExpr>(current))) {
-        if (allZerosRef->getName().isSimpleName(TC.Context.Id_allZeros))
-          break;
-        allZerosRef = nullptr;
-      }
-
-      current = parentMap[current];
-    } while (current);
-
-    if (allZerosRef) {
-      TC.diagnose(allZerosRef->getNameLoc(),
-                  diag::migrate_from_allZeros)
-        .fixItReplace(SourceRange(
-                        allZerosRef->getDotLoc(),
-                        allZerosRef->getNameLoc().getSourceRange().End),
-                      "()");
-    } else {
-      // Diagnostic without Fix-It; we couldn't find what we needed.
-      TC.diagnose(affected->getLoc(), diag::migrate_from_allZeros);
-    }
     return true;
   }
 

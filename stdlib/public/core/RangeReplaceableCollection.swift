@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A *collection* that supports replacement of an arbitrary subrange
+/// A collection that supports replacement of an arbitrary subrange
 /// of elements with the elements of another collection.
 public protocol RangeReplaceableCollection : Collection {
   //===--- Fundamental Requirements ---------------------------------------===//
@@ -27,17 +27,17 @@ public protocol RangeReplaceableCollection : Collection {
   init(repeating repeatedValue: Iterator.Element, count: Int)
 
 
-  /// Replace the elements within `bounds` with `newElements`.
+  /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if
-  ///   `bounds.endIndex == self.endIndex` and `newElements.isEmpty`,
+  /// - Complexity: O(`subRange.count`) if
+  ///   `subRange.endIndex == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    bounds: Range<Index>, with newElements: C
+    subRange: Range<Index>, with newElements: C
   )
 
   /*

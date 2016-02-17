@@ -23,7 +23,7 @@
 /// Its requirements are inherited by `ForwardIndex` and thus must
 /// be satisfied by types conforming to that protocol.
 public protocol _Incrementable : Equatable {
-  /// Return the next consecutive value in a discrete sequence of
+  /// Returns the next consecutive value in a discrete sequence of
   /// `Self` values.
   ///
   /// - Requires: `self` has a well-defined successor.
@@ -130,7 +130,7 @@ public protocol ForwardIndex : _Incrementable {
   // <rdar://problem/21855350> Rejects-valid: rejects code that has two Self
   // types in non-direct-argument-type position
 
-  /// Return the result of advancing `self` by `n` positions.
+  /// Returns the result of advancing `self` by `n` positions.
   ///
   /// - Returns:
   ///   - If `n > 0`, the result of applying `successor` to `self` `n` times.
@@ -144,7 +144,7 @@ public protocol ForwardIndex : _Incrementable {
   @warn_unused_result
   func advanced(by n: Distance) -> Self
 
-  /// Return the result of advancing `self` by `n` positions, or until it
+  /// Returns the result of advancing `self` by `n` positions, or until it
   /// equals `limit`.
   ///
   /// - Returns:
@@ -246,10 +246,10 @@ extension ForwardIndex {
 //===--- BidirectionalIndex -------------------------------------------===//
 
 
-/// An *index* that can step backwards via application of its
+/// An index that can step backwards via application of its
 /// `predecessor()` method.
 public protocol BidirectionalIndex : ForwardIndex {
-  /// Return the previous consecutive value in a discrete sequence.
+  /// Returns the previous consecutive value in a discrete sequence.
   ///
   /// If `self` has a well-defined successor,
   /// `self.successor().predecessor() == self`.  If `self` has a
@@ -334,7 +334,7 @@ extension _RandomAccessAmbiguity {
   }
 }
 
-/// An *index* that can be offset by an arbitrary number of positions,
+/// An index that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
 public protocol RandomAccessIndex : BidirectionalIndex, Strideable,
   _RandomAccessAmbiguity {

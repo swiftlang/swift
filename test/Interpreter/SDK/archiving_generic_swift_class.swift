@@ -20,7 +20,7 @@ final class Foo<T: NSCoding>: NSObject, NSCoding {
     self.init(one: one, two: two)
   }
 
-  @objc(encodeWithCoder:) func encode(withCoder encoder: NSCoder) {
+  @objc(encodeWithCoder:) func encode(with encoder: NSCoder) {
     encoder.encode(one, forKey: "one")
     encoder.encode(two, forKey: "two")
   }

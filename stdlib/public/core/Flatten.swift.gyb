@@ -80,7 +80,7 @@ public struct FlattenSequence<
     self._base = base
   }
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> FlattenIterator<Base.Iterator> {
@@ -121,6 +121,7 @@ extension LazySequenceProtocol
 %   %(Base)sIndex : BidirectionalIndex, 
 %   %(Base)sIterator.Element.Index : BidirectionalIndex'''
 %   Index = Collection + 'Index'
+/// A position in a `${Collection}`.
 public struct ${Index}<
   BaseElements: Collection where ${constraints % {'Base': 'BaseElements.'}}
 > : ${traversal}Index {
@@ -252,7 +253,7 @@ public struct ${Collection}<
     self._base = base
   }
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> FlattenIterator<Base.Iterator> {

@@ -61,7 +61,7 @@ public struct LazyFilterIterator<
 public struct LazyFilterSequence<Base : Sequence>
   : LazySequenceProtocol {
   
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> LazyFilterIterator<Base.Iterator> {
@@ -211,7 +211,7 @@ public struct LazyFilterCollection<
     return _base[position.base]
   }
 
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> LazyFilterIterator<Base.Iterator> {
@@ -224,7 +224,7 @@ public struct LazyFilterCollection<
 }
 
 extension LazySequenceProtocol {
-  /// Return the elements of `self` that satisfy `predicate`.
+  /// Returns the elements of `self` that satisfy `predicate`.
   ///
   /// - Note: The elements of the result are computed on-demand, as
   ///   the result is used. No buffering storage is allocated and each
@@ -240,7 +240,7 @@ extension LazySequenceProtocol {
 }
 
 extension LazyCollectionProtocol {
-  /// Return the elements of `self` that satisfy `predicate`.
+  /// Returns the elements of `self` that satisfy `predicate`.
   ///
   /// - Note: The elements of the result are computed on-demand, as
   ///   the result is used. No buffering storage is allocated and each

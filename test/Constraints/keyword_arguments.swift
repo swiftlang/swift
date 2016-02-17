@@ -9,7 +9,6 @@ struct X1 {
   func f1(a: Int) {}
 }
 X1(a: 5).f1(b: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4-7=}}
-// expected-error@-1{{extraneous argument label 'b:' in call}}{{13-16=}}
 
 // <rdar://problem/16801056>
 enum Policy {
@@ -35,7 +34,6 @@ struct X2 {
   func f2(b b: Int) { }
 }
 X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
-// expected-error @-1{{missing argument label 'b:' in call}}{{10-10=b: }}
 
 
 // -------------------------------------------
@@ -273,7 +271,7 @@ struct Sub2 {
 
 var sub2 = Sub2()
 var d: Double = 0.0
-d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{10-10=d: }}
+d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{9-9=d: }}
 d = sub2[d: d]
 d = sub2[f: d] // expected-error{{incorrect argument label in subscript (have 'f:', expected 'd:')}} {{10-11=d}}
 

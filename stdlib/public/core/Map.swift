@@ -41,14 +41,14 @@ public struct LazyMapSequence<Base : Sequence, Element>
   
   public typealias Elements = LazyMapSequence
   
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> LazyMapIterator<Base.Iterator, Element> {
     return LazyMapIterator(_base: _base.iterator(), _transform: _transform)
   }
 
-  /// Return a value less than or equal to the number of elements in
+  /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
@@ -96,7 +96,7 @@ public struct LazyMapCollection<Base : Collection, Element>
   public var first: Element? { return _base.first.map(_transform) }
   
 
-  /// Returns an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> LazyMapIterator<Base.Iterator, Element> {
@@ -129,7 +129,7 @@ public struct LazyMapCollection<Base : Collection, Element>
 //===--- Support for s.lazy -----------------------------------------------===//
 
 extension LazySequenceProtocol {
-  /// Return a `LazyMapSequence` over this `Sequence`.  The elements of
+  /// Returns a `LazyMapSequence` over this `Sequence`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @warn_unused_result
@@ -141,7 +141,7 @@ extension LazySequenceProtocol {
 }
 
 extension LazyCollectionProtocol {
-  /// Return a `LazyMapCollection` over this `Collection`.  The elements of
+  /// Returns a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @warn_unused_result

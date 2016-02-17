@@ -78,7 +78,7 @@ public struct UnicodeScalar :
     self = v
   }
 
-  /// Return a String representation of `self` .
+  /// Returns a String representation of `self` .
   ///
   /// - parameter forceASCII: If `true`, forces most values into a numeric
   ///   representation.
@@ -142,7 +142,7 @@ public struct UnicodeScalar :
     }
   }
 
-  /// Returns true if this is an ASCII character (code point 0 to 127
+  /// Returns `true` if this is an ASCII character (code point 0 to 127
   /// inclusive).
   public var isASCII: Bool {
     return value <= 127
@@ -309,7 +309,7 @@ extension UnicodeScalar.UTF16View : Collection {
   }
 }
 
-/// Return c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").
+/// Returns c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").
 @warn_unused_result
 public // SPI(SwiftExperimental)
 func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
@@ -317,7 +317,7 @@ func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
   return UTF8.CodeUnit(c.value)
 }
 
-/// Return c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
+/// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
 @warn_unused_result
 public // SPI(SwiftExperimental)
 func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {

@@ -416,7 +416,7 @@ public struct Set<Element : Hashable> :
     return _variantStorage.assertingGet(position)
   }
 
-  /// Return a *iterator* over the members.
+  /// Returns an iterator over the members.
   ///
   /// - Complexity: O(1).
   public func iterator() -> SetIterator<Element> {
@@ -531,7 +531,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Insert the elements of `other`.
+  /// Inserts the elements of `other` into `self`.
   public mutating func unionInPlace<
     S : Sequence where S.Iterator.Element == Element
   >(other: S) {
@@ -540,7 +540,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Return the members of `self` not contained in `other`.
+  /// Returns the members of `self` not contained in `other`.
   @warn_unused_result
   public func subtract<
     S : Sequence where S.Iterator.Element == Element
@@ -556,7 +556,7 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Remove the elements of `other` from `self`.
+  /// Removes the elements of `other` from `self`.
   public mutating func subtractInPlace<
     S : Sequence where S.Iterator.Element == Element
   >(other: S) {
@@ -571,7 +571,7 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Return the members of `self` contained in `other`.
+  /// Returns the members of `self` contained in `other`.
   @warn_unused_result
   public func intersect<
     S : Sequence where S.Iterator.Element == Element
@@ -580,7 +580,7 @@ public struct Set<Element : Hashable> :
     return intersect(otherSet)
   }
 
-  /// Remove any members not contained in `other`.
+  /// Removes any members not contained in `other`.
   public mutating func intersectInPlace<
     S : Sequence where S.Iterator.Element == Element
   >(other: S) {
@@ -1072,7 +1072,7 @@ public struct Dictionary<Key : Hashable, Value> :
     }
   }
 
-  /// Update the value stored in the dictionary for the given key, or, if they
+  /// Update the value stored in the dictionary for the given key, or, if the
   /// key does not exist, add a new key-value pair to the dictionary.
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
@@ -1099,8 +1099,7 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.removeValue(forKey: key)
   }
 
-  /// Remove all the elements.  If `keepingCapacity` is `true`, existing
-  /// element capacity is kept for future insertions.
+  /// Removes all elements.
   ///
   /// - Postcondition: `capacity == 0` if `keepingCapacity` is
   /// `false`, otherwise the capacity will not be decreased.
@@ -1130,7 +1129,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // `Sequence` conformance
   //
 
-  /// Return a *iterator* over the (key, value) pairs.
+  /// Returns an iterator over the `(Key, Value)` pairs.
   ///
   /// - Complexity: O(1).
   public func iterator() -> DictionaryIterator<Key, Value> {
@@ -2523,7 +2522,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return bridgingKeyEnumerator(())
   }
 
-  @objc
+  @objc(copyWithZone:)
   @warn_unused_result
   internal func copy(withZone zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
@@ -2549,16 +2548,19 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @objc(objectForKey:)
+  @warn_unused_result
   internal func objectFor(aKey: AnyObject) -> AnyObject? {
     return bridgingObjectForKey(aKey)
   }
 
   @objc
+  @warn_unused_result
   internal func keyEnumerator() -> _NSEnumerator {
     return bridgingKeyEnumerator(())
   }
 
-  @objc
+  @objc(copyWithZone:)
+  @warn_unused_result
   internal func copy(withZone zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
@@ -3522,7 +3524,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
-  /// Return a *iterator* over the (Key, Value) pairs.
+  /// Returns an iterator over the `(Key, Value)` pairs.
   ///
   /// - Complexity: O(1).
   internal func iterator() -> ${Self}Iterator<${TypeParameters}> {

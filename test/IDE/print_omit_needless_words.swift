@@ -33,23 +33,22 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
 // Note: "with" parameters.
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?)
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?, withObject: AnyObject?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
+// CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
 
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
-// Note: Pointer-to-struct name matching; "with" splits the first
-// piece, then the "with" is dropped.
+// Note: Pointer-to-struct name matching; preposition splitting.
 //
-// CHECK-FOUNDATION: func copy(withZone _: OpaquePointer = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with _: Zone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(forKey _: NSCopying) -> AnyObject?
-// CHECK-FOUNDATION: func removeObject(forKey _: NSCopying)
+// CHECK-FOUNDATION: func object(for _: Copying) -> AnyObject?
+// CHECK-FOUNDATION: func removeObject(for _: Copying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
@@ -133,16 +132,16 @@
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(_: NSEnumerationOptions = [], usingBlock: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingWith(_: NSCopying)
+// CHECK-FOUNDATION: func doSomething(_: Copying)
 
 // Note: NSObject<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingElseWith(_: protocol<NSCopying, NSObjectProtocol>)
+// CHECK-FOUNDATION: func doSomethingElse(_: protocol<Copying, ObjectProtocol>)
 
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
@@ -250,7 +249,7 @@
 // CHECK-APPKIT: func shouldCollapseAutoExpandedItems(forDeposited _: Bool) -> Bool
 
 // Introducing argument labels and pruning the base name.
-// CHECK-APPKIT: func rectForCancelButtonWhenCentered(_: Bool)
+// CHECK-APPKIT: func rectForCancelButton(whenCentered _: Bool)
 
 // CHECK-APPKIT: func openUntitledDocumentAndDisplay(_: Bool)
 
@@ -264,20 +263,42 @@
 // type information from the base name.
 // CHECK-APPKIT: func addGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
-// CHECK-APPKIT: func favoriteView(forGestureRecognizer _: NSGestureRecognizer) -> NSView?
+// CHECK-APPKIT: func favoriteView(for _: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
 // CHECK-APPKIT: func add(_: NSRect)
 // CHECK-APPKIT: class func conjureRect(_: NSRect)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func jump(to _: URL)
-// CHECK-OMIT-NEEDLESS-WORDS: func objectIsCompatibleWith(_: AnyObject) -> Bool
+// CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith _: AnyObject) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x _: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
-// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(withURLs _: [URL])
+// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with _: [URL])
 // CHECK-OMIT-NEEDLESS-WORDS: func save(to _: URL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>)
+
+// "Of" associates left.
+// CHECK-OMIT-NEEDLESS-WORDS: func typeOf(_: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func typeOf(namedString _: String)
+
+// ... except for some properties of the result.
+// CHECK-OMIT-NEEDLESS-WORDS: func type(ofTypeNamed _: String)
+
+// Look for preposition prior to "of".
+// CHECK-OMIT-NEEDLESS-WORDS: func append(contentsOf _: String)
+
+// Leave subscripts alone
+// CHECK-OMIT-NEEDLESS-WORDS: subscript(_: UInt) -> AnyObject { get }
+// CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
+
+// CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func isCompatibleWith(_: String)
+
+// CHECK-OMIT-NEEDLESS-WORDS: func add(_: AnyObject)
+
+// CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
 
 // Leave subscripts alone
 // CHECK-OMIT-NEEDLESS-WORDS: subscript (_: UInt) -> AnyObject { get }

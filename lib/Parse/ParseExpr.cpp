@@ -197,13 +197,13 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// apply to everything to its right.
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
-                                             bool isConfigCondition) {
+                                             bool isForConditionalDirective) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   bool HasCodeCompletion = false;
 
   while (true) {
-    if (isConfigCondition && Tok.isAtStartOfLine())
+    if (isForConditionalDirective && Tok.isAtStartOfLine())
       break;
     
     // Parse a unary expression.
@@ -358,8 +358,8 @@ parse_operator:
 done:
   
   if (SequencedExprs.empty()) {
-    if (isConfigCondition) {
-      diagnose(startLoc, diag::expected_close_to_config_stmt);
+    if (isForConditionalDirective) {
+      diagnose(startLoc, diag::expected_close_to_if_directive);
       return makeParserError();
     } else {
       // If we had semantic errors, just fail here.

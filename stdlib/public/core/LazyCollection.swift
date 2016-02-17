@@ -70,12 +70,12 @@ public struct LazyCollection<Base : Collection>
 /// optimizations it might implement.
 extension LazyCollection : Sequence {
   
-  /// Return an *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> Base.Iterator { return _base.iterator() }
   
-  /// Return a value less than or equal to the number of elements in
+  /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).

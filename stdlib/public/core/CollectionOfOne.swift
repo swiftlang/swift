@@ -55,7 +55,7 @@ public struct CollectionOfOne<Element> : Collection {
     return 1
   }
 
-  /// Return a *iterator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func iterator() -> IteratorOverOne<Element> {
@@ -70,7 +70,7 @@ public struct CollectionOfOne<Element> : Collection {
     return _element
   }
 
-  /// Return the number of elements (always one).
+  /// The number of elements (always one).
   public var count: Int {
     return 1
   }

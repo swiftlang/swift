@@ -4,6 +4,38 @@
 import Builtin
 import Swift
 
+/////////////////////
+// Data Structures //
+/////////////////////
+
+class foo {
+  var a: Int
+   deinit 
+  init()
+}
+
+class bar {
+  var start: foo
+  var end: foo
+   deinit 
+  init()
+}
+
+struct baz {
+  var start: foo
+  var end: foo
+  init()
+}
+
+struct boo {
+  var tbaz = baz()
+  var a = 0
+  init()
+}
+
+
+sil @use_Int : $@convention(thin) (Int) -> ()
+
 // We do this check separately to ensure that this does not occur anywhere in
 // the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
 
@@ -30,6 +62,44 @@ bb3:
   %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   %4 = tuple()
   return %4 : $()
+}
+
+// Make sure %0 is a dead argument.
+//
+// CHECK-LABEL: sil [thunk] @exploded_release_to_dead_argument
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4dg__exploded_release_to_dead_argument 
+// CHECK: apply [[IN1]]()
+// CHECK: release_value [[INPUT_ARG0]] 
+sil @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %1 : $baz, #baz.start
+  %3 = struct_extract %1 : $baz, #baz.end
+  release_value  %2 : $foo
+  release_value  %3 : $foo
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// Make sure %0 is not a dead argument, but gets converted to a guaranteed arg.
+//
+// CHECK-LABEL: sil [thunk] @exploded_release_to_guaranteed_param
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4gs__exploded_release_to_guaranteed_param 
+// CHECK: release_value [[INPUT_ARG0]] 
+sil @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %1 : $baz, #baz.start
+  %3 = struct_extract %1 : $baz, #baz.end
+  %4 = struct_extract %0 : $boo, #boo.a
+  %5 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %5(%4) : $@convention(thin) (Int) -> ()
+  release_value  %2 : $foo
+  release_value  %3 : $foo
+  %6 = tuple ()
+  return %6 : $()
 }
 
 // CHECK-LABEL: sil [fragile] [thunk] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
@@ -118,6 +188,25 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
   %3 = thin_to_thick_function %2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () to $@callee_owned (Builtin.NativeObject, Builtin.NativeObject) -> ()
   %4 = apply %3(%0, %1) : $@callee_owned (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [fragile] @exploded_release_to_guaranteed_param_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %2 = function_ref @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> ()
+  retain_value %0 : $boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+
+sil [fragile] @exploded_release_to_dead_param_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %2 = function_ref @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> ()
+  retain_value %0 : $boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> ()
   %5 = tuple()
   return %5 : $()
 }
@@ -445,6 +534,13 @@ bb0(%0 : $Builtin.Int32):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @_TTSf4dg__exploded_release_to_dead_argument
+
+// CHECK-LABEL: sil @_TTSf4gs__exploded_release_to_guaranteed_param
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $foo, [[INPUT_ARG1:%[0-9]+]] : $foo, [[INPUT_ARG02:%[0-9]+]] : $Int):
+// CHECK-NOT: strong_release
+// CHECK: return
 
 // Check that we specialized this function by removing the dead argument and
 // copied everything appropriately.

@@ -56,7 +56,7 @@ func useSwap(xi: Int, yi: Float) {
   mySwap(x, x) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
     // expected-error @-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{13-13=&}}
   
-  mySwap(&x, &y) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'inout _'}}
+  mySwap(&x, &y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {
@@ -65,7 +65,7 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type '(Int, Float)' to expected argument type '(_, _)'}}
+  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
@@ -75,7 +75,7 @@ func acceptFunction<T, U>(f: (T) -> U, _ t: T, _ u: U) {}
 
 func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{cannot convert value of type '(Int) -> Float' to expected argument type '(_) -> _'}}
+   acceptFunction(f, y, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
@@ -208,14 +208,13 @@ func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<  // expected-note {{in call to function 'rangeOfIsBefore'}}
+func rangeOfIsBefore<
   R : IteratorProtocol where R.Element : IsBefore
->(range : R) { }
-
+>(range: R) { }
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.iterator())
-  rangeOfIsBefore(da.iterator()) // expected-error{{generic parameter 'R' could not be inferred}}
+  rangeOfIsBefore(da.iterator()) // expected-error{{ambiguous reference to member 'iterator()'}}
 }
 
 //===----------------------------------------------------------------------===//

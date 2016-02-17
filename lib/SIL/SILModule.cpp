@@ -281,7 +281,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
   if (context->isExtensionContext())
     return SILFunction::NotRelevant;
 
-  auto *classType = context->isClassOrClassExtensionContext();
+  auto *classType = context->getAsClassOrClassExtensionContext();
   if (!classType || classType->isFinal())
     return SILFunction::NotRelevant;
 
@@ -512,6 +512,13 @@ void SILModule::invalidateSILLoaderCaches() {
   getSILLoader()->invalidateCaches();
 }
 
+void SILModule::removeFromZombieList(StringRef Name) {
+  if (auto *Zombie = ZombieFunctionTable.lookup(Name)) {
+    ZombieFunctionTable.erase(Name);
+    zombieFunctions.remove(Zombie);
+  }
+}
+
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
 
@@ -529,6 +536,7 @@ void SILModule::eraseFunction(SILFunction *F) {
     // or vtable stub generation. So we move it into the zombie list.
     getFunctionList().remove(F);
     zombieFunctions.push_back(F);
+    ZombieFunctionTable[copiedName] = F;
     F->setZombie();
 
     // This opens dead-function-removal opportunities for called functions.

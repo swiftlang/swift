@@ -1141,6 +1141,14 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
     auto constraintKind = ConstraintKind::Conversion;
     if (cs.getContextualTypePurpose() == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
+      
+    if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
+      convertType = convertType.transform([&](Type type) -> Type {
+        if (type->is<UnresolvedType>())
+          return cs.createTypeVariable(cs.getConstraintLocator(expr), 0);
+        return type;
+      });
+    }
     
     cs.addConstraint(constraintKind, expr->getType(), convertType,
                      cs.getConstraintLocator(expr), /*isFavored*/ true);
@@ -1318,7 +1326,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
-      viable.size() != 1) {
+      (viable.size() != 1 || (convertType && convertType->hasUnresolvedType()))) {
     expr->setType(ErrorType::get(Context));
     return false;
   }

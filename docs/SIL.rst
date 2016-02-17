@@ -4392,7 +4392,7 @@ The compiler flag that influences the value of the ``assert_configuration``
 function application is the optimization flag: at ``-Onone` the application will
 be replaced by ``Debug`` at higher optimization levels the instruction will be
 replaced by ``Release``. Optionally, the value to use for replacement can be
-specified with the ``-AssertConf`` flag which overwrites the value selected by
+specified with the ``-assert-config`` flag which overwrites the value selected by
 the optimization flag (possible values are ``Debug``, ``Release``,
 ``DisableReplacement``).
 

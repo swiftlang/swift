@@ -1849,19 +1849,72 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   llvm_unreachable("bad metatype representation");
 }
 
+static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
+                                              CanSILFunctionType origCalleeType,
+                                              ArrayRef<Substitution> subs) {
+  llvm::Value *wtable;
+
+  // The type of the self parameter in the witness. This may be abstract
+  // or concrete.
+  CanType origSelfType = origCalleeType->getSelfParameter().getType();
+
+  if (auto genericParamType = dyn_cast<GenericTypeParamType>(origSelfType)) {
+    // The generic signature for a witness method with abstract Self must
+    // have exactly one protocol requirement.
+    //
+    // We recover the witness table from the substitution that was used to
+    // produce the substituted callee type.
+    assert(genericParamType->getDepth() == 0);
+    assert(genericParamType->getIndex() == 0);
+
+    // There can be multiple substitutions, but the first one is the Self type.
+    assert(subs.size() >= 1);
+    assert(subs[0].getConformances().size() == 1);
+
+    auto conformance = subs[0].getConformances()[0];
+    auto substSelfType = subs[0].getReplacement()->getCanonicalType();
+    auto *proto = conformance.getRequirement();
+
+    llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
+    wtable = emitWitnessTableRef(IGF, substSelfType, &argMetadata,
+                                 proto, IGF.IGM.getProtocolInfo(proto),
+                                 conformance);
+  } else {
+    // Otherwise, we have no way of knowing the original protocol or
+    // conformance, since the witness has a concrete self type.
+    //
+    // Protocol witnesses for concrete types are thus not allowed to touch
+    // the witness table; they already know all the witnesses, and we can't
+    // say who they are.
+    wtable = llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy);
+  }
+
+  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
+  return wtable;
+
+}
+
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          CanSILFunctionType origCalleeType,
                                          CanSILFunctionType substCalleeType,
                                          const LoweredValue &lv,
                                          llvm::Value *selfValue,
-                                         Explosion &args,
-                                         ArrayRef<Substitution> substitutions) {
+                                         ArrayRef<Substitution> substitutions,
+                                         WitnessMetadata *witnessMetadata,
+                                         Explosion &args) {
   llvm::Value *calleeFn, *calleeData;
   
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
     calleeData = selfValue;
+
+    if (origCalleeType->getRepresentation()
+          == SILFunctionType::Representation::WitnessMethod) {
+      llvm::Value *wtable = emitWitnessTableForLoweredCallee(
+          IGF, origCalleeType, substitutions);
+      witnessMetadata->SelfWitnessTable = wtable;
+    }
     break;
       
   case LoweredValue::Kind::ObjCMethod: {
@@ -1918,7 +1971,19 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       calleeFn = calleeValues.claimNext();
 
       if (origCalleeType->getRepresentation()
+            == SILFunctionType::Representation::WitnessMethod) {
+        // @convention(witness_method) callees are exploded as a
+        // triple consisting of the function, Self metadata, and
+        // the Self witness table.
+        witnessMetadata->SelfWitnessTable = calleeValues.claimNext();
+        assert(witnessMetadata->SelfWitnessTable->getType() ==
+               IGF.IGM.WitnessTablePtrTy);
+      }
+
+      if (origCalleeType->getRepresentation()
             == SILFunctionType::Representation::Thick) {
+        // @convention(thick) callees are exploded as a pair
+        // consisting of the function and the self value.
         assert(!selfValue);
         calleeData = calleeValues.claimNext();
       } else {
@@ -2004,10 +2069,11 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   Explosion llArgs;    
+  WitnessMetadata witnessMetadata;
   CallEmission emission =
     getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
-                                   calleeLV, selfValue, llArgs,
-                                   site.getSubstitutions());
+                                   calleeLV, selfValue, site.getSubstitutions(),
+                                   &witnessMetadata, llArgs);
 
   // Lower the arguments and return value in the callee's generic context.
   GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
@@ -2026,7 +2092,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Pass the generic arguments.
-  WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origCalleeType)) {
     emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
                              site.getSubstitutions(), &witnessMetadata, llArgs);
@@ -2097,10 +2162,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 }
 
+/// If the value is a @convention(witness_method) function, the context
+/// is the witness table that must be passed to the call.
+///
+/// \param v A value of possibly-polymorphic SILFunctionType.
+/// \param subs This is the set of substitutions that we are going to be
+/// applying to 'v'.
 static std::tuple<llvm::Value*, llvm::Value*, CanSILFunctionType>
-getPartialApplicationFunction(IRGenSILFunction &IGF,
-                              SILValue v) {
+getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
+                              ArrayRef<Substitution> subs) {
   LoweredValue &lv = IGF.getLoweredValue(v);
+  auto fnType = v->getType().castTo<SILFunctionType>();
 
   switch (lv.kind) {
   case LoweredValue::Kind::Address:
@@ -2110,7 +2182,8 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
   case LoweredValue::Kind::ObjCMethod:
     llvm_unreachable("objc method partial application shouldn't get here");
 
-  case LoweredValue::Kind::StaticFunction:
+  case LoweredValue::Kind::StaticFunction: {
+    llvm::Value *context = nullptr;
     switch (lv.getStaticFunction().getRepresentation()) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Block:
@@ -2119,24 +2192,32 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
       break;
         
     case SILFunctionTypeRepresentation::WitnessMethod:
+      context = emitWitnessTableForLoweredCallee(IGF, fnType, subs);
+      break;
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
       break;
     }
     return std::make_tuple(lv.getStaticFunction().getFunction(),
-                           nullptr, v->getType().castTo<SILFunctionType>());
+                           context, v->getType().castTo<SILFunctionType>());
+  }
   case LoweredValue::Kind::Explosion: {
     Explosion ex = lv.getExplosion(IGF);
     llvm::Value *fn = ex.claimNext();
     llvm::Value *context = nullptr;
-    auto fnType = v->getType().castTo<SILFunctionType>();
     
     switch (fnType->getRepresentation()) {
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::ObjCMethod:
-    case SILFunctionType::Representation::WitnessMethod:
+      break;
+    case SILFunctionType::Representation::WitnessMethod: {
+      llvm::Value *wtable = ex.claimNext();
+      assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
+      context = wtable;
+      break;
+    }
     case SILFunctionType::Representation::CFunctionPointer:
       break;
     case SILFunctionType::Representation::Thick:
@@ -2201,7 +2282,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   CanSILFunctionType origCalleeTy;
   
   std::tie(calleeFn, innerContext, origCalleeTy)
-    = getPartialApplicationFunction(*this, i->getCallee());
+    = getPartialApplicationFunction(*this, i->getCallee(),
+                                    i->getSubstitutions());
   
   // Create the thunk and function value.
   Explosion function;

@@ -729,8 +729,8 @@ class CustomImmutableNSArray : NSArray {
     fatalError("init(coder:) not implemented by CustomImmutableNSArray")
   }
 
-  @objc
-  override func copy(withZone zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  override func copy(with zone: NSZone) -> AnyObject {
     ++CustomImmutableNSArray.timesCopyWithZoneWasCalled
     return self
   }
@@ -1060,7 +1060,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/copyWithZone") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
-  let copy: AnyObject = a.copy(withZone: nil)
+  let copy: AnyObject = a.copy(with: nil)
   expectEqual(
     unsafeBitCast(a, to: UInt.self), unsafeBitCast(copy, to: UInt.self))
 }
@@ -1334,7 +1334,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
 
 ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
-  let copy: AnyObject = a.copy(withZone: nil)
+  let copy: AnyObject = a.copy(with: nil)
   expectEqual(
     unsafeBitCast(a, to: UInt.self),
     unsafeBitCast(copy, to: UInt.self))

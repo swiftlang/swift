@@ -28,8 +28,8 @@
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -3758,9 +3758,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(AbstractTypeParamType, SubstitutableType)
 ///
 /// \sa GenericTypeParamDecl
 class GenericTypeParamType : public AbstractTypeParamType {
+  using DepthIndexTy = llvm::PointerEmbeddedInt<unsigned, 31>;
+
   /// The generic type parameter or depth/index.
-  llvm::PointerUnion<GenericTypeParamDecl *, llvm::Fixnum<31>>
-    ParamOrDepthIndex;
+  llvm::PointerUnion<GenericTypeParamDecl *, DepthIndexTy> ParamOrDepthIndex;
 
 public:
   /// Retrieve a generic type parameter at the given depth and index.

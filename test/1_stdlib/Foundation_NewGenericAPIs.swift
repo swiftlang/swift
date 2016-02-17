@@ -41,7 +41,7 @@ func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
 
 
 func test_NSKeyedUnarchiver_unarchiveObjectWithData(data: NSData) {
-  var r = NSKeyedUnarchiver.unarchiveObject(withData: data)
+  var r = NSKeyedUnarchiver.unarchiveObject(with: data)
   expectType(Optional<AnyObject>.self, &r)
 }
 
