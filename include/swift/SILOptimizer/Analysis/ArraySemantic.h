@@ -134,6 +134,9 @@ public:
   /// Is this a semantics call.
   operator bool() const { return SemanticsCall != nullptr; }
 
+  /// Is this a call which is not used to mutate the array.
+  bool doesNotChangeArray() const;
+
   /// Could this array be backed by an NSArray.
   bool mayHaveBridgedObjectElementType() const;
 

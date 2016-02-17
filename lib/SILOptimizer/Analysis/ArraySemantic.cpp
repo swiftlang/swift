@@ -488,28 +488,29 @@ void swift::ArraySemanticsCall::removeCall() {
   SemanticsCall = nullptr;
 }
 
-static bool hasArrayPropertyIsNativeTypeChecked(ArrayCallKind Kind,
-                                                unsigned &ArgIdx) {
-  switch (Kind) {
-  default: break;
-
-  case ArrayCallKind::kCheckSubscript:
-  case ArrayCallKind::kGetElement:
-    ArgIdx = 1;
-    return true;
-  }
-  return false;
-}
-
 SILValue
 swift::ArraySemanticsCall::getArrayPropertyIsNativeTypeChecked() const {
-  unsigned ArgIdx = 0;
-  bool HasArg = hasArrayPropertyIsNativeTypeChecked(getKind(), ArgIdx);
-  (void)HasArg;
-  assert(HasArg &&
-         "Must have an array.props argument");
+  switch (getKind()) {
+    case ArrayCallKind::kCheckSubscript:
+      return SemanticsCall->getArgument(1);
+    case ArrayCallKind::kGetElement:
+      return getTypeCheckedArgument();
+    default:
+      llvm_unreachable("Must have an array.props argument");
+  }
+}
 
-  return SemanticsCall->getArgument(ArgIdx);
+bool swift::ArraySemanticsCall::doesNotChangeArray() const {
+  switch (getKind()) {
+    default: return false;
+    case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
+    case ArrayCallKind::kCheckSubscript:
+    case ArrayCallKind::kCheckIndex:
+    case ArrayCallKind::kGetCount:
+    case ArrayCallKind::kGetCapacity:
+    case ArrayCallKind::kGetElement:
+      return true;
+  }
 }
 
 bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
