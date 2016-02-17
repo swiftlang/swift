@@ -199,31 +199,62 @@ public:
 
 PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
   PrintOptions result = printInterface();
-  result.setArchetypeTransform(T, DC);
-  result.TypeToPrint = T.getPointer();
+  result.TransformContext = std::make_shared<ArchetypeTransformContext>(
+    new PrinterArchetypeNameTransformer(T, DC), T);
   return result;
 }
 
 void PrintOptions::setArchetypeTransform(Type T, const DeclContext *DC) {
-  pTransformer = std::make_shared<PrinterArchetypeNameTransformer>(T, DC);
+  TransformContext = std::make_shared<ArchetypeTransformContext>(
+    new PrinterArchetypeNameTransformer(T, DC));
 }
 
 void PrintOptions::setArchetypeTransformForQuickHelp(Type T, DeclContext *DC) {
-  pTransformer = std::make_shared<ArchetypeSelfTransformer>(T, *DC);
+  TransformContext = std::make_shared<ArchetypeTransformContext>(
+    new ArchetypeSelfTransformer(T, *DC));
 }
 
 void PrintOptions::initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D) {
-  pTransformer = std::make_shared<ArchetypeSelfTransformer>(D);
-  SynthesizedTarget = D;
-}
-
-bool PrintOptions::isPrintingSynthesizedExtension() {
-  return pTransformer && SynthesizedTarget;
+  TransformContext  = std::make_shared<ArchetypeTransformContext>(
+    new ArchetypeSelfTransformer(D), D);
 }
 
 void PrintOptions::clearArchetypeTransformerForSynthesizedExtensions() {
-  pTransformer = nullptr;
-  SynthesizedTarget = nullptr;
+  TransformContext.reset();
+}
+
+ArchetypeTransformContext::ArchetypeTransformContext(
+  PrinterArchetypeTransformer *Transformer): Transformer(Transformer){};
+
+ArchetypeTransformContext::ArchetypeTransformContext(
+  PrinterArchetypeTransformer *Transformer, Type T):
+  Transformer(Transformer), TypeBaseOrNominal(T.getPointer()) {};
+
+ArchetypeTransformContext::ArchetypeTransformContext(
+  PrinterArchetypeTransformer *Transformer, NominalTypeDecl *NTD) :
+  Transformer(Transformer), TypeBaseOrNominal(NTD){};
+
+NominalTypeDecl *ArchetypeTransformContext::getNominal() {
+  return TypeBaseOrNominal.get<NominalTypeDecl*>();
+}
+
+Type ArchetypeTransformContext::getTypeBase() {
+  return TypeBaseOrNominal.get<TypeBase*>();
+}
+
+bool ArchetypeTransformContext::isPrintingSynthesizedExtension() {
+  return !TypeBaseOrNominal.isNull() && TypeBaseOrNominal.is<NominalTypeDecl*>();
+}
+bool ArchetypeTransformContext::isPrintingTypeInteface() {
+  return !TypeBaseOrNominal.isNull() && TypeBaseOrNominal.is<TypeBase*>();
+}
+
+Type ArchetypeTransformContext::transform(Type Input) {
+  return Transformer->transform(Input);
+}
+
+StringRef ArchetypeTransformContext::transform(StringRef Input) {
+  return Transformer->transform(Input);
 }
 
 std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
@@ -557,8 +588,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printTypeLoc(const TypeLoc &TL) {
-    if (Options.pTransformer && TL.getType()) {
-      if (auto RT = Options.pTransformer->transform(TL.getType())) {
+    if (Options.TransformContext && TL.getType()) {
+      if (auto RT = Options.TransformContext->transform(TL.getType())) {
         PrintOptions FreshOptions;
         RT.print(Printer, FreshOptions);
         return;
@@ -643,16 +674,17 @@ public:
     if (!shouldPrint(D, true))
       return false;
 
-    bool Synthesize = Options.isPrintingSynthesizedExtension() &&
+    bool Synthesize = Options.TransformContext &&
+                    Options.TransformContext->isPrintingSynthesizedExtension() &&
                       D->getKind() == DeclKind::Extension;
     if (Synthesize)
-      Printer.setSynthesizedTarget(Options.SynthesizedTarget);
+      Printer.setSynthesizedTarget(Options.TransformContext->getNominal());
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(nullptr);
       Printer.printSynthesizedExtensionPost(cast<ExtensionDecl>(D),
-                                            Options.SynthesizedTarget);
+                                            Options.TransformContext->getNominal());
     } else {
       Printer.printDeclPost(D);
     }
@@ -798,8 +830,10 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
   Printer << "<";
   bool IsFirst = true;
   SmallVector<Type, 4> Scrach;
-  if (Options.TypeToPrint) {
-    auto ArgArr = Options.TypeToPrint->getAllGenericArgs(Scrach);
+  if (Options.TransformContext &&
+      Options.TransformContext->isPrintingTypeInteface()) {
+    auto ArgArr = Options.TransformContext->getTypeBase()->
+      getAllGenericArgs(Scrach);
     for (auto Arg : ArgArr) {
       if (IsFirst) {
         IsFirst = false;
@@ -841,9 +875,9 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       auto FirstType = std::get<0>(Tuple);
       auto SecondType = std::get<1>(Tuple);
       auto Kind = std::get<2>(Tuple);
-      if (Options.pTransformer) {
-        FirstType = Options.pTransformer->transform(FirstType);
-        SecondType = Options.pTransformer->transform(SecondType);
+      if (Options.TransformContext) {
+        FirstType = Options.TransformContext->transform(FirstType);
+        SecondType = Options.TransformContext->transform(SecondType);
       }
       if (FirstType == SecondType)
         continue;
@@ -913,8 +947,8 @@ bool PrintAST::shouldPrintPattern(const Pattern *P) {
 void PrintAST::printPatternType(const Pattern *P) {
   if (P->hasType()) {
     Type T = P->getType();
-    if (Options.pTransformer) {
-      T = Options.pTransformer->transform(T);
+    if (Options.TransformContext) {
+      T = Options.TransformContext->transform(T);
     }
     Printer << ": ";
     T.print(Printer, Options);
@@ -1493,8 +1527,9 @@ void PrintAST::printExtension(ExtensionDecl* decl) {
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
-  if (Options.SynthesizedTarget && Options.pTransformer)
-    printSynthesizedExtension(Options.SynthesizedTarget, decl);
+  if (Options.TransformContext &&
+      Options.TransformContext->isPrintingSynthesizedExtension())
+    printSynthesizedExtension(Options.TransformContext->getNominal(), decl);
   else
     printExtension(decl);
 }
@@ -1758,8 +1793,9 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     });
   if (decl->hasType()) {
     Printer << ": ";
-    if (Options.pTransformer)
-      Options.pTransformer->transform(decl->getType()).print(Printer, Options);
+    if (Options.TransformContext)
+      Options.TransformContext->transform(decl->getType()).
+        print(Printer, Options);
     else
       decl->getType().print(Printer, Options);
   }
@@ -2054,8 +2090,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Type ResultTy = decl->getResultType();
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
-        if (Options.pTransformer) {
-          ResultTy = Options.pTransformer->transform(ResultTy);
+        if (Options.TransformContext) {
+          ResultTy = Options.TransformContext->transform(ResultTy);
           PrintOptions FreshOptions;
           ResultTy->print(Printer, FreshOptions);
         } else
