@@ -52,6 +52,32 @@ bb3:                                              // Preds: bb1 bb2
   return %18 : $()                                // id: %20
 }
 
+
+// CHECK-LABEL: dont_assert_nrvo
+// CHECK: return
+
+sil hidden @dont_assert_nrvo : $@convention(thin) <T where T : P> (@out T, Bool) -> () {
+bb0(%0 : $*T, %1 : $Bool):
+  %2 = alloc_stack $T, var, name "ro"                 // users: %9, %15, %17, %19
+  debug_value_addr %0 : $*T
+  debug_value_addr %2 : $*T
+  %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
+  %5 = metatype $@thick T.Type                    // user: %9
+  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> () // user: %9
+  %7 = integer_literal $Builtin.Int32, 10          // user: %8
+  %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
+  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, Int32, @thick τ_0_0.Type) -> ()
+  br bb3(%0 : $*T)
+
+bb3(%10 : $*T):                                              // Preds: bb1 bb2
+  copy_addr [take] %2 to [initialization] %10 : $*T // id: %17
+  %18 = tuple ()                                  // user: %20
+  debug_value_addr %0 : $*T
+  debug_value_addr %2 : $*T
+  dealloc_stack %2 : $*T         // id: %19
+  return %18 : $()                                // id: %20
+}
+
 //CHECK-LABEL: forward_init
 //CHECK-NOT: copy_addr
 //CHECK-NOT: destroy_addr
@@ -170,6 +196,26 @@ bb0(%0 : $*T):
   return %t : $()
 }
 
+//CHECK-LABEL: dont_assert_backward_init
+//CHECK: return
+sil hidden @dont_assert_backward_init : $@convention(thin) <T> (@out T) -> () {
+bb0(%0 : $*T):
+  %l1 = alloc_stack $T
+br bb1(%0: $*T)
+
+bb1(%1 : $*T):
+  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
+  debug_value_addr %0 : $*T
+  debug_value_addr %l1 : $*T
+  copy_addr %l1 to [initialization] %0 : $*T
+  debug_value_addr %0 : $*T
+  debug_value_addr %l1 : $*T
+  destroy_addr %l1 : $*T
+  dealloc_stack %l1 : $*T
+  %t = tuple ()
+  return %t : $()
+}
 //CHECK-LABEL: backward_noinit
 //CHECK: copy_addr
 //CHECK: destroy_addr

@@ -121,6 +121,8 @@ static bool isIdentifiedSourceValue(SILValue Def) {
 /// (2) A local alloc_stack variable.
 static bool isIdentifiedDestValue(SILValue Def) {
   if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
+    if (!Arg->isFunctionArg())
+      return false;
     // Check that the argument is passed as an out type. This means there are
     // no aliases accessible within this function scope.
     ParameterConvention Conv =  Arg->getParameterInfo().getConvention();
@@ -1105,6 +1107,9 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   // to be accessed between the initialization and the return.
   auto OutArg = dyn_cast<SILArgument>(CopyInst->getDest());
   if (!OutArg)
+    return false;
+
+  if (!OutArg->isFunctionArg())
     return false;
 
   auto ArgConv = OutArg->getParameterInfo().getConvention();
