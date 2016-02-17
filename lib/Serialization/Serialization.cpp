@@ -268,8 +268,7 @@ DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
   if (id != 0)
     return id;
 
-  LastLocalDeclContextID = LastLocalDeclContextID + 1;
-  id = LastLocalDeclContextID;
+  id = ++LastLocalDeclContextID;
   LocalDeclContextsToWrite.push(DC);
   return id;
 }
@@ -294,8 +293,7 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   if (id)
     return id;
 
-  LastDeclContextID = LastDeclContextID + 1;
-  id = LastDeclContextID;
+  id = ++LastDeclContextID;
   DeclContextsToWrite.push(DC);
 
   return id;
@@ -327,8 +325,7 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   if (paramList)
     GenericContexts[paramList] = D;
 
-  LastDeclID = LastDeclID + 1;
-  id = { LastDeclID, forceSerialization };
+  id = { ++LastDeclID, forceSerialization };
   DeclsAndTypesToWrite.push(D);
   return id.first;
 }
@@ -341,8 +338,7 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (id.first != 0)
     return id.first;
 
-  LastTypeID = LastTypeID + 1;
-  id = { LastTypeID, true };
+  id = { ++LastTypeID, true };
   DeclsAndTypesToWrite.push(ty);
   return id.first;
 }
@@ -355,8 +351,7 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
   if (id != 0)
     return id;
 
-  LastIdentifierID = LastIdentifierID + 1;
-  id = LastIdentifierID;
+  id = ++LastIdentifierID;
   IdentifiersToWrite.push_back(ident);
   return id;
 }
@@ -385,8 +380,7 @@ NormalConformanceID Serializer::addConformanceRef(
   if (conformanceID)
     return conformanceID;
 
-  LastNormalConformanceID = LastNormalConformanceID + 1;
-  conformanceID = LastNormalConformanceID;
+  conformanceID = ++LastNormalConformanceID;
   NormalConformancesToWrite.push(conformance);
 
   return conformanceID;
