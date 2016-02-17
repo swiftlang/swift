@@ -1807,6 +1807,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 fi
                 pushd "${LIBDISPATCH_BUILD_DIR}"
                 make
+                cd tests
+                make build-tests
                 popd
                 { set +x; } 2>/dev/null
 
