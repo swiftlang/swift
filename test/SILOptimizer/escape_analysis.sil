@@ -56,6 +56,16 @@ struct MyError : ErrorType {
 final class ErrorClass : ErrorType {
 }
 
+struct SomeData {
+  let x : X
+}
+
+struct FourFields {
+  let a : SomeData
+  let b : Pointer
+  let c : Builtin.RawPointer
+  let d : Y
+}
 
 // Sanity check with a simple function.
 
@@ -904,6 +914,37 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   unchecked_ref_cast_addr  T in %1 : $*T to U in %0 : $*U
   %5 = tuple ()
   return %5 : $()
+}
+
+sil_global @global_y : $SomeData
+
+// CHECK-LABEL: CG of test_node_merge_during_struct_inst
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%4.1)
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%4.1)
+// CHECK-NEXT:    Val %4 Esc: G, Succ: (%4.1)
+// CHECK-NEXT:    Con %4.1 Esc: G, Succ: (%4.1), %0, %1, %4
+// CHECK-NEXT:  End
+sil @test_node_merge_during_struct_inst : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = global_addr @global_y : $*SomeData
+  %2 = address_to_pointer %1 : $*SomeData to $Builtin.RawPointer
+  %3 = raw_pointer_to_ref %2 : $Builtin.RawPointer to $Y
+
+  %4 = alloc_stack $Pointer
+  %5 = struct_element_addr %4 : $*Pointer, #Pointer.y
+  store %3 to %5 : $*Y
+
+  %7 = load %1 : $*SomeData
+  %8 = load %4 : $*Pointer
+  %9 = address_to_pointer %4 : $*Pointer to $Builtin.RawPointer
+
+  // Analyzing this instruction causes a node merge.
+  // Check that we don't crash on this.
+  %l = struct $FourFields(%7 : $SomeData, %8 : $Pointer, %9 : $Builtin.RawPointer, %0 : $Y)
+
+  dealloc_stack %4 : $*Pointer
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: CG of arraysemantics_is_native_no_typecheck

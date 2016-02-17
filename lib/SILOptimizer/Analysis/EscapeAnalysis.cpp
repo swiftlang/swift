@@ -501,9 +501,7 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       // Create the edge in this graph. Note: this may trigger merging of
       // content nodes.
       if (DestReachable) {
-        Changed |= defer(DestFrom, DestReachable);
-        // In case DestFrom is merged during adding the defer-edge.
-        DestFrom = DestFrom->getMergeTarget();
+        DestFrom = defer(DestFrom, DestReachable, Changed);
       }
 
       for (auto *Deferred : SourceReachable->defersTo) {
@@ -1079,7 +1077,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
       for (SILValue Src : Incoming) {
         CGNode *SrcArg = ConGraph->getNode(Src, this);
         if (SrcArg) {
-          ConGraph->defer(ArgNode, SrcArg);
+          ArgNode = ConGraph->defer(ArgNode, SrcArg);
         } else {
           ConGraph->setEscapesGlobal(ArgNode);
           break;
@@ -1267,7 +1265,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       assert(ResultNode && "thick functions must have a CG node");
       for (const Operand &Op : I->getAllOperands()) {
         if (CGNode *ArgNode = ConGraph->getNode(Op.get(), this)) {
-          ConGraph->defer(ResultNode, ArgNode);
+          ResultNode = ConGraph->defer(ResultNode, ArgNode);
         }
       }
       return;
@@ -1294,7 +1292,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
             ResultNode = FieldNode;
             assert(isPointer(I));
           } else {
-            ConGraph->defer(ResultNode, FieldNode);
+            ResultNode = ConGraph->defer(ResultNode, FieldNode);
           }
         }
       }
@@ -1329,8 +1327,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::ReturnInst:
       if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand(),
                                               this)) {
-        ConGraph->defer(ConGraph->getReturnNode(),
-                                 ValueNd);
+        ConGraph->defer(ConGraph->getReturnNode(), ValueNd);
       }
       return;
     default:
@@ -1350,7 +1347,7 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
       auto *ArgNode = ConGraph->getNode(CaseVal, this);
       assert(ArgNode &&
              "there should be an argument node if there is a result node");
-      ConGraph->defer(ResultNode, ArgNode);
+      ResultNode = ConGraph->defer(ResultNode, ArgNode);
     }
     // ... also including the default value.
     auto *DefaultNode = ConGraph->getNode(SI->getDefaultResult(), this);
