@@ -73,10 +73,11 @@ public struct RangeGenerator<
 ///
 /// However, subscripting that range still works in a generic context:
 ///
-///     func brackets<Element : ForwardIndexType>(x: Range<Element>, i: Element) -> Element {
-///       return x[i] // Just forward to subscript
+///     func brackets<Element: ForwardIndexType>(x: Range<Element>, _ i: Element) -> Element {
+///         return x[i] // Just forward to subscript
 ///     }
-///     print(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
+///     print(brackets(Range<Int>(start: -99, end: 100), 0))
+///     // Prints "0"
 public struct Range<
   Element : ForwardIndexType
 > : Equatable, CollectionType,
@@ -126,7 +127,7 @@ public struct Range<
 
   //===--------------------------------------------------------------------===//
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func generate() -> RangeGenerator<Element> {

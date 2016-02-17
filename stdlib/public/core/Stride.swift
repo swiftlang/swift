@@ -149,7 +149,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")
@@ -172,7 +172,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
 }
 
 extension Strideable {
-  /// Return the sequence of values (`self`, `self + stride`, `self +
+  /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
   @swift3_migration(renamed="strideTo(_:by:)")
@@ -226,7 +226,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @swift3_migration(renamed="iterator()")
@@ -248,7 +248,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
 }
 
 extension Strideable {
-  /// Return the sequence of values (`self`, `self + stride`, `self +
+  /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression less than or equal to `end`.
   ///

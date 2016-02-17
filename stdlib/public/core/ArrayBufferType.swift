@@ -47,7 +47,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> _ContiguousArrayBuffer<Element>?
 
-  /// Returns true iff this buffer is backed by a uniquely-referenced mutable
+  /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.
   ///
   /// - Note: This function must remain mutating; otherwise the buffer
@@ -103,8 +103,8 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// element. Otherwise, `nil`.
   var firstElementAddress: UnsafeMutablePointer<Element> {get}
 
-  /// Return a base address to which you can add an index `i` to get the address
-  /// of the corresponding element at `i`.
+  /// Returns a base address to which you can add an index `i` to get the
+  /// address of the corresponding element at `i`.
   var subscriptBaseAddress: UnsafeMutablePointer<Element> {get}
 
   /// Like `subscriptBaseAddress`, but can assume that `self` is a mutable,
