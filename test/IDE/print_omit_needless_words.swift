@@ -309,6 +309,10 @@
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
 
+// Protocols as contexts
+// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWLanding {
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func flip()
+
 // Verify that we get the Swift name from the original declaration.
 // CHECK-OMIT-NEEDLESS-WORDS: protocol OMWWiggle
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()

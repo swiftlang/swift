@@ -32,6 +32,10 @@
 -(void)drawGreebies:(nonnull SEGreebieArray*)greebies;
 @end
 
+@protocol OMWLanding
+-(void)flipLanding;
+@end
+
 @protocol OMWWiggle
 -(void)joinSub;
 -(void)conflicting1 NS_SWIFT_NAME(wiggle1());
