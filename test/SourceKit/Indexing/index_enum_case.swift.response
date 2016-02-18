@@ -128,6 +128,29 @@
       key.usr: "s:FO15index_enum_case1E3twoFMS0_FT1aSS_S0_",
       key.line: 21,
       key.column: 13
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "brokenEnums()",
+      key.usr: "s:F15index_enum_case11brokenEnumsFT_T_",
+      key.line: 23,
+      key.column: 6,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "E",
+          key.usr: "s:O15index_enum_case1E",
+          key.line: 28,
+          key.column: 10
+        },
+        {
+          key.kind: source.lang.swift.ref.enumelement,
+          key.name: "one",
+          key.usr: "s:FO15index_enum_case1E3oneFMS0_S0_",
+          key.line: 28,
+          key.column: 12
+        }
+      ]
     }
   ]
 }
