@@ -38,6 +38,17 @@
 #define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs) FUNCTION_ID(Id)
 #endif
 
+/// This is a special version for runtime functions which have a global
+/// symbol containing a reference of the implementation of this runtime
+/// entry.
+///  SymbolName is the name of the global symbol
+///  Impl is the name of the function implementing this entry point.
+#ifndef FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL
+#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(Id, Name, SymbolName, Impl, CC,  \
+                                             ReturnTys, ArgTys, Attrs)        \
+  FUNCTION_ID(Id)
+#endif
+
 FUNCTION(AllocBox,       swift_allocBox,      RuntimeCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
@@ -957,5 +968,6 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
 #undef ATTRS
 #undef NO_ARGS
 #undef NO_ATTRS
+#undef FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL
 #undef FUNCTION
 #undef FUNCTION_NAME
