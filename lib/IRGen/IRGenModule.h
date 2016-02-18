@@ -418,6 +418,7 @@ public:
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
   
+  llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
