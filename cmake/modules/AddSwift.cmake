@@ -48,7 +48,7 @@ function(compute_library_subdir result_var_name sdk arch)
 endfunction()
 
 function(_add_variant_c_compile_link_flags
-    sdk arch build_type enable_assertions analyze_code_coverage
+    sdk arch build_type enable_assertions enable_lto analyze_code_coverage
     result_var_name)
   set(result
     ${${result_var_name}}
@@ -67,6 +67,10 @@ function(_add_variant_c_compile_link_flags
       list(APPEND result "-fprofile-instr-generate"
                          "-fcoverage-mapping")
     endif()
+
+    if(enable_lto)
+      list(APPEND result "-flto")
+    endif()
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
@@ -82,6 +86,7 @@ function(_add_variant_c_compile_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      "${SWIFT_ENABLE_LTO}"
       FALSE
       result)
 
@@ -169,6 +174,7 @@ function(_add_variant_link_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      "${SWIFT_ENABLE_LTO}"
       "${analyze_code_coverage}"
       result)
 
