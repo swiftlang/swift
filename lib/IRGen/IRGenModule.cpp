@@ -528,7 +528,7 @@ llvm::Constant *IRGenModule::get##ID##Fn() {               \
   return getRuntimeFn(*this, ID##Fn, #NAME, CC,            \
                       RETURNS, ARGS, ATTRS);               \
 }
-#include "RuntimeFunctions.def"
+#include "swift/Runtime/RuntimeFunctions.def"
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
 IRGenModule::createStringConstant(StringRef Str,

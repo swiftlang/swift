@@ -713,7 +713,7 @@ public:                             \
   llvm::Constant *get##Id##Fn();    \
 private:                            \
   llvm::Constant *Id##Fn = nullptr;
-#include "RuntimeFunctions.def"
+#include "swift/Runtime/RuntimeFunctions.def"
   
   llvm::Constant *FixLifetimeFn = nullptr;
 
