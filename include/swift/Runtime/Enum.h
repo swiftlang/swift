@@ -50,10 +50,13 @@ extern "C" void swift_initEnumValueWitnessTableSinglePayload(
 /// \returns -1 if the payload case is inhabited. If an empty case is inhabited,
 ///          returns a value greater than or equal to zero and less than
 ///          emptyCases.
-SWIFT_RUNTIME_EXPORT
+RT_ENTRY_VISIBILITY
 extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                               const Metadata *payload,
-                                              unsigned emptyCases);
+                                              unsigned emptyCases)
+  CALLING_CONVENTION(RuntimeCC1);
+
+
 
 /// \brief Store the tag value for the given case into a single-payload enum,
 ///        whose associated payload (if any) has already been initialized.
@@ -66,11 +69,12 @@ extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
 ///                    case, or a value greater than or equal to zero and less
 ///                    than emptyCases for an empty case.
 /// \param emptyCases - the number of empty cases in the enum.
-SWIFT_RUNTIME_EXPORT
+RT_ENTRY_VISIBILITY
 extern "C" void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                                  const Metadata *payload,
                                                  int whichCase,
-                                                 unsigned emptyCases);
+                                                 unsigned emptyCases)
+  CALLING_CONVENTION(RuntimeCC1);
 
 /// \brief Initialize the value witness table for a generic, multi-payload
 ///        enum instance.

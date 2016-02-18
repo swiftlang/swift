@@ -2493,10 +2493,11 @@ swift_getResilientMetadata(GenericMetadata *pattern);
 ///                         metadata)
 ///     return metadata
 ///   }
-SWIFT_RUNTIME_EXPORT
+RT_ENTRY_VISIBILITY
 extern "C" const Metadata *
 swift_getGenericMetadata(GenericMetadata *pattern,
-                         const void *arguments);
+                         const void *arguments)
+    CALLING_CONVENTION(RuntimeCC1);
 
 // Callback to allocate a generic class metadata object.
 SWIFT_RUNTIME_EXPORT
@@ -2530,11 +2531,12 @@ swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 ///   never form part of the uniquing key for the conformance, which
 ///   is ultimately a statement about the user model of overlapping
 ///   conformances.
-SWIFT_RUNTIME_EXPORT
+RT_ENTRY_VISIBILITY
 extern "C" const WitnessTable *
 swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
-                             void * const *instantiationArgs);
+                             void * const *instantiationArgs)
+    CALLING_CONVENTION(RuntimeCC1);
 
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
@@ -2736,10 +2738,11 @@ swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
-SWIFT_RUNTIME_EXPORT
+RT_ENTRY_VISIBILITY
 extern "C" const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(size_t numProtocols,
-                                 const ProtocolDescriptor **protocols);
+                                 const ProtocolDescriptor **protocols)
+    CALLING_CONVENTION(RuntimeCC1);
 
 /// \brief Perform a checked dynamic cast of a value to a target type.
 ///
@@ -2757,12 +2760,13 @@ swift_getExistentialTypeMetadata(size_t numProtocols,
 ///
 /// \return true if the cast succeeded. Depending on the flags,
 ///   swift_dynamicCast may fail rather than return false.
-SWIFT_RUNTIME_EXPORT
+RT_ENTRY_VISIBILITY
 extern "C" bool
 swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *srcType,
                   const Metadata *targetType,
-                  DynamicCastFlags flags);
+                  DynamicCastFlags flags)
+    CALLING_CONVENTION(RuntimeCC1);
 
 /// \brief Checked dynamic cast to a Swift class type.
 ///
@@ -2771,9 +2775,10 @@ swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
 /// a Swift class type.
 ///
 /// \returns the object if the cast succeeds, or null otherwise.
-SWIFT_RUNTIME_EXPORT
+RT_ENTRY_VISIBILITY
 extern "C" const void *
-swift_dynamicCastClass(const void *object, const ClassMetadata *targetType);
+swift_dynamicCastClass(const void *object, const ClassMetadata *targetType)
+    CALLING_CONVENTION(RuntimeCC1);
 
 /// \brief Unconditional, checked dynamic cast to a Swift class type.
 ///
