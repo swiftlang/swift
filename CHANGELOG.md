@@ -12,6 +12,11 @@ Swift 3
   func f<Food : Chunks<Meat>, Meat : Molerat>(f: Food, m: Meat) {}
   ```
 
+* Section markers are created in ELF binaries through special objects during link time.
+  These objects allow for the deletion of swift.ld and the use of non-BFD linkers.
+  A new argument to swiftc is provided to select the linker used, and the gold linker
+  is set as the default for arm-based platforms.
+
 Swift 2.2
 ---------
 
