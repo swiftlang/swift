@@ -50,7 +50,7 @@ public struct LazyFilterGenerator<
   
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
-  internal var _predicate: (Base.Element) -> Bool
+  internal let _predicate: (Base.Element) -> Bool
 }
 
 /// A sequence whose elements consist of the elements of some base
@@ -221,7 +221,7 @@ public struct LazyFilterCollection<
   }
 
   var _base: Base
-  var _predicate: (Base.Generator.Element) -> Bool
+  let _predicate: (Base.Generator.Element) -> Bool
 }
 
 extension LazySequenceType {
