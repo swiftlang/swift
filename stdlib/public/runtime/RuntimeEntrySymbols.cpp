@@ -46,15 +46,15 @@ typedef void (*RuntimeEntry)();
 // Define a global symbol referring to this implementation.
 
 #define DEFINE_SYMBOL(SymbolName, Name, CC)                                    \
-  RT_ENTRY_VISIBILITY extern "C" void Name()                      \
-      CALLING_CONVENTION(CC);                                                  \
+  SWIFT_RT_ENTRY_VISIBILITY extern "C" void Name()                             \
+      SWIFT_CC(CC);                                                            \
   SWIFT_RUNTIME_EXPORT extern "C" RuntimeEntry SymbolName =                    \
       reinterpret_cast<RuntimeEntry>(Name);
 
 #define FUNCTION1(Id, Name, CC, ReturnTys, ArgTys, Attrs)                      \
-  DEFINE_SYMBOL(RT_ENTRY_REF(Name), Name, CC)
+  DEFINE_SYMBOL(SWIFT_RT_ENTRY_REF(Name), Name, CC)
 
-#if defined(RT_USE_WRAPPERS)
+#if defined(SWIFT_RT_USE_WRAPPERS)
 // Automatically generate a global symbol name if it is required by the calling
 // convention.
 #define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs)                       \

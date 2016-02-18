@@ -362,7 +362,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
-  DefaultCC = LLVM_CC(DefaultCC);
+  DefaultCC = SWIFT_LLVM_CC(DefaultCC);
   // If it is an interpreter, don't use try to use any
   // advanced calling conventions and use instead a
   // more conservative C calling convention. This
@@ -376,7 +376,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   auto Arch = Triple.getArch();
   if (Arch == llvm::Triple::ArchType::x86_64 ||
       Arch == llvm::Triple::ArchType::aarch64)
-    RegisterPreservingCC = LLVM_CC(RegisterPreservingCC);
+    RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
   else
     RegisterPreservingCC = DefaultCC;
 
@@ -544,7 +544,7 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FOR_CONV_RegisterPreservingCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)      \
-  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, RT_ENTRY_REF(NAME), CC,           \
+  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SWIFT_RT_ENTRY_REF(NAME), CC,     \
                                    QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)                           \

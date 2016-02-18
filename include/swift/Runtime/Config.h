@@ -67,16 +67,16 @@
 // Annotation for specifying a calling convention of
 // a runtime function. It should be used with declarations
 // of runtime functions like this:
-// void runtime_function_name() CALLING_CONVENTION(RegisterPreservingCC)
-#define CALLING_CONVENTION(CC) CALLING_CONVENTION_##CC
+// void runtime_function_name() SWIFT_CC(RegisterPreservingCC)
+#define SWIFT_CC(CC) SWIFT_CC_##CC
 
-#define CALLING_CONVENTION_preserve_most __attribute__((preserve_most))
-#define CALLING_CONVENTION_preserve_all  __attribute__((preserve_all))
-#define CALLING_CONVENTION_c
+#define SWIFT_CC_preserve_most __attribute__((preserve_most))
+#define SWIFT_CC_preserve_all  __attribute__((preserve_all))
+#define SWIFT_CC_c
 
 // Map a logical calling convention (e.g. RegisterPreservingCC) to LLVM calling
 // convention.
-#define LLVM_CC(CC) LLVM_CC_##CC
+#define SWIFT_LLVM_CC(CC) SWIFT_LLVM_CC_##CC
 
 // Currently, RuntimeFunction.def uses the following calling conventions:
 // DefaultCC, RegisterPreservingCC.
@@ -84,14 +84,14 @@
 // here to something appropriate.
 
 // DefaultCC is usually the standard C calling convention.
-#define CALLING_CONVENTION_DefaultCC CALLING_CONVENTION_c
-#define CALLING_CONVENTION_DefaultCC_IMPL CALLING_CONVENTION_c
-#define LLVM_CC_DefaultCC llvm::CallingConv::C
+#define SWIFT_CC_DefaultCC SWIFT_CC_c
+#define SWIFT_CC_DefaultCC_IMPL SWIFT_CC_c
+#define SWIFT_LLVM_CC_DefaultCC llvm::CallingConv::C
 
 // If defined, it indicates that runtime function wrappers
 // should be used on all platforms, even they do not support
 // the new calling convention which requires this.
-#define RT_USE_WRAPPERS_ALWAYS 1
+#define SWIFT_RT_USE_WRAPPERS_ALWAYS 1
 
 // If defined, it indicates that this calling convention is
 // supported by the currnet target.
@@ -114,23 +114,24 @@
 // linker may clobber some of the callee-saved registers defined by
 // this new calling convention when it performs lazy binding of
 // runtime functions using this new calling convention.
-#define CALLING_CONVENTION_RegisterPreservingCC CALLING_CONVENTION_preserve_most
-#define CALLING_CONVENTION_RegisterPreservingCC_IMPL                           \
-  CALLING_CONVENTION_preserve_most
-#define LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
+#define SWIFT_CC_RegisterPreservingCC                          \
+  SWIFT_CC_preserve_most
+#define SWIFT_CC_RegisterPreservingCC_IMPL                     \
+  SWIFT_CC_preserve_most
+#define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
 // Indicate that wrappers should be used, because it is required
 // for the calling convention to get around dynamic linking issues.
-#define RT_USE_WRAPPERS 1
+#define SWIFT_RT_USE_WRAPPERS 1
 
 #else
 
 // Targets not supporting the dedicated runtime calling convention
 // should use the standard calling convention instead.
 // No wrappers are required in this case by the calling convention.
-#define CALLING_CONVENTION_RegisterPreservingCC CALLING_CONVENTION_c
-#define CALLING_CONVENTION_RegisterPreservingCC_IMPL CALLING_CONVENTION_c
-#define LLVM_CC_RegisterPreservingCC llvm::CallingConv::C
+#define SWIFT_CC_RegisterPreservingCC SWIFT_CC_c
+#define SWIFT_CC_RegisterPreservingCC_IMPL SWIFT_CC_c
+#define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::C
 
 #endif
 
@@ -139,40 +140,40 @@
 
 // Generates a name of the runtime enrty's implementation by
 // adding an underscore as a prefix and a suffix.
-#define RT_ENTRY_IMPL(Name) _##Name##_
+#define SWIFT_RT_ENTRY_IMPL(Name) _##Name##_
 
 // Library internal way to invoke the implementation of a runtime entry.
 // E.g. a runtime function  may be called internally via its public API
 // or via the function pointer.
-#define RT_ENTRY_CALL(Name) Name
+#define SWIFT_RT_ENTRY_CALL(Name) Name
 
 // Name of the symbol holding a reference to the
 // implementation of a runtime entry.
-#define RT_ENTRY_REF(Name) _##Name
+#define SWIFT_RT_ENTRY_REF(Name) _##Name
 
 // String representation of the symbol's name.
-#define RT_ENTRY_REF_AS_STR(Name) "_" #Name
+#define SWIFT_RT_ENTRY_REF_AS_STR(Name) "_" #Name
 
-#if defined(RT_USE_WRAPPERS_ALWAYS)
-#define RT_USE_WRAPPERS
+#if defined(SWIFT_RT_USE_WRAPPERS_ALWAYS)
+#define SWIFT_RT_USE_WRAPPERS
 #endif
 
-#if defined(RT_USE_WRAPPERS)
+#if defined(SWIFT_RT_USE_WRAPPERS)
 
 // Both the runtime functions and their implementation are hidden and
 // can be directly referenced only inside the runtime library.
 // User code can access these runtime entries only indirectly
 // via a global function pointer.
-#define RT_ENTRY_VISIBILITY LLVM_LIBRARY_VISIBILITY
-#define RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
+#define SWIFT_RT_ENTRY_VISIBILITY LLVM_LIBRARY_VISIBILITY
+#define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
 #else
 
 // Runtime functions are exported, because it should be possible
 // to invoke them directly from the user code. But internal
 // implementations of runtime functions do not need to be exported.
-#define RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
-#define RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
+#define SWIFT_RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
+#define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
 #endif
 

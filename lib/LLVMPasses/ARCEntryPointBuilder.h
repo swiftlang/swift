@@ -86,8 +86,8 @@ class ARCEntryPointBuilder {
 public:
   ARCEntryPointBuilder(Function &F)
       : B(&*F.begin()), Retain(), ObjectPtrTy(),
-        DefaultCC(LLVM_CC(DefaultCC)),
-        RegisterPreservingCC(LLVM_CC(RegisterPreservingCC)) {
+        DefaultCC(SWIFT_LLVM_CC(DefaultCC)),
+        RegisterPreservingCC(SWIFT_LLVM_CC(RegisterPreservingCC)) {
     //TODO: If the target does not support the new calling convention,
     //set RegisterPreservingCC to use a standard C calling convention.
   }
@@ -209,7 +209,7 @@ private:
     Retain = getWrapperFn(getModule(),
                            cache,
                            "swift_retain",
-                           RT_ENTRY_REF_AS_STR(swift_retain),
+                           SWIFT_RT_ENTRY_REF_AS_STR(swift_retain),
                            RegisterPreservingCC,
                            {VoidTy},
                            {ObjectPtrTy},
@@ -229,7 +229,7 @@ private:
     Release = getWrapperFn(getModule(),
                            cache,
                            "swift_release",
-                           RT_ENTRY_REF_AS_STR(swift_release),
+                           SWIFT_RT_ENTRY_REF_AS_STR(swift_release),
                            RegisterPreservingCC,
                            {VoidTy},
                            {ObjectPtrTy},
@@ -265,7 +265,7 @@ private:
     RetainN = getWrapperFn(getModule(),
                            cache,
                            "swift_retain_n",
-                           RT_ENTRY_REF_AS_STR(swift_retain_n),
+                           SWIFT_RT_ENTRY_REF_AS_STR(swift_retain_n),
                            RegisterPreservingCC,
                            {VoidTy},
                            {ObjectPtrTy, Int32Ty},
@@ -286,7 +286,7 @@ private:
     ReleaseN = getWrapperFn(getModule(),
                             cache,
                             "swift_release_n",
-                            RT_ENTRY_REF_AS_STR(swift_release_n),
+                            SWIFT_RT_ENTRY_REF_AS_STR(swift_release_n),
                             RegisterPreservingCC,
                             {VoidTy},
                             {ObjectPtrTy, Int32Ty},

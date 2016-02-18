@@ -22,17 +22,17 @@
 
 using namespace swift;
 
-RT_ENTRY_VISIBILITY
+SWIFT_RT_ENTRY_VISIBILITY
 void *swift::swift_slowAlloc(size_t size, size_t alignMask)
-    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   // FIXME: use posix_memalign if alignMask is larger than the system guarantee.
   void *p = malloc(size);
   if (!p) swift::crash("Could not allocate memory.");
   return p;
 }
 
-RT_ENTRY_VISIBILITY
+SWIFT_RT_ENTRY_VISIBILITY
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask)
-    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   free(ptr);
 }

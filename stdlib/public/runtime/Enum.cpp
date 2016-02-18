@@ -139,12 +139,12 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   }
 }
 
-RT_ENTRY_VISIBILITY
+SWIFT_RT_ENTRY_VISIBILITY
 int
 swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                       const Metadata *payload,
                                       unsigned emptyCases)
-  CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
+  SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
   auto payloadNumExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
@@ -190,13 +190,13 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
   return -1;
 }
 
-RT_ENTRY_VISIBILITY
+SWIFT_RT_ENTRY_VISIBILITY
 void
 swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                        const Metadata *payload,
                                        int whichCase,
                                        unsigned emptyCases)
-  CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
+  SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
   unsigned payloadNumExtraInhabitants
