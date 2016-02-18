@@ -14,11 +14,23 @@
 #define SWIFT_LLVMPASSES_ARCENTRYPOINTBUILDER_H
 
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Runtime/Config.h"
+#include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/APInt.h"
 
 namespace swift {
+
+namespace RuntimeConstants {
+  const auto ReadNone = llvm::Attribute::ReadNone;
+  const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto NoReturn = llvm::Attribute::NoReturn;
+  const auto NoUnwind = llvm::Attribute::NoUnwind;
+  const auto ZExt = llvm::Attribute::ZExt;
+}
+
+using namespace RuntimeConstants;
 
 /// A class for building ARC entry points. It is a composition wrapper around an
 /// IRBuilder and a constant Cache. It cannot be moved or copied. It is meant
@@ -54,8 +66,18 @@ class ARCEntryPointBuilder {
   NullablePtr<Type> ObjectPtrTy;
   NullablePtr<Type> BridgeObjectPtrTy;
 
+  llvm::CallingConv::ID RuntimeCC;
+  llvm::CallingConv::ID RuntimeCC1;
+
 public:
-  ARCEntryPointBuilder(Function &F) : B(&*F.begin()), Retain(), ObjectPtrTy() {}
+  ARCEntryPointBuilder(Function &F)
+      : B(&*F.begin()), Retain(), ObjectPtrTy(),
+        RuntimeCC(LLVM_CC(RuntimeCC)),
+        RuntimeCC1(LLVM_CC(RuntimeCC1)) {
+    //TODO: If the target does not support the new calling convention,
+    //set RuntimeCC1 to use a standard C calling convention.
+  }
+
   ~ARCEntryPointBuilder() = default;
   ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
   ARCEntryPointBuilder(const ARCEntryPointBuilder &) = delete;
@@ -167,13 +189,18 @@ private:
     if (Retain)
       return Retain.get();
     auto *ObjectPtrTy = getObjectPtrTy();
+    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
-    auto &M = getModule();
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    Retain = M.getOrInsertFunction("swift_retain", AttrList,
-                                   Type::getVoidTy(M.getContext()),
-                                   ObjectPtrTy, nullptr);
+    llvm::Constant *cache = nullptr;
+    Retain = getWrapperFn(getModule(),
+                           cache,
+                           "swift_retain",
+                           RT_ENTRY_REF_AS_STR(swift_retain),
+                           RuntimeCC1,
+                           {VoidTy},
+                           {ObjectPtrTy},
+                           {NoUnwind});
+
     return Retain.get();
   }
 
@@ -182,13 +209,18 @@ private:
     if (Release)
       return Release.get();
     auto *ObjectPtrTy = getObjectPtrTy();
+    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
-    auto &M = getModule();
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    Release = M.getOrInsertFunction("swift_release", AttrList,
-                                   Type::getVoidTy(M.getContext()),
-                                   ObjectPtrTy, nullptr);
+    llvm::Constant *cache = nullptr;
+    Release = getWrapperFn(getModule(),
+                           cache,
+                           "swift_release",
+                           RT_ENTRY_REF_AS_STR(swift_release),
+                           RuntimeCC1,
+                           {VoidTy},
+                           {ObjectPtrTy},
+                           {NoUnwind});
+
     return Release.get();
   }
 
@@ -212,14 +244,19 @@ private:
     if (RetainN)
       return RetainN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
-    auto &M = getModule();
+    auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
+    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    RetainN = M.getOrInsertFunction("swift_retain_n", AttrList,
-                                    Type::getVoidTy(M.getContext()),
-                                    ObjectPtrTy, Int32Ty, nullptr);
+    llvm::Constant *cache = nullptr;
+    RetainN = getWrapperFn(getModule(),
+                           cache,
+                           "swift_retain_n",
+                           RT_ENTRY_REF_AS_STR(swift_retain_n),
+                           RuntimeCC1,
+                           {VoidTy},
+                           {ObjectPtrTy, Int32Ty},
+                           {NoUnwind});
+
     return RetainN.get();
   }
 
@@ -228,14 +265,19 @@ private:
     if (ReleaseN)
       return ReleaseN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
-    auto &M = getModule();
+    auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
+    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    ReleaseN = M.getOrInsertFunction("swift_release_n", AttrList,
-                                     Type::getVoidTy(M.getContext()),
-                                     ObjectPtrTy, Int32Ty, nullptr);
+    llvm::Constant *cache = nullptr;
+    ReleaseN = getWrapperFn(getModule(),
+                            cache,
+                            "swift_release_n",
+                            RT_ENTRY_REF_AS_STR(swift_release_n),
+                            RuntimeCC1,
+                            {VoidTy},
+                            {ObjectPtrTy, Int32Ty},
+                            {NoUnwind});
+
     return ReleaseN.get();
   }
 
@@ -244,14 +286,18 @@ private:
     if (UnknownRetainN)
       return UnknownRetainN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
-    auto &M = getModule();
+    auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
+    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    UnknownRetainN = M.getOrInsertFunction("swift_unknownRetain_n", AttrList,
-                                           Type::getVoidTy(M.getContext()),
-                                           ObjectPtrTy, Int32Ty, nullptr);
+    llvm::Constant *cache = nullptr;
+    UnknownRetainN = getRuntimeFn(getModule(),
+                                  cache,
+                                  "swift_unknownRetain_n",
+                                  RuntimeCC,
+                                  {VoidTy},
+                                  {ObjectPtrTy, Int32Ty},
+                                  {NoUnwind});
+
     return UnknownRetainN.get();
   }
 
@@ -260,14 +306,18 @@ private:
     if (UnknownReleaseN)
       return UnknownReleaseN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
-    auto &M = getModule();
+    auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
+    auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    UnknownReleaseN = M.getOrInsertFunction("swift_unknownRelease_n", AttrList,
-                                            Type::getVoidTy(M.getContext()),
-                                            ObjectPtrTy, Int32Ty, nullptr);
+    llvm::Constant *cache = nullptr;
+    UnknownReleaseN = getRuntimeFn(getModule(),
+                                   cache,
+                                   "swift_unknownRelease_n",
+                                   RuntimeCC,
+                                   {VoidTy},
+                                   {ObjectPtrTy, Int32Ty},
+                                   {NoUnwind});
+
     return UnknownReleaseN.get();
   }
 
@@ -276,15 +326,16 @@ private:
     if (BridgeRetainN)
       return BridgeRetainN.get();
     auto *BridgeObjectPtrTy = getBridgeObjectPtrTy();
-    auto &M = getModule();
+    auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    BridgeRetainN = M.getOrInsertFunction("swift_bridgeObjectRetain_n",
-                                          AttrList, BridgeObjectPtrTy,
-                                          BridgeObjectPtrTy,
-                                          Int32Ty, nullptr);
+    llvm::Constant *cache = nullptr;
+    BridgeRetainN = getRuntimeFn(getModule(),
+                                 cache,
+                                 "swift_bridgeObjectRetain_n",
+                                 RuntimeCC,
+                                 {BridgeObjectPtrTy},
+                                 {BridgeObjectPtrTy, Int32Ty},
+                                 {NoUnwind});
     return BridgeRetainN.get();
   }
 
@@ -292,16 +343,19 @@ private:
   Constant *getBridgeReleaseN() {
     if (BridgeReleaseN)
       return BridgeReleaseN.get();
-    auto &M = getModule();
 
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    BridgeReleaseN = M.getOrInsertFunction("swift_bridgeObjectRelease_n",
-                                            AttrList,
-                                            Type::getVoidTy(M.getContext()),
-                                            BridgeObjectPtrTy, Int32Ty,
-                                            nullptr);
+    auto *BridgeObjectPtrTy = getBridgeObjectPtrTy();
+    auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
+    auto *VoidTy = Type::getVoidTy(getModule().getContext());
+
+    llvm::Constant *cache = nullptr;
+    BridgeReleaseN = getRuntimeFn(getModule(),
+                                  cache,
+                                  "swift_bridgeObjectRelease_n",
+                                  RuntimeCC,
+                                  {VoidTy},
+                                  {BridgeObjectPtrTy, Int32Ty},
+                                  {NoUnwind});
     return BridgeReleaseN.get();
   }
 
