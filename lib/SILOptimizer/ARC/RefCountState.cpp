@@ -124,7 +124,7 @@ void BottomUpRefCountState::clear() {
   // be removed, be conservative and clear the transition state, so we do not
   // propagate KnownSafety forward.
   if (mightRemoveMutators())
-    Transition = None;
+    Transition = RCStateTransition();
   LatState = LatticeState::None;
   SuperTy::clear();
 }
@@ -261,13 +261,13 @@ bool BottomUpRefCountState::handleGuaranteedUser(
 bool BottomUpRefCountState::isRefCountInstMatchedToTrackedInstruction(
     SILInstruction *RefCountInst) {
   // If we are not tracking any state transitions bail.
-  if (!Transition.hasValue())
+  if (!Transition.isValid())
     return false;
 
   // Otherwise, ask the transition state if this instruction causes a
   // transition that can be matched with the transition in order to eliminate
   // the transition.
-  if (!Transition->matchingInst(RefCountInst))
+  if (!Transition.matchingInst(RefCountInst))
     return false;
 
   return handleRefCountInstMatch(RefCountInst);
@@ -328,8 +328,8 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
     return false;
   }
 
-  if (!Transition.hasValue() || !Other.Transition.hasValue() ||
-      !Transition->merge(Other.Transition.getValue())) {
+  if (!Transition.isValid() || !Other.Transition.isValid() ||
+      !Transition.merge(Other.Transition)) {
     DEBUG(llvm::dbgs() << "            Failed merge!\n");
     clear();
     return false;
@@ -568,7 +568,7 @@ bool TopDownRefCountState::initWithMutatorInst(
 void TopDownRefCountState::initWithArg(SILArgument *Arg) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(Arg);
-  assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
+  assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&
          "Expected a strong entrance here");
   RCRoot = Arg;
   KnownSafe = false;
@@ -581,7 +581,7 @@ void TopDownRefCountState::initWithEntranceInst(
     ImmutablePointerSet<SILInstruction> *I, SILValue RCIdentity) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(I);
-  assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
+  assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&
          "Expected a strong entrance here");
   RCRoot = RCIdentity;
   KnownSafe = false;
@@ -590,7 +590,7 @@ void TopDownRefCountState::initWithEntranceInst(
 
 /// Uninitialize the current state.
 void TopDownRefCountState::clear() {
-  Transition = None;
+  Transition = RCStateTransition();
   LatState = LatticeState::None;
   SuperTy::clear();
 }
@@ -719,13 +719,13 @@ bool TopDownRefCountState::handleGuaranteedUser(
 bool TopDownRefCountState::isRefCountInstMatchedToTrackedInstruction(
     SILInstruction *RefCountInst) {
   // If we are not tracking any state transitions bail.
-  if (!Transition.hasValue())
+  if (!Transition.isValid())
     return false;
 
   // Otherwise, ask the transition state if this instruction causes a
   // transition that can be matched with the transition in order to eliminate
   // the transition.
-  if (!Transition->matchingInst(RefCountInst))
+  if (!Transition.matchingInst(RefCountInst))
     return false;
 
   return handleRefCountInstMatch(RefCountInst);
@@ -783,8 +783,8 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
     return false;
   }
 
-  if (!Transition.hasValue() || !Other.Transition.hasValue() ||
-      !Transition->merge(Other.Transition.getValue())) {
+  if (!Transition.isValid() || !Other.Transition.isValid() ||
+      !Transition.merge(Other.Transition)) {
     DEBUG(llvm::dbgs() << "            Failed merge!\n");
     clear();
     return false;
