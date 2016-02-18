@@ -48,9 +48,6 @@ published should not limit its evolution in the future.
 
     - Drew Crawford is concerned about inlineable code breaking modularity;
       you can't just release a new dylib to fix a bug.
-    - David Owens wants it to be clearer that this document doesn't really
-      cover behavior changes and proper semantic versioning, just binary
-      compatibility.
 
 
 Introduction
@@ -68,6 +65,23 @@ current version of the library. In simple terms:
 This document will frequently refer to a *library* which vends public APIs, and
 a single *client* that uses them. The same principles apply even when multiple
 libraries and multiple clients are involved.
+
+This document is primarily concerned with `binary compatibility`, i.e. what
+changes can safely be made to a library between releases that will not break
+memory-safety or type-safety, or cause clients to fail to run at all. A
+secondary concern is identifying `binary-compatible source-breaking changes
+<binary-compatible source-breaking change>`, where clients compiled against the
+previous version of a library are likely to behave differently than clients
+compiled against the new version of the library.
+
+.. note::
+
+    These rules do not (and cannot) guarantee that a change is *semantically*
+    backwards-compatible or forwards-compatible. *Any* change to a library's
+    existing API that affects its observable behavior may affect clients. It is
+    the responsibility of a library author to be sure that the changes they are
+    making are *semantically* correct, preserving the preconditions,
+    postconditions, and invariants of previously-published APIs.
 
 This model is largely not of interest to libraries that are bundled with their
 clients (distribution via source, static library, or embedded/sandboxed dynamic
@@ -176,11 +190,6 @@ Code within a library may generally use all other entities declared within the
 library (barring their own availability checks), since the entire library is
 shipped as a unit. That is, even if a particular API was introduced in v1.0,
 its (non-public) implementation may refer to APIs introduced in later versions.
-
-Swift libraries are strongly encouraged to use `semantic versioning`_, but this
-is not enforced by the language.
-
-.. _semantic versioning: http://semver.org
 
 Certain uses of ``internal`` entities require them to be part of a library's
 binary interface, which means they need to be versioned as well. See
