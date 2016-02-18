@@ -58,6 +58,12 @@ WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
 
+WARNING(inconsistent_swift_name,none,
+        "inconsistent Swift name for Objective-C %select{method|property}0 "
+        "'%1' in '%2' (%3 in '%4' vs. %5 in '%6')",
+        (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
+         StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

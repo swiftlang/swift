@@ -1857,7 +1857,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 /// Retrieve the instance type of the given Clang declaration context.
 clang::QualType ClangImporter::Implementation::getClangDeclContextType(
                   const clang::DeclContext *dc) {
-  auto &ctx = getClangASTContext();
+  auto &ctx = dc->getParentASTContext();
   if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
     return ctx.getObjCObjectPointerType(ctx.getObjCInterfaceType(objcClass));
 
