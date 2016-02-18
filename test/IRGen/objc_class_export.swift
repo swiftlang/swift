@@ -5,8 +5,8 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
+// CHECK: %swift.refcounted = type
 // CHECK: [[HOOZIT:%C17objc_class_export6Hoozit]] = type <{ [[REF:%swift.refcounted]] }>
-// CHECK: [[REF]] = type
 // CHECK: [[FOO:%C17objc_class_export3Foo]] = type <{ [[REF]], %Si }>
 // CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[NSRECT:%VSC6NSRect]] = type <{ %VSC7NSPoint, %VSC6NSSize }>

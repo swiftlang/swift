@@ -181,7 +181,7 @@ enum AllRefcounted {
 // --                              0x3fffffffffffffff
 // CHECK:         %4 = and i64 %3, 4611686018427387903
 // CHECK:         %5 = inttoptr i64 %4 to %swift.refcounted*
-// CHECK:         call void @swift_retain(%swift.refcounted* %5) #1
+// CHECK:         call void @swift_retain(%swift.refcounted* %5)
 // CHECK:         %6 = bitcast %O34enum_value_semantics_special_cases13AllRefcounted* %0 to i64*
 // -- NB: The original loaded value is stored, not the masked one.
 // CHECK:         store i64 %3, i64* %6, align 8

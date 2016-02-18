@@ -6,11 +6,11 @@
 import Builtin
 import Swift
 
+// CHECK: [[REF:%swift.refcounted]] = type
+// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OBJCCLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[C_CLASS:%C5class1C]] = type
-// CHECK: [[REF:%swift.refcounted]] = type
 // CHECK: [[OBJCOBJ:%objc_object]] = type
 
 class C {}

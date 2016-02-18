@@ -500,7 +500,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define linkonce_odr hidden i32 @_TwugO20enum_value_semantics19MultiPayloadGeneric
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics19MultiPayloadGeneric*
 // CHECK-NEXT: [[OPAQUE:%.*]] = bitcast %O20enum_value_semantics19MultiPayloadGeneric* [[SELF]] to %swift.opaque*
-// CHECK-NEXT: [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload(%swift.opaque* [[OPAQUE]], %swift.type* %"MultiPayloadGeneric<T>") #5
+// CHECK-NEXT: [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload(%swift.opaque* [[OPAQUE]], %swift.type* %"MultiPayloadGeneric<T>")
 // CHECK-NEXT: [[PAYLOAD_TAG:%.*]] = sub i32 [[TAG]], 2
 // CHECK-NEXT: ret i32 [[PAYLOAD_TAG]]
 

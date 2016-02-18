@@ -19,7 +19,8 @@ struct Huge {
   var unalign: Builtin.Int8
 }
 
-// CHECK: declare i8* @swift_slowAlloc([[SIZE_T:i(32|64)]],
+// CHECK: @_swift_slowAlloc = external global i8* ([[SIZE_T:i(32|64)]],
+// CHECK: define linkonce_odr hidden i8* @swift_slowAlloc([[SIZE_T:i(32|64)]],
 
 // CHECK:    define linkonce_odr hidden void @_TwdeV4main4Huge(
 // CHECK:      [[T0:%.*]] = bitcast [[BUFFER:.[0-9]+ x i8.]]* {{%.*}} to i8**

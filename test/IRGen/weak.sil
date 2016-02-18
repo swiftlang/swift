@@ -3,8 +3,8 @@
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
 
-// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TYPE:%swift.type]] = type
+// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[C:%C4weak1C]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[A:%V4weak1A]] = type <{ [[WEAK:%swift.weak]] }>
 // CHECK: [[WEAK]] = type
