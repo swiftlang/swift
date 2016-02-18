@@ -43,6 +43,7 @@
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
 #include "GenPoly.h"
+#include "GenValueWitness.h"
 #include "GenArchetype.h"
 #include "GenStruct.h"
 #include "HeapTypeInfo.h"

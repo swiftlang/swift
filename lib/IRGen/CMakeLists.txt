@@ -25,6 +25,7 @@ add_swift_library(swiftIRGen
   GenStruct.cpp
   GenTuple.cpp
   GenType.cpp
+  GenValueWitness.cpp
   IRGen.cpp
   IRGenDebugInfo.cpp
   IRGenFunction.cpp
