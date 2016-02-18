@@ -122,7 +122,7 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Swift tools that are executable on the build machine")
 
-set(SWIFT_ENABLE_LTO "If set to true, build the swift compiler with link time "
+option(SWIFT_ENABLE_LTO "If set to true, build the swift compiler with link time "
   "optimization enabled" FALSE)
 
 #
