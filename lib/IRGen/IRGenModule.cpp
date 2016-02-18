@@ -456,6 +456,67 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   return cache;
 }
 
+llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
+                                    llvm::Constant *&cache,
+                                    char const *name,
+                                    char const *symbol,
+                                    llvm::CallingConv::ID cc,
+                                    llvm::ArrayRef<llvm::Type *> retTypes,
+                                    llvm::ArrayRef<llvm::Type *> argTypes,
+                                    ArrayRef<Attribute::AttrKind> attrs) {
+  assert(symbol && "Symbol name should be defined for a wrapper function");
+  auto fn = getRuntimeFn(Module, cache, name, cc, retTypes, argTypes, attrs);
+  auto *fun = dyn_cast<llvm::Function>(fn);
+  assert(fun && "Wrapper should be an llvm::Function");
+  // Do not inline wrappers, because this would result in a code size increase.
+  fun->addAttribute(llvm::AttributeSet::FunctionIndex,
+                    llvm::Attribute::NoInline);
+  assert(fun->hasFnAttribute(llvm::Attribute::NoInline) &&
+         "Wrappers should not be inlined");
+  if (fun->empty()) {
+    // All wrappers should have ODR linkage so that a linker can detect them
+    // and leave only one copy.
+    fun->setLinkage(llvm::Function::LinkOnceODRLinkage);
+    fun->setVisibility(llvm::Function::HiddenVisibility);
+    fun->setDoesNotThrow();
+
+    // Add the body of a wrapper.
+    // It simply invokes the actual implementation of the runtime entry
+    // by means of indirect call through a pointer stored in the
+    // global variable.
+    llvm::IRBuilder<> Builder(Module.getContext());
+    llvm::BasicBlock *bb =
+        llvm::BasicBlock::Create(Module.getContext(), "entry", fun);
+    Builder.SetInsertPoint(bb);
+    auto fnTy = fun->getFunctionType();
+    auto fnPtrTy = llvm::PointerType::getUnqual(fnTy);
+
+    auto *globalFnPtr =
+        new llvm::GlobalVariable(Module, fnPtrTy, false,
+                                 llvm::GlobalValue::ExternalLinkage, 0, symbol);
+
+    // Forward all arguments.
+    llvm::SmallVector<llvm::Value *, 4> args;
+    for (auto &arg: fun->args()) {
+      args.push_back(&arg);
+    }
+
+
+    auto fnPtr = Builder.CreateLoad(globalFnPtr, "load");
+    auto call = Builder.CreateCall(fnPtr, args);
+    call->setCallingConv(cc);
+    call->setTailCall(true);
+
+    auto VoidTy = llvm::Type::getVoidTy(Module.getContext());
+    if (retTypes.size() == 1 && *retTypes.begin() == VoidTy)
+      Builder.CreateRetVoid();
+    else
+      Builder.CreateRet(call);
+  }
+
+  return fn;
+}
+
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
 #define NO_ARGS {}
