@@ -461,7 +461,7 @@ number of ways:
 
 - A SIL function type declares the conventions for its results.
   The results are written as an unlabelled tuple; the elements of that
-  tuple must be legal SIL types, optionally decoarted with one of the
+  tuple must be legal SIL types, optionally decorated with one of the
   following convention attributes.  Indirect and direct results may
   be interleaved.
 
