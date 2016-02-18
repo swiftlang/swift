@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Command-line arguments for the current process.
 public enum Process {
   /// The list of command-line arguments with which the current
   /// process was invoked.

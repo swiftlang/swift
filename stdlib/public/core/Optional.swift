@@ -10,9 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-// The compiler has special knowledge of Optional<Wrapped>, including the fact
-// that it is an enum with cases named 'None' and 'Some'.
+/// A type that can represent either a `Wrapped` value or `nil`, the absence
+/// of a value.
 public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
+  // The compiler has special knowledge of Optional<Wrapped>, including the fact
+  // that it is an `enum` with cases named `None` and `Some`.
+  
   case None
   case Some(Wrapped)
 
