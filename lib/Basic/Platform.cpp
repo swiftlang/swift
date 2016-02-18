@@ -58,14 +58,5 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "watchos";
   }
 
-  if (triple.isMacOSX())
-    return "macosx";
-
-  if (triple.isOSLinux())
-    return "linux";
-
-  if (triple.isOSFreeBSD())
-    return "freebsd";
-
-  return "";
+  return StringRef(triple.getOSTypeName(triple.getOS()));
 }
