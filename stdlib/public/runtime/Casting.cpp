@@ -502,7 +502,7 @@ RT_ENTRY_VISIBILITY
 const void *
 swift::swift_dynamicCastClass(const void *object,
                               const ClassMetadata *targetType)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
   assert(!targetType->isPureObjC());
 
@@ -2052,7 +2052,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                               const Metadata *srcType,
                               const Metadata *targetType,
                               DynamicCastFlags flags)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   auto unwrapResult = checkDynamicCastFromOptional(dest, src, srcType,
                                                    targetType, flags);
   srcType = unwrapResult.payloadType;

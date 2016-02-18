@@ -54,7 +54,7 @@ RT_ENTRY_VISIBILITY
 extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                               const Metadata *payload,
                                               unsigned emptyCases)
-  CALLING_CONVENTION(RuntimeCC1);
+  CALLING_CONVENTION(RegisterPreservingCC);
 
 
 
@@ -74,7 +74,7 @@ extern "C" void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                                  const Metadata *payload,
                                                  int whichCase,
                                                  unsigned emptyCases)
-  CALLING_CONVENTION(RuntimeCC1);
+  CALLING_CONVENTION(RegisterPreservingCC);
 
 /// \brief Initialize the value witness table for a generic, multi-payload
 ///        enum instance.

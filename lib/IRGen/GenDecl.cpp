@@ -942,7 +942,7 @@ void IRGenModule::emitVTableStubs() {
                                     "_swift_dead_method_stub");
       stub->setAttributes(constructInitialAttributes());
       Module.getFunctionList().push_back(stub);
-      stub->setCallingConv(RuntimeCC);
+      stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
       llvm::CallInst::Create(errorFunc, ArrayRef<llvm::Value *>(), "", entry);
@@ -2231,7 +2231,7 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2255,7 +2255,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2569,7 +2569,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
       cast<llvm::PointerType>(getValueWitnessTy(index))
         ->getElementType());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2902,7 +2902,7 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                           Int8PtrPtrTy },
                                         /*varargs*/ false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2948,7 +2948,7 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
   }
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -2970,7 +2970,7 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
     = llvm::FunctionType::get(WitnessTablePtrTy, false);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -3019,7 +3019,7 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 
   auto fnType = getAssociatedTypeMetadataAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -3043,7 +3043,7 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 
   auto fnType = getAssociatedTypeWitnessTableAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -3057,7 +3057,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   def->setLinkage(llvm::Function::LinkOnceODRLinkage);
   def->setVisibility(llvm::Function::HiddenVisibility);
   def->setDoesNotThrow();
-  def->setCallingConv(IGM.RuntimeCC);
+  def->setCallingConv(IGM.DefaultCC);
   return def;
 }
 

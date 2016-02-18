@@ -66,8 +66,8 @@ class ARCEntryPointBuilder {
   NullablePtr<Type> ObjectPtrTy;
   NullablePtr<Type> BridgeObjectPtrTy;
 
-  llvm::CallingConv::ID RuntimeCC;
-  llvm::CallingConv::ID RuntimeCC1;
+  llvm::CallingConv::ID DefaultCC;
+  llvm::CallingConv::ID RegisterPreservingCC;
 
   llvm::CallInst *CreateCall(Constant *Fn, Value *V) {
     CallInst *CI = B.CreateCall(Fn, V);
@@ -86,10 +86,10 @@ class ARCEntryPointBuilder {
 public:
   ARCEntryPointBuilder(Function &F)
       : B(&*F.begin()), Retain(), ObjectPtrTy(),
-        RuntimeCC(LLVM_CC(RuntimeCC)),
-        RuntimeCC1(LLVM_CC(RuntimeCC1)) {
+        DefaultCC(LLVM_CC(DefaultCC)),
+        RegisterPreservingCC(LLVM_CC(RegisterPreservingCC)) {
     //TODO: If the target does not support the new calling convention,
-    //set RuntimeCC1 to use a standard C calling convention.
+    //set RegisterPreservingCC to use a standard C calling convention.
   }
 
   ~ARCEntryPointBuilder() = default;
@@ -210,7 +210,7 @@ private:
                            cache,
                            "swift_retain",
                            RT_ENTRY_REF_AS_STR(swift_retain),
-                           RuntimeCC1,
+                           RegisterPreservingCC,
                            {VoidTy},
                            {ObjectPtrTy},
                            {NoUnwind});
@@ -230,7 +230,7 @@ private:
                            cache,
                            "swift_release",
                            RT_ENTRY_REF_AS_STR(swift_release),
-                           RuntimeCC1,
+                           RegisterPreservingCC,
                            {VoidTy},
                            {ObjectPtrTy},
                            {NoUnwind});
@@ -266,7 +266,7 @@ private:
                            cache,
                            "swift_retain_n",
                            RT_ENTRY_REF_AS_STR(swift_retain_n),
-                           RuntimeCC1,
+                           RegisterPreservingCC,
                            {VoidTy},
                            {ObjectPtrTy, Int32Ty},
                            {NoUnwind});
@@ -287,7 +287,7 @@ private:
                             cache,
                             "swift_release_n",
                             RT_ENTRY_REF_AS_STR(swift_release_n),
-                            RuntimeCC1,
+                            RegisterPreservingCC,
                             {VoidTy},
                             {ObjectPtrTy, Int32Ty},
                             {NoUnwind});
@@ -307,7 +307,7 @@ private:
     UnknownRetainN = getRuntimeFn(getModule(),
                                   cache,
                                   "swift_unknownRetain_n",
-                                  RuntimeCC,
+                                  DefaultCC,
                                   {VoidTy},
                                   {ObjectPtrTy, Int32Ty},
                                   {NoUnwind});
@@ -327,7 +327,7 @@ private:
     UnknownReleaseN = getRuntimeFn(getModule(),
                                    cache,
                                    "swift_unknownRelease_n",
-                                   RuntimeCC,
+                                   DefaultCC,
                                    {VoidTy},
                                    {ObjectPtrTy, Int32Ty},
                                    {NoUnwind});
@@ -346,7 +346,7 @@ private:
     BridgeRetainN = getRuntimeFn(getModule(),
                                  cache,
                                  "swift_bridgeObjectRetain_n",
-                                 RuntimeCC,
+                                 DefaultCC,
                                  {BridgeObjectPtrTy},
                                  {BridgeObjectPtrTy, Int32Ty},
                                  {NoUnwind});
@@ -366,7 +366,7 @@ private:
     BridgeReleaseN = getRuntimeFn(getModule(),
                                   cache,
                                   "swift_bridgeObjectRelease_n",
-                                  RuntimeCC,
+                                  DefaultCC,
                                   {VoidTy},
                                   {BridgeObjectPtrTy, Int32Ty},
                                   {NoUnwind});

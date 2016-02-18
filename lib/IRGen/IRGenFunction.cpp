@@ -154,7 +154,7 @@ void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
 
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getDeallocBoxFn(), box);
-  call->setCallingConv(IGM.RuntimeCC);
+  call->setCallingConv(IGM.DefaultCC);
   call->setAttributes(attrs);
 }
 
@@ -169,14 +169,14 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
                                        attrKinds);
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getProjectBoxFn(), box);
-  call->setCallingConv(IGM.RuntimeCC);
+  call->setCallingConv(IGM.DefaultCC);
   call->setAttributes(attrs);
   return call;
 }
 
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
                                  std::initializer_list<llvm::Value *> args) {
-  auto cc = IGF.IGM.RuntimeCC;
+  auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(fn))
     cc = fun->getCallingConv();
 

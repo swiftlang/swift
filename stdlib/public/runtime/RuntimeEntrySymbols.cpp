@@ -20,11 +20,11 @@
 // Each runtime function definition in RuntimeFunctions.def should
 // indicate if it requires a global referencing it.
 //
-// For example, all entries using the RuntimeCC1 calling convention need a
-// global, because they are currently always invoked indirectly using a
+// For example, all entries using the RegisterPreservingCC calling convention
+// need a global, because they are currently always invoked indirectly using a
 // client-side wrapper.
 //
-// Runtime entries using the RuntimeCC or RuntimeCC0 calling convention do not
+// Runtime entries using the DefaultCC calling convention do not
 // demand a global symbol by default. But they can optionally ask for it, in
 // case it is needed. For example, _swift_isDeallocating is required by
 // Instruments.
@@ -34,11 +34,11 @@
 // Entry points using a standard C calling convention or not using the new
 // calling convention do not need to have global symbols referring to their
 // implementations.
-#define FOR_CONV_RuntimeCC(...)
+#define FOR_CONV_DefaultCC(...)
 #define FOR_CONV_C_CC(...)
 // Entry points using the new calling convention require global symbols
 // referring to their implementations.
-#define FOR_CONV_RuntimeCC1(x) x
+#define FOR_CONV_RegisterPreservingCC(x) x
 
 typedef void (*RuntimeEntry)();
 

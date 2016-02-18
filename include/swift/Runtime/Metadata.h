@@ -2497,7 +2497,7 @@ RT_ENTRY_VISIBILITY
 extern "C" const Metadata *
 swift_getGenericMetadata(GenericMetadata *pattern,
                          const void *arguments)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 // Callback to allocate a generic class metadata object.
 SWIFT_RUNTIME_EXPORT
@@ -2536,7 +2536,7 @@ extern "C" const WitnessTable *
 swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
                              void * const *instantiationArgs)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
@@ -2742,7 +2742,7 @@ RT_ENTRY_VISIBILITY
 extern "C" const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(size_t numProtocols,
                                  const ProtocolDescriptor **protocols)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// \brief Perform a checked dynamic cast of a value to a target type.
 ///
@@ -2766,7 +2766,7 @@ swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *srcType,
                   const Metadata *targetType,
                   DynamicCastFlags flags)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// \brief Checked dynamic cast to a Swift class type.
 ///
@@ -2778,7 +2778,7 @@ swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
 RT_ENTRY_VISIBILITY
 extern "C" const void *
 swift_dynamicCastClass(const void *object, const ClassMetadata *targetType)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// \brief Unconditional, checked dynamic cast to a Swift class type.
 ///

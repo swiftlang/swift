@@ -817,7 +817,7 @@ static llvm::FunctionType *getTypeOfFunction(llvm::Constant *fn) {
 static void emitUnaryRefCountCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *value) {
-  auto cc = IGF.IGM.RuntimeCC;
+  auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(fn))
     cc = fun->getCallingConv();
 
@@ -845,7 +845,7 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
   assert(dest->getType() == src->getType() &&
          "type mismatch in binary refcounting operation");
 
-  auto cc = IGF.IGM.RuntimeCC;
+  auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(fn))
     cc = fun->getCallingConv();
 
@@ -875,7 +875,7 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
           addr->getType() == IGF.IGM.UnownedReferencePtrTy) &&
          "address is not of a weak or unowned reference");
 
-  auto cc = IGF.IGM.RuntimeCC;
+  auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(fn))
     cc = fun->getCallingConv();
 
@@ -908,7 +908,7 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
           addr->getType() == IGF.IGM.UnownedReferencePtrTy) &&
          "address is not of a weak or unowned reference");
 
-  auto cc = IGF.IGM.RuntimeCC;
+  auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(fn))
     cc = fun->getCallingConv();
 

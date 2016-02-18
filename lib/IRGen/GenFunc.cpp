@@ -1878,7 +1878,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::CallInst *call = IGF.Builder.CreateCall(IGF.IGM.get##id##Fn(),  \
                            args.claimNext()); \
-    call->setCallingConv(IGF.IGM.RuntimeCC); \
+    call->setCallingConv(IGF.IGM.DefaultCC); \
     call->setDoesNotThrow(); \
     return out.add(call); \
  }
@@ -2323,7 +2323,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // Emit the runtime "once" call.
     auto call
       = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode});
-    call->setCallingConv(IGF.IGM.RuntimeCC);
+    call->setCallingConv(IGF.IGM.DefaultCC);
     
     // If we emitted the "done" check inline, join the branches.
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {

@@ -192,7 +192,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
     metadataRef = IGF.Builder.CreateBitCast(metadataRef, IGF.IGM.Int8PtrTy);
 
   // Call the (unconditional) dynamic cast.
-  auto cc = IGF.IGM.RuntimeCC;
+  auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(castFn))
     cc = fun->getCallingConv();
 
@@ -253,7 +253,7 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
     llvm_unreachable("not implemented");
   }
 
-  auto cc = IGF.IGM.RuntimeCC;
+  auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(castFn))
     cc = fun->getCallingConv();
 
@@ -443,7 +443,7 @@ void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
       break;
     }
     
-    auto cc = IGF.IGM.RuntimeCC;
+    auto cc = IGF.IGM.DefaultCC;
     if (auto fun = dyn_cast<llvm::Function>(castFn))
       cc = fun->getCallingConv();
 
@@ -596,7 +596,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     
-    auto cc = IGF.IGM.RuntimeCC;
+    auto cc = IGF.IGM.DefaultCC;
     if (auto fun = dyn_cast<llvm::Function>(castFn))
       cc = fun->getCallingConv();
 

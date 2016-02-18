@@ -144,7 +144,7 @@ int
 swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                       const Metadata *payload,
                                       unsigned emptyCases)
-  CALLING_CONVENTION(RuntimeCC1_IMPL) {
+  CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
   auto payloadNumExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
@@ -196,7 +196,7 @@ swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                        const Metadata *payload,
                                        int whichCase,
                                        unsigned emptyCases)
-  CALLING_CONVENTION(RuntimeCC1_IMPL) {
+  CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
   unsigned payloadNumExtraInhabitants

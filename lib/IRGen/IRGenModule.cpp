@@ -362,7 +362,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
-  RuntimeCC = LLVM_CC(RuntimeCC);
+  DefaultCC = LLVM_CC(DefaultCC);
   // If it is an interpreter, don't use try to use any
   // advanced calling conventions and use instead a
   // more conservative C calling convention. This
@@ -376,9 +376,9 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   auto Arch = Triple.getArch();
   if (Arch == llvm::Triple::ArchType::x86_64 ||
       Arch == llvm::Triple::ArchType::aarch64)
-    RuntimeCC1 = LLVM_CC(RuntimeCC1);
+    RegisterPreservingCC = LLVM_CC(RegisterPreservingCC);
   else
-    RuntimeCC1 = RuntimeCC;
+    RegisterPreservingCC = DefaultCC;
 
   ABITypes = new CodeGenABITypes(clangASTContext, Module);
 
@@ -537,15 +537,14 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FOR_CONV_RuntimeCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)                 \
+#define FOR_CONV_DefaultCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)                 \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FOR_CONV_C_CC(ID, NAME, CC, RETURNS, ARGS, ATTRS)                      \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
-#define FOR_CONV_RuntimeCC1(ID, NAME, CC, RETURNS, ARGS, ATTRS)                \
-  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME,                      \
-                                   RT_ENTRY_REF(NAME), CC,             \
+#define FOR_CONV_RegisterPreservingCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)      \
+  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, RT_ENTRY_REF(NAME), CC,           \
                                    QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)                           \
@@ -1030,4 +1029,3 @@ IRGenModule *IRGenModuleDispatcher::getGenModule(SILFunction *f) {
 
   return getPrimaryIGM();
 }
-

@@ -67,30 +67,26 @@
 // Annotation for specifying a calling convention of
 // a runtime function. It should be used with declarations
 // of runtime functions like this:
-// void runtime_function_name() CALLING_CONVENTION(RuntimeCC1)
+// void runtime_function_name() CALLING_CONVENTION(RegisterPreservingCC)
 #define CALLING_CONVENTION(CC) CALLING_CONVENTION_##CC
 
 #define CALLING_CONVENTION_preserve_most __attribute__((preserve_most))
 #define CALLING_CONVENTION_preserve_all  __attribute__((preserve_all))
 #define CALLING_CONVENTION_c
 
-// Map a logical calling convention (e.g. RuntimeCC1) to LLVM calling
+// Map a logical calling convention (e.g. RegisterPreservingCC) to LLVM calling
 // convention.
 #define LLVM_CC(CC) LLVM_CC_##CC
 
 // Currently, RuntimeFunction.def uses the following calling conventions:
-// RuntimeCC, RuntimeCC0, RuntimeCC1.
+// DefaultCC, RegisterPreservingCC.
 // If new runtime calling conventions are added later, they need to be mapped
 // here to something appropriate.
 
-// RuntimeCC and RuntimeCC0 are the standard C calling convention.
-#define CALLING_CONVENTION_RuntimeCC CALLING_CONVENTION_c
-#define CALLING_CONVENTION_RuntimeCC_IMPL CALLING_CONVENTION_c
-#define LLVM_CC_RuntimeCC llvm::CallingConv::C
-
-#define CALLING_CONVENTION_RuntimeCC0 CALLING_CONVENTION_c
-#define CALLING_CONVENTION_RuntimeCC0_IMPL CALLING_CONVENTION_c
-#define LLVM_CC_RuntimeCC0 llvm::CallingConv::C
+// DefaultCC is usually the standard C calling convention.
+#define CALLING_CONVENTION_DefaultCC CALLING_CONVENTION_c
+#define CALLING_CONVENTION_DefaultCC_IMPL CALLING_CONVENTION_c
+#define LLVM_CC_DefaultCC llvm::CallingConv::C
 
 // If defined, it indicates that runtime function wrappers
 // should be used on all platforms, even they do not support
@@ -101,11 +97,11 @@
 // supported by the currnet target.
 // TODO: Define it once the runtime calling convention support has
 // been integrated into clang and llvm.
-//#define RT_USE_RuntimeCC1
+//#define RT_USE_RegisterPreservingCC
 
-// RuntimeCC1 is a dedicated runtime calling convention to be used
+// RegisterPreservingCC is a dedicated runtime calling convention to be used
 // when calling the most popular runtime functions.
-#if defined(RT_USE_RuntimeCC1) && __has_attribute(preserve_most) &&               \
+#if defined(RT_USE_RegisterPreservingCC) && __has_attribute(preserve_most) &&  \
     (defined(__aarch64__) || defined(__x86_64__))
 
 // Targets supporting the dedicated runtime convention should use it.
@@ -118,9 +114,10 @@
 // linker may clobber some of the callee-saved registers defined by
 // this new calling convention when it performs lazy binding of
 // runtime functions using this new calling convention.
-#define CALLING_CONVENTION_RuntimeCC1 CALLING_CONVENTION_preserve_most
-#define CALLING_CONVENTION_RuntimeCC1_IMPL CALLING_CONVENTION_preserve_most
-#define LLVM_CC_RuntimeCC1 llvm::CallingConv::PreserveMost
+#define CALLING_CONVENTION_RegisterPreservingCC CALLING_CONVENTION_preserve_most
+#define CALLING_CONVENTION_RegisterPreservingCC_IMPL                           \
+  CALLING_CONVENTION_preserve_most
+#define LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
 // Indicate that wrappers should be used, because it is required
 // for the calling convention to get around dynamic linking issues.
@@ -131,9 +128,9 @@
 // Targets not supporting the dedicated runtime calling convention
 // should use the standard calling convention instead.
 // No wrappers are required in this case by the calling convention.
-#define CALLING_CONVENTION_RuntimeCC1 CALLING_CONVENTION_c
-#define CALLING_CONVENTION_RuntimeCC1_IMPL CALLING_CONVENTION_c
-#define LLVM_CC_RuntimeCC1 llvm::CallingConv::C
+#define CALLING_CONVENTION_RegisterPreservingCC CALLING_CONVENTION_c
+#define CALLING_CONVENTION_RegisterPreservingCC_IMPL CALLING_CONVENTION_c
+#define LLVM_CC_RegisterPreservingCC llvm::CallingConv::C
 
 #endif
 

@@ -58,7 +58,7 @@ extern "C"
 HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 
 /// Initializes the object header of a stack allocated object.
@@ -159,7 +159,7 @@ extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 RT_ENTRY_VISIBILITY
 extern "C"
 void *swift_slowAlloc(size_t bytes, size_t alignMask)
-     CALLING_CONVENTION(RuntimeCC1);
+     CALLING_CONVENTION(RegisterPreservingCC);
 
 
 // If the caller cannot promise to zero the object during destruction,
@@ -167,7 +167,7 @@ void *swift_slowAlloc(size_t bytes, size_t alignMask)
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask)
-     CALLING_CONVENTION(RuntimeCC1);
+     CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Atomically increments the retain count of an object.
 ///
@@ -184,21 +184,21 @@ void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask)
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift_retain(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
 extern "C"
-void (* CALLING_CONVENTION(RuntimeCC1) _swift_retain)(HeapObject *object);
+void (* CALLING_CONVENTION(RegisterPreservingCC) _swift_retain)(HeapObject *object);
 
 
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift_retain_n(HeapObject *object, uint32_t n)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
 extern "C"
-void (*CALLING_CONVENTION(RuntimeCC1) _swift_retain_n)(HeapObject *object,
+void (*CALLING_CONVENTION(RegisterPreservingCC) _swift_retain_n)(HeapObject *object,
                                                        uint32_t n);
 
 static inline void _swift_retain_inlined(HeapObject *object) {
@@ -212,11 +212,11 @@ static inline void _swift_retain_inlined(HeapObject *object) {
 RT_ENTRY_VISIBILITY
 extern "C"
 HeapObject *swift_tryRetain(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
 extern "C"
-HeapObject * (* CALLING_CONVENTION(RuntimeCC1) _swift_tryRetain)(HeapObject *);
+HeapObject * (* CALLING_CONVENTION(RegisterPreservingCC) _swift_tryRetain)(HeapObject *);
 
 /// Returns true if an object is in the process of being deallocated.
 SWIFT_RUNTIME_EXPORT
@@ -224,7 +224,7 @@ extern "C" bool swift_isDeallocating(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
 extern "C"
-bool (* CALLING_CONVENTION(RuntimeCC1) _swift_isDeallocating)(HeapObject *);
+bool (* CALLING_CONVENTION(RegisterPreservingCC) _swift_isDeallocating)(HeapObject *);
 
 
 /// Attempts to atomically pin an object and increment its reference
@@ -236,15 +236,16 @@ bool (* CALLING_CONVENTION(RuntimeCC1) _swift_isDeallocating)(HeapObject *);
 /// The object reference may not be nil.
 RT_ENTRY_VISIBILITY
 extern "C" HeapObject *swift_tryPin(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Given that an object is pinned, atomically unpin it and decrement
 /// the reference count.
 ///
 /// The object reference may be nil (to simplify the protocol).
 RT_ENTRY_VISIBILITY
-extern "C" void swift_unpin(HeapObject *object) CALLING_CONVENTION(RuntimeCC1);
-  
+extern "C" void swift_unpin(HeapObject *object)
+    CALLING_CONVENTION(RegisterPreservingCC);
+
 /// Atomically decrements the retain count of an object.  If the
 /// retain count reaches zero, the object is destroyed as follows:
 ///
@@ -263,23 +264,22 @@ extern "C" void swift_unpin(HeapObject *object) CALLING_CONVENTION(RuntimeCC1);
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift_release(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
-void (* CALLING_CONVENTION(RuntimeCC1) _swift_release)(HeapObject *object);
+extern "C" void (*CALLING_CONVENTION(RegisterPreservingCC)
+                     _swift_release)(HeapObject *object);
 
 /// Atomically decrements the retain count of an object n times. If the retain
 /// count reaches zero, the object is destroyed
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift_release_n(HeapObject *object, uint32_t n)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
-void (*CALLING_CONVENTION(RuntimeCC1) _swift_release_n)(HeapObject *object,
-                                                        uint32_t n);
+extern "C" void (*CALLING_CONVENTION(RegisterPreservingCC)
+                     _swift_release_n)(HeapObject *object, uint32_t n);
 
 // Refcounting observation hooks for memory tools. Don't use these.
 SWIFT_RUNTIME_EXPORT
@@ -323,19 +323,19 @@ extern "C" bool swift_isUniquelyReferenced_native(const struct HeapObject *);
 /// to an object?
 RT_ENTRY_VISIBILITY
 extern "C" bool swift_isUniquelyReferencedOrPinned_native(
-  const struct HeapObject *) CALLING_CONVENTION(RuntimeCC1);
+  const struct HeapObject *) CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Is this non-null native Swift pointer a unique reference to
 /// an object?
 RT_ENTRY_VISIBILITY
 extern "C" bool swift_isUniquelyReferenced_nonNull_native(
-  const struct HeapObject *) CALLING_CONVENTION(RuntimeCC1);
+  const struct HeapObject *) CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Does this non-null native Swift pointer refer to an object that
 /// is either uniquely referenced or pinned?
 RT_ENTRY_VISIBILITY
 extern "C" bool swift_isUniquelyReferencedOrPinned_nonNull_native(
-  const struct HeapObject *) CALLING_CONVENTION(RuntimeCC1);
+  const struct HeapObject *) CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Deallocate the given memory.
 ///
@@ -355,7 +355,7 @@ extern "C" bool swift_isUniquelyReferencedOrPinned_nonNull_native(
 RT_ENTRY_VISIBILITY
 extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                     size_t allocatedAlignMask)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Deallocate the given memory.
 ///
@@ -465,35 +465,35 @@ struct UnownedReference {
 /// Increment the weak/unowned retain count.
 RT_ENTRY_VISIBILITY
 extern "C" void swift_unownedRetain(HeapObject *value)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Decrement the weak/unowned retain count.
 RT_ENTRY_VISIBILITY
 extern "C" void swift_unownedRelease(HeapObject *value)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Increment the weak/unowned retain count by n.
 RT_ENTRY_VISIBILITY
 extern "C" void swift_unownedRetain_n(HeapObject *value, int n)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Decrement the weak/unowned retain count by n.
 RT_ENTRY_VISIBILITY
 extern "C" void swift_unownedRelease_n(HeapObject *value, int n)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Increment the strong retain count of an object, aborting if it has
 /// been deallocated.
 RT_ENTRY_VISIBILITY
 extern "C" void swift_unownedRetainStrong(HeapObject *value)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Increment the strong retain count of an object which may have been
 /// deallocated, aborting if it has been deallocated, and decrement its
 /// weak/unowned reference count.
 RT_ENTRY_VISIBILITY
 extern "C" void swift_unownedRetainStrongAndRelease(HeapObject *value)
-    CALLING_CONVENTION(RuntimeCC1);
+    CALLING_CONVENTION(RegisterPreservingCC);
 
 /// Aborts if the object has been deallocated.
 SWIFT_RUNTIME_EXPORT
@@ -640,11 +640,11 @@ extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 
 SWIFT_RUNTIME_EXPORT
 extern "C" void *swift_bridgeObjectRetain(void *value)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 /// Increment the strong retain count of a bridged object by n.
 SWIFT_RUNTIME_EXPORT
     extern "C" void *swift_bridgeObjectRetain_n(void *value, int n)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 
 /*****************************************************************************/
 /************************ UNKNOWN REFERENCE-COUNTING *************************/
@@ -656,22 +656,22 @@ SWIFT_RUNTIME_EXPORT
 /// Swift object.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unknownRetain(void *value)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object by n.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unknownRetain_n(void *value, int n)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 
 #else
 
 static inline void swift_unknownRetain(void *value)
-    CALLING_CONVENTION(RuntimeCC0) {
+    CALLING_CONVENTION(DefaultCC) {
   swift_retain(static_cast<HeapObject *>(value));
 }
 
 static inline void swift_unknownRetain_n(void *value, int n)
-    CALLING_CONVENTION(RuntimeCC0) {
+    CALLING_CONVENTION(DefaultCC) {
   swift_retain_n(static_cast<HeapObject *>(value), n);
 }
 
@@ -679,11 +679,11 @@ static inline void swift_unknownRetain_n(void *value, int n)
 
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_bridgeObjectRelease(void *value)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 /// Decrement the strong retain count of a bridged object by n.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_bridgeObjectRelease_n(void *value, int n)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 
 #if SWIFT_OBJC_INTEROP
 
@@ -691,22 +691,22 @@ extern "C" void swift_bridgeObjectRelease_n(void *value, int n)
 /// Swift object.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unknownRelease(void *value)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 /// Decrement the strong retain count of an object which might not be a native
 /// Swift object by n.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unknownRelease_n(void *value, int n)
-    CALLING_CONVENTION(RuntimeCC0);
+    CALLING_CONVENTION(DefaultCC);
 
 #else
 
 static inline void swift_unknownRelease(void *value)
-    CALLING_CONVENTION(RuntimeCC1) {
+    CALLING_CONVENTION(RegisterPreservingCC) {
   swift_release(static_cast<HeapObject *>(value));
 }
 
 static inline void swift_unknownRelease_n(void *value, int n)
-    CALLING_CONVENTION(RuntimeCC1) {
+    CALLING_CONVENTION(RegisterPreservingCC) {
   swift_release_n(static_cast<HeapObject *>(value), n);
 }
 

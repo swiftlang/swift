@@ -46,7 +46,7 @@ HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
                          size_t requiredAlignmentMask)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   assert(isAlignmentMask(requiredAlignmentMask));
   auto object = reinterpret_cast<HeapObject *>(
       RT_ENTRY_CALL(swift_slowAlloc)(requiredSize, requiredAlignmentMask));
@@ -264,35 +264,35 @@ OpaqueValue *swift::swift_projectBox(HeapObject *o) {
 // Forward-declare this, but define it after swift_release.
 extern "C" LLVM_LIBRARY_VISIBILITY
 void _swift_release_dealloc(HeapObject *object)
-  CALLING_CONVENTION(RuntimeCC1_IMPL)
+  CALLING_CONVENTION(RegisterPreservingCC_IMPL)
   __attribute__((noinline,used));
 
 
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift::swift_retain(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   RT_ENTRY_REF(swift_retain)(object);
 }
 
 RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void RT_ENTRY_IMPL(swift_retain)(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   _swift_retain_inlined(object);
 }
 
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift::swift_retain_n(HeapObject *object, uint32_t n)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   RT_ENTRY_REF(swift_retain_n)(object, n);
 }
 
 RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
-    CALLING_CONVENTION(RuntimeCC1) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (object) {
     object->refCount.increment(n);
   }
@@ -301,14 +301,14 @@ void RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift::swift_release(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   RT_ENTRY_REF(swift_release)(object);
 }
 
 RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void RT_ENTRY_IMPL(swift_release)(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (object  &&  object->refCount.decrementShouldDeallocate()) {
     _swift_release_dealloc(object);
   }
@@ -316,14 +316,14 @@ void RT_ENTRY_IMPL(swift_release)(HeapObject *object)
 
 RT_ENTRY_VISIBILITY
 void swift::swift_release_n(HeapObject *object, uint32_t n)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   return RT_ENTRY_REF(swift_release_n)(object, n);
 }
 
 RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void RT_ENTRY_IMPL(swift_release_n)(HeapObject *object, uint32_t n)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (object && object->refCount.decrementShouldDeallocateN(n)) {
     _swift_release_dealloc(object);
   }
@@ -339,7 +339,7 @@ size_t swift::swift_unownedRetainCount(HeapObject *object) {
 
 RT_ENTRY_VISIBILITY
 void swift::swift_unownedRetain(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (!object)
     return;
 
@@ -348,7 +348,7 @@ void swift::swift_unownedRetain(HeapObject *object)
 
 RT_ENTRY_VISIBILITY
 void swift::swift_unownedRelease(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (!object)
     return;
 
@@ -366,7 +366,7 @@ void swift::swift_unownedRelease(HeapObject *object)
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift::swift_unownedRetain_n(HeapObject *object, int n)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (!object)
     return;
 
@@ -376,7 +376,7 @@ void swift::swift_unownedRetain_n(HeapObject *object, int n)
 RT_ENTRY_VISIBILITY
 extern "C"
 void swift::swift_unownedRelease_n(HeapObject *object, int n)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (!object)
     return;
 
@@ -393,7 +393,7 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n)
 
 RT_ENTRY_VISIBILITY
 HeapObject *swift::swift_tryPin(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   assert(object);
 
   // Try to set the flag.  If this succeeds, the caller will be
@@ -409,7 +409,7 @@ HeapObject *swift::swift_tryPin(HeapObject *object)
 
 RT_ENTRY_VISIBILITY
 void swift::swift_unpin(HeapObject *object)
-  CALLING_CONVENTION(RuntimeCC1_IMPL) {
+  CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (object && object->refCount.decrementAndUnpinShouldDeallocate()) {
     _swift_release_dealloc(object);
   }
@@ -417,14 +417,14 @@ void swift::swift_unpin(HeapObject *object)
 
 RT_ENTRY_VISIBILITY
 HeapObject *swift::swift_tryRetain(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   return RT_ENTRY_REF(swift_tryRetain)(object);
 }
 
 RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 HeapObject *RT_ENTRY_IMPL(swift_tryRetain)(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (!object)
     return nullptr;
 
@@ -447,7 +447,7 @@ bool RT_ENTRY_IMPL(swift_isDeallocating)(HeapObject *object) {
 
 RT_ENTRY_VISIBILITY
 void swift::swift_unownedRetainStrong(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (!object)
     return;
   assert(object->weakRefCount.getCount() &&
@@ -460,7 +460,7 @@ void swift::swift_unownedRetainStrong(HeapObject *object)
 RT_ENTRY_VISIBILITY
 void
 swift::swift_unownedRetainStrongAndRelease(HeapObject *object)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   if (!object)
     return;
   assert(object->weakRefCount.getCount() &&
@@ -486,7 +486,7 @@ void swift::swift_unownedCheck(HeapObject *object) {
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
 void _swift_release_dealloc(HeapObject *object)
-  CALLING_CONVENTION(RuntimeCC1_IMPL) {
+  CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   asFullMetadata(object->metadata)->destroy(object);
 }
 
@@ -556,7 +556,7 @@ RT_ENTRY_VISIBILITY
 void swift::swift_deallocObject(HeapObject *object,
                                 size_t allocatedSize,
                                 size_t allocatedAlignMask)
-    CALLING_CONVENTION(RuntimeCC1_IMPL) {
+    CALLING_CONVENTION(RegisterPreservingCC_IMPL) {
   assert(isAlignmentMask(allocatedAlignMask));
   assert(object->refCount.isDeallocating());
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
