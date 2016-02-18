@@ -534,17 +534,48 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   return fn;
 }
 
+#define QUOTE(...) __VA_ARGS__
+#define STR(X)     #X
+
+#define FOR_CONV_RuntimeCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)                 \
+  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
+#define FOR_CONV_C_CC(ID, NAME, CC, RETURNS, ARGS, ATTRS)                      \
+  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
+#define FOR_CONV_RuntimeCC1(ID, NAME, CC, RETURNS, ARGS, ATTRS)                \
+  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME,                      \
+                                   RT_ENTRY_REF(NAME), CC,             \
+                                   QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
+#define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)                           \
+  FOR_CONV_##CC(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
+#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(ID, NAME, SYMBOL, IMPL, CC,       \
+                                              RETURNS, ARGS, ATTRS)            \
+  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL, CC, QUOTE(RETURNS),       \
+                                   QUOTE(ARGS), QUOTE(ATTRS))
+
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
 #define NO_ARGS {}
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
-#define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)       \
-llvm::Constant *IRGenModule::get##ID##Fn() {               \
-  using namespace RuntimeConstants;                        \
-  return getRuntimeFn(*this, ID##Fn, #NAME, CC,            \
-                      RETURNS, ARGS, ATTRS);               \
-}
+
+#define FUNCTION_IMPL(ID, NAME, CC, RETURNS, ARGS, ATTRS)                      \
+  llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
+    using namespace RuntimeConstants;                                          \
+    return getRuntimeFn(Module, ID##Fn, #NAME, CC, RETURNS, ARGS, ATTRS);      \
+  }
+
+#define FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL_NAME, CC, RETURNS,   \
+                                         ARGS, ATTRS)                          \
+  llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
+    using namespace RuntimeConstants;                                          \
+    return getWrapperFn(Module, ID##Fn, #NAME, STR(SYMBOL_NAME), CC, RETURNS,  \
+                        ARGS, ATTRS);                                          \
+  }
+
 #include "swift/Runtime/RuntimeFunctions.def"
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
