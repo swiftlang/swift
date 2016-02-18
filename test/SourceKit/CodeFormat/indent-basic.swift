@@ -34,4 +34,5 @@ foo(a: [
 // CHECK: key.sourcetext: "    }"
 // CHECK: key.sourcetext: "    "
 // CHECK: key.sourcetext: "}"
-// CHECK: key.sourcetext: "  3: 3"
+//                        "foo(a: ["
+// CHECK: key.sourcetext: "           3: 3"
