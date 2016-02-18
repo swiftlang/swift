@@ -206,6 +206,10 @@ extern "C" void swift_release(HeapObject *object);
 /// count reaches zero, the object is destroyed
 extern "C" void swift_release_n(HeapObject *object, uint32_t n);
 
+// Refcounting observation hooks for memory tools. Don't use these.
+extern "C" size_t swift_retainCount(HeapObject *object);
+extern "C" size_t swift_unownedRetainCount(HeapObject *object);
+
 /// Is this pointer a non-null unique reference to an object
 /// that uses Swift reference counting?
 extern "C" bool swift_isUniquelyReferencedNonObjC(const void *);

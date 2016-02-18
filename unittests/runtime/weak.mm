@@ -40,7 +40,7 @@ static HeapObject *make_objc_object() {
 extern "C" HeapObject *make_swift_object();
 
 static unsigned getUnownedRetainCount(HeapObject *object) {
-  return object->weakRefCount.getCount() - 1;
+  return swift_unownedRetainCount(object) - 1;
 }
 
 static void unknown_release(void *value) {
