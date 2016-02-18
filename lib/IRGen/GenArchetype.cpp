@@ -52,7 +52,23 @@ using namespace irgen;
 
 static llvm::Value *emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
                                                  CanArchetypeType archetype) {
-  return IGF.getLocalTypeData(archetype, LocalTypeDataKind::forTypeMetadata());
+  // Check for an existing cache entry.
+  auto localDataKind = LocalTypeDataKind::forTypeMetadata();
+  auto metadata = IGF.tryGetLocalTypeData(archetype, localDataKind);
+
+  // If that's not present, this must be an associated type.
+  if (!metadata) {
+    assert(!archetype->isPrimary() &&
+           "type metadata for primary archetype was not bound in context");
+
+    CanArchetypeType parent(archetype->getParent());
+    metadata = emitAssociatedTypeMetadataRef(IGF, parent,
+                                             archetype->getAssocType());
+
+    IGF.setScopedLocalTypeData(archetype, localDataKind, metadata);
+  }
+
+  return metadata;
 }
 
 namespace {
@@ -88,8 +104,30 @@ public:
                                unsigned which) const {
     assert(which < getNumStoredProtocols());
     auto protocol = archetype->getConformsTo()[which];
-    return IGF.getLocalTypeData(archetype,
-                 LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol));
+    auto localDataKind =
+      LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol);
+
+    // Check for an existing cache entry.
+    auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
+
+    // If that's not present, this must be an associated type; drill
+    // down from the parent.
+    if (!wtable) {
+      assert(!archetype->isPrimary() &&
+             "witness table for primary archetype was not bound in context");
+
+      // To do this, we need the metadata for the associated type.
+      auto associatedMetadata = emitArchetypeTypeMetadataRef(IGF, archetype);
+
+      CanArchetypeType parent(archetype->getParent());
+      wtable = emitAssociatedTypeWitnessTableRef(IGF, parent,
+                                                 archetype->getAssocType(),
+                                                 associatedMetadata,
+                                                 protocol);
+      IGF.setScopedLocalTypeData(archetype, localDataKind, wtable);
+    }
+
+    return wtable;
   }
 };
 
@@ -174,10 +212,19 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
          "looking up witness table for protocol that doesn't have one");
 
+  // Check immediately for an existing cache entry.
+  auto wtable = IGF.tryGetLocalTypeData(archetype,
+                  LocalTypeDataKind::forAbstractProtocolWitnessTable(proto));
+  if (wtable) return wtable;
+
+  // Otherwise, find the best path from one of the protocols directly
+  // conformed to by the protocol, then get that conformance.
+  // TODO: this isn't necessarily optimal if the direct conformance isn't
+  // concretely available; we really ought to be comparing the full paths
+  // to this conformance from concrete sources.
   auto &archTI = getArchetypeInfo(IGF, archetype,
                                   IGF.getTypeInfoForLowered(archetype));
-  auto wtable = emitImpliedWitnessTableRef(IGF, archTI.getStoredProtocols(),
-                                           proto,
+  wtable = emitImpliedWitnessTableRef(IGF, archTI.getStoredProtocols(), proto,
     [&](unsigned originIndex) -> llvm::Value* {
       return archTI.getWitnessTable(IGF, archetype, originIndex);
     });
