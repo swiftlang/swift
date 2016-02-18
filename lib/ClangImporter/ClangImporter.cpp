@@ -2133,6 +2133,95 @@ Identifier ClangImporter::Implementation::importMacroName(
   return SwiftContext.getIdentifier(name);
 }
 
+namespace {
+  typedef ClangImporter::Implementation::ImportedName ImportedName;
+}
+
+namespace llvm {
+  // An Identifier is "pointer like".
+  template<typename T> class PointerLikeTypeTraits;
+  template<>
+  class PointerLikeTypeTraits<swift::DeclName> {
+  public:
+    static inline void *getAsVoidPointer(swift::DeclName name) {
+      return name.getOpaqueValue();
+    }
+    static inline swift::DeclName getFromVoidPointer(void *ptr) {
+      return swift::DeclName::getFromOpaqueValue(ptr);
+    }
+    enum { NumLowBitsAvailable = 0 };
+  };
+}
+
+/// Retrieve the name of the given Clang declaration context for
+/// printing.
+static StringRef getClangDeclContextName(const clang::DeclContext *dc) {
+  auto type = ClangImporter::Implementation::getClangDeclContextType(dc);
+
+  // FIXME: Hack to work around getClangDeclContextType() failing for
+  // protocols.
+  if (type.isNull()) {
+    if (auto constProto = dyn_cast<clang::ObjCProtocolDecl>(dc)) {
+      auto proto = const_cast<clang::ObjCProtocolDecl *>(constProto);
+      clang::ASTContext &ctx = dc->getParentASTContext();
+      type = ctx.getObjCObjectType(ctx.ObjCBuiltinIdTy, { }, { proto }, false);
+      type = ctx.getObjCObjectPointerType(type);
+    }
+  }
+
+  if (type.isNull()) return StringRef();
+
+  return ClangImporter::Implementation::getClangTypeNameForOmission(
+           dc->getParentASTContext(),
+           type).Name;
+}
+
+namespace {
+  /// Merge the a set of imported names produced for the overridden
+  /// declarations of a given method or property.
+  template<typename DeclType>
+  void mergeOverriddenNames(ASTContext &ctx,
+                            const DeclType *decl,
+                            SmallVectorImpl<std::pair<const DeclType *,
+                                                      ImportedName>>
+                              &overriddenNames) {
+    typedef std::pair<const DeclType *, ImportedName> OverriddenName;
+    llvm::SmallPtrSet<DeclName, 4> known;
+    (void)known.insert(DeclName());
+    overriddenNames.erase(std::remove_if(overriddenNames.begin(),
+                                         overriddenNames.end(),
+                                         [&](OverriddenName overridden) {
+                                           return !known.insert(
+                                                     overridden.second.Imported)
+                                             .second;
+                                         }),
+                          overriddenNames.end());
+
+    if (overriddenNames.size() < 2)
+      return;
+
+    // Complain about inconsistencies.
+    std::string nameStr;
+    auto method = dyn_cast<clang::ObjCMethodDecl>(decl);
+    if (method)
+      nameStr = method->getSelector().getAsString();
+    else
+      nameStr = cast<clang::ObjCPropertyDecl>(decl)->getName().str();
+    for (unsigned i = 1, n = overriddenNames.size(); i != n; ++i) {
+      ctx.Diags.diagnose(SourceLoc(), diag::inconsistent_swift_name,
+                         method == nullptr,
+                         nameStr,
+                         getClangDeclContextName(decl->getDeclContext()),
+                         overriddenNames[0].second,
+                         getClangDeclContextName(
+                           overriddenNames[0].first->getDeclContext()),
+                         overriddenNames[i].second,
+                         getClangDeclContextName(
+                           overriddenNames[i].first->getDeclContext()));
+    }
+  }
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2179,6 +2268,64 @@ auto ClangImporter::Implementation::importFullName(
     // class context.
     if (auto category = dyn_cast<clang::ObjCCategoryDecl>(*effectiveContext)) {
       *effectiveContext = category->getClassInterface();
+    }
+  }
+
+  // When omitting needless words, find the original method/property
+  // declaration.
+  if (OmitNeedlessWords) {
+    if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
+      // Inherit the name from the "originating" declarations, if
+      // there are any.
+      SmallVector<std::pair<const clang::ObjCMethodDecl *, ImportedName>, 4>
+        overriddenNames;
+      SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+      method->getOverriddenMethods(overriddenMethods);
+      for (auto overridden : overriddenMethods) {
+        const auto overriddenName = importFullName(overridden, options,
+                                                   nullptr,clangSemaOverride);
+        if (overriddenName.Imported)
+          overriddenNames.push_back({overridden, overriddenName});
+      }
+
+      // If we found any names of overridden methods, return those names.
+      if (!overriddenNames.empty()) {
+        if (overriddenNames.size() > 1)
+          mergeOverriddenNames(SwiftContext, method, overriddenNames);
+        return overriddenNames[0].second;
+      }
+    } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+      // Inherit the name from the "originating" declarations, if
+      // there are any.
+      if (auto getter = property->getGetterMethodDecl()) {
+        SmallVector<std::pair<const clang::ObjCPropertyDecl *, ImportedName>, 4>
+          overriddenNames;
+        SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+        SmallPtrSet<const clang::ObjCPropertyDecl *, 4> knownProperties;
+        (void)knownProperties.insert(property);
+
+        getter->getOverriddenMethods(overriddenMethods);
+        for (auto overridden : overriddenMethods) {
+          if (!overridden->isPropertyAccessor()) continue;
+          auto overriddenProperty = overridden->findPropertyDecl(true);
+          if (!overriddenProperty) continue;
+          if (!knownProperties.insert(overriddenProperty).second) continue;
+
+          const auto overriddenName = importFullName(overriddenProperty,
+                                                     options,
+                                                     nullptr,
+                                                     clangSemaOverride);
+          if (overriddenName.Imported)
+            overriddenNames.push_back({overriddenProperty, overriddenName});
+        }
+
+        // If we found any names of overridden methods, return those names.
+        if (!overriddenNames.empty()) {
+          if (overriddenNames.size() > 1)
+            mergeOverriddenNames(SwiftContext, property, overriddenNames);
+          return overriddenNames[0].second;
+        }
+      }
     }
   }
 

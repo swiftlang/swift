@@ -820,7 +820,7 @@ public:
 
   /// Retrieve the type of an instance of the given Clang declaration context,
   /// or a null type if the DeclContext does not have a corresponding type.
-  clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
+  static clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
   /// Determine whether this typedef is a CF type.
   static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);

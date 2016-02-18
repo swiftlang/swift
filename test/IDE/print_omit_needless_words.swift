@@ -21,8 +21,10 @@
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangModules/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.CoreCooling.txt
 // RUN: FileCheck %s -check-prefix=CHECK-CORECOOLING -strict-whitespace < %t.CoreCooling.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=OmitNeedlessWords -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.OmitNeedlessWords.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=OmitNeedlessWords -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.OmitNeedlessWords.txt 2> %t.OmitNeedlessWords.diagnostics.txt
 // RUN: FileCheck %s -check-prefix=CHECK-OMIT-NEEDLESS-WORDS -strict-whitespace < %t.OmitNeedlessWords.txt
+// RUN: FileCheck %s -check-prefix=CHECK-OMIT-NEEDLESS-WORDS-DIAGS -strict-whitespace < %t.OmitNeedlessWords.diagnostics.txt
+
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=errors -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words  -enable-strip-ns-prefix -skip-parameter-names -enable-infer-default-arguments > %t.errors.txt
 // RUN: FileCheck %s -check-prefix=CHECK-ERRORS -strict-whitespace < %t.errors.txt
@@ -306,6 +308,27 @@
 
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
+
+// Verify that we get the Swift name from the original declaration.
+// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWWiggle
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func wiggle1()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: var wiggleProp1: Int { get }
+
+// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWWaggle
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func waggle1()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: var waggleProp1: Int { get }
+
+// CHECK-OMIT-NEEDLESS-WORDS: class OMWSuper
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jump()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: var wiggleProp1: Int { get }
+
+// CHECK-OMIT-NEEDLESS-WORDS: class OMWSub
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jump()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
+
+// CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C method 'conflicting1' in 'OMWSub' ('waggle1()' in 'OMWWaggle' vs. 'wiggle1()' in 'OMWWiggle')
+// CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C property 'conflictingProp1' in 'OMWSub' ('waggleProp1' in 'OMWWaggle' vs. 'wiggleProp1' in 'OMWSuper')
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws
