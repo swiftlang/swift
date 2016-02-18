@@ -21,6 +21,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
+#include "swift/Runtime/Config.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
@@ -361,7 +362,23 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
-  RuntimeCC = llvm::CallingConv::C;
+  RuntimeCC = LLVM_CC(RuntimeCC);
+  // If it is an interpreter, don't use try to use any
+  // advanced calling conventions and use instead a
+  // more conservative C calling convention. This
+  // makes sure that none of the registers eventually
+  // used by the dynamic linker are used by generated code.
+  // TODO: Check that the deployment target supports the new
+  // calling convention. Older versions of the runtime library
+  // may not contain the entries using the new calling convention.
+
+  // Only use the new calling conventions on platforms that support it.
+  auto Arch = Triple.getArch();
+  if (Arch == llvm::Triple::ArchType::x86_64 ||
+      Arch == llvm::Triple::ArchType::aarch64)
+    RuntimeCC1 = LLVM_CC(RuntimeCC1);
+  else
+    RuntimeCC1 = RuntimeCC;
 
   ABITypes = new CodeGenABITypes(clangASTContext, Module);
 
