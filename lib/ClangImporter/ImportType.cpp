@@ -1867,6 +1867,13 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
                objcCategory->getClassInterface()));
   }
 
+  if (auto constProto = dyn_cast<clang::ObjCProtocolDecl>(dc)) {
+    auto proto = const_cast<clang::ObjCProtocolDecl *>(constProto);
+    auto type = ctx.getObjCObjectType(ctx.ObjCBuiltinIdTy, { }, { proto },
+                                      false);
+    return ctx.getObjCObjectPointerType(type);
+  }
+
   if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
     return ctx.getTagDeclType(tag);
   }

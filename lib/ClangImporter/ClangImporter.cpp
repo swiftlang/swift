@@ -1927,18 +1927,6 @@ namespace llvm {
 /// printing.
 static StringRef getClangDeclContextName(const clang::DeclContext *dc) {
   auto type = ClangImporter::Implementation::getClangDeclContextType(dc);
-
-  // FIXME: Hack to work around getClangDeclContextType() failing for
-  // protocols.
-  if (type.isNull()) {
-    if (auto constProto = dyn_cast<clang::ObjCProtocolDecl>(dc)) {
-      auto proto = const_cast<clang::ObjCProtocolDecl *>(constProto);
-      clang::ASTContext &ctx = dc->getParentASTContext();
-      type = ctx.getObjCObjectType(ctx.ObjCBuiltinIdTy, { }, { proto }, false);
-      type = ctx.getObjCObjectPointerType(type);
-    }
-  }
-
   if (type.isNull()) return StringRef();
 
   return ClangImporter::Implementation::getClangTypeNameForOmission(
