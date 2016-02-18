@@ -12,7 +12,7 @@ var importedtype : Int
 
 // Imported from enumtest module.
 import enum enumtest.unionSearchFlags
-var importedunion : unionSearchFlags = .Backwards
+var importedunion: unionSearchFlags = .backwards
 
 
 // This shouldn't be imported from data.

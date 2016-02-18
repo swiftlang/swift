@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -module-name Swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
-enum Optional<T> {
-  case Some(T), None
+enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 protocol Boolean {

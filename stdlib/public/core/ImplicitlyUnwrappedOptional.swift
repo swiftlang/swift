@@ -11,21 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 /// An optional type that allows implicit member access.
-public enum ImplicitlyUnwrappedOptional<Wrapped>: NilLiteralConvertible {
+public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
   // the library intrinsics below.
   
-  case None
-  case Some(Wrapped)
+  case none
+  case some(Wrapped)
 
   /// Construct a non-`nil` instance that stores `some`.
-  public init(_ some: Wrapped) { self = .Some(some) }
+  public init(_ some: Wrapped) { self = .some(some) }
 
   /// Create an instance initialized with `nil`.
   @_transparent public
   init(nilLiteral: ()) {
-    self = .None
+    self = .none
   }
 }
 
@@ -33,9 +33,9 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
     switch self {
-    case .Some(let value):
+    case .some(let value):
       return String(value)
-    case .None:
+    case .none:
       return "nil"
     }
   }
@@ -57,9 +57,9 @@ extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
 public // COMPILER_INTRINSIC
 func _getImplicitlyUnwrappedOptionalValue<Wrapped>(v: Wrapped!) -> Wrapped {
   switch v {
-  case .Some(let x):
+  case .some(let x):
     return x
-  case .None:
+  case .none:
     _requirementFailure(
       "unexpectedly found nil while unwrapping an Optional value")
   }
@@ -71,14 +71,14 @@ public // COMPILER_INTRINSIC
 func _injectValueIntoImplicitlyUnwrappedOptional<Wrapped>(
   v: Wrapped
 ) -> Wrapped! {
-  return .Some(v)
+  return .some(v)
 }
 
 @_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _injectNothingIntoImplicitlyUnwrappedOptional<Wrapped>() -> Wrapped! {
-  return .None
+  return .none
 }
 
 #if _runtime(_ObjC)
@@ -89,10 +89,10 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
 
   public func _bridgeToObjectiveC() -> AnyObject {
     switch self {
-    case .None:
+    case .none:
       _requirementFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 
-    case .Some(let x):
+    case .some(let x):
       return Swift._bridgeToObjectiveC(x)!
     }
   }

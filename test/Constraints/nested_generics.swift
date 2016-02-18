@@ -33,7 +33,7 @@ struct AnyStream<T : Sequence> {
     mutating
     func next() -> Element? {
       let result = (index, elements.next())
-      if result.1 == nil { return .None }
+      if result.1 == nil { return .none }
       index += 1
       return (result.0, result.1!)
     }

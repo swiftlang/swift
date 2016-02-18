@@ -1,7 +1,8 @@
 // RUN: %target-parse-verify-swift -parse-stdlib -module-name Swift
 
 enum Optional<T> {
-  case Some(T), None
+  case none
+  case some(T)
 }
 
 // <rdar://problem/15593704>

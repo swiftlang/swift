@@ -368,8 +368,8 @@ public func > <T : IntegerType>(lhs: T, rhs: T) -> Bool {
 //===----------------------------------------------------------------------===//
 public enum ArithmeticOverflow {
   @_transparent
-  public init(_ overflow: Bool) { self = overflow ? .Overflow : .None }
-  case None, Overflow 
+  public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
+  case none, overflow
 }
 
 public protocol FixedWidthIntegerType : IntegerType {
@@ -517,7 +517,7 @@ extension FixedWidthIntegerType {
   @_transparent
   public mutating func ${x.name}InPlace(rhs: Self) {
     let (result, overflow) = self.${x.name}WithOverflow(rhs)
-    _assertCond(overflow == .None, "overflow in ${x.name}")
+    _assertCond(overflow == .none, "overflow in ${x.name}")
     self = result
   }
 
@@ -531,7 +531,7 @@ extension FixedWidthIntegerType {
   public func unsafe${capitalize(x.name)}(rhs: Self) -> Self {
     let (result, overflow) = self.${x.name}WithOverflow(rhs)
     
-    if (overflow != .None) {
+    if (overflow != .none) {
       if (_isDebugAssertConfiguration()) {
         _requirementFailure("overflow in unsafe${capitalize(x.name)}")
       }
@@ -626,8 +626,8 @@ extension UWord {
 
     let result = (
       result: uResult1,
-      carryFlag: carry0 != .None || carry1 != .None,
-      overflowFlag: overflow0 != .None || overflow1 != .None
+      carryFlag: carry0 != .none || carry1 != .none,
+      overflowFlag: overflow0 != .none || overflow1 != .none
     )
     _log("**** -> sum: \(result.result.hex), "
       + "carry: \(result.carryFlag), overflow: \(result.overflowFlag)")
@@ -722,7 +722,7 @@ extension UnsignedIntegerType where Self : FixedWidthIntegerType {
   ) -> ArithmeticOverflow {
     // We were performing a signed operation on unsigned storage.  If
     // the result was negative, we've overflowed.
-    return word(countRepresentedWords - 1) < 0 ? .Overflow : .None
+    return word(countRepresentedWords - 1) < 0 ? .overflow : .none
   }
 }
 
@@ -780,7 +780,7 @@ extension SignedIntegerType where Self : FixedWidthIntegerType {
   public mutating func signedOverflowIntoWord(
     wordIndex: Word, overflow: Bool, originalSign: Word
   ) -> ArithmeticOverflow {
-    return overflow ? .Overflow : .None
+    return overflow ? .overflow : .none
   }
 }
 
@@ -838,7 +838,7 @@ public struct ${Self}
       rhs == 0
       ${'|| self == %s.min && rhs == -1' % Self if signed else ''}
     ) {
-      return (partialValue: self, overflow: .Overflow)
+      return (partialValue: self, overflow: .overflow)
     }
     
     let (newStorage, overflow) = (
@@ -982,7 +982,7 @@ extension IntegerType {
       (sum, carry, _) = uwordOperator(uword(i))(rhs.uword(i), carryIn: carry)
       
       if !self.replaceUWord(i, with: sum) {
-        return (false, .Overflow)
+        return (false, .overflow)
       }
       i += 1
       // optimization: if we've processed all represented words on the
@@ -993,7 +993,7 @@ extension IntegerType {
       // optimize for that :-)
       if carry == (rhs < 0) && i >= rhs.countRepresentedWords {
         _log("*** early exit; carry can't affect lhs")
-        return (carry, .None as ArithmeticOverflow)
+        return (carry, .none as ArithmeticOverflow)
       }
     }
     return (carry, nil)
@@ -1029,7 +1029,7 @@ extension IntegerType {
       (bits, carry, overflow) = uwordOperator(oldSign._lowUWord)(
         rhs.uword(wordIndex), carryIn: carry)
       if !self.replaceUWord(wordIndex, with: bits) {
-        return .Overflow
+        return .overflow
       }
       oldSign &>>= ${word_bits - 1} // further sign words are 0 or -1
       wordIndex += 1
@@ -1067,13 +1067,13 @@ public func ${x.operator}= <
 @inline(__always)
 public func +=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
   let overflow = lhs.addInPlace(rhs)
-  _assertCond(overflow == .None, "overflow in multiprecision add.")
+  _assertCond(overflow == .none, "overflow in multiprecision add.")
 }
 
 @inline(__always)
 public func -=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
   let overflow = lhs.subtractInPlace(rhs)
-  _assertCond(overflow == .None, "overflow in multiprecision subtract.")
+  _assertCond(overflow == .none, "overflow in multiprecision subtract.")
 }
 
 //===--- Multiplication ---------------------------------------------------===//
@@ -1141,7 +1141,7 @@ extension IntegerType {
     if !product.replaceUWord(p + q - 1, with: u) { overflow = true  }
     if (product < 0) != negativeResult { overflow = true  }
     
-    return (product, overflow ? .Overflow : .None)
+    return (product, overflow ? .overflow : .none)
   }
   
   static func multiply<
@@ -1162,7 +1162,7 @@ func *= <
 >(inout lhs: LHS, rhs: RHS) {
   
   let (newLHS, overflow) = LHS.multiply(lhs, rhs)
-  _assertCond(overflow == .None, "Overflow in multiprecision in-place multiply")
+  _assertCond(overflow == .none, "Overflow in multiprecision in-place multiply")
   lhs = newLHS
 }
 
@@ -1641,20 +1641,20 @@ tests.test("Multiprecision/+/DWord") {
   x = DWord(Word.max)
   var overflow: ArithmeticOverflow
   overflow = x.addInPlace(Word.min)
-  expectEqual(.None, overflow)
+  expectEqual(.none, overflow)
   expectEqual(-1, x)
 
   overflow = x.addInPlace(DWord.min)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(DWord.max, x)
 
   overflow = x.addInPlace(1 as Word)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(DWord.min, x)
 
   x = 1
   overflow = x.addInPlace(DWord.max)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(DWord.min, x)
 }
 
@@ -1685,22 +1685,22 @@ tests.test("Multiprecision/+/UDWord") {
   x = UDWord(Word.max)
   var overflow: ArithmeticOverflow
   overflow = x.addInPlace(Word.min)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(UDWord.max, x)
 
   overflow = x.addInPlace(DWord.min)
-  expectEqual(.None, overflow)
+  expectEqual(.none, overflow)
   overflow = x.addInPlace(DWord.min)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(UDWord.max, x)
 
   overflow = x.addInPlace(1 as Int8)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(0, x)
 
   x = 1
   overflow = x.addInPlace(UDWord.max)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(0, x)
 }
 
@@ -1729,20 +1729,20 @@ tests.test("Multiprecision/-/DWord") {
   x = DWord(Word.max)
   var overflow: ArithmeticOverflow
   overflow = x.subtractInPlace(UWord(~Word.min) + 1)
-  expectEqual(.None, overflow)
+  expectEqual(.none, overflow)
   expectEqual(-1, x)
 
   overflow = x.subtractInPlace(UDWord(~DWord.min) + 1)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(DWord.max, x)
 
   overflow = x.subtractInPlace(-1 as Word)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(DWord.min, x)
 
   x = 1
   overflow = x.subtractInPlace(DWord.min + 1)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(DWord.min, x)
 }
 
@@ -1773,32 +1773,32 @@ tests.test("Multiprecision/-/UDWord") {
   x = UDWord(Word.max)
   var overflow: ArithmeticOverflow
   overflow = x.subtractInPlace(UWord(~Word.min) + 1)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(UDWord.max, x)
 
   overflow = x.subtractInPlace(UDWord(DWord.max) + 1)
-  expectEqual(.None, overflow)
+  expectEqual(.none, overflow)
   overflow = x.subtractInPlace(UDWord(DWord.max) + 1)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(UDWord.max, x)
 
   overflow = x.subtractInPlace(DWord.max)
-  expectEqual(.None, overflow)
+  expectEqual(.none, overflow)
   overflow = x.subtractInPlace(DWord.max)
-  expectEqual(.None, overflow)
+  expectEqual(.none, overflow)
   expectEqual(1, x)
   
   overflow = x.subtractInPlace(2 as UDWord)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(UDWord.max, x)
   
   overflow = x.subtractInPlace(-1 as Int8)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(0, x)
 
   x = 1
   overflow = x.subtractInPlace(UDWord.max)
-  expectEqual(.Overflow, overflow)
+  expectEqual(.overflow, overflow)
   expectEqual(2, x)
 }
 
@@ -1819,131 +1819,131 @@ tests.test("Multiprecision/+/Int16") {
 
 tests.test("Multiprecision/*/Int8") {
   let uShift = Int8.bitWidth - 1
-  expectEqual((42, .None), Int8.multiply(7 as Int8, 6 as Int8))
-  expectEqual((42, .None), Int8.multiply(-7 as Int8, -6 as Int8))
-  expectEqual((-42, .None), Int8.multiply(-7 as DWord, 6 as Int8))
-  expectEqual((-42, .None), Int8.multiply(7 as Int8, -6 as DWord))
+  expectEqual((42, .none), Int8.multiply(7 as Int8, 6 as Int8))
+  expectEqual((42, .none), Int8.multiply(-7 as Int8, -6 as Int8))
+  expectEqual((-42, .none), Int8.multiply(-7 as DWord, 6 as Int8))
+  expectEqual((-42, .none), Int8.multiply(7 as Int8, -6 as DWord))
   
-  expectEqual((UInt8.max - 1, .None), UInt8.multiply(Int8.max, 2 as Int8))
-  expectEqual((UInt8.max - 1, .None), UInt8.multiply(-Int8.max, -2 as Int8))
+  expectEqual((UInt8.max - 1, .none), UInt8.multiply(Int8.max, 2 as Int8))
+  expectEqual((UInt8.max - 1, .none), UInt8.multiply(-Int8.max, -2 as Int8))
   expectEqual(
-    (0, .Overflow),
+    (0, .overflow),
     UInt8.multiply((1 as UInt8) << (UInt8.bitWidth - 1), 2 as Int8))
 
   expectEqual(
-    (Int8.max - 1, .None),
+    (Int8.max - 1, .none),
     Int8.multiply(Int8.max >> 1, 2 as Int8))
   
   expectEqual(
-    (Int8.max - 1, .None),
+    (Int8.max - 1, .none),
     Int8.multiply(-(Int8.max >> 1), -2 as Int8))
   
   expectEqual(
-    (-Int8.max + 1, .None),
+    (-Int8.max + 1, .none),
     Int8.multiply(-(Int8.max >> 1), 2 as Int8))
 
   let shift = Int8.bitWidth - 2
   expectEqual(
-    (Int8.min, .Overflow),
+    (Int8.min, .overflow),
     Int8.multiply((1 << shift) as Int8, 2 as Int8))
   
   expectEqual(
-    (Int8.min, .Overflow),
+    (Int8.min, .overflow),
     Int8.multiply(-(1 << shift) as Int8, -2 as Int8))
   
   expectEqual(
-    (Int8.min, .None), Int8.multiply((1 << shift) as Int8, -2 as Int8))
+    (Int8.min, .none), Int8.multiply((1 << shift) as Int8, -2 as Int8))
   
   expectEqual(
-    (Int8.min, .None), Int8.multiply(-(1 << shift) as Int8, 2 as Int8))
+    (Int8.min, .none), Int8.multiply(-(1 << shift) as Int8, 2 as Int8))
 }
 
 tests.test("Multiprecision/*/Word") {
-  expectEqual((42, .None), Word.multiply(7 as Word, 6 as Word))
-  expectEqual((42, .None), Word.multiply(-7 as Word, -6 as Word))
-  expectEqual((-42, .None), Word.multiply(-7 as DWord, 6 as Word))
-  expectEqual((-42, .None), Word.multiply(7 as Word, -6 as DWord))
+  expectEqual((42, .none), Word.multiply(7 as Word, 6 as Word))
+  expectEqual((42, .none), Word.multiply(-7 as Word, -6 as Word))
+  expectEqual((-42, .none), Word.multiply(-7 as DWord, 6 as Word))
+  expectEqual((-42, .none), Word.multiply(7 as Word, -6 as DWord))
   
-  expectEqual((UWord.max - 1, .None), UWord.multiply(Word.max, 2 as Word))
-  expectEqual((UWord.max - 1, .None), UWord.multiply(-Word.max, -2 as Word))
+  expectEqual((UWord.max - 1, .none), UWord.multiply(Word.max, 2 as Word))
+  expectEqual((UWord.max - 1, .none), UWord.multiply(-Word.max, -2 as Word))
   expectEqual(
-    (0, .Overflow),
+    (0, .overflow),
     UWord.multiply((1 as UWord) << (UWord.bitWidth - 1), 2 as Word))
 
   expectEqual(
-    (Word.max - 1, .None),
+    (Word.max - 1, .none),
     Word.multiply(Word.max >> 1, 2 as Word))
   
   expectEqual(
-    (Word.max - 1, .None),
+    (Word.max - 1, .none),
     Word.multiply(-(Word.max >> 1), -2 as Word))
   
   expectEqual(
-    (-Word.max + 1, .None),
+    (-Word.max + 1, .none),
     Word.multiply(-(Word.max >> 1), 2 as Word))
 
   let shift = Word.bitWidth - 2
   expectEqual(
-    (Word.min, .Overflow),
+    (Word.min, .overflow),
     Word.multiply((1 << shift) as Word, 2 as Word))
   
   expectEqual(
-    (Word.min, .Overflow),
+    (Word.min, .overflow),
     Word.multiply(-(1 << shift) as Word, -2 as Word))
   
   expectEqual(
-    (Word.min, .None),
+    (Word.min, .none),
     Word.multiply((1 << shift) as Word, -2 as Word))
   
   expectEqual(
-    (Word.min, .None),
+    (Word.min, .none),
     Word.multiply(-(1 << shift) as Word, 2 as Word))
 }
 
 tests.test("Multiprecision/*/DWord") {
   let uShift = DWord.bitWidth - 1
-  expectEqual((42, .None), DWord.multiply(7 as DWord, 6 as DWord))
-  expectEqual((42, .None), DWord.multiply(-7 as DWord, -6 as DWord))
-  expectEqual((-42, .None), DWord.multiply(-7 as DWord, 6 as DWord))
-  expectEqual((-42, .None), DWord.multiply(7 as DWord, -6 as DWord))
+  expectEqual((42, .none), DWord.multiply(7 as DWord, 6 as DWord))
+  expectEqual((42, .none), DWord.multiply(-7 as DWord, -6 as DWord))
+  expectEqual((-42, .none), DWord.multiply(-7 as DWord, 6 as DWord))
+  expectEqual((-42, .none), DWord.multiply(7 as DWord, -6 as DWord))
   
-  expectEqual((UDWord.max - 1, .None), UDWord.multiply(DWord.max, 2 as DWord))
-  expectEqual((UDWord.max - 1, .None), UDWord.multiply(-DWord.max, -2 as DWord))
+  expectEqual((UDWord.max - 1, .none), UDWord.multiply(DWord.max, 2 as DWord))
+  expectEqual((UDWord.max - 1, .none), UDWord.multiply(-DWord.max, -2 as DWord))
   expectEqual(
-    (0, .Overflow),
+    (0, .overflow),
     UDWord.multiply((1 as UDWord) << (UDWord.bitWidth - 1), 2 as DWord))
 
   expectEqual(
-    (DWord.max - 1, .None),
+    (DWord.max - 1, .none),
     DWord.multiply(DWord.max >> 1, 2 as DWord))
   
   expectEqual(
-    (DWord.max - 1, .None),
+    (DWord.max - 1, .none),
     DWord.multiply(-(DWord.max >> 1), -2 as DWord))
   
   expectEqual(
-    (-DWord.max + 1, .None),
+    (-DWord.max + 1, .none),
     DWord.multiply(-(DWord.max >> 1), 2 as DWord))
 
   let shift = DWord.bitWidth - 2
   expectEqual(
-    (DWord.min, .Overflow),
+    (DWord.min, .overflow),
     DWord.multiply((1 << shift) as DWord, 2 as DWord))
   
   expectEqual(
-    (DWord.min, .Overflow),
+    (DWord.min, .overflow),
     DWord.multiply(-(1 << shift) as DWord, -2 as DWord))
   
   expectEqual(
-    (DWord.min, .None),
+    (DWord.min, .none),
     DWord.multiply((1 << shift) as DWord, -2 as DWord))
   
   expectEqual(
-    (DWord.min, .None),
+    (DWord.min, .none),
     DWord.multiply(-(1 << shift) as DWord, 2 as DWord))
 
   expectEqual(
-    ((-2 << Word.bitWidth) + 1, .Overflow),
+    ((-2 << Word.bitWidth) + 1, .overflow),
     DWord.multiply(UWord.max, UWord.max))
 }
 

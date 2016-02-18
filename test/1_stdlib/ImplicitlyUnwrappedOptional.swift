@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-var x : Int! = .None
+var x : Int! = .none
 if x != nil {
   print("x is non-empty!")
 } else {
@@ -9,7 +9,7 @@ if x != nil {
 }
 // CHECK: an empty optional is logically false
 
-x = .Some(0)
+x = .some(0)
 
 if x != nil {
   print("a non-empty optional is logically true")
@@ -54,12 +54,12 @@ ImplicitlyUnwrappedOptionalTests.test("flatMap") {
   // FIXME(19798684): can't call map or flatMap on ImplicitlyUnwrappedOptional
 
   // let half: Int32 -> Int16! =
-  //   { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .None } }
+  //   { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .none } }
 
   // expectOptionalEqual(2 as Int16, half(4))
   // expectEmpty(half(3))
 
-  // expectEmpty((.None as Int!).flatMap(half))
+  // expectEmpty((.none as Int!).flatMap(half))
   // expectOptionalEqual(2 as Int16, (4 as Int!).flatMap(half))
   // expectEmpty((3 as Int!).flatMap(half))
 }

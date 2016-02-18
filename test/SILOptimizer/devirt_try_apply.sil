@@ -102,7 +102,7 @@ bb0(%0 : $Base):
   debug_value %0 : $Base
   %2 = integer_literal $Builtin.Int32, 0
   %3 = struct $Int32 (%2 : $Builtin.Int32)
-  %4 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %3 : $Int32
+  %4 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32
   return %4 : $Optional<Int32>
 }
 
@@ -122,7 +122,7 @@ sil hidden [noinline] @_TFC16devirt_try_apply4Base4boo2fS0_FzT_GSqS0__ : $@conve
 bb0(%0 : $Base):
   debug_value %0 : $Base
   strong_retain %0 : $Base
-  %3 = enum $Optional<Base>, #Optional.Some!enumelt.1, %0 : $Base
+  %3 = enum $Optional<Base>, #Optional.some!enumelt.1, %0 : $Base
   return %3 : $Optional<Base>
 }
 
@@ -170,7 +170,7 @@ bb0(%0 : $Derived1):
   debug_value %0 : $Derived1
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct $Int32 (%2 : $Builtin.Int32)
-  %4 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %3 : $Int32
+  %4 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32
   return %4 : $Optional<Int32>
 }
 
@@ -187,7 +187,7 @@ sil hidden [noinline] @_TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__ : $@c
 bb0(%0 : $Derived1):
   debug_value %0 : $Derived1
   strong_retain %0 : $Derived1
-  %3 = enum $Optional<Derived1>, #Optional.Some!enumelt.1, %0 : $Derived1
+  %3 = enum $Optional<Derived1>, #Optional.some!enumelt.1, %0 : $Derived1
   return %3 : $Optional<Derived1>
 }
 
@@ -248,7 +248,7 @@ bb0(%0 : $Derived2):
   try_apply %1(%0) : $@convention(method) (@guaranteed Derived2) -> (Int32, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%3 : $Int32):
-  %4 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %3 : $Int32
+  %4 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32
   return %4 : $Optional<Int32>
 
 bb2(%6 : $ErrorProtocol):
@@ -454,7 +454,7 @@ bb0(%0 : $Base):
   %1 = alloc_stack $Optional<Int32>
   debug_value %0 : $Base
   %3 = alloc_stack $Optional<Int32>
-  inject_enum_addr %3 : $*Optional<Int32>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<Int32>, #Optional.none!enumelt
   %5 = tuple ()
   %6 = load %3 : $*Optional<Int32>
   store %6 to %1 : $*Optional<Int32>
@@ -494,7 +494,7 @@ bb0(%0 : $Base):
   %1 = alloc_stack $Optional<Base>
   debug_value %0 : $Base
   %3 = alloc_stack $Optional<Base>
-  inject_enum_addr %3 : $*Optional<Base>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<Base>, #Optional.none!enumelt
   %5 = tuple ()
   %6 = load %3 : $*Optional<Base>
   store %6 to %1 : $*Optional<Base>
@@ -503,7 +503,7 @@ bb0(%0 : $Base):
   try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Base, @error ErrorProtocol), normal bb1, error bb4
 
 bb1(%11 : $Base):
-  %12 = enum $Optional<Base>, #Optional.Some!enumelt.1, %11 : $Base
+  %12 = enum $Optional<Base>, #Optional.some!enumelt.1, %11 : $Base
   store %12 to %1 : $*Optional<Base>
   release_value %6 : $Optional<Base>
   br bb2
@@ -535,7 +535,7 @@ bb0(%0 : $Base):
   %1 = alloc_stack $Optional<Base>
   debug_value %0 : $Base
   %3 = alloc_stack $Optional<Base>
-  inject_enum_addr %3 : $*Optional<Base>, #Optional.None!enumelt
+  inject_enum_addr %3 : $*Optional<Base>, #Optional.none!enumelt
   %5 = tuple ()
   %6 = load %3 : $*Optional<Base>
   store %6 to %1 : $*Optional<Base>
@@ -713,7 +713,7 @@ bb0:
   debug_value %3 : $Derived1
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
-  %7 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %6 : $Int32
+  %7 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
   store %7 to %0 : $*Optional<Int32>
   %9 = class_method %3 : $Derived1, #Derived1.foo!1 : Derived1 -> () throws -> Int32? , $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error ErrorProtocol)
   try_apply %9(%3) : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error ErrorProtocol), normal bb1, error bb4

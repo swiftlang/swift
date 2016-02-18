@@ -121,7 +121,7 @@ struct FixedSizedRefArrayOfOptional<T>
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
     for var i = 0; i < capacity; ++i {
-      (buffer.baseAddress + i).initializePointee(.None)
+      (buffer.baseAddress + i).initializePointee(.none)
     }
 
     buffer.value = capacity
@@ -237,7 +237,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     }
     set(keyValue) {
       assert(keyValue.key == self[i].key)
-      _buffer[i.offset] = .Some(keyValue)
+      _buffer[i.offset] = .some(keyValue)
     }
   }
 
@@ -359,7 +359,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     }
 
     // remove the element
-    _buffer[pos.offset] = .None
+    _buffer[pos.offset] = .none
     --_count
 
     // If we've put a hole in a chain of contiguous elements, some
@@ -398,7 +398,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
 
       // Move the found element into the hole
       _buffer[hole] = _buffer[b]
-      _buffer[b] = .None
+      _buffer[b] = .none
       hole = b
     }
 

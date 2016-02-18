@@ -93,7 +93,7 @@ func callBlocks(x: Foo,
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
   // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK: enum $Optional<@convention(block) NSString -> NSString>, #Optional.Some!enumelt.1, [[G_BLOCK]]
+  // CHECK: enum $Optional<@convention(block) NSString -> NSString>, #Optional.some!enumelt.1, [[G_BLOCK]]
 
   return (x.foo(f, x: 0), x.bar(g, x: "one"), x.bas(h, x: "two"), x.optFunc(g, x: "three"))
 }
@@ -114,14 +114,14 @@ func clearDraggingItemImageComponentsProvider(x: NSDraggingItem) {
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaPs9AnyObject___XFdCb__aGSqCSo7NSArray__
 // CHECK:         [[CONVERT:%.*]] = function_ref @_TF10Foundation22_convertArrayToNSArray
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
-// CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[CONVERTED]]
+// CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[CONVERTED]]
 // CHECK:         return [[OPTIONAL]]
 
 // CHECK-LABEL: sil hidden @{{.*}}bridgeNonnullBlockResult{{.*}}
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oSS_XFdCb__aGSqCSo8NSString__
 // CHECK:         [[CONVERT:%.*]] = function_ref @swift_StringToNSString
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
-// CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
+// CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:         return [[OPTIONAL_BRIDGED]]
 func bridgeNonnullBlockResult() {
   nonnullStringBlockResult { return "test" }

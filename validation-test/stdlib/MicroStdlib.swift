@@ -10,8 +10,9 @@
 // A bare-bones Swift standard library
 //
 
-public enum Optional<T> {
-  case Some(T), None
+public enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 public typealias IntegerLiteralType = Int

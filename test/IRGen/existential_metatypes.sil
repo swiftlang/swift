@@ -91,7 +91,7 @@ sil @test1 : $@convention(thin) (Optional<Kindable.Type>) -> () {
 bb0(%0 : $Optional<Kindable.Type>):
   // CHECK:     [[TYPE:%.*]] = inttoptr i64 %0 to %swift.type*
   // CHECK:     [[WITNESS:%.*]] = inttoptr i64 %1 to i8**
-  switch_enum %0 : $Optional<Kindable.Type>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
+  switch_enum %0 : $Optional<Kindable.Type>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : $@thick Kindable.Type):
   %5 = function_ref @use : $@convention(thin) (@thick Kindable.Type) -> ()

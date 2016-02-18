@@ -125,8 +125,8 @@ enum TwoStateEnum {
 }
 
 enum FakeOptional<T> {
-  case None
-  case Some(T)
+  case nOne
+  case some(T)
 }
 
 // CHECK-LABEL: sil @reinterpretcast_simplification_unchecked_addr : $@convention(thin) (@inout FakeOptional<rs_A>, @inout FakeOptional<rs_C>, @inout FakeOptional<rs_F>, @inout TwoStateEnum, @inout TwoStateEnum) -> (Builtin.NativeObject, Int, Builtin.NativeObject, Builtin.NativeObject, Int) {

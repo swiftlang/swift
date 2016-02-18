@@ -9,8 +9,8 @@ class RawBuffer {}
 class HeapBufferStorage<T,U> : RawBuffer {}
 
 enum FakeOptional<T> {
-  case None
-  case Some(T)
+  case none
+  case some(T)
 }
 
 struct StringData {
@@ -940,11 +940,11 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
 // CHECK-LABEL: sil @enum_promotion_of_concrete_types
 // CHECK: bb0([[INT_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA1:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
-// CHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
+// CHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.none!enumelt
 // CHECK-NEXT: store [[ENUM1]] to [[ALLOCA1]]
 // CHECK-NEXT: [[ALLOCA2:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[INT:%[0-9]+]] = load [[INT_PTR]] : $*Builtin.Int1
-// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1, [[INT]] : $Builtin.Int1
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, [[INT]] : $Builtin.Int1
 // CHECK-NEXT: store [[ENUM2]] to [[ALLOCA2]] : $*FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[RESULT1:%[0-9]+]] = load [[ALLOCA1]]
 // CHECK-NEXT: [[RESULT2:%[0-9]+]] = load [[ALLOCA2]]
@@ -955,14 +955,14 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
 sil @enum_promotion_of_concrete_types : $@convention(thin) (@in Builtin.Int1) -> (FakeOptional<Builtin.Int1>, FakeOptional<Builtin.Int1>) {
 bb0(%0 : $*Builtin.Int1):
   %1 = alloc_stack $FakeOptional<Builtin.Int1>
-  inject_enum_addr %1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
+  inject_enum_addr %1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.none!enumelt
 
   %2 = integer_literal $Builtin.Int1, 1
   %3 = alloc_stack $FakeOptional<Builtin.Int1>
-  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
   %5 = load %0 : $*Builtin.Int1
   store %5 to %4 : $*Builtin.Int1
-  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
 
   %6 = load %1 : $*FakeOptional<Builtin.Int1>
   %7 = load %3 : $*FakeOptional<Builtin.Int1>
@@ -978,7 +978,7 @@ bb0(%0 : $*Builtin.Int1):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_retain [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -987,14 +987,14 @@ bb0(%0 : $*Builtin.Int1):
 sil @enum_promotion_case2 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_retain %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -1005,9 +1005,9 @@ bb0(%0 : $B):
 // CHECK-LABEL: sil @no_enum_promotion_of_non_concrete_types
 // CHECK: bb0
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.None!enumelt
+// CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
 // CHECK-NEXT: copy_addr
 // CHECK-NEXT:  inject_enum_addr
 // CHECK-NEXT: cond_br
@@ -1024,11 +1024,11 @@ bb0(%0 : $B):
 sil @no_enum_promotion_of_non_concrete_types : $@convention(thin) <T> (@out FakeOptional<T>, @inout T, Builtin.Int1) -> () {
 bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
   %3 = alloc_stack $FakeOptional<T>
-  inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.None!enumelt
+  inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.none!enumelt
   %4 = alloc_stack $FakeOptional<T>
-  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
   copy_addr [take] %1 to [initialization] %5 : $*T
-  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
   cond_br %2, bb1, bb2
 
 bb1:
@@ -1088,8 +1088,8 @@ bb0(%0 : $*E):
 sil @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
-  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.Int1
-  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, %0 : $Builtin.Int1
+  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
   return %2 : $Builtin.Int1
 }
 
@@ -1195,10 +1195,10 @@ bb0(%0 : $E):
 // CHECK-NEXT: return
 sil @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> B {
 bb0(%0 : $*FakeOptional<B>):
-  %1 = switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+  %1 = switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   debug_value %2 : $*B  // should not prevent the optimization
   %3 = load %2 : $*B
   return %3 : $B
@@ -1372,7 +1372,7 @@ bb0:
 // CHECK-NEXT: return
 sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@convention(thin) (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.NativeObject
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
   retain_value %1 : $FakeOptional<Builtin.NativeObject>
   br bb1
 
@@ -1609,11 +1609,11 @@ bb0:
 // CHECK-NOT: select_enum
   %1 = integer_literal $Builtin.Int32, 8
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %2 : $Int32
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %2 : $Int32
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ONE:%[^ ]+]] = integer_literal $Builtin.Int1, -1
-  %5 = select_enum %3 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %3 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ONE]]
   return %5 : $Builtin.Int1
 }
@@ -1623,11 +1623,11 @@ sil @isnil : $@convention(thin) () -> Builtin.Int1 {
 bb0:
 // CHECK: bb0
 // CHECK-NOT: select_enum
-  %1 = enum $Optional<Int>, #Optional.None!enumelt
+  %1 = enum $Optional<Int>, #Optional.none!enumelt
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ZERO:%[^ ]+]] = integer_literal $Builtin.Int1, 0
-  %5 = select_enum %1 : $Optional<Int>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %1 : $Optional<Int>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ZERO]]
   return %5 : $Builtin.Int1
 }
@@ -1827,7 +1827,7 @@ struct FakeInt32 {
 // CHECK-NOT: switch_enum_addr
 sil @loadable_switch_enum_addr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
-  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
   br bb3
@@ -2774,10 +2774,10 @@ bb0(%0 : $*Optional<CC2>, %1 : $CC1, %2 : $CC3, %3 : $CC4, %4 : $CC2):
   %16 = alloc_stack $Optional<Int>
   %17 = alloc_stack $Optional<CC2>
   copy_addr %0 to [initialization] %17 : $*Optional<CC2>
-  switch_enum_addr %17 : $*Optional<CC2>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
+  switch_enum_addr %17 : $*Optional<CC2>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %21 = unchecked_take_enum_data_addr %17 : $*Optional<CC2>, #Optional.Some!enumelt.1
+  %21 = unchecked_take_enum_data_addr %17 : $*Optional<CC2>, #Optional.some!enumelt.1
 
   %22 = alloc_stack $CC2
   copy_addr [take] %21 to [initialization] %22 : $*CC2
@@ -2860,7 +2860,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_release [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -2869,14 +2869,14 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 sil @enum_promotion_case3 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_release %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -2894,16 +2894,16 @@ sil @init_enum : $@convention(thin) (@out B) -> ()
 // CHECK:  [[V3:%.*]] = alloc_stack $B
 // CHECK:               apply [[V2]]([[V3]])
 // CHECK:  [[V4:%.*]] = load [[V3]]
-// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[V4]]
+// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[V4]]
 // CHECK:  store [[V5]] to [[V1]]
 
 sil @enum_promotion_case4 : $@convention(thin) () -> @owned FakeOptional<B> {
 bb0:
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %4 = function_ref @init_enum : $@convention(thin) (@out B) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@out B) -> ()
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   return %7 : $FakeOptional<B>

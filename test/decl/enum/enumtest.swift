@@ -6,32 +6,32 @@
 
 
 public enum unionSearchFlags {
-  case None
-  case Backwards
-  case Anchored
+  case none
+  case backwards
+  case anchored
 
-  init() { self = .None }
+  init() { self = .none }
 }
 
 func test1() -> unionSearchFlags {
   let _ : unionSearchFlags
-  var b = unionSearchFlags.None
-  b = unionSearchFlags.Anchored
+  var b = unionSearchFlags.none
+  b = unionSearchFlags.anchored
   _ = b
 
-  return unionSearchFlags.Backwards
+  return unionSearchFlags.backwards
 }
 
 func test1a() -> unionSearchFlags {
   var _ : unionSearchFlags
-  var b : unionSearchFlags = .None
-  b = .Anchored
+  var b : unionSearchFlags = .none
+  b = .anchored
   _ = b
 
   // ForwardIndex use of MaybeInt.
-  _ = MaybeInt.None
+  _ = MaybeInt.none
 
-  return .Backwards
+  return .backwards
 }
 
 func test1b(b : Bool) {
@@ -40,18 +40,18 @@ func test1b(b : Bool) {
 }
 
 enum MaybeInt {
-  case None
-  case Some(Int)
+  case none
+  case some(Int)
 
-  init(_ i: Int) { self = MaybeInt.Some(i) }
+  init(_ i: Int) { self = MaybeInt.some(i) }
 }
 
 func test2(a: Int, _ b: Int, _ c: MaybeInt) {
-  _ = MaybeInt.Some(4)
-  _ = MaybeInt.Some
-  _ = MaybeInt.Some(b)
+  _ = MaybeInt.some(4)
+  _ = MaybeInt.some
+  _ = MaybeInt.some(b)
 
-  test2(1, 2, .None)
+  test2(1, 2, .none)
 }
 
 enum ZeroOneTwoThree {
@@ -68,9 +68,9 @@ enum ZeroOneTwoThree {
 
 func test3(a: ZeroOneTwoThree) {
   _ = ZeroOneTwoThree.Three(1,2,3)
-  _ = ZeroOneTwoThree.Unknown(MaybeInt.None, MaybeInt.Some(4),
-                                  MaybeInt.Some(32))
-  _ = ZeroOneTwoThree(MaybeInt.None, MaybeInt(4), MaybeInt(32))
+  _ = ZeroOneTwoThree.Unknown(
+    MaybeInt.none, MaybeInt.some(4), MaybeInt.some(32))
+  _ = ZeroOneTwoThree(MaybeInt.none, MaybeInt(4), MaybeInt(32))
 
   var _ : Int =
      ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
@@ -89,9 +89,9 @@ func test3(a: ZeroOneTwoThree) {
 
 func test3a(a: ZeroOneTwoThree) {
   var e : ZeroOneTwoThree = (.Three(1, 2, 3))
-  var f = ZeroOneTwoThree.Unknown(.None, .Some(4), .Some(32))
+  var f = ZeroOneTwoThree.Unknown(.none, .some(4), .some(32))
 
-  var g = .None  // expected-error {{reference to member 'None' cannot be resolved without a contextual type}}
+  var g = .none  // expected-error {{reference to member 'none' cannot be resolved without a contextual type}}
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
@@ -172,7 +172,7 @@ func test5(myorigin: CGPoint) {
   // var (CGSize(width, height)) = CGSize(1,2)
 
   // TODO: something like this, how do we get it in scope in the {} block?
-  //if (var Some(x) = somemaybeint) { ... }
+  //if (var some(x) = somemaybeint) { ... }
 
   
 }

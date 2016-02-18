@@ -48,9 +48,9 @@ func generic_dependent_context<T>(x: T, y: Int) -> T {
   return foo()
 }
 
-enum Optionable<T> {
-  case Some(T)
-  case None
+enum Optionable<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 class NestedGeneric<U> {
@@ -78,7 +78,7 @@ class NestedGeneric<U> {
   //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_TTRG__rXFo__dT__XFo_iT__iT__
   //   CHECK:       partial_apply [[REABSTRACT]]<U, T>
   func nested_reabstraction<T>(x: T) -> Optionable<() -> ()> {
-    return .Some({})
+    return .some({})
   }
 }
 

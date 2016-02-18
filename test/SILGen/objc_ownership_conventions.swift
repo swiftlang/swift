@@ -38,7 +38,7 @@ func test5(g: Gizmo) {
   // CHECK-NEXT: [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
   // CHECK:      [[V:%.*]] = load
   // CHECK:      strong_retain [[V]]
-  // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[V]]
+  // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[V]]
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NEXT: release_value [[G]]
 }
@@ -52,7 +52,7 @@ func test6(g: Gizmo) {
   // CHECK-NEXT: [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
   // CHECK:      [[V:%.*]] = load
   // CHECK:      strong_retain [[V]]
-  // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.Some!
+  // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.some!
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NOT:  release_value [[G]]
 }
@@ -120,7 +120,7 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
+  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
   // CHECK:      [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
   // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%[0-9]*]], {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]
@@ -140,7 +140,7 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
+  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
   // CHECK:      [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
   // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%[0-9]*]], {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]

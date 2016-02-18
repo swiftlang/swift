@@ -80,8 +80,8 @@ struct FakeOpaquePointer {
   var rawValue : Builtin.RawPointer
 }
 enum FakeOptional<T> {
-  case None
-  case Some(T)
+  case none
+  case some(T)
 }
 struct FakeUWord {
   var value: Builtin.Word

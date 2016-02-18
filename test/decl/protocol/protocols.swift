@@ -161,7 +161,7 @@ struct IntIterator : IteratorProtocol /*, Sequence, ReplPrintable*/ {
   var stride : Int
 
   mutating func next() -> Int? {
-    if min >= max { return .None }
+    if min >= max { return .none }
     let prev = min
     min += stride
     return prev

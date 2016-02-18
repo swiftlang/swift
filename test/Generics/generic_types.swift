@@ -38,19 +38,19 @@ struct X { }
 var d : S<X> // expected-error{{type 'X' does not conform to protocol 'MyFormattedPrintable'}}
 
 enum Optional<T> {
-  case Element(T)
-  case None
+  case element(T)
+  case none
 
-  init() { self = .None }
-  init(_ t: T) { self = .Element(t) }
+  init() { self = .none }
+  init(_ t: T) { self = .element(t) }
 }
 typealias OptionalInt = Optional<Int>
-var uniontest1 : (Int) -> Optional<Int> = OptionalInt.Element
-var uniontest2 : Optional<Int> = OptionalInt.None
+var uniontest1 : (Int) -> Optional<Int> = OptionalInt.element
+var uniontest2 : Optional<Int> = OptionalInt.none
 var uniontest3 = OptionalInt(1)
 
 // FIXME: Stuff that should work, but doesn't yet.
-// var uniontest4 : OptInt = .None
+// var uniontest4 : OptInt = .none
 // var uniontest5 : OptInt = .Some(1)
 
 func formattedTest<T : MyFormattedPrintable>(a: T) {

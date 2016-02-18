@@ -48,7 +48,7 @@ func checkProtocolName(proto: Protocol, _ name: String, _ mangled: String)
 func checkIvarName(cls: AnyClass, _ name: String)
 {
   let ivarName = ivar_getName(class_getInstanceVariable(cls, name))
-  let s = ivarName != nil ? String(cString: ivarName) : Optional.None
+  let s = ivarName != nil ? String(cString: ivarName) : Optional.none
   assert(name == s)
 }
 

@@ -22,7 +22,7 @@ protocol Q : Sequence {
 
 struct No<NT> : IteratorProtocol {
   func next() -> NT? {
-    return .None
+    return .none
   }
 }
 

@@ -58,12 +58,12 @@ let invalidStatePlist3: Dictionary<String, AnyObject> = [
   "population": 38_040_000,
 ]
 
-// CHECK-LABEL: Some:
+// CHECK-LABEL: some:
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
 dump(stateFromPlistLame(goodStatePlist))
-// CHECK-LABEL: Some:
+// CHECK-LABEL: some:
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
@@ -105,7 +105,7 @@ func statisticFromPlist(plist: Dictionary<String, AnyObject>) -> Statistic? {
     return Statistic.ForState(State(name: name,
                                     population: population,
                                     abbrev: abbrev))
-  case let ("country" as String, name as String, population as Int, .None):
+  case let ("country" as String, name as String, population as Int, .none):
     return Statistic.ForCountry(Country(name: name,
                                         population: population))
   default:

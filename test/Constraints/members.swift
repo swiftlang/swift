@@ -122,7 +122,7 @@ var wcurriedFull : () = w.curried(0)(1)
 
 // Member of enum Type
 func enumMetatypeMember(opt: Int?) {
-  opt.None // expected-error{{static member 'None' cannot be used on instance of type 'Int?'}}
+  opt.none // expected-error{{static member 'none' cannot be used on instance of type 'Int?'}}
 }
 
 ////
@@ -537,7 +537,7 @@ func f22490787() {
 enum r23942743 {
   case Tomato(cloud: String)
 }
-let _ = .Tomato(cloud: .None)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
+let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
 
 
 

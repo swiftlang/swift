@@ -93,7 +93,7 @@ extension String {
   @warn_unused_result
   func _optionalRange(r: NSRange) -> Range<Index>? {
     if r.location == NSNotFound {
-      return .None
+      return nil
     }
     return _range(r)
   }

@@ -80,7 +80,7 @@ ErrorHandlingTests.test("ErrorHandling/Optional.map and .flatMap") {
   do {
     let y: String? = try x.flatMap {(n: Int) -> String? in
       throw SillyError.JazzHands
-      return .Some("\(n)")
+      return .some("\(n)")
     }
     expectUnreachable()
   } catch {}
@@ -155,7 +155,7 @@ ErrorHandlingTests.test("ErrorHandling/Optional flatMap") {
       if $0 == 2 {
         throw SillyError.JazzHands
       }
-      return .Some($0)
+      return .some($0)
     }
     expectUnreachable()
   } catch {}

@@ -35,7 +35,7 @@ public struct PermutationGenerator<
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     let result = indices.next()
-    return result != nil ? seq[result!] : .None
+    return result != nil ? seq[result!] : .none
   }
 
   /// Construct an *iterator* over a permutation of `elements` given

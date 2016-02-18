@@ -692,11 +692,11 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
   public func next() -> AnyObject? {
     if n == count {
       // FIXME: Is this check necessary before refresh()?
-      if count == 0 { return .None }
+      if count == 0 { return nil }
       refresh()
-      if count == 0 { return .None }
+      if count == 0 { return nil }
     }
-    let next : AnyObject = state[0].itemsPtr[n]!
+    let next: AnyObject = state[0].itemsPtr[n]!
     n += 1
     return next
   }
@@ -924,15 +924,13 @@ extension NSDictionary : Sequence {
     }
 
     public func next() -> (key: AnyObject, value: AnyObject)? {
-      switch _fastIterator.next() {
-      case .None:
-        return .None
-      case .Some(let key):
+      if let key = _fastIterator.next() {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
         // requires them, but we don't want to paint ourselves into a corner.
         return (key: key, value: _dictionary.object(for: key)!)
       }
+      return nil
     }
 
     internal init(_ _dict: NSDictionary) {

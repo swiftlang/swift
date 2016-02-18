@@ -59,7 +59,7 @@ func test_array_construct<T>(_: T) {
 
 extension Optional {
   init() {
-    self = .None
+    self = .none
   }
 }
 

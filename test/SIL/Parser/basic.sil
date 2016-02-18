@@ -913,13 +913,13 @@ bb0(%0 : $Builtin.Word):
   %1 = integer_literal $Builtin.Word, 0
   %2 = integer_literal $Builtin.Word, 1
   %3 = enum $IntEnum, #IntEnum.E1!enumelt
-  %4 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %3 : $IntEnum
+  %4 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %3 : $IntEnum
   %5 = integer_literal $Builtin.Word, 2
   %6 = enum $IntEnum, #IntEnum.E2!enumelt
-  %7 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %6 : $IntEnum
+  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %6 : $IntEnum
   %8 = enum $IntEnum, #IntEnum.E0!enumelt
-  %9 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %8 : $IntEnum
-  %10 = enum $Optional<IntEnum>, #Optional.None!enumelt
+  %9 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %8 : $IntEnum
+  %10 = enum $Optional<IntEnum>, #Optional.none!enumelt
 
   // CHECK: select_value %{{.*}} : $Builtin.Word, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, default %{{.*}} : $Optional<IntEnum>
   %11 = select_value %0 : $Builtin.Word, case %2: %4, case %5: %7, case %1: %9, default %10 : $Optional<IntEnum>

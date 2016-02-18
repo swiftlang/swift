@@ -314,7 +314,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
     var identity1 = unsafeBitCast(d1, to: Int.self)
 
     // Insert a new key-value pair.
-    assert(d1.updateValue(2040, forKey: 40) == .None)
+    assert(d1.updateValue(2040, forKey: 40) == .none)
     assert(identity1 == unsafeBitCast(d1, to: Int.self))
     assert(d1[40]! == 2040)
 
@@ -341,7 +341,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
     assert(d1[10]! == 1010)
     assert(d1[20]! == 1020)
     assert(d1[30]! == 1030)
-    assert(d1[40] == .None)
+    assert(d1[40] == .none)
 
     assert(d2.count == 4)
     assert(d2[10]! == 1010)
@@ -2213,7 +2213,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var iter = d.iterator()
   // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
-  // assert(iter.next() == .None)
+  // assert(iter.next() == .none)
   assert(iter.next() == nil)
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
@@ -2231,7 +2231,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var iter = d.iterator()
   // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
-  // assert(iter.next() == .None)
+  // assert(iter.next() == .none)
   assert(iter.next() == nil)
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.

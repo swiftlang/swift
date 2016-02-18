@@ -11,7 +11,7 @@ func testCall(f: (() -> ())?) {
 //   optional...
 
 // CHECK: bb1:
-// CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data %0 : $Optional<() -> ()>, #Optional.Some!enumelt.1
+// CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data %0 : $Optional<() -> ()>, #Optional.some!enumelt.1
 //   ...unnecessarily reabstract back to () -> ()...
 // CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> ()
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
@@ -20,7 +20,7 @@ func testCall(f: (() -> ())?) {
 // CHECK:      br bb2(
 //   (first nothing block)
 // CHECK:    bb3:
-// CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
+// CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br bb2
 
 func testAddrOnlyCallResult<T>(f: (()->T)?) {
@@ -49,7 +49,7 @@ func testAddrOnlyCallResult<T>(f: (()->T)?) {
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[THUNK]]<T>([[T0]])
 // CHECK-NEXT: apply [[T1]]([[TEMP]])
 //   ...and coerce to T?
-// CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}Some
+// CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}some
 // CHECK-NEXT: br bb2
 //   Continuation block.
 // CHECK:    bb2
@@ -61,7 +61,7 @@ func testAddrOnlyCallResult<T>(f: (()->T)?) {
 
 //   Nothing block.
 // CHECK:    bb3:
-// CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}None
+// CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}none
 // CHECK-NEXT: br bb2
 
 

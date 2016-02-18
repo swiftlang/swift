@@ -37,17 +37,17 @@ bb0(%0 : $ECurve):
   %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %4
   %3 = struct $ECurve ()                          // user: %4
   %4 = struct $ECPoint (%3 : $ECurve, %2 : $Int32) // user: %5
-  %5 = enum $Optional<ECPoint>, #Optional.Some!enumelt.1, %4 : $ECPoint // user: %6
+  %5 = enum $Optional<ECPoint>, #Optional.some!enumelt.1, %4 : $ECPoint // user: %6
   return %5 : $Optional<ECPoint>                  // id: %6
 }
 
 // ECurve.unpack (Swift.Optional<ECurve.ECPoint>) -> ECurve.ECPoint
 sil @_TF6ECurve6unpackFGSqVS_7ECPoint_S0_ : $@convention(thin) (Optional<ECPoint>) -> ECPoint {
 bb0(%0 : $Optional<ECPoint>):
-  switch_enum %0 : $Optional<ECPoint>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2 // id: %1
+  switch_enum %0 : $Optional<ECPoint>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2 // id: %1
 
 bb1:                                              // Preds: bb0
-  %2 = unchecked_enum_data %0 : $Optional<ECPoint>, #Optional.Some!enumelt.1 // user: %3
+  %2 = unchecked_enum_data %0 : $Optional<ECPoint>, #Optional.some!enumelt.1 // user: %3
   return %2 : $ECPoint                            // id: %3
 
 bb2:                                              // Preds: bb0

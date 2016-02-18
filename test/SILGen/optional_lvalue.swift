@@ -5,7 +5,7 @@
 // CHECK:         [[PB:%.*]] = project_box [[SHADOW]]
 // CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptionalFT_T_
 // CHECK:         apply [[PRECOND]]()
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[PB]] : $*Optional<Int>, #Optional.Some!enumelt.1
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[PB]] : $*Optional<Int>, #Optional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_optional_lvalue(inout x: Int?, _ y: Int) {
   x! = y
@@ -16,7 +16,7 @@ func assign_optional_lvalue(inout x: Int?, _ y: Int) {
 // CHECK:         [[PB:%.*]] = project_box [[SHADOW]]
 // CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptionalFT_T_
 // CHECK:         apply [[PRECOND]]()
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[PB]] : $*ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[PB]] : $*ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_iuo_lvalue(inout x: Int!, _ y: Int) {
   x! = y

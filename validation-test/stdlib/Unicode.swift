@@ -111,7 +111,7 @@ class EOFCountingIterator<T> : IteratorProtocol {
   func next() -> T? {
     if index == array.count {
       numTimesReturnedEOF += 1
-      return .None
+      return .none
     }
     return array[index++]
   }

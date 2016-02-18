@@ -2423,13 +2423,13 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 // CHECK-32-LABEL: define{{( protected)?}} i1 @optional_optional_class_protocol(i32, i32)
 // CHECK-32:         icmp eq i32 %0, 1
 enum Optionable<T> {
-  case Some(T), None
+  case some(T), none
 }
 sil @optional_optional_class_protocol : $@convention(thin) Optionable<Optionable<PC>> -> Builtin.Int1 {
 entry(%o : $Optionable<Optionable<PC>>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
-  %r = select_enum %o : $Optionable<Optionable<PC>>, case #Optionable.Some!enumelt.1: %t, case #Optionable.None!enumelt: %f : $Builtin.Int1
+  %r = select_enum %o : $Optionable<Optionable<PC>>, case #Optionable.some!enumelt.1: %t, case #Optionable.none!enumelt: %f : $Builtin.Int1
   return %r : $Builtin.Int1
 }
 
@@ -2446,8 +2446,8 @@ struct ContainsUnownedObjC {
 // CHECK-native-32:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned : $@convention(thin) () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
 entry:
-  %a = enum $Optionable<ContainsUnowned>, #Optionable.None!enumelt
-  %b = enum $Optionable<Optionable<ContainsUnowned>>, #Optionable.None!enumelt
+  %a = enum $Optionable<ContainsUnowned>, #Optionable.none!enumelt
+  %b = enum $Optionable<Optionable<ContainsUnowned>>, #Optionable.none!enumelt
   %t = tuple (%a : $Optionable<ContainsUnowned>, %b : $Optionable<Optionable<ContainsUnowned>>)
   return %t : $(Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>)
 }
@@ -2458,8 +2458,8 @@ entry:
 // CHECK-native-32:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned_objc : $@convention(thin) () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
 entry:
-  %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.None!enumelt
-  %b = enum $Optionable<Optionable<ContainsUnownedObjC>>, #Optionable.None!enumelt
+  %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.none!enumelt
+  %b = enum $Optionable<Optionable<ContainsUnownedObjC>>, #Optionable.none!enumelt
   %t = tuple (%a : $Optionable<ContainsUnownedObjC>, %b : $Optionable<Optionable<ContainsUnownedObjC>>)
   return %t : $(Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>)
 }
@@ -2468,22 +2468,22 @@ entry:
 sil @empty_payload_enum_in_enum : $@convention(thin) (Int32) -> Optional<(Optional<()>, Int32)> {
 entry(%x : $Int32):
   %a = tuple ()
-  %b = enum $Optional<()>, #Optional.Some!enumelt.1, %a : $()
+  %b = enum $Optional<()>, #Optional.some!enumelt.1, %a : $()
   %c = tuple (%b : $Optional<()>, %x : $Int32)
   // CHECK-64: [[INT_ZEXT:%.*]] = zext i32 %0 to i64
   // CHECK-64: [[INT_SHL:%.*]] = shl i64 [[INT_ZEXT]], 32
   // CHECK-64: [[COMBINE:%.*]] = or i64 0, [[INT_SHL]]
-  %d = enum $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1, %c : $(Optional<()>, Int32)
+  %d = enum $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt.1, %c : $(Optional<()>, Int32)
   // CHECK-64: [[BIT:%.*]] = trunc i64 [[COMBINE]] to i1
   // CHECK-64: [[INT_SHR:%.*]] = lshr i64 [[COMBINE]], 32
   // CHECK-64: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
-  %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1
+  %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt.1
   return %d : $Optional<(Optional<()>, Int32)>
 }
 
 sil @optional_float80 : $@convention(thin) Float80 -> () {
 entry(%x : $Float80):
-  %y = enum $Optional<Float80>, #Optional.Some!enumelt.1, %x : $Float80
+  %y = enum $Optional<Float80>, #Optional.some!enumelt.1, %x : $Float80
   return undef : $()
 }
 
@@ -2501,14 +2501,14 @@ entry(%x : $*StructWithWeakVar?):
   // CHECK-64:      icmp eq [[WORD]] {{%.*}}, 0
   // CHECK-64-NEXT: icmp eq [[WORD]] {{%.*}}, 1
   switch_enum_addr %x : $*StructWithWeakVar?,
-    case #Optional.Some!enumelt.1: a,
-    case #Optional.None!enumelt:   b
+    case #Optional.some!enumelt.1: a,
+    case #Optional.none!enumelt:   b
 a:
   br x
 b:
   // CHECK-64:      store [[WORD]] 0
   // CHECK-64:      store [[WORD]] 1
-  inject_enum_addr %x : $*StructWithWeakVar?, #Optional.None!enumelt
+  inject_enum_addr %x : $*StructWithWeakVar?, #Optional.none!enumelt
   br x
 
 x:

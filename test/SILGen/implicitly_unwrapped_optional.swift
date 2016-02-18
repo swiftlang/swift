@@ -24,7 +24,7 @@ func foo(f f: (()->())!) {
 // CHECK:      br bb2
 //   (first nothing block)
 // CHECK:    bb3:
-// CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
+// CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br bb2
 //   The rest of this is tested in optional.swift
 

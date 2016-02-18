@@ -151,7 +151,7 @@ func testForEachInference() {
 func testMatchingPatterns() {
   // <rdar://problem/21428712> for case parse failure
   let myArray : [Int?] = []
-  for case .Some(let x) in myArray {
+  for case .some(let x) in myArray {
     _ = x
   }
 

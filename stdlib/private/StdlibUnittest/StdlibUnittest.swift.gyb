@@ -686,18 +686,18 @@ struct _ParentProcess {
         // Determine if the test passed, not taking XFAILs into account.
         var testPassed = false
         switch (childTerminationStatus, expectCrash) {
-        case (.None, false):
+        case (.none, false):
           testPassed = !_anyExpectFailed
 
-        case (.None, true):
+        case (.none, true):
           testPassed = false
           print("expecting a crash, but the test did not crash")
 
-        case (.Some(_), false):
+        case (.some(_), false):
           testPassed = false
           print("the test crashed unexpectedly")
 
-        case (.Some(_), true):
+        case (.some(_), true):
           testPassed = !_anyExpectFailed
         }
         if testPassed && t.crashOutputMatches.count > 0 {
@@ -1020,7 +1020,7 @@ func _stdlib_getSystemVersionPlistPropertyImpl(
 
 func _stdlib_getSystemVersionPlistProperty(propertyName: String) -> String? {
   let cs = _stdlib_getSystemVersionPlistPropertyImpl(propertyName)
-  return (cs != nil) ? String(cString: cs) : Optional.None
+  return (cs != nil) ? String(cString: cs) : nil
 }
 #endif
 

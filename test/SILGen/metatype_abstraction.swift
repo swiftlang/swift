@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -emit-silgen -module-name Swift -parse-stdlib %s | FileCheck %s
 
-enum Optional<T> {
-  case Some(T), None
+enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 struct S {}

@@ -2026,12 +2026,12 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
   int enumCase =
     swift_getEnumCaseSinglePayload(src, payloadType, 1 /*emptyCases=*/);
   if (enumCase != -1) {
-    // Allow Optional<T>.None -> Optional<U>.None
+    // Allow Optional<T>.none -> Optional<U>.none
     if (targetType->getKind() != MetadataKind::Optional) {
       _fail(src, srcType, targetType, flags);
       return {false, nullptr};
     }
-    // Inject the .None tag
+    // Inject the .none tag
     swift_storeEnumTagSinglePayload(dest, payloadType, enumCase,
                                     1 /*emptyCases=*/);
     _succeed(dest, src, srcType, flags);

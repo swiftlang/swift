@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen -module-name Swift %s | FileCheck %s
 
-public enum Optional<T> {
-  case Some(T), None
+enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 enum Boolish {

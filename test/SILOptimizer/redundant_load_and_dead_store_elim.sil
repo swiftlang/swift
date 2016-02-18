@@ -29,8 +29,8 @@ struct X {
 }
 
 enum Optional<T> {
-  case None
-  case Some(T)
+  case none
+  case some(T)
 }
 
 class E : B { }

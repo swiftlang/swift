@@ -690,14 +690,14 @@ func testForcePeephole(f: () throws -> Int?) -> Int {
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
 // CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Cat)
-// CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<Cat>, #Optional.Some!enumelt.1, [[VALUE]]
+// CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[VALUE]]
 // CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<Cat>)
 // CHECK: [[DONE]]([[RESULT:%.+]] : $Optional<Cat>):
 // CHECK-NEXT: release_value [[RESULT]] : $Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
-// CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.None!enumelt
+// CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorProtocol)
@@ -710,19 +710,19 @@ func testOptionalTry() {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: [[BOX:%.+]] = alloc_box $Optional<Cat>
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<Cat>, #Optional.Some!enumelt.1
+// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
 // CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Cat)
 // CHECK-NEXT: store [[VALUE]] to [[BOX_DATA]] : $*Cat
-// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.Some!enumelt.1
+// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK-NEXT: br [[DONE:[^ ]+]]
 // CHECK: [[DONE]]:
 // CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
-// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.None!enumelt
+// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorProtocol)
@@ -734,13 +734,13 @@ func testOptionalTryVar() {
 // CHECK-LABEL: sil hidden @_TF6errors26testOptionalTryAddressOnly
 // CHECK: bb0(%0 : $*T):
 // CHECK: [[BOX:%.+]] = alloc_stack $Optional<T>
-// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
 // CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
 // CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorProtocol, normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
-// CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[DONE:[^ ]+]]
 // CHECK: [[DONE]]:
@@ -750,7 +750,7 @@ func testOptionalTryVar() {
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
-// CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.None!enumelt
+// CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
@@ -764,13 +764,13 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 // CHECK: bb0(%0 : $*T):
 // CHECK: [[BOX:%.+]] = alloc_box $Optional<T>
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
 // CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
 // CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorProtocol, normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
-// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[DONE:[^ ]+]]
 // CHECK: [[DONE]]:
@@ -779,7 +779,7 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
-// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.None!enumelt
+// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorProtocol):
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
@@ -798,14 +798,14 @@ func testOptionalTryAddressOnlyVar<T>(obj: T) {
 // CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]]
 // CHECK: [[SUCCESS_2]]([[VALUE_2:%.+]] : $Cat)
 // CHECK-NEXT: [[TUPLE:%.+]] = tuple ([[VALUE_1]] : $Cat, [[VALUE_2]] : $Cat)
-// CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.Some!enumelt.1, [[TUPLE]]
+// CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.some!enumelt.1, [[TUPLE]]
 // CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<(Cat, Cat)>)
 // CHECK: [[DONE]]([[RESULT:%.+]] : $Optional<(Cat, Cat)>):
 // CHECK-NEXT: release_value [[RESULT]] : $Optional<(Cat, Cat)>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorProtocol):
-// CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.None!enumelt
+// CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<(Cat, Cat)>)
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : $ErrorProtocol):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorProtocol)
@@ -820,7 +820,7 @@ func testOptionalTryMultiple() {
 // CHECK-LABEL: sil hidden @_TF6errors25testOptionalTryNeverFailsFT_T_
 // CHECK: bb0:
 // CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
-// CHECK-NEXT:   = enum $Optional<()>, #Optional.Some!enumelt.1, [[VALUE]]
+// CHECK-NEXT:   = enum $Optional<()>, #Optional.some!enumelt.1, [[VALUE]]
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK: {{^}$}}
@@ -832,8 +832,8 @@ func testOptionalTryNeverFails() {
 // CHECK: bb0:
 // CHECK-NEXT:   [[BOX:%.+]] = alloc_box $Optional<()>
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT:   = init_enum_data_addr [[PB]] : $*Optional<()>, #Optional.Some!enumelt.1
-// CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<()>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   = init_enum_data_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
+// CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
 // CHECK-NEXT:   strong_release [[BOX]] : $@box Optional<()>
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
@@ -845,9 +845,9 @@ func testOptionalTryNeverFailsVar() {
 // CHECK-LABEL: sil hidden @_TF6errors36testOptionalTryNeverFailsAddressOnly
 // CHECK: bb0(%0 : $*T):
 // CHECK:   [[BOX:%.+]] = alloc_stack $Optional<T>
-// CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
-// CHECK-NEXT:   inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT:   destroy_addr [[BOX]] : $*Optional<T>
 // CHECK-NEXT:   dealloc_stack [[BOX]] : $*Optional<T>
 // CHECK-NEXT:   destroy_addr %0 : $*T
@@ -862,9 +862,9 @@ func testOptionalTryNeverFailsAddressOnly<T>(obj: T) {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   [[BOX:%.+]] = alloc_box $Optional<T>
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
-// CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT:   strong_release [[BOX]] : $@box Optional<T>
 // CHECK-NEXT:   destroy_addr %0 : $*T
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()

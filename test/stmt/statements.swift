@@ -319,7 +319,7 @@ Loop:  // expected-note {{previously declared here}}
   
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
   switch x {
-  case .Some(42): break
+  case .some(42): break
   case nil: break
   
   }
@@ -374,7 +374,7 @@ func test_require(x : Int, y : Int??, cond : Bool) {
   markUsed(a)
   guard let b = y where cond else {}
   guard case let c = x where cond else {}
-  guard case let Optional.Some(d) = y else {}
+  guard case let Optional.some(d) = y else {}
   guard x != 4, case _ = x else { }
 
 

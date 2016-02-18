@@ -2957,9 +2957,9 @@ public:
 ///      case true
 ///    }
 ///
-///    enum Optional<T> {
-///      case None
-///      case Some(T)
+///    enum Optional<Wrapped> {
+///      case none
+///      case some(Wrapped)
 ///    }
 /// \endcode
 ///

@@ -555,19 +555,19 @@ bb0(%0 : $Builtin.RawPointer):
 }
 
 enum FakeOptional {
-  case None
-  case Some(Builtin.Int32)
+  case none
+  case some(Builtin.Int32)
 }
 
 // CHECK-LABEL: sil @enum_cse : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUNC:%[0-9]+]] = function_ref @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
-// CHECK-NEXT: [[NONE:%[0-9]+]] = enum $FakeOptional, #FakeOptional.None!enumelt
+// CHECK-NEXT: [[NONE:%[0-9]+]] = enum $FakeOptional, #FakeOptional.none!enumelt
 // CHECK-NEXT: apply [[FUNC]]([[NONE]]) : $@convention(thin) (FakeOptional) -> ()
 // CHECK-NEXT: apply [[FUNC]]([[NONE]]) : $@convention(thin) (FakeOptional) -> ()
 // CHECK-NEXT: [[INTEGER:%[0-9]+]] = integer_literal $Builtin.Int32, 0
-// CHECK-NEXT: [[SOME:%[0-9]+]] = enum $FakeOptional, #FakeOptional.Some!enumelt.1, [[INTEGER]] : $Builtin.Int32
+// CHECK-NEXT: [[SOME:%[0-9]+]] = enum $FakeOptional, #FakeOptional.some!enumelt.1, [[INTEGER]] : $Builtin.Int32
 // CHECK-NEXT: apply [[FUNC]]([[SOME]]) : $@convention(thin) (FakeOptional) -> ()
 // CHECK-NEXT: apply [[FUNC]]([[SOME]]) : $@convention(thin) (FakeOptional) -> ()
 // CHECK-NEXT: tuple
@@ -576,13 +576,13 @@ sil @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
 sil @enum_cse : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
-  %1 = enum $FakeOptional, #FakeOptional.None!enumelt
-  %2 = enum $FakeOptional, #FakeOptional.None!enumelt
+  %1 = enum $FakeOptional, #FakeOptional.none!enumelt
+  %2 = enum $FakeOptional, #FakeOptional.none!enumelt
   apply %0(%1) : $@convention(thin) (FakeOptional) -> ()
   apply %0(%2) : $@convention(thin) (FakeOptional) -> ()
   %3 = integer_literal $Builtin.Int32, 0
-  %4 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %3 : $Builtin.Int32
-  %5 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %3 : $Builtin.Int32
+  %4 = enum $FakeOptional, #FakeOptional.some!enumelt.1, %3 : $Builtin.Int32
+  %5 = enum $FakeOptional, #FakeOptional.some!enumelt.1, %3 : $Builtin.Int32
   apply %0(%4) : $@convention(thin) (FakeOptional) -> ()
   apply %0(%5) : $@convention(thin) (FakeOptional) -> ()
   %6 = tuple()
@@ -595,7 +595,7 @@ sil @int32_user : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK: bb0([[INPUT_ENUM:%[0-9]+]] : $FakeOptional):
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUNC:%[0-9]+]] = function_ref @int32_user : $@convention(thin) (Builtin.Int32) -> ()
-// CHECK-NEXT: [[INT:%[0-9]+]] = unchecked_enum_data [[INPUT_ENUM]] : $FakeOptional, #FakeOptional.Some!enumelt.1
+// CHECK-NEXT: [[INT:%[0-9]+]] = unchecked_enum_data [[INPUT_ENUM]] : $FakeOptional, #FakeOptional.some!enumelt.1
 // CHECK-NEXT: apply [[FUNC]]([[INT]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT: apply [[FUNC]]([[INT]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT: tuple
@@ -603,8 +603,8 @@ sil @int32_user : $@convention(thin) (Builtin.Int32) -> ()
 sil @unchecked_enum_data_cse : $@convention(thin) (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   %1 = function_ref @int32_user : $@convention(thin) (Builtin.Int32) -> ()
-  %2 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
-  %3 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
+  %2 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.some!enumelt.1
+  %3 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.some!enumelt.1
   apply %1(%2) : $@convention(thin) (Builtin.Int32) -> ()
   apply %1(%3) : $@convention(thin) (Builtin.Int32) -> ()
   %6 = tuple()

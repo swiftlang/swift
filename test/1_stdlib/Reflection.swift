@@ -155,7 +155,7 @@ switch true.customPlaygroundQuickLook {
 }
 
 // CHECK-NEXT: Optional("Hello world")
-// CHECK-NEXT:   Some: "Hello world"
+// CHECK-NEXT:   some: "Hello world"
 dump(Optional<String>("Hello world"))
 // CHECK-NEXT: - nil
 let noneString: String? = nil

@@ -14,23 +14,23 @@
 /// of a value.
 public enum Optional<Wrapped> : NilLiteralConvertible {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
-  // that it is an `enum` with cases named `None` and `Some`.
+  // that it is an `enum` with cases named `none` and `some`.
   
-  case None
-  case Some(Wrapped)
+  case none
+  case some(Wrapped)
 
   /// Construct a non-`nil` instance that stores `some`.
   @_transparent
-  public init(_ some: Wrapped) { self = .Some(some) }
+  public init(_ some: Wrapped) { self = .some(some) }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   @warn_unused_result
   public func map<U>(@noescape f: (Wrapped) throws -> U) rethrows -> U? {
     switch self {
-    case .Some(let y):
-      return .Some(try f(y))
-    case .None:
-      return .None
+    case .some(let y):
+      return .some(try f(y))
+    case .none:
+      return .none
     }
   }
 
@@ -38,17 +38,17 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   @warn_unused_result
   public func flatMap<U>(@noescape f: (Wrapped) throws -> U?) rethrows -> U? {
     switch self {
-    case .Some(let y):
+    case .some(let y):
       return try f(y)
-    case .None:
-      return .None
+    case .none:
+      return .none
     }
   }
 
   /// Create an instance initialized with `nil`.
   @_transparent
   public init(nilLiteral: ()) {
-    self = .None
+    self = .none
   }
 
   /// - Returns: `nonEmpty!`.
@@ -92,12 +92,12 @@ extension Optional : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     switch self {
-    case .Some(let value):
+    case .some(let value):
       var result = "Optional("
       debugPrint(value, terminator: "", to: &result)
       result += ")"
       return result
-    case .None:
+    case .none:
       return "nil"
     }
   }
@@ -123,7 +123,7 @@ func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   switch v {
   case let x?:
     return x
-  case .None:
+  case .none:
     _requirementFailure(
       "unexpectedly found nil while unwrapping an Optional value")
   }
@@ -132,13 +132,13 @@ func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
 @_transparent
 public // COMPILER_INTRINSIC
 func _injectValueIntoOptional<Wrapped>(v: Wrapped) -> Wrapped? {
-  return .Some(v)
+  return .some(v)
 }
 
 @_transparent
 public // COMPILER_INTRINSIC
 func _injectNothingIntoOptional<Wrapped>() -> Wrapped? {
-  return .None
+  return .none
 }
 
 // Comparisons
@@ -171,9 +171,9 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
 @warn_unused_result
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_):
+  case .some(_):
     return false
-  case .None:
+  case .none:
     return true
   }
 }
@@ -183,9 +183,9 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 @warn_unused_result
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
-  case .Some(_):
+  case .some(_):
     return false
-  case .None:
+  case .none:
     return true
   }
 }
@@ -193,9 +193,9 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 @warn_unused_result
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
-  case .Some(_):
+  case .some(_):
     return true
-  case .None:
+  case .none:
     return false
   }
 }
@@ -203,9 +203,9 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 @warn_unused_result
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_):
+  case .some(_):
     return false
-  case .None:
+  case .none:
     return true
   }
 }
@@ -213,9 +213,9 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 @warn_unused_result
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_):
+  case .some(_):
     return true
-  case .None:
+  case .none:
     return false
   }
 }
@@ -267,9 +267,9 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
     rethrows -> T {
   switch optional {
-  case .Some(let value):
+  case .some(let value):
     return value
-  case .None:
+  case .none:
     return try defaultValue()
   }
 }
@@ -279,9 +279,9 @@ public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T?)
     rethrows -> T? {
   switch optional {
-  case .Some(let value):
+  case .some(let value):
     return value
-  case .None:
+  case .none:
     return try defaultValue()
   }
 }

@@ -528,11 +528,11 @@ Reflection.test("Struct/Generic/DefaultMirror") {
       "  - first: 123\n" +
       "  ▿ second: 3 elements\n" +
       "    ▿ Optional(\"abc\")\n" +
-      "      - Some: \"abc\"\n" +
+      "      - some: \"abc\"\n" +
       "    ▿ Optional(456)\n" +
-      "      - Some: 456\n" +
+      "      - some: 456\n" +
       "    ▿ Optional(789.25)\n" +
-      "      - Some: 789.25\n"
+      "      - some: 789.25\n"
 
     expectEqual(expected, output)
 

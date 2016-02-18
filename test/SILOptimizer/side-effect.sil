@@ -44,8 +44,8 @@ struct SP {
 }
 
 enum EP {
-  case None
-  case Data(SP, Builtin.Int1)
+  case none
+  case data(SP, Builtin.Int1)
 }
 
 sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
@@ -286,7 +286,7 @@ bb0(%0 : $@box Builtin.Int32):
 // CHECK: <func=,param0=r>
 sil @projections : $@convention(thin) (EP) -> Builtin.Int32 {
 bb0(%0 : $EP):
-  %ee = unchecked_enum_data %0 : $EP, #EP.Data!enumelt.1
+  %ee = unchecked_enum_data %0 : $EP, #EP.data!enumelt.1
   %te = tuple_extract %ee : $(SP, Builtin.Int1), 0
   %se = struct_extract %te : $SP, #SP.value
   %utbc = unchecked_trivial_bit_cast %se : $Builtin.BridgeObject to $Builtin.RawPointer

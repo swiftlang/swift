@@ -46,10 +46,10 @@ EnumChangeSizeTest.test("SingletonEnum") {
     for e in [getMySingletonEnumValues(c), getSingletonEnumValues(c)] {
       let b: [Int] = e.map {
         switch $0 {
-        case .Some(.X(let cc)):
+        case .some(.X(let cc)):
           expectEqual(c.value, cc.value)
           return 0
-        case .None:
+        case .none:
           return 1
         }
       }
@@ -69,14 +69,14 @@ EnumChangeSizeTest.test("SinglePayloadEnum") {
     for e in [getMySinglePayloadEnumValues(c), getSinglePayloadEnumValues(c)] {
       let b: [Int] = e.map {
         switch $0 {
-        case .Some(.X(let cc)):
+        case .some(.X(let cc)):
           expectEqual(c.value, cc.value)
           return 0
-        case .Some(.Y):
+        case .some(.Y):
           return 1
-        case .Some(.Z):
+        case .some(.Z):
           return 2
-        case .None:
+        case .none:
           return 3
         }
       }
@@ -97,15 +97,15 @@ EnumChangeSizeTest.test("MultiPayloadEnum") {
     for e in [getMyMultiPayloadEnumValues(c, d), getMultiPayloadEnumValues(c, d)] {
       let b: [Int] = e.map {
         switch $0 {
-        case .Some(.X(let cc)):
+        case .some(.X(let cc)):
           expectEqual(c.value, cc.value)
           return 0
-        case .Some(.Y(let dd)):
+        case .some(.Y(let dd)):
           expectEqual(d.value, dd.value)
           return 1
-        case .Some(.Z):
+        case .some(.Z):
           return 2
-        case .None:
+        case .none:
           return 3
         }
       }
