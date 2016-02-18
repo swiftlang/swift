@@ -935,10 +935,6 @@ FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
-FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RuntimeCC1,
-         RETURNS(ObjCClassPtrTy),
-         ARGS(ObjCClassPtrTy),
-         ATTRS(NoUnwind))
 FUNCTION(ObjCRetain, objc_retain, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRelease, objc_release, C_CC,
@@ -1036,6 +1032,21 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
          RETURNS(VoidTy),
          ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
          ATTRS(NoUnwind))
+
+#if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
+
+// Put here all definitions of runtime functions which are:
+// - only only available when SWIFT_OBJC_INTEROP is enabled
+// - need a global function pointer referring to their implementation,
+//   e.g. those defined FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL or using
+//   the RuntimeCC1 calling convention.
+
+FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RuntimeCC1,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
+#endif
 
 #undef RETURNS
 #undef ARGS

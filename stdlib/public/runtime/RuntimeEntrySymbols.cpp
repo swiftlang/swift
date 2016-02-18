@@ -69,6 +69,10 @@ typedef void (*RuntimeEntry)();
                                              CC, ReturnTys, ArgTys, Attrs)     \
   DEFINE_SYMBOL(GlobalSymbolName, Impl, CC)
 
+// Indicate that we are going to generate the global symbols for those runtime
+// functions that require it.
+#define SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS 1
+
 namespace swift {
 // Generate global symbols which are function pointers to the actual
 // implementations of runtime entry points.
