@@ -72,6 +72,7 @@ KNOWN_SETTINGS=(
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
+    swift-enable-lto            "0"              "enable LTO compilation of the Swift compiler"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
@@ -1588,6 +1589,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
+                    -DSWIFT_ENABLE_LTO:BOOL=$(true_false "${SWIFT_ENABLE_LTO}")
                     "${swift_cmake_options[@]}"
                     "${SWIFT_SOURCE_DIR}"
                 )
