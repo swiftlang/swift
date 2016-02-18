@@ -2351,8 +2351,6 @@ ERROR(sil_function_output_label,PointsToFirstBadToken,
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))
-ERROR(sil_function_multiple_results,PointsToFirstBadToken,
-      "SIL function types cannot have multiple results", ())
 ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
