@@ -49,7 +49,8 @@
   FUNCTION_ID(Id)
 #endif
 
-FUNCTION(AllocBox,       swift_allocBox,      RuntimeCC,
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
+         _swift_allocBox, _swift_allocBox_, RuntimeCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
@@ -65,7 +66,8 @@ FUNCTION(ProjectBox,     swift_projectBox,    RuntimeCC,
          ATTRS(NoUnwind, ReadNone))
 
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
-FUNCTION(AllocObject,    swift_allocObject,   RuntimeCC,
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocObject,    swift_allocObject,
+         _swift_allocObject, swift_allocObject, RuntimeCC1,
          RETURNS(RefCountedPtrTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
@@ -138,19 +140,37 @@ FUNCTION(CopyPOD,        swift_copyPOD,       RuntimeCC,
          ATTRS(NoUnwind))
 
 // void swift_retain(void *ptr);
-FUNCTION(NativeStrongRetain, swift_retain, RuntimeCC,
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRetain, swift_retain,
+         _swift_retain,  _swift_retain_,  RuntimeCC1,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_release(void *ptr);
-FUNCTION(NativeStrongRelease, swift_release, RuntimeCC,
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRelease, swift_release,
+         _swift_release, _swift_release_,  RuntimeCC1,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_retain_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRetainN, swift_retain_n,
+         _swift_retain_n, _swift_retain_n_, RuntimeCC1,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_release_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongReleaseN, swift_release_n,
+         _swift_release_n, _swift_release_n_,  RuntimeCC1,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
 // void *swift_tryPin(void *ptr);
 FUNCTION(NativeTryPin, swift_tryPin, RuntimeCC,
+// void *swift_tryRetain(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeTryRetain, swift_tryRetain,
+         _swift_tryRetain, _swift_tryRetain_, RuntimeCC1,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
@@ -160,6 +180,13 @@ FUNCTION(NativeUnpin, swift_unpin, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
+
+// bool swift_isDeallocating(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(IsDeallocating, swift_isDeallocating,
+         _swift_isDeallocating, _swift_isDeallocating_, RuntimeCC,
+         RETURNS(Int1Ty),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
 
 // void swift_unknownRetain(void *ptr);
 FUNCTION(UnknownRetain, swift_unknownRetain, RuntimeCC,
