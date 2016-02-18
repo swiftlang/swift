@@ -838,7 +838,7 @@ namespace {
 ///
 /// It is important that any Initialization created for a pattern that might
 /// not have an immediate initializer implement finishUninitialized.  Note
-/// that this only applies to irredutable patterns.
+/// that this only applies to irrefutable patterns.
 struct InitializationForPattern
   : public PatternVisitor<InitializationForPattern, InitializationPtr>
 {
