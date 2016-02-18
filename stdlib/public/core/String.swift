@@ -644,19 +644,19 @@ extension SequenceType where Generator.Element == String {
       result.reserveCapacity(n)
     }
 
-    if separatorSize != 0 {
-      var gen = generate()
-      if let first = gen.next() {
-        result.appendContentsOf(first)
-        while let next = gen.next() {
-          result.appendContentsOf(separator)
-          result.appendContentsOf(next)
-        }
-      }
-    }
-    else {
+    if separatorSize == 0 {
       for x in self {
         result.appendContentsOf(x)
+      }
+      return result
+    }
+    
+    var gen = generate()
+    if let first = gen.next() {
+      result.appendContentsOf(first)
+      while let next = gen.next() {
+        result.appendContentsOf(separator)
+        result.appendContentsOf(next)
       }
     }
 
