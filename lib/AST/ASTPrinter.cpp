@@ -245,7 +245,7 @@ Type ArchetypeTransformContext::getTypeBase() {
 bool ArchetypeTransformContext::isPrintingSynthesizedExtension() {
   return !TypeBaseOrNominal.isNull() && TypeBaseOrNominal.is<NominalTypeDecl*>();
 }
-bool ArchetypeTransformContext::isPrintingTypeInteface() {
+bool ArchetypeTransformContext::isPrintingTypeInterface() {
   return !TypeBaseOrNominal.isNull() && TypeBaseOrNominal.is<TypeBase*>();
 }
 
@@ -831,7 +831,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
   bool IsFirst = true;
   SmallVector<Type, 4> Scrach;
   if (Options.TransformContext &&
-      Options.TransformContext->isPrintingTypeInteface()) {
+      Options.TransformContext->isPrintingTypeInterface()) {
     auto ArgArr = Options.TransformContext->getTypeBase()->
       getAllGenericArgs(Scrach);
     for (auto Arg : ArgArr) {
