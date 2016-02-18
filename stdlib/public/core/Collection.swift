@@ -741,10 +741,10 @@ internal func _writeBackMutableSlice<
 
   _precondition(
     selfElementIndex == selfElementsEndIndex,
-    "Cannot replace a slice of a MutableCollectionType with a slice of a larger size")
+    "Cannot replace a slice of a MutableCollectionType with a slice of a smaller size")
   _precondition(
     newElementIndex == newElementsEndIndex,
-    "Cannot replace a slice of a MutableCollectionType with a slice of a smaller size")
+    "Cannot replace a slice of a MutableCollectionType with a slice of a larger size")
 }
 
 /// Returns the range of `x`'s valid index values.
