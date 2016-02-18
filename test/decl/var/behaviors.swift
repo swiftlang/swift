@@ -188,3 +188,45 @@ struct S<T> {
   var [getset] testGetset: T
   static var [getset] testGetset: T
 }
+
+protocol initialValue {
+  associatedtype Value
+  static var initialValue: Value { get }
+}
+extension initialValue {
+  var value: Value {
+    get { }
+    set { }
+  }
+}
+
+let compoundInitialValue = (0,0)
+
+struct TestInitialValues {
+  var [initialValue] hasInitialValue: Int = 0
+  var [initialValue] (sharedInitialValue1, sharedInitialValue2): (Int,Int) 
+    = compoundInitialValue // expected-error * {{cannot destructure}}
+  var [initialValue] missingInitialValue: Int // expected-error{{requires an initializer}}
+  // TODO: "return expression" message is wrong
+  var [initialValue] invalidInitialValue: Int = 5.5 // expected-error{{cannot convert return expression of type 'Double' to return type 'Int'}}
+}
+
+// TODO
+var [initialValue] globalInitialValue: Int = 0 // expected-error{{not supported}}
+
+protocol noInitialValue {
+  associatedtype Value
+}
+extension noInitialValue {
+  var value: Value {
+    get { }
+    set { }
+  }
+}
+
+var [noInitialValue] hasNoInitialValue: Int
+var [noInitialValue] hasUnwantedInitialValue: Int = 0 // expected-error{{initializer expression provided, but property behavior 'noInitialValue' does not use it}}
+var [noInitialValue] (hasUnwantedSharedInitialValue1,
+                      hasUnwantedSharedInitialValue2): (Int, Int)
+  = compoundInitialValue // expected-error * {{initializer expression provided, but property behavior 'noInitialValue' does not use it}}
+
