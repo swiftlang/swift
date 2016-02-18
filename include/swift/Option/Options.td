@@ -254,6 +254,10 @@ def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
   Flags<[HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't link in additions to the Objective-C runtime">;
 
+def use_ld : Joined<["-"], "use-ld=">,
+  Flags<[DoesNotAffectIncrementalBuild]>,
+  HelpText<"Specifies the linker to be used">;
+
 def Xlinker : Separate<["-"], "Xlinker">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies an option which should be passed to the linker">;

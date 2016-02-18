@@ -221,7 +221,7 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if(SWIFT_BUILT_STANDALONE)
-  project(Swift)
+  project(Swift C CXX ASM)
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "")
