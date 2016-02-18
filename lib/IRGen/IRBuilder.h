@@ -38,6 +38,17 @@ class IRBuilder : public IRBuilderBase {
   /// ordering.
   llvm::BasicBlock *ClearedIP;
 
+  // Set calling convention of the call instruction using
+  // the same calling convention as the callee function.
+  // This ensures that they are always compatible.
+  void setCallingConvUsingCallee(llvm::CallInst *Call) {
+    auto CalleeFn = Call->getCalledFunction();
+    if (CalleeFn) {
+      auto CC = CalleeFn->getCallingConv();
+      Call->setCallingConv(CC);
+    }
+  }
+
 public:
   IRBuilder(llvm::LLVMContext &Context)
     : IRBuilderBase(Context), ClearedIP(nullptr) {}
@@ -235,6 +246,34 @@ public:
   llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
     return CreateLifetimeEnd(buf.getAddress(),
                    llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+
+  //using IRBuilderBase::CreateCall;
+
+  llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
+  }
+
+  llvm::CallInst *CreateCall(llvm::FunctionType *FTy, llvm::Value *Callee,
+                             ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
+  }
+
+  llvm::CallInst *CreateCall(llvm::Function *Callee,
+                             ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
   }
 };
 

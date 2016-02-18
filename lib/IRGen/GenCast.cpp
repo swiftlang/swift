@@ -192,9 +192,14 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
     metadataRef = IGF.Builder.CreateBitCast(metadataRef, IGF.IGM.Int8PtrTy);
 
   // Call the (unconditional) dynamic cast.
+  auto cc = IGF.IGM.RuntimeCC;
+  if (auto fun = dyn_cast<llvm::Function>(castFn))
+    cc = fun->getCallingConv();
+
   auto call
     = IGF.Builder.CreateCall(castFn, {from, metadataRef});
   // FIXME: Eventually, we may want to throw.
+  call->setCallingConv(cc);
   call->setDoesNotThrow();
 
   llvm::Type *subTy = IGF.getTypeInfo(toType).getStorageType();
@@ -248,7 +253,12 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
     llvm_unreachable("not implemented");
   }
 
+  auto cc = IGF.IGM.RuntimeCC;
+  if (auto fun = dyn_cast<llvm::Function>(castFn))
+    cc = fun->getCallingConv();
+
   auto call = IGF.Builder.CreateCall(castFn, {metatype, toMetadata});
+  call->setCallingConv(cc);
   call->setDoesNotThrow();
   ex.add(call);
 }
@@ -433,7 +443,12 @@ void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
       break;
     }
     
+    auto cc = IGF.IGM.RuntimeCC;
+    if (auto fun = dyn_cast<llvm::Function>(castFn))
+      cc = fun->getCallingConv();
+
     auto call = IGF.Builder.CreateCall(castFn, metatypeValue);
+    call->setCallingConv(cc);
     ex.add(call);
     return;
   }
@@ -581,10 +596,17 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     
-    objcCast = IGF.Builder.CreateCall(
+    auto cc = IGF.IGM.RuntimeCC;
+    if (auto fun = dyn_cast<llvm::Function>(castFn))
+      cc = fun->getCallingConv();
+
+
+    auto call = IGF.Builder.CreateCall(
         castFn,
         {objcCastObject, IGF.IGM.getSize(Size(objcProtos.size())),
          protoRefsBuf.getAddress()});
+    call->setCallingConv(cc);
+    objcCast = call;
     resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
   }
 

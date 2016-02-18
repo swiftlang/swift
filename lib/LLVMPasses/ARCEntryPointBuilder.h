@@ -69,6 +69,20 @@ class ARCEntryPointBuilder {
   llvm::CallingConv::ID RuntimeCC;
   llvm::CallingConv::ID RuntimeCC1;
 
+  llvm::CallInst *CreateCall(Constant *Fn, Value *V) {
+    CallInst *CI = B.CreateCall(Fn, V);
+    if (auto Fun = llvm::dyn_cast<llvm::Function>(Fn))
+      CI->setCallingConv(Fun->getCallingConv());
+    return CI;
+  }
+
+  llvm::CallInst *CreateCall(Constant *Fn, llvm::ArrayRef<Value *> Args) {
+    CallInst *CI = B.CreateCall(Fn, Args);
+    if (auto Fun = llvm::dyn_cast<llvm::Function>(Fn))
+      CI->setCallingConv(Fun->getCallingConv());
+    return CI;
+  }
+
 public:
   ARCEntryPointBuilder(Function &F)
       : B(&*F.begin()), Retain(), ObjectPtrTy(),
@@ -106,7 +120,7 @@ public:
     V = B.CreatePointerCast(V, getObjectPtrTy());
 
     // Create the call.
-    CallInst *CI = B.CreateCall(getRetain(), V);
+    CallInst *CI = CreateCall(getRetain(), V);
     CI->setTailCall(true);
     return CI;
   }
@@ -116,7 +130,7 @@ public:
     V = B.CreatePointerCast(V, getObjectPtrTy());
 
     // Create the call.
-    CallInst *CI = B.CreateCall(getRelease(), V);
+    CallInst *CI = CreateCall(getRelease(), V);
     CI->setTailCall(true);
     return CI;
   }
@@ -126,7 +140,7 @@ public:
     // Cast just to make sure that we have the right type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
     
-    CallInst *CI = B.CreateCall(getCheckUnowned(), V);
+    CallInst *CI = CreateCall(getCheckUnowned(), V);
     CI->setTailCall(true);
     return CI;
   }
@@ -134,7 +148,7 @@ public:
   CallInst *createRetainN(Value *V, uint32_t n) {
     // Cast just to make sure that we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    CallInst *CI = B.CreateCall(getRetainN(), {V, getIntConstant(n)});
+    CallInst *CI = CreateCall(getRetainN(), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
@@ -142,7 +156,7 @@ public:
   CallInst *createReleaseN(Value *V, uint32_t n) {
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    CallInst *CI = B.CreateCall(getReleaseN(), {V, getIntConstant(n)});
+    CallInst *CI = CreateCall(getReleaseN(), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
@@ -150,7 +164,7 @@ public:
   CallInst *createUnknownRetainN(Value *V, uint32_t n) {
     // Cast just to make sure that we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    CallInst *CI = B.CreateCall(getUnknownRetainN(), {V, getIntConstant(n)});
+    CallInst *CI = CreateCall(getUnknownRetainN(), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
@@ -158,7 +172,7 @@ public:
   CallInst *createUnknownReleaseN(Value *V, uint32_t n) {
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    CallInst *CI = B.CreateCall(getUnknownReleaseN(), {V, getIntConstant(n)});
+    CallInst *CI = CreateCall(getUnknownReleaseN(), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
@@ -166,7 +180,7 @@ public:
   CallInst *createBridgeRetainN(Value *V, uint32_t n) {
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
-    CallInst *CI = B.CreateCall(getBridgeRetainN(), {V, getIntConstant(n)});
+    CallInst *CI = CreateCall(getBridgeRetainN(), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
@@ -174,7 +188,7 @@ public:
   CallInst *createBridgeReleaseN(Value *V, uint32_t n) {
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
-    CallInst *CI = B.CreateCall(getBridgeReleaseN(), {V, getIntConstant(n)});
+    CallInst *CI = CreateCall(getBridgeReleaseN(), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }

@@ -817,6 +817,10 @@ static llvm::FunctionType *getTypeOfFunction(llvm::Constant *fn) {
 static void emitUnaryRefCountCall(IRGenFunction &IGF,
                                   llvm::Constant *fn,
                                   llvm::Value *value) {
+  auto cc = IGF.IGM.RuntimeCC;
+  if (auto fun = dyn_cast<llvm::Function>(fn))
+    cc = fun->getCallingConv();
+
   // Instead of casting the input, we cast the function type.
   // This tends to produce less IR, but might be evil.
   if (value->getType() != getTypeOfFunction(fn)->getParamType(0)) {
@@ -827,8 +831,8 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
   
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
-  call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();  
+  call->setCallingConv(cc);
+  call->setDoesNotThrow();
 }
 
 /// Emit a copy-like call to perform a ref-counting operation.
@@ -841,6 +845,10 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
   assert(dest->getType() == src->getType() &&
          "type mismatch in binary refcounting operation");
 
+  auto cc = IGF.IGM.RuntimeCC;
+  if (auto fun = dyn_cast<llvm::Function>(fn))
+    cc = fun->getCallingConv();
+
   // Instead of casting the inputs, we cast the function type.
   // This tends to produce less IR, but might be evil.
   if (dest->getType() != getTypeOfFunction(fn)->getParamType(0)) {
@@ -852,8 +860,8 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
   
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {dest, src});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();  
+  call->setCallingConv(cc);
+  call->setDoesNotThrow();
 }
 
 /// Emit a call to a function with a loadWeak-like signature.
@@ -867,6 +875,11 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
           addr->getType() == IGF.IGM.UnownedReferencePtrTy) &&
          "address is not of a weak or unowned reference");
 
+  auto cc = IGF.IGM.RuntimeCC;
+  if (auto fun = dyn_cast<llvm::Function>(fn))
+    cc = fun->getCallingConv();
+
+
   // Instead of casting the output, we cast the function type.
   // This tends to produce less IR, but might be evil.
   if (resultType != getTypeOfFunction(fn)->getReturnType()) {
@@ -878,7 +891,7 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
 
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, addr);
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(cc);
   call->setDoesNotThrow();
 
   return call;
@@ -895,6 +908,10 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
           addr->getType() == IGF.IGM.UnownedReferencePtrTy) &&
          "address is not of a weak or unowned reference");
 
+  auto cc = IGF.IGM.RuntimeCC;
+  if (auto fun = dyn_cast<llvm::Function>(fn))
+    cc = fun->getCallingConv();
+
   // Instead of casting the inputs, we cast the function type.
   // This tends to produce less IR, but might be evil.
   if (value->getType() != getTypeOfFunction(fn)->getParamType(1)) {
@@ -906,7 +923,7 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
 
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {addr, value});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
 
@@ -922,7 +939,6 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value) {
   // Emit the call.
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getNativeStrongRetainFn(), value);
-  call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
 
@@ -1235,7 +1251,6 @@ void IRGenFunction::emitErrorStrongRelease(llvm::Value *value) {
 
 llvm::Value *IRGenFunction::emitNativeTryPin(llvm::Value *value) {
   llvm::CallInst *call = Builder.CreateCall(IGM.getNativeTryPinFn(), value);
-  call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
 
   // Builtin.NativeObject? has representation i32/i64.
@@ -1248,7 +1263,6 @@ void IRGenFunction::emitNativeUnpin(llvm::Value *value) {
   value = Builder.CreateIntToPtr(value, IGM.RefCountedPtrTy);
 
   llvm::CallInst *call = Builder.CreateCall(IGM.getNativeUnpinFn(), value);
-  call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
 
@@ -1301,7 +1315,6 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
     llvm_unreachable("Unexpected LLVM type for a refcounted pointer.");
   }
   llvm::CallInst *call = Builder.CreateCall(fn, value);
-  call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
   return call;
 }
