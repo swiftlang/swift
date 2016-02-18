@@ -1220,6 +1220,14 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                        DC);
   Storage->setInterfaceType(SubstStorageInterfaceTy);
   Storage->setUserAccessible(false);
+  // Mark the vardecl to be final, implicit, and private.  In a class, this
+  // prevents it from being dynamically dispatched.
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+    makeFinal(Context, Storage);
+  Storage->setImplicit();
+  Storage->setAccessibility(Accessibility::Private);
+  Storage->setSetterAccessibility(Accessibility::Private);
+  
   addMemberToContextIfNeeded(Storage, DC);
   
   // Build the initializer expression, 'Self.initStorage()', using the
@@ -1266,14 +1274,6 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   PBD->setInitializerChecked(0);
   addMemberToContextIfNeeded(PBD, VD->getDeclContext(), VD);
   
-  // Mark the vardecl to be final, implicit, and private.  In a class, this
-  // prevents it from being dynamically dispatched.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
-    makeFinal(Context, Storage);
-  Storage->setImplicit();
-  Storage->setAccessibility(Accessibility::Private);
-  Storage->setSetterAccessibility(Accessibility::Private);
-  
   // Add accessors to the storage, since we'll need them to satisfy the
   // conformance requirements.
   addTrivialAccessorsToStorage(Storage, *this);
@@ -1292,6 +1292,89 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   if (BehaviorStorage->isSettable(DC))
     BehaviorConformance->setWitness(BehaviorStorage->getSetter(),
                     ConcreteDeclRef(Context, Storage->getSetter(), MemberSubs));
+}
+
+void TypeChecker::completePropertyBehaviorInitialValue(VarDecl *VD,
+                               VarDecl *BehaviorInitialValue,
+                               NormalProtocolConformance *BehaviorConformance,
+                               ArrayRef<Substitution> SelfInterfaceSubs,
+                               ArrayRef<Substitution> SelfContextSubs) {
+  // Create a property to witness the requirement.
+  auto DC = VD->getDeclContext();
+  SmallString<64> NameBuf = VD->getName().str();
+  NameBuf += ".initialValue";
+  auto InitialValueName = Context.getIdentifier(NameBuf);
+  // TODO: non-static initialValue
+  assert(BehaviorInitialValue->isStatic());
+  auto *InitialValue = new (Context) VarDecl(/*static*/ true,
+                                             /*let*/ false,
+                                             VD->getLoc(),
+                                             InitialValueName,
+                                            SelfContextSubs[1].getReplacement(),
+                                             DC);
+  InitialValue->setInterfaceType(SelfInterfaceSubs[1].getReplacement());
+  InitialValue->setUserAccessible(false);
+  // Mark the vardecl to be final, implicit, and private.  In a class, this
+  // prevents it from being dynamically dispatched.
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+    makeFinal(Context, InitialValue);
+  InitialValue->setImplicit();
+  InitialValue->setAccessibility(Accessibility::Private);
+  InitialValue->setIsBeingTypeChecked();
+
+  addMemberToContextIfNeeded(InitialValue, DC);
+  
+  Pattern *InitialPBDPattern = new (Context) NamedPattern(InitialValue,
+                                                          /*implicit*/true);
+  InitialPBDPattern = new (Context) TypedPattern(InitialPBDPattern,
+                      TypeLoc::withoutLoc(SelfContextSubs[1].getReplacement()),
+                      /*implicit*/ true);
+  auto *InitialPBD = PatternBindingDecl::create(Context,
+                                              /*staticloc*/SourceLoc(),
+                                              StaticSpellingKind::KeywordStatic,
+                                              VD->getLoc(),
+                                              InitialPBDPattern, nullptr,
+                                              VD->getDeclContext());
+  InitialPBD->setImplicit();
+  InitialPBD->setInitializerChecked(0);
+  addMemberToContextIfNeeded(InitialPBD, VD->getDeclContext(), VD);
+  
+  // Create a getter.
+  auto Get = createGetterPrototype(InitialValue, *this);
+  addMemberToContextIfNeeded(Get, DC);
+  
+  // Take the initializer from the PatternBindingDecl for VD.
+  auto *InitValue = VD->getParentInitializer();
+  auto PBD = VD->getParentPatternBinding();
+  unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
+  PBD->setInit(entryIndex, nullptr);
+  PBD->setInitializerChecked(entryIndex);
+
+  // Recontextualize any closure declcontexts nested in the initializer to
+  // realize that they are in the getter function.
+  InitValue->walk(RecontextualizeClosures(Get));
+  
+  // Return the expression value.
+  auto Ret = new (Context) ReturnStmt(SourceLoc(), InitValue,
+                                             /*implicit*/ true);
+  auto Body = BraceStmt::create(Context, SourceLoc(), ASTNode(Ret),
+                                SourceLoc(), /*implicit*/ true);
+  Get->setBody(Body);
+  
+  InitialValue->makeComputed(SourceLoc(), Get, nullptr, nullptr, SourceLoc());
+  InitialValue->setIsBeingTypeChecked(false);
+
+  // Add the witnesses to the conformance.
+  ArrayRef<Substitution> MemberSubs;
+  if (DC->isGenericTypeContext()) {
+    MemberSubs = DC->getGenericParamsOfContext()
+    ->getForwardingSubstitutions(Context);
+  }
+
+  BehaviorConformance->setWitness(BehaviorInitialValue,
+                            ConcreteDeclRef(Context, InitialValue, MemberSubs));
+  BehaviorConformance->setWitness(BehaviorInitialValue->getGetter(),
+                            ConcreteDeclRef(Context, Get, MemberSubs));
 }
 
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
@@ -1559,20 +1642,26 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     NormalProtocolConformance *conformance = nullptr;
     VarDecl *valueProp = nullptr;
 
+    bool mightBeMutating = dc->isTypeContext()
+      && !var->isStatic()
+      && !dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
+
     auto makeBehaviorAccessors = [&]{
       FuncDecl *getter;
       FuncDecl *setter = nullptr;
       if (valueProp && valueProp->getGetter()) {
         getter = createGetterPrototype(var, TC);
-        // The getter is mutating if the behavior implementation is.
-        getter->setMutating(valueProp->getGetter()->isMutating());
+        // The getter is mutating if the behavior implementation is, unless
+        // we're in a class or non-instance context.
+        getter->setMutating(mightBeMutating &&
+                            valueProp->getGetter()->isMutating());
         getter->setAccessibility(var->getFormalAccess());
         
         // Make a setter if the behavior property has one.
         if (auto valueSetter = valueProp->getSetter()) {
           ParamDecl *newValueParam = nullptr;
           setter = createSetterPrototype(var, newValueParam, TC);
-          setter->setMutating(valueSetter->isMutating());
+          setter->setMutating(mightBeMutating && valueSetter->isMutating());
           // TODO: max of property and implementation setter visibility?
           setter->setAccessibility(var->getFormalAccess());
         }

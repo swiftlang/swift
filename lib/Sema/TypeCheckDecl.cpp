@@ -2697,6 +2697,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   // First, satisfy any associated type requirements.
   Substitution valueSub;
+  AssociatedTypeDecl *valueReqt = nullptr;
   for (auto requirementDecl : behaviorProto->getMembers()) {
     auto assocTy = dyn_cast<AssociatedTypeDecl>(requirementDecl);
     if (!assocTy)
@@ -2707,6 +2708,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
       unknownRequirement(assocTy);
       continue;
     }
+    
+    valueReqt = assocTy;
     
     // Check for required protocol conformances.
     // TODO: Handle secondary 'where' constraints on the associated types.
@@ -2770,6 +2773,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // Now that type witnesses are done, satisfy property and method requirements.
   conformance->setState(ProtocolConformanceState::Checking);
 
+  bool requiresInitialValue = false;
   for (auto requirementDecl : behaviorProto->getMembers()) {
     auto requirement = dyn_cast<ValueDecl>(requirementDecl);
     if (!requirement)
@@ -2777,87 +2781,149 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     if (isa<AssociatedTypeDecl>(requirement))
       continue;
     
-    // Match a storage requirement.
-    if (auto storageReqt = dyn_cast<VarDecl>(requirement)) {
-      if (storageReqt->getName() != TC.Context.Id_storage) {
-        unknownRequirement(requirement);
-        continue;
-      }
-      auto storageTy = storageReqt->getInterfaceType();
-      auto expectedInitStorageTy =
-        FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
+    if (auto varReqt = dyn_cast<VarDecl>(requirement)) {
+      // Match a storage requirement.
+      if (varReqt->getName() == TC.Context.Id_storage) {
+        auto storageTy = varReqt->getInterfaceType();
+        auto expectedInitStorageTy =
+          FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
 
-      // We need an initStorage extension method to initialize this storage.
-      auto lookup = TC.lookupMember(dc, behaviorProtoTy,
-                                    TC.Context.Id_initStorage);
-      FuncDecl *initStorageDecl = nullptr;
-      for (auto found : lookup) {
-        if (auto foundFunc = dyn_cast<FuncDecl>(found.Decl)) {
-          // Should have the signature `static func initStorage() -> Storage`.
-          // TODO: For out-of-line initialization, could also support
-          // initStorage(Value) -> Storage.
-          if (!foundFunc->isStatic())
-            continue;
-          auto methodTy = foundFunc->getInterfaceType()
-            ->castTo<AnyFunctionType>()
-            ->getResult();
-          if (!methodTy->isEqual(expectedInitStorageTy))
-            continue;
-          
-          if (initStorageDecl) {
-            TC.diagnose(behavior->getLoc(),
-                        diag::property_behavior_protocol_reqt_ambiguous,
-                        TC.Context.Id_initStorage);
-            TC.diagnose(initStorageDecl->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
-                        TC.Context.Id_initStorage);
-            TC.diagnose(foundFunc->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
-                        TC.Context.Id_initStorage);
-            break;
+        // We need an initStorage extension method to initialize this storage.
+        auto lookup = TC.lookupMember(dc, behaviorProtoTy,
+                                      TC.Context.Id_initStorage);
+        FuncDecl *initStorageDecl = nullptr;
+        for (auto found : lookup) {
+          if (auto foundFunc = dyn_cast<FuncDecl>(found.Decl)) {
+            // Should have the signature `static func initStorage() -> Storage`.
+            // TODO: For out-of-line initialization, could also support
+            // initStorage(Value) -> Storage.
+            if (!foundFunc->isStatic())
+              continue;
+            auto methodTy = foundFunc->getInterfaceType()
+              ->castTo<AnyFunctionType>()
+              ->getResult();
+            if (!methodTy->isEqual(expectedInitStorageTy))
+              continue;
+            
+            if (initStorageDecl) {
+              TC.diagnose(behavior->getLoc(),
+                          diag::property_behavior_protocol_reqt_ambiguous,
+                          TC.Context.Id_initStorage);
+              TC.diagnose(initStorageDecl->getLoc(),
+                          diag::property_behavior_protocol_reqt_here,
+                          TC.Context.Id_initStorage);
+              TC.diagnose(foundFunc->getLoc(),
+                          diag::property_behavior_protocol_reqt_here,
+                          TC.Context.Id_initStorage);
+              break;
+            }
+            
+            initStorageDecl = foundFunc;
           }
-          
-          initStorageDecl = foundFunc;
         }
-      }
-      
-      if (!initStorageDecl) {
-        TC.diagnose(behavior->getLoc(),
-                    diag::property_behavior_protocol_no_initStorage,
-                    expectedInitStorageTy);
-        for (auto found : lookup)
-          TC.diagnose(found.Decl->getLoc(),
-                      diag::found_candidate);
+        
+        if (!initStorageDecl) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_protocol_no_initStorage,
+                      expectedInitStorageTy);
+          for (auto found : lookup)
+            TC.diagnose(found.Decl->getLoc(),
+                        diag::found_candidate);
+          continue;
+        }
+        
+        // TODO: Support storage-backed behaviors in non-type contexts.
+        if (!dc->isTypeContext()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_with_feature_not_supported,
+                      behaviorProto->getName(), "storage");
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // Instantiate the storage next to us in the enclosing scope.
+        TC.completePropertyBehaviorStorage(decl, varReqt,
+                                           initStorageDecl,
+                                           behaviorSelf,
+                                           storageTy,
+                                           conformance,
+                                           interfaceSubs,
+                                           contextSubs);
+        continue;
+      // Handle an initialValue requirement.
+      } else if (varReqt->getName() == TC.Context.Id_initialValue) {
+        requiresInitialValue = true;
+        
+        // The requirement should be static, get-only, and have the type of the
+        // Value.
+        // TODO: A "deferred" initialization would be an instance requirement.
+        Type valueTy = GenericTypeParamType::get(0, 0, TC.Context);
+        assert(valueReqt && "no Value associated type?!");
+        valueTy = DependentMemberType::get(valueTy, valueReqt, TC.Context);
+  
+        if (!varReqt->isStatic()
+            || varReqt->isSettable(dc)
+            || !varReqt->getInterfaceType()->isEqual(valueTy)) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_invalid_initialValue_reqt,
+                      behaviorProto->getName());
+          TC.diagnose(varReqt->getLoc(),
+                      diag::property_behavior_protocol_reqt_here,
+                      TC.Context.Id_initialValue);
+          continue;
+        }
+        
+        // The declaration must have an initializer expression.
+        // FIXME: It should have the initializer to itself too, no 'var (a,b)=x'
+        if (!decl->getParentInitializer()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_requires_initialValue,
+                      behaviorProto->getName(),
+                      decl->getName());
+          continue;
+        }
+        
+        if (!isa<NamedPattern>(
+                    decl->getParentPattern()->getSemanticsProvidingPattern())) {
+          TC.diagnose(decl->getParentInitializer()->getLoc(),
+                      diag::property_behavior_requires_unique_initialValue,
+                      behaviorProto->getName());
+          continue;
+        }
+        
+        // TODO: Support initialValue requirements in non-type contexts.
+        if (!dc->isTypeContext()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_with_feature_not_supported,
+                      behaviorProto->getName(), "initial value requirement");
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // Wrap the initializer expression in a get-only property to
+        TC.completePropertyBehaviorInitialValue(decl, varReqt,
+                                                conformance,
+                                                interfaceSubs,
+                                                contextSubs);
         continue;
       }
-      
-      // TODO: Support storage-backed behaviors in non-type contexts.
-      if (!dc->isTypeContext()) {
-        TC.diagnose(behavior->getLoc(),
-                    diag::property_behavior_with_storage_not_supported,
-                    behaviorProto->getName());
-        conformance->setInvalid();
-        continue;
-      }
-      
-      // Instantiate the storage next to us in the enclosing scope.
-      TC.completePropertyBehaviorStorage(decl, storageReqt,
-                                         initStorageDecl,
-                                         behaviorSelf,
-                                         storageTy,
-                                         conformance,
-                                         interfaceSubs,
-                                         contextSubs);
-      continue;
-    }
-    
-    if (auto func = dyn_cast<FuncDecl>(requirement)) {
+    } else if (auto func = dyn_cast<FuncDecl>(requirement)) {
       // Handle accessors as part of their property.
       if (func->isAccessor())
         continue;
     }
 
     unknownRequirement(requirement);
+  }
+  
+  // If the property was declared with an initializer, but the behavior didn't
+  // use it, complain.
+  // TODO: The initializer could eventually be consumed by DI-style
+  // initialization.
+  if (!requiresInitialValue && decl->getParentInitializer()) {
+    TC.diagnose(decl->getParentInitializer()->getLoc(),
+                diag::property_behavior_invalid_initializer,
+                behaviorProto->getName());
   }
   
   // Bail out if we didn't resolve method witnesses.

@@ -96,7 +96,6 @@ extension withStorage {
 // TODO: storage behaviors in non-instance context
 struct S2<T> {
   var [withStorage] instance: T
-  lazy var ninstance = 0
 }
 class C2<T> {
   var [withStorage] instance: T
@@ -104,6 +103,46 @@ class C2<T> {
 
 func exerciseStorage<T>(inout _ sx: S2<T>, inout _ sy: S2<Int>,
                         _ cx: C2<T>, _ cy: C2<Int>,
+                        _ z: T) {
+  _ = sx.instance
+  sx.instance = z
+
+  _ = sy.instance
+  sy.instance = zero
+
+  _ = cx.instance
+  cx.instance = z
+
+  _ = cy.instance
+  cy.instance = zero
+}
+
+protocol withInit {
+  associatedtype Value
+  var storage: Value? { get set }
+  static var initialValue: Value { get }
+}
+extension withInit {
+  var value: Value {
+    get { }
+    set { }
+  }
+
+  static func initStorage() -> Value? { }
+}
+
+// TODO: initialValue behaviors in non-instance context
+func any<T>() -> T { }
+
+struct S3<T> {
+  var [withInit] instance: T = any()
+}
+class C3<T> {
+  var [withInit] instance: T = any()
+}
+
+func exerciseStorage<T>(inout _ sx: S3<T>, inout _ sy: S3<Int>,
+                        _ cx: C3<T>, _ cy: C3<Int>,
                         _ z: T) {
   _ = sx.instance
   sx.instance = z

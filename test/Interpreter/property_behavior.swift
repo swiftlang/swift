@@ -34,29 +34,91 @@ extension delayedImmutable {
   }
 }
 
-class Foo {
-  var [delayedImmutable] x: Int
+protocol lazy {
+  associatedtype Value
+  var storage: Value? { get set }
+  static var initialValue: Value { get }
+}
+extension lazy {
+  var value: Value {
+    mutating get {
+      if let existing = storage {
+        return existing
+      }
+      let value = Self.initialValue
+      storage = value
+      return value
+    }
+    
+    set {
+      storage = newValue
+    }
+  }
+
+  static func initStorage() -> Value? {
+    return nil
+  }
 }
 
-var tests = TestSuite("DelayedImmutable")
+var lazyEvaluated = false
+func evaluateLazy() -> Int {
+  lazyEvaluated = true
+  return 1738
+}
 
-tests.test("correct usage") {
+class Foo {
+  var [delayedImmutable] x: Int
+  var [lazy] y = evaluateLazy()
+}
+
+var DelayedImmutable = TestSuite("DelayedImmutable")
+
+DelayedImmutable.test("correct usage") {
   let foo = Foo()
   foo.x = 679
   expectEqual(foo.x, 679)
 }
 
-tests.test("read before initialization") {
+DelayedImmutable.test("read before initialization") {
   let foo = Foo()
   expectCrashLater()
   _ = foo.x
 }
 
-tests.test("write after initialization") {
+DelayedImmutable.test("write after initialization") {
   let foo = Foo()
   foo.x = 679
   expectCrashLater()
   foo.x = 680
+}
+
+var Lazy = TestSuite("Lazy")
+
+Lazy.test("usage") {
+  let foo = Foo()
+
+  expectFalse(lazyEvaluated)
+  expectEqual(foo.y, 1738)
+  expectTrue(lazyEvaluated)
+
+  lazyEvaluated = false
+  expectEqual(foo.y, 1738)
+  expectFalse(lazyEvaluated)
+
+  foo.y = 36
+  expectEqual(foo.y, 36)
+  expectFalse(lazyEvaluated)
+
+  let foo2 = Foo()
+  expectFalse(lazyEvaluated)
+  foo2.y = 36
+  expectEqual(foo2.y, 36)
+  expectFalse(lazyEvaluated)
+
+  let foo3 = Foo()
+  expectFalse(lazyEvaluated)
+  expectEqual(foo3.y, 1738)
+  expectTrue(lazyEvaluated)
 }
 
 runAllTests()

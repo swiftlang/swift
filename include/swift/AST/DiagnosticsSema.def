@@ -1554,16 +1554,30 @@ ERROR(property_behavior_with_self_requirement_not_in_type,none,
       "property behavior %0 can only be used on instance properties "
       "because it has 'Self' requirements",
       (Identifier))
-ERROR(property_behavior_with_storage_not_supported,none,
-      "property behavior %0 with storage is not supported outside of "
+ERROR(property_behavior_with_feature_not_supported,none,
+      "property behavior %0 with %1 is not supported outside of "
       "type contexts",
-      (Identifier))
+      (Identifier, StringRef))
 ERROR(property_behavior_value_type_doesnt_match,none,
       "property behavior %0 provides 'value' property implementation with "
       "type %1 that doesn't match type %2 of declared property %3",
       (Identifier, Type, Identifier, Type))
 NOTE(property_behavior_value_decl_here,none,
      "'value' property declared here", ())
+ERROR(property_behavior_invalid_initialValue_reqt,none,
+      "property behavior %0 'initialValue' requirement must be static, "
+      "get-only, and of type 'Self.Value'", (Identifier))
+ERROR(property_behavior_requires_initialValue,none,
+      "property behavior %0 requires an initializer in the declaration of %1",
+      (Identifier, Identifier))
+ERROR(property_behavior_requires_unique_initialValue,none,
+      "property behavior %0 cannot destructure an initializer expression in a "
+      "compound pattern",
+      (Identifier))
+ERROR(property_behavior_invalid_initializer,none,
+      "initializer expression provided, but property behavior %0 does not "
+      "use it",
+      (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Attributes
