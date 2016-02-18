@@ -1846,13 +1846,32 @@ class FormatWalker: public ide::SourceEntityWalker {
     SourceLoc FoundSibling;
     SourceManager &SM;
     std::vector<Token> &Tokens;
-    std::vector<SourceLoc> TokenLocs;
     SourceLoc &TargetLoc;
     TokenIt TI;
     bool NeedExtraIndentation;
 
+    class SourceLocIterator : public std::iterator<std::input_iterator_tag,
+                                                   SourceLoc>
+    {
+      TokenIt It;
+    public:
+      SourceLocIterator(TokenIt It) :It(It) {}
+      SourceLocIterator(const SourceLocIterator& mit) : It(mit.It) {}
+      SourceLocIterator& operator++() {++It; return *this;}
+      SourceLocIterator operator++(int) {
+        SourceLocIterator tmp(*this);
+        operator++();
+        return tmp;
+      }
+      bool operator==(const SourceLocIterator& rhs) {return It==rhs.It;}
+      bool operator!=(const SourceLocIterator& rhs) {return It!=rhs.It;}
+      SourceLoc operator*() {return It->getLoc();}
+    };
+
     void adjustTokenIteratorToImmediateAfter(SourceLoc End) {
-      auto Lower = std::lower_bound(TokenLocs.begin(), TokenLocs.end(), End,
+      SourceLocIterator LocBegin(Tokens.begin());
+      SourceLocIterator LocEnd(Tokens.end());
+      auto Lower = std::lower_bound(LocBegin, LocEnd, End,
                                     [&](SourceLoc L, SourceLoc R) {
         return SM.isBeforeInBuffer(L, R);
       });
@@ -1860,7 +1879,7 @@ class FormatWalker: public ide::SourceEntityWalker {
         Lower ++;
       }
       TI = Tokens.begin();
-      std::advance(TI, Lower - TokenLocs.begin());
+      std::advance(TI, std::distance(LocBegin, Lower));
     }
 
     bool isImmediateAfterSeparator(SourceLoc End, tok Separator) {
@@ -1892,11 +1911,7 @@ class FormatWalker: public ide::SourceEntityWalker {
     SiblingCollector(SourceManager &SM, std::vector<Token> &Tokens,
                      SourceLoc &TargetLoc) : SM(SM), Tokens(Tokens),
                       TargetLoc(TargetLoc), TI(Tokens.begin()),
-                      NeedExtraIndentation(false) {
-      for (Token &T : Tokens) {
-        TokenLocs.push_back(T.getLoc());
-      }
-    }
+                      NeedExtraIndentation(false) {}
 
     void collect(ASTNode Node) {
       if (FoundSibling.isValid())
