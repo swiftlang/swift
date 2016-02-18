@@ -577,11 +577,11 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       auto *VD = capture.getDecl();
       auto type = VD->getType()->getCanonicalType();
       
-      type = Types.getInterfaceTypeOutOfContext(type,
+      auto interfaceType = Types.getInterfaceTypeOutOfContext(type,
                                                 function->getAsDeclContext());
       
       auto &loweredTL = Types.getTypeLowering(
-                                    AbstractionPattern(genericSig, type), type);
+                                    AbstractionPattern(type), interfaceType);
       auto loweredTy = loweredTL.getLoweredType();
       switch (Types.getDeclCaptureKind(capture)) {
       case CaptureKind::None:
