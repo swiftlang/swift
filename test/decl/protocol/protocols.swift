@@ -465,3 +465,13 @@ class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}
 func h<T : C3>(x : T) {
   x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
+
+
+
+protocol P4 {
+  associatedtype T
+}
+
+class C4 : P4 {
+  associatedtype T = Int  // expected-error {{associated types can only be defined in a protocol}} {{3-17=typealias}}
+}
