@@ -1858,6 +1858,7 @@ static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
     // produce the substituted callee type.
     assert(genericParamType->getDepth() == 0);
     assert(genericParamType->getIndex() == 0);
+    (void) genericParamType;
 
     // There can be multiple substitutions, but the first one is the Self type.
     assert(subs.size() >= 1);

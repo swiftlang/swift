@@ -521,6 +521,7 @@ public:
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       assert(RepeatWhileStack.back() == RWS && "Malformed repeat-while stack");
+      (void) RWS;
       RepeatWhileStack.pop_back();
 
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
