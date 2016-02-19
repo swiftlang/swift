@@ -1902,7 +1902,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     // 'class' is a modifier on func, but is also a top-level decl.
     case tok::kw_class: {
       SourceLoc ClassLoc = consumeToken(tok::kw_class);
-      
+
       // If 'class' is a modifier on another decl kind, like var or func,
       // then treat it as a modifier.
       if (isStartOfDecl()) {
@@ -1916,7 +1916,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         }
         continue;
       }
-      
+
       // Otherwise this is the start of a class declaration.
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
       Status = DeclResult;
@@ -1991,7 +1991,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Convenience);
         continue;
       }
-        
+
       // Otherwise this is not a context-sensitive keyword.
       SWIFT_FALLTHROUGH;
 
@@ -2005,13 +2005,28 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                                                   false);
         }
       }
+
       diagnose(Tok, diag::expected_decl);
+
+      if (CurDeclContext) {
+        if (auto nominal = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
+          diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
+                   nominal->getName());
+        } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
+          if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
+            if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
+              diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
+                idRepr->getComponentRange().front()->getIdentifier());
+            }
+          }
+        }
+      }
       return makeParserErrorResult<Decl>();
-  
+
     case tok::unknown:
       consumeToken(tok::unknown);
       continue;
-        
+
     // Unambiguous top level decls.
     case tok::kw_import:
       DeclResult = parseDeclImport(Flags, Attributes);
@@ -2113,7 +2128,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       break;
     }
-  
+
     // If we 'break' out of the switch, break out of the loop too.
     break;
   }
