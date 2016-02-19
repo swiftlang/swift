@@ -33,8 +33,10 @@ struct DistanceToTest {
   let expectedDistance: Int
   let loc: SourceLoc
 
-  init(startIndex: Int, endIndex: Int, expectedDistance: Int,
-    file: String = __FILE__, line: UInt = __LINE__) {
+  init(
+    startIndex: Int, endIndex: Int, expectedDistance: Int,
+    file: String = #file, line: UInt = #line
+  ) {
     self.startIndex = startIndex
     self.endIndex = endIndex
     self.expectedDistance = expectedDistance
@@ -48,8 +50,11 @@ struct AdvancedByTest {
   let limit: Int?
   let expectedIndex: Int
   let loc: SourceLoc
-  init(startIndex: Int, distance: Int, expectedIndex: Int,
-    limit: Int? = nil, file: String = __FILE__, line: UInt = __LINE__) {
+  init(
+    startIndex: Int, distance: Int, expectedIndex: Int,
+    limit: Int? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
     self.startIndex = startIndex
     self.distance = distance
     self.expectedIndex = expectedIndex

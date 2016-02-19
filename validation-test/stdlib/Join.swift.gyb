@@ -33,7 +33,7 @@ public struct JoinWithSeparatorTest {
 
   init(
     elements: [[Int]], separator: [Int], expected: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.elements = elements
     self.separator = separator
