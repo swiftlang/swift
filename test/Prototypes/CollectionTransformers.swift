@@ -422,7 +422,7 @@ final class _ForkJoinWorkerThread {
   }
 
   internal func startAsync() {
-    var queue: dispatch_queue_t? = nil
+    var queue: dispatch_queue_t?
     if #available(OSX 10.10, iOS 8.0, *) {
       queue = dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0)
     } else {
@@ -535,7 +535,7 @@ internal protocol _FutureType {
 }
 
 public class ForkJoinTaskBase {
-  final internal var _pool: ForkJoinPool? = nil
+  final internal var _pool: ForkJoinPool?
 
   // FIXME(performance): there is no need to create heavy-weight
   // synchronization primitives every time.  We could start with a lightweight
@@ -578,7 +578,7 @@ public class ForkJoinTaskBase {
 
 final public class ForkJoinTask<Result> : ForkJoinTaskBase, _FutureType {
   internal let _task: () -> Result
-  internal var _result: Result? = nil
+  internal var _result: Result?
 
   public init(_task: () -> Result) {
     self._task = _task

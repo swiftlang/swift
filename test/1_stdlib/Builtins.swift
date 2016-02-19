@@ -51,7 +51,7 @@ tests.test("_isUniquelyReferenced/OptionalNativeObject") {
   var b = a
   expectFalse(_getBool(Builtin.isUnique(&a)))
   expectFalse(_getBool(Builtin.isUnique(&b)))
-  var x: Builtin.NativeObject? = nil
+  var x: Builtin.NativeObject?
   expectFalse(_getBool(Builtin.isUnique(&x)))
 }
 

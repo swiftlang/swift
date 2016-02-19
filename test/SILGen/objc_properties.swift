@@ -108,8 +108,8 @@ class TestNSCopying {
   @NSCopying var optionalProperty : NSString?
   @NSCopying var uncheckedOptionalProperty : NSString!
 
-  @NSCopying weak var weakProperty : NSString? = nil
-//  @NSCopying unowned var unownedProperty : NSString? = nil
+  @NSCopying weak var weakProperty : NSString?
+//  @NSCopying unowned var unownedProperty : NSString?
 
   init(s : NSString) { property = s }
 }

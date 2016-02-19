@@ -21,7 +21,7 @@ func test(c: C) {
 class D {}
 
 var d = D()
-var dopt: D? = nil
+var dopt: D?
 var diuopt: D! = nil
 
 _ = d == nil // expected-error{{value of type 'D' can never be nil, comparison isn't allowed}}

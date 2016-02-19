@@ -56,6 +56,6 @@ class A {
 
 // rdar://15144951
 class TestWeak : NSObject {
-  weak var b : WeakObject? = nil
+  weak var b : WeakObject?
 }
 class WeakObject : NSObject {}

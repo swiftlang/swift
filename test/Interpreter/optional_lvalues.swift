@@ -17,6 +17,6 @@ print(sequences) // CHECK-NEXT: ["fibonacci": [1, 1, 2, 3, 5, 8]]
 func printAndReturn(x: Int) -> Int { print(x); return x }
 
 print("optional binding") // CHECK-NEXT: optional binding
-var y: Int? = nil
+var y: Int?
 y? += printAndReturn(4)
 print("done with binding test") // CHECK-NEXT: done with binding test

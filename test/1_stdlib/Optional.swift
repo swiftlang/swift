@@ -41,7 +41,7 @@ extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
 }
 
 OptionalTests.test("nil comparison") {
-  var x: Int? = nil
+  var x: Int?
   expectFalse(x != nil)
 
   switch x {

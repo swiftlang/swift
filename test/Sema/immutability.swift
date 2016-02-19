@@ -524,7 +524,7 @@ struct TestBangMutability {
 
 // <rdar://problem/21176945> mutation through ? not considered a mutation
 func testBindOptional() {
-  var a : TestStruct2? = nil  // Mutated through optional chaining.
+  var a : TestStruct2?  // Mutated through optional chaining.
   a?.mutatingfunc()
 }
 

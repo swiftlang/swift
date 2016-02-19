@@ -489,7 +489,7 @@ AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference
 
 var TestSuiteLifetimeTracked = TestSuite("TestSuiteLifetimeTracked")
-var leakMe: LifetimeTracked? = nil
+var leakMe: LifetimeTracked?
 TestSuiteLifetimeTracked.test("failsIfLifetimeTrackedAreLeaked") {
   leakMe = LifetimeTracked(0)
 }

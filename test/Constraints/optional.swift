@@ -106,7 +106,7 @@ func test10(i: Int, io: Int?) {
   var _: Double = result2
 }
 
-var z: Int? = nil
+var z: Int?
 z = z ?? 3
 
 var fo: Float? = 3.14159

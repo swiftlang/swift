@@ -90,7 +90,7 @@ if nil == x_foo { print("x_foo is nil") }
 if nil != x_foo { print("x_foo is not nil") } else { print("x_foo is nil") }
 // CHECK: x_foo is nil
 
-var y_foo: Foo? = nil
+var y_foo: Foo?
 if y_foo == nil { print("y_foo is nil") }
 // CHECK: y_foo is nil
 if y_foo != nil { print("y_foo is not nil") } else { print("y_foo is nil") }
@@ -100,9 +100,9 @@ if nil == y_foo { print("y_foo is nil") }
 if nil != y_foo { print("y_foo is not nil") } else { print("y_foo is nil") }
 // CHECK: y_foo is nil
 
-var x : Int? = nil
+var x : Int?
 var y : Int?? = x
-var z : Int?? = nil
+var z : Int??
 
 switch y {
   case nil:  print("y is nil")
@@ -120,7 +120,7 @@ switch z {
 
 // Validate nil equality comparisons with non-equatable optional types
 class C {}
-var c: C? = nil
+var c: C?
 
 print(c == nil)
 // CHECK: true

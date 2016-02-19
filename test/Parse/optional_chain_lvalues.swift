@@ -10,7 +10,7 @@ struct S {
 }
 
 struct T {
-  var mutS: S? = nil
+  var mutS: S?
   let immS: S? = nil  // expected-note 4 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}}
 
   mutating func mutateT() {}
