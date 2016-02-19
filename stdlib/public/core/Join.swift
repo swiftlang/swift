@@ -55,18 +55,12 @@ public struct JoinGenerator<
         if _fastPath(result != nil) {
           return result
         }
-        if _separatorData.isEmpty {
-          _inner = _base.next()?.generate()
-          if _inner == nil {
-            _state = .End
-            return nil
-          }
-        } else {
-          _inner = _base.next()?.generate()
-          if _inner == nil {
-            _state = .End
-            return nil
-          }
+        _inner = _base.next()?.generate()
+        if _inner == nil {
+          _state = .End
+          return nil
+        }
+        if !_separatorData.isEmpty {
           _separator = _separatorData.generate()
           _state = .GeneratingSeparator
         }
