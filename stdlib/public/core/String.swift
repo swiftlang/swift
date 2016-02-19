@@ -610,9 +610,9 @@ extension Sequence where Iterator.Element == String {
   /// Interpose the `separator` between elements of `self`, then concatenate
   /// the result.  For example:
   ///
-  ///     ["foo", "bar", "baz"].joinWithSeparator("-|-") // "foo-|-bar-|-baz"
+  ///     ["foo", "bar", "baz"].join(separator: "-|-") // "foo-|-bar-|-baz"
   @warn_unused_result
-  public func joinWithSeparator(separator: String) -> String {
+  public func join(separator separator: String) -> String {
     var result = ""
 
     // FIXME(performance): this code assumes UTF-16 in-memory representation.
@@ -1025,6 +1025,13 @@ extension String {
 
   @available(*, unavailable, renamed="uppercased()")
   public var uppercaseString: String {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Sequence where Iterator.Element == String {
+  @available(*, unavailable, renamed="join")
+  public func joinWithSeparator(separator: String) -> String {
     fatalError("unavailable function can't be called")
   }
 }

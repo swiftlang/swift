@@ -168,14 +168,14 @@ extension Sequence where Iterator.Element : Sequence {
   /// `separator` between the elements of the sequence `self`.
   ///
   /// For example,
-  /// `[[1, 2, 3], [4, 5, 6], [7, 8, 9]].joinWithSeparator([-1, -2])`
+  /// `[[1, 2, 3], [4, 5, 6], [7, 8, 9]].join(separator: [-1, -2])`
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   @warn_unused_result
-  public func joinWithSeparator<
+  public func join<
     Separator : Sequence
     where
     Separator.Iterator.Element == Iterator.Element.Iterator.Element
-  >(separator: Separator) -> JoinSequence<Self> {
+  >(separator separator: Separator) -> JoinSequence<Self> {
     return JoinSequence(base: self, separator: separator)
   }
 }
@@ -191,3 +191,15 @@ extension JoinSequence {
     fatalError("unavailable function can't be called")
   }
 }
+
+extension Sequence where Iterator.Element : Sequence {
+  @available(*, unavailable, renamed="join")
+  public func joinWithSeparator<
+    Separator : Sequence
+    where
+    Separator.Iterator.Element == Iterator.Element.Iterator.Element
+  >(separator: Separator) -> JoinSequence<Self> {
+    fatalError("unavailable function can't be called")
+  }
+}
+

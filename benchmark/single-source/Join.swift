@@ -19,6 +19,6 @@ public func run_Join(N: Int) {
   for x in 0..<1000 * N {
     array.append(String(x))
   }
-  _ = array.joinWithSeparator("")
-  _ = array.joinWithSeparator(" ")
+  _ = array.join(separator: "")
+  _ = array.join(separator: " ")
 }
