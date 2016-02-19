@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 internal enum _JoinIteratorState {
-  case Start
-  case GeneratingElements
-  case GeneratingSeparator
-  case End
+  case start
+  case generatingElements
+  case generatingSeparator
+  case end
 }
 
 /// An iterator that presents the elements of the sequences traversed
@@ -41,16 +41,16 @@ public struct JoinIterator<
   public mutating func next() -> Base.Element.Iterator.Element? {
     repeat {
       switch _state {
-      case .Start:
+      case .start:
         if let nextSubSequence = _base.next() {
           _inner = nextSubSequence.iterator()
-          _state = .GeneratingElements
+          _state = .generatingElements
         } else {
-          _state = .End
+          _state = .end
           return nil
         }
 
-      case .GeneratingElements:
+      case .generatingElements:
         let result = _inner!.next()
         if _fastPath(result != nil) {
           return result
@@ -58,27 +58,27 @@ public struct JoinIterator<
         if _separatorData.isEmpty {
           _inner = _base.next()?.iterator()
           if _inner == nil {
-            _state = .End
+            _state = .end
             return nil
           }
         } else {
           _inner = _base.next()?.iterator()
           if _inner == nil {
-            _state = .End
+            _state = .end
             return nil
           }
           _separator = _separatorData.iterator()
-          _state = .GeneratingSeparator
+          _state = .generatingSeparator
         }
 
-      case .GeneratingSeparator:
+      case .generatingSeparator:
         let result = _separator!.next()
         if _fastPath(result != nil) {
           return result
         }
-        _state = .GeneratingElements
+        _state = .generatingElements
 
-      case .End:
+      case .end:
         return nil
 
       }
@@ -91,7 +91,7 @@ public struct JoinIterator<
   internal var _separatorData: ContiguousArray<Base.Element.Iterator.Element>
   internal var _separator:
     ContiguousArray<Base.Element.Iterator.Element>.Iterator?
-  internal var _state: _JoinIteratorState = .Start
+  internal var _state: _JoinIteratorState = .start
 }
 
 /// A sequence that presents the elements of the `Base` sequences
