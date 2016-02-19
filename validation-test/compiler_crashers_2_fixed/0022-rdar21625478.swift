@@ -267,7 +267,7 @@ public func expectCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UInt = __LINE__,
+  file: String = #file, line: UInt = #line,
   collectMoreInfo: (()->String)? = nil
 ) {
   expectNotEqual(
@@ -286,7 +286,7 @@ public func expectNotCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UInt = __LINE__,
+  file: String = #file, line: UInt = #line,
   collectMoreInfo: (()->String)? = nil
 ) {
   expectNotEqual(

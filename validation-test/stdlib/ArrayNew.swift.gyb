@@ -385,7 +385,7 @@ struct WithUnsafeMutableBufferPointerIfSupportedTest {
 
   init(
     _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
+    file: String = #file, line: UInt = #line
   ) {
     self.sequence = sequence
     self.loc = SourceLoc(file, line, comment: "test data")
