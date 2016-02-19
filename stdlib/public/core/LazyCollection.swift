@@ -27,7 +27,7 @@ public protocol LazyCollectionProtocol
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  associatedtype Elements: Collection = Self
+  associatedtype Elements : Collection = Self
 }
 
 /// When there's no special associated `Elements` type, the `elements`
@@ -59,8 +59,8 @@ public struct LazyCollection<Base : Collection>
   
   /// Construct an instance with `base` as its underlying Collection
   /// instance.
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   internal var _base: Base
@@ -172,7 +172,7 @@ extension Collection {
   ///
   /// - See Also: `LazySequenceProtocol`, `LazyCollectionProtocol`.
   public var lazy: LazyCollection<Self> {
-    return LazyCollection(self)
+    return LazyCollection(_base: self)
   }
 }
 

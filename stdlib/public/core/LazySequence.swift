@@ -132,7 +132,7 @@ public protocol LazySequenceProtocol : Sequence {
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  associatedtype Elements: Sequence = Self
+  associatedtype Elements : Sequence = Self
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -146,7 +146,7 @@ public protocol LazySequenceProtocol : Sequence {
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
-  var elements: Elements { get } 
+  var elements: Elements { get }
 }
 
 /// When there's no special associated `Elements` type, the `elements`
@@ -167,10 +167,10 @@ public struct LazySequence<Base : Sequence>
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
   /// lazily.
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
-  
+
   public var _base: Base
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.
@@ -184,7 +184,7 @@ extension Sequence {
   ///
   /// - See also: `LazySequenceProtocol`, `LazySequence`
   public var lazy: LazySequence<Self> {
-    return LazySequence(self)
+    return LazySequence(_base: self)
   }
 }
 
@@ -196,7 +196,6 @@ extension LazySequenceProtocol {
     return self
   }
 }
-
 
 @available(*, unavailable, renamed="LazyCollectionProtocol")
 public typealias LazySequenceType = LazySequenceProtocol
