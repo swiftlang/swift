@@ -392,7 +392,6 @@ static bool isUserCode(const SILInstruction *I) {
       return !S->isImplicit();
     if (auto *P = Loc.getAsASTNode<Pattern>())
       return !P->isImplicit();
-    return true;
   }
   return false;
 }
