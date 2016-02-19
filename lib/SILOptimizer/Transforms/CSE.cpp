@@ -36,6 +36,9 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/RecyclingAllocator.h"
 
+STATISTIC(NumOpenExtRemoved,
+          "Number of open_existential_addr instructions removed");
+
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
 
@@ -678,6 +681,202 @@ bool CSE::canHandle(SILInstruction *Inst) {
   }
 }
 
+using ApplyWitnessPair = std::pair<ApplyInst *, WitnessMethodInst *>;
+
+/// Returns the Apply and WitnessMethod instructions that use the
+/// open_existential_addr instructions, or null if at least one of the
+/// instructions is missing.
+ApplyWitnessPair getOpenExsUsers(OpenExistentialAddrInst *OE) {
+  ApplyInst *AI = nullptr;
+  WitnessMethodInst *WMI = nullptr;
+  auto Empty = std::make_pair(nullptr, nullptr);
+
+  for (auto *UI : getNonDebugUses(OE)) {
+    auto *User = UI->getUser();
+    // Check that we have a single Apply user.
+    if (auto *AA = dyn_cast<ApplyInst>(User)) {
+      if (AI)
+        return Empty;
+
+      AI = AA;
+      continue;
+    }
+
+    // Check that we have a single WMI user.
+    if (auto *W = dyn_cast<WitnessMethodInst>(User)) {
+      if (WMI)
+        return Empty;
+
+      WMI = W;
+      continue;
+    }
+
+    // Unknown instruction.
+    return Empty;
+  }
+
+  // Both instructions need to exist.
+  if (!WMI || !AI)
+    return Empty;
+
+  // Make sure that the WMI and AI match.
+  if (AI->getCallee() != WMI)
+    return Empty;
+
+  // We have exactly the pattern that we expected.
+  return std::make_pair(AI, WMI);
+}
+
+/// Try to CSE the users of \p From to the users of \p To.
+/// The original users of \p To are passed in ToApplyWitnessUsers.
+/// Returns true on success.
+static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
+                                OpenExistentialAddrInst *To,
+                                ApplyWitnessPair ToApplyWitnessUsers,
+                                DominanceInfo *DA) {
+  assert(From != To && "Can't replace instruction with itself");
+
+  ApplyInst *FromAI = nullptr;
+  ApplyInst *ToAI = nullptr;
+  WitnessMethodInst *FromWMI = nullptr;
+  WitnessMethodInst *ToWMI = nullptr;
+  std::tie(FromAI, FromWMI) = getOpenExsUsers(From);
+  std::tie(ToAI, ToWMI) = ToApplyWitnessUsers;
+
+  // Make sure that the OEA instruction has exactly two expected users.
+  if (!FromAI || !ToAI || !FromWMI || !ToWMI)
+    return false;
+
+  // Make sure we are calling the same method.
+  if (FromWMI->getMember() != ToWMI->getMember())
+    return false;
+
+  // We are going to reuse the TO-WMI, so make sure it dominates the call site.
+  if (!DA->properlyDominates(ToWMI, FromWMI))
+    return false;
+
+  SILBuilder Builder(FromAI);
+
+  assert(FromAI->getArguments().size() == ToAI->getArguments().size() &&
+         "Invalid number of arguments");
+
+  // Don't handle any apply instructions that involve substitutions.
+  if (ToAI->getSubstitutions().size() != 1) return false;
+
+  // Prepare the Apply args.
+  SmallVector<SILValue, 8> Args;
+  for (auto Op : FromAI->getArguments()) {
+      Args.push_back(Op == From ? To : Op);
+  }
+
+  auto FnTy = ToAI->getSubstCalleeSILType();
+  auto ResTy = FnTy.castTo<SILFunctionType>()->getResult().getSILType();
+
+  ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI, FnTy, ResTy,
+                                       ToAI->getSubstitutions(), Args,
+                                       ToAI->isNonThrowing());
+  FromAI->replaceAllUsesWith(NAI);
+  FromAI->eraseFromParent();
+  NumOpenExtRemoved++;
+  return true;
+}
+
+/// Try to CSE the users of the protocol that's passed in argument \p Arg.
+/// \returns True if some instructions were modified.
+static bool CSExistentialInstructions(SILArgument *Arg, DominanceInfo *DA) {
+  ParameterConvention Conv = Arg->getParameterInfo().getConvention();
+  // We can assume that the address of Proto does not alias because the
+  // calling convention is In or In-guaranteed.
+  bool MayAlias = Conv != ParameterConvention::Indirect_In_Guaranteed &&
+                  Conv != ParameterConvention::Indirect_In;
+  if (MayAlias)
+    return false;
+
+  // Now check that the only uses of the protocol are witness_method,
+  // open_existential_addr and destroy_addr. Also, collect all of the 'opens'.
+  llvm::SmallVector<OpenExistentialAddrInst*, 8> Opens;
+  for (auto *UI : getNonDebugUses(Arg)) {
+    auto *User = UI->getUser();
+    if (auto *Open = dyn_cast<OpenExistentialAddrInst>(User)) {
+      Opens.push_back(Open);
+      continue;
+    }
+
+    if (isa<WitnessMethodInst>(User) || isa<DestroyAddrInst>(User))
+      continue;
+
+    // Bail out if we found an instruction that we can't handle.
+    return false;
+  }
+
+  // Find the best dominating 'open' for each open existential.
+  llvm::SmallVector<OpenExistentialAddrInst*, 8> TopDominator(Opens);
+
+  bool Changed = false;
+
+  // Try to CSE the users of the current open_existential_addr instruction with
+  // one of the other open_existential_addr that dominate it.
+  int NumOpenInstr = Opens.size();
+  for (int i = 0; i < NumOpenInstr; i++) {
+    // Try to find a better dominating 'open' for the i-th instruction.
+    OpenExistentialAddrInst *SomeOpen = TopDominator[i];
+    for (int j = 0; j < NumOpenInstr; j++) {
+
+      if (i == j || TopDominator[i] == TopDominator[j])
+        continue;
+
+      OpenExistentialAddrInst *DominatingOpen = TopDominator[j];
+
+      if (DominatingOpen->getOperand() != SomeOpen->getOperand())
+        continue;
+
+      if (DA->properlyDominates(DominatingOpen, SomeOpen)) {
+        // We found an open instruction that DominatingOpen dominates:
+        TopDominator[i] = TopDominator[j];
+      }
+    }
+  }
+
+
+  // Inspect all of the open_existential_addr instructions and record the
+  // apply-witness users. We need to save the original Apply-Witness users
+  // because we'll be adding new users and we need to make sure that we can
+  // find the original users.
+  llvm::SmallVector<ApplyWitnessPair, 8> OriginalAW;
+  for (int i=0; i < NumOpenInstr; i++) {
+    OriginalAW.push_back(getOpenExsUsers(TopDominator[i]));
+  }
+
+  // Perform the CSE for the open_existential_addr instruction and their
+  // dominating instruction.
+  for (int i=0; i < NumOpenInstr; i++) {
+    if (Opens[i] != TopDominator[i])
+      Changed |= tryToCSEOpenExtCall(Opens[i], TopDominator[i],
+                                     OriginalAW[i], DA);
+  }
+
+  return Changed;
+}
+
+/// Detect multiple calls to existential members and try to CSE the instructions
+/// that perform the method lookup (the open_existential_addr and
+/// witness_method):
+///
+/// open_existential_addr %0 : $*Pingable to $*@opened("1E467EB8-...")
+/// witness_method $@opened("1E467EB8-...") Pingable, #Pingable.ping!1, %2
+/// apply %3<@opened("1E467EB8-...") Pingable>(%2)
+///
+/// \returns True if some instructions were modified.
+static bool CSEExistentialCalls(SILFunction *Func, DominanceInfo *DA) {
+  bool Changed = false;
+  for (auto *Arg : Func->getArguments()) {
+    if (Arg->getType().isExistentialType())
+      Changed |= CSExistentialInstructions(Arg, DA);
+  }
+
+  return Changed;
+}
+
 namespace {
 class SILCSE : public SILFunctionTransform {
   
@@ -696,7 +895,15 @@ class SILCSE : public SILFunctionTransform {
     auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
 
     CSE C(RunsOnHighLevelSil, SEA);
-    if (C.processFunction(*getFunction(), DA->get(getFunction()))) {
+    bool Changed = false;
+
+    // Perform the traditional CSE.
+    Changed |= C.processFunction(*getFunction(), DA->get(getFunction()));
+
+    // Perform CSE of existential and witness_method instructions.
+    Changed |= CSEExistentialCalls(getFunction(),
+                                          DA->get(getFunction()));
+    if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
