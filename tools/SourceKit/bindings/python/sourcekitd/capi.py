@@ -87,8 +87,8 @@ class Object(object):
             raise ValueError("wrong init parameter (%s)" % type(obj))
         self._as_parameter_ = self._obj
 
-    def from_param(obj):
-        return obj._as_parameter_
+    def from_param(self):
+        return self._as_parameter_
 
     def __del__(self):
         if self._obj:
@@ -110,8 +110,8 @@ class Response(object):
     def get_payload(self):
         return conf.lib.sourcekitd_response_get_value(self)
 
-    def from_param(obj):
-        return obj._as_parameter_
+    def from_param(self):
+        return self._as_parameter_
 
     def __del__(self):
         if self._obj:
@@ -138,8 +138,8 @@ class UIdent(object):
     def __str__(self):
         return conf.lib.sourcekitd_uid_get_string_ptr(self)
 
-    def from_param(obj):
-        return obj._as_parameter_
+    def from_param(self):
+        return self._as_parameter_
 
     def __repr__(self):
         return "UIdent('%s')" % self.__str__()
