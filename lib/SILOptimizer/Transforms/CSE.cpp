@@ -770,7 +770,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   }
 
   auto FnTy = ToAI->getSubstCalleeSILType();
-  auto ResTy = FnTy.castTo<SILFunctionType>()->getResult().getSILType();
+  auto ResTy = FnTy.castTo<SILFunctionType>()->getSILResult();
 
   ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI, FnTy, ResTy,
                                        ToAI->getSubstitutions(), Args,
@@ -784,7 +784,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
 /// Try to CSE the users of the protocol that's passed in argument \p Arg.
 /// \returns True if some instructions were modified.
 static bool CSExistentialInstructions(SILArgument *Arg, DominanceInfo *DA) {
-  ParameterConvention Conv = Arg->getParameterInfo().getConvention();
+  ParameterConvention Conv = Arg->getKnownParameterInfo().getConvention();
   // We can assume that the address of Proto does not alias because the
   // calling convention is In or In-guaranteed.
   bool MayAlias = Conv != ParameterConvention::Indirect_In_Guaranteed &&
@@ -869,7 +869,7 @@ static bool CSExistentialInstructions(SILArgument *Arg, DominanceInfo *DA) {
 /// \returns True if some instructions were modified.
 static bool CSEExistentialCalls(SILFunction *Func, DominanceInfo *DA) {
   bool Changed = false;
-  for (auto *Arg : Func->getArguments()) {
+  for (auto *Arg : Func->getArgumentsWithoutIndirectResults()) {
     if (Arg->getType().isExistentialType())
       Changed |= CSExistentialInstructions(Arg, DA);
   }
