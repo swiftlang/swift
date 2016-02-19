@@ -1479,6 +1479,11 @@ static SourceLoc getVarDeclInitEnd(VarDecl *VD) {
              SourceLoc();
 }
 
+struct SiblingAlignInfo {
+  SourceLoc Loc;
+  bool ExtraIndent;
+};
+
 class FormatContext
 {
   SourceManager &SM;
@@ -1488,7 +1493,7 @@ class FormatContext
   swift::ASTWalker::ParentTy End;
   bool InDocCommentBlock;
   bool InCommentLine;
-  SourceLoc SiblingLoc;
+  SiblingAlignInfo SiblingInfo;
 
 public:
   FormatContext(SourceManager &SM,
@@ -1497,10 +1502,10 @@ public:
                 swift::ASTWalker::ParentTy End = swift::ASTWalker::ParentTy(),
                 bool InDocCommentBlock = false,
                 bool InCommentLine = false,
-                SourceLoc SiblingLoc = SourceLoc())
+                SiblingAlignInfo SiblingInfo = SiblingAlignInfo())
     :SM(SM), Stack(Stack), Cursor(Stack.rbegin()), Start(Start), End(End),
      InDocCommentBlock(InDocCommentBlock), InCommentLine(InCommentLine),
-     SiblingLoc(SiblingLoc) { }
+     SiblingInfo(SiblingInfo) { }
 
   FormatContext parent() {
     assert(Cursor != Stack.rend());
@@ -1518,16 +1523,20 @@ public:
   }
 
   void padToSiblingColumn(StringBuilder &Builder) {
-    assert(SiblingLoc.isValid() && "No sibling to align with.");
-    CharSourceRange Range(SM, Lexer::getLocForStartOfLine(SM, SiblingLoc),
-                          SiblingLoc);
+    assert(SiblingInfo.Loc.isValid() && "No sibling to align with.");
+    CharSourceRange Range(SM, Lexer::getLocForStartOfLine(SM, SiblingInfo.Loc),
+                          SiblingInfo.Loc);
     for (auto C : Range.str()) {
       Builder.append(1, C == '\t' ? C : ' ');
     }
   }
 
   bool HasSibling() {
-    return SiblingLoc.isValid();
+    return SiblingInfo.Loc.isValid();
+  }
+
+  bool needExtraIndentationForSibling() {
+    return SiblingInfo.ExtraIndent;
   }
 
   std::pair<unsigned, unsigned> lineAndColumn() {
@@ -1830,6 +1839,7 @@ public:
   }
 };
 
+
 class FormatWalker: public ide::SourceEntityWalker {
   typedef std::vector<Token>::iterator TokenIt;
   class SiblingCollector {
@@ -1838,15 +1848,42 @@ class FormatWalker: public ide::SourceEntityWalker {
     std::vector<Token> &Tokens;
     SourceLoc &TargetLoc;
     TokenIt TI;
+    bool NeedExtraIndentation;
+
+    class SourceLocIterator : public std::iterator<std::input_iterator_tag,
+                                                   SourceLoc>
+    {
+      TokenIt It;
+    public:
+      SourceLocIterator(TokenIt It) :It(It) {}
+      SourceLocIterator(const SourceLocIterator& mit) : It(mit.It) {}
+      SourceLocIterator& operator++() {++It; return *this;}
+      SourceLocIterator operator++(int) {
+        SourceLocIterator tmp(*this);
+        operator++();
+        return tmp;
+      }
+      bool operator==(const SourceLocIterator& rhs) {return It==rhs.It;}
+      bool operator!=(const SourceLocIterator& rhs) {return It!=rhs.It;}
+      SourceLoc operator*() {return It->getLoc();}
+    };
+
+    void adjustTokenIteratorToImmediateAfter(SourceLoc End) {
+      SourceLocIterator LocBegin(Tokens.begin());
+      SourceLocIterator LocEnd(Tokens.end());
+      auto Lower = std::lower_bound(LocBegin, LocEnd, End,
+                                    [&](SourceLoc L, SourceLoc R) {
+        return SM.isBeforeInBuffer(L, R);
+      });
+      if (*Lower == End) {
+        Lower ++;
+      }
+      TI = Tokens.begin();
+      std::advance(TI, std::distance(LocBegin, Lower));
+    }
 
     bool isImmediateAfterSeparator(SourceLoc End, tok Separator) {
-      auto BeforeE = [&]() {
-        return TI != Tokens.end() &&
-               !SM.isBeforeInBuffer(End, TI->getLoc());
-      };
-      if (!BeforeE())
-        return false;
-      for (; BeforeE(); TI ++);
+      adjustTokenIteratorToImmediateAfter(End);
       if (TI == Tokens.end() || TI->getKind() != Separator)
         return false;
       auto SeparatorLoc = TI->getLoc();
@@ -1858,10 +1895,24 @@ class FormatWalker: public ide::SourceEntityWalker {
             !SM.isBeforeInBuffer(NextLoc, TargetLoc);
     }
 
+    bool isTargetImmediateAfter(SourceLoc Loc) {
+      adjustTokenIteratorToImmediateAfter(Loc);
+      // Make sure target loc is after loc
+      return SM.isBeforeInBuffer(Loc, TargetLoc) &&
+      // Make sure immediate loc after loc is not before target loc.
+             !SM.isBeforeInBuffer(TI->getLoc(), TargetLoc);
+    }
+
+    bool sameLineWithTarget(SourceLoc Loc) {
+      return SM.getLineNumber(Loc) == SM.getLineNumber(TargetLoc);
+    }
+
   public:
     SiblingCollector(SourceManager &SM, std::vector<Token> &Tokens,
                      SourceLoc &TargetLoc) : SM(SM), Tokens(Tokens),
-                      TargetLoc(TargetLoc), TI(Tokens.begin()) {}
+                      TargetLoc(TargetLoc), TI(Tokens.begin()),
+                      NeedExtraIndentation(false) {}
+
     void collect(ASTNode Node) {
       if (FoundSibling.isValid())
         return;
@@ -1926,6 +1977,12 @@ class FormatWalker: public ide::SourceEntityWalker {
 
       // Array/Dictionary elements are siblings to align with each other.
       if (auto AE = dyn_cast_or_null<CollectionExpr>(Node.dyn_cast<Expr *>())) {
+        SourceLoc LBracketLoc = AE->getLBracketLoc();
+        if (isTargetImmediateAfter(LBracketLoc) &&
+            !sameLineWithTarget(LBracketLoc)) {
+          FoundSibling = LBracketLoc;
+          NeedExtraIndentation = true;
+        }
         for (unsigned I = 0, N = AE->getNumElements(); I < N;  I ++) {
           addPair(AE->getElement(I)->getEndLoc(),
                   FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
@@ -1940,8 +1997,8 @@ class FormatWalker: public ide::SourceEntityWalker {
       }
     };
 
-    SourceLoc findSibling() {
-      return FoundSibling;
+    SiblingAlignInfo getSiblingInfo() {
+      return {FoundSibling, NeedExtraIndentation};
     }
   };
 
@@ -2044,7 +2101,7 @@ public:
     walk(SF);
     scanForComments(SourceLoc());
     return FormatContext(SM, Stack, AtStart, AtEnd, InDocCommentBlock,
-                         InCommentLine, SCollector.findSibling());
+                         InCommentLine, SCollector.getSiblingInfo());
   }
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
@@ -2101,6 +2158,12 @@ public:
       StringRef Line = Doc.getTrimmedTextForLine(LineIndex);
       StringBuilder Builder;
       FC.padToSiblingColumn(Builder);
+      if (FC.needExtraIndentationForSibling()) {
+        if (FmtOptions.UseTabs)
+          Builder.append(1, '\t');
+        else
+          Builder.append(FmtOptions.IndentWidth, ' ');
+      }
       Builder.append(Line);
       Consumer.recordFormattedText(Builder.str().str());
       return SwiftEditorLineRange(LineIndex, 1);

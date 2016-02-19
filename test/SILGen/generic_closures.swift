@@ -144,3 +144,18 @@ func shmassert(@autoclosure f: () -> Bool) {}
 func capture_generic_param<A: Fooable>(x: A) {
   shmassert(A.foo())
 }
+
+// Make sure we use the correct convention when capturing class-constrained
+// member types: <rdar://problem/24470533>
+class Class {}
+
+protocol HasClassAssoc { associatedtype Assoc : Class }
+
+// CHECK-LABEL: sil hidden @_TF16generic_closures34captures_class_constrained_genericuRxS_13HasClassAssocrFTx1fFwx5AssocwxS1__T_
+// CHECK: bb0(%0 : $*T, %1 : $@callee_owned (@owned T.Assoc) -> @owned T.Assoc):
+// CHECK: [[GENERIC_FN:%.*]] = function_ref @_TFF16generic_closures34captures_class_constrained_genericuRxS_13HasClassAssocrFTx1fFwx5AssocwxS1__T_U_FT_FQQ_5AssocS2_
+// CHECK: [[CONCRETE_FN:%.*]] = partial_apply [[GENERIC_FN]]<T, T.Assoc>(%1)
+
+func captures_class_constrained_generic<T : HasClassAssoc>(x: T, f: T.Assoc -> T.Assoc) {
+  let _: () -> T.Assoc -> T.Assoc = { f }
+}

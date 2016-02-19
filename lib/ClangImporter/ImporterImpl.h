@@ -27,7 +27,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/APINotes/APINotesReader.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Serialization/ModuleFileExtension.h"
@@ -217,8 +216,15 @@ enum class SpecialMethodKind {
 #define SWIFT_PROTOCOL_SUFFIX "Protocol"
 #define SWIFT_CFTYPE_SUFFIX "Ref"
 
-namespace api_notes = clang::api_notes;
-using api_notes::FactoryAsInitKind;
+/// Describes whether to classify a factory method as an initializer.
+enum class FactoryAsInitKind {
+  /// Infer based on name and type (the default).
+  Infer,
+  /// Treat as a class method.
+  AsClassMethod,
+  /// Treat as an initializer.
+  AsInitializer
+};
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
@@ -331,55 +337,6 @@ public:
 
   /// Translation API nullability from an API note into an optional kind.
   static OptionalTypeKind translateNullability(clang::NullabilityKind kind);
-
-  /// Retrieve the API notes readers that may contain information for the
-  /// given Objective-C container.
-  ///
-  /// \returns a (name, primary, secondary) tuple containing the name of the
-  /// entity to look for and the API notes readers where information could be
-  /// found. The "primary" reader is the reader describes the module where the
-  /// specific container is defined; the "secondary" reader describes the
-  /// module in which the type is originally defined, if it's different from
-  /// the primary. Either or both of the readers may be null.
-  std::tuple<StringRef, api_notes::APINotesReader*, api_notes::APINotesReader*>
-  getAPINotesForContext(const clang::ObjCContainerDecl *container);
-
-  /// Retrieve the API notes reader that contains information for the
-  /// given declaration. Note, use getAPINotesForContext to get notes for ObjC
-  /// properties and methods.
-  api_notes::APINotesReader* getAPINotesForDecl(const clang::Decl *decl);
-
-  /// Retrieve any information known a priori about the given Objective-C
-  /// method, if we have it.
-  ///
-  /// If \p container is specified, we're looking for a method with the same
-  /// selector and instance-ness in \p container.
-  Optional<api_notes::ObjCMethodInfo>
-  getKnownObjCMethod(const clang::ObjCMethodDecl *method,
-                     const clang::ObjCContainerDecl *container = nullptr);
-
-  /// For ObjC property accessor, if the property is known, lookup
-  /// the property info and merge it in.
-  void mergePropInfoIntoAccessor(const clang::ObjCMethodDecl *method,
-                                 api_notes::ObjCMethodInfo &methodInfo);
-
-  /// Retrieve information about the given Objective-C context scoped to the
-  /// given Swift module.
-  Optional<api_notes::ObjCContextInfo>
-  getKnownObjCContext(const clang::ObjCContainerDecl *container);
-
-  /// Retrieve any information known a priori about the given Objective-C
-  /// property.
-  Optional<api_notes::ObjCPropertyInfo>
-  getKnownObjCProperty(const clang::ObjCPropertyDecl *property);
-
-  /// Retrieve any information known a priori about the given global variable.
-  Optional<api_notes::GlobalVariableInfo>
-  getKnownGlobalVariable(const clang::VarDecl *global);
-
-  /// Retrieve any information known a priori about the given global function.
-  Optional<api_notes::GlobalFunctionInfo>
-  getKnownGlobalFunction(const clang::FunctionDecl *function);
 
   /// Determine whether the given class has designated initializers,
   /// consulting 
@@ -622,11 +579,6 @@ public:
   /// A map from Clang modules to their Swift wrapper modules.
   llvm::SmallDenseMap<const clang::Module *, ModuleInitPair, 16> ModuleWrappers;
 
-  /// A map from Clang modules to their associated API notes.
-  llvm::SmallDenseMap<
-    const clang::Module *,
-    std::unique_ptr<api_notes::APINotesReader>> APINotesReaders;
-
   /// The module unit that contains declarations from imported headers.
   ClangModuleUnit *ImportedHeaderUnit = nullptr;
 
@@ -820,7 +772,6 @@ public:
          clang::QualType resultType,
          const clang::DeclContext *dc,
          const llvm::SmallBitVector &nonNullArgs,
-         const Optional<api_notes::ObjCMethodInfo> &knownMethod,
          Optional<unsigned> errorParamIndex,
          bool returnsSelf,
          bool isInstanceMethod,
@@ -1086,13 +1037,6 @@ public:
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
                                        const clang::Module *underlying);
-
-  /// Retrieve the API notes reader that corresponds to the given Clang module,
-  /// loading it if necessary.
-  ///
-  /// \returns an unowned pointer to the corresponding API notes reader, or
-  /// nullptr if no API notes file exists.
-  api_notes::APINotesReader *getAPINotesForModule(const clang::Module *module);
 
   /// \brief Constructs a Swift module for the given Clang module.
   Module *finishLoadingClangModule(ClangImporter &importer,

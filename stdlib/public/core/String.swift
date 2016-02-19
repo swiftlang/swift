@@ -634,19 +634,19 @@ extension Sequence where Iterator.Element == String {
       result.reserveCapacity(n)
     }
 
-    if separatorSize != 0 {
-      var iter = iterator()
-      if let first = iter.next() {
-        result.append(first)
-        while let next = iter.next() {
-          result.append(separator)
-          result.append(next)
-        }
-      }
-    }
-    else {
+    if separatorSize == 0 {
       for x in self {
         result.append(x)
+      }
+      return result
+    }
+
+    var iter = iterator()
+    if let first = iter.next() {
+      result.append(first)
+      while let next = iter.next() {
+        result.append(separator)
+        result.append(next)
       }
     }
 

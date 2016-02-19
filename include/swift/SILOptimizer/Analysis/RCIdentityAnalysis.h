@@ -32,7 +32,6 @@ class DominanceAnalysis;
 /// This class is a simple wrapper around an identity cache.
 class RCIdentityFunctionInfo {
   llvm::DenseSet<SILArgument *> VisitedArgs;
-  llvm::DenseMap<SILValue, SILValue> Cache;
   DominanceAnalysis *DA;
 
   /// This number is arbitrary and conservative. At some point if compile time
@@ -50,16 +49,6 @@ public:
   /// user of the RC is not managed by ARC. For instance
   /// unchecked_trivial_bit_cast.
   void getRCUsers(SILValue V, llvm::SmallVectorImpl<SILInstruction *> &Users);
-
-  void handleDeleteNotification(SILInstruction *I) {
-    // Check the cache. If we don't find it, there is nothing to do.
-    auto Iter = Cache.find(SILValue(I));
-    if (Iter == Cache.end())
-      return;
-
-    // Then erase Iter from the cache.
-    Cache.erase(Iter);
-  }
 
 private:
   SILValue getRCIdentityRootInner(SILValue V, unsigned RecursionDepth);
@@ -95,23 +84,6 @@ public:
     return true;
   }
 
-  virtual void handleDeleteNotification(ValueBase *V) override {
-    auto *I = dyn_cast<SILInstruction>(V);
-    // We are only interesting in SILInstructions.
-    if (!I || !I->getParentBB())
-      return;
-
-    // If the parent function of this instruction was just turned into an
-    // external declaration, bail. This happens during SILFunction destruction,
-    // when
-    SILFunction *F = I->getFunction();
-    if (F->isExternalDeclaration()) {
-      return;
-    }
-    get(F)->handleDeleteNotification(I);
-  }
-
-  virtual bool needsNotifications() override { return true; }
  };
 
 } // end swift namespace

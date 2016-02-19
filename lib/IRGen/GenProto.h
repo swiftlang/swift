@@ -134,21 +134,6 @@ namespace irgen {
                                 WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 
-  /// True if a type has a generic-parameter-dependent value witness table.
-  /// Currently, this is true if the size and/or alignment of the type is
-  /// dependent on its generic parameters.
-  bool hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty);
-  
-  /// Emit a value-witness table for the given type, which is assumed
-  /// to be non-dependent.
-  llvm::Constant *emitValueWitnessTable(IRGenModule &IGM, CanType type);
-
-  /// Emit the elements of a dependent value witness table template into a
-  /// vector.
-  void emitDependentValueWitnessTablePattern(IRGenModule &IGM,
-                                    CanType abstractType,
-                                    SmallVectorImpl<llvm::Constant*> &fields);
-
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
   void emitWitnessTableRefs(IRGenFunction &IGF,

@@ -54,12 +54,6 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 //                    RC Identity Root Instruction Casting
 //===----------------------------------------------------------------------===//
 
-static SILValue stripRCIdentityPreservingCasts(SILValue V) {
-  while (isRCIdentityPreservingCast(V->getKind()))
-    V = cast<SILInstruction>(V)->getOperand(0);
-  return V;
-}
-
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
   if (isRCIdentityPreservingCast(V->getKind()))
@@ -451,30 +445,14 @@ SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
 }
 
 SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
-  // We save some memory here by stripping off casts from any V. This is good to
-  // do since stripping off casts is the cheap part of
-  // stripRCIdentityPreservingInsts and reduces the number of possible values we
-  // can track.
-  //
-  // The expensive parts of stripRCIdentityPreservingInsts function are the
-  // unique non trivial elt calls. It should be investigated if they fit well
-  // here as well.
-  SILValue NoCastV = stripRCIdentityPreservingCasts(V);
-  auto Iter = Cache.find(NoCastV);
-  if (Iter != Cache.end())
-    return Iter->second;
-
-  SILValue Root = getRCIdentityRootInner(NoCastV, 0);
+  SILValue Root = getRCIdentityRootInner(V, 0);
   VisitedArgs.clear();
 
-  // If we fail to find a root, return NoCastV.
-  //
-  // We know that stripping off RC identical preserving casts is always safe, so
-  // since NoCastV is "better" information, we can return it without issue.
+  // If we fail to find a root, return V.
   if (!Root)
-    return NoCastV;
+    return V;
 
-  return Cache[NoCastV] = Root;
+  return Root;
 }
 
 //===----------------------------------------------------------------------===//

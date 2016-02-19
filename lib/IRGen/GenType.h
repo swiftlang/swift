@@ -236,24 +236,6 @@ public:
 void emitTypeLayoutVerifier(IRGenFunction &IGF,
                             ArrayRef<CanType> formalTypes);
 
-/// Build a value witness that initializes an array front-to-back.
-void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
-                                    const TypeInfo &type,
-                                    Address destArray,
-                                    Address srcArray,
-                                    llvm::Value *count,
-                                    SILType T,
-                                    IsTake_t take);
-
-/// Build a value witness that initializes an array back-to-front.
-void emitInitializeArrayBackToFront(IRGenFunction &IGF,
-                                    const TypeInfo &type,
-                                    Address destArray,
-                                    Address srcArray,
-                                    llvm::Value *count,
-                                    SILType T,
-                                    IsTake_t take);
-
 /// If a type is visibly a singleton aggregate (a tuple with one element, a
 /// struct with one field, or an enum with a single payload case), return the
 /// type of its field, which it is guaranteed to have identical layout to.

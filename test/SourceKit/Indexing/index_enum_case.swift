@@ -19,3 +19,14 @@ public enum E {
 }
 
 let e: E = .two(a:"String")
+
+func brokenEnums() {
+  switch NonExistent.A {
+  case .A:
+    return "one"
+  }
+  switch E.one {
+  case .tenthousand:
+    return "one"
+  }
+}
