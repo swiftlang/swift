@@ -1246,10 +1246,6 @@ Type ClangImporter::Implementation::importPropertyType(
        const clang::ObjCPropertyDecl *decl,
        bool isFromSystemModule) {
   OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
-  if (auto info = getKnownObjCProperty(decl)) {
-    if (auto nullability = info->getNullability())
-      optionality = translateNullability(*nullability);
-  }
 
   bool allowNSUIntegerAsInt = isFromSystemModule;
   if (allowNSUIntegerAsInt)
@@ -1316,13 +1312,9 @@ static Type applyNoEscape(Type type) {
 ///
 /// \param knownNonNull Whether a function- or method-level "nonnull" attribute
 /// applies to this parameter.
-///
-/// \param knownNullability When API notes describe the nullability of this
-/// parameter, that nullability.
 static OptionalTypeKind getParamOptionality(
                           const clang::ParmVarDecl *param,
-                          bool knownNonNull,
-                          Optional<clang::NullabilityKind> knownNullability) {
+                          bool knownNonNull) {
   auto &clangCtx = param->getASTContext();
 
   // If nullability is available on the type, use it.
@@ -1333,11 +1325,6 @@ static OptionalTypeKind getParamOptionality(
   // If it's known non-null, use that.
   if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
     return OTK_None;
-
-  // If API notes gives us nullability, use that.
-  if (knownNullability)
-    return ClangImporter::Implementation::translateNullability(
-             *knownNullability);
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;
@@ -1367,16 +1354,9 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
       clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
 
   // Check if we know more about the type from our whitelists.
-  Optional<api_notes::GlobalFunctionInfo> knownFn;
-  if (auto knownFnTmp = getKnownGlobalFunction(clangDecl))
-    if (knownFnTmp->NullabilityAudited)
-      knownFn = knownFnTmp;
-
   OptionalTypeKind OptionalityOfReturn;
   if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
     OptionalityOfReturn = OTK_None;
-  } else if (knownFn) {
-    OptionalityOfReturn = translateNullability(knownFn->getReturnTypeInfo());
   } else {
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
   }
@@ -1406,11 +1386,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
 
     // Check nullability of the parameter.
     OptionalTypeKind OptionalityOfParam
-      = getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index],
-                            knownFn
-                              ? Optional<clang::NullabilityKind>(
-                                  knownFn->getParamTypeInfo(index))
-                              : None);
+      = getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index]);
 
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     if (param->hasAttr<clang::CFReturnsRetainedAttr>())
@@ -1786,7 +1762,6 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
        clang::QualType resultType,
        const clang::DeclContext *dc,
        const llvm::SmallBitVector &nonNullArgs,
-       const Optional<api_notes::ObjCMethodInfo> &knownMethod,
        Optional<unsigned> errorParamIndex,
        bool returnsSelf,
        bool isInstanceMethod,
@@ -1822,11 +1797,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
           clangSema.PP,
           param->getType(),
           getParamOptionality(param,
-                              !nonNullArgs.empty() && nonNullArgs[i],
-                              knownMethod && knownMethod->NullabilityAudited
-                                ? Optional<clang::NullabilityKind>(
-                                    knownMethod->getParamTypeInfo(i))
-                                : None),
+                              !nonNullArgs.empty() && nonNullArgs[i]),
           SwiftContext.getIdentifier(baseName), numParams,
           argumentName, isLastParameter) != DefaultArgumentKind::None;
 
@@ -2042,13 +2013,6 @@ Type ClangImporter::Implementation::importMethodType(
   else
     resultKind = ImportTypeKind::Result;
 
-  // Check if we know more about the type from our whitelists.
-  Optional<api_notes::ObjCMethodInfo> knownMethod;
-  if (auto knownMethodTmp = getKnownObjCMethod(clangDecl)) {
-    if (knownMethodTmp->NullabilityAudited)
-      knownMethod = knownMethodTmp;
-  }
-
   // Determine if the method is a property getter/setter.
   const clang::ObjCPropertyDecl *property = nullptr;
   bool isPropertyGetter = false;
@@ -2074,9 +2038,6 @@ Type ClangImporter::Implementation::importMethodType(
     OptionalTypeKind OptionalityOfReturn;
     if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
       OptionalityOfReturn = OTK_None;
-    } else if (knownMethod) {
-      OptionalityOfReturn = translateNullability(
-                              knownMethod->getReturnTypeInfo());
     } else {
       OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
     }
@@ -2160,11 +2121,7 @@ Type ClangImporter::Implementation::importMethodType(
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam
       = getParamOptionality(param,
-                            !nonNullArgs.empty() && nonNullArgs[paramIndex],
-                            knownMethod
-                              ? Optional<clang::NullabilityKind>(
-                                  knownMethod->getParamTypeInfo(paramIndex))
-                              : None);
+                            !nonNullArgs.empty() && nonNullArgs[paramIndex]);
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {

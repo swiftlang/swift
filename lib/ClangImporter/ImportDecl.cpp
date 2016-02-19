@@ -2511,11 +2511,6 @@ namespace {
       }
 
       // Set availability.
-      auto knownFnInfo = Impl.getKnownGlobalFunction(decl);
-      if (knownFnInfo && knownFnInfo->Unavailable) {
-        Impl.markUnavailable(result, knownFnInfo->UnavailableMsg);
-      }
-
       if (decl->isVariadic()) {
         Impl.markUnavailable(result, "Variadic function is unavailable");
       }
@@ -2584,15 +2579,6 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto knownVarInfo = Impl.getKnownGlobalVariable(decl);
-
-      // Lookup nullability info.
-      OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
-      if (knownVarInfo) {
-        if (auto nullability = knownVarInfo->getNullability())
-          optionality = Impl.translateNullability(*nullability);
-      }
-
       // If the declaration is const, consider it audited.
       // We can assume that loading a const global variable doesn't
       // involve an ownership transfer.
@@ -2612,11 +2598,6 @@ namespace {
                        Impl.shouldImportGlobalAsLet(decl->getType()),
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
-
-      // Check availability.
-      if (knownVarInfo && knownVarInfo->Unavailable) {
-        Impl.markUnavailable(result, knownVarInfo->UnavailableMsg);
-      }
 
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
@@ -2930,12 +2911,6 @@ namespace {
                                      Impl.getClangASTContext())) {
           // If the return type has nullability, use it.
           nullability = Impl.translateNullability(*typeNullability);
-        } else if (auto known = Impl.getKnownObjCMethod(decl)) {
-          // If the method is known to have nullability information for
-          // its return type, use that.
-          if (known->NullabilityAudited) {
-            nullability = Impl.translateNullability(known->getReturnTypeInfo());
-          }
         }
         if (nullability != OTK_None && !errorConvention.hasValue()) {
           resultTy = OptionalType::get(nullability, resultTy);
@@ -5187,54 +5162,6 @@ void ClangImporter::Implementation::importAttributes(
   // If the declaration is unavailable, we're done.
   if (AnyUnavailable)
     return;
-
-  // Add implicit attributes.
-  if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
-    Optional<api_notes::ObjCMethodInfo> knownMethod;
-    if (NewContext)
-      knownMethod = getKnownObjCMethod(MD, NewContext);
-    if (!knownMethod)
-      knownMethod = getKnownObjCMethod(MD);
-
-    // Any knowledge of methods known due to our whitelists.
-    if (knownMethod) {
-      // Availability.
-      if (knownMethod->Unavailable) {
-        auto attr = AvailableAttr::createUnconditional(
-                      C,
-                      SwiftContext.AllocateCopy(knownMethod->UnavailableMsg));
-        MappedDecl->getAttrs().add(attr);
-
-        // If we made a protocol requirement unavailable, mark it optional:
-        // nobody should have to satisfy it.
-        if (isa<ProtocolDecl>(MappedDecl->getDeclContext())) {
-          if (!MappedDecl->getAttrs().hasAttribute<OptionalAttr>())
-            MappedDecl->getAttrs().add(new (C) OptionalAttr(/*implicit*/false));
-        }
-      }
-    }
-  } else if (auto PD = dyn_cast<clang::ObjCPropertyDecl>(ClangDecl)) {
-    if (auto knownProperty = getKnownObjCProperty(PD)) {
-      if (knownProperty->Unavailable) {
-        auto attr = AvailableAttr::createUnconditional(
-                      C,
-                      SwiftContext.AllocateCopy(knownProperty->UnavailableMsg));
-        MappedDecl->getAttrs().add(attr);
-      }
-    }
-  } else if (auto CD = dyn_cast<clang::ObjCContainerDecl>(ClangDecl)) {
-    if (isa<clang::ObjCInterfaceDecl>(CD) || isa<clang::ObjCProtocolDecl>(CD)) {
-      if (auto knownContext = getKnownObjCContext(CD)) {
-        if (knownContext->Unavailable) {
-          auto attr = AvailableAttr::createUnconditional(
-                        C,
-                        SwiftContext.AllocateCopy(
-                          knownContext->UnavailableMsg));
-          MappedDecl->getAttrs().add(attr);
-        }
-      }
-    }
-  }
 
   // Ban NSInvocation.
   if (auto ID = dyn_cast<clang::ObjCInterfaceDecl>(ClangDecl)) {

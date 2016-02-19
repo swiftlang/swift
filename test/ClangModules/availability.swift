@@ -33,9 +33,9 @@ func test_NSInvocation(x: NSInvocation,         // expected-error {{'NSInvocatio
                        z: NSMethodSignature) {} // expected-error {{'NSMethodSignature' is unavailable}}
 
 func test_class_avail(x:NSObject, obj: AnyObject) {
-  x.`class`() // expected-error {{'class()' is unavailable: use 'dynamicType' instead}}
-  NSObject.`class`() // expected-error {{'class()' is unavailable: use 'self' instead}}
-  obj.`class`!() // expected-error {{'class()' is unavailable: use 'dynamicType' instead}}
+  x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
+  NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
+  obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
 }
 
 func test_unavailable_app_extension() {
@@ -108,8 +108,4 @@ func test_NSCalendarDate(o: NSCalendarDate) {} // expected-error {{'NSCalendarDa
 func test_dispatch(object: dispatch_object_t) {
   dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}
   dispatch_release(object); // expected-error {{'dispatch_release' is unavailable}}
-}
-
-func test_NSError() {
-  _ = NSError() // expected-error {{'init()' is unavailable: use 'init(domain:code:userInfo:)'}}
 }
