@@ -201,8 +201,10 @@ extension Collection where Iterator == IndexingIterator<Self> {
 extension Collection where SubSequence == Slice<Self> {
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     Index._failEarlyRangeCheck2(
-      bounds.startIndex, rangeEnd: bounds.endIndex,
-      boundsStart: startIndex, boundsEnd: endIndex)
+      rangeStart: bounds.startIndex,
+      rangeEnd: bounds.endIndex,
+      boundsStart: startIndex,
+      boundsEnd: endIndex)
     return Slice(_base: self, bounds: bounds)
   }
 }
@@ -679,8 +681,10 @@ extension MutableCollection {
   public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
     get {
       Index._failEarlyRangeCheck2(
-        bounds.startIndex, rangeEnd: bounds.endIndex,
-        boundsStart: startIndex, boundsEnd: endIndex)
+        rangeStart: bounds.startIndex,
+        rangeEnd: bounds.endIndex,
+        boundsStart: startIndex,
+        boundsEnd: endIndex)
       return MutableSlice(_base: self, bounds: bounds)
     }
     set {
@@ -697,8 +701,10 @@ internal func _writeBackMutableSlice<
   C.Index == Slice_.Index
 >(inout self_: C, bounds: Range<C.Index>, slice: Slice_) {
   C.Index._failEarlyRangeCheck2(
-    bounds.startIndex, rangeEnd: bounds.endIndex,
-    boundsStart: self_.startIndex, boundsEnd: self_.endIndex)
+    rangeStart: bounds.startIndex,
+    rangeEnd: bounds.endIndex,
+    boundsStart: self_.startIndex,
+    boundsEnd: self_.endIndex)
   // FIXME(performance): can we use
   // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
   // aliasing violations if the newValue points to the same buffer?

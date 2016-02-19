@@ -504,7 +504,7 @@ public struct ${Index} : ForwardIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: ${Index}, rangeEnd: ${Index},
+    rangeStart rangeStart: ${Index}, rangeEnd: ${Index},
     boundsStart: ${Index}, boundsEnd: ${Index}
   ) {
     let range = rangeStart..<rangeEnd
@@ -516,7 +516,7 @@ public struct ${Index} : ForwardIndex {
 
     if ${Index}.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
-        rangeStart.position,
+        rangeStart: rangeStart.position,
         rangeEnd: rangeEnd.position,
         boundsStart: boundsStart.position,
         boundsEnd: boundsEnd.position)
@@ -603,7 +603,7 @@ public struct MinimalBidirectionalIndex : BidirectionalIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: MinimalBidirectionalIndex,
+    rangeStart rangeStart: MinimalBidirectionalIndex,
     rangeEnd: MinimalBidirectionalIndex,
     boundsStart: MinimalBidirectionalIndex,
     boundsEnd: MinimalBidirectionalIndex
@@ -617,7 +617,7 @@ public struct MinimalBidirectionalIndex : BidirectionalIndex {
 
     if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
-        rangeStart.position,
+        rangeStart: rangeStart.position,
         rangeEnd: rangeEnd.position,
         boundsStart: boundsStart.position,
         boundsEnd: boundsEnd.position)
@@ -805,7 +805,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: MinimalRandomAccessIndex,
+    rangeStart rangeStart: MinimalRandomAccessIndex,
     rangeEnd: MinimalRandomAccessIndex,
     boundsStart: MinimalRandomAccessIndex,
     boundsEnd: MinimalRandomAccessIndex
@@ -819,7 +819,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndex {
 
     if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
       Int._failEarlyRangeCheck2(
-        rangeStart.position,
+        rangeStart: rangeStart.position,
         rangeEnd: rangeEnd.position,
         boundsStart: boundsStart.position,
         boundsEnd: boundsEnd.position)
@@ -1343,8 +1343,10 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
 
   public subscript(bounds: Range<Index>) -> Self_ {
     Index._failEarlyRangeCheck2(
-      bounds.startIndex, rangeEnd: bounds.endIndex,
-      boundsStart: startIndex, boundsEnd: endIndex)
+      rangeStart: bounds.startIndex,
+      rangeEnd: bounds.endIndex,
+      boundsStart: startIndex,
+      boundsEnd: endIndex)
     return Defaulted${traversal}RangeReplaceableSlice(
       base: base, bounds: bounds)
   }
@@ -1361,8 +1363,10 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       - subRange.count
       + numericCast(newElements.count) as Int
     Index._failEarlyRangeCheck2(
-      subRange.startIndex, rangeEnd: subRange.endIndex,
-      boundsStart: startIndex, boundsEnd: endIndex)
+      rangeStart: subRange.startIndex,
+      rangeEnd: subRange.endIndex,
+      boundsStart: startIndex,
+      boundsEnd: endIndex)
     base.replaceSubrange(subRange, with: newElements)
     startIndex = base.startIndex.advanced(by: startOffset)
     endIndex = base.startIndex.advanced(by: endOffset)

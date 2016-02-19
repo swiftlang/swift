@@ -124,7 +124,10 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// - Complexity: O(1).
   static func _failEarlyRangeCheck2(
-    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self)
+    rangeStart rangeStart: Self,
+    rangeEnd: Self,
+    boundsStart: Self,
+    boundsEnd: Self)
   // FIXME: the suffix `2` in the name, and passing `startIndex` and `endIndex`
   // separately (rather than as a range) are workarounds for a compiler defect.
   // <rdar://problem/21855350> Rejects-valid: rejects code that has two Self
@@ -184,7 +187,10 @@ extension ForwardIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self
+    rangeStart rangeStart: Self,
+    rangeEnd: Self,
+    boundsStart: Self,
+    boundsEnd: Self
   ) {
     // Can't perform range checks in O(1) on forward indices.
   }
@@ -360,7 +366,10 @@ extension RandomAccessIndex {
   }
 
   public static func _failEarlyRangeCheck2(
-    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self
+    rangeStart rangeStart: Self,
+    rangeEnd: Self,
+    boundsStart: Self,
+    boundsEnd: Self
   ) {
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd

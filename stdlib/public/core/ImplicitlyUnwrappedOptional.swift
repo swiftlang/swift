@@ -23,8 +23,8 @@ public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
   public init(_ some: Wrapped) { self = .some(some) }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
+  @_transparent
+  public init(nilLiteral: ()) {
     self = .none
   }
 }

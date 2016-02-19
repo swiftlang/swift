@@ -449,7 +449,10 @@ public protocol MyIndexableType {
   func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
 
   func _failEarlyRangeCheck2(
-    rangeStart: Index, rangeEnd: Index, boundsStart: Index, boundsEnd: Index)
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index)
 }
 extension MyIndexableType {
   @inline(__always)
@@ -493,7 +496,10 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
 
   func _failEarlyRangeCheck2(
-    rangeStart: Index, rangeEnd: Index, boundsStart: Index, boundsEnd: Index)
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index)
 
   var indices: IndexRange { get }
 
@@ -565,7 +571,10 @@ extension MyForwardCollectionType {
   }
 
   public func _failEarlyRangeCheck2(
-    rangeStart: Index, rangeEnd: Index, boundsStart: Index, boundsEnd: Index
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index
   ) {
     // Can't perform range checks in O(1) on forward indices.
   }
@@ -989,7 +998,7 @@ public struct MySlice<Collection : MyIndexableType /* : MyForwardCollectionType 
   public typealias SubSequence = MySlice
   public subscript(bounds: MyRange<Index>) -> SubSequence {
     _base._failEarlyRangeCheck2(
-      bounds.startIndex, rangeEnd: bounds.endIndex,
+      rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
     return MySlice(base: _base, start: bounds.startIndex, end: bounds.endIndex)
   }
@@ -1004,7 +1013,11 @@ public struct MySlice<Collection : MyIndexableType /* : MyForwardCollectionType 
   }
 
   public func _failEarlyRangeCheck2(
-    rangeStart: Index, rangeEnd: Index, boundsStart: Index, boundsEnd: Index) {
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index
+  ) {
     fatalError("FIXME")
   }
 
@@ -1089,7 +1102,11 @@ public struct MySliceIndexRange<Collection : MyIndexableType /* MyForwardCollect
   }
 
   public func _failEarlyRangeCheck2(
-    rangeStart: Index, rangeEnd: Index, boundsStart: Index, boundsEnd: Index) {
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index
+  ) {
   }
 
   public typealias IndexRange = MySliceIndexRange
@@ -1177,7 +1194,10 @@ extension MyRandomAccessIndexType {
   }
 
   public func _failEarlyRangeCheck2(
-    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self
+    rangeStart rangeStart: Self,
+    rangeEnd: Self,
+    boundsStart: Self,
+    boundsEnd: Self
   ) {
     let range = MyRange(startIndex: rangeStart, endIndex: rangeEnd)
     let bounds = MyRange(startIndex: boundsStart, endIndex: boundsEnd)
