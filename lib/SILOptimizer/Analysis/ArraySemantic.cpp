@@ -187,6 +187,25 @@ bool swift::ArraySemanticsCall::hasGuaranteedSelf() const {
     ParameterConvention::Direct_Guaranteed;
 }
 
+bool swift::ArraySemanticsCall::hasGetElementDirectResult() const {
+  assert(getKind() == ArrayCallKind::kGetElement &&
+         "must be an array.get_element call");
+  bool DirectResult =
+    (SemanticsCall->getOrigCalleeType()->getNumIndirectResults() == 0);
+  assert((DirectResult && SemanticsCall->getNumArguments() == 4 ||
+          !DirectResult && SemanticsCall->getNumArguments() == 5) &&
+         "wrong number of array.get_element call arguments");
+  return DirectResult;
+}
+
+SILValue swift::ArraySemanticsCall::getTypeCheckedArgument() const {
+  return SemanticsCall->getArgument(hasGetElementDirectResult() ? 1 : 2);
+}
+
+SILValue swift::ArraySemanticsCall::getSubscriptCheckArgument() const {
+  return SemanticsCall->getArgument(hasGetElementDirectResult() ? 2 : 3);
+}
+
 SILValue swift::ArraySemanticsCall::getIndex() const {
   assert(SemanticsCall && "Must have a semantics call");
   assert(SemanticsCall->getNumArguments() && "Must have arguments");
@@ -196,7 +215,7 @@ SILValue swift::ArraySemanticsCall::getIndex() const {
          getKind() == ArrayCallKind::kGetElementAddress);
 
   if (getKind() == ArrayCallKind::kGetElement)
-    return SemanticsCall->getArgument(1);
+    return SemanticsCall->getArgument(hasGetElementDirectResult() ? 0 : 1);
 
   return SemanticsCall->getArgument(0);
 }
@@ -465,9 +484,9 @@ void swift::ArraySemanticsCall::removeCall() {
   break;
   case ArrayCallKind::kGetElement: {
     // Remove the matching isNativeTypeChecked and check_subscript call.
-    ArraySemanticsCall IsNative(SemanticsCall->getArgument(2),
+    ArraySemanticsCall IsNative(getTypeCheckedArgument(),
                                 "array.props.isNativeTypeChecked");
-    ArraySemanticsCall SubscriptCheck(SemanticsCall->getArgument(3),
+    ArraySemanticsCall SubscriptCheck(getSubscriptCheckArgument(),
                                       "array.check_subscript");
     if (SubscriptCheck)
       SubscriptCheck.removeCall();
@@ -626,15 +645,8 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   if (!V->getType().isLoadable(SemanticsCall->getModule()))
    return false;
 
-  auto Dest = SemanticsCall->getArgument(0);
-
-  // Expect an alloc_stack initialization.
-  auto *ASI = dyn_cast<AllocStackInst>(Dest);
-  if (!ASI)
-    return false;
-
   // Expect a check_subscript call or the empty dependence.
-  auto SubscriptCheck = SemanticsCall->getArgument(3);
+  auto SubscriptCheck = getSubscriptCheckArgument();
   ArraySemanticsCall Check(SubscriptCheck, "array.check_subscript");
   auto *EmptyDep = dyn_cast<StructInst>(SubscriptCheck);
   if (!Check && (!EmptyDep || !EmptyDep->getElements().empty()))
@@ -642,9 +654,21 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 
   SILBuilderWithScope Builder(SemanticsCall);
   auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
-  ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
-  ValLowering.emitStoreOfCopy(Builder, SemanticsCall->getLoc(), V, Dest,
-                              IsInitialization_t::IsInitialization);
+  if (hasGetElementDirectResult()) {
+    ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
+    SemanticsCall->replaceAllUsesWith(V);
+  } else {
+    auto Dest = SemanticsCall->getArgument(0);
+
+    // Expect an alloc_stack initialization.
+    auto *ASI = dyn_cast<AllocStackInst>(Dest);
+    if (!ASI)
+      return false;
+
+    ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
+    ValLowering.emitStoreOfCopy(Builder, SemanticsCall->getLoc(), V, Dest,
+                                IsInitialization_t::IsInitialization);
+  }
   removeCall();
   return true;
 }

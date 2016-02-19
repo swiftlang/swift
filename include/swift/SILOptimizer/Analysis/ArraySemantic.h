@@ -78,6 +78,18 @@ public:
   /// Get the self argument operand.
   Operand &getSelfOperand() const;
 
+  /// Returns true if this array.get_element call returns the element
+  /// as a direct result (and not as an indirect result).
+  bool hasGetElementDirectResult() const;
+
+  /// Returns the the wasNativeTypeChecked argument of this
+  /// array.get_element call.
+  SILValue getTypeCheckedArgument() const;
+
+  /// Returns the the matchingSubscriptCheck argument of this
+  /// array.get_element call.
+  SILValue getSubscriptCheckArgument() const;
+
   /// Get the index for operations that have one.
   SILValue getIndex() const;
 
