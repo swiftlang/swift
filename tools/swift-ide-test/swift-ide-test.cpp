@@ -391,6 +391,10 @@ static llvm::cl::list<std::string>
 ModuleToPrint("module-to-print",
               llvm::cl::desc("Name of the module to print"));
 
+static llvm::cl::list<std::string>
+ModuleGroupToPrint("module-group",
+                   llvm::cl::desc("Name of the module group to print"));
+
 static llvm::cl::opt<bool>
 ModulePrintSubmodules("module-print-submodules",
                       llvm::cl::desc("Recursively print submodules"),
@@ -1596,6 +1600,7 @@ public:
 
 static int doPrintModules(const CompilerInvocation &InitInvok,
                           const std::vector<std::string> ModulesToPrint,
+                          const std::vector<std::string> GroupsToPrint,
                           ide::ModuleTraversalOptions TraversalOptions,
                           const PrintOptions &Options,
                           bool AnnotatePrint,
@@ -1658,9 +1663,13 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
         continue;
       }
     }
+    std::vector<StringRef> GroupNames;
+    for (StringRef G : GroupsToPrint) {
+      GroupNames.push_back(G);
+    }
 
-    printSubmoduleInterface(M, ModuleName, None, TraversalOptions, *Printer, Options,
-                            SynthesizeExtensions);
+    printSubmoduleInterface(M, ModuleName, GroupNames, TraversalOptions,
+                            *Printer, Options, SynthesizeExtensions);
   }
 
   return ExitCode;
@@ -2654,8 +2663,9 @@ int main(int argc, char *argv[]) {
       TraversalOptions |= ide::ModuleTraversal::SkipOverlay;
 
     ExitCode = doPrintModules(
-        InitInvok, options::ModuleToPrint, TraversalOptions, PrintOpts,
-        options::AnnotatePrint, options::SynthesizeExtension);
+        InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
+        TraversalOptions, PrintOpts, options::AnnotatePrint,
+        options::SynthesizeExtension);
     break;
   }
 

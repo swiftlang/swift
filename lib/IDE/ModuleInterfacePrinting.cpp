@@ -129,8 +129,9 @@ void swift::ide::printModuleInterface(Module *M,
                                       ASTPrinter &Printer,
                                       const PrintOptions &Options,
                                       const bool PrintSynthesizedExtensions) {
-  printSubmoduleInterface(M, M->getName().str(), None, TraversalOptions, Printer,
-                          Options, PrintSynthesizedExtensions);
+  printSubmoduleInterface(M, M->getName().str(), ArrayRef<StringRef>(),
+                          TraversalOptions, Printer, Options,
+                          PrintSynthesizedExtensions);
 }
 
 static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
@@ -178,7 +179,7 @@ void findExtensionsFromConformingProtocols(Decl *D,
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,
-       Optional<StringRef> GroupName,
+       ArrayRef<StringRef> GroupNames,
        ModuleTraversalOptions TraversalOptions,
        ASTPrinter &Printer,
        const PrintOptions &Options,
@@ -321,9 +322,14 @@ void swift::ide::printSubmoduleInterface(
     }
     if (FullModuleName.empty()) {
       // If group name is given and the decl does not belong to the group, skip it.
-      if (GroupName && (!D->getGroupName() ||
-                        D->getGroupName().getValue() != GroupName.getValue()))
+      if (!GroupNames.empty()){
+        if (auto Target = D->getGroupName()) {
+          if (std::find(GroupNames.begin(), GroupNames.end(),
+                        Target.getValue()) != GroupNames.end())
+             SwiftDecls.push_back(D);
+        }
         continue;
+      }
       // Add Swift decls if we are printing the top-level module.
       SwiftDecls.push_back(D);
     }
@@ -361,7 +367,7 @@ void swift::ide::printSubmoduleInterface(
 
   // If the group name is specified, we sort them according to their source order,
   // which is the order preserved by getTopLeveDecls.
-  if (!GroupName) {
+  if (GroupNames.empty()) {
     std::sort(SwiftDecls.begin(), SwiftDecls.end(),
       [&](Decl *LHS, Decl *RHS) -> bool {
         auto *LHSValue = dyn_cast<ValueDecl>(LHS);
