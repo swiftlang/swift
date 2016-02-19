@@ -28,20 +28,20 @@ public struct Mirror {
   /// Note that the effect of this setting goes no deeper than the
   /// nearest descendant class that overrides `customMirror`, which
   /// in turn can determine representation of *its* descendants.
-  internal enum DefaultDescendantRepresentation {
-  /// Generate a default mirror for descendant classes that don't
-  /// override `customMirror`.
-  ////
-  /// This case is the default.
-  case Generated
+  internal enum _DefaultDescendantRepresentation {
+    /// Generate a default mirror for descendant classes that don't
+    /// override `customMirror`.
+    ///
+    /// This case is the default.
+    case generated
 
-  /// Suppress the representation of descendant classes that don't
-  /// override `customMirror`.
-  ///
-  /// This option may be useful at the root of a class cluster, where
-  /// implementation details of descendants should generally not be
-  /// visible to clients.  
-  case Suppressed
+    /// Suppress the representation of descendant classes that don't
+    /// override `customMirror`.
+    ///
+    /// This option may be useful at the root of a class cluster, where
+    /// implementation details of descendants should generally not be
+    /// visible to clients.
+    case suppressed
   }
 
   /// Representation of ancestor classes.
@@ -220,7 +220,7 @@ public struct Mirror {
     self.children = Children(children)
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
-      = subject is CustomLeafReflectable ? .Suppressed : .Generated
+      = subject is CustomLeafReflectable ? .suppressed : .generated
   }
 
   /// Represent `subject` with child values given by
@@ -270,7 +270,7 @@ public struct Mirror {
     )
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
-      = subject is CustomLeafReflectable ? .Suppressed : .Generated
+      = subject is CustomLeafReflectable ? .suppressed : .generated
   }
 
   /// Represent `subject` with labeled structure described by
@@ -311,7 +311,7 @@ public struct Mirror {
 
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
-      = subject is CustomLeafReflectable ? .Suppressed : .Generated
+      = subject is CustomLeafReflectable ? .suppressed : .generated
   }
 
   /// The static type of the subject being reflected.
@@ -332,7 +332,7 @@ public struct Mirror {
   }
 
   internal let _makeSuperclassMirror: () -> Mirror?
-  internal let _defaultDescendantRepresentation: DefaultDescendantRepresentation
+  internal let _defaultDescendantRepresentation: _DefaultDescendantRepresentation
 }
 
 /// A type that explicitly supplies its own Mirror.
@@ -520,7 +520,7 @@ internal extension Mirror {
     legacy legacyMirror: _Mirror? = nil
   ) {
     if ancestor.subjectType == subjectClass
-      || ancestor._defaultDescendantRepresentation == .Suppressed {
+      || ancestor._defaultDescendantRepresentation == .suppressed {
       self = ancestor
     }
     else {
@@ -562,7 +562,7 @@ internal extension Mirror {
     self.subjectType = subjectType
     self.children = Children(LegacyChildren(legacyMirror))
     self.displayStyle = DisplayStyle(legacy: legacyMirror.disposition)
-    self._defaultDescendantRepresentation = .Generated
+    self._defaultDescendantRepresentation = .generated
   }
 }
 
