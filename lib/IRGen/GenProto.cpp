@@ -304,12 +304,42 @@ namespace {
 
 } // end anonymous namespace
 
+/// Return true if the witness table requires runtime instantiation to
+/// handle resiliently-added requirements with default implementations.
+static bool isResilientConformance(const NormalProtocolConformance *conformance) {
+  // If the protocol is not resilient, the conformance is not resilient
+  // either.
+  if (conformance->getProtocol()->hasFixedLayout())
+    return false;
+
+  // If the protocol is in the same module as the conformance, we're
+  // not resilient.
+  if (conformance->getDeclContext()->getParentModule()
+      == conformance->getProtocol()->getParentModule())
+    return false;
+
+  // We have a resilient conformance.
+  return true;
+}
+
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
 static bool isDependentConformance(IRGenModule &IGM,
                              const NormalProtocolConformance *conformance,
                                    ResilienceExpansion expansion) {
-  // If the conforming type isn't dependent, this is never true.
+  // If the conformance is resilient, this is always true.
+  if (isResilientConformance(conformance))
+    return true;
+
+  // Check whether any of the inherited protocols are dependent.
+  for (auto &entry : conformance->getInheritedConformances()) {
+    if (isDependentConformance(IGM, entry.second->getRootNormalConformance(),
+                               expansion)) {
+      return true;
+    }
+  }
+
+  // If the conforming type isn't dependent, the below check is never true.
   if (!conformance->getDeclContext()->isGenericContext())
     return false;
 
@@ -319,16 +349,8 @@ static bool isDependentConformance(IRGenModule &IGM,
             TypeDecl *explicitDecl) -> bool {
           // RESILIENCE: this could be an opaque conformance
           return sub.getReplacement()->hasArchetype();
-         })) {
+       })) {
     return true;
-  }
-
-  // Check whether any of the associated types are dependent.
-  for (auto &entry : conformance->getInheritedConformances()) {
-    if (isDependentConformance(IGM, entry.second->getRootNormalConformance(),
-                               expansion)) {
-      return true;
-    }
   }
 
   return false;
@@ -439,10 +461,8 @@ public:
 
   llvm::Value *getTable(IRGenFunction &IGF, CanType type,
                         llvm::Value **typeMetadataCache) const override {
-    // If the conformance isn't generic, or we're looking up a dependent
-    // type, we don't want to / can't cache the result.
-    if (!Conformance->getDeclContext()->isGenericContext() ||
-        type->hasArchetype()) {
+    // If we're looking up a dependent type, we can't cache the result.
+    if (type->hasArchetype()) {
       return emitWitnessTableAccessorCall(IGF, Conformance, type,
                                           typeMetadataCache);
     }
@@ -491,6 +511,10 @@ public:
     {
       // TODO: in conditional conformances, allocate space for the assumed
       // conformances here.
+
+      // If the conformance is resilient, we require runtime instantiation.
+      if (isResilientConformance(&Conformance))
+        RequiresSpecialization = true;
     }
 
     /// The top-level entry point.
@@ -1007,9 +1031,16 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   }
 
   // The target metadata is the first argument.
-  assert(Conformance.getDeclContext()->isGenericContext());
+  assert(isDependentConformance(IGF.IGM, &Conformance,
+                                ResilienceExpansion::Maximal));
+
   Explosion params = IGF.collectParameters();
-  llvm::Value *metadata = params.claimNext();
+  llvm::Value *metadata;
+
+  if (Conformance.getDeclContext()->isGenericContext())
+    metadata = params.claimNext();
+  else
+    metadata = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
 
   // Okay, we need a cache.  Build the cache structure.
   //  struct GenericWitnessTable {
