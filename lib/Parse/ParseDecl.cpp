@@ -2668,6 +2668,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 /// \verbatim
 ///   decl-typealias:
 ///     'typealias' identifier inheritance? '=' type
+///     'associatedtype' identifier inheritance? '=' type
 /// \endverbatim
 ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                                   bool isAssociatedType,
@@ -2683,10 +2684,11 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     }
   } else {
     if (consumeIf(tok::kw_associatedtype, TypeAliasLoc)) {
-      diagnose(TypeAliasLoc, diag::associatedtype_outside_protocol);
-      return makeParserErrorResult<TypeDecl>();
+      diagnose(TypeAliasLoc, diag::associatedtype_outside_protocol)
+        .fixItReplace(TypeAliasLoc, "typealias");
+    } else {
+      TypeAliasLoc = consumeToken(tok::kw_typealias);
     }
-    TypeAliasLoc = consumeToken(tok::kw_typealias);
   }
   
   Identifier Id;
