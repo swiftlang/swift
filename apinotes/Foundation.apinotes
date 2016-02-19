@@ -10,14 +10,8 @@ Classes:
   Methods:
   - Selector: 'decodeObjectOfClass:forKey:'
     MethodKind: Instance
-    Availability: none
+    Availability: nonswift
     AvailabilityMsg: use generic 'decodeObjectOfClass(_:forKey:)'
-- Name: NSError
-  Methods:
-  - Selector: 'init'
-    MethodKind: Instance
-    Availability: none
-    AvailabilityMsg: use 'init(domain:code:userInfo:)'
 - Name: NSProcessInfo
   Methods:
   - Selector: processInfo

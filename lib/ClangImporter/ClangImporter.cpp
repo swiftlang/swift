@@ -477,6 +477,14 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
+
+  // Add API notes paths.
+  for (const auto &searchPath : searchPathOpts.ImportSearchPaths) {
+    invocationArgStrs.push_back("-iapinotes-modules");
+    invocationArgStrs.push_back(searchPath);
+  }
+  invocationArgStrs.push_back("-iapinotes-modules");
+  invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
 }
 
 std::unique_ptr<ClangImporter>
@@ -1080,9 +1088,6 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
     result->forAllVisibleModules({}, [](Module::ImportedModule import) {});
   }
 
-  // Try to load the API notes for this module.
-  (void)getAPINotesForModule(clangModule->getTopLevelModule());
-
   if (clangModule->isSubModule()) {
     finishLoadingClangModule(owner, clangModule->getTopLevelModule(), true);
   } else {
@@ -1215,61 +1220,6 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   cacheEntry.setPointer(file);
 
   return file;
-}
-
-api_notes::APINotesReader *
-ClangImporter::Implementation::getAPINotesForModule(
-    const clang::Module *underlying) {
-  assert(underlying == underlying->getTopLevelModule() &&
-         "Only allowed on a top-level module");
-  // Check whether we already have an API notes reader.
-  auto known = APINotesReaders.find(underlying);
-  if (known != APINotesReaders.end())
-    return known->second.get();
-
-  /// Determine the name of the API notes we're looking for.
-  llvm::SmallString<64> notesFilename(underlying->Name);
-  notesFilename += '.';
-  notesFilename += api_notes::BINARY_APINOTES_EXTENSION;
-
-  // Look for a compiled API notes file in at the given search path. Sets
-  // the reader and returns true if one was found.
-  llvm::SmallString<64> scratch;
-  std::unique_ptr<api_notes::APINotesReader> reader;
-  auto findAPINotes = [&](StringRef searchPath) -> bool {
-    // Compute the file name we're looking for.
-    scratch.clear();
-    llvm::sys::path::append(scratch, searchPath, notesFilename.str());
-
-    // Try to open the file.
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> bufferOrErr
-      = llvm::MemoryBuffer::getFile(scratch.str());
-    if (!bufferOrErr)
-      return false;
-
-    // We found the API notes file; try to load it.
-    reader = api_notes::APINotesReader::get(std::move(bufferOrErr.get()));
-    return true;
-  };
-
-  // Look for a ModuleName.apinotes file in the import search paths.
-  // FIXME: Good thing we have no notion of layering for these paths.
-  bool foundAny = false;
-  for (const auto& searchPath : SwiftContext.SearchPathOpts.ImportSearchPaths) {
-    if (findAPINotes(searchPath)) {
-      foundAny = true;
-      break;
-    }
-  }
-
-  // If we didn't find anything in the user-provided import search paths, look
-  // in the runtime library import path.
-  if (!foundAny)
-    findAPINotes(SwiftContext.SearchPathOpts.RuntimeLibraryImportPath);
-
-  // Add the reader we formed (if any) to the table.
-  return APINotesReaders.insert({underlying, std::move(reader)})
-           .first->second.get();
 }
 
 Optional<const clang::Decl *>
@@ -1648,12 +1598,8 @@ static bool hasErrorMethodNameCollision(ClangImporter::Implementation &importer,
 /// Determine the optionality of the given Objective-C method.
 ///
 /// \param method The Clang method.
-///
-/// \param knownNullability When API notes describe the nullability of this
-/// parameter, that nullability.
 static OptionalTypeKind getResultOptionality(
-                          const clang::ObjCMethodDecl *method,
-                          Optional<clang::NullabilityKind> knownNullability) {
+                          const clang::ObjCMethodDecl *method) {
   auto &clangCtx = method->getASTContext();
 
   // If nullability is available on the type, use it.
@@ -1664,12 +1610,6 @@ static OptionalTypeKind getResultOptionality(
   // If there is a returns_nonnull attribute, non-null.
   if (method->hasAttr<clang::ReturnsNonNullAttr>())
     return OTK_None;
-
-  // If API notes gives us nullability, use that.
-  if (knownNullability) {
-    return ClangImporter::Implementation::translateNullability(
-             *knownNullability);
-  }
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;
@@ -1701,17 +1641,9 @@ considerErrorImport(ClangImporter::Implementation &importer,
     if (!isErrorOutParameter(params[index], isErrorOwned))
       break;
 
-    // Determine the nullability of the result.
-    Optional<clang::NullabilityKind> knownResultNullability;
-    if (auto knownMethod = importer.getKnownObjCMethod(clangDecl)) {
-      if (knownMethod->NullabilityAudited)
-        knownResultNullability = knownMethod->getReturnTypeInfo();
-    }
-
     auto errorKind =
       classifyMethodErrorHandling(clangDecl,
-                                  getResultOptionality(clangDecl,
-                                                       knownResultNullability));
+                                  getResultOptionality(clangDecl));
     if (!errorKind) return None;
 
     // Consider adjusting the imported declaration name to remove the
@@ -2515,7 +2447,6 @@ auto ClangImporter::Implementation::importFullName(
         method->getReturnType(),
         method->getDeclContext(),
         getNonNullArgs(method, params),
-        getKnownObjCMethod(method),
         result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
                          : None,
         method->hasRelatedResultType(),
@@ -2683,279 +2614,10 @@ OptionalTypeKind ClangImporter::Implementation::translateNullability(
   }
 }
 
-api_notes::APINotesReader*
-ClangImporter::Implementation::getAPINotesForDecl(const clang::Decl *decl) {
-  if (auto module = getClangSubmoduleForDecl(decl))
-    if (*module)
-      return getAPINotesForModule((*module)->getTopLevelModule());
-  return nullptr;
-}
-
-std::tuple<StringRef, api_notes::APINotesReader *, api_notes::APINotesReader *>
-ClangImporter::Implementation::getAPINotesForContext(
-    const clang::ObjCContainerDecl *container) {
-  // Find the primary set of API notes, in the module where this container
-  // was declared.
-  api_notes::APINotesReader *primary = getAPINotesForDecl(container);
-
-  StringRef name;
-
-  // Find the secondary set of API notes, in the module where the original
-  // class was declared.
-  api_notes::APINotesReader *secondary = nullptr;
-  if (auto category = dyn_cast<clang::ObjCCategoryDecl>(container)) {
-    auto *objcClass = category->getClassInterface();
-    secondary = getAPINotesForDecl(objcClass);
-
-    // For categories, use the name of the class itself.
-    name = objcClass->getName();
-  } else {
-    // For protocols and classes, we just need the class name.
-    name = container->getName();
-  }
-
-  // If the primary and secondary are the same.
-  if (primary == secondary) {
-    // Drop the secondary; we only care about the primary.
-    secondary = nullptr;
-  }
-
-  return std::make_tuple(name, primary, secondary);
-}
-
-void ClangImporter::Implementation::mergePropInfoIntoAccessor(
-    const clang::ObjCMethodDecl *method, api_notes::ObjCMethodInfo &methodInfo){
-
-  if (!method->isPropertyAccessor())
-    return;
-
-  const clang::ObjCPropertyDecl *pDecl = method->findPropertyDecl();
-  if (!pDecl)
-    return;
-
-  if (auto pInfo = getKnownObjCProperty(pDecl)) {
-    if (method->param_size() == 0) {
-      methodInfo.mergePropInfoIntoGetter(*pInfo);
-    } else {
-      assert(method->param_size() == 1);
-      methodInfo.mergePropInfoIntoSetter(*pInfo);
-    }
-  }
-}
-
-static Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-lookupObjCContext(api_notes::APINotesReader *reader, StringRef contextName,
-                  const clang::ObjCContainerDecl *contextDecl) {
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    contextInfo;
-
-  // Look for context information in the primary source.
-  if (isa<clang::ObjCProtocolDecl>(contextDecl))
-    contextInfo = reader->lookupObjCProtocol(contextName);
-  else
-    contextInfo = reader->lookupObjCClass(contextName);
-
-  return contextInfo;
-}
-
-
-Optional<api_notes::ObjCMethodInfo>
-ClangImporter::Implementation::getKnownObjCMethod(
-    const clang::ObjCMethodDecl *method,
-    const clang::ObjCContainerDecl *container) {
-  if (!container)
-    container = cast<clang::ObjCContainerDecl>(method->getDeclContext());
-
-  // Figure out where to look for context information.
-  StringRef contextName;
-  api_notes::APINotesReader *primary;
-  api_notes::APINotesReader *secondary;
-  std::tie(contextName, primary, secondary) = getAPINotesForContext(container);
-
-  // Map the selector.
-  SmallVector<StringRef, 2> selectorPieces;
-  api_notes::ObjCSelectorRef selectorRef;
-  selectorRef.NumPieces = method->getSelector().getNumArgs();
-  for (unsigned i = 0, n = std::max(1u, selectorRef.NumPieces); i != n; ++i) {
-    selectorPieces.push_back(method->getSelector().getNameForSlot(i));
-  }
-  selectorRef.Identifiers = selectorPieces;
-
-  // Look for method and context information in the primary source.
-  Optional<api_notes::ObjCMethodInfo> methodInfo;
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    contextInfo;
-
-  if (primary) {
-    // Look for context information in the primary source.
-    contextInfo = lookupObjCContext(primary, contextName, container);
-
-    // Look for method information in the primary source.
-    if (contextInfo) {
-      methodInfo = primary->lookupObjCMethod(contextInfo->first, selectorRef,
-                                             method->isInstanceMethod());
-    }
-  }
-
-  // If we found method or class information in the primary source, return what
-  // we found.
-  if (methodInfo || contextInfo) {
-    if (!methodInfo)
-      methodInfo = api_notes::ObjCMethodInfo();
-
-    // If accessor, merge the property info in.
-    mergePropInfoIntoAccessor(method, *methodInfo);
-
-    // Merge class information into the method.
-    *methodInfo |= contextInfo->second;
-
-    return methodInfo;
-  }
-
-  // Look for method information in the secondary source.
-  if (secondary) {
-    // Look for the context information in the secondary source.
-    contextInfo = lookupObjCContext(secondary, contextName, container);
-
-    // Look for the method in the secondary source. We don't merge context
-    // information from the secondary source.
-    if (contextInfo) {
-      methodInfo = secondary->lookupObjCMethod(contextInfo->first, selectorRef,
-                                               method->isInstanceMethod());
-
-      if (!methodInfo)
-        methodInfo = api_notes::ObjCMethodInfo();
-
-      // If accessor, merge the property info in.
-      mergePropInfoIntoAccessor(method, *methodInfo);
-
-      return methodInfo;
-    }
-  }
-
-  return None;
-}
-
-Optional<api_notes::ObjCContextInfo>
-ClangImporter::Implementation::getKnownObjCContext(
-    const clang::ObjCContainerDecl *container) {
-  // Figure out where to look for context information.
-  StringRef name;
-  api_notes::APINotesReader *primary;
-  api_notes::APINotesReader *secondary;
-  std::tie(name, primary, secondary) = getAPINotesForContext(container);
-
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    primaryInfo;
-  if (primary)
-    primaryInfo = lookupObjCContext(primary, name, container);
-
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    secondaryInfo;
-  if (secondary)
-    secondaryInfo = lookupObjCContext(secondary, name, container);
-
-  // If neither place had information about this class, we're done.
-  if (!primaryInfo && !secondaryInfo)
-    return None;
-
-  api_notes::ObjCContextInfo info;
-
-  // Merge in primary information, if available.
-  if (primaryInfo) {
-    info |= primaryInfo->second;
-  }
-
-  // Merge in secondary information after stripping out anything that is not
-  // propagated from the context's defining module.
-  if (secondaryInfo) {
-    secondaryInfo->second.stripModuleLocalInfo();
-    info |= secondaryInfo->second;
-  }
-
-  return info;
-}
-
-Optional<api_notes::ObjCPropertyInfo>
-ClangImporter::Implementation::getKnownObjCProperty(
-    const clang::ObjCPropertyDecl *property) {
-  auto *container = cast<clang::ObjCContainerDecl>(property->getDeclContext());
-
-  // Figure out where to look for context information.
-  StringRef contextName;
-  api_notes::APINotesReader *primary;
-  api_notes::APINotesReader *secondary;
-  std::tie(contextName, primary, secondary) = getAPINotesForContext(container);
-
-  // Look for property and context information in the primary source.
-  Optional<api_notes::ObjCPropertyInfo> propertyInfo;
-  Optional<std::pair<api_notes::ContextID, api_notes::ObjCContextInfo>>
-    contextInfo;
-
-  if (primary) {
-    // Look for context information in the primary source.
-    contextInfo = lookupObjCContext(primary, contextName, container);
-
-    // Look for property information in the primary source.
-    if (contextInfo) {
-      propertyInfo = primary->lookupObjCProperty(contextInfo->first,
-                                                 property->getName());
-    }
-  }
-
-  // If we found property or class information in the primary source, return what
-  // we found.
-  if (propertyInfo || contextInfo) {
-    if (!propertyInfo)
-      propertyInfo = api_notes::ObjCPropertyInfo();
-
-    // Merge class information into the property.
-    *propertyInfo |= contextInfo->second;
-
-    return propertyInfo;
-  }
-
-  // Look for property information in the secondary source.
-  if (secondary) {
-    // Look for the context information in the secondary source.
-    contextInfo = lookupObjCContext(secondary, contextName, container);
-
-    // Look for the property in the secondary source. We don't merge context
-    // information from the secondary source.
-    if (contextInfo) {
-      return secondary->lookupObjCProperty(contextInfo->first,
-                                           property->getName());
-    }
-  }
-
-  return None;
-}
-
-Optional<api_notes::GlobalVariableInfo>
-ClangImporter::Implementation::getKnownGlobalVariable(
-    const clang::VarDecl *global) {
-  if (auto notesReader = getAPINotesForDecl(global))
-    return notesReader->lookupGlobalVariable(global->getName());
-  
-  return None;
-}
-
-Optional<api_notes::GlobalFunctionInfo>
-ClangImporter::Implementation::getKnownGlobalFunction(
-    const clang::FunctionDecl *fn) {
-  if (auto notesReader = getAPINotesForDecl(fn))
-    return notesReader->lookupGlobalFunction(fn->getName());
-  
-  return None;
-}
-
 bool ClangImporter::Implementation::hasDesignatedInitializers(
        const clang::ObjCInterfaceDecl *classDecl) {
   if (classDecl->hasDesignatedInitializers())
     return true;
-
-  if (auto info = getKnownObjCContext(classDecl))
-    return info->hasDesignatedInits();
 
   return false;
 }
@@ -2972,33 +2634,27 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
     }
   }
 
-  if (auto info = getKnownObjCMethod(method, classDecl))
-    return info->DesignatedInit;
-
   return false;
 }
 
 bool ClangImporter::Implementation::isRequiredInitializer(
        const clang::ObjCMethodDecl *method) {
   // FIXME: No way to express this in Objective-C.
-
-  if (auto info = getKnownObjCMethod(method))
-    return info->Required;
-
   return false;
 }
 
 FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
                     const clang::ObjCInterfaceDecl *classDecl,
                     const clang::ObjCMethodDecl *method) {
-  if (auto info = getKnownObjCMethod(method, classDecl))
-    return info->getFactoryAsInitKind();
-
   if (auto *customNameAttr = method->getAttr<clang::SwiftNameAttr>()) {
     if (customNameAttr->getName().startswith("init("))
       return FactoryAsInitKind::AsInitializer;
     else
       return FactoryAsInitKind::AsClassMethod;
+  }
+
+  if (method->hasAttr<clang::SwiftSuppressFactoryAsInitAttr>()) {
+    return FactoryAsInitKind::AsClassMethod;
   }
 
   return FactoryAsInitKind::Infer;
