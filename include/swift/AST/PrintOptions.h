@@ -33,7 +33,7 @@ struct ArchetypeTransformContext {
   NominalTypeDecl *getNominal();
   PrinterArchetypeTransformer *getTransformer() { return Transformer.get(); }
   bool isPrintingSynthesizedExtension();
-  bool isPrintingTypeInteface();
+  bool isPrintingTypeInterface();
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer);
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
                             Type T);

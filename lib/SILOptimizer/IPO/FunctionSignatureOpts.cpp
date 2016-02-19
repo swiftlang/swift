@@ -643,7 +643,7 @@ bool SignatureAnalyzer::analyze() {
   for (SILResultInfo DirectResult : DirectResults) {
     ResultDescList.emplace_back(DirectResult);
   }
-  // For now, only do anyting if there's a single direct result.
+  // For now, only do anything if there's a single direct result.
   if (DirectResults.size() == 1 &&
       ResultDescList[0].hasConvention(ResultConvention::Owned)) {
     auto &RI = ResultDescList[0];
