@@ -42,6 +42,7 @@ UIdent sourcekitd::KeySourceFile("key.sourcefile");
 UIdent sourcekitd::KeySourceText("key.sourcetext");
 UIdent sourcekitd::KeyModuleName("key.modulename");
 UIdent sourcekitd::KeyGroupName("key.groupname");
+UIdent sourcekitd::KeySynthesizedExtension("key.synthesizedextensions");
 UIdent sourcekitd::KeyNotification("key.notification");
 UIdent sourcekitd::KeyKeyword("key.keyword");
 UIdent sourcekitd::KeyName("key.name");
@@ -114,6 +115,7 @@ UIdent sourcekitd::KeyNextRequestStart("key.nextrequeststart");
 UIdent sourcekitd::KeyPopular("key.popular");
 UIdent sourcekitd::KeyUnpopular("key.unpopular");
 UIdent sourcekitd::KeyHide("key.hide");
+UIdent sourcekitd::KeySimplified("key.simplified");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");

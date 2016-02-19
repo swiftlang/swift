@@ -48,7 +48,7 @@ scalarWithCallerSideDefaults(x)
 tupleWithDefaults(x: (x,x))
 
 // CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @_TF20scalar_to_tuple_args13variadicFirstFtGSaSi__T_
-// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[ARRAY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 0
 // CHECK: [[MEMORY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 1
 // CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
@@ -58,7 +58,7 @@ tupleWithDefaults(x: (x,x))
 variadicFirst(x)
 
 // CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @_TF20scalar_to_tuple_args14variadicSecondFtSiGSaSi__T_
-// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[ARRAY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 0
 // CHECK: [[X:%.*]] = load [[X_ADDR]]
 // CHECK: apply [[VARIADIC_SECOND]]([[X]], [[ARRAY]])

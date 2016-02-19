@@ -116,9 +116,6 @@ class AnnotatingPrinter : public StreamPrinter {
   // synthesize target to the original USR.
   std::string TargetUSR;
 
-  // A separator between the target usr and the real usr.
-  std::string Separator = "::SYNTHESIZED::";
-
 public:
   AnnotatingPrinter(SourceTextInfo &Info, llvm::raw_ostream &OS)
     : StreamPrinter(OS), Info(Info) { }
@@ -160,7 +157,7 @@ public:
 
         // Append target's USR if this is a member of a synthesized extension.
         if (!TargetUSR.empty()) {
-          OS << Separator;
+          OS << LangSupport::SynthesizedUSRSeparator;
           OS << TargetUSR;
         }
         StringRef USR = OS.str();
@@ -275,7 +272,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
                                    StringRef ModuleName,
                                    Optional<StringRef> Group,
                                  SwiftInterfaceGenContext::Implementation &Impl,
-                                   std::string &ErrMsg) {
+                                   std::string &ErrMsg,
+                                   bool SynthesizedExtensions) {
   Module *&Mod = Impl.Mod;
   SourceTextInfo &Info = Impl.Info;
 
@@ -318,7 +316,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   AnnotatingPrinter Printer(Info, OS);
   printSubmoduleInterface(Mod, SplitModuleName, Group,
                           TraversalOptions,
-                          Printer, Options, false);
+                          Printer, Options, SynthesizedExtensions);
 
   Info.Text = OS.str();
   return false;
@@ -374,7 +372,8 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
                                  StringRef ModuleOrHeaderName,
                                  Optional<StringRef> Group,
                                  CompilerInvocation Invocation,
-                                 std::string &ErrMsg) {
+                                 std::string &ErrMsg,
+                                 bool SynthesizedExtensions) {
   SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
   IFaceGenCtx->Impl.DocumentName = DocumentName;
   IFaceGenCtx->Impl.IsModule = IsModule;
@@ -403,7 +402,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
 
   if (IsModule) {
     if (getModuleInterfaceInfo(Ctx, ModuleOrHeaderName, Group, IFaceGenCtx->Impl,
-                               ErrMsg))
+                               ErrMsg, SynthesizedExtensions))
       return nullptr;
   } else {
     auto &FEOpts = Invocation.getFrontendOptions();
@@ -582,7 +581,8 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
                                            StringRef Name,
                                            StringRef ModuleName,
                                            Optional<StringRef> Group,
-                                           ArrayRef<const char *> Args) {
+                                           ArrayRef<const char *> Args,
+                                           bool SynthesizedExtensions) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -615,7 +615,8 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
                                                       ModuleName,
                                                       Group,
                                                       Invocation,
-                                                      ErrMsg);
+                                                      ErrMsg,
+                                                      SynthesizedExtensions);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(ErrMsg.c_str());
     return;
@@ -683,7 +684,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
 void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  StringRef Name,
                                                  StringRef HeaderName,
-                                                 ArrayRef<const char *> Args) {
+                                                 ArrayRef<const char *> Args,
+                                                 bool SynthesizedExtensions) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -719,7 +721,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                       HeaderName,
                                                       None,
                                                       Invocation,
-                                                      Error);
+                                                      Error,
+                                                      SynthesizedExtensions);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(Error.c_str());
     return;

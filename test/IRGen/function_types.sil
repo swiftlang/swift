@@ -47,17 +47,17 @@ entry(%x : $@convention(witness_method) () -> ()):
 
 struct X {}
 
-sil @out_void_return : $@convention(thin) (@out X) -> ()
+sil @out_void_return : $@convention(thin) () -> @out X
 
 // CHECK-LABEL: define{{( protected)?}} void @use_void_return_value(%V14function_types1X* noalias nocapture sret) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    call void @out_void_return(%V14function_types1X* noalias nocapture sret %0)
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
-sil @use_void_return_value : $@convention(thin) (@out X) -> () {
+sil @use_void_return_value : $@convention(thin) () -> @out X {
 entry(%x : $*X):
-  %f = function_ref @out_void_return : $@convention(thin) (@out X) -> ()
-  %z = apply %f(%x) : $@convention(thin) (@out X) -> ()
+  %f = function_ref @out_void_return : $@convention(thin) () -> @out X
+  %z = apply %f(%x) : $@convention(thin) () -> @out X
   return %z : $()
 }
 

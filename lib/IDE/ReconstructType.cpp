@@ -311,13 +311,6 @@ public:
           }
           return;
         }
-        else
-        {
-          const bool allow_crawler = false;
-          if (!_crawler._module.empty())
-            GetDeclsLookupSource(*ast_ctx, ConstString(_crawler._module),
-                                 allow_crawler).lookupQualified(name, options, typeResolver, result);
-        }
       }
     }
     else if (_type == Type::SwiftModule)
@@ -350,14 +343,6 @@ public:
             iter++;
           }
           return;
-        }
-        else
-        {
-          const bool allow_crawler = false;
-          if (!_crawler._module.empty())
-            GetDeclsLookupSource(*ast_ctx, ConstString(_crawler._module),
-                                 allow_crawler).lookupValue(path, name, kind,
-                                                            result);
         }
       }
     }
@@ -447,7 +432,6 @@ public:
         break;
       case Type::Crawler:
         _crawler._ast = rhs._crawler._ast;
-        _crawler._module = rhs._crawler._module;
         break;
       case Type::SwiftModule:
         _module = rhs._module;
@@ -476,7 +460,6 @@ public:
           break;
         case Type::Crawler:
           _crawler._ast = rhs._crawler._ast;
-          _crawler._module = rhs._crawler._module;
           break;
         case Type::SwiftModule:
           _module = rhs._module;
@@ -561,7 +544,6 @@ private:
     swift::ModuleDecl *_module;
     struct {
       swift::ASTContext* _ast;
-      std::string _module;
     } _crawler;
     swift::NominalTypeDecl *_decl;
     struct {
@@ -588,7 +570,6 @@ private:
     if (_a)
     {
       _crawler._ast = _a;
-      _crawler._module = _m.data();
       _type = Type::Crawler;
     }
     else

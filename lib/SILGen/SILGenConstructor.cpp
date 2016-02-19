@@ -120,14 +120,13 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
         // Cleanup after this initialization.
         FullExpr scope(gen.Cleanups, field->getParentPatternBinding());
-        gen.emitRValue(field->getParentInitializer())
-          .forwardInto(gen, init.get(), Loc);
+        gen.emitExprInto(field->getParentInitializer(), init.get());
         continue;
       }
 
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      std::move(*elti).forwardInto(gen, init.get(), Loc);
+      std::move(*elti).forwardInto(gen, Loc, init.get());
       ++elti;
     }
     gen.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
@@ -226,7 +225,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     // Return nil.
     if (lowering.isAddressOnly()) {
       // Inject 'nil' into the indirect return.
-      B.createInjectEnumAddr(ctor, IndirectReturnAddress,
+      assert(F.getIndirectResults().size() == 1);
+      B.createInjectEnumAddr(ctor, F.getIndirectResults()[0],
                    getASTContext().getOptionalNoneDecl(ctor->getFailability()));
       B.createBranch(ctor, failureExitBB);
 
@@ -250,8 +250,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
-    auto nominal = ctor->getDeclContext()->getDeclaredTypeInContext()
-                     ->getNominalOrBoundGenericNominal();
+    auto nominal = ctor->getDeclContext()
+        ->getAsNominalTypeOrNominalTypeExtensionContext();
     emitMemberInitializers(selfDecl, nominal);
   }
 
@@ -285,20 +285,21 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       }
     } else {
       // If 'self' is address-only, copy 'self' into the indirect return slot.
-      assert(IndirectReturnAddress &&
+      assert(F.getIndirectResults().size() == 1 &&
              "no indirect return for address-only ctor?!");
-      
+
       // Get the address to which to store the result.
+      SILValue completeReturnAddress = F.getIndirectResults()[0];
       SILValue returnAddress;
       switch (ctor->getFailability()) {
       // For non-failable initializers, store to the return address directly.
       case OTK_None:
-        returnAddress = IndirectReturnAddress;
+        returnAddress = completeReturnAddress;
         break;
       // If this is a failable initializer, project out the payload.
       case OTK_Optional:
       case OTK_ImplicitlyUnwrappedOptional:
-        returnAddress = B.createInitEnumDataAddr(ctor, IndirectReturnAddress,
+        returnAddress = B.createInitEnumDataAddr(ctor, completeReturnAddress,
                  getASTContext().getOptionalSomeDecl(ctor->getFailability()),
                                                  selfLV->getType());
         break;
@@ -312,8 +313,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       // Inject the enum tag if the result is optional because of failability.
       if (ctor->getFailability() != OTK_None) {
         // Inject the 'Some' tag.
-        B.createInjectEnumAddr(ctor, IndirectReturnAddress,
-                               getASTContext().getOptionalSomeDecl(ctor->getFailability()));
+        B.createInjectEnumAddr(ctor, completeReturnAddress,
+                  getASTContext().getOptionalSomeDecl(ctor->getFailability()));
       }
     }
   }
@@ -436,9 +437,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Use alloc_ref to allocate the object.
   // TODO: allow custom allocation?
   // FIXME: should have a cleanup in case of exception
-  auto selfTypeContext = ctor->getDeclContext()->getDeclaredTypeInContext();
-  auto selfClassDecl =
-    cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
+  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
 
   SILValue selfValue;
 
@@ -524,9 +523,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // TODO: If we could require Objective-C classes to have an attribute to get
   // this behavior, we could avoid runtime overhead here.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto selfTypeContext = ctor->getDeclContext()->getDeclaredTypeInContext();
-  auto selfClassDecl =
-    cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
+  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
   bool NeedsBoxForSelf = isDelegating ||
     (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
@@ -730,7 +727,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     if (selfFormalType->hasReferenceSemantics())
       self = SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
                                    AccessSemantics::DirectToStorage,
-                                   SGFContext::AllowImmediatePlusZero);
+                                   SGFContext::AllowImmediatePlusZero)
+        .getAsSingleValue(SGF, loc);
     else
       self = SGF.emitLValueForDecl(loc, selfDecl, src.getType(),
                                    AccessKind::Write,

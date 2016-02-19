@@ -566,16 +566,12 @@ void ARCRegionState::summarize(
     return;
 
   assert(R->isLoop() && "Expected to be called on a loop");
-  // Make sure that all subregions that are blocked are summarized. We know that
-  // all subloops have already been summarized.
-  for (unsigned SubregionID : R->getSubregions()) {
-    auto *Subregion = LRFI->getRegion(SubregionID);
-    if (!Subregion->isBlock())
-      continue;
-    auto *SubregionState = RegionStateInfo[Subregion];
-    SubregionState->summarizeBlock(Subregion->getBlock());
-  }
-
+  // We know that all of our sub blocks have the correct interesting insts since
+  // we did one scan at the beginning and are updating our interesting inst list
+  // as we move around retains/releases. Additionally since we are going through
+  // the loop nest bottom up, all of our subloops have already been
+  // summarized. Thus all we need to do is gather up the interesting
+  // instructions from our subregions.
   summarizeLoop(R, LRFI, RegionStateInfo);
 }
 

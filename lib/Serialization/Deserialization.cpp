@@ -3258,7 +3258,6 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   case serialization::ParameterConvention::ID: \
     return swift::ParameterConvention::ID;
   CASE(Indirect_In)
-  CASE(Indirect_Out)
   CASE(Indirect_Inout)
   CASE(Indirect_InoutAliasable)
   CASE(Indirect_In_Guaranteed)
@@ -3278,6 +3277,7 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   switch (serialization::ResultConvention(raw)) {
 #define CASE(ID) \
   case serialization::ResultConvention::ID: return swift::ResultConvention::ID;
+  CASE(Indirect)
   CASE(Owned)
   CASE(Unowned)
   CASE(UnownedInnerPointer)
@@ -3846,26 +3846,22 @@ Type ModuleFile::getType(TypeID TID) {
   }
       
   case decls_block::SIL_FUNCTION_TYPE: {
-    TypeID interfaceResultID;
-    uint8_t rawInterfaceResultConvention;
-    TypeID interfaceErrorResultID;
-    uint8_t rawInterfaceErrorResultConvention;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
     bool noreturn = false;
-    unsigned numGenericParams;
-    ArrayRef<uint64_t> paramIDs;
+    bool hasErrorResult;
+    unsigned numParams;
+    unsigned numResults;
+    ArrayRef<uint64_t> variableData;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
-                                             interfaceResultID,
-                                             rawInterfaceResultConvention,
-                                             interfaceErrorResultID,
-                                             rawInterfaceErrorResultConvention,
                                              rawCalleeConvention,
                                              rawRepresentation,
                                              noreturn,
-                                             numGenericParams,
-                                             paramIDs);
+                                             hasErrorResult,
+                                             numParams,
+                                             numResults,
+                                             variableData);
 
     // Process the ExtInfo.
     auto representation
@@ -3875,44 +3871,6 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
     SILFunctionType::ExtInfo extInfo(*representation, noreturn);
-    // Process the result.
-    auto interfaceResultConvention
-      = getActualResultConvention(rawInterfaceResultConvention);
-    if (!interfaceResultConvention.hasValue()) {
-      error();
-      return nullptr;
-    }
-    SILResultInfo interfaceResult(getType(interfaceResultID)->getCanonicalType(),
-                                  interfaceResultConvention.getValue());
-
-    // Process the error result.
-    Optional<SILResultInfo> interfaceErrorResult;
-    if (interfaceErrorResultID != 0) {
-      auto convention
-        = getActualResultConvention(rawInterfaceErrorResultConvention);
-      if (!convention.hasValue()) {
-        error();
-        return nullptr;
-      }
-      interfaceErrorResult =
-        SILResultInfo(getType(interfaceErrorResultID)->getCanonicalType(),
-                      convention.getValue());
-    }
-
-    // Process the parameters.
-    unsigned numParamIDs = paramIDs.size() - numGenericParams;
-    SmallVector<SILParameterInfo, 8> allParams;
-    allParams.reserve(numParamIDs);
-    for (size_t i = 0, e = numParamIDs; i != e; i += 2) {
-      auto type = getType(paramIDs[i])->getCanonicalType();
-      auto convention = getActualParameterConvention(paramIDs[i+1]);
-      if (!convention.hasValue()) {
-        error();
-        return nullptr;
-      }
-      SILParameterInfo param(type, convention.getValue());
-      allParams.push_back(param);
-    }
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
@@ -3921,9 +3879,74 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
+    auto processParameter = [&](TypeID typeID, uint64_t rawConvention)
+                                  -> Optional<SILParameterInfo> {
+      auto convention = getActualParameterConvention(rawConvention);
+      auto type = getType(typeID);
+      if (!convention || !type) return None;
+      return SILParameterInfo(type->getCanonicalType(), *convention);
+    };
+
+    auto processResult = [&](TypeID typeID, uint64_t rawConvention)
+                               -> Optional<SILResultInfo> {
+      auto convention = getActualResultConvention(rawConvention);
+      auto type = getType(typeID);
+      if (!convention || !type) return None;
+      return SILResultInfo(type->getCanonicalType(), *convention);
+    };
+
+    // Bounds check.  FIXME: overflow
+    if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
+          > variableData.size()) {
+      error();
+      return nullptr;
+    }
+
+    unsigned nextVariableDataIndex = 0;
+
+    // Process the parameters.
+    SmallVector<SILParameterInfo, 8> allParams;
+    allParams.reserve(numParams);
+    for (unsigned i = 0; i != numParams; ++i) {
+      auto typeID = variableData[nextVariableDataIndex++];
+      auto rawConvention = variableData[nextVariableDataIndex++];
+      auto param = processParameter(typeID, rawConvention);
+      if (!param) {
+        error();
+        return nullptr;
+      }
+      allParams.push_back(*param);
+    }
+
+    // Process the results.
+    SmallVector<SILResultInfo, 8> allResults;
+    allParams.reserve(numResults);
+    for (unsigned i = 0; i != numResults; ++i) {
+      auto typeID = variableData[nextVariableDataIndex++];
+      auto rawConvention = variableData[nextVariableDataIndex++];
+      auto result = processResult(typeID, rawConvention);
+      if (!result) {
+        error();
+        return nullptr;
+      }
+      allResults.push_back(*result);
+    }
+
+    // Process the error result.
+    Optional<SILResultInfo> errorResult;
+    if (hasErrorResult) {
+      auto typeID = variableData[nextVariableDataIndex++];
+      auto rawConvention = variableData[nextVariableDataIndex++];
+      errorResult = processResult(typeID, rawConvention);
+      if (!errorResult) {
+        error();
+        return nullptr;
+      }
+    }
+
     // Process the generic signature parameters.
     SmallVector<GenericTypeParamType *, 8> genericParamTypes;
-    for (auto id : paramIDs.slice(numParamIDs)) {
+    for (auto id : variableData.slice(nextVariableDataIndex)) {
       genericParamTypes.push_back(
                   cast<GenericTypeParamType>(getType(id)->getCanonicalType()));
     }
@@ -3939,8 +3962,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     typeOrOffset = SILFunctionType::get(genericSig, extInfo,
                                         calleeConvention.getValue(),
-                                        allParams, interfaceResult,
-                                        interfaceErrorResult,
+                                        allParams, allResults, errorResult,
                                         ctx);
     break;
   }

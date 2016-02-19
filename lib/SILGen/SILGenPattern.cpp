@@ -1184,9 +1184,9 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
 
   RValue rv(SGF, loc, formalValueType, value.getFinalManagedValue());
   if (shouldTake(value, isIrrefutable)) {
-    std::move(rv).forwardInto(SGF, init.get(), loc);
+    std::move(rv).forwardInto(SGF, loc, init.get());
   } else {
-    std::move(rv).copyInto(SGF, init.get(), loc);
+    std::move(rv).copyInto(SGF, loc, init.get());
   }
 }
 
@@ -1467,7 +1467,8 @@ emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
                                              firstMatcher->getType(),
                                              // TODO: Avoid copies on
                                              // address-only types.
-                                             SGFContext());
+                                             SGFContext())
+      .getAsSingleValue(SGF, loc);
     destructured.push_back(ConsumableManagedValue::forOwned(val));
   }
 

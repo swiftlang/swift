@@ -18,7 +18,7 @@ func reabstractFunctionInOut() {
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
   // CHECK: store [[THICK_ARG:%.*]] to [[PB]]
   // CHECK: [[FUNC:%.*]] = function_ref @_TF17reabstract_lvalue19consumeGenericInOut
-  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_owned (@out Double, @in Int) -> ()
+  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_owned (@in Int) -> @out Double
   // CHECK: [[THICK_ARG:%.*]] = load [[PB]]
   // CHECK: strong_retain [[THICK_ARG]]
   // CHECK: [[THUNK1:%.*]] = function_ref @_TTRXFo_dSi_dSd_XFo_iSi_iSd_
@@ -32,8 +32,8 @@ func reabstractFunctionInOut() {
   consumeGenericInOut(&minimallyAbstracted)
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSd_XFo_iSi_iSd_ : $@convention(thin) (@out Double, @in Int, @owned @callee_owned (Int) -> Double) -> ()
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iSi_iSd_XFo_dSi_dSd_ : $@convention(thin) (Int, @owned @callee_owned (@out Double, @in Int) -> ()) -> Double
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSd_XFo_iSi_iSd_ : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Double) -> @out Double
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iSi_iSd_XFo_dSi_dSd_ : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Double) -> Double
 
 // CHECK-LABEL: sil hidden @_TF17reabstract_lvalue23reabstractMetatypeInOutFT_T_ : $@convention(thin) () -> ()
 func reabstractMetatypeInOut() {

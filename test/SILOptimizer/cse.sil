@@ -461,15 +461,15 @@ sil @tupleextract_test : $@convention(thin) () -> (Builtin.Int32) {
   return %7 : $(Builtin.Int32)
 }
 
-sil @init_tuple_addr : $@convention(thin) (@out (Builtin.Int32, Builtin.Int32)) -> ()
+sil @init_tuple_addr : $@convention(thin) () -> @out (Builtin.Int32, Builtin.Int32)
 
 // CHECK-LABEL: tupleelementaddr_test
 // CHECK: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
 // CHECK-NOT: tuple_element_addr {{%[0-9]}} : $*(Builtin.Int32, Builtin.Int32), 0
 sil @tupleelementaddr_test : $@convention(thin) () -> (Builtin.Int32) {
   %0 = alloc_stack $(Builtin.Int32, Builtin.Int32)
-  %1 = function_ref @init_tuple_addr : $@convention(thin) (@out (Builtin.Int32, Builtin.Int32)) -> ()
-  apply %1(%0) : $@convention(thin) (@out (Builtin.Int32, Builtin.Int32)) -> ()
+  %1 = function_ref @init_tuple_addr : $@convention(thin) () -> (@out (Builtin.Int32, Builtin.Int32))
+  apply %1(%0) : $@convention(thin) () -> (@out (Builtin.Int32, Builtin.Int32))
   %2 = tuple_element_addr %0 : $*(Builtin.Int32, Builtin.Int32), 0
   %3 = tuple_element_addr %0 : $*(Builtin.Int32, Builtin.Int32), 0
   %5 = integer_literal $Builtin.Int1, 0

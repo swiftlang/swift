@@ -274,7 +274,7 @@ public:
                          bool isNonThrowing) {
     auto FnTy = Fn->getType();
     return createApply(Loc, Fn, FnTy,
-                       FnTy.castTo<SILFunctionType>()->getResult().getSILType(),
+                       FnTy.castTo<SILFunctionType>()->getSILResult(),
                        ArrayRef<Substitution>(), Args, isNonThrowing);
   }
 
@@ -678,6 +678,8 @@ public:
     return insert(
         TupleInst::create(createSILDebugLocation(Loc), Ty, Elements, F));
   }
+
+  TupleInst *createTuple(SILLocation loc, ArrayRef<SILValue> elts);
 
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty) {

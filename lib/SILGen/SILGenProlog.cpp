@@ -115,10 +115,8 @@ public:
       // An owned or 'in' parameter is passed in at +1. We can claim ownership
       // of the parameter and clean it up when it goes out of scope.
       return gen.emitManagedRValueWithCleanup(arg);
-
-    case ParameterConvention::Indirect_Out:
-      llvm_unreachable("should not emit @out parameters here");
     }
+    llvm_unreachable("bad parameter convention");
   }
 
   ManagedValue visitType(CanType t) {
@@ -226,9 +224,6 @@ struct ArgumentInitHelper {
   ArgumentInitHelper(SILGenFunction &gen, SILFunction &f)
     : gen(gen), f(f), initB(gen.B),
       parameters(f.getLoweredFunctionType()->getParameters()) {
-    // If we have an out parameter, skip it.
-    if (parameters.size() && parameters[0].isIndirectResult())
-      parameters = parameters.slice(1);
   }
 
   unsigned getNumArgs() const { return ArgNo; }
@@ -430,19 +425,35 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
     emitCaptureArguments(*this, capture, ++ArgNo);
 }
 
-unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList*> paramLists,
-                                    Type resultType, DeclContext *DeclCtx) {
-  // If the return type is address-only, emit the indirect return argument.
-  const TypeLowering &returnTI = getTypeLowering(resultType);
-  if (returnTI.isReturnedIndirectly()) {
-    auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
-                                 AC.getIdentifier("$return_value"), SourceLoc(),
-                                 AC.getIdentifier("$return_value"), resultType,
-                                 DeclCtx);
-    IndirectReturnAddress = new (SGM.M)
-      SILArgument(F.begin(), returnTI.getLoweredType(), VD);
+static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
+                                         DeclContext *DC) {
+  // Expand tuples.
+  if (auto tupleType = resultType->getAs<TupleType>()) {
+    for (auto eltType : tupleType->getElementTypes()) {
+      emitIndirectResultParameters(gen, eltType, DC);
+    }
+    return;
   }
+
+  // If the return type is address-only, emit the indirect return argument.
+  const TypeLowering &resultTI = gen.getTypeLowering(resultType);
+  if (!resultTI.isReturnedIndirectly()) return;
+
+  auto &ctx = gen.getASTContext();
+  auto var = new (ctx) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
+                                 ctx.getIdentifier("$return_value"), SourceLoc(),
+                                 ctx.getIdentifier("$return_value"), resultType,
+                                 DC);
+
+  auto arg =
+    new (gen.SGM.M) SILArgument(gen.F.begin(), resultTI.getLoweredType(), var);
+  (void) arg;
+}
+
+unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList*> paramLists,
+                                    Type resultType, DeclContext *DC) {
+  // Create the indirect result parameters.
+  emitIndirectResultParameters(*this, resultType, DC);
 
   // Emit the argument variables in calling convention order.
   ArgumentInitHelper emitter(*this, F);

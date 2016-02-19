@@ -114,7 +114,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
     for (auto param : ty->getParameters())
       if (doIt(param.getType()))
         return true;
-    return doIt(ty->getResult().getType());
+    for (auto result : ty->getAllResults())
+      if (doIt(result.getType()))
+        return true;
+    if (ty->hasErrorResult())
+      if (doIt(ty->getErrorResult().getType()))
+        return true;
+    return false;
   }
 
   bool visitSyntaxSugarType(SyntaxSugarType *ty) {

@@ -131,6 +131,11 @@ IntervalTestSuite.test("Overlaps") {
   expectOverlaps(true, 0..<20, 5...10)
   expectOverlaps(true, 0...20, 5..<10)
   expectOverlaps(true, 0...20, 5...10)
+
+  // 0-0, 0-5
+  expectOverlaps(false, 0..<0, 0..<5)
+  expectOverlaps(false, 0..<0, 0...5)
+  
 }
 
 IntervalTestSuite.test("Emptiness") {

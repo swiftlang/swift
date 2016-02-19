@@ -142,16 +142,16 @@ bb0:
 protocol P {
 }
 
-sil @returns_protocol : $@convention(thin) (@out P) -> ()
+sil @returns_protocol : $@convention(thin) () -> @out P
 
 // CHECK-LABEL: sil @test_indirect_return
 sil @test_indirect_return : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_stack
-  %1 = function_ref @returns_protocol : $@convention(thin) (@out P) -> ()
+  %1 = function_ref @returns_protocol : $@convention(thin) () -> @out P
   %2 = alloc_box $P
   %2a = project_box %2 : $@box P
-  %3 = apply %1(%2a) : $@convention(thin) (@out P) -> ()
+  %3 = apply %1(%2a) : $@convention(thin) () -> @out P
   %5 = strong_release %2 : $@box P
   %0 = tuple ()
   %6 = return %0 : $()
@@ -396,9 +396,9 @@ sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@convention(thin) (@owned @
 bb0(%0 : $@box Int):
   %1 = project_box %0 : $@box Int
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-  %2 = function_ref @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %2 = function_ref @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0 // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
   %5 = load %3 : $*Int                          // user: %8
   dealloc_stack %3 : $*Int       // id: %6
   strong_release %0 : $@box Int      // id: %7
@@ -406,7 +406,7 @@ bb0(%0 : $@box Int):
 }
 
 // Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-sil [transparent] @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+sil [transparent] @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
 
 // CHECK-LABEL: sil @_TF6struct6useBoxFT1tSi_T_
 // struct.useBox (t : Swift.Int) -> ()
@@ -436,9 +436,9 @@ sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@convention(thin) (@owned @bo
 bb0(%0 : $@box Int):
   %1 = project_box %0 : $@box Int
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-  %2 = function_ref @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %2 = function_ref @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0 // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
   %5 = load %3 : $*Int                          // user: %8
   dealloc_stack %3 : $*Int       // id: %6
   strong_release %0 : $@box Int      // id: %7
@@ -464,17 +464,17 @@ bb0(%0 : $Int):
   unreachable
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned (@out U) -> ()) -> ()
-sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned (@out U) -> ()) -> () {
+// CHECK-LABEL: sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> ()
+sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> () {
 // CHECK: bb0
-bb0(%0 : $@callee_owned (@out U) -> ()):
-  debug_value %0 : $@callee_owned (@out U) -> ()
-  strong_retain %0 : $@callee_owned (@out U) -> ()
+bb0(%0 : $@callee_owned () -> @out U):
+  debug_value %0 : $@callee_owned () -> @out U
+  strong_retain %0 : $@callee_owned () -> @out U
   %3 = alloc_stack $U
-  %4 = apply %0(%3) : $@callee_owned (@out U) -> ()
+  %4 = apply %0(%3) : $@callee_owned () -> @out U
   destroy_addr %3 : $*U
   dealloc_stack %3 : $*U
-  strong_release %0 : $@callee_owned (@out U) -> ()
+  strong_release %0 : $@callee_owned () -> @out U
   %8 = tuple ()
 // CHECK: return
   return %8 : $()
@@ -488,8 +488,8 @@ bb0(%0 : $*T):
   // CHECK: debug_value_addr
   debug_value_addr %0 : $*T
   // CHECK: function_ref @mightApply
-  %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
-  %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned @box τ_0_0) -> ()
+  %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
+  %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @box τ_0_0) -> @out τ_0_0
   // CHECK-NOT: alloc_box
   %4 = alloc_box $T
   %4a = project_box %4 : $@box T
@@ -497,8 +497,8 @@ bb0(%0 : $*T):
   copy_addr %0 to [initialization] %4a : $*T
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @_TTSf0n_k__closure_to_specialize
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
-  %6 = partial_apply %3<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned @box τ_0_0) -> ()
-  %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  %6 = partial_apply %3<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @box τ_0_0) -> @out τ_0_0
+  %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   // CHECK: destroy_addr [[STACK]] : $*T
   destroy_addr %0 : $*T
   %9 = tuple ()
@@ -507,8 +507,8 @@ bb0(%0 : $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil shared @_TTSf0n_k__closure_to_specialize : $@convention(thin) <T where T : P> (@out T, @inout_aliasable T) -> ()
-sil shared @closure_to_specialize : $@convention(thin) <T where T : P> (@out T, @owned @box T) -> () {
+// CHECK-LABEL: sil shared @_TTSf0n_k__closure_to_specialize : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
+sil shared @closure_to_specialize : $@convention(thin) <T where T : P> (@owned @box T) -> @out T {
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $@box T):
   %2 = project_box %1 : $@box T
@@ -643,7 +643,7 @@ bb0(%0 : $Int, %1 : $@box S<T>):
 sil [transparent] [fragile] @binary : $@convention(thin) (Int, Int) -> Bool
 
 // CHECK-LABEL: sil @destroy_stack_value_after_closure
-sil @destroy_stack_value_after_closure : $@convention(thin) <T> (@out T, @in T) -> () {
+sil @destroy_stack_value_after_closure : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $*T):
   // CHECK: [[STACK:%.*]] = alloc_stack

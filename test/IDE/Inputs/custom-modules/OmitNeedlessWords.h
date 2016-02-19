@@ -1,5 +1,12 @@
 @import Foundation;
 
+#ifndef NS_SWIFT_NAME(Name)
+#  define NS_SWIFT_NAME(Name) __attribute__((swift_name(#Name)))
+#endif
+
+@interface SEGreebieArray : NSObject
+@end
+
 @interface OmitNeedlessWords : NSObject
 -(void)jumpToUrl:(nonnull NSURL *)url;
 -(BOOL)objectIsCompatibleWithObject:(nonnull id)other;
@@ -20,4 +27,34 @@
 -(void)isCompatibleWithString:(nonnull NSString *)string;
 -(void)addObjectValue:(nonnull id)object;
 -(nonnull OmitNeedlessWords *)wordsBySlobbering:(nonnull NSString *)string;
+-(void)drawPolygonWithPoints:(const NSPoint[])points count:(NSInteger)count;
+-(void)drawFilledPolygonWithPoints:(NSPointArray)points count:(NSInteger)count;
+-(void)drawGreebies:(nonnull SEGreebieArray*)greebies;
+@end
+
+@protocol OMWLanding
+-(void)flipLanding;
+@end
+
+@protocol OMWWiggle
+-(void)joinSub;
+-(void)conflicting1 NS_SWIFT_NAME(wiggle1());
+@property (readonly) NSInteger conflictingProp1 NS_SWIFT_NAME(wiggleProp1);
+@end
+
+@protocol OMWWaggle
+-(void)conflicting1 NS_SWIFT_NAME(waggle1());
+@property (readonly) NSInteger conflictingProp1 NS_SWIFT_NAME(waggleProp1);
+@end
+
+@interface OMWSuper : NSObject <OMWWiggle>
+-(void)jumpSuper;
+@property (readonly) NSInteger conflictingProp1;
+@end
+
+@interface OMWSub : OMWSuper <OMWWaggle>
+-(void)jumpSuper;
+-(void)joinSub;
+-(void)conflicting1;
+@property (readonly) NSInteger conflictingProp1;
 @end

@@ -56,8 +56,7 @@ func tuple_patterns() {
   // CHECK: [[EFGH:%[0-9]+]] = apply
   // CHECK: [[E:%[0-9]+]] = tuple_extract {{.*}}, 0
   // CHECK: [[F:%[0-9]+]] = tuple_extract {{.*}}, 1
-  // CHECK: [[G:%[0-9]+]] = tuple_extract {{.*}}, 2
-  // CHECK: [[H:%[0-9]+]] = tuple_extract {{.*}}, 3
+  // CHECK: [[H:%[0-9]+]] = tuple_extract {{.*}}, 2
   // CHECK: store [[E]] to [[PBE]]
   // CHECK: store [[F]] to [[PBF]]
   // CHECK: store [[H]] to [[PBH]]

@@ -1606,7 +1606,7 @@ bb2(%9 : $fuzz):
 // CHECK-LABEL: retain_blocked_by_copyaddr
 // CHECK: bb0
 // CHECK-NEXT: retain_value
-sil hidden @retain_blocked_by_copyaddr : $@convention(thin) <T> (@out T, @in T, B) -> () {
+sil hidden @retain_blocked_by_copyaddr : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
   copy_addr [take] %1 to %0 : $*T // id: %3
@@ -1622,7 +1622,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 // CHECK-NEXT: copy_addr 
 // CHECK-NEXT: tuple 
 // CHECK-NEXT: retain_value
-sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@out T, @in T, B) -> () {
+sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
   copy_addr [take] %1 to [initialization] %0 : $*T // id: %3
@@ -1638,7 +1638,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 // CHECK-NEXT: copy_addr 
 // CHECK-NEXT: tuple 
 // CHECK-NEXT: retain_value
-sil hidden @retain_not_blocked_by_copyaddr_notake_init : $@convention(thin) <T> (@out T, @in T, B) -> () {
+sil hidden @retain_not_blocked_by_copyaddr_notake_init : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
   copy_addr %1 to [initialization] %0 : $*T // id: %3

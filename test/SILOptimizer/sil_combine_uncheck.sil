@@ -41,7 +41,7 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-NEXT: builtin "int_trap"
 // CHECK: unreachable
 // CHECK: }
-sil @test_unconditional_checked_cast_addr_fail : $@convention(thin) (@out D, @in E, @in D) -> () {
+sil @test_unconditional_checked_cast_addr_fail : $@convention(thin) (@in E, @in D) -> @out D {
 bb0(%0 : $*D, %1 : $*E, %2 : $*D):
   unconditional_checked_cast_addr take_always E in %1 : $*E to D in %0 : $*D
   %4 = load %2 : $*D

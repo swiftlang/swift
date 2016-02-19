@@ -336,12 +336,7 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   subs.append(fromSubsts.begin(), fromSubsts.end());
   subs.append(toSubsts.begin(), toSubsts.end());
 
-  auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {source}, C);
-
-  Type resultType = destType;
-  if (conditional)
-    resultType = OptionalType::get(resultType);
-  return RValue(SGF, loc, resultType->getCanonicalType(), emitApply);
+  return SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {source}, C);
 }
 
 static ManagedValue

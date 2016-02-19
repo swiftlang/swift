@@ -3,12 +3,12 @@
 sil_stage raw
 import Builtin
 
-// CHECK-LABEL: sil @foo : $@convention(thin) <T> (@out T, @in T) -> () {
+// CHECK-LABEL: sil @foo : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK:   return undef : $()
 // CHECK: }
-sil @foo : $@convention(thin) <T> (@out T, @in T) -> () {
+sil @foo : $@convention(thin) <T> (@in T) -> @out T {
 entry(%o : $*T, %i : $*T):
   copy_addr [take] %i to [initialization] %o : $*T
   return undef : $()
@@ -18,44 +18,44 @@ struct Bar {}
 struct Bas {}
 
 // CHECK-LABEL: sil @ref_foo_1 : $@convention(thin) () -> () {
-// CHECK:   %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:   %3 = apply %2<Bar>(%1, %0) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:   %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK:   %3 = apply %2<Bar>(%1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 sil @ref_foo_1 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bar
   %o = alloc_stack $Bar
-  %f = function_ref @foo : $@convention(thin) <XYZ> (@out XYZ, @in XYZ) -> ()
-  %z = apply %f<Bar>(%o, %i) : $@convention(thin) <ZYX> (@out ZYX, @in ZYX) -> ()
+  %f = function_ref @foo : $@convention(thin) <XYZ> (@in XYZ) -> @out XYZ
+  %z = apply %f<Bar>(%o, %i) : $@convention(thin) <ZYX> (@in ZYX) -> @out ZYX
   dealloc_stack %o : $*Bar
   dealloc_stack %i : $*Bar
   return %z : $()
 }
 
 // CHECK-LABEL: sil @ref_foo_2 : $@convention(thin) () -> () {
-// CHECK:  %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:  %3 = apply %2<Bas>(%1, %0) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK:  %3 = apply %2<Bas>(%1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 sil @ref_foo_2 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bas
   %o = alloc_stack $Bas
-  %f = function_ref @foo : $@convention(thin) <ABC> (@out ABC, @in ABC) -> ()
-  %z = apply %f<Bas>(%o, %i) : $@convention(thin) <CBA> (@out CBA, @in CBA) -> ()
+  %f = function_ref @foo : $@convention(thin) <ABC> (@in ABC) -> @out ABC
+  %z = apply %f<Bas>(%o, %i) : $@convention(thin) <CBA> (@in CBA) -> @out CBA
   dealloc_stack %o : $*Bas
   dealloc_stack %i : $*Bas
   return %z : $()
 }
 
-// CHECK-LABEL: sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned (@out Bas) -> () {
-// CHECK:  %1 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:  %2 = partial_apply %1<Bas>(%0) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:  return %2 : $@callee_owned (@out Bas) -> ()
-sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned (@out Bas) -> () {
+// CHECK-LABEL: sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned () -> @out Bas {
+// CHECK:  %1 = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK:  %2 = partial_apply %1<Bas>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK:  return %2 : $@callee_owned () -> @out Bas
+sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned () -> @out Bas {
 entry:
   %i = alloc_stack $Bas
-  %f = function_ref @foo : $@convention(thin) <Z> (@out Z, @in Z) -> ()
-  %g = partial_apply %f<Bas>(%i) : $@convention(thin) <Y> (@out Y, @in Y) -> ()
+  %f = function_ref @foo : $@convention(thin) <Z> (@in Z) -> @out Z
+  %g = partial_apply %f<Bas>(%i) : $@convention(thin) <Y> (@in Y) -> @out Y
   dealloc_stack %i : $*Bas
-  return %g : $@callee_owned (@out Bas) -> ()
+  return %g : $@callee_owned () -> @out Bas
 }
 
 sil_global @zero: $Builtin.Int64
@@ -100,9 +100,9 @@ sil @protocol_extension_with_constrained_associated_type : $@convention(method) 
 bb0(%0 : $*I, %1 : $*Self):
   %2 = alloc_stack $I                             // users: %3, %6, %7, %9
   copy_addr %0 to [initialization] %2 : $*I     // id: %3
-  %4 = witness_method $I, #FooProto.value!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@out τ_0_0.Assoc, @in_guaranteed τ_0_0) -> () // user: %6
+  %4 = witness_method $I, #FooProto.value!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc // user: %6
   %5 = alloc_stack $Self.Assoc                    // users: %6, %8
-  %6 = apply %4<I, Self.Assoc>(%5, %2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@out τ_0_0.Assoc, @in_guaranteed τ_0_0) -> ()
+  %6 = apply %4<I, Self.Assoc>(%5, %2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc
   destroy_addr %2 : $*I                         // id: %7
   dealloc_stack %5 : $*Self.Assoc // id: %8
   dealloc_stack %2 : $*I         // id: %9

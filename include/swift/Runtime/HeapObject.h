@@ -220,6 +220,12 @@ extern "C" void swift_release(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_release_n(HeapObject *object, uint32_t n);
 
+// Refcounting observation hooks for memory tools. Don't use these.
+SWIFT_RUNTIME_EXPORT
+extern "C" size_t swift_retainCount(HeapObject *object);
+SWIFT_RUNTIME_EXPORT
+extern "C" size_t swift_unownedRetainCount(HeapObject *object);
+
 /// Is this pointer a non-null unique reference to an object
 /// that uses Swift reference counting?
 SWIFT_RUNTIME_EXPORT

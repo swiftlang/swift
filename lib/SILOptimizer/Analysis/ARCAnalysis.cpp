@@ -450,6 +450,87 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 //===----------------------------------------------------------------------===//
 //                          Owned Argument Utilities
 //===----------------------------------------------------------------------===//
+ConsumedReturnValueToEpilogueRetainMatcher::
+ConsumedReturnValueToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
+                                           AliasAnalysis *AA,
+                                           SILFunction *F,
+                                           ExitKind Kind)
+    : F(F), RCFI(RCFI), AA(AA), Kind(Kind) {
+  recompute();
+}
+
+void ConsumedReturnValueToEpilogueRetainMatcher::recompute() {
+  EpilogueRetainInsts.clear();
+
+  // Find the return BB of F. If we fail, then bail.
+  SILFunction::iterator BB;
+  switch (Kind) {
+  case ExitKind::Return:
+    BB = F->findReturnBB();
+    break;
+  case ExitKind::Throw:
+    BB = F->findThrowBB();
+    break;
+  }
+
+  if (BB == F->end()) {
+    HasBlock = false;
+    return;
+  }
+  HasBlock = true;
+  findMatchingRetains(&*BB);
+}
+
+void
+ConsumedReturnValueToEpilogueRetainMatcher::
+findMatchingRetains(SILBasicBlock *BB) {
+  // Iterate over the instructions post-order and find retains associated with
+  // return value.
+  //
+  // Break on a user that can potential decrement the reference count, we do not
+  // want to create a life-time gap.
+  SILValue RV = SILValue();
+  for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
+    if (ReturnInst *RI = dyn_cast<ReturnInst>(&*II)) {
+      assert(!RV && "Found multiple return instructions");
+      RV = RI->getOperand();
+      continue;
+    }
+
+    // If we do not have a retain_value or strong_retain...
+    if (!isa<RetainValueInst>(*II) && !isa<StrongRetainInst>(*II)) {
+      assert(RV && "Found instructions before return instruction");
+      // we can ignore it if it can not decrement the reference count of the
+      // return value.
+      if (!mayDecrementRefCount(&*II, RV, AA))
+        continue;
+
+      // Otherwise, we need to stop computing since we do not want to create
+      // lifetime gap.
+      break;
+    }
+
+    // Somehow, we managed not to find a return value.
+    if (!RV)
+      break;
+
+    // Ok, we have a retain_value or strong_retain. Grab Target and find the
+    // RC identity root of its operand.
+    SILInstruction *Target = &*II;
+    SILValue RetainValue = RCFI->getRCIdentityRoot(Target->getOperand(0));
+    SILValue ReturnValue = RCFI->getRCIdentityRoot(RV);
+
+    // Is this the epilogue retain we are looking for ?.
+    // We break here as we do not know whether this is a part of the epilogue
+    // retain for the @own return value.
+    if (RetainValue != ReturnValue)
+      break;
+
+    // We've found the epilogue retain for the @own return value.
+    EpilogueRetainInsts.push_back(&*II);
+    break;
+  }
+}
 
 ConsumedArgToEpilogueReleaseMatcher::ConsumedArgToEpilogueReleaseMatcher(
     RCIdentityFunctionInfo *RCFI, SILFunction *F, ExitKind Kind)
@@ -567,7 +648,7 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
     if (!Arg || !Arg->isFunctionArg() ||
-        !Arg->hasConvention(ParameterConvention::Direct_Owned))
+        !Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       break;
 
     // Ok, we have a release on a SILArgument that is direct owned. Attempt to
@@ -601,7 +682,7 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
     // SILArgument. Then we do not need to use projection to check for whether
     // all non-trivial fields are covered. This is a short-cut to avoid
     // projection for cost as well as accuracy. Projection currently does not
-    // support single incoming argument as rc-identity does whereas rc-idenity
+    // support single incoming argument as rc-identity does whereas rc-identity
     // does.
     if (Arg.second.size() == 1) {
       SILInstruction *I = *Arg.second.begin();

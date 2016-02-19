@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_RCSTATETRANSITION_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_RCSTATETRANSITION_H
 
+#include "swift/Basic/type_traits.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -60,10 +61,14 @@ RCStateTransitionKind getRCStateTransitionKind(ValueBase *V);
 //===----------------------------------------------------------------------===//
 
 class RefCountState;
+class BottomUpRefCountState;
+class TopDownRefCountState;
 
 /// Represents a transition in the RC history of a ref count.
 class RCStateTransition {
   friend class RefCountState;
+  friend class BottomUpRefCountState;
+  friend class TopDownRefCountState;
 
   /// An RCStateTransition can represent either an RC end point (i.e. an initial
   /// or terminal RC transition) or a ptr set of Mutators.
@@ -73,11 +78,11 @@ class RCStateTransition {
   RCStateTransitionKind Kind;
 
   // Should only be constructed be default RefCountState.
-  RCStateTransition() {}
+  RCStateTransition() = default;
 
 public:
-  ~RCStateTransition() {}
-  RCStateTransition(const RCStateTransition &R);
+  ~RCStateTransition() = default;
+  RCStateTransition(const RCStateTransition &R) = default;
 
   RCStateTransition(ImmutablePointerSet<SILInstruction> *I) {
     assert(I->size() == 1);
@@ -98,7 +103,7 @@ public:
 
   RCStateTransition(SILArgument *A)
       : EndPoint(A), Kind(RCStateTransitionKind::StrongEntrance) {
-    assert(A->hasConvention(ParameterConvention::Direct_Owned) &&
+    assert(A->hasConvention(SILArgumentConvention::Direct_Owned) &&
            "Expected owned argument");
   }
 
@@ -132,7 +137,14 @@ public:
   /// Attempt to merge \p Other into \p this. Returns true if we succeeded,
   /// false otherwise.
   bool merge(const RCStateTransition &Other);
+
+  /// Return true if the kind of this RCStateTransition is not 'Invalid'.
+  bool isValid() const { return getKind() != RCStateTransitionKind::Invalid; }
 };
+
+// These static assert checks are here for performance reasons.
+static_assert(IsTriviallyCopyable<RCStateTransition>::value,
+              "RCStateTransitions must be trivially copyable");
 
 } // end swift namespace
 

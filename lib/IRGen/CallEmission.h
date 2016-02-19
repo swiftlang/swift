@@ -26,6 +26,7 @@ namespace llvm {
 namespace swift {
 namespace irgen {
 
+class LoadableTypeInfo;
 struct WitnessMetadata;
 
 /// A plan for emitting a series of calls.
@@ -54,7 +55,7 @@ private:
   void setFromCallee();
   void emitToUnmappedMemory(Address addr);
   void emitToUnmappedExplosion(Explosion &out);
-  llvm::CallSite emitCallSite(bool hasIndirectResult);
+  llvm::CallSite emitCallSite();
   llvm::CallSite emitInvoke(llvm::CallingConv::ID cc, llvm::Value *fn,
                             ArrayRef<llvm::Value*> args,
                             const llvm::AttributeSet &attrs);
@@ -77,13 +78,11 @@ public:
   }
 
   /// Set the arguments to the function from an explosion.
-  void setArgs(Explosion &arg,
-               ArrayRef<SILParameterInfo> params,
-               WitnessMetadata *witnessMetadata = nullptr);
+  void setArgs(Explosion &arg, WitnessMetadata *witnessMetadata = nullptr);
   
   void addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr);
 
-  void emitToMemory(Address addr, const TypeInfo &substResultTI);
+  void emitToMemory(Address addr, const LoadableTypeInfo &substResultTI);
   void emitToExplosion(Explosion &out);
    
   void invalidate();

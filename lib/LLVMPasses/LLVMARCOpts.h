@@ -9,6 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+#ifndef SWIFT_LLVMPASSES_LLVMARCOPTS_H
+#define SWIFT_LLVMPASSES_LLVMARCOPTS_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/IR/Instructions.h"
@@ -117,3 +119,5 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
 }
 
 } // end namespace swift
+#endif
+

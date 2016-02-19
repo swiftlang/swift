@@ -9,11 +9,14 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the class Projection and related utilities. A projection is
-// a representation of type projections that is nominal, tuple agnostic. These
-// utilities are useful for working with aggregate type trees at a high level.
-//
+///
+/// \file
+///
+/// This file defines the class Projection and related utilities. A projection
+/// is a representation of type projections that is nominal, tuple
+/// agnostic. These utilities are useful for working with aggregate type trees
+/// at a high level.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_PROJECTION_H

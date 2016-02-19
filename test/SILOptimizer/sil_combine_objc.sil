@@ -14,7 +14,7 @@ class ZZZ {
 class C {}
 
 sil @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
-sil @reabstraction_thunk : $@convention(thin) (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
+sil @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
 
 // CHECK-LABEL: sil @dead_closure_elimination : $@convention(thin) (@owned _StringCore) -> ()
 // CHECK: bb0
@@ -25,9 +25,9 @@ sil @dead_closure_elimination : $@convention(thin) (@owned _StringCore) -> () {
 bb0(%0 : $_StringCore):
   %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
   %2 = partial_apply %1(%0) : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
-  %3 = function_ref @reabstraction_thunk : $@convention(thin) (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
-  %4 = partial_apply %3(%2) : $@convention(thin) (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
-  strong_release %4 : $@callee_owned (@out Optional<_CocoaString>) -> ()
+  %3 = function_ref @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
+  %4 = partial_apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
+  strong_release %4 : $@callee_owned () -> @out Optional<_CocoaString>
   %5 = tuple()
   return %5 : $()
 }
@@ -43,14 +43,14 @@ sil @dead_closure_elimination2 : $@convention(thin) (@owned _StringCore) -> () {
 bb0(%0 : $_StringCore):
   %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
   %2 = partial_apply %1(%0) : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
-  %3 = function_ref @reabstraction_thunk : $@convention(thin) (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
-  %4 = partial_apply %3(%2) : $@convention(thin) (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
+  %3 = function_ref @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
+  %4 = partial_apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   br bb1
 
 bb1:
-  strong_retain %4 : $@callee_owned (@out Optional<_CocoaString>) -> ()
-  strong_release %4 : $@callee_owned (@out Optional<_CocoaString>) -> ()
-  strong_release %4 : $@callee_owned (@out Optional<_CocoaString>) -> ()
+  strong_retain %4 : $@callee_owned () -> @out Optional<_CocoaString>
+  strong_release %4 : $@callee_owned () -> @out Optional<_CocoaString>
+  strong_release %4 : $@callee_owned () -> @out Optional<_CocoaString>
   %5 = tuple()
   return %5 : $()
 }

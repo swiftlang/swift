@@ -43,7 +43,7 @@ func assign_iuo_lvalue_implicit(inout s: S!, _ y: Int) {
 // CHECK-LABEL: sil hidden @_TF15optional_lvalue35assign_optional_lvalue_reabstractedFTRGSqFSiSi_FSiSi_T_
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [[REABSTRACT]]
-// CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_owned (@out Int, @in Int) -> ()
+// CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_owned (@in Int) -> @out Int
 func assign_optional_lvalue_reabstracted(inout x: (Int -> Int)?,
                                          _ y: Int -> Int) {
   x! = y

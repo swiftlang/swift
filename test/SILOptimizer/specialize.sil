@@ -30,7 +30,7 @@ bb0:
 }
 
 // specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
-sil [noinline] @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <T> (@out XXX<T>, @in T, @thin XXX<T>.Type) -> () {
+sil [noinline] @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <T> (@in T, @thin XXX<T>.Type) -> @out XXX<T> {
 bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
   %3 = alloc_stack $XXX<T>, var, name "sf"           // users: %7, %11, %13
   debug_value_addr %1 : $*T, let, name "t" // id: %4
@@ -83,13 +83,13 @@ sil @_TF10specialize4exp1FT_T_ : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $XXX<Int32>, var, name "II"           // users: %7, %15, %19
   // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
-  %1 = function_ref @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> () // user: %7
+  %1 = function_ref @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
   %2 = metatype $@thin XXX<Int32>.Type              // user: %7
   %3 = alloc_stack $Int32                           // users: %6, %7, %8
   %4 = integer_literal $Builtin.Int32, 5            // user: %5
   %5 = struct $Int32 (%4 : $Builtin.Int32)          // user: %6
   store %5 to %3 : $*Int32                        // id: %6
-  %7 = apply %1<Int32>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> ()
+  %7 = apply %1<Int32>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
   dealloc_stack %3 : $*Int32       // id: %8
   // function_ref specialize.acceptsInt (Swift.Int32) -> ()
   %9 = function_ref @_TF10specialize10acceptsIntFSiT_ : $@convention(thin) (Int32) -> () // user: %16
@@ -112,13 +112,13 @@ sil @_TF10specialize4exp2FT_T_ : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $XXX<UInt8>, var, name "I8"        // users: %7, %15, %19
   // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
-  %1 = function_ref @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> () // user: %7
+  %1 = function_ref @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
   %2 = metatype $@thin XXX<UInt8>.Type            // user: %7
   %3 = alloc_stack $UInt8                         // users: %6, %7, %8
   %4 = integer_literal $Builtin.Int8, 5           // user: %5
   %5 = struct $UInt8 (%4 : $Builtin.Int8)         // user: %6
   store %5 to %3 : $*UInt8                      // id: %6
-  %7 = apply %1<UInt8>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@out XXX<τ_0_0>, @in τ_0_0, @thin XXX<τ_0_0>.Type) -> ()
+  %7 = apply %1<UInt8>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
   dealloc_stack %3 : $*UInt8     // id: %8
   // function_ref specialize.acceptsInt (Swift.Int32) -> ()
   %9 = function_ref @_TF10specialize10acceptsIntFSiT_ : $@convention(thin) (Int32) -> () // user: %16
@@ -150,32 +150,32 @@ bb0(%0 : $Int32, %1 : $@thin UInt8.Type):
 }
 
 // specialize.useClosure <A>(fun : () -> A) -> A
-sil @_TF10specialize10useClosureU__FT3funFT_Q__Q_ : $@convention(thin) <T> (@out T, @owned @callee_owned (@out T) -> ()) -> () {
-bb0(%0 : $*T, %1 : $@callee_owned (@out T) -> ()):
-  debug_value %1 : $@callee_owned (@out T) -> (), let, name "fun" // id: %2
-  strong_retain %1 : $@callee_owned (@out T) -> () // id: %3
-  %4 = apply %1(%0) : $@callee_owned (@out T) -> ()
-  strong_release %1 : $@callee_owned (@out T) -> () // id: %5
+sil @_TF10specialize10useClosureU__FT3funFT_Q__Q_ : $@convention(thin) <T> (@owned @callee_owned () -> @out T) -> @out T {
+bb0(%0 : $*T, %1 : $@callee_owned () -> @out T):
+  debug_value %1 : $@callee_owned () -> @out T, let, name "fun" // id: %2
+  strong_retain %1 : $@callee_owned () -> @out T // id: %3
+  %4 = apply %1(%0) : $@callee_owned () -> @out T
+  strong_release %1 : $@callee_owned () -> @out T // id: %5
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7
 }
 
 // specialize.getGenericClosure <A>(t : A) -> () -> A
-sil @_TF10specialize17getGenericClosureU__FT1tQ__FT_Q_ : $@convention(thin) <T> (@in T) -> @owned @callee_owned (@out T) -> () {
+sil @_TF10specialize17getGenericClosureU__FT1tQ__FT_Q_ : $@convention(thin) <T> (@in T) -> @owned @callee_owned () -> @out T {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T, let, name "t" // id: %1
   // function_ref specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())A
-  %2 = function_ref @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @box τ_0_0) -> () // user: %5
+  %2 = function_ref @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0 // user: %5
   %3 = alloc_box $T                               // users: %4, %5, %5
   %3a = project_box %3 : $@box T
   copy_addr %0 to [initialization] %3a : $*T     // id: %4
-  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @box τ_0_0) -> () // user: %7
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0 // user: %7
   destroy_addr %0 : $*T                           // id: %6
-  return %5 : $@callee_owned (@out T) -> ()       // id: %7
+  return %5 : $@callee_owned () -> @out T       // id: %7
 }
 
 // specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())
-sil shared @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <T> (@out T, @owned @box T) -> () {
+sil shared @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <T> (@owned @box T) -> @out T {
 bb0(%0 : $*T, %1 : $@box T):
   %2 = project_box %1 : $@box T
   copy_addr %2 to [initialization] %0 : $*T       // id: %3
@@ -192,20 +192,20 @@ bb0:
   %2 = struct $UInt8 (%1 : $Builtin.Int8)         // users: %3, %7
   store %2 to %0 : $*UInt8                      // id: %3
   // function_ref specialize.useClosure <A>(fun : () -> A) -> A
-  %4 = function_ref @_TF10specialize10useClosureU__FT3funFT_Q__Q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @callee_owned (@out τ_0_0) -> ()) -> () // user: %14
+  %4 = function_ref @_TF10specialize10useClosureU__FT3funFT_Q__Q_ : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> @out τ_0_0) -> @out τ_0_0 // user: %14
   // function_ref specialize.getGenericClosure <A>(t : A) -> () -> A
-  %5 = function_ref @_TF10specialize17getGenericClosureU__FT1tQ__FT_Q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned (@out τ_0_0) -> () // user: %8
+  %5 = function_ref @_TF10specialize17getGenericClosureU__FT1tQ__FT_Q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %8
   %6 = alloc_stack $UInt8                         // users: %7, %8, %17
   store %2 to %6 : $*UInt8                      // id: %7
-  %8 = apply %5<UInt8>(%6) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned (@out τ_0_0) -> () // user: %10
+  %8 = apply %5<UInt8>(%6) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %10
   // function_ref reabstraction thunk helper from @callee_owned () -> (@out Swift.UInt8) to @callee_owned () -> (@unowned Swift.UInt8)
-  %9 = function_ref @_TTRXFo__iVs5UInt8_XFo__dS__ : $@convention(thin) (@owned @callee_owned (@out UInt8) -> ()) -> UInt8 // user: %10
-  %10 = partial_apply %9(%8) : $@convention(thin) (@owned @callee_owned (@out UInt8) -> ()) -> UInt8 // user: %12
+  %9 = function_ref @_TTRXFo__iVs5UInt8_XFo__dS__ : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 // user: %10
+  %10 = partial_apply %9(%8) : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 // user: %12
   // function_ref reabstraction thunk helper from @callee_owned () -> (@unowned Swift.UInt8) to @callee_owned () -> (@out Swift.UInt8)
-  %11 = function_ref @_TTRXFo__dVs5UInt8_XFo__iS__ : $@convention(thin) (@out UInt8, @owned @callee_owned () -> UInt8) -> () // user: %12
-  %12 = partial_apply %11(%10) : $@convention(thin) (@out UInt8, @owned @callee_owned () -> UInt8) -> () // user: %14
+  %11 = function_ref @_TTRXFo__dVs5UInt8_XFo__iS__ : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 // user: %12
+  %12 = partial_apply %11(%10) : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 // user: %14
   %13 = alloc_stack $UInt8                        // users: %14, %15, %16
-  %14 = apply %4<UInt8>(%13, %12) : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  %14 = apply %4<UInt8>(%13, %12) : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> @out τ_0_0) -> @out τ_0_0
   %15 = load %13 : $*UInt8                      // user: %19
   dealloc_stack %13 : $*UInt8    // id: %16
   dealloc_stack %6 : $*UInt8     // id: %17
@@ -214,17 +214,17 @@ bb0:
 }
 
 // reabstraction thunk helper from @callee_owned () -> (@out Swift.UInt8) to @callee_owned () -> (@unowned Swift.UInt8)
-sil shared [transparent] @_TTRXFo__iVs5UInt8_XFo__dS__ : $@convention(thin) (@owned @callee_owned (@out UInt8) -> ()) -> UInt8 {
-bb0(%0 : $@callee_owned (@out UInt8) -> ()):
+sil shared [transparent] @_TTRXFo__iVs5UInt8_XFo__dS__ : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 {
+bb0(%0 : $@callee_owned () -> @out UInt8):
   %1 = alloc_stack $UInt8                         // users: %2, %3, %4
-  %2 = apply %0(%1) : $@callee_owned (@out UInt8) -> ()
+  %2 = apply %0(%1) : $@callee_owned () -> @out UInt8
   %3 = load %1 : $*UInt8                        // user: %5
   dealloc_stack %1 : $*UInt8     // id: %4
   return %3 : $UInt8                              // id: %5
 }
 
 // reabstraction thunk helper from @callee_owned () -> (@unowned Swift.UInt8) to @callee_owned () -> (@out Swift.UInt8)
-sil shared [transparent] @_TTRXFo__dVs5UInt8_XFo__iS__ : $@convention(thin) (@out UInt8, @owned @callee_owned () -> UInt8) -> () {
+sil shared [transparent] @_TTRXFo__dVs5UInt8_XFo__iS__ : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 {
 bb0(%0 : $*UInt8, %1 : $@callee_owned () -> UInt8):
   %2 = apply %1() : $@callee_owned () -> UInt8    // user: %3
   store %2 to %0 : $*UInt8                        // id: %3

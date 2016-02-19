@@ -498,6 +498,15 @@ public:
     }
   }
 
+  /// Is this an interface type that is subject to a concrete
+  /// same-type constraint?
+  bool isConcreteType(ModuleDecl &module) const {
+    assert(isTypeParameter());
+    return (getKind() != Kind::Opaque &&
+            GenericSig != nullptr &&
+            GenericSig->isConcreteType(getType(), module));
+  }
+
   bool requiresClass(ModuleDecl &module) {
     switch (getKind()) {
     case Kind::Opaque:
@@ -742,6 +751,10 @@ public:
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its input type.
   AbstractionPattern getFunctionInputType() const;
+
+  /// Given that the value being abstracted is optional, return the
+  /// abstraction pattern for its object type.
+  AbstractionPattern getAnyOptionalObjectType() const;
 
   /// If this pattern refers to a reference storage type, look through
   /// it.

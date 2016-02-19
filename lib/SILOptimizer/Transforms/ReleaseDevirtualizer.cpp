@@ -209,7 +209,7 @@ bool ReleaseDevirtualizer::createDeinitCall(SILType AllocType,
     DeinitType = DeinitType->substGenericArgs(M, M.getSwiftModule(),
                                               AllocSubsts);
 
-  SILType ReturnType = DeinitType->getResult().getSILType();
+  SILType ReturnType = DeinitType->getSILResult();
   SILType DeinitSILType = SILType::getPrimitiveObjectType(DeinitType);
 
   SILBuilder B(ReleaseInst);

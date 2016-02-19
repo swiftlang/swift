@@ -2877,13 +2877,9 @@ namespace {
                            bool isSelfParameter) {
       auto type = param.getType();
       switch (param.getConvention()) {
-      // Out-parameters don't give us a value we can use.
-      case ParameterConvention::Indirect_Out:
-        return;
-
-      // In-parameters do, but right now we don't bother, for no good
-      // reason. But if this is 'self', consider passing an extra
-      // metatype.
+      // Indirect parameters do give us a value we can use, but right now
+      // we don't bother, for no good reason. But if this is 'self',
+      // consider passing an extra metatype.
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:

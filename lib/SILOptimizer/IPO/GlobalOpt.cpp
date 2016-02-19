@@ -224,11 +224,11 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   // Generate a getter from the global init function without side-effects.
   auto refType = varDecl->getType().getCanonicalTypeOrNull();
   // Function takes no arguments and returns refType
-  SILResultInfo ResultInfo(refType, ResultConvention::Owned);
+  SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, ResultInfo, None,
+      ParameterConvention::Direct_Owned, { }, Results, None,
       Store->getModule().getASTContext());
   auto *GetterF = Store->getModule().getOrCreateFunction(Store->getLoc(),
       getterName, SILLinkage::PrivateExternal, LoweredType,
@@ -474,11 +474,11 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
 
   auto refType = varDecl->getType().getCanonicalTypeOrNull();
   // Function takes no arguments and returns refType
-  SILResultInfo ResultInfo(refType, ResultConvention::Owned);
+  SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, ResultInfo, None,
+      ParameterConvention::Direct_Owned, { }, Results, None,
       InitF->getASTContext());
   auto *GetterF = InitF->getModule().getOrCreateFunction(InitF->getLocation(),
      getterName, SILLinkage::PrivateExternal, LoweredType,

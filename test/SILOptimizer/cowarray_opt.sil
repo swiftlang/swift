@@ -473,9 +473,9 @@ struct MyInt {
 }
 
 sil [_semantics "array.check_subscript"] @checkSubscript : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<My2dArray<MyInt>>) -> ()
-sil [_semantics "array.get_element"] @getElement : $@convention(method) (@out My2dArray<MyInt>, MyInt, Bool, @guaranteed My2dArray<My2dArray<MyInt>>) -> ()
+sil [_semantics "array.get_element"] @getElement : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<My2dArray<MyInt>>) -> @out My2dArray<MyInt>
 sil [_semantics "array.check_subscript"] @checkSubscript2 : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<MyInt>) -> ()
-sil [_semantics "array.get_element"] @getElement2 : $@convention(method) (@out MyInt, MyInt, Bool, @guaranteed My2dArray<MyInt>) -> ()
+sil [_semantics "array.get_element"] @getElement2 : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<MyInt>) -> @out MyInt
 sil [_semantics "array.make_mutable"] @makeMutable : $@convention(method) (@inout My2dArray<My2dArray<MyInt>>) -> ()
 sil [_semantics "array.get_element_address"] @getElementAddress : $@convention(method) (MyInt, @guaranteed My2dArray<My2dArray<MyInt>>) -> UnsafeMutablePointer<My2dArray<MyInt>>
 sil [_semantics "array.make_mutable"] @makeMutable2 : $@convention(method) (@inout My2dArray<MyInt>) -> ()
@@ -1134,10 +1134,10 @@ bb2:
 
 sil [_semantics "array.props.isNativeTypeChecked"] @hoistableIsNativeTypeChecked : $@convention(method) (@guaranteed My2dArray<My2dArray<MyInt>>) -> Bool
 sil [_semantics "array.check_subscript"] @checkSubscript3 : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<My2dArray<MyInt>>) -> _DependenceToken
-sil [_semantics "array.get_element"] @getElement3 : $@convention(method) (@out My2dArray<MyInt>, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> ()
+sil [_semantics "array.get_element"] @getElement3 : $@convention(method) (MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> @out My2dArray<MyInt>
 sil [_semantics "array.props.isNativeTypeChecked"] @hoistableIsNativeTypeChecked2 : $@convention(method) (@guaranteed My2dArray<MyInt>) -> Bool
 sil [_semantics "array.check_subscript"] @checkSubscript4 : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<MyInt>) -> _DependenceToken
-sil [_semantics "array.get_element"] @getElement4 : $@convention(method) (@out MyInt, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> ()
+sil [_semantics "array.get_element"] @getElement4 : $@convention(method) (MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> @out MyInt
 sil [_semantics "array.make_mutable"] @makeMutable3 : $@convention(method) (@inout My2dArray<My2dArray<MyInt>>) -> ()
 sil [_semantics "array.get_element_address"] @getElementAddress3 : $@convention(method) (MyInt, @guaranteed My2dArray<My2dArray<MyInt>>) -> UnsafeMutablePointer<My2dArray<MyInt>>
 sil [_semantics "array.make_mutable"] @makeMutable4 : $@convention(method) (@inout My2dArray<MyInt>) -> ()
@@ -1163,10 +1163,10 @@ bb0(%0 : $*My2dArray<My2dArray<MyInt>>, %1 : $MyInt):
   %7 = integer_literal $Builtin.Int1, 0
   %9 = function_ref @hoistableIsNativeTypeChecked : $@convention(method) (@guaranteed My2dArray<My2dArray<MyInt>>) -> Bool
   %10 = function_ref @checkSubscript3 : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<My2dArray<MyInt>>) -> _DependenceToken
-  %11 = function_ref @getElement3 : $@convention(method) (@out My2dArray<MyInt>, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> ()
+  %11 = function_ref @getElement3 : $@convention(method) (MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> @out My2dArray<MyInt>
   %12 = function_ref @hoistableIsNativeTypeChecked2 : $@convention(method) (@guaranteed My2dArray<MyInt>) -> Bool
   %13 = function_ref @checkSubscript4 : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<MyInt>) -> _DependenceToken
-  %14 = function_ref @getElement4 : $@convention(method) (@out MyInt, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> ()
+  %14 = function_ref @getElement4 : $@convention(method) (MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> @out MyInt
   %15 = integer_literal $Builtin.Int1, -1
   %18 = function_ref @makeMutable3 : $@convention(method) (@inout My2dArray<My2dArray<MyInt>>) -> ()
   %20 = struct $Bool (%15 : $Builtin.Int1)
@@ -1187,12 +1187,12 @@ bb2(%27 : $Builtin.Int64):
   %33 = alloc_stack $My2dArray<MyInt>
   %35 = apply %9(%32) : $@convention(method) (@guaranteed My2dArray<My2dArray<MyInt>>) -> Bool
   %37 = apply %10(%1, %35, %32) : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<My2dArray<MyInt>>) -> _DependenceToken
-  %39 = apply %11(%33, %1, %35, %37, %32) : $@convention(method) (@out My2dArray<MyInt>, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> ()
+  %39 = apply %11(%33, %1, %35, %37, %32) : $@convention(method) (MyInt, Bool, _DependenceToken, @guaranteed My2dArray<My2dArray<MyInt>>) -> @out My2dArray<MyInt>
   %40 = load %33 : $*My2dArray<MyInt>
   %41 = alloc_stack $MyInt
   %44 = apply %12(%40) : $@convention(method) (@guaranteed My2dArray<MyInt>) -> Bool
   %46 = apply %13(%28, %44, %40) : $@convention(method) (MyInt, Bool, @guaranteed My2dArray<MyInt>) -> _DependenceToken
-  %48 = apply %14(%41, %28, %44, %46, %40) : $@convention(method) (@out MyInt, MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> ()
+  %48 = apply %14(%41, %28, %44, %46, %40) : $@convention(method) (MyInt, Bool, _DependenceToken, @guaranteed My2dArray<MyInt>) -> @out MyInt
   %49 = struct_extract %40 : $My2dArray<MyInt>, #My2dArray._buffer
   %50 = struct_extract %49 : $_My2dArrayBuffer<MyInt>, #_My2dArrayBuffer._storage
   %51 = struct_extract %50 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue

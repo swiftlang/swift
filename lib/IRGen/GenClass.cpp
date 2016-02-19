@@ -572,7 +572,12 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
   auto fnType = silFn->getLoweredFunctionType();
   if (fnType->getParameters().size() != 1)
     return false;
-  if (fnType->getResult().getConvention() != ResultConvention::Unowned)
+  if (fnType->getNumDirectResults() != 2 ||
+      fnType->getNumIndirectResults() != 0)
+    return false;
+  auto results = fnType->getDirectResults();
+  if (results[0].getConvention() != ResultConvention::Unowned ||
+      results[1].getConvention() != ResultConvention::Unowned)
     return false;
   llvm::Function *llvmFn =
     IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition);
@@ -1715,8 +1720,7 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls) {
 llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
                                         ExtensionDecl *ext) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
-  ClassDecl *cls = ext->getDeclaredTypeInContext()
-    ->getClassOrBoundGenericClass();
+  ClassDecl *cls = ext->getAsClassOrClassExtensionContext();
   assert(cls && "generating category metadata for a non-class extension");
   
   ClassDataBuilder builder(IGM, cls, ext);

@@ -56,7 +56,7 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
   case ValueKind::SILArgument: {
     auto *Arg = cast<SILArgument>(V);
     if (Arg->isFunctionArg() &&
-        Arg->hasConvention(ParameterConvention::Direct_Owned))
+        Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       return RCStateTransitionKind::StrongEntrance;
     return RCStateTransitionKind::Unknown;
   }
@@ -72,8 +72,10 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
     // TODO: When we support pairing retains with @owned parameters, we will
     // need to be able to handle the potential of multiple state transition
     // kinds.
-    if (AI->hasResultConvention(ResultConvention::Owned))
-      return RCStateTransitionKind::StrongEntrance;
+    for (auto result : AI->getSubstCalleeType()->getDirectResults()) {
+      if (result.getConvention() == ResultConvention::Owned)
+        return RCStateTransitionKind::StrongEntrance;
+    }
 
     return RCStateTransitionKind::Unknown;
   }
@@ -120,18 +122,6 @@ raw_ostream &llvm::operator<<(raw_ostream &os, RCStateTransitionKind Kind) {
     return isRCStateTransition ## Name(getKind());  \
   }
 #include "RCStateTransition.def"
-
-RCStateTransition::RCStateTransition(const RCStateTransition &R) {
-  Kind = R.Kind;
-  if (R.isEndPoint()) {
-    EndPoint = R.EndPoint;
-    return;
-  }
-
-  if (!R.isMutator())
-    return;
-  Mutators = R.Mutators;
-}
 
 bool RCStateTransition::matchingInst(SILInstruction *Inst) const {
   // We only pair mutators for now.

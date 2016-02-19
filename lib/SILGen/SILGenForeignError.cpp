@@ -306,14 +306,13 @@ static SILValue emitUnwrapIntegerResult(SILGenFunction &gen,
 
 /// Perform a foreign error check by testing whether the call result is zero.
 /// The call result is otherwise ignored.
-static ManagedValue
+static void
 emitResultIsZeroErrorCheck(SILGenFunction &gen, SILLocation loc,
                            ManagedValue result, ManagedValue errorSlot,
-                           bool suppressErrorCheck, bool resultIsIgnored,
-                           bool zeroIsError) {
+                           bool suppressErrorCheck, bool zeroIsError) {
   // Just ignore the call result if we're suppressing the error check.
   if (suppressErrorCheck) {
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+    return;
   }
 
   SILValue resultValue =
@@ -336,9 +335,6 @@ emitResultIsZeroErrorCheck(SILGenFunction &gen, SILLocation loc,
   gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
 
   gen.B.emitBlock(contBB);
-
-  if (resultIsIgnored) return ManagedValue::forInContext();
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 /// Perform a foreign error check by testing whether the call result is nil.
@@ -381,12 +377,11 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
 }
 
 /// Perform a foreign error check by testing whether the error was nil.
-static ManagedValue
+static void
 emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
-                            ManagedValue origResult, ManagedValue errorSlot,
-                            bool suppressErrorCheck) {
+                            ManagedValue errorSlot, bool suppressErrorCheck) {
   // If we're suppressing the check, just don't check.
-  if (suppressErrorCheck) return origResult;
+  if (suppressErrorCheck) return;
 
   SILValue optionalError = gen.B.createLoad(loc, errorSlot.getValue());
 
@@ -407,17 +402,17 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
 
   // Return the result.
   gen.B.emitBlock(contBB);
-  return origResult;
+  return;
 }
 
 /// Emit a check for whether a non-native function call produced an
 /// error.
 ///
-/// \return The true result of the function, in the normal code path;
-///   the entire error path will have been processed separately.
-ManagedValue
+/// \c results should be left with only values that match the formal
+/// direct results of the function.
+void
 SILGenFunction::emitForeignErrorCheck(SILLocation loc,
-                                      ManagedValue result,
+                                      SmallVectorImpl<ManagedValue> &results,
                                       ManagedValue errorSlot,
                                       bool suppressErrorCheck,
                                 const ForeignErrorConvention &foreignError) {
@@ -426,28 +421,32 @@ SILGenFunction::emitForeignErrorCheck(SILLocation loc,
 
   switch (foreignError.getKind()) {
   case ForeignErrorConvention::ZeroPreservedResult:
-    emitResultIsZeroErrorCheck(*this, loc, result, errorSlot,
+    assert(results.size() == 1);
+    emitResultIsZeroErrorCheck(*this, loc, results[0], errorSlot,
                                suppressErrorCheck,
-                               /*ignored*/ true,
                                /*zeroIsError*/ true);
-    assert(!result.hasCleanup());
-    return result;
+    return;
   case ForeignErrorConvention::ZeroResult:
-    return emitResultIsZeroErrorCheck(*this, loc, result, errorSlot,
-                                      suppressErrorCheck,
-                                      /*ignored*/ false,
-                                      /*zeroIsError*/ true);
+    assert(results.size() == 1);
+    emitResultIsZeroErrorCheck(*this, loc, results.pop_back_val(),
+                               errorSlot, suppressErrorCheck,
+                               /*zeroIsError*/ true);
+    return;
   case ForeignErrorConvention::NonZeroResult:
-    return emitResultIsZeroErrorCheck(*this, loc, result, errorSlot,
-                                      suppressErrorCheck,
-                                      /*ignored*/ false,
-                                      /*zeroIsError*/ false);
+    assert(results.size() == 1);
+    emitResultIsZeroErrorCheck(*this, loc, results.pop_back_val(),
+                               errorSlot, suppressErrorCheck,
+                               /*zeroIsError*/ false);
+    return;
   case ForeignErrorConvention::NilResult:
-    return emitResultIsNilErrorCheck(*this, loc, result, errorSlot,
-                                     suppressErrorCheck);
+    assert(results.size() == 1);
+    results[0] = emitResultIsNilErrorCheck(*this, loc, results[0], errorSlot,
+                                           suppressErrorCheck);
+    return;
   case ForeignErrorConvention::NonNilError:
-    return emitErrorIsNonNilErrorCheck(*this, loc, result, errorSlot,
-                                       suppressErrorCheck);
+    // Leave the direct results alone.
+    emitErrorIsNonNilErrorCheck(*this, loc, errorSlot, suppressErrorCheck);
+    return;
   }
   llvm_unreachable("bad foreign error convention kind");
 }

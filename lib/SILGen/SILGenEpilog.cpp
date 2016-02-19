@@ -22,14 +22,16 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
                                    CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
-  // If we have a non-null, non-void, non-address-only return type, receive the
-  // return value via a BB argument.
-  NeedsReturn = resultType && !resultType->isVoid();
-  if (NeedsReturn) {
-    auto &resultTI = getTypeLowering(resultType);
-    if (!resultTI.isAddressOnly())
-      new (F.getModule()) SILArgument(epilogBB, resultTI.getLoweredType());
+  // If we have any direct results, receive them via BB arguments.
+  // But callers can disable this by passing a null result type.
+  if (resultType) {
+    NeedsReturn = (F.getLoweredFunctionType()->getNumAllResults() != 0);
+    for (auto directResult : F.getLoweredFunctionType()->getDirectResults()) {
+      SILType resultType = F.mapTypeIntoContext(directResult.getSILType());
+      new (F.getModule()) SILArgument(epilogBB, resultType);
+    }
   }
+
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 
   if (isThrowing) {
@@ -44,13 +46,30 @@ void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 
+/// Given a list of direct results, form the direct result value.
+///
+/// Note that this intentionally loses any tuple sub-structure of the
+/// formal result type.
+static SILValue buildReturnValue(SILGenFunction &gen, SILLocation loc,
+                                 ArrayRef<SILValue> directResults) {
+  if (directResults.size() == 1)
+    return directResults[0];
+
+  SmallVector<TupleTypeElt, 4> eltTypes;
+  for (auto elt : directResults)
+    eltTypes.push_back(elt->getType().getSwiftRValueType());
+  auto resultType = SILType::getPrimitiveObjectType(
+    CanType(TupleType::get(eltTypes, gen.getASTContext())));
+  return gen.B.createTuple(loc, resultType, directResults);
+}
+
 std::pair<Optional<SILValue>, SILLocation>
 SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   assert(ReturnDest.getBlock() && "no epilog bb prepared?!");
   SILBasicBlock *epilogBB = ReturnDest.getBlock();
   SILLocation ImplicitReturnFromTopLevel =
     ImplicitReturnLocation::getImplicitReturnLoc(TopLevel);
-  SILValue returnValue;
+  SmallVector<SILValue, 4> directResults;
   Optional<SILLocation> returnLoc = None;
 
   // If the current BB isn't terminated, and we require a return, then we
@@ -59,8 +78,6 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     B.createUnreachable(ImplicitReturnFromTopLevel);
 
   if (epilogBB->pred_empty()) {
-    bool hadArg = !epilogBB->bbarg_empty();
-
     // If the epilog was not branched to at all, kill the BB and
     // just emit the epilog into the current BB.
     while (!epilogBB->empty())
@@ -70,9 +87,8 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If the current bb is terminated then the epilog is just unreachable.
     if (!B.hasValidInsertionPoint())
       return { None, TopLevel };
+
     // We emit the epilog at the current insertion point.
-    assert(!hadArg && "NeedsReturn is false but epilog had argument?!");
-    (void)hadArg;
     returnLoc = ImplicitReturnFromTopLevel;
 
   } else if (std::next(epilogBB->pred_begin()) == epilogBB->pred_end()
@@ -80,22 +96,17 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If the epilog has a single predecessor and there's no current insertion
     // point to fall through from, then we can weld the epilog to that
     // predecessor BB.
-    bool needsArg = false;
-    if (!epilogBB->bbarg_empty()) {
-      assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
-      needsArg = true;
-    }
 
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
-    assert(predBranch->getArgs().size() == (needsArg ? 1 : 0) &&
+    assert(predBranch->getArgs().size() == epilogBB->bbarg_size() &&
            "epilog predecessor arguments does not match block params");
 
-    if (needsArg) {
-      returnValue = predBranch->getArgs()[0];
-      // RAUW the old BB argument (if any) with the new value.
-      (*epilogBB->bbarg_begin())->replaceAllUsesWith(returnValue);
+    for (auto index : indices(predBranch->getArgs())) {
+      SILValue result = predBranch->getArgs()[index];
+      directResults.push_back(result);
+      epilogBB->getBBArg(index)->replaceAllUsesWith(result);
     }
 
     // If we are optimizing, we should use the return location from the single,
@@ -123,11 +134,9 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
       (StartOfPostmatter ? SILFunction::iterator(StartOfPostmatter) : F.end());
     B.moveBlockTo(epilogBB, endOfOrdinarySection);
 
-    // Emit the epilog into the epilog bb. Its argument is the return value.
-    if (!epilogBB->bbarg_empty()) {
-      assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
-      returnValue = epilogBB->bbarg_begin()[0];
-    }
+    // Emit the epilog into the epilog bb. Its arguments are the
+    // direct results.
+    directResults.append(epilogBB->bbarg_begin(), epilogBB->bbarg_end());
 
     // If we are falling through from the current block, the return is implicit.
     B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
@@ -147,6 +156,17 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   //
   // Otherwise make the ret instruction part of the cleanups.
   if (!returnLoc) returnLoc = cleanupLoc;
+
+  // Build the return value.  We don't do this if there are no direct
+  // results; this can happen for void functions, but also happens when
+  // prepareEpilog was asked to not add result arguments to the epilog
+  // block.
+  SILValue returnValue;
+  if (!directResults.empty()) {
+    assert(directResults.size()
+             == F.getLoweredFunctionType()->getNumDirectResults());
+    returnValue = buildReturnValue(*this, TopLevel, directResults);
+  }
 
   return { returnValue, *returnLoc };
 }

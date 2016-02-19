@@ -268,8 +268,7 @@ DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
   if (id != 0)
     return id;
 
-  LastLocalDeclContextID = LastLocalDeclContextID + 1;
-  id = LastLocalDeclContextID;
+  id = ++LastLocalDeclContextID;
   LocalDeclContextsToWrite.push(DC);
   return id;
 }
@@ -294,8 +293,7 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   if (id)
     return id;
 
-  LastDeclContextID = LastDeclContextID + 1;
-  id = LastDeclContextID;
+  id = ++LastDeclContextID;
   DeclContextsToWrite.push(DC);
 
   return id;
@@ -327,8 +325,7 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   if (paramList)
     GenericContexts[paramList] = D;
 
-  LastDeclID = LastDeclID + 1;
-  id = { LastDeclID, forceSerialization };
+  id = { ++LastDeclID, forceSerialization };
   DeclsAndTypesToWrite.push(D);
   return id.first;
 }
@@ -341,8 +338,7 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (id.first != 0)
     return id.first;
 
-  LastTypeID = LastTypeID + 1;
-  id = { LastTypeID, true };
+  id = { ++LastTypeID, true };
   DeclsAndTypesToWrite.push(ty);
   return id.first;
 }
@@ -355,8 +351,7 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
   if (id != 0)
     return id;
 
-  LastIdentifierID = LastIdentifierID + 1;
-  id = LastIdentifierID;
+  id = ++LastIdentifierID;
   IdentifiersToWrite.push_back(ident);
   return id;
 }
@@ -385,8 +380,7 @@ NormalConformanceID Serializer::addConformanceRef(
   if (conformanceID)
     return conformanceID;
 
-  LastNormalConformanceID = LastNormalConformanceID + 1;
-  conformanceID = LastNormalConformanceID;
+  conformanceID = ++LastNormalConformanceID;
   NormalConformancesToWrite.push(conformance);
 
   return conformanceID;
@@ -2662,7 +2656,6 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   switch (pc) {
   SIMPLE_CASE(ParameterConvention, Indirect_In)
   SIMPLE_CASE(ParameterConvention, Indirect_In_Guaranteed)
-  SIMPLE_CASE(ParameterConvention, Indirect_Out)
   SIMPLE_CASE(ParameterConvention, Indirect_Inout)
   SIMPLE_CASE(ParameterConvention, Indirect_InoutAliasable)
   SIMPLE_CASE(ParameterConvention, Direct_Owned)
@@ -2677,6 +2670,7 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
 /// Serialization enum values, which are guaranteed to be stable.
 static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   switch (rc) {
+  SIMPLE_CASE(ResultConvention, Indirect)
   SIMPLE_CASE(ResultConvention, Owned)
   SIMPLE_CASE(ResultConvention, Unowned)
   SIMPLE_CASE(ResultConvention, UnownedInnerPointer)
@@ -3006,31 +3000,28 @@ void Serializer::writeType(Type ty) {
     auto stableRepresentation =
       getRawStableSILFunctionTypeRepresentation(representation);
     
-    auto interfaceResult = fnTy->getResult();
-    TypeID interfaceResultTyID = addTypeRef(interfaceResult.getType());
-    auto stableInterfaceResultConvention =
-      getRawStableResultConvention(interfaceResult.getConvention());
-
-    TypeID errorResultTyID = 0;
-    uint8_t stableErrorResultConvention = 0;
+    SmallVector<TypeID, 8> variableData;
+    for (auto param : fnTy->getParameters()) {
+      variableData.push_back(addTypeRef(param.getType()));
+      unsigned conv = getRawStableParameterConvention(param.getConvention());
+      variableData.push_back(TypeID(conv));
+    }
+    for (auto result : fnTy->getAllResults()) {
+      variableData.push_back(addTypeRef(result.getType()));
+      unsigned conv = getRawStableResultConvention(result.getConvention());
+      variableData.push_back(TypeID(conv));
+    }
     if (fnTy->hasErrorResult()) {
       auto abResult = fnTy->getErrorResult();
-      errorResultTyID = addTypeRef(abResult.getType());
-      stableErrorResultConvention =
-        getRawStableResultConvention(abResult.getConvention());
-    }
-
-    SmallVector<TypeID, 8> paramTypes;
-    for (auto param : fnTy->getParameters()) {
-      paramTypes.push_back(addTypeRef(param.getType()));
-      unsigned conv = getRawStableParameterConvention(param.getConvention());
-      paramTypes.push_back(TypeID(conv));
+      variableData.push_back(addTypeRef(abResult.getType()));
+      unsigned conv = getRawStableResultConvention(abResult.getConvention());
+      variableData.push_back(TypeID(conv));
     }
 
     auto sig = fnTy->getGenericSignature();
     if (sig) {
       for (auto param : sig->getGenericParams())
-        paramTypes.push_back(addTypeRef(param));
+        variableData.push_back(addTypeRef(param));
     }
 
     auto stableCalleeConvention =
@@ -3038,15 +3029,13 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-          interfaceResultTyID,
-          stableInterfaceResultConvention,
-          errorResultTyID,
-          stableErrorResultConvention,
           stableCalleeConvention,
           stableRepresentation,
           fnTy->isNoReturn(),
-          sig ? sig->getGenericParams().size() : 0,
-          paramTypes);
+          fnTy->hasErrorResult(),
+          fnTy->getParameters().size(),
+          fnTy->getNumAllResults(),
+          variableData);
     if (sig)
       writeRequirements(sig->getRequirements());
     else

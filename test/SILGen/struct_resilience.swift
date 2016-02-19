@@ -4,8 +4,8 @@ import resilient_struct
 
 // Resilient structs are always address-only
 
-// CHECK-LABEL: sil hidden @_TF17struct_resilience26functionWithResilientTypesFTV16resilient_struct4Size1fFS1_S1__S1_ : $@convention(thin) (@out Size, @in Size, @owned @callee_owned (@out Size, @in Size) -> ()) -> ()
-// CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : $@callee_owned (@out Size, @in Size) -> ()):
+// CHECK-LABEL: sil hidden @_TF17struct_resilience26functionWithResilientTypesFTV16resilient_struct4Size1fFS1_S1__S1_ : $@convention(thin) (@in Size, @owned @callee_owned (@in Size) -> @out Size) -> @out Size
+// CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : $@callee_owned (@in Size) -> @out Size):
 func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
 
   // Stored properties of resilient structs from outside our resilience
@@ -56,8 +56,8 @@ func functionWithFixedLayoutTypes(p: Point, f: Point -> Point) -> Point {
 
 // Fixed-layout struct with resilient stored properties is still address-only
 
-// CHECK-LABEL: sil hidden @_TF17struct_resilience39functionWithFixedLayoutOfResilientTypesFTV16resilient_struct9Rectangle1fFS1_S1__S1_ : $@convention(thin) (@out Rectangle, @in Rectangle, @owned @callee_owned (@out Rectangle, @in Rectangle) -> ()) -> ()
-// CHECK:        bb0(%0 : $*Rectangle, %1 : $*Rectangle, %2 : $@callee_owned (@out Rectangle, @in Rectangle) -> ()):
+// CHECK-LABEL: sil hidden @_TF17struct_resilience39functionWithFixedLayoutOfResilientTypesFTV16resilient_struct9Rectangle1fFS1_S1__S1_ : $@convention(thin) (@in Rectangle, @owned @callee_owned (@in Rectangle) -> @out Rectangle) -> @out Rectangle
+// CHECK:        bb0(%0 : $*Rectangle, %1 : $*Rectangle, %2 : $@callee_owned (@in Rectangle) -> @out Rectangle):
 func functionWithFixedLayoutOfResilientTypes(r: Rectangle, f: Rectangle -> Rectangle) -> Rectangle {
   return f(r)
 }
@@ -107,7 +107,7 @@ public struct MySize {
   public static var copyright: Int = 0
 }
 
-// CHECK-LABEL: sil @_TF17struct_resilience28functionWithMyResilientTypesFTVS_6MySize1fFS0_S0__S0_ : $@convention(thin) (@out MySize, @in MySize, @owned @callee_owned (@out MySize, @in MySize) -> ()) -> ()
+// CHECK-LABEL: sil @_TF17struct_resilience28functionWithMyResilientTypesFTVS_6MySize1fFS0_S0__S0_ : $@convention(thin) (@in MySize, @owned @callee_owned (@in MySize) -> @out MySize) -> @out MySize
 public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySize {
 
   // Stored properties of resilient structs from inside our resilience

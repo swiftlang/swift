@@ -563,6 +563,12 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
   llvm_unreachable("bad kind");
 }
 
+AbstractionPattern AbstractionPattern::getAnyOptionalObjectType() const {
+  // Currently, the abstraction pattern corresponding to an optional object
+  // is always opaque.  Eventually we'll allow optionals to carry abstraction.
+  return getOpaque();
+}
+
 AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   switch (getKind()) {
   case Kind::Invalid:

@@ -358,7 +358,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen, ManagedValue self,
   address = gen.B.createAddressToPointer(loc, address, rawPointerTy);
 
   SILType resultTupleTy = gen.F.mapTypeIntoContext(
-                 gen.F.getLoweredFunctionType()->getResult().getSILType());
+                 gen.F.getLoweredFunctionType()->getSILResult());
   SILType optCallbackTy = resultTupleTy.getTupleElementType(1);
 
   // Form the callback.
@@ -541,16 +541,14 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
     { selfType->getCanonicalType(), ParameterConvention::Indirect_Inout },
     { selfMetatypeType->getCanonicalType(), ParameterConvention::Direct_Unowned },
   };
-  SILResultInfo result = {
-    TupleType::getEmpty(ctx), ResultConvention::Unowned
-  };
+  ArrayRef<SILResultInfo> results = {};
   auto extInfo = 
     SILFunctionType::ExtInfo()
       .withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto callbackType = SILFunctionType::get(GenericSig, extInfo,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
-                                           params, result, None, ctx);
+                                           params, results, None, ctx);
   auto callback =
     SGM.M.getOrCreateFunction(Witness, name, Linkage, callbackType,
                               IsBare,
@@ -703,11 +701,10 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &gen,
                                    callbackBuffer);
 
     // Emit into the buffer.
-    auto init = gen.useBufferAsTemporary(loc, allocatedCallbackBuffer,
-                                         *indicesTL);
+    auto init = gen.useBufferAsTemporary(allocatedCallbackBuffer, *indicesTL);
     indicesCleanup = init->getInitializedCleanup();
 
-    indices.copyInto(gen, init.get(), loc);
+    indices.copyInto(gen, loc, init.get());
   }
 
   // Set up the result buffer.
@@ -720,10 +717,10 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &gen,
 
   // Evaluate the getter into the result buffer.
   LValue lv = buildLValue(gen, loc, self, std::move(indices), AccessKind::Read);
-  ManagedValue result = gen.emitLoadOfLValue(loc, std::move(lv),
+  RValue result = gen.emitLoadOfLValue(loc, std::move(lv),
                                              SGFContext(&init));
   if (!result.isInContext()) {
-    result.forwardInto(gen, loc, resultBuffer);
+    std::move(result).forwardInto(gen, loc, &init);
   }
 
   // Forward the cleanup on the saved indices.

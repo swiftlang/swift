@@ -3,12 +3,10 @@
 
 func dup<T>(let x: T) -> (T, T) { return (x,x) }
 // CHECK-LABEL:      sil hidden @_TF14generic_tuples3dup
-// CHECK:      ([[RESULT:%.*]] : $*(T, T), [[XVAR:%.*]] : $*T):
+// CHECK:      ([[RESULT_0:%.*]] : $*T, [[RESULT_1:%.*]] : $*T, [[XVAR:%.*]] : $*T):
 // CHECK-NEXT: debug_value_addr [[XVAR]] : $*T, let, name "x"
-// CHECK-NEXT: [[T0:%.*]] = tuple_element_addr [[RESULT]] : {{.*}}, 0
-// CHECK-NEXT: [[T1:%.*]] = tuple_element_addr [[RESULT]] : {{.*}}, 1
-// CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[T0]]
-// CHECK-NEXT: copy_addr [take] [[XVAR]] to [initialization] [[T1]]
+// CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_0]]
+// CHECK-NEXT: copy_addr [take] [[XVAR]] to [initialization] [[RESULT_1]]
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]]
 

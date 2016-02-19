@@ -29,14 +29,8 @@ func testShuffleOpaque() {
   // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y]]
 
   // CHECK:      [[T0:%.*]] = function_ref @_TF6tuples7make_xyFT_T1xSi1yPS_1P__
-  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $(x: Int, y: P)
-  // CHECK-NEXT: apply [[T0]]([[TEMP]])
-  // CHECK-NEXT: [[T0:%.*]] = tuple_element_addr [[TEMP]] : $*(x: Int, y: P), 0
-  // CHECK-NEXT: [[T1:%.*]] = load [[T0]] : $*Int
-  // CHECK-NEXT: [[T2:%.*]] = tuple_element_addr [[TEMP]] : $*(x: Int, y: P), 1
+  // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[PBX]])
   // CHECK-NEXT: store [[T1]] to [[PBY]]
-  // CHECK-NEXT: copy_addr [take] [[T2]] to [initialization] [[PBX]]
-  // CHECK-NEXT: dealloc_stack [[TEMP]]
   var (x,y) : (y:P, x:Int) = make_xy()
 
   // CHECK-NEXT: [[PAIR:%.*]] = alloc_box $(y: P, x: Int)
@@ -45,34 +39,23 @@ func testShuffleOpaque() {
   // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 1
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples7make_xyFT_T1xSi1yPS_1P__
-  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $(x: Int, y: P)
-  // CHECK-NEXT: apply [[T0]]([[TEMP]])
-  // CHECK-NEXT: [[T0:%.*]] = tuple_element_addr [[TEMP]] : $*(x: Int, y: P), 0
-  // CHECK-NEXT: [[T1:%.*]] = load [[T0]] : $*Int
-  // CHECK-NEXT: [[T2:%.*]] = tuple_element_addr [[TEMP]] : $*(x: Int, y: P), 1
+  // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[PAIR_0]])
   // CHECK-NEXT: store [[T1]] to [[PAIR_1]]
-  // CHECK-NEXT: copy_addr [take] [[T2]] to [initialization] [[PAIR_0]]
-  // CHECK-NEXT: dealloc_stack [[TEMP]]
   var pair : (y:P, x:Int) = make_xy()
 
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples7make_xyFT_T1xSi1yPS_1P__
-  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $(x: Int, y: P)
-  // CHECK-NEXT: apply [[T0]]([[TEMP]])
-  // CHECK-NEXT: [[T0:%.*]] = tuple_element_addr [[TEMP]] : $*(x: Int, y: P), 0
-  // CHECK-NEXT: [[T1:%.*]] = load [[T0]] : $*Int
-  // CHECK-NEXT: [[T2:%.*]] = tuple_element_addr [[TEMP]] : $*(x: Int, y: P), 1
-  // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $(y: P, x: Int)
-  // CHECK-NEXT: [[TEMP2_0:%.*]] = tuple_element_addr [[TEMP2]] : $*(y: P, x: Int), 0
-  // CHECK-NEXT: copy_addr [take] [[T2]] to [initialization] [[TEMP2_0]]
-  // CHECK-NEXT: [[TEMP2_1:%.*]] = tuple_element_addr [[TEMP2]] : $*(y: P, x: Int), 1
-  // CHECK-NEXT: store [[T1]] to [[TEMP2_1]]
-  // CHECK-NEXT: copy_addr [take] [[TEMP2]] to [[PBPAIR]]
-  // CHECK-NEXT: dealloc_stack [[TEMP2]]
+  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
+  // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TEMP]])
+  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 0
+  // CHECK-NEXT: copy_addr [take] [[TEMP]] to [[PAIR_0]]
+  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 1
+  // CHECK-NEXT: assign [[T1]] to [[PAIR_1]]
   // CHECK-NEXT: dealloc_stack [[TEMP]]
   pair = make_xy()
 }
 
+// CHECK-LABEL: testShuffleTuple
 func testShuffleTuple() {
   // CHECK: [[X:%.*]] = alloc_box $P
   // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
@@ -109,13 +92,10 @@ func testShuffleTuple() {
   // CHECK-NEXT: [[T0:%.*]] = function_ref @_TF6tuples6make_pFT_PS_1P_ 
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
   // CHECK-NEXT: apply [[T0]]([[TEMP]])
-  // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $(y: P, x: Int)
-  // CHECK-NEXT: [[TEMP2_0:%.*]] = tuple_element_addr [[TEMP2]] : $*(y: P, x: Int), 0
-  // CHECK-NEXT: copy_addr [take] [[TEMP]] to [initialization] [[TEMP2_0]]
-  // CHECK-NEXT: [[TEMP2_1:%.*]] = tuple_element_addr [[TEMP2]] : $*(y: P, x: Int), 1
-  // CHECK-NEXT: store [[INT]] to [[TEMP2_1]]
-  // CHECK-NEXT: copy_addr [take] [[TEMP2]] to [[PBPAIR]]
-  // CHECK-NEXT: dealloc_stack [[TEMP2]]
+  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 0
+  // CHECK-NEXT: copy_addr [take] [[TEMP]] to [[PAIR_0]]
+  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: P, x: Int), 1
+  // CHECK-NEXT: assign [[INT]] to [[PAIR_1]]
   // CHECK-NEXT: dealloc_stack [[TEMP]]
   pair = (x: make_int(), y: make_p())
 }

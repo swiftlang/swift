@@ -453,7 +453,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
-  OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResult();
+  OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResults();
   auto OldOpTypes = SubstCalleeTy->getParameterSILTypes();
   auto NewOpTypes = ConvertCalleeTy->getParameterSILTypes();
 
@@ -538,7 +538,6 @@ void SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
-      case ParameterConvention::Indirect_Out:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Direct_Guaranteed:
@@ -597,11 +596,10 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     }
     if (isa<ApplyInst>(User) || isa<TryApplyInst>(User)) {
       // Ignore function calls which do not write to the stack location.
-      auto Params = FullApplySite(User).getSubstCalleeType()->getParameters();
       auto Idx = Use->getOperandNumber() - ApplyInst::getArgumentOperandNumber();
-      ParameterConvention Conv = Params[Idx].getConvention();
-      if (Conv != ParameterConvention::Indirect_In &&
-          Conv != ParameterConvention::Indirect_In_Guaranteed)
+      auto Conv = FullApplySite(User).getArgumentConvention(Idx);
+      if (Conv != SILArgumentConvention::Indirect_In &&
+          Conv != SILArgumentConvention::Indirect_In_Guaranteed)
         return SILValue();
       continue;
     }
@@ -1069,7 +1067,9 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   auto FnTy = F->getLoweredFunctionType();
 
   // Look at the result type.
-  auto ResultInfo = FnTy->getResult();
+  if (FnTy->getNumAllResults() != 1)
+    return false;
+  auto ResultInfo = FnTy->getAllResults()[0];
   if (ResultInfo.getConvention() != ResultConvention::Owned)
     return false;
 
@@ -1088,7 +1088,8 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
   SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
-  auto ResultInfo = FnTy->getResult();
+  assert(FnTy->getNumAllResults() == 1);
+  auto ResultInfo = FnTy->getAllResults()[0];
   (void) ResultInfo;
 
   assert(ResultInfo.getConvention() == ResultConvention::Owned &&
@@ -1244,7 +1245,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // (apply (thin_to_thick_function f)) to (apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
     // TODO: Handle substitutions and indirect results
-    if (AI->hasSubstitutions() || AI->hasIndirectResult())
+    if (AI->hasSubstitutions() || AI->hasIndirectResults())
       return nullptr;
     SmallVector<SILValue, 4> Arguments;
     for (auto &Op : AI->getArgumentOperands()) {
@@ -1375,7 +1376,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   // (try_apply (thin_to_thick_function f)) to (try_apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
     // TODO: Handle substitutions and indirect results
-    if (AI->hasSubstitutions() || AI->hasIndirectResult())
+    if (AI->hasSubstitutions() || AI->hasIndirectResults())
       return nullptr;
     SmallVector<SILValue, 4> Arguments;
     for (auto &Op : AI->getArgumentOperands()) {

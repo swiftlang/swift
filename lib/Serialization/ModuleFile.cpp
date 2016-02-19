@@ -1377,7 +1377,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1390,7 +1390,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1419,7 +1419,7 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
           if (nominal->getName() == accessPath.front().first)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }

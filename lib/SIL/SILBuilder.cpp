@@ -17,6 +17,17 @@ using namespace swift;
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
 
+TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
+  // Derive the tuple type from the elements.
+  SmallVector<TupleTypeElt, 4> eltTypes;
+  for (auto elt : elts)
+    eltTypes.push_back(elt->getType().getSwiftRValueType());
+  auto tupleType = SILType::getPrimitiveObjectType(
+      CanType(TupleType::get(eltTypes, F.getASTContext())));
+
+  return createTuple(loc, tupleType, elts);
+}
+
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                               SILModule &M,
                                               ArrayRef<Substitution> subs) {
@@ -36,7 +47,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,
                                             newParams,
-                                            FTI->getResult(),
+                                            FTI->getAllResults(),
                                             FTI->getOptionalErrorResult(),
                                             M.getASTContext());
   return SILType::getPrimitiveObjectType(appliedFnType);

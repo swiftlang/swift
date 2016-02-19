@@ -183,16 +183,9 @@ public:
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
   SILType getFunctionInterfaceResultType() const {
-    return castTo<SILFunctionType>()->getSemanticResultSILType();
+    return castTo<SILFunctionType>()->getSILResult();
   }
 
-  /// Returns true if this function type has an indirect argument.
-  ///
-  /// The SILType must refer to a function type.
-  bool isFunctionTypeWithIndirectResult() const {
-    return castTo<SILFunctionType>()->hasIndirectResult();
-  }
-  
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.
   SILFunctionTypeRepresentation getFunctionRepresentation() const {
@@ -569,19 +562,22 @@ SILFunctionType::getParameterSILType(const SILParameterInfo &param) {
   return param.getSILType();
 }
 
-inline SILType SILFunctionType::getSILResult() const {
-  return getResult().getSILType();
-}
-
 inline SILType SILResultInfo::getSILType() const {
-  return SILType::getPrimitiveObjectType(getType());
+  if (isIndirect()) {
+    return SILType::getPrimitiveAddressType(getType());
+  } else {
+    return SILType::getPrimitiveObjectType(getType());    
+  }
 }
 
-inline SILType SILFunctionType::getSemanticResultSILType() const {
-  return (hasIndirectResult() ? getIndirectResult().getSILType()
-                              : getResult().getSILType());
-}  
-  
+inline SILType SILFunctionType::getSILArgumentType(unsigned index) const {
+  if (index < getNumIndirectResults()) {
+    return getIndirectResults()[index].getSILType();
+  } else {
+    return getParameters()[index - getNumIndirectResults()].getSILType();
+  }
+}
+
 inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
 }

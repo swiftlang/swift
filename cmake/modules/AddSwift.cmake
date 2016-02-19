@@ -48,7 +48,7 @@ function(compute_library_subdir result_var_name sdk arch)
 endfunction()
 
 function(_add_variant_c_compile_link_flags
-    sdk arch build_type enable_assertions analyze_code_coverage
+    sdk arch build_type enable_assertions enable_lto analyze_code_coverage
     result_var_name)
   set(result
     ${${result_var_name}}
@@ -67,6 +67,10 @@ function(_add_variant_c_compile_link_flags
       list(APPEND result "-fprofile-instr-generate"
                          "-fcoverage-mapping")
     endif()
+
+    if(enable_lto)
+      list(APPEND result "-flto")
+    endif()
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
@@ -82,6 +86,7 @@ function(_add_variant_c_compile_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      "${SWIFT_ENABLE_LTO}"
       FALSE
       result)
 
@@ -169,19 +174,14 @@ function(_add_variant_link_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      "${SWIFT_ENABLE_LTO}"
       "${analyze_code_coverage}"
       result)
 
   if("${sdk}" STREQUAL "LINUX")
-    if("${arch}" STREQUAL "armv7")
-      list(APPEND result "-lpthread" "-ldl" "-Wl,-Bsymbolic")
-    elseif("${arch}" STREQUAL "armv6")
-      list(APPEND result "-lpthread" "-ldl" "-Wl,-Bsymbolic")
-    else()
-      list(APPEND result "-lpthread" "-ldl")
-    endif()
+    list(APPEND result "-lpthread" "-ldl")
   elseif("${sdk}" STREQUAL "FREEBSD")
-    list(APPEND result "-lpthread" "-Wl,-Bsymbolic")
+    list(APPEND result "-lpthread")
   else()
     list(APPEND result "-lobjc")
   endif()
@@ -856,6 +856,22 @@ function(_add_swift_library_single target name)
     set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 
+  # On platforms that use ELF binaries (for now that is Linux and FreeBSD)
+  # we add markers for metadata sections in the shared libraries using 
+  # these object files.  This wouldn't be necessary if the link was done by
+  # the swift binary: rdar://problem/19007002
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
+     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+
+    if("${libkind}" STREQUAL "SHARED")
+      set(arch_subdir "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+
+      set(SWIFT_SECTIONS_OBJECT_BEGIN "${arch_subdir}/swift_begin.o")
+      set(SWIFT_SECTIONS_OBJECT_END   "${arch_subdir}/swift_end.o")
+    endif()
+
+  endif()
+
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
   # just any swiftmodule files that are associated with them.
   handle_swift_sources(
@@ -877,8 +893,21 @@ function(_add_swift_library_single target name)
       INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}")
 
   add_library("${target}" ${libkind}
+      ${SWIFT_SECTIONS_OBJECT_BEGIN}
       ${SWIFTLIB_SINGLE_SOURCES}
-      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
+      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
+      ${SWIFT_SECTIONS_OBJECT_END})
+
+  # The section metadata objects are generated sources, and we need to tell CMake
+  # not to expect to find them prior to their generation.
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
+     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+    if("${libkind}" STREQUAL "SHARED")
+      set_source_files_properties(${SWIFT_SECTIONS_OBJECT_BEGIN} PROPERTIES GENERATED 1)
+      set_source_files_properties(${SWIFT_SECTIONS_OBJECT_END} PROPERTIES GENERATED 1)
+      add_dependencies("${target}" section_magic)
+    endif()
+  endif()
 
   if (dtrace_dependency_targets)
     add_dependencies("${target}" ${dtrace_dependency_targets})
@@ -1089,16 +1118,8 @@ function(_add_swift_library_single target name)
       "${analyze_code_coverage}"
       link_flags)
 
-  # Handle gold linker flags for shared libraries.
-  if(SWIFT_ENABLE_GOLD_LINKER AND SWIFTLIB_SINGLE_SHARED)
-    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
-      # Extend the link_flags for the gold linker so long as this
-      # isn't the standard library.  The standard library uses a
-      # linker script that isn't supported by the gold linker.
-      if(NOT SWIFTLIB_SINGLE_IS_STDLIB)
-        list(APPEND link_flags "-fuse-ld=gold")
-      endif()
-    endif()
+  if(SWIFT_ENABLE_GOLD_LINKER)
+    list(APPEND link_flags "-fuse-ld=gold")
   endif()
 
   # Configure plist creation for OS X.
@@ -1131,16 +1152,6 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_NAME)
     set(PLIST_INFO_VERSION)
     set(PLIST_INFO_BUILD_VERSION)
-  endif()
-
-  # On Linux and FreeBSD add the linker script that coalesces protocol
-  # conformance sections. This wouldn't be necessary if the link was done by
-  # the swift binary: rdar://problem/19007002
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
-     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-    list(APPEND link_flags
-        "-Xlinker" "-T"
-        "-Xlinker" "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swift.ld")
   endif()
 
   # Convert variables to space-separated strings.

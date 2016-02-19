@@ -21,6 +21,7 @@
 #include "llvm/IR/InlineAsm.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/CodeGen/CGFunctionInfo.h"
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
@@ -638,9 +639,10 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
           || method.kind == SILDeclRef::Kind::Deallocator) &&
          "objc method call must be to a func/initializer/getter/setter/dtor");
 
+  ForeignFunctionInfo foreignInfo;
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(origFnType, attrs);
-  bool indirectResult = requiresExternalIndirectResult(IGF.IGM, origFnType);
+  auto fnTy = IGF.IGM.getFunctionType(origFnType, attrs, &foreignInfo);
+  bool indirectResult = foreignInfo.ClangInfo->getReturnInfo().isIndirect();
   if (kind != ObjCMessageKind::Normal)
     fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
 
@@ -684,7 +686,8 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                         Callee::forKnownFunction(origFnType,
                                                  substFnType,
                                                  subs,
-                                                 messenger, nullptr));
+                                                 messenger, nullptr,
+                                                 foreignInfo));
   return emission;
 }
 
@@ -743,8 +746,9 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
   auto formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
 
   // Compute the appropriate LLVM type for the function.
+  ForeignFunctionInfo foreignInfo;
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(formalType, attrs);
+  auto fnTy = IGF.IGM.getFunctionType(formalType, attrs, &foreignInfo);
 
   // Get the messenger function.
   llvm::Constant *messenger = IGF.IGM.getObjCMsgSendFn();
@@ -753,7 +757,8 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
   // Prepare the call.
   CallEmission emission(IGF, Callee::forKnownFunction(formalType,
                                                       formalType, {},
-                                                      messenger, nullptr));
+                                                      messenger, nullptr,
+                                                      foreignInfo));
 
   // Emit the arguments.
   {
@@ -761,7 +766,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
     args.add(self);
     args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
     args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
-    emission.setArgs(args, {});
+    emission.setArgs(args);
   }
 
   // Emit the call.
@@ -799,16 +804,22 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Do we need to lifetime-extend self?
   bool lifetimeExtendsSelf;
-  switch (origMethodType->getResult().getConvention()) {
-  case ResultConvention::UnownedInnerPointer:
-    lifetimeExtendsSelf = true;
-    break;
-      
-  case ResultConvention::Unowned:
-  case ResultConvention::Owned:
-  case ResultConvention::Autoreleased:
+  auto results = origMethodType->getAllResults();
+  if (results.size() == 1) {
+    switch (results[0].getConvention()) {
+    case ResultConvention::UnownedInnerPointer:
+      lifetimeExtendsSelf = true;
+      break;
+
+    case ResultConvention::Indirect:
+    case ResultConvention::Unowned:
+    case ResultConvention::Owned:
+    case ResultConvention::Autoreleased:
+      lifetimeExtendsSelf = false;
+      break;
+    }
+  } else {
     lifetimeExtendsSelf = false;
-    break;
   }
   
   // Do we need to retain self before calling, and/or release it after?
@@ -824,7 +835,6 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     break;
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("self passed indirectly?!");
@@ -844,11 +854,21 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Value *self = selfParams.claimNext();
   
   // Save off the forwarded indirect return address if we have one.
-  llvm::Value *indirectReturn = nullptr;
-  SILType appliedResultTy = origMethodType->getSemanticResultSILType();
-  auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
-  if (appliedResultTI.getSchema().requiresIndirectResult(IGM)) {
-    indirectReturn = params.claimNext();
+  llvm::Value *formalIndirectResult = nullptr;
+  llvm::Value *indirectedDirectResult = nullptr;
+  const LoadableTypeInfo *indirectedResultTI = nullptr;
+  if (origMethodType->hasIndirectResults()) {
+    // We should never import an ObjC method as returning a tuple which
+    // would get broken up into multiple results like this.
+    assert(origMethodType->getNumIndirectResults() == 1);
+    formalIndirectResult = params.claimNext();
+  } else {
+    SILType appliedResultTy = origMethodType->getSILResult();
+    indirectedResultTI =
+      &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
+    if (indirectedResultTI->getSchema().requiresIndirectResult(IGM)) {
+      indirectedDirectResult = params.claimNext();
+    }
   }
 
   // Prepare the call to the underlying method.
@@ -858,9 +878,14 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                                 ObjCMessageKind::Normal);
   
   Explosion args;
+
+  // Take care of formal indirect returns ourselves.
+  if (formalIndirectResult)
+    args.add(formalIndirectResult);
+
   addObjCMethodCallImplicitArguments(subIGF, args, method, self, SILType());
   args.add(params.claimAll());
-  emission.setArgs(args, {});
+  emission.setArgs(args);
   
   // Cleanup that always has to occur after the function call.
   auto cleanup = [&]{
@@ -873,10 +898,11 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     subIGF.emitNativeStrongRelease(context);
   };
   
-  // Emit the call and produce the return value.
-  if (indirectReturn) {
-    emission.emitToMemory(appliedResultTI.getAddressForPointer(indirectReturn),
-                          appliedResultTI);
+   // Emit the call and produce the return value.
+  if (indirectedDirectResult) {
+    Address addr =
+      indirectedResultTI->getAddressForPointer(indirectedDirectResult);
+    emission.emitToMemory(addr, *indirectedResultTI);
     cleanup();
     subIGF.Builder.CreateRetVoid();
   } else {
@@ -1059,8 +1085,7 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
   auto getter = property->getGetter();
   assert(getter);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
-  return IGM.getClangType(
-                  methodTy->getSemanticResultSILType().getSwiftRValueType());
+  return IGM.getClangType(methodTy->getCSemanticResult().getSwiftRValueType());
 }
 
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
@@ -1125,10 +1150,10 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
 static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
                                                     CanSILFunctionType fnType,
                                                     bool useExtendedEncoding) {
-  SILType resultType = fnType->getSemanticResultSILType();
+  SILType resultType = fnType->getCSemanticResult();
 
   // Get the inputs without 'self'.
-  auto inputs = fnType->getParametersWithoutIndirectResult().drop_back();
+  auto inputs = fnType->getParameters().drop_back();
 
   // Include the encoding for 'self' and '_cmd'.
   llvm::SmallString<8> specialParams;
@@ -1363,11 +1388,11 @@ irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
 llvm::Constant *
 irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
                                     CanSILFunctionType invokeTy) {
-  SILType resultType = invokeTy->getSemanticResultSILType();
+  SILType resultType = invokeTy->getCSemanticResult();
 
   // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
   // recursion of the usual '@?<...>' rule for blocks.
-  auto paramTypes = invokeTy->getParametersWithoutIndirectResult().slice(1);
+  auto paramTypes = invokeTy->getParameters().slice(1);
   
   return getObjCEncodingForTypes(IGM, resultType, paramTypes,
                                  "@?0", IGM.getPointerSize().getValue(),

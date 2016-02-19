@@ -108,7 +108,6 @@
 // LINUX-x86_64-DAG: -lswiftCore
 // LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-x86_64-DAG: -Xlinker -T /{{[^ ]+}}/linux/x86_64/swift.ld
 // LINUX-x86_64-DAG: -F foo
 // LINUX-x86_64-DAG: -framework bar
 // LINUX-x86_64-DAG: -L baz
@@ -125,7 +124,6 @@
 // LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-armv6-DAG: --target=armv6-unknown-linux-gnueabihf
 // LINUX-armv6-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-armv6-DAG: -Xlinker -T /{{[^ ]+}}/linux/armv6/swift.ld
 // LINUX-armv6-DAG: -F foo
 // LINUX-armv6-DAG: -framework bar
 // LINUX-armv6-DAG: -L baz
@@ -142,7 +140,6 @@
 // LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-armv7-DAG: --target=armv7-unknown-linux-gnueabihf
 // LINUX-armv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-armv7-DAG: -Xlinker -T /{{[^ ]+}}/linux/armv7/swift.ld
 // LINUX-armv7-DAG: -F foo
 // LINUX-armv7-DAG: -framework bar
 // LINUX-armv7-DAG: -L baz

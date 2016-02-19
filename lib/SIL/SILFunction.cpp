@@ -222,11 +222,13 @@ struct SubstDependentSILType
       params.push_back(param.map([&](CanType pt) -> CanType {
         return visit(pt);
       }));
-    
-    SILResultInfo result = t->getResult().map([&](CanType elt) -> CanType {
-        return visit(elt);
-      });
 
+    SmallVector<SILResultInfo, 4> results;
+    for (auto &result : t->getAllResults())
+      results.push_back(result.map([&](CanType pt) -> CanType {
+        return visit(pt);
+      }));
+    
     Optional<SILResultInfo> errorResult;
     if (t->hasErrorResult()) {
       errorResult = t->getErrorResult().map([&](CanType elt) -> CanType {
@@ -237,7 +239,7 @@ struct SubstDependentSILType
     return SILFunctionType::get(t->getGenericSignature(),
                                 t->getExtInfo(),
                                 t->getCalleeConvention(),
-                                params, result, errorResult,
+                                params, results, errorResult,
                                 t->getASTContext());
   }
   

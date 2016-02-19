@@ -281,7 +281,7 @@ bb2:
 // CHECK: [[A:%[0-9]+]] = apply [[IF]]([[B]],
 // CHECK: tuple_extract [[A]]
 // CHECK: tuple_extract [[A]]
-// CHECK: [[DF:%[0-9]+]] = function_ref @swift_bufferDeallocateFromStack : $@convention(thin) (@guaranteed AnyObject) -> @owned ()
+// CHECK: [[DF:%[0-9]+]] = function_ref @swift_bufferDeallocateFromStack : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK: apply [[DF]]([[B]])
 // CHECK: return
 sil @promote_array : $@convention(thin) (Int, Int, Int, Int) -> () {

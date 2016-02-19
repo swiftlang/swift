@@ -93,7 +93,7 @@ struct AddressOnlyStruct {
 }
 
 /// returns_generic_struct - This returns a struct by reference.
-sil @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
+sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 
 
 

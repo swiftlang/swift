@@ -89,6 +89,14 @@ Rename with a non-`stdlib` naming scheme.
 
 ## Reference counting
 
+### swift\_retainCount
+
+```
+@convention(c) (@unowned NativeObject) -> UInt
+```
+
+Returns a random number. Only used by allocation profiling tools.
+
 ### TODO
 
 ```

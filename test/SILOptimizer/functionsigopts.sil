@@ -33,7 +33,6 @@ struct boo {
   init()
 }
 
-
 sil @use_Int : $@convention(thin) (Int) -> ()
 
 // We do this check separately to ensure that this does not occur anywhere in
@@ -100,6 +99,51 @@ bb0(%0 : $boo):
   release_value  %3 : $foo
   %6 = tuple ()
   return %6 : $()
+}
+
+// CHECK-LABEL: sil [thunk] @single_owned_return_value
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4n_g_single_owned_return_value 
+// CHECK: [[IN2:%.*]] = apply [[IN1]]([[INPUT_ARG0]]
+// CHECK: retain_value [[IN2]] 
+sil @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo {
+bb0(%0 : $boo):
+  retain_value %0 : $boo
+  return %0 : $boo
+}
+
+// CHECK-LABEL: sil [thunk] @single_owned_return_value_with_interfering_release
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4s__single_owned_return_value_with_interfering_release
+// CHECK-NOT: retain_value
+// CHECK: return
+sil @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> @owned boo {
+bb0(%0 : $boo):
+  retain_value %0 : $boo
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %1 : $baz, #baz.start
+  release_value %2: $foo
+  return %0 : $boo
+}
+
+// Make sure we do not move the retain_value in the throw block.
+//
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol) {
+// CHECK: function_ref @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol)
+// CHECK: bb1
+// CHECK-NOT retain_value
+// CHECK: bb2
+sil [fragile] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol) {
+bb0(%0 : $boo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  retain_value %0 : $boo
+  return %0 : $boo
+
+bb2:
+  retain_value %0 : $boo
+  throw undef : $ErrorProtocol
 }
 
 // CHECK-LABEL: sil [fragile] [thunk] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
@@ -210,6 +254,63 @@ bb0(%0 : $boo):
   %5 = tuple()
   return %5 : $()
 }
+
+sil [fragile] @single_owned_return_value_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo 
+  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo 
+  %4 = tuple()
+  return %4 : $()
+}
+
+sil [fragile] @single_owned_return_value_with_interfering_release_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> @owned boo 
+  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo 
+  %4 = tuple()
+  return %4 : $()
+}
+
+sil [fragile] @owned_to_unowned_retval_with_error_result_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol), normal bb4, error bb5
+
+bb4(%99 : $boo):
+  %4 = tuple()
+  return %4 : $()
+
+bb5(%100 : $ErrorProtocol):
+  unreachable
+}
+
 
 //========================================
 // @owned => @guaranteed with error result
@@ -541,6 +642,20 @@ bb0(%0 : $Builtin.Int32):
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $foo, [[INPUT_ARG1:%[0-9]+]] : $foo, [[INPUT_ARG02:%[0-9]+]] : $Int):
 // CHECK-NOT: strong_release
 // CHECK: return
+
+// CHECK-LABEL: sil @_TTSf4n_g_single_owned_return_value : $@convention(thin) (@owned boo) -> boo
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK-NOT: retain_value
+// CHECK: return
+
+// CHECK-LABEL: sil @_TTSf4s__single_owned_return_value_with_interfering_release : $@convention(thin) (@owned foo, @owned foo, Int) -> @owned boo {
+// CHECK: retain_value
+// CHECK: release_value
+
+// CHECK-LABEL: @_TTSf4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol) {
+// CHECK: bb2
+// CHECK: retain_value
+// CHECK: throw
 
 // Check that we specialized this function by removing the dead argument and
 // copied everything appropriately.

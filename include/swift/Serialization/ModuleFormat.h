@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 238; // SILValue changes
+const uint16_t VERSION_MINOR = 239; // multiple results for SILFunctionType
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -179,7 +179,6 @@ using CtorInitializerKindField = BCFixed<2>;
 // VERSION_MAJOR.
 enum class ParameterConvention : uint8_t {
   Indirect_In,
-  Indirect_Out,
   Indirect_Inout,
   Indirect_InoutAliasable,
   Direct_Owned,
@@ -193,12 +192,13 @@ using ParameterConventionField = BCFixed<4>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class ResultConvention : uint8_t {
+  Indirect,
   Owned,
   Unowned,
   UnownedInnerPointer,
   Autoreleased,
 };
-using ResultConventionField = BCFixed<2>;
+using ResultConventionField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -697,15 +697,15 @@ namespace decls_block {
 
   using SILFunctionTypeLayout = BCRecordLayout<
     SIL_FUNCTION_TYPE,
-    TypeIDField,           // interface result type
-    ResultConventionField, // interface result convention
-    TypeIDField,           // interface error result type
-    ResultConventionField, // interface error result convention
     ParameterConventionField, // callee convention
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // noreturn?
-    BCFixed<30>,           // number of generic parameters
-    BCArray<TypeIDField>   // parameter types and conventions, alternating
+    BCFixed<1>,            // error result?
+    BCFixed<30>,           // number of parameters
+    BCFixed<30>,           // number of results
+    BCArray<TypeIDField>   // parameter types/conventions, alternating
+                           // followed by result types/conventions, alternating
+                           // followed by error result type/convention
                            // followed by generic parameter types
     // Trailed by its generic requirements, if any.
   >;

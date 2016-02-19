@@ -1,4 +1,4 @@
-//===--- EpilogueReleaseMatcherDumper.cpp - Find Epilogue Releases  -------===//
+//===--- EpilogueRetainReleaseMatcherDumper.cpp - Find Epilogue Releases --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,9 +21,10 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
@@ -35,9 +36,10 @@ using namespace swift;
 namespace {
 
 /// Find and dump the epilogue release instructions for the arguments.
-class SILEpilogueReleaseMatcherDumper : public SILModuleTransform {
+class SILEpilogueRetainReleaseMatcherDumper : public SILModuleTransform {
 
   void run() override {
+    auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     for (auto &Fn: *getModule()) {
       // Function is not definition.
@@ -45,13 +47,19 @@ class SILEpilogueReleaseMatcherDumper : public SILModuleTransform {
         continue;
 
       llvm::outs() << "START: sil @" << Fn.getName() << "\n";
-      ConsumedArgToEpilogueReleaseMatcher ArgToRetRelMap(RCIA->get(&Fn), &Fn); 
 
+      // Handle @owned return value.
+      ConsumedReturnValueToEpilogueRetainMatcher RetMap(RCIA->get(&Fn), AA, &Fn); 
+      for (auto &RI : RetMap)
+        llvm::outs() << *RI;
+
+      // Handle @owned function arguments.
+      ConsumedArgToEpilogueReleaseMatcher RelMap(RCIA->get(&Fn), &Fn); 
       // Iterate over arguments and dump their epilogue releases.
       for (auto Arg : Fn.getArguments()) {
         llvm::outs() << *Arg;
         // Can not find an epilogue release instruction for the argument.
-        for (auto &RI : ArgToRetRelMap.getReleasesForArgument(Arg))
+        for (auto &RI : RelMap.getReleasesForArgument(Arg))
           llvm::outs() << *RI;
       }
 
@@ -59,11 +67,11 @@ class SILEpilogueReleaseMatcherDumper : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Epilogue Release Matcher Dumper"; }
+  StringRef getName() override { return "Epilogue Retain/Release Matcher Dumper"; }
 };
         
 } // end anonymous namespace
 
-SILTransform *swift::createEpilogueReleaseMatcherDumper() {
-  return new SILEpilogueReleaseMatcherDumper();
+SILTransform *swift::createEpilogueRetainReleaseMatcherDumper() {
+  return new SILEpilogueRetainReleaseMatcherDumper();
 }

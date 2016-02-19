@@ -122,6 +122,9 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Swift tools that are executable on the build machine")
 
+option(SWIFT_ENABLE_LTO
+  "If set to true, build the swift compiler with link time optimization enabled" FALSE)
+
 #
 # User-configurable Darwin-specific options.
 #
@@ -221,7 +224,7 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if(SWIFT_BUILT_STANDALONE)
-  project(Swift)
+  project(Swift C CXX ASM)
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "")

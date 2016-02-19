@@ -27,7 +27,7 @@ struct MyArray<T> {
 sil @swift_bufferAllocate : $@convention(thin)() -> @owned AnyObject
 sil [_semantics "array.uninitialized"] @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
 sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
-sil [_semantics "array.get_element"] @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, @guaranteed MyArray<MyInt>) -> ()
+sil [_semantics "array.get_element"] @getElement : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> @out MyInt
 sil [_semantics "array.uninitialized"] @allocateUninitialized : $@convention(thin) (MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
 sil [_semantics "array.init"] @initCountRepeatedValue : $@convention(thin) (MyInt, @in MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
 sil [_semantics "array.init"] @initEmpty : $@convention(thin) (@thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
@@ -80,10 +80,10 @@ bb0:
  %12 = struct_extract %7 : $MyArray<MyInt>, #MyArray._buffer
  %13 = struct_extract %12 : $_MyArrayBuffer<MyInt>, #_MyArrayBuffer._storage
  %14 = struct_extract %13 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
- %15 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, @guaranteed MyArray<MyInt>) -> ()
+ %15 = function_ref @getElement : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> @out MyInt
  %16 = alloc_stack $MyInt
  %17 = struct $MyBool()
- %18 = apply %15(%16, %3, %17, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, @guaranteed MyArray<MyInt>) -> ()
+ %18 = apply %15(%16, %3, %17, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> @out MyInt
  strong_release %14 : $Builtin.BridgeObject
  dealloc_stack %16 : $*MyInt
  return %10 : $MyInt
@@ -111,10 +111,10 @@ bb0:
  %12 = struct_extract %6 : $MyArray<MyInt>, #MyArray._buffer
  %13 = struct_extract %12 : $_MyArrayBuffer<MyInt>, #_MyArrayBuffer._storage
  %14 = struct_extract %13 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
- %15 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, @guaranteed MyArray<MyInt>) -> ()
+ %15 = function_ref @getElement : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> @out MyInt
  %16 = alloc_stack $MyInt
  %17 = struct $MyBool()
- %18 = apply %15(%16, %3, %17, %6) : $@convention(method) (@out MyInt, MyInt, MyBool, @guaranteed MyArray<MyInt>) -> ()
+ %18 = apply %15(%16, %3, %17, %6) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> @out MyInt
  strong_release %14 : $Builtin.BridgeObject
  dealloc_stack %16 : $*MyInt
  dealloc_stack %1 : $*MyInt

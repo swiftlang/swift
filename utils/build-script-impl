@@ -72,6 +72,7 @@ KNOWN_SETTINGS=(
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
+    swift-enable-lto            "0"              "enable LTO compilation of the Swift compiler"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
@@ -223,12 +224,18 @@ function set_deployment_target_based_options() {
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
         linux-armv6)
+            # ARM targets require the gold linker
+            USE_GOLD_LINKER=1
             SWIFT_HOST_VARIANT_ARCH="armv6"
             ;;
         linux-armv7)
+            # ARM targets require the gold linker
+            USE_GOLD_LINKER=1
             SWIFT_HOST_VARIANT_ARCH="armv7"
             ;;
         linux-aarch64)
+            # ARM targets require the gold linker
+            USE_GOLD_LINKER=1
             SWIFT_HOST_VARIANT_ARCH="aarch64"
             ;;
         freebsd-x86_64)
@@ -1582,6 +1589,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
+                    -DSWIFT_ENABLE_LTO:BOOL=$(true_false "${SWIFT_ENABLE_LTO}")
                     "${swift_cmake_options[@]}"
                     "${SWIFT_SOURCE_DIR}"
                 )
@@ -1741,7 +1749,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                 SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
                 set -x
-                "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}"
+                "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}"
                 { set +x; } 2>/dev/null
 
                 # XCTest builds itself and doesn't rely on cmake
@@ -1760,6 +1768,10 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${deployment_target} libdispatch)"
                     LIBDISPATCH_BUILD_ARGS="-DLIBDISPATCH_SOURCE_DIR=${LIBDISPATCH_SOURCE_DIR} -DLIBDISPATCH_BUILD_DIR=${LIBDISPATCH_BUILD_DIR}"
+                fi
+
+                if [[ "${USE_GOLD_LINKER}" ]]; then
+                    SWIFT_USE_LINKER="-fuse-ld=gold"
                 fi
 
                 if [[ "${BUILD_NINJA}" ]]; then
@@ -2124,12 +2136,17 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 if [[ -z "${INSTALL_XCTEST}" ]] ; then
                     continue
                 fi
-                LIB_TARGET="linux"
+                if [[ $(uname -s) == "Linux" ]]; then
+                    LIB_TARGET="linux"
+                    ARCH_FLAG="--arch=\"${SWIFT_HOST_VARIANT_ARCH}\""
+                fi
                 if [[ $(uname -s) == "FreeBSD" ]]; then
                     LIB_TARGET="freebsd"
+                    ARCH_FLAG="--arch=\"${SWIFT_HOST_VARIANT_ARCH}\""
                 fi
                 if [[ $(uname -s) == "Darwin" ]]; then
                     LIB_TARGET="macosx"
+                    ARCH_FLAG=""
                 fi
                 XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"
                 echo "--- Installing ${product} ---"
@@ -2138,7 +2155,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                                     --build-dir="${build_dir}" \
                                     --library-install-path="${XCTEST_INSTALL_PREFIX}" \
                                     --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
-                                    --swift-build-dir="${SWIFT_BUILD_PATH}"
+                                    --swift-build-dir="${SWIFT_BUILD_PATH}" ${ARCH_FLAG}
                 { set +x; } 2>/dev/null
                 
                 # As XCTest installation is self-contained, we break early here.

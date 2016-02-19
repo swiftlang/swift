@@ -879,7 +879,7 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   auto FnTy = FRIConvertFromBuiltin->getType();
-  auto STResultType = FnTy.castTo<SILFunctionType>()->getResult().getSILType();
+  auto STResultType = FnTy.castTo<SILFunctionType>()->getSILResult();
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin, FnTy,
                              STResultType, ArrayRef<Substitution>(), Arguments,
                              false);
@@ -1272,8 +1272,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   auto *Conformance = Conf.getPointer();
 
-  auto ParamTypes = BridgedFunc->getLoweredFunctionType()
-                               ->getParametersWithoutIndirectResult();
+  auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();
 
   auto *FuncRef = Builder.createFunctionRef(Loc, BridgedFunc);
 
@@ -1471,8 +1470,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
         BridgedFunc->isExternalDeclaration()))
     return nullptr;
 
-  auto ParamTypes = BridgedFunc->getLoweredFunctionType()
-                               ->getParametersWithoutIndirectResult();
+  auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();
 
   auto SILFnTy = SILType::getPrimitiveObjectType(
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));

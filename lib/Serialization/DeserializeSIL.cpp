@@ -894,13 +894,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType FnTy = getSILType(Ty, SILValueCategory::Object);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
-    auto ArgTys = FTI->getParameterSILTypes();
-
-    assert(ArgTys.size() == ListOfValues.size() &&
+    assert(FTI->getNumSILArguments() == ListOfValues.size() &&
            "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
-      Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I]));
+      Args.push_back(getLocalValue(ListOfValues[I],FTI->getSILArgumentType(I)));
     unsigned NumSub = NumSubs;
 
     SmallVector<Substitution, 4> Substitutions;
@@ -912,7 +910,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
                                     SubstFnTy,
-                                    FTI->getResult().getSILType(),
+                                    FTI->getSILResult(),
                                     Substitutions, Args, IsNonThrowingApply != 0);
     break;
   }
@@ -932,12 +930,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ListOfValues = ListOfValues.drop_back();
 
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
-    auto ArgTys = FTI->getParameterSILTypes();
-    assert(ArgTys.size() == ListOfValues.size() &&
+    assert(FTI->getNumSILArguments() == ListOfValues.size() &&
            "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
-      Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I]));
+      Args.push_back(getLocalValue(ListOfValues[I],FTI->getSILArgumentType(I)));
     unsigned NumSub = NumSubs;
 
     SmallVector<Substitution, 4> Substitutions;

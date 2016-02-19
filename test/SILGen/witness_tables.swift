@@ -525,7 +525,7 @@ protocol Initializer {
 // TABLE-LABEL: sil_witness_table hidden HasInitializerStruct: Initializer module witness_tables {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerStruct, Arg, @thick HasInitializerStruct.Type) -> ()
+// SYMBOL: sil hidden [transparent] [thunk] @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerStruct.Type) -> @out HasInitializerStruct
 struct HasInitializerStruct : Initializer { 
   init(arg: Arg) { }
 }
@@ -533,7 +533,7 @@ struct HasInitializerStruct : Initializer {
 // TABLE-LABEL: sil_witness_table hidden HasInitializerClass: Initializer module witness_tables {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerClass, Arg, @thick HasInitializerClass.Type) -> ()
+// SYMBOL: sil hidden [transparent] [thunk] @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerClass.Type) -> @out HasInitializerClass
 class HasInitializerClass : Initializer {
   required init(arg: Arg) { }
 }
@@ -541,7 +541,7 @@ class HasInitializerClass : Initializer {
 // TABLE-LABEL: sil_witness_table hidden HasInitializerEnum: Initializer module witness_tables {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerEnum, Arg, @thick HasInitializerEnum.Type) -> ()
+// SYMBOL: sil hidden [transparent] [thunk] @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerEnum.Type) -> @out HasInitializerEnum
 enum HasInitializerEnum : Initializer {
   case A
 

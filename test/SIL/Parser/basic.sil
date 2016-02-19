@@ -71,10 +71,10 @@ bb2:
   br bb1                                       // CHECK:   br bb1
 }
 
-sil @named_tuple : $() -> (x: Builtin.Word, Builtin.Word) {
+sil @named_tuple : $() -> (Builtin.Word, Builtin.Word) {
   %0 = integer_literal $Builtin.Word, 42      // CHECK: integer_literal $Builtin.Word, 42
-  %9 = tuple $(x: Builtin.Word, Builtin.Word) (%0, %0)
-  %10 = return %9 : $(x: Builtin.Word, Builtin.Word)
+  %9 = tuple $(Builtin.Word, Builtin.Word) (%0, %0)
+  %10 = return %9 : $(Builtin.Word, Builtin.Word)
 }
 
 sil @return_int : $@convention(thin) (Int) -> Int { // CHECK: $@convention(thin) (Int) -> Int {
@@ -279,8 +279,8 @@ bb0(%0 : $*T):
 
 protocol Bendable { }
 
-// CHECK: $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
-sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
+// CHECK: $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible
+sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_box
   %2 = alloc_box $protocol<Bendable, Runcible>
@@ -397,7 +397,7 @@ enum Gimel {
   case DataCase(Q)
 }
 
-sil @test_union_addr_empty_case : $(@out Gimel) -> () {
+sil @test_union_addr_empty_case : $() -> @out Gimel {
 bb0(%0 : $*Gimel):
   // CHECK: inject_enum_addr {{%.*}} : $*Gimel, #Gimel.EmptyCase!enumelt
   inject_enum_addr %0 : $*Gimel, #Gimel.EmptyCase!enumelt
@@ -405,7 +405,7 @@ bb0(%0 : $*Gimel):
   return %t : $()
 }
 
-sil @test_union_addr_data_case : $(@out Gimel, @in Q) -> () {
+sil @test_union_addr_data_case : $(@in Q) -> (@out Gimel) {
 bb0(%0 : $*Gimel, %1 : $*Q):
   // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
   %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
@@ -933,8 +933,8 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> ()
-sil @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> () {
+// CHECK-LABEL: sil @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
+sil @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
   %2a = project_box %2 : $@box Spoon

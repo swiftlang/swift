@@ -56,10 +56,10 @@ entry(%x : $Huge):
 // CHECK-LABEL: define{{( protected)?}} void @huge_param_and_indirect_return(%V17indirect_argument4Huge* noalias nocapture sret, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK:         call void @huge_param_and_indirect_return(%V17indirect_argument4Huge* noalias nocapture sret %0, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]])
-sil @huge_param_and_indirect_return : $@convention(thin) (@out Huge, Huge) -> () {
+sil @huge_param_and_indirect_return : $@convention(thin) (Huge) -> @out Huge {
 entry(%o : $*Huge, %x : $Huge):
-  %f = function_ref @huge_param_and_indirect_return : $@convention(thin) (@out Huge, Huge) -> ()
-  %z = apply %f(%o, %x) : $@convention(thin) (@out Huge, Huge) -> ()
+  %f = function_ref @huge_param_and_indirect_return : $@convention(thin) (Huge) -> @out Huge
+  %z = apply %f(%o, %x) : $@convention(thin) (Huge) -> @out Huge
   return %z : $()
 }
 

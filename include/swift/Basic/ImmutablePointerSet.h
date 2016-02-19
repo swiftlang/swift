@@ -209,6 +209,12 @@ public:
     // We assume that S2 is sorted and uniqued.
     assert(is_sorted_and_uniqued(S2));
 
+    // If S1 and S2 have the same size, do a quick check to see if they
+    // equal. If so, we can bail early and just return S1.
+    if (S1->size() == S2.size() &&
+        std::equal(S1->begin(), S1->end(), S2.begin()))
+      return S1;
+
     llvm::FoldingSetNodeID ID;
 
     // We know that both of our pointer sets are sorted, so we can essentially
@@ -250,6 +256,12 @@ public:
     if (S1->empty())
       return S2;
     if (S2->empty())
+      return S1;
+
+    // We know that all of our PtrSets are uniqued. So if S1 and S2 are the same
+    // set, their pointers must also be the same set. In such a case, we return
+    // early returning S1 without any loss of generality.
+    if (S1 == S2)
       return S1;
 
     llvm::FoldingSetNodeID ID;

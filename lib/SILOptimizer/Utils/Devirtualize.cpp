@@ -509,13 +509,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     SubstCalleeType =
         GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
-  // If we have a direct return type, make sure we use the subst callee return
-  // type. If we have an indirect return type, AI's return type of the empty
-  // tuple should be ok.
-  SILType ReturnType = AI.getType();
-  if (!SubstCalleeType->hasIndirectResult()) {
-    ReturnType = SubstCalleeType->getSILResult();
-  }
+  SILType ReturnType = SubstCalleeType->getSILResult();
 
   if (!canCastValueToABICompatibleType(Mod, ReturnType, AI.getType()))
       return false;
@@ -553,9 +547,17 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   // in order to handle covariant indirect return types and
   // contravariant argument types.
   llvm::SmallVector<SILValue, 8> NewArgs;
-  auto Args = AI.getArguments();
-  auto ParamTypes = SubstCalleeType->getParameterSILTypes();
 
+  auto IndirectResultArgs = AI.getIndirectResults();
+  auto IndirectResultInfos = SubstCalleeType->getIndirectResults();
+  for (unsigned i : indices(IndirectResultArgs))
+    NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(),
+                              IndirectResultArgs[i],
+                              IndirectResultArgs[i]->getType(),
+                              IndirectResultInfos[i].getSILType()).getValue());
+
+  auto Args = AI.getArgumentsWithoutIndirectResults();
+  auto ParamTypes = SubstCalleeType->getParameterSILTypes();
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i)
     NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(), Args[i],
                                                    Args[i]->getType(),
@@ -569,13 +571,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                                                  ClassOrMetatypeType,
                                                  SelfParamTy).getValue());
 
-  // If we have a direct return type, make sure we use the subst callee return
-  // type. If we have an indirect return type, AI's return type of the empty
-  // tuple should be ok.
-  SILType ResultTy = AI.getType();
-  if (!SubstCalleeType->hasIndirectResult()) {
-    ResultTy = SubstCalleeType->getSILResult();
-  }
+  SILType ResultTy = SubstCalleeType->getSILResult();
 
   SILType SubstCalleeSILType =
     SILType::getPrimitiveObjectType(SubstCalleeType);
@@ -733,14 +729,13 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // Collect arguments from the apply instruction.
   auto Arguments = SmallVector<SILValue, 4>();
 
-  auto ParamTypes = SubstCalleeCanType->getParameterSILTypes();
-
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
   SILBuilderWithScope B(AI.getInstruction());
   for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
     SILValue A = AI.getArgument(ArgN);
-    auto ParamType = ParamTypes[ParamTypes.size() - AI.getNumArguments() + ArgN];
+    auto ParamType = SubstCalleeCanType->getSILArgumentType(
+      SubstCalleeCanType->getNumSILArguments() - AI.getNumArguments() + ArgN);
     if (A->getType() != ParamType)
       A = B.createUpcast(AI.getLoc(), A, ParamType);
 

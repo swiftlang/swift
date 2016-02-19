@@ -2607,13 +2607,16 @@ case TypeKind::Id:
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
 
-    SILResultInfo transResult = fnTy->getResult();
-    if (transformSILResult(transResult, changed, fn)) return Type();
-
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
     for (SILParameterInfo param : fnTy->getParameters()) {
       if (transformSILParameter(param, changed, fn)) return Type();
       transInterfaceParams.push_back(param);
+    }
+
+    SmallVector<SILResultInfo, 8> transInterfaceResults;
+    for (SILResultInfo result : fnTy->getAllResults()) {
+      if (transformSILResult(result, changed, fn)) return Type();
+      transInterfaceResults.push_back(result);
     }
 
     Optional<SILResultInfo> transErrorResult;
@@ -2629,7 +2632,7 @@ case TypeKind::Id:
                                 fnTy->getExtInfo(),
                                 fnTy->getCalleeConvention(),
                                 transInterfaceParams,
-                                transResult,
+                                transInterfaceResults,
                                 transErrorResult,
                                 Ptr->getASTContext());
   }

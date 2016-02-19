@@ -429,7 +429,7 @@ struct GenericStruct<T> {
   func getA() -> T {
     return a
   }
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@convention(method) <T> (@out T, @in_guaranteed GenericStruct<T>)
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> @out T
   // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
@@ -477,7 +477,7 @@ var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 // CHECK: bb0(%0 : $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @{{.*}}addressOnlyGetOnlyGlobalProperty
-// CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) (@out SimpleProtocol) -> ()
+// CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out SimpleProtocol
 // CHECK-NEXT:  %3 = tuple ()
 // CHECK-NEXT:  return %3 : $()
 // CHECK-NEXT: }

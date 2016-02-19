@@ -592,6 +592,21 @@ IRGenDebugInfo::createParameterTypes(SILType SILTy, DeclContext *DeclCtx) {
   return createParameterTypes(SILTy.castTo<SILFunctionType>(), DeclCtx);
 }
 
+static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
+  if (fnTy->getNumAllResults() == 1) {
+    return fnTy->getAllResults()[0].getSILType();
+  } else if (!fnTy->getNumIndirectResults()) {
+    return fnTy->getSILResult();
+  } else {
+    SmallVector<TupleTypeElt, 4> eltTys;
+    for (auto &result : fnTy->getAllResults()) {
+      eltTys.push_back(result.getType());
+    }
+    return SILType::getPrimitiveAddressType(
+      CanType(TupleType::get(eltTys, fnTy->getASTContext())));
+  }
+}
+
 /// Create the array of function parameters for a function type.
 llvm::DITypeRefArray
 IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
@@ -601,8 +616,7 @@ IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
   GenericContextScope scope(IGM, FnTy->getGenericSignature());
 
   // The function return type is the first element in the list.
-  createParameterType(Parameters, FnTy->getSemanticResultSILType(),
-                      DeclCtx);
+  createParameterType(Parameters, getResultTypeForDebugInfo(FnTy), DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument

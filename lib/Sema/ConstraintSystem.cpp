@@ -1459,7 +1459,7 @@ static bool isPrivilegedAccessToImplicitlyUnwrappedOptional(DeclContext *DC,
     // If we're in a type context that's defining or extending
     // ImplicitlyUnwrappedOptional<T>, we're privileged.
     } else if (DC->isTypeContext()) {
-      if (DC->getDeclaredTypeInContext()->getAnyNominal() == D)
+      if (DC->getAsNominalTypeOrNominalTypeExtensionContext() == D)
         return true;
 
     // Otherwise, we're privileged if we're within the same file that

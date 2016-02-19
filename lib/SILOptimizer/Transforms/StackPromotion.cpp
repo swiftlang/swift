@@ -261,9 +261,8 @@ SILFunction *StackPromoter::getBufferDeallocFunc(SILFunction *OrigFunc,
                                                  SILLocation Loc) {
   if (!BufferDeallocFunc) {
     SILModule &M = OrigFunc->getModule();
-    const ASTContext &Ctx = OrigFunc->getModule().getASTContext();
     CanSILFunctionType OrigTy = OrigFunc->getLoweredFunctionType();
-    CanType ObjectTy = OrigTy->getResult().getType();
+    CanType ObjectTy = OrigTy->getSILResult().getSwiftRValueType();
 
     // The function type for swift_bufferDeallocateFromStack.
     CanSILFunctionType FunTy = SILFunctionType::get(
@@ -271,7 +270,7 @@ SILFunction *StackPromoter::getBufferDeallocFunc(SILFunction *OrigFunc,
       OrigTy->getExtInfo(),
       OrigTy->getCalleeConvention(),
       { SILParameterInfo(ObjectTy, ParameterConvention::Direct_Guaranteed) },
-      SILResultInfo(TupleType::getEmpty(Ctx), ResultConvention::Owned),
+      ArrayRef<SILResultInfo>(),
       OrigTy->getOptionalErrorResult(),
       M.getASTContext());
 

@@ -11,7 +11,7 @@
 // CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i64 }
 
 func dup<T>(x: T) -> (T, T) { var x = x; return (x,x) }
-// CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(<{}>* noalias nocapture sret
+// CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK:    entry:
 //   Allocate a local variable for 'x'.
 // CHECK-NEXT: [[XBUF:%.*]] = alloca [[BUFFER:.*]], align 8
@@ -24,29 +24,16 @@ func dup<T>(x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT: [[INITIALIZE_BUFFER_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[BUFFER]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_BUFFER_FN]]([[BUFFER]]* [[XBUF]], [[OPAQUE]]* {{.*}}, [[TYPE]]* %T)
-//   Get value witnesses for T.
-//   Project to first element of tuple.
-// CHECK: [[FST:%.*]] = bitcast <{}>* [[RET:%.*]] to [[OPAQUE]]*
-//   Get the tuple metadata.
-//   FIXME: maybe this should get passed in?
-// CHECK-NEXT: [[TT_PAIR:%.*]] = call [[TYPE]]* @swift_getTupleTypeMetadata2([[TYPE]]* %T, [[TYPE]]* %T, i8* null, i8** null)
-//   Pull out the offset of the second element and GEP to that.
-// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* [[TT_PAIR]] to [[TUPLE_TYPE]]*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[TUPLE_TYPE]], [[TUPLE_TYPE]]* [[T0]], i64 0, i32 3, i64 1, i32 1
-// CHECK-NEXT: [[T2:%.*]] = load i64, i64* [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = bitcast <{}>* [[RET]] to i8*
-// CHECK-NEXT: [[T4:%.*]] = getelementptr inbounds i8, i8* [[T3]], i64 [[T2]]
-// CHECK-NEXT: [[SND:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]*
-//   Copy 'x' into the first element.
+//   Copy 'x' into the first result.
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 6
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[FST]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
+// CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* %0, [[OPAQUE]]* [[X]], [[TYPE]]* %T)
 //   Copy 'x' into the second element.
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 9
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* [[SND]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
+// CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* %1, [[OPAQUE]]* [[X]], [[TYPE]]* %T)
 
 struct S {}
 
@@ -82,13 +69,13 @@ func callDupC(let c: C) { _ = dupC(c) }
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* %0)
 // CHECK-NEXT: ret void
 
-// CHECK: define hidden void @_TF14generic_tuples4lump{{.*}}(<{ %Si }>* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden i64 @_TF14generic_tuples4lump{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump<T>(x: T) -> (Int, T, T) { return (0,x,x) }
-// CHECK: define hidden void @_TF14generic_tuples5lump2{{.*}}(<{ %Si, %Si }>* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden { i64, i64 } @_TF14generic_tuples5lump2{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump2<T>(x: T) -> (Int, Int, T) { return (0,0,x) }
-// CHECK: define hidden void @_TF14generic_tuples5lump3{{.*}}(<{}>* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples5lump3{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump3<T>(x: T) -> (T, T, T) { return (x,x,x) }
-// CHECK: define hidden void @_TF14generic_tuples5lump4{{.*}}(<{}>* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden i64 @_TF14generic_tuples5lump4{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump4<T>(x: T) -> (T, Int, T) { return (x,0,x) }
 
 // CHECK: define hidden i64 @_TF14generic_tuples6unlump{{.*}}(i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)

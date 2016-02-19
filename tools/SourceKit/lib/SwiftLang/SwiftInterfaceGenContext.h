@@ -38,7 +38,8 @@ public:
                                             StringRef ModuleOrHeaderName,
                                             Optional<StringRef> Group,
                                             swift::CompilerInvocation Invocation,
-                                            std::string &ErrorMsg);
+                                            std::string &ErrorMsg,
+                                            bool SynthesizedExtensions);
 
   static SwiftInterfaceGenContextRef createForSwiftSource(StringRef DocumentName,
                                                           StringRef SourceFileName,

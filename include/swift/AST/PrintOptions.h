@@ -27,6 +27,28 @@ class Type;
 enum DeclAttrKind : unsigned;
 class PrinterArchetypeTransformer;
 
+/// Necessary information for archetype transformation during printing.
+struct ArchetypeTransformContext {
+  Type getTypeBase();
+  NominalTypeDecl *getNominal();
+  PrinterArchetypeTransformer *getTransformer() { return Transformer.get(); }
+  bool isPrintingSynthesizedExtension();
+  bool isPrintingTypeInteface();
+  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer);
+  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
+                            Type T);
+  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
+                            NominalTypeDecl *NTD);
+  Type transform(Type Input);
+  StringRef transform(StringRef Input);
+private:
+  std::shared_ptr<PrinterArchetypeTransformer> Transformer;
+
+  // When printing a type interface, this is the type to print.
+  // When synthesizing extensions, this is the target nominal.
+  llvm::PointerUnion<TypeBase*, NominalTypeDecl*> TypeBaseOrNominal;
+};
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
@@ -201,12 +223,8 @@ struct PrintOptions {
   /// \brief Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
-  /// \brief When printing a type interface, register the type to print.
-  TypeBase *TypeToPrint = nullptr;
-
-  std::shared_ptr<PrinterArchetypeTransformer> pTransformer;
-
-  NominalTypeDecl *SynthesizedTarget = nullptr;
+  /// \brief The information for converting archetypes to specialized types.
+  std::shared_ptr<ArchetypeTransformContext> TransformContext;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
@@ -256,8 +274,6 @@ struct PrintOptions {
   void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
 
   void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
-
-  bool isPrintingSynthesizedExtension();
 
   void clearArchetypeTransformerForSynthesizedExtensions();
 

@@ -65,10 +65,10 @@ bb0(%0 : $AnyObject):
   return %4 : $ObjCProto
 }
 
-// CHECK-LABEL: sil @nopromote_nativeproto : $@convention(thin) (@out NativeProto, @owned AnyObject) -> () {
+// CHECK-LABEL: sil @nopromote_nativeproto : $@convention(thin) (@owned AnyObject) -> @out NativeProto {
 // CHECK: bb0(%0 : $*NativeProto, %1 : $AnyObject):
 // CHECK: unchecked_addr_cast %{{.*}} : $*AnyObject to $*NativeProto
-sil @nopromote_nativeproto : $@convention(thin) (@out NativeProto, @owned AnyObject) -> () {
+sil @nopromote_nativeproto : $@convention(thin) (@owned AnyObject) -> @out NativeProto {
 bb0(%0 : $*NativeProto, %1 : $AnyObject):
   %3 = alloc_stack $AnyObject
   store %1 to %3 : $*AnyObject
