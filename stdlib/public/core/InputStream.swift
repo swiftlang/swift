@@ -16,13 +16,13 @@ import SwiftShims
 /// current line or until EOF is reached, or `nil` if EOF has already been
 /// reached.
 ///
-/// If `stripNewline` is `true`, newline characters and character
+/// If `strippingNewline` is `true`, newline characters and character
 /// combinations will be stripped from the result.  This is the default.
 ///
 /// Standard input is interpreted as `UTF-8`.  Invalid bytes
 /// will be replaced by Unicode [replacement characters](http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character).
 @warn_unused_result
-public func readLine(stripNewline stripNewline: Bool = true) -> String? {
+public func readLine(strippingNewline strippingNewline: Bool = true) -> String? {
   var linePtr: UnsafeMutablePointer<CChar> = nil
   var readBytes = swift_stdlib_readLine_stdin(&linePtr)
   if readBytes == -1 {
@@ -33,7 +33,7 @@ public func readLine(stripNewline stripNewline: Bool = true) -> String? {
   if readBytes == 0 {
     return ""
   }
-  if stripNewline {
+  if strippingNewline {
     // FIXME: Unicode conformance.  To fix this, we need to reimplement the
     // code we call above to get a line, since it will only stop on LF.
     //
