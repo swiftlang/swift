@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -module-name Main
+// RUN: %target-parse-verify-swift -enable-experimental-property-behaviors -module-name Main
 
 protocol behavior {
   associatedtype Value

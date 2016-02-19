@@ -137,6 +137,9 @@ namespace swift {
     /// \brief Enable experimental "switch" pattern-matching features.
     bool EnableExperimentalPatterns = false;
 
+    /// \brief Enable experimental property behavior feature.
+    bool EnableExperimentalPropertyBehaviors = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-property-behaviors %s | FileCheck %s
 protocol behavior {
   associatedtype Value
 }
