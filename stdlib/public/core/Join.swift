@@ -87,7 +87,7 @@ public struct JoinGenerator<
   }
 
   internal var _base: Base
-  internal var _inner: Base.Element.Generator? = nil
+  internal var _inner: Base.Element.Generator?
   internal var _separatorData: ContiguousArray<Base.Element.Generator.Element>
   internal var _separator: ContiguousArray<Base.Element.Generator.Element>.Generator?
   internal var _state: _JoinGeneratorState = .Start
