@@ -265,7 +265,7 @@ public func _sanityCheckFailure(
 public func precondition(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   fatalError("unavailable function can't be called")
 }
@@ -273,7 +273,7 @@ public func precondition(
 @available(*, unavailable, renamed="requirementFailure")
 public func preconditionFailure(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UInt = __LINE__
+  file: StaticString = #file, line: UInt = #line
 ) {
   fatalError("unavailable function can't be called")
 }

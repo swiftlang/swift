@@ -22,7 +22,7 @@ public func withExtendedLifetime<T, Result>(
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, @noescape _ f: T throws -> Result
+  x: T, @noescape _ f: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try f(x)
@@ -34,7 +34,7 @@ extension String {
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
   public func withCString<Result>(
-    @noescape f: UnsafePointer<Int8> throws -> Result
+    @noescape f: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
       try f(UnsafePointer($0.baseAddress))
@@ -54,7 +54,7 @@ public func _fixLifetime<T>(x: T) {
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
   inout arg: T,
-  @noescape _ body: UnsafeMutablePointer<T> throws -> Result
+  @noescape _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
@@ -95,7 +95,7 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
   inout arg: T,
-  @noescape _ body: UnsafePointer<T> throws -> Result
+  @noescape _ body: (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressof(&arg)))
