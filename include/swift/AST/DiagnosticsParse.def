@@ -644,6 +644,8 @@ WARNING(let_on_param_is_redundant, none,
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
+ERROR(extra_var_in_multiple_pattern_list,none,
+      "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern cannot appear nested in an already immutable context", ())
 ERROR(inout_must_have_type,none,
@@ -887,9 +889,6 @@ ERROR(expected_case_colon,PointsToFirstBadToken,
       "expected ':' after '%0'", (StringRef))
 ERROR(default_with_where,none,
       "'default' cannot be used with a 'where' guard expression",
-      ())
-ERROR(var_binding_with_multiple_case_patterns,none,
-      "'case' labels with multiple patterns cannot declare variables",
       ())
 ERROR(case_stmt_without_body,none,
       "%select{'case'|'default'}0 label in a 'switch' should have at least one "
