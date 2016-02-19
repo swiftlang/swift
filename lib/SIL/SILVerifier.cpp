@@ -531,9 +531,8 @@ public:
     SILLocation::LocationKind LocKind = L.getKind();
     ValueKind InstKind = I->getKind();
 
-    // Regular locations and SIL file locations are allowed on all instructions.
-    if (LocKind == SILLocation::RegularKind ||
-        LocKind == SILLocation::SILFileKind)
+    // Regular locations are allowed on all instructions.
+    if (LocKind == SILLocation::RegularKind)
       return;
 
 #if 0

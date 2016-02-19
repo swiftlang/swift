@@ -1547,7 +1547,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       SILLocation ILoc = I.getLoc();
       auto DS = I.getDebugScope();
       // Handle cleanup locations.
-      if (ILoc.getKind() == SILLocation::CleanupKind) {
+      if (ILoc.is<CleanupLocation>()) {
         // Cleanup locations point to the decl of the value that is
         // being destroyed (for diagnostic generation). As far as
         // the linetable is concerned, cleanups at the end of a
@@ -1559,7 +1559,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           // this basic block.
           auto It = InsnIter;
           do ++It; while (It != BB->end() &&
-                          It->getLoc().getKind() == SILLocation::CleanupKind);
+                          It->getLoc().is<CleanupLocation>());
           // We are still in the middle of a basic block?
           if (It != BB->end() && !isa<TermInst>(It))
             KeepCurrentLocation = true;

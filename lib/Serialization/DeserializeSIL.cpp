@@ -282,7 +282,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   SourceLoc loc;
   return M.getOrCreateFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
-      SILFileLocation(loc), IsNotBare, IsNotTransparent, IsNotFragile,
+      RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotFragile,
       IsNotThunk, SILFunction::NotRelevant);
 }
 
@@ -402,7 +402,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   auto fn = existingFn;
 
   // TODO: use the correct SILLocation from module.
-  SILLocation loc = SILFileLocation(SourceLoc());
+  SILLocation loc = RegularLocation(SourceLoc());
 
   // If we have an existing function, verify that the types match up.
   if (fn) {
@@ -624,7 +624,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ModuleID OwningModuleID;
   SourceLoc SLoc;
   ArrayRef<uint64_t> ListOfValues;
-  SILLocation Loc = SILFileLocation(SLoc);
+  SILLocation Loc = RegularLocation(SLoc);
 
   switch (RecordKind) {
   default:

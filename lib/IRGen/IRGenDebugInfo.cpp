@@ -348,7 +348,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   //
   // The actual closure has a closure expression as scope.
   if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc)
-      && Loc->getKind() != SILLocation::ImplicitReturnKind)
+      && !Loc->is<ImplicitReturnLocation>())
     return;
 
   if (L.Line == 0 && DS == LastScope) {
@@ -660,7 +660,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 
   StringRef Name;
   if (DS) {
-    if (DS->Loc.getKind() == SILLocation::SILFileKind)
+    if (DS->Loc.isSILFile())
       Name = SILFn->getName();
     else
       Name = getName(DS->Loc);

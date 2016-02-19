@@ -51,7 +51,7 @@ llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(true));
 static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
   // Set up the builder we use to insert at our insertion point.
   SILBuilder B(InsertPt);
-  auto Loc = SILFileLocation(SourceLoc());
+  auto Loc = RegularLocation(SourceLoc());
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
@@ -68,7 +68,7 @@ static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
 static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   // Setup the builder we will use to insert at our insertion point.
   SILBuilder B(InsertPt);
-  auto Loc = SILFileLocation(SourceLoc());
+  auto Loc = RegularLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr->getType().isReferenceCounted(B.getModule()))
