@@ -390,14 +390,33 @@ public:
   StringLiteralInst *createStringLiteral(SILLocation Loc, StringRef text,
                                          StringLiteralInst::Encoding encoding) {
     return insert(StringLiteralInst::create(createSILDebugLocation(Loc), text,
-                                            encoding, F));
+                                            encoding, /*nullTerminate=*/false,
+                                            F));
   }
 
   StringLiteralInst *createStringLiteral(SILLocation Loc, const Twine &text,
                                          StringLiteralInst::Encoding encoding) {
     SmallVector<char, 256> Out;
-    return insert(StringLiteralInst::create(
-        createSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
+    return insert(StringLiteralInst::create(createSILDebugLocation(Loc),
+                                            text.toStringRef(Out), encoding,
+                                            /*nullTerminate=*/false, F));
+  }
+
+  StringLiteralInst *
+  createStringLiteralWithNullTerminator(SILLocation Loc, StringRef text,
+                                        StringLiteralInst::Encoding encoding) {
+    return insert(StringLiteralInst::create(createSILDebugLocation(Loc), text,
+                                            encoding, /*nullTerminate=*/true,
+                                            F));
+  }
+
+  StringLiteralInst *
+  createStringLiteralWithNullTerminator(SILLocation Loc, const Twine &text,
+                                        StringLiteralInst::Encoding encoding) {
+    SmallVector<char, 256> Out;
+    return insert(StringLiteralInst::create(createSILDebugLocation(Loc),
+                                            text.toStringRef(Out), encoding,
+                                            /*nullTerminate=*/true, F));
   }
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {

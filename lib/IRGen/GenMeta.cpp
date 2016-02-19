@@ -93,7 +93,8 @@ static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
   auto name = LinkEntity::forTypeMangling(type);
   llvm::SmallString<32> mangling;
   name.mangle(mangling);
-  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
+  return IGM.getAddrOfNullTerminatedGlobalString(mangling,
+                                                 willBeRelativelyAddressed);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -463,7 +464,7 @@ static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
 
   // Otherwise, create a new string literal.
   // This method implicitly adds a null terminator.
-  return IGM.getAddrOfGlobalString(buffer);
+  return IGM.getAddrOfNullTerminatedGlobalString(buffer);
 }
 
 namespace {
@@ -2149,7 +2150,8 @@ namespace {
         os << prop->getName().str() << '\0';
         ++numFields;
       }
-      // The final null terminator is provided by getAddrOfGlobalString.
+      // The final null terminator is provided by
+      // getAddrOfNullTerminatedGlobalString.
     }
     return numFields;
   }
@@ -2277,9 +2279,10 @@ namespace {
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
-      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
-                                           /*willBeRelativelyAddressed*/ true));
-      
+      addRelativeAddress(IGM.getAddrOfNullTerminatedGlobalString(
+          fieldNames,
+          /*willBeRelativelyAddressed*/ true));
+
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
         = getFieldTypeAccessorFn(IGM, Target,
@@ -2362,9 +2365,10 @@ namespace {
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
-      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
-                                           /*willBeRelativelyAddressed*/ true));
-      
+      addRelativeAddress(IGM.getAddrOfNullTerminatedGlobalString(
+          fieldNames,
+          /*willBeRelativelyAddressed*/ true));
+
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
         = getFieldTypeAccessorFn(IGM, Target,
@@ -5022,7 +5026,7 @@ namespace {
       auto name = LinkEntity::forTypeMangling(
         Protocol->getDeclaredType()->getCanonicalType());
       name.mangle(mangling);
-      auto global = IGM.getAddrOfGlobalString(mangling);
+      auto global = IGM.getAddrOfNullTerminatedGlobalString(mangling);
       addWord(global);
     }
     

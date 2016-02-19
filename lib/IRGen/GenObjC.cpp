@@ -1144,7 +1144,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   encodingString += llvm::itostr(parmOffset);
   encodingString += fixedParamsString;
   encodingString += paramsString;
-  return IGM.getAddrOfGlobalString(encodingString);
+  return IGM.getAddrOfNullTerminatedGlobalString(encodingString);
 }
 
 static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
@@ -1223,7 +1223,7 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   TypeStr += llvm::itostr(ParmOffset);
   TypeStr += "@0:";
   TypeStr += llvm::itostr(PtrSize.getValue());
-  atEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
+  atEncoding = IGM.getAddrOfNullTerminatedGlobalString(TypeStr.c_str());
   impl = getObjCGetterPointer(IGM, property);
 }
 
@@ -1291,7 +1291,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   ParmOffset = 2 * PtrSize.getValue();
   clangASTContext.getObjCEncodingForType(clangType, TypeStr);
   TypeStr += llvm::itostr(ParmOffset);
-  atEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
+  atEncoding = IGM.getAddrOfNullTerminatedGlobalString(TypeStr.c_str());
 
   impl = getObjCSetterPointer(IGM, property);
 }
@@ -1367,7 +1367,7 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
   
   /// The second element is the type @encoding, which is always "@?"
   /// for a function type.
-  llvm::Constant *atEncoding = IGM.getAddrOfGlobalString("@?");
+  llvm::Constant *atEncoding = IGM.getAddrOfNullTerminatedGlobalString("@?");
 
   /// The third element is the method implementation pointer.
   llvm::Constant *impl = llvm::ConstantExpr::getBitCast(*objcImpl,

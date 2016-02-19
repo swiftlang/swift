@@ -469,14 +469,14 @@ llvm::Constant *IRGenModule::get##ID##Fn() {               \
 }
 #include "RuntimeFunctions.def"
 
-std::pair<llvm::GlobalVariable *, llvm::Constant *>
-IRGenModule::createStringConstant(StringRef Str,
-  bool willBeRelativelyAddressed, StringRef sectionName) {
-  // If not, create it.  This implicitly adds a trailing null.
-  auto init = llvm::ConstantDataArray::getString(LLVMContext, Str);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
+static std::pair<llvm::GlobalVariable *, llvm::Constant *>
+createStringConstantImpl(llvm::LLVMContext &LLVMContext, llvm::Module &Module,
+                         llvm::Type *SizeTy, StringRef Str,
+                         bool willBeRelativelyAddressed, StringRef sectionName,
+                         bool addNull) {
+  auto init = llvm::ConstantDataArray::getString(LLVMContext, Str, addNull);
+  auto global = new llvm::GlobalVariable(
+      Module, init->getType(), true, llvm::GlobalValue::PrivateLinkage, init);
   // FIXME: ld64 crashes resolving relative references to coalesceable symbols.
   // rdar://problem/22674524
   // If we intend to relatively address this string, don't mark it with
@@ -490,11 +490,28 @@ IRGenModule::createStringConstant(StringRef Str,
 
   // Drill down to make an i8*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
-  llvm::Constant *indices[] = { zero, zero };
+  llvm::Constant *indices[] = {zero, zero};
   auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
-    global->getValueType(), global, indices);
+      global->getValueType(), global, indices);
 
-  return { global, address };
+  return {global, address};
+}
+
+std::pair<llvm::GlobalVariable *, llvm::Constant *>
+IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
+                                  StringRef sectionName) {
+  return createStringConstantImpl(LLVMContext, Module, SizeTy, Str,
+                                  willBeRelativelyAddressed, sectionName,
+                                  /*addNull=*/false);
+}
+
+std::pair<llvm::GlobalVariable *, llvm::Constant *>
+IRGenModule::createNullTerminatedStringConstant(StringRef Str,
+                                                bool willBeRelativelyAddressed,
+                                                StringRef sectionName) {
+  return createStringConstantImpl(LLVMContext, Module, SizeTy, Str,
+                                  willBeRelativelyAddressed, sectionName,
+                                  /*addNull=*/true);
 }
 
 llvm::Constant *IRGenModule::getEmptyTupleMetadata() {

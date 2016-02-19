@@ -109,7 +109,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
       auto count = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                     IGF.IGM.DataLayout.getTypeStoreSize(runtimeVal->getType()));
       auto msg
-        = IGF.IGM.getAddrOfGlobalString(description.str());
+        = IGF.IGM.getAddrOfNullTerminatedGlobalString(description.str());
       
       IGF.Builder.CreateCall(
           verifierFn, {metadata, runtimePtr, staticPtr, count, msg});

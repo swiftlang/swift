@@ -2313,15 +2313,18 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
   setLoweredExplosion(i, e);
 }
 
-static llvm::Constant *getAddrOfString(IRGenModule &IGM, StringRef string,
-                                       StringLiteralInst::Encoding encoding) {
-  switch (encoding) {
-  case swift::StringLiteralInst::Encoding::UTF8:
-    return IGM.getAddrOfGlobalString(string);
+static llvm::Constant *getAddrOfString(IRGenModule &IGM,
+                                       StringLiteralInst *SLI) {
+  switch (SLI->getEncoding()) {
+  case swift::StringLiteralInst::Encoding::UTF8: {
+    return SLI->isNullTerminated()
+               ? IGM.getAddrOfNullTerminatedGlobalString(SLI->getValue())
+               : IGM.getAddrOfGlobalString(SLI->getValue());
+  }
 
   case swift::StringLiteralInst::Encoding::UTF16: {
     // This is always a GEP of a GlobalVariable with a nul terminator.
-    auto addr = IGM.getAddrOfGlobalUTF16String(string);
+    auto addr = IGM.getAddrOfGlobalUTF16String(SLI->getValue());
 
     // Cast to Builtin.RawPointer.
     return llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
@@ -2339,8 +2342,8 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
   // Emit a load of a selector.
   if (i->getEncoding() == swift::StringLiteralInst::Encoding::ObjCSelector)
     addr = emitObjCSelectorRefLoad(i->getValue());
-  else
-    addr = getAddrOfString(IGM, i->getValue(), i->getEncoding());
+  else 
+    addr = getAddrOfString(IGM, i);
 
   Explosion e;
   e.add(addr);
@@ -4765,7 +4768,7 @@ static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
     else if (auto *FLI = dyn_cast<FloatLiteralInst>(SI->getOperand(i)))
       Elts.push_back(getConstantFP(IGM, FLI));
     else if (auto *SLI = dyn_cast<StringLiteralInst>(SI->getOperand(i)))
-      Elts.push_back(getAddrOfString(IGM, SLI->getValue(), SLI->getEncoding()));
+      Elts.push_back(getAddrOfString(IGM, SLI));
     else
       llvm_unreachable("Unexpected SILInstruction in static initializer!");
   }
@@ -4791,7 +4794,7 @@ static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
     else if (auto *FLI = dyn_cast<FloatLiteralInst>(TI->getOperand(i)))
       Elts.push_back(getConstantFP(IGM, FLI));
     else if (auto *SLI = dyn_cast<StringLiteralInst>(TI->getOperand(i)))
-      Elts.push_back(getAddrOfString(IGM, SLI->getValue(), SLI->getEncoding()));
+      Elts.push_back(getAddrOfString(IGM, SLI));
     else
       llvm_unreachable("Unexpected SILInstruction in static initializer!");
   }

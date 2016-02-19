@@ -566,7 +566,13 @@ public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *>
   createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
                        StringRef sectionName = "");
+  std::pair<llvm::GlobalVariable *, llvm::Constant *>
+  createNullTerminatedStringConstant(StringRef Str,
+                                     bool willBeRelativelyAddressed = false,
+                                     StringRef sectionName = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
+                                        bool willBeRelativelyAddressed = false);
+  llvm::Constant *getAddrOfNullTerminatedGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
@@ -605,7 +611,9 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalStrings;
+    GlobalUTF8Strings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
+    GlobalUTF8NullTerminatedStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;

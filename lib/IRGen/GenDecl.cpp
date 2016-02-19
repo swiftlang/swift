@@ -290,9 +290,9 @@ public:
     // Check if the ObjC runtime already has a descriptor for this
     // protocol. If so, use it.
     SmallString<32> buf;
-    auto protocolName
-      = IGM.getAddrOfGlobalString(proto->getObjCRuntimeName(buf));
-    
+    auto protocolName =
+        IGM.getAddrOfNullTerminatedGlobalString(proto->getObjCRuntimeName(buf));
+
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
                    llvm::ConstantPointerNull::get(IGM.ProtocolDescriptorPtrTy));
@@ -2760,16 +2760,19 @@ Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
 
 /// Get or create a global string constant.
 ///
-/// \returns an i8* with a null terminator; note that embedded nulls
-///   are okay
+/// \returns an i8* (optionally with a null terminator); note that embedded
+//    nulls are okay
 ///
 /// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                               bool willBeRelativelyAddressed) {
+static llvm::Constant *getAddrOfGlobalStringImpl(
+    StringRef data, bool willBeRelativelyAddressed, bool nullTerminate,
+    IRGenModule &IGM,
+    llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>
+        &cache) {
   // Check whether this string already exists.
-  auto &entry = GlobalStrings[data];
+  auto &entry = cache[data];
   if (entry.second) {
     // FIXME: Clear unnamed_addr if the global will be relative referenced
     // to work around an ld64 bug. rdar://problem/22674524
@@ -2778,8 +2781,28 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
-  entry = createStringConstant(data, willBeRelativelyAddressed);
+  if (nullTerminate)
+    entry =
+        IGM.createNullTerminatedStringConstant(data, willBeRelativelyAddressed);
+  else
+    entry = IGM.createStringConstant(data, willBeRelativelyAddressed);
+
   return entry.second;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfGlobalString(StringRef data,
+                                   bool willBeRelativelyAddressed) {
+  return getAddrOfGlobalStringImpl(data, willBeRelativelyAddressed,
+                                   /*nullTerminate=*/false, *this,
+                                   GlobalUTF8Strings);
+}
+
+llvm::Constant *IRGenModule::getAddrOfNullTerminatedGlobalString(
+    StringRef data, bool willBeRelativelyAddressed) {
+  return getAddrOfGlobalStringImpl(data, willBeRelativelyAddressed,
+                                   /*nullTerminate=*/true, *this,
+                                   GlobalUTF8NullTerminatedStrings);
 }
 
 /// Get or create a global UTF-16 string constant.

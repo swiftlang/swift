@@ -783,8 +783,8 @@ void StringConcatenationOptimizer::adjustEncodings() {
     FuncResultType = AIRight->getOperand(3);
     FRIConvertFromBuiltin = FRIRight;
     // Convert UTF8 representation into UTF16.
-    SLILeft = Builder.createStringLiteral(AI->getLoc(), SLILeft->getValue(),
-                                          StringLiteralInst::Encoding::UTF16);
+    SLILeft = Builder.createStringLiteralWithNullTerminator(
+        AI->getLoc(), SLILeft->getValue(), StringLiteralInst::Encoding::UTF16);
   }
 
   if (SLIRight->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
@@ -792,8 +792,8 @@ void StringConcatenationOptimizer::adjustEncodings() {
     FuncResultType = AILeft->getOperand(3);
     FRIConvertFromBuiltin = FRILeft;
     // Convert UTF8 representation into UTF16.
-    SLIRight = Builder.createStringLiteral(AI->getLoc(), SLIRight->getValue(),
-                                           StringLiteralInst::Encoding::UTF16);
+    SLIRight = Builder.createStringLiteralWithNullTerminator(
+        AI->getLoc(), SLIRight->getValue(), StringLiteralInst::Encoding::UTF16);
   }
 
   // It should be impossible to have two operands with different
@@ -857,8 +857,8 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   auto LV = SLILeft->getValue();
   auto RV = SLIRight->getValue();
-  auto *NewSLI =
-      Builder.createStringLiteral(AI->getLoc(), LV + Twine(RV), Encoding);
+  auto *NewSLI = Builder.createStringLiteralWithNullTerminator(
+      AI->getLoc(), LV + Twine(RV), Encoding);
   Arguments.push_back(NewSLI);
 
   // Length of the concatenated literal according to its encoding.

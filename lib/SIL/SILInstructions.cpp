@@ -407,20 +407,22 @@ APFloat FloatLiteralInst::getValue() const {
 }
 
 StringLiteralInst::StringLiteralInst(SILDebugLocation *Loc, StringRef Text,
-                                     Encoding encoding, SILType Ty)
+                                     Encoding encoding, bool nullTerminate,
+                                     SILType Ty)
     : LiteralInst(ValueKind::StringLiteralInst, Loc, Ty), Length(Text.size()),
-      TheEncoding(encoding) {
+      TheEncoding(encoding), NullTerminated(nullTerminate) {
   memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
 }
 
 StringLiteralInst *StringLiteralInst::create(SILDebugLocation *Loc,
                                              StringRef text, Encoding encoding,
+                                             bool nullTerminate,
                                              SILFunction &F) {
   void *buf
     = allocateLiteralInstWithTextSize<StringLiteralInst>(F, text.size());
 
   auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
-  return ::new (buf) StringLiteralInst(Loc, text, encoding, Ty);
+  return ::new (buf) StringLiteralInst(Loc, text, encoding, nullTerminate, Ty);
 }
 
 uint64_t StringLiteralInst::getCodeUnitCount() {
