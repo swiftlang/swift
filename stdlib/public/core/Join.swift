@@ -55,18 +55,12 @@ public struct JoinIterator<
         if _fastPath(result != nil) {
           return result
         }
-        if _separatorData.isEmpty {
-          _inner = _base.next()?.iterator()
-          if _inner == nil {
-            _state = .end
-            return nil
-          }
-        } else {
-          _inner = _base.next()?.iterator()
-          if _inner == nil {
-            _state = .end
-            return nil
-          }
+        _inner = _base.next()?.iterator()
+        if _inner == nil {
+          _state = .end
+          return nil
+        }
+        if !_separatorData.isEmpty {
           _separator = _separatorData.iterator()
           _state = .generatingSeparator
         }
@@ -87,7 +81,7 @@ public struct JoinIterator<
   }
 
   internal var _base: Base
-  internal var _inner: Base.Element.Iterator? = nil
+  internal var _inner: Base.Element.Iterator?
   internal var _separatorData: ContiguousArray<Base.Element.Iterator.Element>
   internal var _separator:
     ContiguousArray<Base.Element.Iterator.Element>.Iterator?

@@ -42,7 +42,7 @@ func expectWrapperDispatch<R1, R2>(
   @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   counters.reset()
