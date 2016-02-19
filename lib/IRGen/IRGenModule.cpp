@@ -308,16 +308,30 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   BridgeObjectPtrTy = llvm::StructType::create(getLLVMContext(), "swift.bridge")
                 ->getPointerTo(DefaultAS);
 
-  ObjCClassStructTy = llvm::StructType::create(LLVMContext, "objc_class");
+  ObjCCacheStructTy = Module.getTypeByName("struct._objc_cache");
+  if (ObjCCacheStructTy == nullptr)
+    ObjCCacheStructTy =
+        llvm::StructType::create(LLVMContext, "struct._objc_cache");
+  ObjCCachePtrTy = ObjCCacheStructTy->getPointerTo(DefaultAS);
+
+  ObjCClassStructTy = Module.getTypeByName("struct._class_t");
+  if (ObjCClassStructTy == nullptr) {
+    ObjCClassStructTy =
+        llvm::StructType::create(LLVMContext, "struct._class_t");
+
+    // struct _class_t {
+    //  struct _class_t *isa;
+    //  struct _class_t * const superclass;
+    //  void *cache;
+    //  IMP *vtable;
+    //  struct class_ro_t *ro;
+    // }
+    ObjCClassStructTy->setBody(llvm::PointerType::getUnqual(ObjCClassStructTy),
+                               llvm::PointerType::getUnqual(ObjCClassStructTy),
+                               ObjCCachePtrTy, OpaquePtrTy, IntPtrTy,
+                               nullptr);
+  }
   ObjCClassPtrTy = ObjCClassStructTy->getPointerTo(DefaultAS);
-  llvm::Type *objcClassElts[] = {
-    ObjCClassPtrTy,
-    ObjCClassPtrTy,
-    OpaquePtrTy,
-    OpaquePtrTy,
-    IntPtrTy
-  };
-  ObjCClassStructTy->setBody(objcClassElts);
 
   ObjCSuperStructTy = llvm::StructType::create(LLVMContext, "objc_super");
   ObjCSuperPtrTy = ObjCSuperStructTy->getPointerTo(DefaultAS);
@@ -510,8 +524,8 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
 
   if (ObjCInterop) {
     // struct objc_cache _objc_empty_cache;
-    ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
-                                                 OpaquePtrTy->getElementType());
+    ObjCEmptyCachePtr =
+        Module.getOrInsertGlobal("_objc_empty_cache", ObjCCacheStructTy);
   } else {
     // FIXME: Remove even the null value per rdar://problem/18801263
     ObjCEmptyCachePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
@@ -530,8 +544,17 @@ llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
   // FIXME: When !ObjCInterop, we should remove even the null value per
   // rdar://problem/18801263
 
-  if (!ObjCEmptyVTablePtr)
-    ObjCEmptyVTablePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
+  if (!ObjCEmptyVTablePtr) {
+    // FIXME: use the proper types for defining the IMP
+    // id (*)(id, SEL, ...)
+    llvm::Type *Params[] = {Int8PtrTy, Int8PtrTy};
+    llvm::Type *IMPTy =
+        llvm::FunctionType::get(Int8PtrTy, Params, false)->getPointerTo();
+    ObjCEmptyVTablePtr =
+        new llvm::GlobalVariable(Module, IMPTy, false,
+                                 llvm::GlobalValue::ExternalLinkage, nullptr,
+                                 "_objc_empty_vtable");
+  }
 
   return ObjCEmptyVTablePtr;
 }

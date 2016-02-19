@@ -393,13 +393,15 @@ public:
     llvm::PointerType *UnknownRefCountedPtrTy;
   };
   llvm::PointerType *BridgeObjectPtrTy; /// %swift.bridge*
-  llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
-  llvm::StructType *ObjCClassStructTy; /// %objc_class
-  llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
-  llvm::StructType *ObjCSuperStructTy; /// %objc_super
-  llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
-  llvm::StructType *ObjCBlockStructTy; /// %objc_block
-  llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
+  llvm::PointerType *OpaquePtrTy;       /// %swift.opaque*
+  llvm::StructType *ObjCCacheStructTy;  /// %objc_cache
+  llvm::PointerType *ObjCCachePtrTy;    /// %objc_cache*
+  llvm::StructType *ObjCClassStructTy;  /// %objc_class
+  llvm::PointerType *ObjCClassPtrTy;    /// %objc_class*
+  llvm::StructType *ObjCSuperStructTy;  /// %objc_super
+  llvm::PointerType *ObjCSuperPtrTy;    /// %objc_super*
+  llvm::StructType *ObjCBlockStructTy;  /// %objc_block
+  llvm::PointerType *ObjCBlockPtrTy;    /// %objc_block*
   llvm::StructType *ProtocolConformanceRecordTy;
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
   llvm::StructType *NominalTypeDescriptorTy;
