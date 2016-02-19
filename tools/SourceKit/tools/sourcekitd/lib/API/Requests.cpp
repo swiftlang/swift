@@ -60,6 +60,8 @@ public:
 
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 
+static LazySKDUID RequestCrashWithExit("source.request.crash_exit");
+
 static LazySKDUID RequestDemangle("source.request.demangle");
 static LazySKDUID RequestMangleSimpleClass("source.request.mangle_simple_class");
 
@@ -311,6 +313,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     dict.set(KeyVersionMajor, ProtocolMajorVersion);
     dict.set(KeyVersionMinor, ProtocolMinorVersion);
     return Rec(RB.createResponse());
+  }
+
+  if (ReqUID == RequestCrashWithExit) {
+    // 'exit' has the same effect as crashing but without the crash log.
+    ::exit(1);
   }
 
   if (ReqUID == RequestDemangle) {
