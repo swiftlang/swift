@@ -70,6 +70,7 @@ import PopFront
 import PopFrontGeneric
 import Prims
 import ProtocolDispatch
+import ProtocolDispatch2
 import RC4
 import RGBHistogram
 import RangeAssignment
@@ -147,6 +148,7 @@ precommitTests = [
   "PopFrontUnsafePointer": run_PopFrontUnsafePointer,
   "Prims": run_Prims,
   "ProtocolDispatch": run_ProtocolDispatch,
+  "ProtocolDispatch2": run_ProtocolDispatch2,
   "RC4": run_RC4,
   "RGBHistogram": run_RGBHistogram,
   "RangeAssignment": run_RangeAssignment,
