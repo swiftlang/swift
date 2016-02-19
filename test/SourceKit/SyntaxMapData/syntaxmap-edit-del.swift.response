@@ -73,7 +73,16 @@
       key.filepath: syntaxmap-edit-del.swift,
       key.severity: source.diagnostic.severity.error,
       key.description: "expected declaration",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.diagnostics: [
+        {
+          key.line: 2,
+          key.column: 8,
+          key.filepath: syntaxmap-edit-del.swift,
+          key.severity: source.diagnostic.severity.note,
+          key.description: "in declaration of 'Foo'"
+        }
+      ]
     }
   ]
 }
