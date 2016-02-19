@@ -231,7 +231,7 @@ SILValue SILDeserializer::getLocalValue(ValueID Id,
   // it until we see a real definition.
   ValueBase *&Placeholder = ForwardLocalValues[Id];
   if (!Placeholder)
-    Placeholder = new (SILMod) GlobalAddrInst(nullptr, Type);
+    Placeholder = new (SILMod) GlobalAddrInst(SILDebugLocation(), Type);
   return Placeholder;
 }
 

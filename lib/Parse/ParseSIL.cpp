@@ -144,8 +144,8 @@ namespace {
     /// method is used to register it and update our symbol table.
     void setLocalValue(ValueBase *Value, StringRef Name, SourceLoc NameLoc);
 
-    SILDebugLocation *getDebugLoc(SILBuilder & B, SILLocation Loc) {
-      return B.getOrCreateDebugLocation(Loc, F->getDebugScope());
+    SILDebugLocation getDebugLoc(SILBuilder & B, SILLocation Loc) {
+      return SILDebugLocation(Loc, F->getDebugScope());
     }
 
   public:

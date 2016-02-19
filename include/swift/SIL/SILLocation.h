@@ -674,6 +674,21 @@ private:
   }
 };
 
+class SILDebugScope;
+
+/// A SILLocation paired with a SILDebugScope.
+class SILDebugLocation {
+  const SILDebugScope *Scope = nullptr;
+  SILLocation Location;
+
+public:
+  SILDebugLocation() : Scope(nullptr), Location(RegularLocation(SourceLoc())) {}
+  SILDebugLocation(SILLocation Loc, const SILDebugScope *DS)
+      : Scope(DS), Location(Loc) {}
+  SILLocation getLocation() const { return Location; }
+  const SILDebugScope *getScope() const { return Scope; }
+};
+
 } // end swift namespace
 
 
