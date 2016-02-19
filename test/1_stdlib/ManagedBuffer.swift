@@ -74,7 +74,7 @@ struct CountAndCapacity {
 // potential bugs.
 final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
   class func create(capacity: Int) -> TestManagedBuffer {
-    let r = super.create(capacity) {
+    let r = super.create(minimumCapacity: capacity) {
       CountAndCapacity(
         count: LifetimeTracked(0), capacity: $0.capacity)
     }

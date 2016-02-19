@@ -1815,14 +1815,14 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   /// Create a storage instance with room for 'capacity' entries and all entries
   /// marked invalid.
-  internal class func create(capacity: Int) -> StorageImpl {
+  internal class func create(capacity capacity: Int) -> StorageImpl {
     let requiredCapacity =
       bytesForBitMap(capacity: capacity) + bytesForKeys(capacity: capacity)
 %if Self == 'Dictionary':
         + bytesForValues(capacity: capacity)
 %end
 
-    let r = super.create(requiredCapacity) { _ in
+    let r = super.create(minimumCapacity: requiredCapacity) { _ in
       return _HashedContainerStorageHeader(capacity: capacity)
     }
     let storage = r as! StorageImpl
@@ -1891,7 +1891,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 %end
 
   internal init(capacity: Int) {
-    buffer = StorageImpl.create(capacity)
+    buffer = StorageImpl.create(capacity: capacity)
     initializedEntries = _BitMap(
         storage: buffer._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
@@ -2617,7 +2617,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   @warn_unused_result
   internal func _createBridgedNativeStorage(capacity: Int) ->
     BridgedNativeStorage {
-    let buffer = BridgedNativeStorage.StorageImpl.create(capacity)
+    let buffer = BridgedNativeStorage.StorageImpl.create(capacity: capacity)
     return BridgedNativeStorage(buffer: buffer)
   }
 

@@ -98,7 +98,7 @@ public class ManagedBuffer<Value, Element>
   /// `initializeValue` on the partially-constructed object to
   /// generate an initial `Value`.
   public final class func create(
-    minimumCapacity: Int,
+    minimumCapacity minimumCapacity: Int,
     initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
   ) -> ManagedBuffer<Value, Element> {
 
