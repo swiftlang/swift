@@ -25,7 +25,7 @@ class Foo : NSObject, __PrivProto {
   init()
 }
 class Bar : NSObject {
-  init!(__: ())
+  init!()
   init!(__noArgs: ())
   init!(__oneArg arg: Int32)
   init!(__twoArgs arg: Int32, other arg2: Int32)
