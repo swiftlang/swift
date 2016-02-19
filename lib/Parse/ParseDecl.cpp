@@ -3830,7 +3830,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   };
   
   // Check for a behavior declaration.
-  if (Tok.is(tok::l_square)) {
+  if (Context.LangOpts.EnableExperimentalPropertyBehaviors
+      && Tok.is(tok::l_square)) {
     BehaviorLBracket = consumeToken(tok::l_square);
     // TODO: parse visibility (public/private/internal)
     auto type = parseType(diag::expected_behavior_name,
