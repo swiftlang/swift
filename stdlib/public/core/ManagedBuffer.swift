@@ -97,6 +97,7 @@ public class ManagedBuffer<Value, Element>
   /// Create a new instance of the most-derived class, calling
   /// `initializeValue` on the partially-constructed object to
   /// generate an initial `Value`.
+  @swift3_migration(renamed="create(minimumCapacity:initialValue:)")
   public final class func create(
     minimumCapacity: Int,
     initialValue: (ManagedProtoBuffer<Value,Element>) -> Value

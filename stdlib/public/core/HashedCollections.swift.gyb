@@ -376,7 +376,7 @@ public struct Set<Element : Hashable> :
   }
 
   /// Remove the member referenced by the given index.
-  @swift3_migration(renamed="removeAt")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(index: Index) -> Element {
     return _variantStorage.removeAtIndex(index)
   }
@@ -958,7 +958,7 @@ public struct Dictionary<Key : Hashable, Value> :
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
   internal typealias _NativeStorage = _NativeDictionaryStorage<Key, Value>
-  @swift3_migration(message="(key: Key, value: Value)")
+  @swift3_migration(message="labels were added to the tuple: '(key: Key, value: Value)'")
   public typealias Element = (Key, Value)
   public typealias Index = DictionaryIndex<Key, Value>
 
@@ -1036,6 +1036,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// Returns the `Index` for the given key, or `nil` if the key is not
   /// present in the dictionary.
+  @swift3_migration(renamed="index(forKey:)")
   @warn_unused_result
   public func indexForKey(key: Key) -> Index? {
     // Complexity: amortized O(1) for native storage, O(N) when wrapping an
@@ -1087,7 +1088,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  @swift3_migration(renamed="removeAt")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(index: Index) -> Element {
     return _variantStorage.removeAtIndex(index)
   }
@@ -1095,6 +1096,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Remove a given key and the associated value from the dictionary.
   /// Returns the value that was removed, or `nil` if the key was not present
   /// in the dictionary.
+  @swift3_migration(renamed="removeValue(forKey:)")
   public mutating func removeValueForKey(key: Key) -> Value? {
     return _variantStorage.removeValueForKey(key)
   }

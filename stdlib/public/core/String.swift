@@ -623,6 +623,7 @@ extension SequenceType where Generator.Element == String {
   ///
   ///     ["foo", "bar", "baz"].joinWithSeparator("-|-") // "foo-|-bar-|-baz"
   @warn_unused_result
+  @swift3_migration(renamed="join(separator:)")
   public func joinWithSeparator(separator: String) -> String {
     var result = ""
 
@@ -726,7 +727,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  @swift3_migration(renamed="removeAt(_:)")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(i: Index) -> Character {
     return withMutableCharacters {
       (inout v: CharacterView) in v.removeAtIndex(i)

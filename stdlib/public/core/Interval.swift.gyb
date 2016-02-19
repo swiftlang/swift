@@ -74,6 +74,11 @@ public struct ${Self}<Bound : Comparable>
   /// Construct an interval with the given bounds.
   ///
   /// - Requires: `start <= end`.
+%   if Self == 'HalfOpenInterval':
+  @swift3_migration(message="Use the '..<' operator")
+%   else:
+  @swift3_migration(message="Use the '...' operator")
+%   end
   public init(_ start: Bound, _ end: Bound) {
     _precondition(end >= start, "Invalid ${Self} bounds (end < start)")
     _start = start

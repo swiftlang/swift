@@ -69,7 +69,11 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   /// - Complexity: O(`elements.count`).
   ///
   /// ${orderingRequirement}
+%   if preds:
+  @swift3_migration(renamed="min(isOrderedBefore:)")
+%   else:
   @swift3_migration(renamed="min")
+%   end
   @warn_unused_result
   public func minElement(
 %   if preds:
@@ -92,7 +96,11 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   ///
   /// - Complexity: O(`elements.count`).
   ///   ${orderingRequirement}
+%   if preds:
+  @swift3_migration(renamed="max(isOrderedBefore:)")
+%   else:
   @swift3_migration(renamed="max")
+%   end
   @warn_unused_result
   public func maxElement(
 %   if preds:

@@ -21,15 +21,34 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 /// The set of possible IEEE 754 "classes"
 public enum FloatingPointClassification {
+  @swift3_migration(renamed="signalingNaN")
   case SignalingNaN
+
+  @swift3_migration(renamed="quietNaN")
   case QuietNaN
+
+  @swift3_migration(renamed="negativeInfinity")
   case NegativeInfinity
+
+  @swift3_migration(renamed="negativeNormal")
   case NegativeNormal
+
+  @swift3_migration(renamed="negativeSubnormal")
   case NegativeSubnormal
+
+  @swift3_migration(renamed="negativeZero")
   case NegativeZero
+
+  @swift3_migration(renamed="positiveZero")
   case PositiveZero
+
+  @swift3_migration(renamed="positiveSubnormal")
   case PositiveSubnormal
+
+  @swift3_migration(renamed="positiveNormal")
   case PositiveNormal
+
+  @swift3_migration(renamed="positiveInfinity")
   case PositiveInfinity
 }
 

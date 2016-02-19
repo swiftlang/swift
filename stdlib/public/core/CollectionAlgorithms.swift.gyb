@@ -127,6 +127,7 @@ extension MutableCollectionType where Index : RandomAccessIndexType {
 ${partitionDocComment}
   ///
 ${orderingRequirementForPredicate}
+  @swift3_migration(message="slice the collection using the range, and call partition(isOrderedBefore:)")
   public mutating func partition(
     range: Range<Index>,
     isOrderedBefore: (${GElement}, ${GElement}) -> Bool
@@ -141,6 +142,7 @@ extension MutableCollectionType
 ${partitionDocComment}
   ///
 ${orderingRequirementForComparable}
+  @swift3_migration(message="slice the collection using the range, and call partition()")
   public mutating func partition(range: Range<Index>) -> Index {
 
 %   end
@@ -232,7 +234,7 @@ ${sortDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  @swift3_migration(renamed="sorted")
+  @swift3_migration(renamed="sorted(isOrderedBefore:)")
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   public func sort(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
@@ -282,7 +284,7 @@ ${sortInPlaceDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  @swift3_migration(renamed="sort")
+  @swift3_migration(renamed="sort(isOrderedBefore:)")
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {

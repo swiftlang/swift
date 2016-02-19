@@ -162,6 +162,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`abs(n)`) otherwise
+  @swift3_migration(renamed="advanced(by:)")
   @warn_unused_result
   func advancedBy(n: Distance) -> Self
 
@@ -180,6 +181,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`abs(n)`) otherwise
+  @swift3_migration(renamed="advanced(by:limit:)")
   @warn_unused_result
   func advancedBy(n: Distance, limit: Self) -> Self
 
@@ -193,6 +195,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`n`) otherwise, where `n` is the function's result.
+  @swift3_migration(renamed="distance(to:)")
   @warn_unused_result
   func distanceTo(end: Self) -> Distance
 }
@@ -241,16 +244,19 @@ extension ForwardIndexType {
     return p
   }
 
+  @swift3_migration(renamed="advanced(by:)")
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     return self._advanceForward(n)
   }
 
+  @swift3_migration(renamed="advanced(by:limit:)")
   @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     return self._advanceForward(n, limit)
   }
 
+  @swift3_migration(renamed="distance(to:)")
   @warn_unused_result
   public func distanceTo(end: Self) -> Distance {
     var p = self
@@ -291,6 +297,7 @@ extension BidirectionalIndexType {
     self = self.predecessor()
   }
 
+  @swift3_migration(renamed="advanced(by:)")
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     if n >= 0 {
@@ -305,6 +312,7 @@ extension BidirectionalIndexType {
     return p
   }
 
+  @swift3_migration(renamed="advanced(by:limit:)")
   @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     if n >= 0 {
@@ -350,6 +358,7 @@ public protocol _RandomAccessAmbiguity {
 }
 
 extension _RandomAccessAmbiguity {
+  @swift3_migration(renamed="advanced(by:)")
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     fatalError("advancedBy(n) not implemented")
@@ -362,12 +371,15 @@ extension _RandomAccessAmbiguity {
 public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
   _RandomAccessAmbiguity {
 
+  @swift3_migration(renamed="distance(to:)")
   @warn_unused_result
   func distanceTo(other: Self) -> Distance
 
+  @swift3_migration(renamed="advanced(by:)")
   @warn_unused_result
   func advancedBy(n: Distance) -> Self
 
+  @swift3_migration(renamed="advanced(by:limit:)")
   @warn_unused_result
   func advancedBy(n: Distance, limit: Self) -> Self
 }
@@ -402,6 +414,7 @@ extension RandomAccessIndexType {
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }
 
+  @swift3_migration(renamed="advanced(by:limit:)")
   @_transparent
   @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {

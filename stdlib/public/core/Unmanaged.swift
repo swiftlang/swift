@@ -15,7 +15,6 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 public struct Unmanaged<
-  @swift3_migration(renamed="Object")
   Instance : AnyObject
 > {
   @available(*, unavailable, renamed="Instance")
@@ -32,7 +31,6 @@ public struct Unmanaged<
   /// This operation does not change reference counts.
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  @swift3_migration(renamed="init(bitPattern:)")
   @_transparent
   @warn_unused_result
   public static func fromOpaque(value: COpaquePointer) -> Unmanaged {
@@ -64,7 +62,6 @@ public struct Unmanaged<
   /// This is useful when passing an object to an API which Swift
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
-  @swift3_migration(renamed="init(retaining:)")
   @_transparent
   @warn_unused_result
   public static func passRetained(value: Instance) -> Unmanaged {
@@ -80,7 +77,6 @@ public struct Unmanaged<
   ///
   ///     CFArraySetValueAtIndex(.passUnretained(array), i,
   ///                            .passUnretained(object))
-  @swift3_migration(renamed="init(withoutRetaining:)")
   @_transparent
   @warn_unused_result
   public static func passUnretained(value: Instance) -> Unmanaged {
@@ -92,7 +88,6 @@ public struct Unmanaged<
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're not responsible for releasing the result.
-  @swift3_migration(renamed="object")
   @warn_unused_result
   public func takeUnretainedValue() -> Instance {
     return _value
@@ -103,7 +98,6 @@ public struct Unmanaged<
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're responsible for releasing the result.
-  @swift3_migration(renamed="release()")
   @warn_unused_result
   public func takeRetainedValue() -> Instance {
     let result = _value
@@ -112,8 +106,6 @@ public struct Unmanaged<
   }
 
   /// Perform an unbalanced retain of the object.
-  @swift3_migration(message="it will be removed in Swift 3")
-  @available(*, deprecated, message="it will be removed in Swift 3")
   @_transparent
   public func retain() -> Unmanaged {
     Builtin.retain(_value)
@@ -128,8 +120,6 @@ public struct Unmanaged<
 
 #if _runtime(_ObjC)
   /// Perform an unbalanced autorelease of the object.
-  @swift3_migration(message="it will be removed in Swift 3")
-  @available(*, deprecated, message="it will be removed in Swift 3")
   @_transparent
   public func autorelease() -> Unmanaged {
     Builtin.autorelease(_value)

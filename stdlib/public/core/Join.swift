@@ -173,6 +173,7 @@ extension SequenceType where Generator.Element : SequenceType {
   /// `[[1, 2, 3], [4, 5, 6], [7, 8, 9]].joinWithSeparator([-1, -2])`
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   @warn_unused_result
+  @swift3_migration(renamed="join(separator:)")
   public func joinWithSeparator<
     Separator : SequenceType
     where

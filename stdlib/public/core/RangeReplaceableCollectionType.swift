@@ -130,7 +130,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  @swift3_migration(renamed="removeAt(_:)")
+  @swift3_migration(renamed="remove(at:)")
   mutating func removeAtIndex(i: Index) -> Generator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
@@ -218,7 +218,7 @@ extension RangeReplaceableCollectionType {
     replaceRange(i..<i, with: newElements)
   }
 
-  @swift3_migration(renamed="removeAt(_:)")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(index: Index) -> Generator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Generator.Element = self[index]

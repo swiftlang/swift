@@ -181,7 +181,7 @@ public protocol SequenceType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @swift3_migration(message="call 'split(maxSplits:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   func split(maxSplit: Int, allowEmptySlices: Bool,
     @noescape isSeparator: (Generator.Element) throws -> Bool
@@ -401,7 +401,7 @@ extension SequenceType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @swift3_migration(message="call 'split(maxSplits:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   public func split(
     maxSplit: Int = Int.max,
@@ -522,7 +522,7 @@ extension SequenceType where Generator.Element : Equatable {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(message="call 'split(_:maxSplits:omitEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
+  @swift3_migration(message="call 'split(_:maxSplits:omittingEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   public func split(
     separator: Generator.Element,

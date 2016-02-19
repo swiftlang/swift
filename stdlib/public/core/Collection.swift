@@ -92,6 +92,8 @@ public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
   
   /// Create a generator over the given collection.
+  @available(*, deprecated, message="it will be removed in Swift 3, call '.generator()' on the collection instead")
+  @swift3_migration(message="call '.iterator()' on the collection")
   public init(_ elements: Elements) {
     self._elements = elements
     self._position = elements.startIndex
@@ -168,18 +170,21 @@ public protocol CollectionType : Indexable, SequenceType {
   /// Returns `self[startIndex..<end]`
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="prefix(upTo:)")
   @warn_unused_result
   func prefixUpTo(end: Index) -> SubSequence
 
   /// Returns `self[start..<endIndex]`
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="suffix(from:)")
   @warn_unused_result
   func suffixFrom(start: Index) -> SubSequence
 
   /// Returns `prefixUpTo(position.successor())`
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="prefix(through:)")
   @warn_unused_result
   func prefixThrough(position: Index) -> SubSequence
 
@@ -413,6 +418,7 @@ extension CollectionType {
   /// Returns `self[startIndex..<end]`
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="prefix(upTo:)")
   @warn_unused_result
   public func prefixUpTo(end: Index) -> SubSequence {
     return self[startIndex..<end]
@@ -421,6 +427,7 @@ extension CollectionType {
   /// Returns `self[start..<endIndex]`
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="suffix(from:)")
   @warn_unused_result
   public func suffixFrom(start: Index) -> SubSequence {
     return self[start..<endIndex]
@@ -429,6 +436,7 @@ extension CollectionType {
   /// Returns `prefixUpTo(position.successor())`
   ///
   /// - Complexity: O(1)
+  @swift3_migration(renamed="prefix(through:)")
   @warn_unused_result
   public func prefixThrough(position: Index) -> SubSequence {
     return prefixUpTo(position.successor())
@@ -449,7 +457,7 @@ extension CollectionType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(renamed="split(_:omitEmptySubsequences:isSeparator:)")
+  @swift3_migration(renamed="split(maxSplits:omittingEmptySubsequences:isSeparator:)")
   @warn_unused_result
   public func split(
     maxSplit: Int = Int.max,
@@ -513,7 +521,7 @@ extension CollectionType where Generator.Element : Equatable {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(renamed="split(_:maxSplits:omitEmptySubsequences:)")
+  @swift3_migration(message="split(_:maxSplits:omittingEmptySubsequences:) and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   public func split(
     separator: Generator.Element,

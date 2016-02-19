@@ -69,6 +69,7 @@ protocol _ArrayType
   /// - Complexity: Worst case O(N).
   ///
   /// - Requires: `count > index`.
+  @swift3_migration(renamed="remove(at:)")
   mutating func removeAtIndex(index: Int) -> Generator.Element
 
   //===--- implementation detail  -----------------------------------------===//

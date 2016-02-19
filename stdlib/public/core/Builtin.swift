@@ -101,6 +101,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///   with extreme care.  There's almost always a better way to do
 ///   anything.
 ///
+@swift3_migration(renamed="unsafeBitCast(_:to:)")
 @_transparent
 @warn_unused_result
 public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
@@ -228,6 +229,7 @@ public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
 ///   are confident that, always, `x is T`.  It is better than an
 ///   `unsafeBitCast` because it's more restrictive, and because
 ///   checking is still performed in debug builds.
+@swift3_migration(message="add a parameter 'to:' with the destination type of the cast, like this: 'unsafeDowncast(_:to:)'")
 @_transparent
 @warn_unused_result
 public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
