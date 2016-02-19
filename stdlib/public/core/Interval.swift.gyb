@@ -71,10 +71,10 @@ public struct ${Self}<Bound : Comparable>
   /// Construct an interval with the given bounds.
   ///
   /// - Requires: `start <= end`.
-  public init(_ start: Bound, _ end: Bound) {
-    _require(end >= start, "Invalid ${Self} bounds (end < start)")
-    _start = start
-    _end = end
+  internal init(_start: Bound, end: Bound) {
+    _require(end >= _start, "Invalid ${Self} bounds (end < start)")
+    self._start = _start
+    self._end = end
   }
 
   /// The `Interval`'s lower bound.
@@ -113,13 +113,13 @@ public struct ${Self}<Bound : Comparable>
   /// `self`.
   @warn_unused_result
   public func clamp(intervalToClamp: ${Self}) -> ${Self} {
-
     return ${Self}(
-      self.start > intervalToClamp.start ? self.start
+      _start:
+        self.start > intervalToClamp.start ? self.start
         : self.end < intervalToClamp.start ? self.end
         : intervalToClamp.start,
-
-      self.end < intervalToClamp.end ? self.end
+      end:
+        self.end < intervalToClamp.end ? self.end
         : self.start > intervalToClamp.end ? self.start
         : intervalToClamp.end
     )
@@ -179,7 +179,7 @@ extension Interval {
 public func ..< <Bound : Comparable>(
   start: Bound, end: Bound
 ) -> HalfOpenInterval<Bound> {
-  return HalfOpenInterval(start, end)
+  return HalfOpenInterval(_start: start, end: end)
 }
 
 /// Returns a closed interval from `start` through `end`.
@@ -187,7 +187,7 @@ public func ..< <Bound : Comparable>(
 public func ... <Bound : Comparable>(
   start: Bound, end: Bound
 ) -> ClosedInterval<Bound> {
-  return ClosedInterval(start, end)
+  return ClosedInterval(_start: start, end: end)
 }
 
 /// Returns `true` iff `pattern` contains `value`.
@@ -198,3 +198,18 @@ public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
 
 @available(*, unavailable, renamed="Interval")
 public typealias IntervalType = Interval
+
+extension HalfOpenInterval {
+  @available(*, unavailable, message="Please use the '..<' operator instead.")
+  public init(_ start: Bound, _ end: Bound) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension ClosedInterval {
+  @available(*, unavailable, message="Please use the '...' operator instead.")
+  public init(_ start: Bound, _ end: Bound) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
