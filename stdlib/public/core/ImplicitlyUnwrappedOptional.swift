@@ -107,22 +107,6 @@ func _getImplicitlyUnwrappedOptionalValue<Wrapped>(v: Wrapped!) -> Wrapped {
   }
 }
 
-@_transparent
-@warn_unused_result
-public // COMPILER_INTRINSIC
-func _injectValueIntoImplicitlyUnwrappedOptional<Wrapped>(
-  v: Wrapped
-) -> Wrapped! {
-  return .Some(v)
-}
-
-@_transparent
-@warn_unused_result
-public // COMPILER_INTRINSIC
-func _injectNothingIntoImplicitlyUnwrappedOptional<Wrapped>() -> Wrapped! {
-  return .None
-}
-
 #if _runtime(_ObjC)
 extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
