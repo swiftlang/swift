@@ -3614,7 +3614,7 @@ class DeclGroupNameContext {
 
 public:
   DeclGroupNameContext(bool Enable) :
-    pNameCollector(new GroupNameCollectorFromFileName(Enable)) {}
+    pNameCollector(new GroupNameCollectorFromJson(Enable)) {}
   uint32_t getGroupSequence(const ValueDecl *VD) {
     return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
                                      Map.size())).first->second;
