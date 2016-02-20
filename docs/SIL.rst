@@ -2391,6 +2391,16 @@ The second operand may have either object or address type.  In the
 latter case, the dependency is on the current value stored in the
 address.
 
+strong_pin
+``````````
+
+TODO: Fill me in!
+
+strong_unpin
+````````````
+
+TODO: Fill me in!
+
 is_unique
 `````````
 
