@@ -89,7 +89,7 @@ struct TestConfig {
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
-  var afterRunSleep: Int? = .None
+  var afterRunSleep: Int? = nil
 
   /// The list of tests to run.
   var tests = [Test]()
@@ -97,7 +97,7 @@ struct TestConfig {
   mutating func processArguments() -> TestAction {
     let validOptions=["--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--run-all", "--list", "--sleep"]
-    let maybeBenchArgs: Arguments? = parseArgs(.Some(validOptions))
+    let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
       return .Fail("Failed to parse arguments")
     }
