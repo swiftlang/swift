@@ -21,7 +21,7 @@ let arrayCount = 1024
 func _arrayReplace<B: _ArrayBufferType, C: CollectionType
   where C.Generator.Element == B.Element, B.Index == Int
   >(
-  inout target: B, _ subRange: Range<Int>, _ newValues: C
+  target: inout B, _ subRange: Range<Int>, _ newValues: C
 ) {
   _precondition(
     subRange.startIndex >= 0,

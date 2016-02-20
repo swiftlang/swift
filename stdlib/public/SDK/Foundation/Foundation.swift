@@ -150,14 +150,14 @@ extension String : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSString,
-    inout result: String?
+    result: inout String?
   ) {
     result = String(x)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSString,
-    inout result: String?
+    result: inout String?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return result != nil
@@ -192,14 +192,14 @@ extension Int : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Int?
+    result: inout Int?
   ) {
     result = x.integerValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Int?
+    result: inout Int?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -226,13 +226,13 @@ extension UInt : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: UInt?
+    result: inout UInt?
   ) {
     result = x.unsignedIntegerValue
   }
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: UInt?
+    result: inout UInt?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -259,14 +259,14 @@ extension Float : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Float?
+    result: inout Float?
   ) {
     result = x.floatValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Float?
+    result: inout Float?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -293,14 +293,14 @@ extension Double : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Double?
+    result: inout Double?
   ) {
     result = x.doubleValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Double?
+    result: inout Double?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -327,14 +327,14 @@ extension Bool: _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Bool?
+    result: inout Bool?
   ) {
     result = x.boolValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Bool?
+    result: inout Bool?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -362,7 +362,7 @@ extension CGFloat : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: CGFloat?
+    result: inout CGFloat?
   ) {
     var nativeResult: CGFloat.NativeType? = 0.0
     CGFloat.NativeType._forceBridgeFromObjectiveC(x, result: &nativeResult)
@@ -371,7 +371,7 @@ extension CGFloat : _ObjectiveCBridgeable {
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: CGFloat?
+    result: inout CGFloat?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -480,7 +480,7 @@ extension Array : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     source: NSArray,
-    inout result: Array?
+    result: inout Array?
   ) {
     _precondition(
       Swift._isBridgedToObjectiveC(Element.self),
@@ -503,7 +503,7 @@ extension Array : _ObjectiveCBridgeable {
 
   public static func _conditionallyBridgeFromObjectiveC(
     source: NSArray,
-    inout result: Array?
+    result: inout Array?
   ) -> Bool {
     // Construct the result array by conditionally bridging each element.
     let anyObjectArr = [AnyObject](_cocoaArray: source)
@@ -614,7 +614,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     d: NSDictionary,
-    inout result: Dictionary?
+    result: inout Dictionary?
   ) {
     if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorage(
         d as AnyObject) {
@@ -644,7 +644,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSDictionary,
-    inout result: Dictionary?
+    result: inout Dictionary?
   ) -> Bool {
     let anyDict = x as [NSObject : AnyObject]
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
@@ -870,7 +870,7 @@ extension Set : _ObjectiveCBridgeable {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), NSSet.self)
   }
 
-  public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: Set?) {
+  public static func _forceBridgeFromObjectiveC(s: NSSet, result: inout Set?) {
     if let native =
       Set<Element>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
 
@@ -895,7 +895,7 @@ extension Set : _ObjectiveCBridgeable {
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSSet, inout result: Set?
+    x: NSSet, result: inout Set?
   ) -> Bool {
     let anySet = x as Set<NSObject>
     if _isBridgedVerbatimToObjectiveC(Element.self) {

@@ -11,13 +11,13 @@ func test_arch() {
   arch({(x: Int) -> () in  })
 
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1([[WORD]] 1, i8* inttoptr ([[WORD]] or ([[WORD]] ptrtoint (%swift.type* @_TMSi to [[WORD]]), [[WORD]] 1) to i8*), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1))
-  arch({(inout x: Int) -> () in })
+  arch({(x: inout Int) -> () in })
 
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata2([[WORD]] 2, i8* inttoptr ([[WORD]] or ([[WORD]] ptrtoint (%swift.type* @_TMSi to [[WORD]]), [[WORD]] 1) to i8*), i8* bitcast (%swift.type* @_TMSi to i8*), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1))
-  arch({(inout x: Int, y: Int) -> () in })
+  arch({(x: inout Int, y: Int) -> () in })
 
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata3([[WORD]] 3, i8* inttoptr ([[WORD]] or ([[WORD]] ptrtoint (%swift.type* @_TMSi to [[WORD]]), [[WORD]] 1) to i8*), i8* bitcast (%swift.type* @_TMSf to i8*), i8* bitcast (%swift.type* @_TMSS to i8*), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1))
-  arch({(inout x: Int, y: Float, z: String) -> () in })
+  arch({(x: inout Int, y: Float, z: String) -> () in })
 
   // CHECK: [[T0:%.*]] = getelementptr inbounds [6 x i8*], [6 x i8*]* %function-arguments, i32 0, i32 0
   // CHECK: store [[WORD]] 4
@@ -32,5 +32,5 @@ func test_arch() {
   // CHECK: getelementptr inbounds [6 x i8*], [6 x i8*]* %function-arguments, i32 0, i32 5
   // CHECK: store %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1)
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata(i8** [[T0]]) {{#[0-9]+}}
-  arch({(inout x: Int, y: Double, z: String, w: Int8) -> () in })
+  arch({(x: inout Int, y: Double, z: String, w: Int8) -> () in })
 }

@@ -13,7 +13,7 @@ _ = Holder(value: C())
 // CHECK-NEXT:   [[T2:%.*]] = struct $Holder ([[T1]] : $@sil_unmanaged C)
 // CHECK-NEXT:   return [[T2]] : $Holder
 
-func set(inout holder holder: Holder) {
+func set(holder holder: inout Holder) {
   holder.value = C()
 }
 // CHECK-LABEL:sil hidden @_TF9unmanaged3setFT6holderRVS_6Holder_T_ : $@convention(thin) (@inout Holder) -> ()
@@ -27,7 +27,7 @@ func set(inout holder holder: Holder) {
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 
-func get(inout holder holder: Holder) -> C {
+func get(holder holder: inout Holder) -> C {
   return holder.value
 }
 // CHECK-LABEL:sil hidden @_TF9unmanaged3getFT6holderRVS_6Holder_CS_1C : $@convention(thin) (@inout Holder) -> @owned C

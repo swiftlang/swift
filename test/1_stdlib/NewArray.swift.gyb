@@ -143,7 +143,7 @@ where T.Generator.Element == T._Buffer.Element,
   checkEqual(x, y, false)
 
   func checkReallocations(
-    a: T, _ growthDescription: String, _ growBy1: (inout _: T)->()
+    a: T, _ growthDescription: String, _ growBy1: (_: inout T)->()
   ) {
     var a = a
     var reallocations = 0
@@ -167,8 +167,8 @@ where T.Generator.Element == T._Buffer.Element,
     }
   }
 
-  checkReallocations(x, "append") { (inout x: T) -> () in x.append(42) }
-  checkReallocations(x, "+=") { (inout x: T) -> () in x.append(42) }
+  checkReallocations(x, "append") { (x: inout T) -> () in x.append(42) }
+  checkReallocations(x, "+=") { (x: inout T) -> () in x.append(42) }
   print("done.")
 }
 

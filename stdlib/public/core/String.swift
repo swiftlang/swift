@@ -509,7 +509,7 @@ public func + (lhs: String, rhs: String) -> String {
 }
 
 // String append
-public func += (inout lhs: String, rhs: String) {
+public func += (lhs: inout String, rhs: String) {
   if lhs.isEmpty {
     lhs = rhs
   }
@@ -579,12 +579,12 @@ extension String {
 extension String {
   public mutating func reserveCapacity(n: Int) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.reserveCapacity(n)
+      (v: inout CharacterView) in v.reserveCapacity(n)
     }
   }
   public mutating func append(c: Character) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.append(c)
+      (v: inout CharacterView) in v.append(c)
     }
   }
   
@@ -593,7 +593,7 @@ extension String {
   where S.Generator.Element == Character
   >(newElements: S) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.appendContentsOf(newElements)
+      (v: inout CharacterView) in v.appendContentsOf(newElements)
     }
   }
   
@@ -677,7 +677,7 @@ extension String {
     subRange: Range<Index>, with newElements: C
   ) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.replaceRange(subRange, with: newElements)
+      (v: inout CharacterView) in v.replaceRange(subRange, with: newElements)
     }
   }
 
@@ -700,7 +700,7 @@ extension String {
   /// - Complexity: O(`self.count`).
   public mutating func insert(newElement: Character, atIndex i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.insert(newElement, atIndex: i)
+      (v: inout CharacterView) in v.insert(newElement, atIndex: i)
     }
   }
 
@@ -713,7 +713,7 @@ extension String {
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, at i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.insertContentsOf(newElements, at: i)
+      (v: inout CharacterView) in v.insertContentsOf(newElements, at: i)
     }
   }
 
@@ -724,7 +724,7 @@ extension String {
   /// - Complexity: O(`self.count`).
   public mutating func removeAtIndex(i: Index) -> Character {
     return withMutableCharacters {
-      (inout v: CharacterView) in v.removeAtIndex(i)
+      (v: inout CharacterView) in v.removeAtIndex(i)
     }
   }
 
@@ -735,7 +735,7 @@ extension String {
   /// - Complexity: O(`self.count`).
   public mutating func removeRange(subRange: Range<Index>) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.removeRange(subRange)
+      (v: inout CharacterView) in v.removeRange(subRange)
     }
   }
 
@@ -748,7 +748,7 @@ extension String {
   ///   when `self` is going to be grown again.
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.removeAll(keepCapacity: keepCapacity)
+      (v: inout CharacterView) in v.removeAll(keepCapacity: keepCapacity)
     }
   }
 }

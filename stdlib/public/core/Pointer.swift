@@ -49,7 +49,7 @@ public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
->(inout a: [FromElement]) -> (AnyObject?, ToPointer) {
+>(a: inout [FromElement]) -> (AnyObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
 

@@ -120,7 +120,7 @@ func test() {
   print(Bar.staticStoredBar)
   
 
-  func increment(inout x: Int) {
+  func increment(x: inout Int) {
     x += 1
   }
 
