@@ -50,7 +50,7 @@ public struct FlattenGenerator<
   }
 
   internal var _base: Base
-  internal var _inner: Base.Element.Generator? = nil
+  internal var _inner: Base.Element.Generator?
 }
 
 /// A flattened view of a base sequence-of-sequences.
