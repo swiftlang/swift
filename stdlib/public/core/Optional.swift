@@ -76,16 +76,15 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   public // SPI(SwiftExperimental)
-  var _unsafelyUnwrapped: Wrapped {
+  var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     get {
       if let x = self {
         return x
       }
-      _sanityCheckFailure("_unsafelyUnwrapped of nil optional")
+      _sanityCheckFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
   }
-
 }
 
 extension Optional : CustomDebugStringConvertible {
