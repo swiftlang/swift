@@ -23,6 +23,7 @@ internal var IVITakenAddress = 1
 
 // Taking the address of a global should prevent from performing the propagation of its value.
 @inline(never)
+@_semantics("optimize.sil.never")
 public func takeInout<T>(inout x:T) {
 }
 

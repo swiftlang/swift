@@ -5,21 +5,17 @@
     "FlatMap.swift",
     "Map.swift",
     "Join.swift",
-    "Hashing.swift",
     "Sort.swift",
     "Zip.swift",
     "Filter.swift",
     "Repeat.swift",
     "Reverse.swift",
-    "SetAlgebra.swift",
-    "Interval.swift",
-    "Index.swift",
     "Stride.swift"
   ],
   "Array": [
     "ArrayBody.swift",
     "ArrayBuffer.swift",
-    "ArrayBufferType.swift",
+    "ArrayBufferProtocol.swift",
     "ArrayCast.swift",
     "ArrayType.swift",
     "Arrays.swift",
@@ -52,7 +48,7 @@
   ],
   "Bool": [
     "Bool.swift",
-    "BooleanType.swift"
+    "Boolean.swift"
   ],
   "Collection": [
     "Collection.swift",
@@ -64,36 +60,43 @@
     "Slice.swift",
     "SliceBuffer.swift",
     "CollectionOfOne.swift",
-    "HeapBuffer.swift"
-  ],
-  "Sequence": [
+    "HeapBuffer.swift",
     "LazySequence.swift",
     "Sequence.swift",
     "SequenceWrapper.swift",
-    "SequenceAlgorithms.swift"
+    "SequenceAlgorithms.swift",
+    "RangeReplaceableCollection.swift",
+    "Index.swift",
+    "Existential.swift"
   ],
   "C": [
     "BridgeObjectiveC.swift",
     "Builtin.swift",
+    "VarArgs.swift",
     "CTypes.swift"
+  ],
+  "Reflection": [
+    "Mirrors.swift",
+    "Reflection.swift"
   ],
   "Math": [
     "FloatingPoint.swift",
     "FloatingPointOperations.swift",
     "FloatingPointParsing.swift",
     "IntegerArithmetic.swift",
-    "IntegerParsing.swift"
+    "FixedPoint.swift",
+    "IntegerParsing.swift",
+    "SetAlgebra.swift"
   ],
   "Misc": [
+    "Interval.swift",
+    "Hashing.swift",
     "CompilerProtocols.swift",
     "ErrorType.swift",
-    "Existential.swift",
-    "FixedPoint.swift",
     "ImplicitlyUnwrappedOptional.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",
-    "Mirrors.swift",
     "Misc.swift",
     "Optional.swift",
     "OptionSet.swift",
@@ -103,8 +106,6 @@
     "Print.swift",
     "REPL.swift",
     "Range.swift",
-    "RangeReplaceableCollectionType.swift",
-    "Reflection.swift",
     "Runtime.swift",
     "ShadowProtocols.swift",
     "Shims.swift",
@@ -115,7 +116,6 @@
     "Bit.swift",
     "Mirror.swift",
     "Process.swift",
-    "Tuple.swift",
-    "VarArgs.swift"
+    "Tuple.swift"
   ]
 }

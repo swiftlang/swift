@@ -327,29 +327,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Should be after FunctionSignatureOpts and before the last inliner.
   PM.addReleaseDevirtualizer();
 
-  // Run the devirtualizer, specializer, and inliner. If any of these
-  // makes a change we'll end up restarting the function passes on the
-  // current function (after optimizing any new callees).
-  PM.addDevirtualizer();
-  PM.addGenericSpecializer();
-  PM.addLateInliner();
-  AddSimplifyCFGSILCombine(PM);
-  PM.addAllocBoxToStack();
-
-  // The ReleaseDevirtualizer + specialization (in the inliner) can produce
-  // aggregates in specialized deinit functions, which can be lowered.
-  PM.addLowerAggregateInstrs();
-
-  PM.addSROA();
-  PM.addMem2Reg();
-  PM.addCSE();
-  PM.addSILCombine();
-  PM.addJumpThreadSimplifyCFG();
+  AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
   PM.addDeadStoreElimination();
-  PM.addCSE();
-  PM.addLateCodeMotion();
-  PM.addARCSequenceOpts();
-
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 

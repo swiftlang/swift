@@ -235,7 +235,6 @@ class UnicodeTrieGenerator(object):
 
         Don't change parameter values after calling this method.
         """
-
         self.BMP_data_offset_bits = 16 - self.BMP_first_level_index_bits
 
         self.supp_data_offset_bits = \
@@ -319,9 +318,7 @@ class UnicodeTrieGenerator(object):
         """Compress internal trie representation.
 
         Don't mutate the trie after calling this method.
-
         """
-
         def remap_indexes(indexes, old_idx, new_idx):
             def map_index(idx):
                 if idx == old_idx:

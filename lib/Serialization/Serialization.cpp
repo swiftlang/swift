@@ -3604,6 +3604,7 @@ class DeclGroupNameContext {
         return NullGroupName;
       StringRef FileName = llvm::sys::path::filename(FullPath);
       auto Found = pMap->find(FileName);
+      assert(Found != pMap->end() && "A source file is not grouped.");
       return Found == pMap->end() ? NullGroupName : Found->second;
     }
   };

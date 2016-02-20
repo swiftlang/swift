@@ -29,7 +29,7 @@ public struct LazyMapIterator<
   public var base: Base { return _base }
   
   internal var _base: Base
-  internal var _transform: (Base.Element) -> Element
+  internal let _transform: (Base.Element) -> Element
 }
 
 /// A `Sequence` whose elements consist of those in a `Base`
@@ -62,9 +62,9 @@ public struct LazyMapSequence<Base : Sequence, Element>
     self._base = _base
     self._transform = transform
   }
-  
+
   internal var _base: Base
-  internal var _transform: (Base.Iterator.Element) -> Element
+  internal let _transform: (Base.Iterator.Element) -> Element
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -121,9 +121,9 @@ public struct LazyMapCollection<Base : Collection, Element>
     self._base = _base
     self._transform = transform
   }
-  
+
   internal var _base: Base
-  internal var _transform: (Base.Iterator.Element) -> Element
+  internal let _transform: (Base.Iterator.Element) -> Element
 }
 
 //===--- Support for s.lazy -----------------------------------------------===//
