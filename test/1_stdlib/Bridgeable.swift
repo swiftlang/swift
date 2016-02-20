@@ -49,13 +49,13 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     x: C,
     inout result: BridgedValueType?
   ) {
-    _requirementFailure("implement")
+    _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: C,
     inout result: BridgedValueType?
   ) -> Bool {
-    _requirementFailure("implement")
+    _preconditionFailure("implement")
   }
 }
 
@@ -89,13 +89,13 @@ struct ConditionallyBridged<T> : _ObjectiveCBridgeable {
     x: C,
     inout result: ConditionallyBridged<T>?
   ) {
-    _requirementFailure("implement")
+    _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: C,
     inout result: ConditionallyBridged<T>?
   ) -> Bool {
-    _requirementFailure("implement")
+    _preconditionFailure("implement")
   }
   static func _isBridgedToObjectiveC() -> Bool {
     return ((T.self as Any) as? String.Type) == nil

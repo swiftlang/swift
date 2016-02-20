@@ -383,8 +383,8 @@ public struct ${Self}<Element>
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
   internal func _checkIndex(index: Int) {
-    _require(index <= endIndex, "${Self} index out of range")
-    _require(index >= startIndex, "Negative ${Self} index is out of range")
+    _precondition(index <= endIndex, "${Self} index out of range")
+    _precondition(index >= startIndex, "Negative ${Self} index is out of range")
   }
 
   @warn_unused_result
@@ -526,7 +526,7 @@ extension ${Self} : _ArrayProtocol {
 
   /// Construct a ${Self} of `count` uninitialized elements.
   internal init(_uninitializedCount count: Int) {
-    _require(count >= 0, "Can't construct ${Self} with count < 0")
+    _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     // Note: Sinking this constructor into an else branch below causes an extra
     // Retain/Release.
     _buffer = _Buffer()
@@ -717,7 +717,7 @@ extension ${Self} : _ArrayProtocol {
   ///
   /// - Requires: `!isEmpty`.
   public mutating func removeLast() -> Element {
-    _require(count > 0, "can't removeLast from an empty ${Self}")
+    _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let i = count
     // We don't check for overflow in `i - 1` because `i` is known to be
     // positive.
@@ -883,7 +883,7 @@ extension ${Self} {
 
     // Put the working array back before returning.
     defer {
-      _require(
+      _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
@@ -968,10 +968,10 @@ extension ${Self} {
   >(
     subRange: Range<Int>, with newElements: C
   ) {
-    _require(subRange.startIndex >= self._buffer.startIndex,
+    _precondition(subRange.startIndex >= self._buffer.startIndex,
       "${Self} replace: subRange start is negative")
 
-    _require(subRange.endIndex <= self._buffer.endIndex,
+    _precondition(subRange.endIndex <= self._buffer.endIndex,
       "${Self} replace: subRange extends past the end")
 
     let oldCount = self._buffer.count

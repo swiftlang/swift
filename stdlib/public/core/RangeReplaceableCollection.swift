@@ -230,7 +230,7 @@ extension RangeReplaceableCollection {
   }
 
   public mutating func remove(at index: Index) -> Iterator.Element {
-    _require(!isEmpty, "can't remove from an empty collection")
+    _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
     replaceSubrange(index...index, with: EmptyCollection())
     return result
@@ -242,15 +242,15 @@ extension RangeReplaceableCollection {
 
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
-    _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it has")
     let end = startIndex.advanced(by: numericCast(n))
     removeSubrange(startIndex..<end)
   }
 
   public mutating func removeFirst() -> Iterator.Element {
-    _require(!isEmpty,
+    _precondition(!isEmpty,
       "can't remove first element from an empty collection")
     let firstElement = first!
     removeFirst(1)
@@ -275,7 +275,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`.
   public mutating func removeFirst() -> Iterator.Element {
-    _require(!isEmpty, "can't remove items from an empty collection")
+    _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
     self = self[startIndex.successor()..<endIndex]
     return element
@@ -287,8 +287,8 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// - Requires: `self.count >= n`.
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
-    _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
     self = self[startIndex.advanced(by: numericCast(n))..<endIndex]
   }
@@ -331,7 +331,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`
   public mutating func removeLast() -> Iterator.Element {
-    _require(!isEmpty, "can't remove last element from an empty collection")
+    _precondition(!isEmpty, "can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
       return result
     }
@@ -344,8 +344,8 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
   /// - Requires: `n >= 0 && self.count >= n`.
   public mutating func removeLast(n: Int) {
     if n == 0 { return }
-    _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
     if _customRemoveLast(n) {
       return

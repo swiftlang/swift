@@ -62,7 +62,7 @@ public struct EmptyCollection<Element> : Collection {
   ///
   /// Should never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
-    _requirementFailure("Index out of range")
+    _preconditionFailure("Index out of range")
   }
 
   /// The number of elements (always zero).

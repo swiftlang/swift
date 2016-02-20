@@ -66,7 +66,7 @@ public struct CollectionOfOne<Element> : Collection {
   ///
   /// - Requires: `position == 0`.
   public subscript(position: Int) -> Element {
-    _require(position == 0, "Index out of range")
+    _precondition(position == 0, "Index out of range")
     return _element
   }
 

@@ -14,7 +14,7 @@
 ///
 /// Use this function for internal sanity checks that are active
 /// during testing but do not impact performance of shipping code.
-/// To check for invalid usage in Release builds; see `require`.
+/// To check for invalid usage in Release builds; see `precondition`.
 ///
 /// * In playgrounds and -Onone builds (the default for Xcode's Debug
 ///   configuration): if `condition` evaluates to false, stop program
@@ -59,7 +59,7 @@ public func assert(
 ///   to satisfy that assumption in -Ounchecked builds is a serious
 ///   programming error.
 @_transparent
-public func require(
+public func precondition(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
   file: StaticString = #file, line: UInt = #line
@@ -83,7 +83,7 @@ public func require(
 /// reach the call (e.g. in the `default` case of a `switch` where you
 /// have knowledge that one of the other cases must be satisfied). To
 /// protect code from invalid usage in Release builds; see
-/// `requirementFailure`.
+/// `preconditionFailure`.
 ///
 /// * In playgrounds and -Onone builds (the default for Xcode's Debug
 ///   configuration) stop program execution in a debuggable state
@@ -124,7 +124,7 @@ public func assertionFailure(
 ///   function will never be called. Failure to satisfy that assumption
 ///   is a serious programming error.
 @_transparent @noreturn
-public func requirementFailure(
+public func preconditionFailure(
   @autoclosure message: () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -155,7 +155,7 @@ public func fatalError(
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
 @_transparent
-public func _require(
+public func _precondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -172,11 +172,11 @@ public func _require(
 }
 
 @_transparent @noreturn
-public func _requirementFailure(
+public func _preconditionFailure(
   message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  _require(false, message, file: file, line: line)
+  _precondition(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }
 
@@ -227,7 +227,7 @@ public func _stdlibAssertionFailure(
   message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line) {
   if _isDebugAssertConfiguration() {
-    _require(false, message, file: file, line: line)
+    _precondition(false, message, file: file, line: line)
   }
   _conditionallyUnreachable()
 }
@@ -258,22 +258,4 @@ public func _sanityCheckFailure(
 ) {
   _sanityCheck(false, message, file: file, line: line)
   _conditionallyUnreachable()
-}
-
-
-@available(*, unavailable, renamed="require")
-public func precondition(
-  @autoclosure condition: () -> Bool,
-  @autoclosure _ message: () -> String = String(),
-  file: StaticString = #file, line: UInt = #line
-) {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="requirementFailure")
-public func preconditionFailure(
-  @autoclosure message: () -> String = String(),
-  file: StaticString = #file, line: UInt = #line
-) {
-  fatalError("unavailable function can't be called")
 }

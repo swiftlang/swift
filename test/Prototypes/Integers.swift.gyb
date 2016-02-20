@@ -114,7 +114,7 @@ public func _assertCond(
   file: StaticString = #file, line: UInt = #line) {
   let ok = condition()
   if _isDebugAssertConfiguration() {
-    require(ok, message, file: file, line: line)
+    precondition(ok, message, file: file, line: line)
   }
   Builtin.condfail((!ok).__value)
 }
@@ -533,7 +533,7 @@ extension FixedWidthIntegerType {
     
     if (overflow != .none) {
       if (_isDebugAssertConfiguration()) {
-        _requirementFailure("overflow in unsafe${capitalize(x.name)}")
+        _preconditionFailure("overflow in unsafe${capitalize(x.name)}")
       }
       else {
         Builtin.conditionallyUnreachable()
@@ -572,7 +572,7 @@ extension FixedWidthIntegerType {
 
   @_transparent
   public func uword(n: Word) -> UWord {
-    _require(n >= 0, "Negative word index")
+    _precondition(n >= 0, "Negative word index")
     if _fastPath(n < countRepresentedWords) {
       let shift = UWord(n._storage) &* ${word_bits}
       let bitWidth = UWord(Self.bitWidth._storage)

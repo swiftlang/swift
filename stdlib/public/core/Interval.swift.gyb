@@ -72,7 +72,7 @@ public struct ${Self}<Bound : Comparable>
   ///
   /// - Requires: `start <= end`.
   internal init(_start: Bound, end: Bound) {
-    _require(end >= _start, "Invalid ${Self} bounds (end < start)")
+    _precondition(end >= _start, "Invalid ${Self} bounds (end < start)")
     self._start = _start
     self._end = end
   }

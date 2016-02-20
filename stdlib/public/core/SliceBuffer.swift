@@ -216,7 +216,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
   internal func _checkValidSubscript(index : Int) {
-    _require(
+    _precondition(
       index >= startIndex && index < endIndex, "Index out of bounds")
   }
 

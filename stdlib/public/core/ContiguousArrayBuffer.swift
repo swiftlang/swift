@@ -364,7 +364,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// `0 ≤ index < count`.
   @inline(__always)
   func _checkValidSubscript(index : Int) {
-    _require(
+    _precondition(
       (index >= 0) && (index < __bufferPointer.value.count),
       "Index out of range"
     )

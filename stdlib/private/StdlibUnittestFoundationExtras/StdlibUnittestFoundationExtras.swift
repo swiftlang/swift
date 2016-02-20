@@ -28,13 +28,13 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
 ) -> Result {
   let oldMethod = class_getClassMethod(
     NSLocale.self, #selector(NSLocale.current))
-  require(oldMethod != nil, "could not find +[NSLocale currentLocale]")
+  precondition(oldMethod != nil, "could not find +[NSLocale currentLocale]")
 
   let newMethod = class_getClassMethod(
     NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale))
-  require(newMethod != nil, "could not find +[NSLocale _swiftUnittest_currentLocale]")
+  precondition(newMethod != nil, "could not find +[NSLocale _swiftUnittest_currentLocale]")
 
-  require(_temporaryNSLocaleCurrentLocale == nil,
+  precondition(_temporaryNSLocaleCurrentLocale == nil,
     "nested calls to withOverriddenNSLocaleCurrentLocale are not supported")
 
   _temporaryNSLocaleCurrentLocale = temporaryLocale
@@ -50,7 +50,7 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
   temporaryLocaleIdentifier: String,
   @noescape _ body: () -> Result
 ) -> Result {
-  require(
+  precondition(
     NSLocale.availableLocaleIdentifiers().contains(temporaryLocaleIdentifier),
     "requested locale \(temporaryLocaleIdentifier) is not available")
 

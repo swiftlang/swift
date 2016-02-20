@@ -120,7 +120,7 @@ extension String {
   public init<T : _SignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
-    _require(radix > 1, "Radix must be greater than 1")
+    _precondition(radix > 1, "Radix must be greater than 1")
     self = _int64ToString(
       v.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
@@ -132,7 +132,7 @@ extension String {
   public init<T : UnsignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
-    _require(radix > 1, "Radix must be greater than 1")
+    _precondition(radix > 1, "Radix must be greater than 1")
     self = _uint64ToString(
       v.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
   }

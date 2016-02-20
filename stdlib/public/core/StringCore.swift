@@ -268,11 +268,11 @@ public struct _StringCore {
 
   /// Returns the given sub-`_StringCore`.
   public subscript(bounds: Range<Int>) -> _StringCore {
-    _require(
+    _precondition(
       bounds.startIndex >= 0,
       "subscript: subrange start precedes String start")
 
-    _require(
+    _precondition(
       bounds.endIndex <= count,
       "subscript: subrange extends past String end")
 
@@ -305,11 +305,11 @@ public struct _StringCore {
 
   /// Get the Nth UTF-16 Code Unit stored.
   public subscript(position: Int) -> UTF16.CodeUnit {
-    _require(
+    _precondition(
       position >= 0,
       "subscript: index precedes String start")
 
-    _require(
+    _precondition(
       position <= count,
       "subscript: index points past String end")
 
@@ -583,11 +583,11 @@ extension _StringCore : RangeReplaceableCollection {
   >(
     bounds: Range<Int>, with newElements: C
   ) {
-    _require(
+    _precondition(
       bounds.startIndex >= 0,
       "replaceSubrange: subrange start precedes String start")
 
-    _require(
+    _precondition(
       bounds.endIndex <= count,
       "replaceSubrange: subrange extends past String end")
 

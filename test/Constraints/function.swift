@@ -42,7 +42,7 @@ testArgumentShuffle(third: 1, 2)
 
 func rejectsAssertStringLiteral() {
   assert("foo") // expected-error {{cannot convert value of type 'String' to expected argument type 'Bool'}}
-  require("foo") // expected-error {{cannot convert value of type 'String' to expected argument type 'Bool'}}
+  precondition("foo") // expected-error {{cannot convert value of type 'String' to expected argument type 'Bool'}}
 }
 
 

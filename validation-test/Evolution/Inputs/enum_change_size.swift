@@ -20,7 +20,7 @@ public struct ChangeSize {
 #if BEFORE
     return _value.value
 #else
-    require(_value1 == _value2, "state corrupted")
+    precondition(_value1 == _value2, "state corrupted")
     return Int(_value1)
 #endif
   }

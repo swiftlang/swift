@@ -30,9 +30,9 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   // are @noreturn.
   switch i {
   case 2:
-    requirementFailure("cannot happen")
+    preconditionFailure("cannot happen")
   case 3:
-    _requirementFailure("cannot happen")
+    _preconditionFailure("cannot happen")
   case 4:
     _stdlibAssertionFailure("cannot happen")
   case 5:
@@ -93,19 +93,19 @@ Assert.test("assertionFailure/StringInterpolation")
   assertionFailure("this \(should) fail")
 }
 
-Assert.test("require")
+Assert.test("precondition")
   .xfail(.Custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   var x = 2
-  require(x * 21 == 42, "should not fail")
+  precondition(x * 21 == 42, "should not fail")
   expectCrashLater()
-  require(x == 42, "this should fail")
+  precondition(x == 42, "this should fail")
 }
 
-Assert.test("require/StringInterpolation")
+Assert.test("precondition/StringInterpolation")
   .xfail(.Custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
@@ -113,22 +113,22 @@ Assert.test("require/StringInterpolation")
   .code {
   var should = "should"
   var x = 2
-  require(x * 21 == 42, "\(should) not fail")
+  precondition(x * 21 == 42, "\(should) not fail")
   expectCrashLater()
-  require(x == 42, "this \(should) fail")
+  precondition(x == 42, "this \(should) fail")
 }
 
-Assert.test("requirementFailure")
+Assert.test("preconditionFailure")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   expectCrashLater()
-  requirementFailure("this should fail")
+  preconditionFailure("this should fail")
 }
 
-Assert.test("requirementFailure/StringInterpolation")
+Assert.test("preconditionFailure/StringInterpolation")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
@@ -136,7 +136,7 @@ Assert.test("requirementFailure/StringInterpolation")
   .code {
   var should = "should"
   expectCrashLater()
-  requirementFailure("this \(should) fail")
+  preconditionFailure("this \(should) fail")
 }
 
 Assert.test("fatalError")
@@ -154,26 +154,26 @@ Assert.test("fatalError/StringInterpolation")
   fatalError("this \(should) fail")
 }
 
-Assert.test("_require")
+Assert.test("_precondition")
   .xfail(.Custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   var x = 2
-  _require(x * 21 == 42, "should not fail")
+  _precondition(x * 21 == 42, "should not fail")
   expectCrashLater()
-  _require(x == 42, "this should fail")
+  _precondition(x == 42, "this should fail")
 }
 
-Assert.test("_requirementFailure")
+Assert.test("_preconditionFailure")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   expectCrashLater()
-  _requirementFailure("this should fail")
+  _preconditionFailure("this should fail")
 }
 
 Assert.test("_stdlibAssert")

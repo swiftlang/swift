@@ -24,7 +24,7 @@ extension String {
   ///
   /// - Requires: `cString != nil`
   public init(cString: UnsafePointer<CChar>) {
-    _require(cString != nil, "cString must not be nil")
+    _precondition(cString != nil, "cString must not be nil")
     self = String.decodeCString(UnsafePointer(cString), as: UTF8.self,
       repairingInvalidCodeUnits: true)!.result
   }
@@ -37,7 +37,7 @@ extension String {
   ///
   /// - Requires: `cString != nil`
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
-    _require(cString != nil, "cString must not be nil")
+    _precondition(cString != nil, "cString must not be nil")
     guard let (result, _) = String.decodeCString(
       UnsafePointer(cString),
         as: UTF8.self,

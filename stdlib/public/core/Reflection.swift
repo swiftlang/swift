@@ -355,7 +355,7 @@ struct _OpaqueMirror : _Mirror {
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
   subscript(i: Int) -> (String, _Mirror) {
-    _requirementFailure("no children")
+    _preconditionFailure("no children")
   }
   var summary: String { return data.summary }
   var quickLookObject: PlaygroundQuickLook? { return nil }
@@ -522,7 +522,7 @@ struct _MetatypeMirror : _Mirror {
     return 0
   }
   subscript(i: Int) -> (String, _Mirror) {
-    _requirementFailure("no children")
+    _preconditionFailure("no children")
   }
   var summary: String {
     return _typeName(data._loadValue() as Any.Type)

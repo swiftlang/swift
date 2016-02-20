@@ -21,7 +21,7 @@ public struct Repeated<Element> : Collection {
   /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
   internal init(_repeating repeatedValue: Element, count: Int) {
-    _require(count >= 0, "Repetition count should be non-negative")
+    _precondition(count >= 0, "Repetition count should be non-negative")
     self.count = count
     self.repeatedValue = repeatedValue
   }
@@ -43,7 +43,7 @@ public struct Repeated<Element> : Collection {
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
-    _require(position >= 0 && position < count, "Index out of range")
+    _precondition(position >= 0 && position < count, "Index out of range")
     return repeatedValue
   }
 

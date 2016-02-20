@@ -330,7 +330,7 @@ extension Collection {
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
-    _require(n >= 0, "Can't drop a negative number of elements from a collection")
+    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = startIndex.advanced(by: numericCast(n), limit: endIndex)
     return self[start..<endIndex]
   }
@@ -341,7 +341,7 @@ extension Collection {
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
-    _require(
+    _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
     let end = startIndex.advanced(by: numericCast(amount), limit: endIndex)
@@ -358,7 +358,7 @@ extension Collection {
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
   public func prefix(maxLength: Int) -> SubSequence {
-    _require(
+    _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
     let end = startIndex.advanced(by: numericCast(maxLength), limit: endIndex)
@@ -375,7 +375,7 @@ extension Collection {
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
-    _require(
+    _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let amount = Swift.max(0, numericCast(count) - maxLength)
@@ -429,7 +429,7 @@ extension Collection {
     omittingEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
-    _require(maxSplits >= 0, "Must take zero or more splits")
+    _precondition(maxSplits >= 0, "Must take zero or more splits")
 
     var result: [SubSequence] = []
     var subSequenceStart: Index = startIndex
@@ -507,7 +507,7 @@ extension Collection where Index : BidirectionalIndex {
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
-    _require(
+    _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let end = endIndex.advanced(by: numericCast(-n), limit: startIndex)
     return self[startIndex..<end]
@@ -523,7 +523,7 @@ extension Collection where Index : BidirectionalIndex {
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
-    _require(
+    _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let start = endIndex.advanced(by: numericCast(-maxLength), limit: startIndex)
@@ -537,7 +537,7 @@ extension Collection where SubSequence == Self {
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`.
   public mutating func removeFirst() -> Iterator.Element {
-    _require(!isEmpty, "can't remove items from an empty collection")
+    _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
     self = self[startIndex.successor()..<endIndex]
     return element
@@ -551,8 +551,8 @@ extension Collection where SubSequence == Self {
   /// - Requires: `n >= 0 && self.count >= n`.
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
-    _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
     self = self[startIndex.advanced(by: numericCast(n))..<endIndex]
   }
@@ -581,8 +581,8 @@ extension Collection
   /// - Requires: `n >= 0 && self.count >= n`.
   public mutating func removeLast(n: Int) {
     if n == 0 { return }
-    _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
     self = self[startIndex..<endIndex.advanced(by: numericCast(-n))]
   }
@@ -722,10 +722,10 @@ internal func _writeBackMutableSlice<
     newElementIndex._successorInPlace()
   }
 
-  _require(
+  _precondition(
     selfElementIndex == selfElementsEndIndex,
     "Cannot replace a slice of a MutableCollection with a slice of a larger size")
-  _require(
+  _precondition(
     newElementIndex == newElementsEndIndex,
     "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
 }

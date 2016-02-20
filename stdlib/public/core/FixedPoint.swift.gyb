@@ -578,10 +578,10 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % if signed:
-  _require(U${Self}(rhs) < U${Self}._sizeInBits,
+  _precondition(U${Self}(rhs) < U${Self}._sizeInBits,
       "shift amount is larger than type size in bits")
 % else:
-  _require(rhs < ${Self}._sizeInBits,
+  _precondition(rhs < ${Self}._sizeInBits,
       "shift amount is larger than type size in bits")
 % end
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs._value, rhs._value))

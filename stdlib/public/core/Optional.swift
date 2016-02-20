@@ -113,7 +113,7 @@ func _doesOptionalHaveValueAsBool<Wrapped>(v: Wrapped?) -> Bool {
 @_transparent
 public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional() {
-  _requirementFailure(
+  _preconditionFailure(
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 
@@ -124,7 +124,7 @@ func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   case let x?:
     return x
   case .none:
-    _requirementFailure(
+    _preconditionFailure(
       "unexpectedly found nil while unwrapping an Optional value")
   }
 }

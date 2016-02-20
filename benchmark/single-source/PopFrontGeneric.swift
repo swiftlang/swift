@@ -23,11 +23,11 @@ func _arrayReplace<B: _ArrayBufferProtocol, C: Collection
   >(
   inout target: B, _ subRange: Range<Int>, _ newValues: C
 ) {
-  _require(
+  _precondition(
     subRange.startIndex >= 0,
     "Array replace: subRange start is negative")
 
-  _require(
+  _precondition(
     subRange.endIndex <= target.endIndex,
     "Array replace: subRange extends past the end")
 
@@ -40,7 +40,7 @@ func _arrayReplace<B: _ArrayBufferProtocol, C: Collection
     target.replace(subRange: subRange, with: insertCount, elementsOf: newValues)
   }
   else {
-    _requirementFailure("Should not get here?")
+    _preconditionFailure("Should not get here?")
   }
 }
 

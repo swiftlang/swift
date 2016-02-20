@@ -42,7 +42,7 @@ for case let i? in OptionalArr where i != 3 {
 // CHECK-NEXT: 5
 
 print("guard top level")
-guard let guardvalue = Optional(42) else { requirementFailure() }
+guard let guardvalue = Optional(42) else { preconditionFailure() }
 print(guardvalue)
 
 // CHECK-LABEL: guard top level

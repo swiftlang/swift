@@ -318,7 +318,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     minimumCapacity: Int
   ) {
     ManagedBufferPointer._checkValidBufferClass(bufferClass, creating: true)
-    _require(
+    _precondition(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
 

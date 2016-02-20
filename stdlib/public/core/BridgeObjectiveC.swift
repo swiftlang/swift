@@ -151,7 +151,7 @@ public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
 @warn_unused_result
 public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
   let optResult: AnyObject? = _bridgeToObjectiveC(x)
-  _require(optResult != nil,
+  _precondition(optResult != nil,
       "value failed to bridge from Swift type to a Objective-C type")
   return optResult!
 }
@@ -165,7 +165,7 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
     return unsafeBitCast(x, to: AnyObject.self)
   }
   guard let bridged = _bridgeNonVerbatimToObjectiveC(x) else {
-    _requirementFailure(
+    _preconditionFailure(
       "Dictionary key failed to bridge from Swift type to a Objective-C type")
   }
 

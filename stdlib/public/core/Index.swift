@@ -89,7 +89,7 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// The range check, if performed, is equivalent to:
   ///
-  ///     require(bounds.contains(index))
+  ///     precondition(bounds.contains(index))
   ///
   /// Use this function to perform a cheap range check for QoI purposes when
   /// memory safety is not a concern.  Do not rely on this range check for
@@ -107,10 +107,10 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// The range check, if performed, is equivalent to:
   ///
-  ///     require(
+  ///     precondition(
   ///       bounds.contains(range.startIndex) ||
   ///       range.startIndex == bounds.endIndex)
-  ///     require(
+  ///     precondition(
   ///       bounds.contains(range.endIndex) ||
   ///       range.endIndex == bounds.endIndex)
   ///
@@ -199,7 +199,7 @@ extension ForwardIndex {
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance) -> Self {
-    _require(n >= 0,
+    _precondition(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
     var i : Distance = 0
@@ -214,7 +214,7 @@ extension ForwardIndex {
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
-    _require(n >= 0,
+    _precondition(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
     var i : Distance = 0
@@ -357,10 +357,10 @@ public protocol RandomAccessIndex : BidirectionalIndex, Strideable,
 
 extension RandomAccessIndex {
   public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
-    _require(
+    _precondition(
       bounds.startIndex <= index,
       "index is out of bounds: index designates a position before bounds.startIndex")
-    _require(
+    _precondition(
       index < bounds.endIndex,
       "index is out of bounds: index designates the bounds.endIndex position or a position after it")
   }
@@ -373,17 +373,17 @@ extension RandomAccessIndex {
   ) {
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd
-    _require(
+    _precondition(
       bounds.startIndex <= range.startIndex,
       "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
-    _require(
+    _precondition(
       bounds.startIndex <= range.endIndex,
       "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
 
-    _require(
+    _precondition(
       range.startIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
-    _require(
+    _precondition(
       range.endIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }

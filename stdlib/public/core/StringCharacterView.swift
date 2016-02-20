@@ -93,7 +93,7 @@ extension String.CharacterView : Collection {
     ///
     /// - Requires: The next value is representable.
     public func successor() -> Index {
-      _require(_base != _base._viewEndIndex, "cannot increment endIndex")
+      _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
       return Index(_base: _endBase)
     }
 
@@ -101,7 +101,7 @@ extension String.CharacterView : Collection {
     ///
     /// - Requires: The previous value is representable.
     public func predecessor() -> Index {
-      _require(_base != _base._viewStartIndex,
+      _precondition(_base != _base._viewStartIndex,
           "cannot decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)

@@ -50,7 +50,7 @@ public func _bridgeErrorProtocolToNSError(error: ErrorProtocol) -> AnyObject
 /// throws an error.
 @_silgen_name("swift_unexpectedError")
 public func _unexpectedError(error: ErrorProtocol) {
-  requirementFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
+  preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.

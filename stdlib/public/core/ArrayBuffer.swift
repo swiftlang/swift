@@ -171,13 +171,13 @@ extension _ArrayBuffer {
   internal func _typeCheckSlowPath(index: Int) {
     if _fastPath(_isNative) {
       let element: AnyObject = cast(toBufferOf: AnyObject.self)._native[index]
-      _require(
+      _precondition(
         element is Element,
         "Down-casted Array element failed to match the target type")
     }
     else {
       let ns = _nonNative
-      _require(
+      _precondition(
         ns.objectAt(index) is Element,
         "NSArray element failed to match the Swift Array Element type")
     }
@@ -305,7 +305,7 @@ extension _ArrayBuffer {
   /// Because the optimizer can hoist the original check it might have
   /// been invalidated by illegal user code.
   internal func _checkInoutAndNativeBounds(index: Int, wasNative: Bool) {
-    _require(
+    _precondition(
       _isNative == wasNative,
       "inout rules were violated: the array was overwritten")
 
@@ -325,7 +325,7 @@ extension _ArrayBuffer {
   internal func _checkInoutAndNativeTypeCheckedBounds(
     index: Int, wasNativeTypeChecked: Bool
   ) {
-    _require(
+    _precondition(
       _isNativeTypeChecked == wasNativeTypeChecked,
       "inout rules were violated: the array was overwritten")
 
@@ -362,13 +362,13 @@ extension _ArrayBuffer {
       _native._checkValidSubscript(i)
       
       element = cast(toBufferOf: AnyObject.self)._native[i]
-      _require(
+      _precondition(
         element is Element,
         "Down-casted Array element failed to match the target type")
     } else {
       // ObjC arrays do their own subscript checking.
       element = _nonNative.objectAt(i)
-      _require(
+      _precondition(
         element is Element,
         "NSArray element failed to match the Swift Array Element type")
     }

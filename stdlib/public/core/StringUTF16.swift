@@ -51,7 +51,7 @@ extension String {
     ///   `position != endIndex`.
     public subscript(i: Index) -> UTF16.CodeUnit {
       let position = i._offset
-      _require(position >= 0 && position < _length,
+      _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
       let index = _toInternalIndex(position)
@@ -237,7 +237,7 @@ extension String.UTF16View.Index {
   ) {
     let core = utf16._core
 
-    _require(
+    _precondition(
       utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
       "Invalid String.UTF8Index for this UTF-16 view")
 

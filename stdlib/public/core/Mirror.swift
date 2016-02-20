@@ -425,7 +425,7 @@ extension Mirror {
           by: offset, limit: children.endIndex)
       }
       else {
-        _requirementFailure(
+        _preconditionFailure(
           "Someone added a conformance to MirrorPath; that privilege is reserved to the standard library")
       }
       if position == children.endIndex { return nil }
@@ -448,7 +448,7 @@ extension Mirror.DisplayStyle {
     case .IndexContainer: self = .collection
     case .KeyContainer: self = .dictionary
     case .MembershipContainer: self = .`set`
-    case .Container: requirementFailure("unused!")
+    case .Container: preconditionFailure("unused!")
     case .Optional: self = .optional
     case .ObjCObject: self = .`class`
     }

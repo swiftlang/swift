@@ -113,7 +113,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
   
   func append(x: T) {
     let count = self.count
-    require(count + 2 <= myCapacity)
+    precondition(count + 2 <= myCapacity)
     
     withUnsafeMutablePointerToElements {
       (p: UnsafeMutablePointer<T>) -> () in

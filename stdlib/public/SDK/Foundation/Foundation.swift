@@ -482,7 +482,7 @@ extension Array : _ObjectiveCBridgeable {
     source: NSArray,
     inout result: Array?
   ) {
-    _require(
+    _precondition(
       Swift._isBridgedToObjectiveC(Element.self),
       "array element type is not bridged to Objective-C")
 
