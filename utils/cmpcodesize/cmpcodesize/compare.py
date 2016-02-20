@@ -12,9 +12,10 @@ from __future__ import print_function
 
 import re
 import os
-import subprocess
 import collections
 from operator import itemgetter
+
+from cmpcodesize import otool, regex
 
 Prefixes = {
     # Cpp
@@ -76,44 +77,27 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
         sizes[function] += size
 
 
-def flatten(*args):
-    for x in args:
-        if hasattr(x, '__iter__'):
-            for y in flatten(*x):
-                yield y
-        else:
-            yield x
-
-
 def readSizes(sizes, fileName, functionDetails, groupByPrefix):
     # Check if multiple architectures are supported by the object file.
     # Prefer arm64 if available.
-    architectures = subprocess.check_output(["otool", "-V", "-f", fileName]).split("\n")
-    arch = None
-    archPattern = re.compile('architecture ([\S]+)')
-    for architecture in architectures:
-        archMatch = archPattern.match(architecture)
-        if archMatch:
-            if arch is None:
-                arch = archMatch.group(1)
-            if "arm64" in arch:
-                arch = "arm64"
-    if arch is not None:
-      archParams = ["-arch", arch]
-    else:
-      archParams = []
-
+    fat_headers = otool.fat_headers(fileName)
+    architecture = regex.architecture(fat_headers)
     if functionDetails:
-        content = subprocess.check_output(flatten(["otool", archParams, "-l", "-v", "-t", fileName])).split("\n")
-        content += subprocess.check_output(flatten(["otool", archParams, "-v", "-s", "__TEXT", "__textcoal_nt", fileName])).split("\n")
+        content = otool.load_commands(fileName,
+                                      architecture=architecture,
+                                      include_text_sections=True).split('\n')
+        content += otool.text_sections(fileName,
+                                       architecture=architecture).split('\n')
     else:
-        content = subprocess.check_output(flatten(["otool", archParams, "-l", fileName])).split("\n")
+        content = otool.load_commands(fileName,
+                                      architecture=architecture).split('\n')
 
     sectName = None
     currFunc = None
     startAddr = None
     endAddr = None
 
+    # FIXME: Move re calls into cmpcodesize.regex module.
     sectionPattern = re.compile(' +sectname ([\S]+)')
     sizePattern = re.compile(' +size ([\da-fx]+)')
     asmlinePattern = re.compile('^([0-9a-fA-F]+)\s')
