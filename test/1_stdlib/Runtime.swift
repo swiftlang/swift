@@ -507,7 +507,9 @@ Reflection.test("Struct/NonGeneric/DefaultMirror") {
     expectEqual("▿ a.StructWithDefaultMirror\n  - s: \"456\"\n", output)
   }
 
-  expectEqual(.Struct, Mirror(reflecting: StructWithDefaultMirror("")).displayStyle)
+  expectEqual(
+    .`struct`,
+    Mirror(reflecting: StructWithDefaultMirror("")).displayStyle)
 }
 
 struct GenericStructWithDefaultMirror<T, U> {
@@ -1016,7 +1018,7 @@ Reflection.test("TupleMirror") {
 
     expectEqual(expected, output)
 
-    expectEqual(.Tuple, Mirror(reflecting: tuple).displayStyle)
+    expectEqual(.tuple, Mirror(reflecting: tuple).displayStyle)
   }
 
   do {
@@ -1055,7 +1057,7 @@ Reflection.test("TupleMirror") {
 class DullClass {}
 
 Reflection.test("ClassReflection") {
-  expectEqual(.Class, Mirror(reflecting: DullClass()).displayStyle)
+  expectEqual(.`class`, Mirror(reflecting: DullClass()).displayStyle)
 }
 
 Reflection.test("String/Mirror") {

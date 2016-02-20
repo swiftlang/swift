@@ -100,13 +100,13 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
 
   if let displayStyle = mirror.displayStyle {
     switch displayStyle {
-      case .Optional:
+      case .optional:
         if let child = mirror.children.first {
           _debugPrint_unlocked(child.1, &target)
         } else {
           _debugPrint_unlocked("nil", &target)
         }
-      case .Tuple:
+      case .tuple:
         target.write("(")
         var first = true
         for (_, value) in mirror.children {
@@ -118,7 +118,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
           _debugPrint_unlocked(value, &target)
         }
         target.write(")")
-      case .Struct:
+      case .`struct`:
         printTypeName(mirror.subjectType)
         target.write("(")
         var first = true
@@ -135,7 +135,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
           }
         }
         target.write(")")
-      case .Enum:
+      case .`enum`:
         let cString = _getEnumCaseName(value)
         if cString != nil, let caseName = String(validatingUTF8: cString) {
           // Write the qualified type name in debugPrint.
@@ -149,7 +149,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
           printTypeName(mirror.subjectType)
         }
         if let (_, value) = mirror.children.first {
-          if (Mirror(reflecting: value).displayStyle == .Tuple) {
+          if (Mirror(reflecting: value).displayStyle == .tuple) {
             _debugPrint_unlocked(value, &target)
           } else {
             target.write("(")
@@ -260,24 +260,24 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
   if let displayStyle = mirror.displayStyle {
     // Containers and tuples are always displayed in terms of their element count
     switch displayStyle {
-      case .Tuple:
-        let count = mirror.children.count
-        target.write(count == 1 ? "(1 element)" : "(\(count) elements)")
-        return
-      case .Collection:
-        let count = mirror.children.count
-        target.write(count == 1 ? "1 element" : "\(count) elements")
-        return
-      case .Dictionary:
-        let count = mirror.children.count
-        target.write(count == 1 ? "1 key/value pair" : "\(count) key/value pairs")
-        return
-      case .Set:
-        let count = mirror.children.count
-        target.write(count == 1 ? "1 member" : "\(count) members")
-        return
-      default:
-        break
+    case .tuple:
+      let count = mirror.children.count
+      target.write(count == 1 ? "(1 element)" : "(\(count) elements)")
+      return
+    case .collection:
+      let count = mirror.children.count
+      target.write(count == 1 ? "1 element" : "\(count) elements")
+      return
+    case .dictionary:
+      let count = mirror.children.count
+      target.write(count == 1 ? "1 key/value pair" : "\(count) key/value pairs")
+      return
+    case .`set`:
+      let count = mirror.children.count
+      target.write(count == 1 ? "1 member" : "\(count) members")
+      return
+    default:
+      break
     }
   }
 
@@ -298,21 +298,21 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
 
   if let displayStyle = mirror.displayStyle {
     switch displayStyle {
-      case .Class, .Struct:
-        // Classes and structs without custom representations are displayed as
-        // their fully qualified type name
-        target.write(_typeName(mirror.subjectType, qualified: true))
-        return
-      case .Enum:
-        target.write(_typeName(mirror.subjectType, qualified: true))
-        let cString = _getEnumCaseName(value)
-        if cString != nil, let caseName = String(validatingUTF8: cString) {
-          target.write(".")
-          target.write(caseName)
-        }
-        return
-      default:
-        break
+    case .`class`, .`struct`:
+      // Classes and structs without custom representations are displayed as
+      // their fully qualified type name
+      target.write(_typeName(mirror.subjectType, qualified: true))
+      return
+    case .`enum`:
+      target.write(_typeName(mirror.subjectType, qualified: true))
+      let cString = _getEnumCaseName(value)
+      if cString != nil, let caseName = String(validatingUTF8: cString) {
+        target.write(".")
+        target.write(caseName)
+      }
+      return
+    default:
+      break
     }
   }
 

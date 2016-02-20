@@ -52,36 +52,36 @@ public struct Mirror {
   /// reflecting value type instances.
   public enum AncestorRepresentation {
 
-  /// Generate a default mirror for all ancestor classes.
-  ///
-  /// This case is the default.
-  ///
-  /// - Note: This option generates default mirrors even for
-  ///   ancestor classes that may implement `CustomReflectable`'s
-  ///   `customMirror` requirement.  To avoid dropping an ancestor class
-  ///   customization, an override of `customMirror` should pass
-  ///   `ancestorRepresentation: .Customized(super.customMirror)` when
-  ///   initializing its `Mirror`.
-  case Generated
+    /// Generate a default mirror for all ancestor classes.
+    ///
+    /// This case is the default.
+    ///
+    /// - Note: This option generates default mirrors even for
+    ///   ancestor classes that may implement `CustomReflectable`'s
+    ///   `customMirror` requirement.  To avoid dropping an ancestor class
+    ///   customization, an override of `customMirror` should pass
+    ///   `ancestorRepresentation: .Customized(super.customMirror)` when
+    ///   initializing its `Mirror`.
+    case generated
 
-  /// Use the nearest ancestor's implementation of `customMirror` to
-  /// create a mirror for that ancestor.  Other classes derived from
-  /// such an ancestor are given a default mirror.
-  ///
-  /// The payload for this option should always be
-  /// "`{ super.customMirror }`":
-  ///
-  ///     var customMirror: Mirror {
-  ///       return Mirror(
-  ///         self,
-  ///         children: ["someProperty": self.someProperty],
-  ///         ancestorRepresentation: .Customized({ super.customMirror })) // <==
-  ///     }
-  case Customized(() -> Mirror)
+    /// Use the nearest ancestor's implementation of `customMirror` to
+    /// create a mirror for that ancestor.  Other classes derived from
+    /// such an ancestor are given a default mirror.
+    ///
+    /// The payload for this option should always be
+    /// "`{ super.customMirror }`":
+    ///
+    ///     var customMirror: Mirror {
+    ///       return Mirror(
+    ///         self,
+    ///         children: ["someProperty": self.someProperty],
+    ///         ancestorRepresentation: .Customized({ super.customMirror })) // <==
+    ///     }
+    case customized(() -> Mirror)
 
-  /// Suppress the representation of all ancestor classes.  The
-  /// resulting `Mirror`'s `superclassMirror` is `nil`.
-  case Suppressed
+    /// Suppress the representation of all ancestor classes.  The
+    /// resulting `Mirror`'s `superclassMirror` is `nil`.
+    case suppressed
   }
 
   /// Reflect upon the given `subject`.
@@ -132,7 +132,8 @@ public struct Mirror {
   /// to the one used for instances of the kind indicated by the
   /// `DisplayStyle` case name when the `Mirror` is used for display.
   public enum DisplayStyle {
-  case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set
+    case `struct`, `class`, `enum`, tuple, optional, collection
+    case dictionary, `set`
   }
 
   @warn_unused_result
@@ -170,16 +171,18 @@ public struct Mirror {
       let superclass = _getSuperclass(subjectClass) {
 
       switch ancestorRepresentation {
-      case .Generated: return {
+      case .generated:
+        return {
           self._legacyMirror(subject, asClass: superclass).map {
             Mirror(legacy: $0, subjectType: superclass)
           }
         }
-      case .Customized(let makeAncestor):
+      case .customized(let makeAncestor):
         return {
           Mirror(subject, subjectClass: superclass, ancestor: makeAncestor())
         }
-      case .Suppressed: break
+      case .suppressed:
+        break
       }
     }
     return Mirror._noSuperclassMirror
@@ -197,7 +200,7 @@ public struct Mirror {
   /// ancestors, `customMirror` overrides should initialize the
   /// `Mirror` with:
   ///
-  ///     ancestorRepresentation: .Customized({ super.customMirror })
+  ///     ancestorRepresentation: .customized({ super.customMirror })
   ///
   /// - Note: The traversal protocol modeled by `children`'s indices
   ///   (`ForwardIndex`, `BidirectionalIndex`, or
@@ -211,7 +214,7 @@ public struct Mirror {
     _ subject: Subject,
     children: C,
     displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .Generated
+    ancestorRepresentation: AncestorRepresentation = .generated
   ) {
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
@@ -232,7 +235,7 @@ public struct Mirror {
   ///
   ///     extension MyArray : CustomReflectable {
   ///       var customMirror: Mirror {
-  ///         return Mirror(self, unlabeledChildren: self, displayStyle: .Collection)
+  ///         return Mirror(self, unlabeledChildren: self, displayStyle: .collection)
   ///       }
   ///     }
   ///
@@ -259,7 +262,7 @@ public struct Mirror {
     _ subject: Subject,
     unlabeledChildren: C,
     displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .Generated
+    ancestorRepresentation: AncestorRepresentation = .generated
   ) {
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
@@ -290,7 +293,7 @@ public struct Mirror {
   /// ancestors, `customMirror` overrides should initialize the
   /// `Mirror` with:
   ///
-  ///     ancestorRepresentation: .Customized({ super.customMirror })
+  ///     ancestorRepresentation: .customized({ super.customMirror })
   ///
   /// - Note: The resulting `Mirror`'s `children` may be upgraded to
   ///   `AnyRandomAccessCollection` later.  See the failable
@@ -300,7 +303,7 @@ public struct Mirror {
     _ subject: Subject,
     children: DictionaryLiteral<String, Any>,
     displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .Generated
+    ancestorRepresentation: AncestorRepresentation = .generated
   ) {
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
@@ -437,17 +440,17 @@ extension Mirror.DisplayStyle {
   /// Construct from a legacy `_MirrorDisposition`
   internal init?(legacy: _MirrorDisposition) {
     switch legacy {
-    case .Struct: self = .Struct
-    case .Class: self = .Class
-    case .Enum: self = .Enum
-    case .Tuple: self = .Tuple
+    case .Struct: self = .`struct`
+    case .Class: self = .`class`
+    case .Enum: self = .`enum`
+    case .Tuple: self = .tuple
     case .Aggregate: return nil
-    case .IndexContainer: self = .Collection
-    case .KeyContainer: self = .Dictionary
-    case .MembershipContainer: self = .Set
+    case .IndexContainer: self = .collection
+    case .KeyContainer: self = .dictionary
+    case .MembershipContainer: self = .`set`
     case .Container: requirementFailure("unused!")
-    case .Optional: self = .Optional
-    case .ObjCObject: self = .Class
+    case .Optional: self = .optional
+    case .ObjCObject: self = .`class`
     }
   }
 }

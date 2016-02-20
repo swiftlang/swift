@@ -92,8 +92,12 @@ enum Statistic : CustomReflectable {
 
   var customMirror: Mirror {
     switch self {
-      case .ForState(let state): return Mirror(self, children: ["State": state], displayStyle: .Enum)
-      case .ForCountry(let country): return Mirror(self, children: ["Country": country], displayStyle: .Enum)
+      case .ForState(let state):
+        return Mirror(
+          self, children: ["State": state], displayStyle: .`enum`)
+      case .ForCountry(let country):
+        return Mirror(
+          self, children: ["Country": country], displayStyle: .`enum`)
     }
   }
 }

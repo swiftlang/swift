@@ -4027,9 +4027,9 @@ extension ${Self} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   public var customMirror: Mirror {
 %if Self == 'Set':
-    let style = Mirror.DisplayStyle.Set
+    let style = Mirror.DisplayStyle.`set`
 %elif Self == 'Dictionary':
-    let style = Mirror.DisplayStyle.Dictionary
+    let style = Mirror.DisplayStyle.dictionary
 %end
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
   }

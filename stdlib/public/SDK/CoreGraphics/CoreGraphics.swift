@@ -36,7 +36,7 @@ public extension CGPoint {
 
 extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
   public var customMirror: Mirror {
-    return Mirror(self, children: ["x": x, "y": y], displayStyle: .Struct)
+    return Mirror(self, children: ["x": x, "y": y], displayStyle: .`struct`)
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
@@ -76,7 +76,10 @@ public extension CGSize {
 
 extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
   public var customMirror: Mirror {
-    return Mirror(self, children: ["width": width, "height": height], displayStyle: .Struct)
+    return Mirror(
+      self,
+      children: ["width": width, "height": height],
+      displayStyle: .`struct`)
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
@@ -295,7 +298,10 @@ public extension CGRect {
 
 extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
   public var customMirror: Mirror {
-    return Mirror(self, children: ["origin": origin, "size": size], displayStyle: .Struct)
+    return Mirror(
+      self,
+      children: ["origin": origin, "size": size],
+      displayStyle: .`struct`)
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {

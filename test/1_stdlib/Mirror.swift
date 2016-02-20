@@ -82,12 +82,12 @@ mirrors.test("ForwardStructure") {
       return Mirror(
         self,
         unlabeledChildren: Set(letters.characters),
-        displayStyle: .Set)
+        displayStyle: .`set`)
     }
   }
 
   let w = DoubleYou().customMirror
-  expectEqual(.Set, w.displayStyle)
+  expectEqual(.`set`, w.displayStyle)
   expectEqual(letters.characters.count, numericCast(w.children.count))
   
   // Because we don't control the order of a Set, we need to do a
@@ -105,13 +105,13 @@ mirrors.test("BidirectionalStructure") {
       return Mirror(
         self,
         unlabeledChildren: letters.characters,
-        displayStyle: .Collection)
+        displayStyle: .collection)
     }
   }
 
   // Test that the basics seem to work
   let y = Why().customMirror
-  expectEqual(.Collection, y.displayStyle)
+  expectEqual(.`collection`, y.displayStyle)
 
   let description = y.testDescription
   expectEqual(
@@ -134,11 +134,11 @@ mirrors.test("LabeledStructure") {
   struct Zee2 : CustomReflectable {
     var customMirror: Mirror {
       return Mirror(
-        self, children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
+        self, children: ["bark": 1, "bite": 0], displayStyle: .dictionary)
     }
   }
   let z2 = Zee2().customMirror
-  expectEqual(.Dictionary, z2.displayStyle)
+  expectEqual(.dictionary, z2.displayStyle)
   expectEqual("[bark: 1, bite: 0]", z2.testDescription)
 
   struct Heterogeny : CustomReflectable {
@@ -238,12 +238,12 @@ mirrors.test("Class/Root/Uncustomized") {
 }
 
 //===--- Generated Superclass Mirrors -------------------------------------===//
-mirrors.test("Class/Root/superclass:.Generated") {
+mirrors.test("Class/Root/superclass:.generated") {
   class B : CustomReflectable {
     var b: String = "two"
     var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Generated)
+        self, children: [ "bee": b ], ancestorRepresentation: .generated)
     }
   }
   
@@ -319,7 +319,7 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Explicit") {
     var b: UInt = 42
     var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Generated)
+        self, children: [ "bee": b ], ancestorRepresentation: .generated)
     }
   }
 
@@ -416,7 +416,7 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Explicit") {
     var b: UInt = 42
     var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Generated)
+        self, children: [ "bee": b ], ancestorRepresentation: .generated)
     }
   }
 
@@ -475,7 +475,7 @@ mirrors.test("Class/Root/NoSuperclassMirror") {
     var b: String = "two"
     var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
+        self, children: [ "bee": b ], ancestorRepresentation: .suppressed)
     }
   }
   
@@ -493,7 +493,7 @@ mirrors.test("class/UncustomizedSuper/NoSuperclassMirror") {
     var b: UInt = 42
     var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
+        self, children: [ "bee": b ], ancestorRepresentation: .suppressed)
     }
   }
 
@@ -514,7 +514,7 @@ mirrors.test("class/CustomizedSuper/NoSuperclassMirror") {
     var b: UInt = 42
     override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
+        self, children: [ "bee": b ], ancestorRepresentation: .suppressed)
     }
   }
 
@@ -537,9 +537,9 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
     var b: UInt = 42
     override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized({ super.customMirror })
-        )
+        self,
+        children: [ "bee": b ],
+        ancestorRepresentation: .customized({ super.customMirror }))
     }
   }
 
@@ -569,8 +569,9 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
     var b: UInt = 42
     override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized({ super.customMirror }))
+        self,
+        children: [ "bee": b ],
+        ancestorRepresentation: .customized({ super.customMirror }))
     }
   }
 
@@ -609,8 +610,9 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
     var b: UInt = 42
     override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized({ super.customMirror }))
+        self,
+        children: [ "bee": b ],
+        ancestorRepresentation: .customized({ super.customMirror }))
     }
   }
 
@@ -696,7 +698,7 @@ mirrors.test("Invalid Path Type")
   let m = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m.descendant(0) as? Int)
   expectCrashLater()
-  m.descendant(X())
+  _ = m.descendant(X())
 }
 
 mirrors.test("PlaygroundQuickLook") {
