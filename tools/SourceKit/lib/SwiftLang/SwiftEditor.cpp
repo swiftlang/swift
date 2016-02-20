@@ -658,7 +658,7 @@ adjustDiagnosticFixits(SmallVectorImpl<DiagnosticEntryInfo::Fixit> &Fixits,
     // If it intersects with the remove range, ignore the whole diagnostic.
     if (!(FixitEnd < ByteOffset || FixitBegin > RemoveEnd))
       return true; // Ignore.
-    if (FixitBegin > FixitEnd)
+    if (FixitBegin > RemoveEnd)
       Fixit.Offset += Delta;
   }
   return false;

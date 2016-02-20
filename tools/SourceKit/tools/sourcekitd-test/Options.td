@@ -67,6 +67,9 @@ def json_request_path: Separate<["-"], "json-request-path">,
 def print_response_as_json : Flag<["-"], "print-response-as-json">,
   HelpText<"Print the response as JSON output">;
 
+def print_raw_response : Flag<["-"], "print-raw-response">,
+  HelpText<"Dump the response to stdout">;
+
 def group_name : Separate<["-"], "group-name">,
   HelpText<"Module group name to print">;
 
