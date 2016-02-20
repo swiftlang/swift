@@ -755,7 +755,7 @@ extension DictionaryLiteral : Collection {
 
   /// Access the element indicated by `position`.
   ///
-  /// - Requires: `position >= 0 && position < endIndex`.
+  /// - Precondition: `position >= 0 && position < endIndex`.
   ///
   /// - complexity: O(1).
   public subscript(position: Int) -> Element {

@@ -35,7 +35,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Returns an `_ArrayBuffer<U>` containing the same elements.
   ///
-  /// - Requires: The elements actually have dynamic type `U`, and `U`
+  /// - Precondition: The elements actually have dynamic type `U`, and `U`
   ///   is a class or `@objc` existential.
   @warn_unused_result
   internal func cast<U>(toBufferOf _: U.Type) -> _ArrayBuffer<U> {
@@ -51,7 +51,8 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
   /// deferring checking each element's `U`-ness until it is accessed.
   ///
-  /// - Requires: `U` is a class or `@objc` existential derived from `Element`.
+  /// - Precondition: `U` is a class or `@objc` existential derived from
+  /// `Element`.
   @warn_unused_result
   internal func downcast<U>(
     toBufferWithDeferredTypeCheckOf _: U.Type
@@ -410,7 +411,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
-  /// - Requires: Such contiguous storage exists or the buffer is empty.
+  /// - Precondition: Such contiguous storage exists or the buffer is empty.
   public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -430,7 +431,7 @@ extension _ArrayBuffer {
   
   /// An object that keeps the elements stored in this buffer alive.
   ///
-  /// - Requires: This buffer is backed by a `_ContiguousArrayBuffer`.
+  /// - Precondition: This buffer is backed by a `_ContiguousArrayBuffer`.
   public var nativeOwner: AnyObject {
     _sanityCheck(_isNative, "Expect a native array")
     return _native._storage
@@ -490,7 +491,7 @@ extension _ArrayBuffer {
 
   /// Our native representation.
   ///
-  /// - Requires: `_isNative`.
+  /// - Precondition: `_isNative`.
   var _native: NativeBuffer {
     return NativeBuffer(
       _isClassOrObjCExistential(Element.self)
@@ -499,7 +500,7 @@ extension _ArrayBuffer {
 
   /// Fast access to the native representation.
   ///
-  /// - Requires: `_isNativeTypeChecked`.
+  /// - Precondition: `_isNativeTypeChecked`.
   var _nativeTypeChecked: NativeBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }

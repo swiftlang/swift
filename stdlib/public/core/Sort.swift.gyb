@@ -27,13 +27,13 @@ def cmp(a, b, p):
 %{
 if p:
   orderingRequirement = """\
-/// - Requires: `isOrderedBefore` is a
+/// - Precondition: `isOrderedBefore` is a
 ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 ///   over `elements`."""
   according = " according to `isOrderedBefore`"
 else:
   orderingRequirement = """\
-/// - Requires: The less-than operator (`func <`) defined in the `Comparable`
+/// - Precondition: The less-than operator (`func <`) defined in the `Comparable`
 ///   conformance is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 ///   over `elements`."""
   according = ""
@@ -273,7 +273,7 @@ func _heapSort<
 
 /// Exchange the values of `a` and `b`.
 ///
-/// - Requires: `a` and `b` do not alias each other.
+/// - Precondition: `a` and `b` do not alias each other.
 public func swap<T>(inout a : T, inout _ b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.

@@ -55,7 +55,7 @@ protocol _ArrayProtocol
   ///
   /// - Complexity: O(`self.count`).
   ///
-  /// - Requires: `i <= count`.
+  /// - Precondition: `i <= count`.
   mutating func insert(newElement: Iterator.Element, at i: Int)
 
   /// Remove and return the element at the given index.
@@ -64,7 +64,7 @@ protocol _ArrayProtocol
   ///
   /// - Complexity: Worst case O(N).
   ///
-  /// - Requires: `count > index`.
+  /// - Precondition: `count > index`.
   mutating func remove(at index: Int) -> Iterator.Element
 
   //===--- implementation detail  -----------------------------------------===//

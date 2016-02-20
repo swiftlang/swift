@@ -71,7 +71,7 @@ extension Collection
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Base.Index) -> Base.Iterator.Element {
     return _base[position]
@@ -207,7 +207,7 @@ public struct _prext_MapIterator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> T? {
@@ -256,7 +256,7 @@ public struct _prext_MapCollection<Base : Collection, T>
   
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Base.Index) -> T {
     return _transform(_base[position])
@@ -320,14 +320,14 @@ internal protocol _prext_ReverseIndex : BidirectionalIndex {
 extension BidirectionalIndex where Self : _prext_ReverseIndex {
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   public func successor() -> Self {
     return Self(_base.predecessor())
   }
 
   /// Returns the previous consecutive value before `self`.
   ///
-  /// - Requires: The previous value is representable.
+  /// - Precondition: The previous value is representable.
   public func predecessor() -> Self {
     return Self(_base.successor())
   }

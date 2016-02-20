@@ -471,7 +471,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Returns `true` if the buffer stores only elements of type `U`.
   ///
-  /// - Requires: `U` is a class or `@objc` existential.
+  /// - Precondition: `U` is a class or `@objc` existential.
   ///
   /// - Complexity: O(N).
   @warn_unused_result

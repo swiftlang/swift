@@ -300,14 +300,14 @@ public struct ${Self}<Element>
     return _buffer.capacity
   }
 
-  /// - Requires: The array has a native buffer.
+  /// - Precondition: The array has a native buffer.
   @warn_unused_result
   @_semantics("array.owner")
   internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
   }
 
-  /// - Requires: The array has a native buffer.
+  /// - Precondition: The array has a native buffer.
   @warn_unused_result
   @inline(__always)
   internal func _getOwner_native() -> Builtin.NativeObject {
@@ -453,7 +453,7 @@ extension ${Self} : ArrayLiteralConvertible {
 ///
 /// This function is referenced by the compiler to allocate array literals.
 ///
-/// - Requires: `storage` is `_ContiguousArrayStorage`.
+/// - Precondition: `storage` is `_ContiguousArrayStorage`.
 @warn_unused_result
 @inline(__always)
 public // COMPILER_INTRINSIC
@@ -556,7 +556,7 @@ extension ${Self} : _ArrayProtocol {
   /// given `storage`, and a pointer to uninitialized memory for the
   /// first element.
   ///
-  /// - Requires: `storage is _ContiguousArrayStorage`.
+  /// - Precondition: `storage is _ContiguousArrayStorage`.
   @warn_unused_result
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
@@ -715,7 +715,7 @@ extension ${Self} : _ArrayProtocol {
 
   /// Remove and return the last element in O(1).
   ///
-  /// - Requires: `!isEmpty`.
+  /// - Precondition: `!isEmpty`.
   public mutating func removeLast() -> Element {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let i = count
@@ -728,7 +728,7 @@ extension ${Self} : _ArrayProtocol {
 
   /// Insert `newElement` at index `i`.
   ///
-  /// - Requires: `i <= count`.
+  /// - Precondition: `i <= count`.
   ///
   /// - Complexity: O(`self.count`).
   public mutating func insert(newElement: Element, at i: Int) {
@@ -1324,7 +1324,7 @@ public func != <Element : Equatable>(
 /// Returns an `Array<Base>` containing the same elements as `a` in
 /// O(1).
 ///
-/// - Requires: `Base` is a base class or base `@objc` protocol (such
+/// - Precondition: `Base` is a base class or base `@objc` protocol (such
 ///   as `AnyObject`) of `Derived`.
 @warn_unused_result
 public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {

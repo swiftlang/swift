@@ -105,12 +105,12 @@ partitionDocComment = """\
   ///   Only returns `range.endIndex` when `self` is empty."""
 
 orderingRequirementForPredicate = """\
-  /// - Requires: `isOrderedBefore` is a
+  /// - Precondition: `isOrderedBefore` is a
   ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   ///   over the elements in `self`."""
 
 orderingRequirementForComparable = """\
-  /// - Requires: The less-than operator (`func <`) defined in
+  /// - Precondition: The less-than operator (`func <`) defined in
   ///   the `Comparable` conformance is a
   ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   ///   over the elements in `self`."""

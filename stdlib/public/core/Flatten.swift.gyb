@@ -30,7 +30,7 @@ public struct FlattenIterator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Base.Element.Iterator.Element? {
@@ -127,7 +127,7 @@ public struct ${Index}<
 > : ${traversal}Index {
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   public func successor() -> ${Index} {
     let nextInner = _inner!.successor()
     if _fastPath(nextInner != _innerCollection!.endIndex) {
@@ -146,7 +146,7 @@ public struct ${Index}<
 % if traversal == 'Bidirectional':
   /// Returns the previous consecutive value before `self`.
   ///
-  /// - Requires: The previous value is representable.
+  /// - Precondition: The previous value is representable.
   public func predecessor() -> ${Index} {
     var prevOuter = _outer
     var prevInnerCollection : BaseElements.Iterator.Element
@@ -278,7 +278,7 @@ public struct ${Collection}<
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(
     position: Index

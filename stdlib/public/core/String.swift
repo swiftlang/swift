@@ -552,7 +552,7 @@ extension String {
 
   /// Access the `Character` at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self.characters`
+  /// - Precondition: `position` is a valid position in `self.characters`
   ///   and `position != endIndex`.
   public subscript(i: Index) -> Character { return characters[i] }
 }
@@ -902,7 +902,7 @@ extension String.Index {
   /// Construct the position in `characters` that corresponds exactly to
   /// `unicodeScalarIndex`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `unicodeScalarIndex` is an element of
+  /// - Precondition: `unicodeScalarIndex` is an element of
   ///   `characters.unicodeScalars.indices`.
   public init?(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
@@ -917,7 +917,7 @@ extension String.Index {
   /// Construct the position in `characters` that corresponds exactly to
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf16Index` is an element of
+  /// - Precondition: `utf16Index` is an element of
   ///   `characters.utf16.indices`.
   public init?(
     _ utf16Index: String.UTF16Index,
@@ -936,7 +936,7 @@ extension String.Index {
   /// Construct the position in `characters` that corresponds exactly to
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf8Index` is an element of
+  /// - Precondition: `utf8Index` is an element of
   ///   `characters.utf8.indices`.
   public init?(
     _ utf8Index: String.UTF8Index,
@@ -955,7 +955,7 @@ extension String.Index {
   /// Returns the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(utf8).indices`.
+  /// - Precondition: `self` is an element of `String(utf8).indices`.
   @warn_unused_result
   public func samePositionIn(
     utf8: String.UTF8View
@@ -966,7 +966,7 @@ extension String.Index {
   /// Returns the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(utf16).indices`.
+  /// - Precondition: `self` is an element of `String(utf16).indices`.
   @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
@@ -977,7 +977,7 @@ extension String.Index {
   /// Returns the position in `unicodeScalars` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(unicodeScalars).indices`.
+  /// - Precondition: `self` is an element of `String(unicodeScalars).indices`.
   @warn_unused_result
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView

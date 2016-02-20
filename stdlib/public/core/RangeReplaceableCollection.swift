@@ -152,13 +152,13 @@ public protocol RangeReplaceableCollection : Collection {
   /// Remove the element at `startIndex` and return it.
   ///
   /// - Complexity: O(`self.count`)
-  /// - Requires: `!self.isEmpty`.
+  /// - Precondition: `!self.isEmpty`.
   mutating func removeFirst() -> Iterator.Element
 
   /// Remove the first `n` elements.
   ///
   /// - Complexity: O(`self.count`)
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Precondition: `n >= 0 && self.count >= n`.
   mutating func removeFirst(n: Int)
 
   /// Remove all elements within `bounds`.
@@ -273,7 +273,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// Remove the element at `startIndex` and return it.
   ///
   /// - Complexity: O(1)
-  /// - Requires: `!self.isEmpty`.
+  /// - Precondition: `!self.isEmpty`.
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
@@ -284,7 +284,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// Remove the first `n` elements.
   ///
   /// - Complexity: O(1)
-  /// - Requires: `self.count >= n`.
+  /// - Precondition: `self.count >= n`.
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
@@ -329,7 +329,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
   /// Remove an element from the end.
   ///
   /// - Complexity: O(1)
-  /// - Requires: `!self.isEmpty`
+  /// - Precondition: `!self.isEmpty`
   public mutating func removeLast() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
@@ -341,7 +341,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
   /// Remove the last `n` elements.
   ///
   /// - Complexity: O(`self.count`)
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Precondition: `n >= 0 && self.count >= n`.
   public mutating func removeLast(n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")

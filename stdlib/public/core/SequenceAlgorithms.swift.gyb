@@ -51,7 +51,7 @@ extension Sequence {
 %{
 if preds:
   orderingRequirement = """
-  /// - Requires: `isOrderedBefore` is a
+  /// - Precondition: `isOrderedBefore` is a
   ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   ///   over `self`."""
   rethrows_ = "rethrows "
@@ -129,7 +129,7 @@ if preds:
   /// `other`, using `isEquivalent` as the equivalence test.  Returns `true` if
   /// `other` is empty.
   ///
-  /// - Requires: `isEquivalent` is an
+  /// - Precondition: `isEquivalent` is an
   ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
 
   rethrows_ = "rethrows "
@@ -182,7 +182,7 @@ if preds:
   /// Returns `true` iff `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
-  /// - Requires: `isEquivalent` is an
+  /// - Precondition: `isEquivalent` is an
   ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
   rethrows_ = "rethrows "
 else:
@@ -244,7 +244,7 @@ if preds:
   ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison.
   ///
-  /// - Requires: `isOrderedBefore` is a
+  /// - Precondition: `isOrderedBefore` is a
   ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   ///   over the elements of `self` and `other`."""
   rethrows_ = "rethrows "

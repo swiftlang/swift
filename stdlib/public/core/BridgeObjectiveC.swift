@@ -356,8 +356,8 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
 
   /// Access the `Pointee` instance referenced by `self`.
   ///
-  /// - Requires: the pointee has been initialized with an instance of
-  ///   type `Pointee`.
+  /// - Precondition: the pointee has been initialized with an instance of type
+  ///   `Pointee`.
   public var pointee: Pointee {
     /// Retrieve the value the pointer points to.
     @_transparent get {
@@ -389,7 +389,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// Access the `i`th element of the raw array pointed to by
   /// `self`.
   ///
-  /// - Requires: `self != nil`.
+  /// - Precondition: `self != nil`.
   public subscript(i: Int) -> Pointee {
     @_transparent
     get {

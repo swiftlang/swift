@@ -444,7 +444,7 @@ public struct ${Self} : ${Traversal}Index {
   /// Returns the next consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
-  /// - Requires: `self` has a well-defined successor.
+  /// - Precondition: `self` has a well-defined successor.
   public func successor() -> ${Self} {
     return ${Self}(_box.successor())
   }
@@ -462,7 +462,7 @@ public struct ${Self} : ${Traversal}Index {
   /// Returns the previous consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
-  /// - Requires: `self` has a well-defined predecessor.
+  /// - Precondition: `self` has a well-defined predecessor.
   public func predecessor() -> ${Self} {
     return ${Self}(_box.predecessor())
   }
@@ -517,7 +517,7 @@ public struct ${Self} : ${Traversal}Index {
 /// Returns `true` iff `lhs` and `rhs` wrap equal underlying
 /// `${Self}`s.
 ///
-/// - Requires: The types of indices wrapped by `lhs` and `rhs` are
+/// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
 ///   identical.
 @warn_unused_result
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
@@ -651,7 +651,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
 
   /// Access the element indicated by `position`.
   ///
-  /// - Requires: `position` indicates a valid position in `self` and
+  /// - Precondition: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Any${Traversal}Index) -> Element {
     return _box[position._box]

@@ -21,7 +21,7 @@ public struct LazyFilterIterator<
   /// Advances to the next element and returns it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Base.Element? {
@@ -104,7 +104,7 @@ public struct LazyFilterIndex<
 > : ForwardIndex {
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   ///
   /// - Complexity: Amortized O(M), where M is the average distance in
   ///   the base collection between elements that satisfy the
@@ -205,7 +205,7 @@ public struct LazyFilterCollection<
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.
   public subscript(position: Index) -> Base.Iterator.Element {
     return _base[position.base]

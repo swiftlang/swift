@@ -40,10 +40,9 @@ internal enum _BridgeStyle {
 
 /// Implements `source as! [TargetElement]`.
 ///
-/// - Requires: At least one of `SourceElement` and `TargetElement` is a
-///   class type or ObjC existential.  May trap for other "valid" inputs
-///   when `TargetElement` is not bridged verbatim, if an element can't
-///   be converted.
+/// - Precondition: At least one of `SourceElement` and `TargetElement` is a
+/// class type or ObjC existential.  May trap for other "valid" inputs when
+/// `TargetElement` is not bridged verbatim, if an element can't be converted.
 public func _arrayForceCast<SourceElement, TargetElement>(
   source: Array<SourceElement>
 ) -> Array<TargetElement> {
@@ -181,7 +180,7 @@ ElementwiseBridging:
 /// `source` to a `TargetElement` and return the resulting array, or
 /// return `nil` if any element fails to convert.
 ///
-/// - Requires: `SourceElement` is a class or ObjC existential type.
+/// - Precondition: `SourceElement` is a class or ObjC existential type.
 /// O(n), because each element must be checked.
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   source: [SourceElement]

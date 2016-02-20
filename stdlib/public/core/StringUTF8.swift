@@ -123,7 +123,7 @@ extension String {
 
       /// Returns the next consecutive value after `self`.
       ///
-      /// - Requires: The next value is representable.
+      /// - Precondition: The next value is representable.
       @warn_unused_result
       public func successor() -> Index {
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
@@ -212,7 +212,7 @@ extension String {
 
     /// Access the element at `position`.
     ///
-    /// - Requires: `position` is a valid position in `self` and
+    /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     public subscript(position: Index) -> UTF8.CodeUnit {
       let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
@@ -329,7 +329,7 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf8Index` is an element of
+  /// - Precondition: `utf8Index` is an element of
   ///   `String(utf16)!.utf8.indices`.
   public init?(_ utf16Index: String.UTF16Index, within utf8: String.UTF8View) {
     let utf16 = String.UTF16View(utf8._core)
@@ -356,7 +356,7 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `unicodeScalarIndex`.
   ///
-  /// - Requires: `unicodeScalarIndex` is an element of
+  /// - Precondition: `unicodeScalarIndex` is an element of
   ///   `String(utf8)!.unicodeScalars.indices`.
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
@@ -368,7 +368,7 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `characterIndex`.
   ///
-  /// - Requires: `characterIndex` is an element of
+  /// - Precondition: `characterIndex` is an element of
   ///   `String(utf8)!.indices`.
   public init(_ characterIndex: String.Index, within utf8: String.UTF8View) {
     self.init(utf8._core, _utf16Offset: characterIndex._base._position)
@@ -377,7 +377,7 @@ extension String.UTF8View.Index {
   /// Returns the position in `utf16` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of `String(utf16)!.utf8.indices`.
+  /// - Precondition: `self` is an element of `String(utf16)!.utf8.indices`.
   @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
@@ -388,7 +388,7 @@ extension String.UTF8View.Index {
   /// Returns the position in `unicodeScalars` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of
+  /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
   @warn_unused_result
   public func samePositionIn(
@@ -400,7 +400,7 @@ extension String.UTF8View.Index {
   /// Returns the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of `characters.utf8.indices`.
+  /// - Precondition: `self` is an element of `characters.utf8.indices`.
   @warn_unused_result
   public func samePositionIn(
     characters: String

@@ -22,7 +22,7 @@ extension String {
   /// If `cString` contains ill-formed UTF-8 code unit sequences, replaces them
   /// with replacement characters (U+FFFD).
   ///
-  /// - Requires: `cString != nil`
+  /// - Precondition: `cString != nil`
   public init(cString: UnsafePointer<CChar>) {
     _precondition(cString != nil, "cString must not be nil")
     self = String.decodeCString(UnsafePointer(cString), as: UTF8.self,
@@ -35,7 +35,7 @@ extension String {
   /// Does not try to repair ill-formed UTF-8 code unit sequences, fails if any
   /// such sequences are found.
   ///
-  /// - Requires: `cString != nil`
+  /// - Precondition: `cString != nil`
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
     _precondition(cString != nil, "cString must not be nil")
     guard let (result, _) = String.decodeCString(

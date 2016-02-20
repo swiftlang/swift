@@ -34,14 +34,14 @@ public protocol ReverseIndexProtocol : BidirectionalIndex {
 extension BidirectionalIndex where Self : ReverseIndexProtocol {
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   public func successor() -> Self {
     return Self(base.predecessor())
   }
 
   /// Returns the previous consecutive value before `self`.
   ///
-  /// - Requires: The previous value is representable.
+  /// - Precondition: The previous value is representable.
   public func predecessor() -> Self {
     return Self(base.successor())
   }

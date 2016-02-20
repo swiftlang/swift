@@ -26,7 +26,7 @@ public protocol _Incrementable : Equatable {
   /// Returns the next consecutive value in a discrete sequence of
   /// `Self` values.
   ///
-  /// - Requires: `self` has a well-defined successor.
+  /// - Precondition: `self` has a well-defined successor.
   @warn_unused_result
   func successor() -> Self
 
@@ -140,7 +140,7 @@ public protocol ForwardIndex : _Incrementable {
   ///   - If `n < 0`, the result of applying `predecessor` to `self` `-n` times.
   ///   - Otherwise, `self`.
   ///
-  /// - Requires: `n >= 0` if only conforming to `ForwardIndex`
+  /// - Precondition: `n >= 0` if only conforming to `ForwardIndex`
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`abs(n)`) otherwise
@@ -157,7 +157,7 @@ public protocol ForwardIndex : _Incrementable {
   ///     but not past `limit`.
   ///   - Otherwise, `self`.
   ///
-  /// - Requires: `n >= 0` if only conforming to `ForwardIndex`.
+  /// - Precondition: `n >= 0` if only conforming to `ForwardIndex`.
   ///
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndex`
@@ -167,7 +167,7 @@ public protocol ForwardIndex : _Incrementable {
 
   /// Measure the distance between `self` and `end`.
   ///
-  /// - Requires:
+  /// - Precondition:
   ///   - `start` and `end` are part of the same sequence when conforming to
   ///     `RandomAccessSequenceType`.
   ///   - `end` is reachable from `self` by incrementation otherwise.
@@ -262,7 +262,7 @@ public protocol BidirectionalIndex : ForwardIndex {
   /// well-defined predecessor, `self.predecessor().successor() ==
   /// self`.
   ///
-  /// - Requires: `self` has a well-defined predecessor.
+  /// - Precondition: `self` has a well-defined predecessor.
   @warn_unused_result
   func predecessor() -> Self
 

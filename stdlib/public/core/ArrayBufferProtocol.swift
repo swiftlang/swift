@@ -66,7 +66,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// Replace the given `subRange` with the first `newCount` elements of
   /// the given collection.
   ///
-  /// - Requires: This buffer is backed by a uniquely-referenced
+  /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
   mutating func replace<C : Collection where C.Iterator.Element == Element>(
     subRange subRange: Range<Int>,
@@ -87,7 +87,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
-  /// - Requires: Such contiguous storage exists or the buffer is empty.
+  /// - Precondition: Such contiguous storage exists or the buffer is empty.
   mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R

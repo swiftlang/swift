@@ -1882,7 +1882,7 @@ public func checkForwardIndex<
 /// to generate equality expectations from pairs of positions in
 /// `instances`.
 ///
-/// - Preconditions:
+/// - Precondition:
 ///   - all elements of `instances` are reachable from `startIndex`.
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkBidirectionalIndex<
@@ -1915,7 +1915,7 @@ public func checkBidirectionalIndex<
 /// about the results of `advanced(by:)` and `distance(to:)` from pairs of
 /// positions in `instances` and `distances`.
 ///
-/// - Preconditions:
+/// - Precondition:
 ///   - all elements of `instances` are reachable from `startIndex`.
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkRandomAccessIndex<

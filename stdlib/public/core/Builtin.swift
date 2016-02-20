@@ -220,7 +220,7 @@ public func _unsafeReferenceCast<T, U>(x: T, to: U.Type) -> U {
 
 /// - returns: `x as T`.
 ///
-/// - Requires: `x is T`.  In particular, in -O builds, no test is
+/// - Precondition: `x is T`.  In particular, in -O builds, no test is
 ///   performed to ensure that `x` actually has dynamic type `T`.
 ///
 /// - Warning: Trades safety for performance.  Use `unsafeDowncast`
@@ -397,7 +397,7 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 /// Reference-counting and other operations on this
 /// object will have access to the knowledge that it is native.
 ///
-/// - Requires: `bits & _objectPointerIsObjCBit == 0`,
+/// - Precondition: `bits & _objectPointerIsObjCBit == 0`,
 ///   `bits & _objectPointerSpareBits == bits`.
 @inline(__always)
 @warn_unused_result
@@ -426,7 +426,7 @@ func _makeObjCBridgeObject(
 /// Create a `BridgeObject` around the given `object` with the
 /// given spare bits.
 ///
-/// - Requires:
+/// - Precondition:
 ///
 ///   1. `bits & _objectPointerSpareBits == bits`
 ///   2. if `object` is a tagged pointer, `bits == 0`.  Otherwise,

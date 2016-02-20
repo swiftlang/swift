@@ -19,7 +19,7 @@ public struct LazyMapIterator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Element? {
@@ -84,7 +84,7 @@ public struct LazyMapCollection<Base : Collection, Element>
   
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Base.Index) -> Element {
     return _transform(_base[position])

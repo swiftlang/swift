@@ -59,7 +59,7 @@ extension String {
 
       /// Returns the next consecutive value after `self`.
       ///
-      /// - Requires: The next value is representable.
+      /// - Precondition: The next value is representable.
       @warn_unused_result
       public func successor() -> Index {
         var scratch = _ScratchIterator(_core, _position)
@@ -70,7 +70,7 @@ extension String {
 
       /// Returns the previous consecutive value before `self`.
       ///
-      /// - Requires: The previous value is representable.
+      /// - Precondition: The previous value is representable.
       @warn_unused_result
       public func predecessor() -> Index {
         var i = _position-1
@@ -114,7 +114,7 @@ extension String {
 
     /// Access the element at `position`.
     ///
-    /// - Requires: `position` is a valid position in `self` and
+    /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     public subscript(position: Index) -> UnicodeScalar {
       var scratch = _ScratchIterator(_core, position._position)
@@ -165,7 +165,7 @@ extension String {
       /// Advance to the next element and return it, or `nil` if no next
       /// element exists.
       ///
-      /// - Requires: No preceding call to `self.next()` has returned
+      /// - Precondition: No preceding call to `self.next()` has returned
       ///   `nil`.
       public mutating func next() -> UnicodeScalar? {
         var result: UnicodeDecodingResult
@@ -291,7 +291,7 @@ extension String.UnicodeScalarIndex {
   /// Construct the position in `unicodeScalars` that corresponds exactly to
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf16Index` is an element of
+  /// - Precondition: `utf16Index` is an element of
   ///   `String(unicodeScalars).utf16.indices`.
   public init?(
     _ utf16Index: String.UTF16Index,
@@ -321,7 +321,7 @@ extension String.UnicodeScalarIndex {
   /// Construct the position in `unicodeScalars` that corresponds exactly to
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
-  /// - Requires: `utf8Index` is an element of
+  /// - Precondition: `utf8Index` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
   public init?(
     _ utf8Index: String.UTF8Index,
@@ -343,7 +343,7 @@ extension String.UnicodeScalarIndex {
   /// Construct the position in `unicodeScalars` that corresponds
   /// exactly to `characterIndex`.
   ///
-  /// - Requires: `characterIndex` is an element of
+  /// - Precondition: `characterIndex` is an element of
   ///   `String(unicodeScalars).indices`.
   public init(
     _ characterIndex: String.Index,
@@ -355,7 +355,7 @@ extension String.UnicodeScalarIndex {
   /// Returns the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(utf8)!.indices`.
+  /// - Precondition: `self` is an element of `String(utf8)!.indices`.
   @warn_unused_result
   public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
@@ -364,7 +364,7 @@ extension String.UnicodeScalarIndex {
   /// Returns the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
-  /// - Requires: `self` is an element of `String(utf16)!.indices`.
+  /// - Precondition: `self` is an element of `String(utf16)!.indices`.
   @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
@@ -375,7 +375,8 @@ extension String.UnicodeScalarIndex {
   /// Returns the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// - Requires: `self` is an element of `characters.unicodeScalars.indices`.
+  /// - Precondition: `self` is an element of
+  ///   `characters.unicodeScalars.indices`.
   @warn_unused_result
   public func samePositionIn(characters: String) -> String.Index? {
     return String.Index(self, within: characters)

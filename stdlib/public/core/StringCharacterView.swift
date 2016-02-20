@@ -91,7 +91,7 @@ extension String.CharacterView : Collection {
 
     /// Returns the next consecutive value after `self`.
     ///
-    /// - Requires: The next value is representable.
+    /// - Precondition: The next value is representable.
     public func successor() -> Index {
       _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
       return Index(_base: _endBase)
@@ -99,7 +99,7 @@ extension String.CharacterView : Collection {
 
     /// Returns the previous consecutive value before `self`.
     ///
-    /// - Requires: The previous value is representable.
+    /// - Precondition: The previous value is representable.
     public func predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
           "cannot decrement startIndex")
@@ -230,7 +230,7 @@ extension String.CharacterView : Collection {
 
   /// Access the `Character` at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(i: Index) -> Character {
     return Character(String(unicodeScalars[i._base..<i._endBase]))

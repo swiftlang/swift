@@ -57,7 +57,7 @@ public struct StaticString
 
   /// A pointer to the beginning of UTF-8 code units.
   ///
-  /// - Requires: `self` stores a pointer to either ASCII or UTF-8 code
+  /// - Precondition: `self` stores a pointer to either ASCII or UTF-8 code
   ///   units.
   @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
@@ -69,7 +69,7 @@ public struct StaticString
 
   /// The stored Unicode scalar value.
   ///
-  /// - Requires: `self` stores a single Unicode scalar value.
+  /// - Precondition: `self` stores a single Unicode scalar value.
   @_transparent
   public var unicodeScalar: UnicodeScalar {
     _precondition(

@@ -73,7 +73,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///
-  /// - Requires: This buffer is backed by a uniquely-referenced
+  /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
   public mutating func replace<
@@ -252,7 +252,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
     get {

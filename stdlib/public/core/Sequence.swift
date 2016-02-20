@@ -29,7 +29,7 @@ public protocol IteratorProtocol {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.  Specific implementations of this protocol
   ///   are encouraged to respond to violations of this requirement by
@@ -130,15 +130,15 @@ public protocol Sequence {
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
-  /// - Requires: `n >= 0`
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
   func dropFirst(n: Int) -> SubSequence
 
   /// Returns a subsequence containing all but the last `n` elements.
   ///
-  /// - Requires: `self` is a finite sequence.
-  /// - Requires: `n >= 0`
+  /// - Precondition: `self` is a finite sequence.
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   func dropLast(n: Int) -> SubSequence
@@ -149,7 +149,7 @@ public protocol Sequence {
   /// If `maxLength` exceeds `self.count`, the result contains all
   /// the elements of `self`.
   ///
-  /// - Requires: `maxLength >= 0`
+  /// - Precondition: `maxLength >= 0`
   @warn_unused_result
   func prefix(maxLength: Int) -> SubSequence
 
@@ -159,8 +159,8 @@ public protocol Sequence {
   /// If `maxLength` exceeds `s.count`, the result contains all
   /// the elements of `s`.
   ///
-  /// - Requires: `self` is a finite sequence.
-  /// - Requires: `maxLength >= 0`
+  /// - Precondition: `self` is a finite sequence.
+  /// - Precondition: `maxLength >= 0`
   @warn_unused_result
   func suffix(maxLength: Int) -> SubSequence
 
@@ -179,7 +179,7 @@ public protocol Sequence {
   ///   satisfying `isSeparator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplits >= 0`
+  /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   func split(
     maxSplits maxSplits: Int, omittingEmptySubsequences: Bool,
@@ -397,7 +397,7 @@ extension Sequence {
   ///   satisfying `isSeparator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplits >= 0`
+  /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
     maxSplits maxSplits: Int = Int.max,
@@ -516,7 +516,7 @@ extension Sequence where Iterator.Element : Equatable {
   ///   equal to `separator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplits >= 0`
+  /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
     separator: Iterator.Element,
@@ -537,7 +537,7 @@ extension Sequence where
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
-  /// - Requires: `n >= 0`
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
@@ -548,8 +548,8 @@ extension Sequence where
 
   /// Returns a subsequence containing all but the last `n` elements.
   ///
-  /// - Requires: `self` is a finite collection.
-  /// - Requires: `n >= 0`
+  /// - Precondition: `self` is a finite collection.
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
@@ -597,8 +597,8 @@ extension Sequence {
 
   /// Returns a subsequence containing all but the last element.
   ///
-  /// - Requires: `self` is a finite sequence.
-  /// - Requires: `n >= 0`
+  /// - Precondition: `self` is a finite sequence.
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast() -> SubSequence  { return dropLast(1) }
@@ -635,7 +635,7 @@ public struct IteratorSequence<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
+  /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Base.Element? {

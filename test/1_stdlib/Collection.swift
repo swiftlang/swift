@@ -32,7 +32,7 @@ public struct PermutationGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
+  /// - Precondition: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     let result = indices.next()
     return result != nil ? seq[result!] : .none
@@ -41,7 +41,7 @@ public struct PermutationGenerator<
   /// Construct an *iterator* over a permutation of `elements` given
   /// by `indices`.
   ///
-  /// - Requires: `elements[i]` is valid for every `i` in `indices`.
+  /// - Precondition: `elements[i]` is valid for every `i` in `indices`.
   public init(elements: C, indices: Indices) {
     self.seq = elements
     self.indices = indices.iterator()

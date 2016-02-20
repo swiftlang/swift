@@ -392,7 +392,7 @@ public struct Set<Element : Hashable> :
 
   /// Removes and returns the first element.
   ///
-  /// - Requires: `!isEmpty`.
+  /// - Precondition: `!isEmpty`.
   public mutating func removeFirst() -> Element {
     _precondition(!isEmpty, "can't removeFirst from an empty Set")
     return remove(at: startIndex)
@@ -793,7 +793,7 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSet) ->
 #if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
 ///
-/// - Requires: `BaseValue` is a base class or base `@objc`
+/// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 @warn_unused_result
 public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
@@ -1327,7 +1327,7 @@ internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionary)
 #if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
 ///
-/// - Requires: `BaseKey` and `BaseValue` are base classes or base `@objc`
+/// - Precondition: `BaseKey` and `BaseValue` are base classes or base `@objc`
 ///   protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
 ///   respectively.
 @warn_unused_result
@@ -3284,7 +3284,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   /// - parameter idealBucket: The ideal bucket for the element being deleted.
   /// - parameter offset: The offset of the element that will be deleted.
-  /// Requires an initialized entry at offset.
+  /// Precondition: there should be an initialized entry at offset.
   internal mutating func nativeDeleteImpl(
     nativeStorage: NativeStorage, idealBucket: Int, offset: Int
   ) {
@@ -3565,7 +3565,7 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   @warn_unused_result
   internal func successor() -> NativeIndex {
     var i = offset + 1
@@ -3647,7 +3647,7 @@ internal struct _Cocoa${Self}Index : ForwardIndex, Comparable {
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   @warn_unused_result
   internal func successor() -> _Cocoa${Self}Index {
     _precondition(
@@ -3766,7 +3766,7 @@ public struct ${Self}Index<${TypeParametersDecl}> :
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   public func successor() -> ${Self}Index<${TypeParameters}> {
     if _fastPath(_guaranteedNative) {
       return ._Native(_nativeIndex.successor())
@@ -3986,7 +3986,7 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
+  /// - Precondition: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> ${Sequence}? {
     if _fastPath(_guaranteedNative) {
       return _nativeNext()

@@ -177,7 +177,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///   object and a function that can be called on it to get the actual
   ///   number of allocated elements.
   ///
-  /// - Requires: `minimumCapacity >= 0`, and the type indicated by
+  /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Value` and any constructed `Element`s.
@@ -204,9 +204,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Manage the given `buffer`.
   ///
-  /// - Requires: `buffer` is an instance of a non-`@objc` class whose
-  ///   `deinit` destroys its stored `Value` and any constructed
-  ///   `Element`s.
+  /// - Precondition: `buffer` is an instance of a non-`@objc` class whose
+  ///   `deinit` destroys its stored `Value` and any constructed `Element`s.
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
 
@@ -309,7 +308,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - parameter minimumCapacity: The minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
   ///
-  /// - Requires: `minimumCapacity >= 0`, and the type indicated by
+  /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Value` and any constructed `Element`s.

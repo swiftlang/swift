@@ -118,7 +118,7 @@ extension LazyCollection : Collection {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Base.Index) -> Base.Iterator.Element {
     return _base[position]

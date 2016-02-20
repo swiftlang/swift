@@ -375,14 +375,14 @@ extension ${Self} : RandomAccessIndex {
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// - Requires: The next value is representable.
+  /// - Precondition: The next value is representable.
   @_transparent public
   func successor() -> ${Self} {
     return self &+ 1
   }
   /// Returns the previous consecutive value before `self`.
   ///
-  /// - Requires: The previous value is representable.
+  /// - Precondition: The previous value is representable.
   @_transparent public
   func predecessor() -> ${Self} {
     return self &- 1

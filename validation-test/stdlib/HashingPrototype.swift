@@ -72,7 +72,7 @@ class UserClassA : NSObject {
 
 /// A hasher object computes a hash value.
 ///
-/// Requirement: two hasher objects compute the same hash value when
+/// Precondition: two hasher objects compute the same hash value when
 /// the same sequence of `combine(...)` calls with equal arguments is
 /// performed on both of them.
 protocol Hasher {

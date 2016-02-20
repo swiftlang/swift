@@ -867,7 +867,7 @@ extension UTF16 {
   /// Returns the high surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
   /// `x`.
   ///
-  /// - Requires: `width(x) == 2`.
+  /// - Precondition: `width(x) == 2`.
   @warn_unused_result
   public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
@@ -877,7 +877,7 @@ extension UTF16 {
   /// Returns the low surrogate code unit of a [surrogate pair](http://www.unicode.org/glossary/#surrogate_pair) representing
   /// `x`.
   ///
-  /// - Requires: `width(x) == 2`.
+  /// - Precondition: `width(x) == 2`.
   @warn_unused_result
   public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)

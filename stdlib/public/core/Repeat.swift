@@ -40,7 +40,7 @@ public struct Repeated<Element> : Collection {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
     _precondition(position >= 0 && position < count, "Index out of range")

@@ -53,7 +53,7 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
 
   /// - Returns: `nonEmpty!`.
   ///
-  /// - Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
+  /// - Precondition: `nonEmpty != nil`.  In particular, in -O builds, no test
   ///   is performed to ensure that `nonEmpty` actually is non-nil.
   ///
   /// - Warning: Trades safety for performance.  Use `unsafelyUnwrapped`

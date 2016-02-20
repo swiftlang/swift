@@ -84,7 +84,7 @@ public struct IndexingIterator<Elements : Indexable>
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
+  /// - Precondition: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
@@ -326,7 +326,7 @@ extension Collection {
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
-  /// - Requires: `n >= 0`
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
@@ -337,7 +337,7 @@ extension Collection {
 
   /// Returns a subsequence containing all but the last `n` elements.
   ///
-  /// - Requires: `n >= 0`
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
@@ -354,7 +354,7 @@ extension Collection {
   /// If `maxLength` exceeds `self.count`, the result contains all
   /// the elements of `self`.
   ///
-  /// - Requires: `maxLength >= 0`
+  /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
   public func prefix(maxLength: Int) -> SubSequence {
@@ -371,7 +371,7 @@ extension Collection {
   /// If `maxLength` exceeds `s.count`, the result contains all
   /// the elements of `self`.
   ///
-  /// - Requires: `maxLength >= 0`
+  /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
@@ -422,7 +422,7 @@ extension Collection {
   ///   satisfying `isSeparator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplits >= 0`
+  /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
     maxSplits maxSplits: Int = Int.max,
@@ -486,7 +486,7 @@ extension Collection where Iterator.Element : Equatable {
   ///   equal to `separator`.
   ///   The default value is `true`.
   ///
-  /// - Requires: `maxSplits >= 0`
+  /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
     separator: Iterator.Element,
@@ -503,7 +503,7 @@ extension Collection where Iterator.Element : Equatable {
 extension Collection where Index : BidirectionalIndex {
   /// Returns a subsequence containing all but the last `n` elements.
   ///
-  /// - Requires: `n >= 0`
+  /// - Precondition: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
@@ -519,7 +519,7 @@ extension Collection where Index : BidirectionalIndex {
   /// If `maxLength` exceeds `s.count`, the result contains all
   /// the elements of `self`.
   ///
-  /// - Requires: `maxLength >= 0`
+  /// - Precondition: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
@@ -535,7 +535,7 @@ extension Collection where SubSequence == Self {
   /// Remove the element at `startIndex` and return it.
   ///
   /// - Complexity: O(1)
-  /// - Requires: `!self.isEmpty`.
+  /// - Precondition: `!self.isEmpty`.
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
@@ -548,7 +548,7 @@ extension Collection where SubSequence == Self {
   /// - Complexity:
   ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Precondition: `n >= 0 && self.count >= n`.
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
@@ -566,7 +566,7 @@ extension Collection
   /// Remove an element from the end.
   ///
   /// - Complexity: O(1)
-  /// - Requires: `!self.isEmpty`
+  /// - Precondition: `!self.isEmpty`
   public mutating func removeLast() -> Iterator.Element {
     let element = last!
     self = self[startIndex..<endIndex.predecessor()]
@@ -578,7 +578,7 @@ extension Collection
   /// - Complexity:
   ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Precondition: `n >= 0 && self.count >= n`.
   public mutating func removeLast(n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
@@ -638,7 +638,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` indicates a valid position in `self` and
+  /// - Precondition: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
   ///
   /// - Complexity: O(1)

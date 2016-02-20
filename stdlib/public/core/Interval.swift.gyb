@@ -70,7 +70,7 @@ public struct ${Self}<Bound : Comparable>
 
   /// Construct an interval with the given bounds.
   ///
-  /// - Requires: `start <= end`.
+  /// - Precondition: `start <= end`.
   internal init(_start: Bound, end: Bound) {
     _precondition(end >= _start, "Invalid ${Self} bounds (end < start)")
     self._start = _start
