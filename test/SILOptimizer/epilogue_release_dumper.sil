@@ -321,3 +321,51 @@ bb0(%0 : $boo):
   strong_retain  %3 : $foo
   return %0 : $boo
 }
+
+// CHECK-LABEL: START: sil @epilogue_retains_in_split_block
+// CHECK: strong_retain [[IN1:%.*]] : $foo
+// CHECK: strong_retain [[IN2:%.*]] : $foo
+// CHECK: END: sil @epilogue_retains_in_split_block
+sil @epilogue_retains_in_split_block : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  cond_br undef, bb1(%0: $foo), bb2(%0 : $foo)
+bb1(%1 : $foo):
+  strong_retain %1 : $foo
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  strong_retain %2 : $foo
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @epilogue_retains_in_diamond_top_block
+// CHECK: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @epilogue_retains_in_diamond_top_block
+sil @epilogue_retains_in_diamond_top_block : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  cond_br undef, bb1(%0: $foo), bb2(%0 : $foo)
+bb1(%1 : $foo):
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @epilogue_retains_in_diamond_top_and_left_split_block
+// CHECK-NOT: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @epilogue_retains_in_diamond_top_and_left_split_block
+sil @epilogue_retains_in_diamond_top_and_left_split_block : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  cond_br undef, bb1(%0: $foo), bb2(%0 : $foo)
+bb1(%1 : $foo):
+  strong_retain %1 : $foo
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  return %0 : $foo
+}

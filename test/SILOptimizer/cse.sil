@@ -1244,3 +1244,65 @@ bb0(%0 : $*Flyable):
 sil_witness_table hidden Airplane: Flyable module p2 {
   method #Flyable.fly!1: @_TTWV2p28AirplaneS_7FlyableS_FS1_3flyuRq_S1__fq_FT_T_	// protocol witness for p2.Flyable.fly <A where A: p2.Flyable> (A)() -> () in conformance p2.Airplane : p2.Flyable in p2
 }
+
+
+protocol Pingable { func ping() }
+
+// CHECK-LABEL: CSE_Existential_Simple
+// CHECK: open_existential_addr %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073")
+// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %2
+// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2)
+// CHECK: open_existential_addr
+// CHECK: witness_method
+// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2)
+// CHECK: return
+sil hidden @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
+bb0(%0 : $*Pingable):
+  debug_value_addr %0 : $*Pingable  // let x      // id: %1
+  %2 = open_existential_addr %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable // users: %3, %4
+  %3 = witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %2 : $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %4
+  %4 = apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %5 = open_existential_addr %0 : $*Pingable to $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable // users: %6, %7
+  %6 = witness_method $@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %5 : $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %7
+  %7 = apply %6<@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0 : $*Pingable                    // id: %8
+  %9 = tuple ()                                   // user: %10
+  return %9 : $()                                 // id: %10
+}
+
+// CHECK-LABEL: CSE_Existential_Calls_With_Control_Flow
+sil hidden @CSE_Existential_Calls_With_Control_Flow : $@convention(thin) (@in Pingable, Int) -> () {
+bb0(%0 : $*Pingable, %1 : $Int):
+  debug_value_addr %0 : $*Pingable  // let x      // id: %2
+  debug_value %1 : $Int  // let y                 // id: %3
+  %4 = open_existential_addr %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable // users: %5, %6
+  %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %6
+
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
+  %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %7 = integer_literal $Builtin.Int64, 3          // user: %9
+  %8 = integer_literal $Builtin.Int64, 3          // user: %9
+  %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1 // user: %10
+  cond_br %9, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  %11 = open_existential_addr %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable // users: %12, %13
+  %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %13
+
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
+  %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable>(%11) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  br bb2                                          // id: %14
+
+bb2:                                              // Preds: bb0 bb1
+  %15 = open_existential_addr %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable // users: %16, %17
+  %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %17
+
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
+  %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable>(%15) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0 : $*Pingable                    // id: %18
+  %19 = tuple ()                                  // user: %20
+
+  // CHECK: return
+  return %19 : $()                                // id: %20
+}
+

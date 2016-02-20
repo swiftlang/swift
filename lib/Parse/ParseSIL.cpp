@@ -144,8 +144,8 @@ namespace {
     /// method is used to register it and update our symbol table.
     void setLocalValue(ValueBase *Value, StringRef Name, SourceLoc NameLoc);
 
-    SILDebugLocation *getDebugLoc(SILBuilder & B, SILLocation Loc) {
-      return B.getOrCreateDebugLocation(Loc, F->getDebugScope());
+    SILDebugLocation getDebugLoc(SILBuilder & B, SILLocation Loc) {
+      return SILDebugLocation(Loc, F->getDebugScope());
     }
 
   public:
@@ -366,7 +366,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
       P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(),
                  Fn->getLoweredFunctionType(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
-      auto loc = SILFileLocation(Loc);
+      auto loc = RegularLocation(Loc);
       Fn =
           SILMod.getOrCreateFunction(SILLinkage::Private, "", Ty, nullptr, loc,
                                      IsNotBare, IsNotTransparent, IsNotFragile);
@@ -383,7 +383,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     return Fn;
   }
   
-  auto loc = SILFileLocation(Loc);
+  auto loc = RegularLocation(Loc);
   // If we don't have a forward reference, make sure the function hasn't been
   // defined already.
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
@@ -410,7 +410,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
 SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
                                                   CanSILFunctionType Ty,
                                                   SourceLoc Loc) {
-  auto loc = SILFileLocation(Loc);
+  auto loc = RegularLocation(Loc);
   
   // Check to see if we have a function by this name already.
   if (SILFunction *FnRef = SILMod.lookUpFunction(Name.str())) {
@@ -1042,7 +1042,7 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
       parseSILType(Ty))
     return true;
   
-  Result = getLocalValue(Name, Ty, SILFileLocation(Loc), B);
+  Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
   return false;
 }
 
@@ -1443,7 +1443,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
 
-  SILLocation InstLoc = SILFileLocation(OpcodeLoc);
+  SILLocation InstLoc = RegularLocation(OpcodeLoc);
 
   auto parseCastConsumptionKind = [&](Identifier name, SourceLoc loc,
                                       CastConsumptionKind &out) -> bool {
@@ -2337,7 +2337,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         Type EltTy = TT->getElement(TypeElts.size()).getType();
         if (parseValueRef(Val,
                  SILType::getPrimitiveObjectType(EltTy->getCanonicalType()),
-                          SILFileLocation(P.Tok.getLoc()), B))
+                          RegularLocation(P.Tok.getLoc()), B))
           return true;
         OpList.push_back(Val);
         TypeElts.push_back(Val->getType().getSwiftRValueType());
@@ -2930,7 +2930,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       // Parse 'case' value-ref ':' sil-identifier.
       if (P.consumeIf(tok::kw_case)) {
         if (parseValueRef(CaseVal, Val->getType(),
-                          SILFileLocation(P.Tok.getLoc()), B)) {
+                          RegularLocation(P.Tok.getLoc()), B)) {
           // TODO: Issue a proper error message here
           P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "reference to a value");
           return true;
@@ -3618,7 +3618,7 @@ bool Parser::parseSILGlobal() {
   auto *GV = SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(),
                                        (IsFragile_t)isFragile,
                                        GlobalName.str(),GlobalType,
-                                       SILFileLocation(NameLoc));
+                                       RegularLocation(NameLoc));
 
   GV->setLet(isLet);
   // Parse static initializer if exists.

@@ -46,7 +46,7 @@ void printModuleInterface(ModuleDecl *M,
 // FIXME: this API should go away when Swift can represent Clang submodules as
 // 'swift::Module *' objects.
 void printSubmoduleInterface(ModuleDecl *M, ArrayRef<StringRef> FullModuleName,
-                             Optional<StringRef> GroupName,
+                             ArrayRef<StringRef> GroupNames,
                              ModuleTraversalOptions TraversalOptions,
                              ASTPrinter &Printer, const PrintOptions &Options,
                              const bool PrintSynthesizedExtensions);

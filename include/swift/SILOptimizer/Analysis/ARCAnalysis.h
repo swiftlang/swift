@@ -114,6 +114,10 @@ class ConsumedReturnValueToEpilogueRetainMatcher {
 public:
   enum class ExitKind { Return, Throw };
 
+  enum class FindRetainKind { None, Found, Blocked };
+
+  using RetainKindValue = std::pair<FindRetainKind, SILInstruction *>;
+
 private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
@@ -158,6 +162,11 @@ public:
   unsigned size() const { return EpilogueRetainInsts.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+
+
+private:
+  /// Finds matching releases in the provided block \p BB.
+  RetainKindValue findMatchingRetainsInner(SILBasicBlock *BB, SILValue V);
 };
 
 /// A class that attempts to match owned arguments and corresponding epilogue

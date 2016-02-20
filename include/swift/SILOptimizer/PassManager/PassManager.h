@@ -196,6 +196,9 @@ private:
   /// options) whether we should continue running passes.
   bool continueTransforming();
 
+  /// Return true if all analyses are unlocked.
+  bool analysesUnlocked();
+
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.
   /// When asserts are disabled, this is a NoOp.

@@ -449,6 +449,16 @@ private:
   /// A map from each BasicBlock to its BlockState.
   llvm::SmallDenseMap<SILBasicBlock *, BlockState, 16> BBToLocState;
 
+  /// Keeps a list of basic blocks that have LoadInsts. If a basic block does
+  /// not have LoadInst, we do not actually perform the last iteration where
+  /// RLE is actually performed on the basic block.
+  ///
+  /// NOTE: This is never populated for functions which will only require 1
+  /// data flow iteration. For function that requires more than 1 iteration of
+  /// the data flow this is populated when the first time the functions is
+  /// walked, i.e. when the we generate the genset and killset.
+  llvm::DenseSet<SILBasicBlock *> BBWithLoads;
+
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
              TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO);
@@ -478,7 +488,7 @@ public:
   void processBasicBlocksForAvailValue();
 
   /// Process basic blocks to perform the redundant load elimination.
-  void processBasicBlocksForRLE();
+  void processBasicBlocksForRLE(bool Optimistic);
 
   /// Returns the alias analysis we will use during all computations.
   AliasAnalysis *getAA() const { return AA; }
@@ -1218,6 +1228,8 @@ void RLEContext::processBasicBlocksForGenKillSet() {
     // point in the basic block.
     for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
       if (auto *LI = dyn_cast<LoadInst>(&*I)) {
+        if (BBWithLoads.find(BB) == BBWithLoads.end())
+          BBWithLoads.insert(BB);
         S.processLoadInst(*this, LI, RLEKind::ComputeAvailSetMax);
       }
       if (auto *SI = dyn_cast<StoreInst>(&*I)) {
@@ -1284,8 +1296,16 @@ void RLEContext::processBasicBlocksForAvailValue() {
   }
 }
 
-void RLEContext::processBasicBlocksForRLE() {
+void RLEContext::processBasicBlocksForRLE(bool Optimistic) {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
+    // If we know this is not a one iteration function which means its
+    // forward sets have been computed and converged, 
+    // and this basic block does not even have LoadInsts, there is no point
+    // in processing every instruction in the basic block again as no store
+    // will be eliminated. 
+    if (Optimistic && BBWithLoads.find(BB) == BBWithLoads.end())
+      continue;
+
     BlockState &Forwarder = getBlockState(BB);
 
     // Merge the predecessors. After merging, BlockState now contains
@@ -1295,6 +1315,11 @@ void RLEContext::processBasicBlocksForRLE() {
 
     // Perform the actual redundant load elimination.
     Forwarder.processBasicBlockWithKind(*this, RLEKind::PerformRLE);
+
+    // If this is not a one iteration data flow, then the forward sets
+    // have been computed.
+    if (Optimistic)
+      continue;
 
     // Update the locations with available values and their values.
     Forwarder.updateForwardSetOut();
@@ -1344,7 +1369,7 @@ bool RLEContext::run() {
     return false;
 
   // Do we run a multi-iteration data flow ?
-  bool MultiIteration = Kind == ProcessKind::ProcessMultipleIterations ?
+  bool Optimistic = Kind == ProcessKind::ProcessMultipleIterations ?
                         true : false;
 
   // These are a list of basic blocks that we actually processed.
@@ -1358,16 +1383,16 @@ bool RLEContext::run() {
   // vector to the appropriate size.
   for (auto &B : *Fn) {
     BBToLocState[&B] = BlockState();
-    BBToLocState[&B].init(&B, LocationVault.size(), MultiIteration &&
+    BBToLocState[&B].init(&B, LocationVault.size(), Optimistic &&
                           BBToProcess.find(&B) != BBToProcess.end());
   }
 
-  if (MultiIteration)
+  if (Optimistic)
     runIterativeRLE();
 
   // We have the available value bit computed and the local forwarding value.
   // Set up the load forwarding.
-  processBasicBlocksForRLE();
+  processBasicBlocksForRLE(Optimistic);
 
   // Finally, perform the redundant load replacements.
   llvm::DenseSet<SILInstruction *> InstsToDelete;

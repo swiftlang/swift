@@ -461,7 +461,7 @@ number of ways:
 
 - A SIL function type declares the conventions for its results.
   The results are written as an unlabelled tuple; the elements of that
-  tuple must be legal SIL types, optionally decoarted with one of the
+  tuple must be legal SIL types, optionally decorated with one of the
   following convention attributes.  Indirect and direct results may
   be interleaved.
 
@@ -2390,6 +2390,16 @@ the same.  Transformations should be somewhat forgiving here.
 The second operand may have either object or address type.  In the
 latter case, the dependency is on the current value stored in the
 address.
+
+strong_pin
+``````````
+
+TODO: Fill me in!
+
+strong_unpin
+````````````
+
+TODO: Fill me in!
 
 is_unique
 `````````

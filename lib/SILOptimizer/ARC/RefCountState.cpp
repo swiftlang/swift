@@ -86,6 +86,7 @@ bool BottomUpRefCountState::initWithMutatorInst(
   SILInstruction *Inst = *I->begin();
   assert((isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst)) &&
          "strong_release and release_value are only supported.");
+  (void) Inst;
 
   bool NestingDetected = SuperTy::initWithMutatorInst(I);
 

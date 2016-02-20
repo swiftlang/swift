@@ -40,7 +40,7 @@ inline bool isIndirectConvention(SILArgumentConvention convention) {
   return convention <= SILArgumentConvention::Indirect_Out;
 }
 
-/// Turn a ParameterConveneion into a SILArgumentConvention.
+/// Turn a ParameterConvention into a SILArgumentConvention.
 inline SILArgumentConvention getSILArgumentConvention(ParameterConvention conv){
   switch (conv) {
   case ParameterConvention::Indirect_In:

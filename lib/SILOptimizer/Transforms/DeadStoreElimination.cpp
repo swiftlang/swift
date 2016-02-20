@@ -255,7 +255,7 @@ public:
   SILBasicBlock *getBB() const { return BB; }
 
   /// Initialize the bitvectors for the current basic block.
-  void init(DSEContext &Ctx, bool PessimisticDF);
+  void init(DSEContext &Ctx, bool Optimistic);
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
@@ -452,7 +452,7 @@ public:
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
-  void processBasicBlockForDSE(SILBasicBlock *BB, bool PessimisticDF);
+  void processBasicBlockForDSE(SILBasicBlock *BB, bool Optimistic);
 
   /// Compute the genset and killset for the current basic block.
   void processBasicBlockForGenKillSet(SILBasicBlock *BB);
@@ -470,7 +470,7 @@ public:
 
 } // end anonymous namespace
 
-void BlockState::init(DSEContext &Ctx, bool PessimisticDF)  {
+void BlockState::init(DSEContext &Ctx, bool Optimistic)  {
   std::vector<LSLocation> &LV = Ctx.getLocationVault();
   LocationNum = LV.size();
   // For function that requires just 1 iteration of the data flow to converge
@@ -489,7 +489,7 @@ void BlockState::init(DSEContext &Ctx, bool PessimisticDF)  {
   // However, by doing so, we can only eliminate the dead stores after the
   // data flow stabilizes.
   //
-  BBWriteSetIn.resize(LocationNum, !PessimisticDF);
+  BBWriteSetIn.resize(LocationNum, Optimistic);
   BBWriteSetOut.resize(LocationNum, false);
   BBWriteSetMid.resize(LocationNum, false);
 
@@ -607,14 +607,14 @@ bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
 }
 
 void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB,
-                                         bool PessimisticDF) {
+                                         bool Optimistic) {
   // If we know this is not a one iteration function which means its
   // its BBWriteSetIn and BBWriteSetOut have been computed and converged, 
   // and this basic block does not even have StoreInsts, there is no point
   // in processing every instruction in the basic block again as no store
   // will be eliminated. 
-  if (!PessimisticDF && BBWithStores.find(BB) == BBWithStores.end())
-       return;
+  if (Optimistic && BBWithStores.find(BB) == BBWithStores.end())
+    return;
 
   // Intersect in the successor WriteSetIns. A store is dead if it is not read
   // from any path to the end of the program. Thus an intersection.
@@ -1131,7 +1131,7 @@ bool DSEContext::run() {
       return false;
 
   // Do we run a pessimistic data flow ?
-  bool PessimisticDF = Kind == ProcessKind::ProcessOptimistic ? false : true;
+  bool Optimistic = Kind == ProcessKind::ProcessOptimistic ? true : false;
 
   // For all basic blocks in the function, initialize a BB state.
   //
@@ -1142,7 +1142,7 @@ bool DSEContext::run() {
     BlockStates.push_back(BlockState(&B));
     // Since we know all the locations accessed in this function, we can resize
     // the bit vector to the appropriate size.
-    BlockStates.back().init(*this, PessimisticDF);
+    BlockStates.back().init(*this, Optimistic);
   }
 
   // Initialize the BBToLocState mapping.
@@ -1173,14 +1173,14 @@ bool DSEContext::run() {
   // on the function.
 
   // We need to run the iterative data flow on the function.
-  if (!PessimisticDF) {
+  if (Optimistic) {
     runIterativeDSE();
   }
 
   // The data flow has stabilized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
   for (SILBasicBlock *B : PO->getPostOrder()) {
-    processBasicBlockForDSE(B, PessimisticDF);
+    processBasicBlockForDSE(B, Optimistic);
   }
 
   // Finally, delete the dead stores and create the live stores.

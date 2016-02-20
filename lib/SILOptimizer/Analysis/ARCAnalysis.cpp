@@ -481,56 +481,128 @@ void ConsumedReturnValueToEpilogueRetainMatcher::recompute() {
   findMatchingRetains(&*BB);
 }
 
+
 void
 ConsumedReturnValueToEpilogueRetainMatcher::
 findMatchingRetains(SILBasicBlock *BB) {
   // Iterate over the instructions post-order and find retains associated with
   // return value.
-  //
-  // Break on a user that can potential decrement the reference count, we do not
-  // want to create a life-time gap.
   SILValue RV = SILValue();
   for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
     if (ReturnInst *RI = dyn_cast<ReturnInst>(&*II)) {
-      assert(!RV && "Found multiple return instructions");
       RV = RI->getOperand();
-      continue;
+      break;
+    }
+  }
+
+  // Somehow, we managed not to find a return value.
+  if (!RV)
+    return;
+
+  // OK. we've found the return value, now iterate on the CFG to find all the
+  // post-dominating retains.
+  constexpr unsigned WorkListMaxSize = 8;
+  RV = RCFI->getRCIdentityRoot(RV);
+  llvm::DenseSet<SILBasicBlock *> RetainFrees;
+  llvm::SmallVector<SILBasicBlock *, 4> WorkList;
+  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  WorkList.push_back(BB);
+  HandledBBs.insert(BB);
+  while (!WorkList.empty()) {
+    auto *CBB = WorkList.pop_back_val();
+    RetainKindValue Kind = findMatchingRetainsInner(CBB, RV);
+
+    // Too many blocks ?.
+    if (WorkList.size() > WorkListMaxSize) {
+      EpilogueRetainInsts.clear();
+      return;
     }
 
+    // There is a MayDecrement instruction.
+    if (Kind.first == FindRetainKind::Blocked)
+      return;
+  
+    if (Kind.first == FindRetainKind::None) {
+      RetainFrees.insert(CBB);
+
+      // We can not find a retain in a block with no predecessors.
+      if (CBB->getPreds().begin() == CBB->getPreds().end()) {
+        EpilogueRetainInsts.clear();
+        return;
+      }
+
+      // Check the predecessors.
+      for (auto X : CBB->getPreds()){
+        if (HandledBBs.find(X) != HandledBBs.end())
+          continue;
+        WorkList.push_back(X);
+        HandledBBs.insert(X);
+      }
+    }
+
+    // We've found a retain on this path.
+    if (Kind.first == FindRetainKind::Found) 
+      EpilogueRetainInsts.push_back(Kind.second);
+  }
+
+  // For every block with retain, we need to check the transitive
+  // closure of its successors are retain-free.
+  for (auto &I : EpilogueRetainInsts) {
+    auto *CBB = I->getParent();
+    for (auto &Succ : CBB->getSuccessors()) {
+      if (RetainFrees.find(Succ) != RetainFrees.end())
+        continue;
+      EpilogueRetainInsts.clear();
+      return;
+    }
+  }
+  for (auto CBB : RetainFrees) {
+    for (auto &Succ : CBB->getSuccessors()) {
+      if (RetainFrees.find(Succ) != RetainFrees.end())
+        continue;
+      EpilogueRetainInsts.clear();
+      return;
+    }
+  }
+
+  // At this point, we've either failed to find any epilogue retains or
+  // all the post-dominating epilogue retains.
+}
+
+ConsumedReturnValueToEpilogueRetainMatcher::RetainKindValue
+ConsumedReturnValueToEpilogueRetainMatcher::
+findMatchingRetainsInner(SILBasicBlock *BB, SILValue V) {
+  for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
     // If we do not have a retain_value or strong_retain...
     if (!isa<RetainValueInst>(*II) && !isa<StrongRetainInst>(*II)) {
-      assert(RV && "Found instructions before return instruction");
       // we can ignore it if it can not decrement the reference count of the
       // return value.
-      if (!mayDecrementRefCount(&*II, RV, AA))
+      if (!mayDecrementRefCount(&*II, V, AA))
         continue;
 
       // Otherwise, we need to stop computing since we do not want to create
       // lifetime gap.
-      break;
+      return std::make_pair(FindRetainKind::Blocked, nullptr);
     }
-
-    // Somehow, we managed not to find a return value.
-    if (!RV)
-      break;
 
     // Ok, we have a retain_value or strong_retain. Grab Target and find the
     // RC identity root of its operand.
     SILInstruction *Target = &*II;
     SILValue RetainValue = RCFI->getRCIdentityRoot(Target->getOperand(0));
-    SILValue ReturnValue = RCFI->getRCIdentityRoot(RV);
+    SILValue ReturnValue = RCFI->getRCIdentityRoot(V);
 
     // Is this the epilogue retain we are looking for ?.
     // We break here as we do not know whether this is a part of the epilogue
     // retain for the @own return value.
     if (RetainValue != ReturnValue)
-      break;
+      continue;
 
-    // We've found the epilogue retain for the @own return value.
-    EpilogueRetainInsts.push_back(&*II);
-    break;
+    return std::make_pair(FindRetainKind::Found, &*II);
   }
-}
+
+  // Did not find retain in this block.
+  return std::make_pair(FindRetainKind::None, nullptr);
+} 
 
 ConsumedArgToEpilogueReleaseMatcher::ConsumedArgToEpilogueReleaseMatcher(
     RCIdentityFunctionInfo *RCFI, SILFunction *F, ExitKind Kind)

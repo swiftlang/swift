@@ -34,27 +34,29 @@ var x: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: Int.Type
 // CHECK1-NEXT: Swift{{$}}
-// CHECK1-NEXT: <Group>FixedPoint</Group>
+// CHECK1-NEXT: <Group>Misc</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
 // CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>
-// GROUP1: Algorithm
-// GROUP1: Assert
-// GROUP1: Character
-// GROUP1: Collection
-// GROUP1: FlatMap
-// GROUP1: OutputStream
-// GROUP1: String
-// GROUP1: Zip
+// GROUP1-DAG: Algorithm
+// GROUP1-DAG: Assert
+// GROUP1-DAG: String
+// GROUP1-DAG: Collection
+// GROUP1-DAG: Bool
+// GROUP1-DAG: Math
+// GROUP1-DAG: Misc
 // GROUP1: <\GROUPS>
 
-// RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Zip > %t.zip.response
-// RUN: FileCheck -check-prefix=CHECK-ZIP -input-file %t.zip.response %s
-// CHECK-ZIP: public struct Zip2Iterator<Iterator1 : IteratorProtocol, Iterator2 : IteratorProtocol> : IteratorProtocol {
-// CHECK-ZIP: public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> : Sequence {
-// Zip group cannot include Int
-// CHECK-ZIP-NOT: struct Int : SignedIntegerType, Comparable, Equatable {
-// CHECK-ZIP-NOT: extension String.UTF16View.Index {
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Bool > %t.Bool.response
+// RUN: FileCheck -check-prefix=CHECK-BOOL -input-file %t.Bool.response %s
+// CHECK-BOOL-DAG: extension Bool : Boolean {
+// CHECK-BOOL-DAG: extension Bool : BooleanLiteralConvertible {
+
+// These are not in the bool group:
+// CHECK-BOOL-NOT: Zip2Iterator
+// CHECK-BOOL-NOT: Zip2Sequence
+// CHECK-BOOL-NOT: struct Int
+// CHECK-BOOL-NOT: extension String

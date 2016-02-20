@@ -19,6 +19,7 @@
 #include "clang/Basic/TargetOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -946,6 +947,7 @@ GetKindAsDeclKind (swift::Demangle::Node::Kind node_kind)
       printf ("Missing alias for %s.\n", SwiftDemangleNodeKindToCString(node_kind));
       assert (0);
   }
+  llvm_unreachable("Invalid case");
 }
 
 // This should be called with a function type & its associated Decl.  If the type is not a function type,

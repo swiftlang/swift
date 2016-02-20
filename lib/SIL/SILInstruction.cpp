@@ -48,7 +48,7 @@ void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
   assert(DS->getParentFunction() == getFunction() &&
          "scope belongs to different function");
 
-  Location = *B.getOrCreateDebugLocation(getLoc(), DS);
+  Location = SILDebugLocation(getLoc(), DS);
 }
 
 //===----------------------------------------------------------------------===//

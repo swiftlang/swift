@@ -149,29 +149,6 @@ public:
   const SILDebugScope *getOrCreateClonedScope(const SILDebugScope *OrigScope);
 };
 
-/// A SILLocation paired with a SILDebugScope.
-class SILDebugLocation : public SILAllocated<SILDebugLocation> {
-  SILLocation Location;
-  const SILDebugScope *Scope = nullptr;
-
-public:
-  SILDebugLocation(SILLocation Loc, const SILDebugScope *DS)
-      : Location(Loc), Scope(DS) {}
-  SILLocation getLocation() const { return Location; }
-  const SILDebugScope *getScope() const { return Scope; }
-  bool operator==(const SILDebugLocation &other) const {
-    return Location == other.getLocation() && Scope == other.getScope();
-  }
-};
-
-/// Fingerprint a SILDebugLocation for use in a DenseMap.
-typedef std::pair<std::pair<const void *, unsigned>, const void *> DebugLocKey;
-struct SILDebugLocationID : public DebugLocKey {
-  SILDebugLocationID(const SILDebugLocation &L)
-      : DebugLocKey({L.getLocation().getOpaquePointerValue(),
-                     L.getLocation().getOpaqueKind()},
-                    L.getScope()) {}
-};
 }
 
 #endif

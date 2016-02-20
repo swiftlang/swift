@@ -128,18 +128,6 @@ func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   }
 }
 
-@_transparent
-public // COMPILER_INTRINSIC
-func _injectValueIntoOptional<Wrapped>(v: Wrapped) -> Wrapped? {
-  return .some(v)
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
-func _injectNothingIntoOptional<Wrapped>() -> Wrapped? {
-  return .none
-}
-
 // Comparisons
 @warn_unused_result
 public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {

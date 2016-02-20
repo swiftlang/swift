@@ -65,6 +65,7 @@ set(SWIFT_BENCH_MODULES
     single-source/PopFrontGeneric
     single-source/Prims
     single-source/ProtocolDispatch
+    single-source/ProtocolDispatch2
     single-source/RangeAssignment
     single-source/RC4
     single-source/RecursiveOwnedParameter

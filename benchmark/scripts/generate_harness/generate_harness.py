@@ -40,14 +40,14 @@ if __name__ == '__main__':
              for x in glob.glob(os.path.join(single_source_dir, '*.swift'))]
 
     # CMakeList multi-source
-    class multi_source_bench(object):
+    class MultiSourceBench(object):
         def __init__(self, path):
             self.name = os.path.basename(path)
             self.files = [x for x in os.listdir(path)
                           if x.endswith('.swift')]
     if os.path.isdir(multi_source_dir):
         multisource_benches = [
-            multi_source_bench(os.path.join(multi_source_dir, x))
+            MultiSourceBench(os.path.join(multi_source_dir, x))
             for x in os.listdir(multi_source_dir)
             if os.path.isdir(os.path.join(multi_source_dir, x))
         ]

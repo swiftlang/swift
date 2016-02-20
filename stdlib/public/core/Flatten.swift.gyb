@@ -51,7 +51,7 @@ public struct FlattenIterator<
   }
 
   internal var _base: Base
-  internal var _inner: Base.Element.Iterator? = nil
+  internal var _inner: Base.Element.Iterator?
 }
 
 /// A sequence consisting of all the elements contained in each segment

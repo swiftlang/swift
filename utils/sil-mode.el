@@ -1,14 +1,14 @@
-;===--- sil-mode.el --------------------------------------------------------===;
-;
-; This source file is part of the Swift.org open source project
-;
-; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
-; Licensed under Apache License v2.0 with Runtime Library Exception
-;
-; See http://swift.org/LICENSE.txt for license information
-; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-;
-;===------------------------------------------------------------------------===;
+;;===--- sil-mode.el ------------------------------------------------------===;;
+;;
+;; This source file is part of the Swift.org open source project
+;;
+;; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+;; Licensed under Apache License v2.0 with Runtime Library Exception
+;;
+;; See http://swift.org/LICENSE.txt for license information
+;; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+;;
+;;===----------------------------------------------------------------------===;;
 
 ;; Create mode-specific tables.
 (defvar sil-mode-syntax-table nil
@@ -40,6 +40,7 @@
                   'words) . font-lock-keyword-face)
    ;; SIL Stage
    '("sil_stage" . font-lock-keyword-face)
+
    ;; SIL Function
    `(,(regexp-opt '("sil" "internal" "thunk")
                   'words) . font-lock-keyword-face)
@@ -47,28 +48,38 @@
    `(,(regexp-opt '("public" "hidden" "private" "shared" "public_external"
                     "hidden_external" "shared_external" "private_external")
                   'words) . font-lock-keyword-face)
+
    ;; SIL Declaration
    `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "enumelt"
                     "destroyer" "globalaccessor" "objc") 'words) .
 		    font-lock-keyword-face)
+
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
-                    "dealloc_stack" "dealloc_box" "dealloc_ref")
+                    "alloc_value_buffer" "alloc_global"
+                    "dealloc_stack" "dealloc_box" "project_box" "dealloc_ref"
+                    "dealloc_partial_ref" "dealloc_value_buffer"
+                    "project_value_buffer")
 		  'words) . font-lock-keyword-face)
+
    ;; SIL Instructions - Debug Information.
    `(,(regexp-opt '("debug_value" "debug_value_addr")
                   'words) . font-lock-keyword-face)
+
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
                     "mark_function_escape" "copy_addr" "destroy_addr"
                     "index_addr" "index_raw_pointer" "to")
 		  'words) . font-lock-keyword-face)
+
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain"
                     "strong_release" "strong_retain_unowned"
                     "unowned_retain" "unowned_release"
-                    "ref_to_unmanaged" "unmanaged_to_ref"
-                    "load_weak" "store_weak" "fix_lifetime" "mark_dependence"
+                    "load_weak" "store_weak"
+                    "fix_lifetime" "mark_dependence"
+                    "is_unique" "is_unique_or_pinned"
+                    "copy_block"
                     "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
 		  'words) . font-lock-keyword-face)
    ;; Literals
@@ -125,11 +136,10 @@
                     "objc_existential_metatype_to_object"
                     "word_to_bridge_object"
                     "is_nonnull"
+
                     )
                   'words) . font-lock-keyword-face)
-   ;; Value Buffer
-   `(,(regexp-opt '("alloc_value_buffer" "dealloc_value_buffer"
-                    "project_value_buffer") 'words) . font-lock-keyword-face)
+
    ;; Checked Conversions
    `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr")
 		  'words) . font-lock-keyword-face)

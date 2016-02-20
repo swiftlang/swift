@@ -172,6 +172,14 @@ bool SILPassManager::continueTransforming() {
          NumPassesRun < SILNumOptPassesToRun;
 }
 
+bool SILPassManager::analysesUnlocked() {
+  for (auto A : Analysis)
+    if (A->isLocked())
+      return false;
+
+  return true;
+}
+
 void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
                                          SILFunction *F,
                                          bool runToCompletion) {
@@ -179,6 +187,8 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
   const SILOptions &Options = getOptions();
 
   CompletedPasses &completedPasses = CompletedPassesMap[F];
+
+  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   for (auto SFT : FuncTransforms) {
     PrettyStackTraceSILFunctionTransform X(SFT);
@@ -220,6 +230,7 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
     llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
     Mod->registerDeleteNotificationHandler(SFT);
     SFT->run();
+    assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
     Mod->removeDeleteNotificationHandler(SFT);
 
     // Did running the transform result in new functions being added
@@ -357,9 +368,11 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   }
 
   llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->registerDeleteNotificationHandler(SMT);
   SMT->run();
   Mod->removeDeleteNotificationHandler(SMT);
+  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   if (SILPrintPassTime) {
     auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
@@ -384,13 +397,6 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
 }
 
 void SILPassManager::runOneIteration() {
-  // Verify that all analysis were properly unlocked.
-  for (auto A : Analysis) {
-    assert(!A->isLocked() &&
-           "Deleting a locked analysis. Did we forget to unlock ?");
-    (void)A;
-  }
-
   const SILOptions &Options = getOptions();
 
   DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
