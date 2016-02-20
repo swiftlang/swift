@@ -17,12 +17,12 @@
 ///       let rawValue: Int
 ///       init(rawValue: Int) { self.rawValue = rawValue }
 ///     
-///       static let Box = PackagingOptions(rawValue: 1)
-///       static let Carton = PackagingOptions(rawValue: 2)
-///       static let Bag = PackagingOptions(rawValue: 4)
-///       static let Satchel = PackagingOptions(rawValue: 8)
-///       static let BoxOrBag: PackagingOptions = [Box, Bag]
-///       static let BoxOrCartonOrBag: PackagingOptions = [Box, Carton, Bag]
+///       static let box = PackagingOptions(rawValue: 1)
+///       static let carton = PackagingOptions(rawValue: 2)
+///       static let bag = PackagingOptions(rawValue: 4)
+///       static let satchel = PackagingOptions(rawValue: 8)
+///       static let boxOrBag: PackagingOptions = [box, bag]
+///       static let boxOrCartonOrBag: PackagingOptions = [box, carton, bag]
 ///     }
 ///
 /// In the example above, `PackagingOptions.Element` is the same type
