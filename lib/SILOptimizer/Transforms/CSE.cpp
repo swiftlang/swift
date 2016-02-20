@@ -686,10 +686,10 @@ using ApplyWitnessPair = std::pair<ApplyInst *, WitnessMethodInst *>;
 /// Returns the Apply and WitnessMethod instructions that use the
 /// open_existential_addr instructions, or null if at least one of the
 /// instructions is missing.
-ApplyWitnessPair getOpenExsUsers(OpenExistentialAddrInst *OE) {
+ApplyWitnessPair getOpenExistentialUsers(OpenExistentialAddrInst *OE) {
   ApplyInst *AI = nullptr;
   WitnessMethodInst *WMI = nullptr;
-  auto Empty = std::make_pair(nullptr, nullptr);
+  ApplyWitnessPair Empty = std::make_pair(nullptr, nullptr);
 
   for (auto *UI : getNonDebugUses(OE)) {
     auto *User = UI->getUser();
@@ -740,7 +740,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   ApplyInst *ToAI = nullptr;
   WitnessMethodInst *FromWMI = nullptr;
   WitnessMethodInst *ToWMI = nullptr;
-  std::tie(FromAI, FromWMI) = getOpenExsUsers(From);
+  std::tie(FromAI, FromWMI) = getOpenExistentialUsers(From);
   std::tie(ToAI, ToWMI) = ToApplyWitnessUsers;
 
   // Make sure that the OEA instruction has exactly two expected users.
@@ -844,7 +844,7 @@ static bool CSExistentialInstructions(SILArgument *Arg, DominanceInfo *DA) {
   // find the original users.
   llvm::SmallVector<ApplyWitnessPair, 8> OriginalAW;
   for (int i=0; i < NumOpenInstr; i++) {
-    OriginalAW.push_back(getOpenExsUsers(TopDominator[i]));
+    OriginalAW.push_back(getOpenExistentialUsers(TopDominator[i]));
   }
 
   // Perform the CSE for the open_existential_addr instruction and their
