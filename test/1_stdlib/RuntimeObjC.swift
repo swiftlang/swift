@@ -857,7 +857,7 @@ Reflection.test("NSRange QuickLook") {
   let rng = NSRange(location:Int.min, length:5)
   let ql = PlaygroundQuickLook(reflecting: rng)
   switch ql {
-  case .Range(let loc, let len):
+  case .range(let loc, let len):
     expectEqual(loc, Int64(Int.min))
     expectEqual(len, 5)
   default:

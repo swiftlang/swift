@@ -583,78 +583,72 @@ public enum PlaygroundQuickLook {
   // implementation.
 
   /// Plain text.
-  case Text(String)
+  case text(String)
 
   /// An integer numeric value.
-  case Int(Int64)
+  case int(Int64)
 
   /// An unsigned integer numeric value.
-  case UInt(UInt64)
+  case uInt(UInt64)
 
   /// A single precision floating-point numeric value.
-  case Float(Float32)
+  case float(Float32)
 
   /// A double precision floating-point numeric value.
-  case Double(Float64)
+  case double(Float64)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An image.
-  case Image(Any)
+  case image(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A sound.
-  case Sound(Any)
+  case sound(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A color.
-  case Color(Any)
+  case color(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A bezier path.
-  case BezierPath(Any)
+  case bezierPath(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An attributed string.
-  case AttributedString(Any)
+  case attributedString(Any)
 
+  // FIXME: Uses explicit coordinates to avoid coupling a particular Cocoa type.
   /// A rectangle.
-  ///
-  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Rectangle(Float64,Float64,Float64,Float64)
+  case rectangle(Float64, Float64, Float64, Float64)
 
+  // FIXME: Uses explicit coordinates to avoid coupling a particular Cocoa type.
   /// A point.
-  ///
-  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Point(Float64,Float64)
+  case point(Float64, Float64)
 
+  // FIXME: Uses explicit coordinates to avoid coupling a particular Cocoa type.
   /// A size.
-  ///
-  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Size(Float64,Float64)
+  case size(Float64, Float64)
 
-  /// A logical value.
-  case Logical(Bool)
+  /// A boolean value.
+  case bool(Bool)
 
+  // FIXME: Uses explicit values to avoid coupling a particular Cocoa type.
   /// A range.
-  ///
-  /// Uses explicit values to avoid coupling a particular Cocoa type.
-  case Range(Int64, Int64)
+  case range(Int64, Int64)
 
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A GUI view.
-  ///
-  /// Uses an Any to avoid coupling a particular Cocoa type.
-  case View(Any)
+  case view(Any)
 
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A graphical sprite.
-  ///
-  /// Uses an Any to avoid coupling a particular Cocoa type.
-  case Sprite(Any)
+  case sprite(Any)
 
   /// A Uniform Resource Locator.
-  case URL(String)
+  case url(String)
 
   /// Raw data that has already been encoded in a format the IDE understands.
-  case _Raw([UInt8], String)
+  case _raw([UInt8], String)
 }
 
 extension PlaygroundQuickLook {
@@ -680,7 +674,7 @@ extension PlaygroundQuickLook {
         self = q
       }
       else {
-        self = .Text(String(reflecting: subject))
+        self = .text(String(reflecting: subject))
       }
     }
   }

@@ -24,15 +24,15 @@ extension ${Self} : CustomPlaygroundQuickLookable {
     // send that
 #if os(OSX)
     if let data = data {
-      return .Sprite(NSImage(data: data))
+      return .sprite(NSImage(data: data))
     } else {
-      return .Sprite(NSImage())
+      return .sprite(NSImage())
     }
 #elseif os(iOS) || os(watchOS) || os(tvOS)
     if let data = data {
-      return .Sprite(UIImage(data: data))
+      return .sprite(UIImage(data: data))
     } else {
-      return .Sprite(UIImage())
+      return .sprite(UIImage())
     }
 #endif
   }

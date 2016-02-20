@@ -209,7 +209,7 @@ extension String.CharacterView : Collection {
     }
 
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
-      return .Int(Int64(_utf16Index))
+      return .int(Int64(_utf16Index))
     }
   }
 

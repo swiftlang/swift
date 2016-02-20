@@ -419,6 +419,6 @@ extension String.UTF8View : CustomReflectable {
 
 extension String.UTF8View : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Text(description)
+    return .text(description)
   }
 }

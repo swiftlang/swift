@@ -1399,7 +1399,7 @@ public typealias _FileReferenceLiteralType = NSURL
 
 extension NSURL : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .URL(absoluteString)
+    return .url(absoluteString)
   }
 }
 
@@ -1411,7 +1411,7 @@ extension NSRange : CustomReflectable {
 
 extension NSRange : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Range(Int64(location), Int64(length))
+    return .range(Int64(location), Int64(length))
   }
 }
 
@@ -1424,7 +1424,7 @@ extension NSDate : CustomPlaygroundQuickLookable {
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Text(summary)
+    return .text(summary)
   }
 }
 
@@ -1436,7 +1436,7 @@ extension NSSet : CustomReflectable {
 
 extension NSString : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Text(self as String)
+    return .text(self as String)
   }
 }
 

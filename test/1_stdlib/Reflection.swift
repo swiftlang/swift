@@ -150,7 +150,7 @@ dump(barrable)
 
 // CHECK-NEXT: Logical: true
 switch true.customPlaygroundQuickLook {
-  case .Logical(let x): print("Logical: \(x)")
+  case .bool(let x): print("Logical: \(x)")
   default: print("wrong quicklook type")
 }
 

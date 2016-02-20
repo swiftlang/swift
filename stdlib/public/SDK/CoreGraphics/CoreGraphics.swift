@@ -40,7 +40,7 @@ extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Point(Double(x), Double(y))
+    return .point(Double(x), Double(y))
   }
 }
 
@@ -83,7 +83,7 @@ extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Size(Double(width), Double(height))
+    return .size(Double(width), Double(height))
   }
 }
 
@@ -305,7 +305,9 @@ extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Rectangle(Double(origin.x), Double(origin.y), Double(size.width), Double(size.height))
+    return .rectangle(
+      Double(origin.x), Double(origin.y),
+      Double(size.width), Double(size.height))
   }
 }
 

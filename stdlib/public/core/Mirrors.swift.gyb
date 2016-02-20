@@ -18,20 +18,20 @@ from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 Types = [
-    ('Float', '.Float', 'self'),
-    ('Double', '.Double', 'self'),
-    ('Bool', '.Logical', 'self'),
-    ('String', '.Text', 'self'),
-    ('Character', '.Text', 'String(self)'),
-    ('UnicodeScalar', '.UInt', 'UInt64(self)'),
+    ('Float', '.float', 'self'),
+    ('Double', '.double', 'self'),
+    ('Bool', '.bool', 'self'),
+    ('String', '.text', 'self'),
+    ('Character', '.text', 'String(self)'),
+    ('UnicodeScalar', '.uInt', 'UInt64(self)'),
 ]
 
 for self_ty in all_integer_types(word_bits):
   Self = self_ty.stdlib_name
   if self_ty.is_signed:
-    Types.append( (Self, '.Int', 'Int64(self)') )
+    Types.append( (Self, '.int', 'Int64(self)') )
   else:
-    Types.append( (Self, '.UInt', 'UInt64(self)') )
+    Types.append( (Self, '.uInt', 'UInt64(self)') )
 
 }%
 

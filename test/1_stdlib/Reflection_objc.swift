@@ -79,7 +79,7 @@ dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 
 // CHECK-NEXT: got the expected quick look text
 switch PlaygroundQuickLook(reflecting: "woozle wuzzle" as NSString) {
-case .Text("woozle wuzzle"):
+case .text("woozle wuzzle"):
   print("got the expected quick look text")
 case _:
   print("got something else")
@@ -88,14 +88,14 @@ case _:
 // CHECK-NEXT: foobar
 let somesubclassofnsstring = ("foo" + "bar") as NSString
 switch PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
-  case .Text(let text): print(text)
+  case .text(let text): print(text)
   default: print("not the expected quicklook")
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
 let astr = NSAttributedString(string: "yizzle pizzle")
 switch PlaygroundQuickLook(reflecting: astr as NSAttributedString) {
-case .AttributedString(let astr2 as NSAttributedString)
+case .attributedString(let astr2 as NSAttributedString)
 where astr === astr2:
   print("got the expected quick look attributed string")
 case _:
@@ -104,7 +104,7 @@ case _:
 
 // CHECK-NEXT: got the expected quick look int
 switch PlaygroundQuickLook(reflecting: Int.max as NSNumber) {
-case .Int(+Int64(Int.max)):
+case .int(+Int64(Int.max)):
   print("got the expected quick look int")
 case _:
   print("got something else")
@@ -112,7 +112,7 @@ case _:
 
 // CHECK-NEXT: got the expected quick look uint
 switch PlaygroundQuickLook(reflecting: NSNumber(unsignedLongLong: UInt64.max)) {
-case .UInt(UInt64.max):
+case .uInt(UInt64.max):
   print("got the expected quick look uint")
 case _:
   print("got something else")
@@ -120,7 +120,7 @@ case _:
 
 // CHECK-NEXT: got the expected quick look double
 switch PlaygroundQuickLook(reflecting: 22.5 as NSNumber) {
-case .Double(22.5):
+case .double(22.5):
   print("got the expected quick look double")
 case _:
   print("got something else")
@@ -128,7 +128,7 @@ case _:
 
 // CHECK-NEXT: got the expected quick look float
 switch PlaygroundQuickLook(reflecting: Float32(1.25)) {
-case .Float(1.25):
+case .float(1.25):
   print("got the expected quick look float")
 case _:
   print("got something else")
@@ -140,7 +140,7 @@ case _:
 
 let image = OSImage(contentsOfFile:Process.arguments[1])!
 switch PlaygroundQuickLook(reflecting: image) {
-case .Image(let image2 as OSImage) where image === image2:
+case .image(let image2 as OSImage) where image === image2:
   print("got the expected quick look image")
 case _:
   print("got something else")
@@ -148,7 +148,7 @@ case _:
 
 let color = OSColor.black()
 switch PlaygroundQuickLook(reflecting: color) {
-case .Color(let color2 as OSColor) where color === color2:
+case .color(let color2 as OSColor) where color === color2:
   print("got the expected quick look color")
 case _:
   print("got something else")
@@ -156,7 +156,7 @@ case _:
 
 let path = OSBezierPath()
 switch PlaygroundQuickLook(reflecting: path) {
-case .BezierPath(let path2 as OSBezierPath) where path === path2:
+case .bezierPath(let path2 as OSBezierPath) where path === path2:
   print("got the expected quick look bezier path")
 case _:
   print("got something else")

@@ -15,7 +15,7 @@ import Foundation
 
 extension NSCursor : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Image(image)
+    return .image(image)
   }
 }
 
@@ -33,15 +33,15 @@ extension NSView : CustomPlaygroundQuickLookable {
     // an empty view, which is probably a safer option than crashing
     // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
     if _NSViewQuickLookState.views.contains(self) {
-      return .View(NSImage())
+      return .view(NSImage())
     } else {
       _NSViewQuickLookState.views.insert(self)
       let result: PlaygroundQuickLook
       if let b = bitmapImageRepForCachingDisplay(in: bounds) {
         cacheDisplay(in: bounds, to: b)
-        result = .View(b)
+        result = .view(b)
       } else {
-        result = .View(NSImage())
+        result = .view(NSImage())
       }
       _NSViewQuickLookState.views.remove(self)
       return result

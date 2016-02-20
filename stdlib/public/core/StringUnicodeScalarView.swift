@@ -417,6 +417,6 @@ extension String.UnicodeScalarView : CustomReflectable {
 
 extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Text(description)
+    return .text(description)
   }
 }

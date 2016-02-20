@@ -132,7 +132,7 @@ public struct ${Self}<Bound : Comparable>
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .Text(description)
+    return .text(description)
   }
 
   internal var _start: Bound

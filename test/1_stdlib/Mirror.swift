@@ -705,23 +705,25 @@ mirrors.test("PlaygroundQuickLook") {
   // Customization works.
   struct CustomQuickie : CustomPlaygroundQuickLookable {
     var customPlaygroundQuickLook: PlaygroundQuickLook {
-      return .Point(1.25, 42)
+      return .point(1.25, 42)
     }
   }
   switch PlaygroundQuickLook(reflecting: CustomQuickie()) {
-  case .Point(1.25, 42): break; default: expectTrue(false)
+  case .point(1.25, 42): break
+  default: expectTrue(false)
   }
   
   // PlaygroundQuickLook support from Legacy Mirrors works.
   switch PlaygroundQuickLook(reflecting: true) {
-  case .Logical(true): break; default: expectTrue(false)
+  case .bool(true): break
+  default: expectTrue(false)
   }
 
   // With no Legacy Mirror QuickLook support, we fall back to
   // String(reflecting: ).
   struct X {}
   switch PlaygroundQuickLook(reflecting: X()) {
-  case .Text(let text):
+  case .text(let text):
     expectTrue(text.hasSuffix(".(X #1)()"), text)
   default:
     expectTrue(false)
@@ -730,7 +732,8 @@ mirrors.test("PlaygroundQuickLook") {
     var debugDescription: String { return "Why?" }
   }
   switch PlaygroundQuickLook(reflecting: Y()) {
-  case .Text("Why?"): break; default: expectTrue(false)
+  case .text("Why?"): break
+  default: expectTrue(false)
   }
 }
 
