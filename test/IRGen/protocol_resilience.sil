@@ -199,6 +199,30 @@ bb0(%0 : $*ResilientConformingType):
   return %result : $()
 }
 
+// Caching witness table accessor
+
+// CHECK-LABEL: define linkonce_odr hidden i8** @_TWlV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_
+// CHECK-NEXT:    [[COND:%.*]] = icmp eq i8** [[CACHE]], null
+// CHECK-NEXT:    br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK:       cacheIsNull:
+// CHECK:         [[WTABLE:%.*]] = call i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-NEXT:    store i8** [[WTABLE]], i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_
+// CHECK-NEXT:    br label %cont
+
+// CHECK:       cont:
+// CHECK-NEXT:    [[RESULT:%.*]] = phi i8** [ [[CCHE:%.*]], %entry ], [ [[WTABLE:%.*]], %cacheIsNull ]
+// CHECK-NEXT:    ret i8** [[RESULT]]
+
+// Resilient conformance -- must call a runtime function
+
+// CHECK-LABEL: define i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_, %swift.type* null, i8** null)
+// CHECK-NEXT:    ret i8** [[WTABLE]]
+
 
 //
 // If a protocol refines a resilient protocol, any conformances are
@@ -286,33 +310,11 @@ bb0(%0 : $*ConformsWithResilientAssoc):
 
 
 //
-// Witness table accessors
+// Witness table accessors for fragile conformances are emitted last
 //
-
-// Resilient conformance -- must call a runtime function
-
-// QHECK-LABEL: define linkonce_odr hidden i8** @_TWlV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_()
-// QHECK-NEXT:  entry:
-// QHECK-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_
-// QHECK-NEXT:    [[COND:%.*]] = icmp eq i8** [[CACHE]], null
-// QHECK-NEXT:    br i1 [[COND]], label %cacheIsNull, label %cont
-
-// QHECK:       cacheIsNull:
-// QHECK:         [[WTABLE:%.*]] = call i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
-// QHECK-NEXT:    store i8** [[WTABLE]], i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_
-// QHECK-NEXT:    br label %cont
-
-// QHECK:       cont:
-// QHECK-NEXT:    [[RESULT:%.*]] = phi i8** [ [[CCHE:%.*]], %entry ], [ [[WTABLE:%.*]], %cacheIsNull ]
-// QHECK-NEXT:    ret i8** [[RESULT]]
-
-// QHECK-LABEL: define i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
-// QHECK-NEXT:  entry:
-// QHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_, %swift.type* null, i8** null)
-// QHECK-NEXT:    ret i8** [[WTABLE]]
 
 // Fragile conformance -- no runtime calls needed
 
-// QHECK-LABEL: define i8** @_TWaV19protocol_resilience16ConformingStructS_17ResilientProtocolS_()
-// QHECK-NEXT:  entry:
-// QHECK-NEXT:    ret i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @_TWPV19protocol_resilience16ConformingStructS_17ResilientProtocolS_, i32 0, i32 0)
+// CHECK-LABEL: define i8** @_TWaV19protocol_resilience16ConformingStructS_17ResilientProtocolS_()
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @_TWPV19protocol_resilience16ConformingStructS_17ResilientProtocolS_, i32 0, i32 0)
