@@ -29,36 +29,6 @@
 using namespace swift;
 using namespace swift::PatternMatch;
 
-/// Check that this is a partial apply of a reabstraction thunk and return the
-/// argument of the partial apply if it is.
-static SILValue
-isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI, bool requireSingleUse) {
-  if (requireSingleUse) {
-    SILValue PAIVal(PAI);
-    if (!hasOneNonDebugUse(PAIVal))
-      return SILValue();
-  }
-
-  if (PAI->getNumArguments() != 1)
-    return SILValue();
-
-  auto *Fun = PAI->getCalleeFunction();
-  if (!Fun)
-    return SILValue();
-
-  // Make sure we have a reabstraction thunk.
-  if (Fun->isThunk() != IsReabstractionThunk)
-    return SILValue();
-
-  // The argument should be a closure.
-  auto Arg = PAI->getArgument(0);
-  if (!Arg->getType().is<SILFunctionType>() ||
-      !Arg->getType().isReferenceCounted(PAI->getFunction()->getModule()))
-    return SILValue();
-
-  return PAI->getArgument(0);
-}
-
 /// Remove pointless reabstraction thunk closures.
 ///   partial_apply %reabstraction_thunk_typeAtoB(
 ///      partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
@@ -66,7 +36,7 @@ isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI, bool requireSingleUse)
 ///   %closure_typeB
 static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
                                            SILCombiner *Combiner) {
-  auto PAIArg = isPartialApplyOfReabstractionThunk(PAI, false);
+  auto PAIArg = isPartialApplyOfReabstractionThunk(PAI);
   if (!PAIArg)
     return false;
 
@@ -74,7 +44,10 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   if (!PAI2)
     return false;
 
-  auto PAI2Arg = isPartialApplyOfReabstractionThunk(PAI2, true);
+  if (!hasOneNonDebugUse(PAI2))
+    return false;
+
+  auto PAI2Arg = isPartialApplyOfReabstractionThunk(PAI2);
   if (!PAI2Arg)
     return false;
 

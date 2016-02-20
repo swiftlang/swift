@@ -232,6 +232,28 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
   return FullApplySite();
 }
 
+SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
+  if (PAI->getNumArguments() != 1)
+    return SILValue();
+
+  auto *Fun = PAI->getCalleeFunction();
+  if (!Fun)
+    return SILValue();
+
+  // Make sure we have a reabstraction thunk.
+  if (Fun->isThunk() != IsReabstractionThunk)
+    return SILValue();
+
+  // The argument should be a closure.
+  auto Arg = PAI->getArgument(0);
+  if (!Arg->getType().is<SILFunctionType>() ||
+      !Arg->getType().isReferenceCounted(PAI->getFunction()->getModule()))
+    return SILValue();
+
+  return Arg;
+}
+
+
 // Replace a dead apply with a new instruction that computes the same
 // value, and delete the old apply.
 void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
