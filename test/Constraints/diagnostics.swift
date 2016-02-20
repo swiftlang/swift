@@ -420,7 +420,7 @@ func ident<T>(t: T) -> T {}
 var c = ident({1.DOESNT_EXIST}) // error: expected-error {{value of type 'Int' has no member 'DOESNT_EXIST'}}
 
 // <rdar://problem/20712541> QoI: Int/UInt mismatch produces useless error inside a block
-var afterMessageCount : Int? = nil
+var afterMessageCount : Int?
 
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(a : () -> ()) {}

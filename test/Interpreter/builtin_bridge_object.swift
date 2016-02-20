@@ -176,7 +176,7 @@ if true {
   print(sizeof(Optional<Builtin.BridgeObject>.self)
             == sizeof(Builtin.BridgeObject.self))
 
-  var bo: Builtin.BridgeObject? = nil
+  var bo: Builtin.BridgeObject?
 
   // CHECK-NEXT: None
   hitOptionalSpecifically(bo)

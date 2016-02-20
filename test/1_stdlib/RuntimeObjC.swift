@@ -760,7 +760,7 @@ Reflection.test("CGRect") {
 
 Reflection.test("Unmanaged/nil") {
   var output = ""
-  var optionalURL: Unmanaged<CFURL>? = nil
+  var optionalURL: Unmanaged<CFURL>?
   dump(optionalURL, &output)
 
   let expected = "- nil\n"

@@ -467,13 +467,13 @@ print((NoPayload.x as NoPayload?) == NoPayload.y)
 class Foo {}
 
 struct Oof {
-  weak var foo: Foo? = nil
+  weak var foo: Foo?
 }
 
 protocol Boo {}
 
 struct Goof {
-  var boo: Boo? = nil
+  var boo: Boo?
 }
 
 let oofs = [Oof()]

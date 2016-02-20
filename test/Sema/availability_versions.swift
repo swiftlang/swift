@@ -736,7 +736,7 @@ class ClassWithDeclarationsOfUnavailableClasses {
   lazy var unavailablePropertyOfUnavailableType: ClassAvailableOn10_51 = ClassAvailableOn10_51()
   
   @available(OSX, introduced=10.51)
-  lazy var unavailablePropertyOfOptionalUnavailableType: ClassAvailableOn10_51? = nil
+  lazy var unavailablePropertyOfOptionalUnavailableType: ClassAvailableOn10_51?
 
   @available(OSX, introduced=10.51)
   lazy var unavailablePropertyOfUnavailableTypeWithInitializer: ClassAvailableOn10_51 = ClassAvailableOn10_51()
@@ -1217,7 +1217,7 @@ functionAvailableOn10_51()
     // expected-error@-1 {{'functionAvailableOn10_51()' is only available on OS X 10.51 or newer}}
     // expected-note@-2 {{add 'if #available' version check}} {{1-27=if #available(OSX 10.51, *) {\n    functionAvailableOn10_51()\n} else {\n    // Fallback on earlier versions\n}}}
 
-let declForFixitAtTopLevel: ClassAvailableOn10_51? = nil
+let declForFixitAtTopLevel: ClassAvailableOn10_51?
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-2 {{add 'if #available' version check}} {{1-57=if #available(OSX 10.51, *) {\n    let declForFixitAtTopLevel: ClassAvailableOn10_51? = nil\n} else {\n    // Fallback on earlier versions\n}}}
 
@@ -1291,31 +1291,31 @@ class ClassForFixit {
     }
   }
 
-  var fixitForReferenceInPropertyType: ClassAvailableOn10_51? = nil
+  var fixitForReferenceInPropertyType: ClassAvailableOn10_51?
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.51, *)\n}}
 
-  lazy var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_51? = nil
+  lazy var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_51?
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.51, *)\n  }}
       // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.51, *)\n}}
 
-  private lazy var fixitForReferenceInPrivateLazyPropertyType: ClassAvailableOn10_51? = nil
+  private lazy var fixitForReferenceInPrivateLazyPropertyType: ClassAvailableOn10_51?
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.51, *)\n  }}
       // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.51, *)\n}}
 
-  lazy private var fixitForReferenceInLazyPrivatePropertyType: ClassAvailableOn10_51? = nil
+  lazy private var fixitForReferenceInLazyPrivatePropertyType: ClassAvailableOn10_51?
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.51, *)\n  }}
       // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.51, *)\n}}
 
-  static var fixitForReferenceInStaticPropertyType: ClassAvailableOn10_51? = nil
+  static var fixitForReferenceInStaticPropertyType: ClassAvailableOn10_51?
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing class var}} {{3-3=@available(OSX 10.51, *)\n  }}
       // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.51, *)\n}}
 
-  var fixitForReferenceInPropertyTypeMultiple: ClassAvailableOn10_51? = nil, other: Int = 7
+  var fixitForReferenceInPropertyTypeMultiple: ClassAvailableOn10_51?, other: Int = 7
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.51, *)\n}}
 

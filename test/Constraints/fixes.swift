@@ -111,7 +111,7 @@ class T {
 class C {
   var a: Int = 1
 }
-var co: C? = nil
+var co: C?
 var ciuo: C! = nil 
 
 if co {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}

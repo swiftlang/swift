@@ -37,7 +37,7 @@ class Foo: NSManagedObject {
   var f: NSData = NSData()
   // nonatomic, weak, assign, ivar g
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,W,Vg\00"
-  weak var g: NSData? = nil
+  weak var g: NSData?
   // nonatomic, copy, ivar h
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,C,Vh\00"
   @NSCopying var h: NSData! = nil
