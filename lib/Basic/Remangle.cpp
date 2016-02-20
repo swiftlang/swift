@@ -452,6 +452,16 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   // Start another mangled name.
   Out << "__T";
 }
+void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
+  Out << "TSr";
+  mangleChildNodes(node); // GenericSpecializationParams
+
+  // Specializations are just prepended to already-mangled names.
+  resetSubstitutions();
+
+  // Start another mangled name.
+  Out << "__T";
+}
 void Remangler::mangleGenericSpecializationParam(Node *node) {
   // Should be a type followed by a series of protocol conformances.
   mangleChildNodes(node);
