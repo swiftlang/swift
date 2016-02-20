@@ -17,7 +17,9 @@ import os
 
 class Config():
     """A class to store configuration information specified by command-line
-    arguments."""
+    arguments.
+    """
+
     def __init__(self, out_dir, no_remove_files):
         self.out_dir = out_dir
         self.tmp_dir = tempfile.mkdtemp()

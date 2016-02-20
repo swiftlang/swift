@@ -157,9 +157,7 @@ class UIdent(object):
         return hash(self._ptr())
 
 class ErrorKind(object):
-    """
-    Describes the kind of type.
-    """
+    """Describes the kind of type."""
 
     # The unique kind objects, indexed by id.
     _kinds = []
@@ -242,9 +240,7 @@ class Variant(Structure):
         return d
 
 class VariantType(object):
-    """
-    Describes the kind of type.
-    """
+    """Describes the kind of type."""
 
     # The unique kind objects, indexed by id.
     _kinds = []
@@ -542,7 +538,6 @@ def register_functions(lib, ignore_errors):
     This must be called as part of library instantiation so Python knows how
     to call out to the shared library.
     """
-
     def register(item):
         return register_function(lib, item, ignore_errors)
 
