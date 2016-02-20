@@ -59,7 +59,7 @@ def update_working_copy(repo_path, branch):
         check_call(["git", "rebase", "FETCH_HEAD"])
 
 def obtain_additional_swift_sources(
-    with_ssh, branch, skip_history, skip_repositories):
+        with_ssh, branch, skip_history, skip_repositories):
     for dir_name, repo in REPOSITORIES.items():
         if dir_name in skip_repositories:
             print("--- Skipping '" + dir_name + "' ---")
