@@ -47,6 +47,7 @@
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/YAMLParser.h"
 
 #include <vector>
 
@@ -3476,6 +3477,79 @@ public:
 };
 
 } // end unnamed namespace
+
+typedef llvm::StringMap<std::string> FileNameToGroupNameMap;
+typedef std::unique_ptr<FileNameToGroupNameMap> pFileNameToGroupNameMap;
+
+class YamlGroupInputParser {
+  StringRef RecordPath;
+
+  static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
+
+public:
+  YamlGroupInputParser(StringRef RecordPath): RecordPath(RecordPath) {}
+
+  FileNameToGroupNameMap* getParsedMap() {
+    return AllMaps[RecordPath].get();
+  }
+
+  // Parse the Yaml file that contains the group information.
+  // True on failure; false on success.
+  bool parse() {
+    // If we have already parsed this group info file, return false;
+    auto FindMap = AllMaps.find(RecordPath);
+    if (FindMap != AllMaps.end())
+      return false;
+
+    auto Buffer = llvm::MemoryBuffer::getFile(RecordPath);
+    if (!Buffer) {
+      // The group info file does not exist.
+      return true;
+    }
+    llvm::SourceMgr SM;
+    llvm::yaml::Stream YAMLStream(Buffer.get()->getMemBufferRef(), SM);
+    llvm::yaml::document_iterator I = YAMLStream.begin();
+    if (I == YAMLStream.end()) {
+      // Cannot parse correctly.
+      return true;
+    }
+    llvm::yaml::Node *Root = I->getRoot();
+    if (!Root) {
+      // Cannot parse correctly.
+      return true;
+    }
+
+    // The format is a map of ("group0" : ["file1", "file2"]), meaning all
+    // symbols from file1 and file2 belong to "group0".
+    llvm::yaml::MappingNode *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
+    if (!Map) {
+      return true;
+    }
+    pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
+    for (auto Pair : *Map) {
+      auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
+      auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
+
+      if (!Key || !Value) {
+        return true;
+      }
+      llvm::SmallString<16> GroupNameStorage;
+      StringRef GroupName = Key->getValue(GroupNameStorage);
+      for (llvm::yaml::Node &Entry : *Value) {
+        auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry);
+        llvm::SmallString<16> FileNameStorage;
+        StringRef FileName = FileEntry->getValue(FileNameStorage);
+        (*pMap)[FileName] = GroupName;
+      }
+    }
+
+    // Save the parsed map to the owner.
+    AllMaps[RecordPath] = std::move(pMap);
+    return false;
+  }
+};
+
+llvm::StringMap<pFileNameToGroupNameMap> YamlGroupInputParser::AllMaps;
 
 class DeclGroupNameContext {
   struct GroupNameCollector {
