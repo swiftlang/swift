@@ -545,7 +545,7 @@ findMatchingRetains(SILBasicBlock *BB) {
       EpilogueRetainInsts.push_back(Kind.second);
   }
 
-  // For every block with retain, we need to check the transistive
+  // For every block with retain, we need to check the transitive
   // closure of its successors are retain-free.
   for (auto &I : EpilogueRetainInsts) {
     auto *CBB = I->getParent();
