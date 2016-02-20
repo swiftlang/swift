@@ -206,6 +206,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       PrintResponseAsJSON = true;
       break;
 
+    case OPT_print_raw_response:
+      PrintRawResponse = true;
+      break;
+
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = llvm::None;

@@ -598,6 +598,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     llvm::outs() << json << '\n';
     free(json);
 
+  } else if (Opts.PrintRawResponse) {
+    sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+
   } else {
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     switch (Opts.Request) {

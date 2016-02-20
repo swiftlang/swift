@@ -68,7 +68,7 @@ struct TestOptions {
   bool CheckInterfaceIsASCII = false;
   bool UsedSema = false;
   bool PrintResponseAsJSON = false;
-
+  bool PrintRawResponse = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
 };
 
