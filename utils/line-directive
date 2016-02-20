@@ -36,7 +36,7 @@ def _make_line_map(filename, stream=None):
     ... line 7
     ... '''))
     [(0, 'box', 1), (1, 'foo.bar', 3), (5, 'baz.txt', 20)]
-"""
+    """
     result = [(0, filename, 1)]
     input = stream or open(filename)
     for i, l in enumerate(input.readlines()):

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-"""
-Utility script for submitting benchmark results to an LNT server.
-"""
+"""Utility script for submitting benchmark results to an LNT server."""
 
 from __future__ import print_function
 
@@ -27,7 +25,8 @@ def capture_with_result(args, include_stderr=False):
     """capture_with_result(command) -> (output, exit code)
 
     Run the given command (or argv list) in a shell and return the standard
-    output and exit code."""
+    output and exit code.
+    """
     stderr = subprocess.PIPE
     if include_stderr:
         stderr = subprocess.STDOUT
@@ -44,7 +43,8 @@ def capture_with_result(args, include_stderr=False):
 
 def capture(args, include_stderr=False):
     """capture(command) - Run the given command (or argv list) in a shell and
-    return the standard output."""
+    return the standard output.
+    """
     return capture_with_result(args, include_stderr)[0]
 
 

@@ -124,7 +124,8 @@ def get_current_git_branch(git_repo_path):
 
 def log_results(log_directory, driver, formatted_output, swift_repo=None):
     """Log `formatted_output` to a branch specific directory in
-    `log_directory`"""
+    `log_directory`
+    """
     try:
         branch = get_current_git_branch(swift_repo)
     except:
@@ -149,7 +150,8 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
                    log_directory=None, swift_repo=None):
     """Run perf tests individually and return results in a format that's
     compatible with `parse_results`. If `benchmarks` is not empty,
-    only run tests included in it."""
+    only run tests included in it.
+    """
     (total_tests, total_min, total_max, total_mean) = (0, 0, 0, 0)
     output = []
     headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',

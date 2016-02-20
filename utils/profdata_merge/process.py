@@ -36,7 +36,8 @@ class ProfdataMergerProcess(Process):
         """Merge all files in this worker's buffer and clear them.
         This method makes a copy of the working merge progress, then
         calls llvm-cov merge with up to 10 filenames, plus the current
-        in-progress merge."""
+        in-progress merge.
+        """
         if not self.filename_buffer:
             self.report("no files to merge...")
             return
@@ -62,7 +63,8 @@ class ProfdataMergerProcess(Process):
     def run(self):
         """Blocks and waits for the file queue so it can fill its buffer and
         execute merges. If it finds None in the queue, then it knows to stop
-        waiting for the queue, merge its current buffer, and kill itself"""
+        waiting for the queue, merge its current buffer, and kill itself
+        """
         while True:
             filename = self.file_queue.get()
             self.report("received filename: %s" % filename)
