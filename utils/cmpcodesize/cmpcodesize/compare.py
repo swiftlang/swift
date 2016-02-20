@@ -12,9 +12,10 @@ from __future__ import print_function
 
 import re
 import os
-import subprocess
 import collections
 from operator import itemgetter
+
+from cmpcodesize import otool
 
 Prefixes = {
     # Cpp
@@ -76,19 +77,10 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
         sizes[function] += size
 
 
-def flatten(*args):
-    for x in args:
-        if hasattr(x, '__iter__'):
-            for y in flatten(*x):
-                yield y
-        else:
-            yield x
-
-
 def readSizes(sizes, fileName, functionDetails, groupByPrefix):
     # Check if multiple architectures are supported by the object file.
     # Prefer arm64 if available.
-    architectures = subprocess.check_output(["otool", "-V", "-f", fileName]).split("\n")
+    architectures = otool.fat_headers(fileName).split('\n')
     arch = None
     archPattern = re.compile('architecture ([\S]+)')
     for architecture in architectures:
@@ -98,16 +90,14 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
                 arch = archMatch.group(1)
             if "arm64" in arch:
                 arch = "arm64"
-    if arch is not None:
-      archParams = ["-arch", arch]
-    else:
-      archParams = []
 
     if functionDetails:
-        content = subprocess.check_output(flatten(["otool", archParams, "-l", "-v", "-t", fileName])).split("\n")
-        content += subprocess.check_output(flatten(["otool", archParams, "-v", "-s", "__TEXT", "__textcoal_nt", fileName])).split("\n")
+        content = otool.load_commands(fileName,
+                                      architecture=arch,
+                                      include_text_sections=True).split('\n')
+        content += otool.text_sections(fileName, architecture=arch).split('\n')
     else:
-        content = subprocess.check_output(flatten(["otool", archParams, "-l", fileName])).split("\n")
+        content = otool.load_commands(fileName, architecture=arch).split('\n')
 
     sectName = None
     currFunc = None
