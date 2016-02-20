@@ -851,6 +851,10 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
 
 /// Expand all of the direct and indirect result types.
 llvm::Type *SignatureExpansion::expandResult() {
+    // Disable the use of sret if we have multiple indirect results.
+    if (FnType->getNumIndirectResults() > 1)
+      CanUseSRet = false;
+
   // Expand the direct result.
   llvm::Type *resultType = expandDirectResult();
 

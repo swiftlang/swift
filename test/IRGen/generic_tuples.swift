@@ -11,7 +11,7 @@
 // CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i64 }
 
 func dup<T>(x: T) -> (T, T) { var x = x; return (x,x) }
-// CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK:    entry:
 //   Allocate a local variable for 'x'.
 // CHECK-NEXT: [[XBUF:%.*]] = alloca [[BUFFER:.*]], align 8
@@ -73,7 +73,7 @@ func callDupC(let c: C) { _ = dupC(c) }
 func lump<T>(x: T) -> (Int, T, T) { return (0,x,x) }
 // CHECK: define hidden { i64, i64 } @_TF14generic_tuples5lump2{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump2<T>(x: T) -> (Int, Int, T) { return (0,0,x) }
-// CHECK: define hidden void @_TF14generic_tuples5lump3{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden void @_TF14generic_tuples5lump3{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump3<T>(x: T) -> (T, T, T) { return (x,x,x) }
 // CHECK: define hidden i64 @_TF14generic_tuples5lump4{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump4<T>(x: T) -> (T, Int, T) { return (x,0,x) }
