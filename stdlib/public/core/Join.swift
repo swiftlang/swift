@@ -134,18 +134,19 @@ public struct JoinSequence<
       result.reserveCapacity(numericCast(n))
     }
 
-    if separatorSize != 0 {
-      var gen = _base.generate()
-      if let first = gen.next() {
-        result.appendContentsOf(first)
-        while let next = gen.next() {
-          result.appendContentsOf(_separator)
-          result.appendContentsOf(next)
-        }
-      }
-    } else {
+    if separatorSize == 0 {
       for x in _base {
         result.appendContentsOf(x)
+      }
+      return result._buffer
+    }
+
+    var gen = _base.generate()
+    if let first = gen.next() {
+      result.appendContentsOf(first)
+      while let next = gen.next() {
+        result.appendContentsOf(_separator)
+        result.appendContentsOf(next)
       }
     }
 
