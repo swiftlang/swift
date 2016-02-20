@@ -32,7 +32,7 @@ public struct LazyMapGenerator<
   public var base: Base { return _base }
   
   internal var _base: Base
-  internal var _transform: (Base.Element) -> Element
+  internal let _transform: (Base.Element) -> Element
 }
 
 /// A `SequenceType` whose elements consist of those in a `Base`
@@ -67,7 +67,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   }
   
   public var _base: Base
-  internal var _transform: (Base.Generator.Element) -> Element
+  internal let _transform: (Base.Generator.Element) -> Element
 
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -129,7 +129,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   }
   
   public var _base: Base
-  var _transform: (Base.Generator.Element) -> Element
+  let _transform: (Base.Generator.Element) -> Element
 
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
