@@ -720,9 +720,9 @@ public protocol CustomPlaygroundQuickLookable {
 public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
   /// Store `elements`.
   public init(dictionaryLiteral elements: (Key, Value)...) {
-    self.elements = elements
+    self._elements = elements
   }
-  internal let elements: [(Key, Value)]
+  internal let _elements: [(Key, Value)]
 }
 
 /// `Collection` conformance that allows `DictionaryLiteral` to
@@ -742,10 +742,10 @@ extension DictionaryLiteral : Collection {
   /// `successor()`.
   ///
   /// - Complexity: O(1).
-  public var endIndex: Int { return elements.endIndex }
+  public var endIndex: Int { return _elements.endIndex }
 
   // FIXME: a typealias is needed to prevent <rdar://20248032>
-  public typealias Element = (Key, Value)
+  public typealias Element = (key: Key, value: Value)
 
   /// Access the element indicated by `position`.
   ///
@@ -753,7 +753,7 @@ extension DictionaryLiteral : Collection {
   ///
   /// - complexity: O(1).
   public subscript(position: Int) -> Element {
-    return elements[position]
+    return _elements[position]
   }
 }
 
