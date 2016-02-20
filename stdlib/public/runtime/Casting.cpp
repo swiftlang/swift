@@ -2221,16 +2221,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
   _failCorruptType(srcType);
 }
 
-// The return type is incorrect.  It is only important that it is
-// passed using 'sret'.
-extern "C" OpaqueExistentialContainer
-_TFs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
-                                            const Metadata *T);
-// The return type is incorrect.  It is only important that it is
-// passed using 'sret'.
-extern "C" OpaqueExistentialContainer
-_TFs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
-
 static inline bool swift_isClassOrObjCExistentialTypeImpl(const Metadata *T) {
   auto kind = T->getKind();
   // Classes.
