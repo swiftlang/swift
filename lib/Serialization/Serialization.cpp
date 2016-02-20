@@ -3596,7 +3596,7 @@ class DeclGroupNameContext {
         YamlGroupInputParser Parser(Path.str());
         if (!Parser.parse()) {
 
-          // Get the file-name to group map if parsing correctlly.
+          // Get the file-name to group map if parsing correctly.
           pMap = Parser.getParsedMap();
         }
       }
