@@ -100,7 +100,6 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     if clone or clone_with_ssh:
         obtain_additional_swift_sources(clone_with_ssh, branch, skip_history)
-        return 0
 
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"), branch)
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"), branch)
