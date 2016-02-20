@@ -175,14 +175,14 @@ public struct ResilientConformingType : OtherResilientProtocol {}
 
 sil_witness_table ResilientConformingType : OtherResilientProtocol module protocol_resilience {}
 
-// CHECK-LABEL: define void @doSomething(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.OtherResilientProtocol)
+// CHECK-LABEL: define{{( protected)?}} void @doSomething(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.OtherResilientProtocol)
 sil @doSomething : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> () {
 bb0(%0 : $*T):
   %result = tuple ()
   return %result : $()
 }
 
-// CHECK-LABEL: define void @passConformingType(%V19protocol_resilience23ResilientConformingType* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} void @passConformingType(%V19protocol_resilience23ResilientConformingType* noalias nocapture)
 sil @passConformingType : $@convention(thin) (@in ResilientConformingType) -> () {
 bb0(%0 : $*ResilientConformingType):
 
@@ -201,7 +201,7 @@ bb0(%0 : $*ResilientConformingType):
 
 // Caching witness table accessor
 
-// CHECK-LABEL: define linkonce_odr hidden i8** @_TWlV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden i8** @_TWlV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_()
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_
 // CHECK-NEXT:    [[COND:%.*]] = icmp eq i8** [[CACHE]], null
@@ -218,7 +218,7 @@ bb0(%0 : $*ResilientConformingType):
 
 // Resilient conformance -- must call a runtime function
 
-// CHECK-LABEL: define i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-LABEL: define{{( protected)?}} i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_, %swift.type* null, i8** null)
 // CHECK-NEXT:    ret i8** [[WTABLE]]
@@ -240,14 +240,14 @@ sil_witness_table AnotherConformingStruct : RefinesOtherResilientProtocol module
 sil_witness_table hidden AnotherConformingStruct: OtherResilientProtocol module protocol_resilience {
 }
 
-// CHECK-LABEL: define void @doSomethingRefined(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.RefinesOtherResilientProtocol)
+// CHECK-LABEL: define{{( protected)?}} void @doSomethingRefined(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.RefinesOtherResilientProtocol)
 sil @doSomethingRefined : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> () {
 bb0(%0 : $*T):
   %result = tuple ()
   return %result : $()
 }
 
-// CHECK-LABEL: define void @passConformingTypeRefined(%V19protocol_resilience23AnotherConformingStruct* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} void @passConformingTypeRefined(%V19protocol_resilience23AnotherConformingStruct* noalias nocapture)
 sil @passConformingTypeRefined : $@convention(thin) (@in AnotherConformingStruct) -> () {
 bb0(%0 : $*AnotherConformingStruct):
 
@@ -284,14 +284,14 @@ sil_witness_table ConformsWithResilientAssoc : HasResilientAssoc module protocol
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
 }
 
-// CHECK-LABEL: define void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc, %swift.type* %T.T, i8** %T.T.OtherResilientProtocol)
+// CHECK-LABEL: define{{( protected)?}} void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc, %swift.type* %T.T, i8** %T.T.OtherResilientProtocol)
 sil @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> () {
 bb0(%0 : $*T):
   %result = tuple ()
   return %result : $()
 }
 
-// CHECK-LABEL: define void @passConformingTypeAssoc(%V19protocol_resilience26ConformsWithResilientAssoc* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} void @passConformingTypeAssoc(%V19protocol_resilience26ConformsWithResilientAssoc* noalias nocapture)
 sil @passConformingTypeAssoc : $@convention(thin) (@in ConformsWithResilientAssoc) -> () {
 bb0(%0 : $*ConformsWithResilientAssoc):
 
@@ -315,6 +315,6 @@ bb0(%0 : $*ConformsWithResilientAssoc):
 
 // Fragile conformance -- no runtime calls needed
 
-// CHECK-LABEL: define i8** @_TWaV19protocol_resilience16ConformingStructS_17ResilientProtocolS_()
+// CHECK-LABEL: define{{( protected)?}} i8** @_TWaV19protocol_resilience16ConformingStructS_17ResilientProtocolS_()
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @_TWPV19protocol_resilience16ConformingStructS_17ResilientProtocolS_, i32 0, i32 0)
