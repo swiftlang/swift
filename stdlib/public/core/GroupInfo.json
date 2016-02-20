@@ -1,0 +1,121 @@
+{
+  "Algorithm": [
+    "Algorithm.swift",
+    "Flatten.swift",
+    "FlatMap.swift",
+    "Map.swift",
+    "Join.swift",
+    "Hashing.swift",
+    "Sort.swift",
+    "Zip.swift",
+    "Filter.swift",
+    "Repeat.swift",
+    "Reverse.swift",
+    "SetAlgebra.swift",
+    "Interval.swift",
+    "Index.swift",
+    "Stride.swift"
+  ],
+  "Array": [
+    "ArrayBody.swift",
+    "ArrayBuffer.swift",
+    "ArrayBufferType.swift",
+    "ArrayCast.swift",
+    "ArrayType.swift",
+    "Arrays.swift",
+    "CocoaArray.swift",
+    "ContiguousArrayBuffer.swift",
+    "SwiftNativeNSArray.swift"
+  ],
+  "Assert": [
+    "Assert.swift",
+    "AssertCommon.swift"
+  ],
+  "String": [
+    "CString.swift",
+    "Character.swift",
+    "StringCharacterView.swift",
+    "String.swift",
+    "StringBridge.swift",
+    "StringBuffer.swift",
+    "StringCore.swift",
+    "StringInterpolation.swift",
+    "StringLegacy.swift",
+    "StringUnicodeScalarView.swift",
+    "StringUTF16.swift",
+    "StringUTF8.swift",
+    "Unicode.swift",
+    "UnicodeScalar.swift",
+    "UnicodeTrie.swift",
+    "StaticString.swift",
+    "UnavailableStringAPIs.swift"
+  ],
+  "Bool": [
+    "Bool.swift",
+    "BooleanType.swift"
+  ],
+  "Collection": [
+    "Collection.swift",
+    "CollectionAlgorithms.swift",
+    "EmptyCollection.swift",
+    "LazyCollection.swift",
+    "HashedCollections.swift",
+    "ExistentialCollection.swift",
+    "Slice.swift",
+    "SliceBuffer.swift",
+    "CollectionOfOne.swift",
+    "HeapBuffer.swift"
+  ],
+  "Sequence": [
+    "LazySequence.swift",
+    "Sequence.swift",
+    "SequenceWrapper.swift",
+    "SequenceAlgorithms.swift"
+  ],
+  "C": [
+    "BridgeObjectiveC.swift",
+    "Builtin.swift",
+    "CTypes.swift"
+  ],
+  "Math": [
+    "FloatingPoint.swift",
+    "FloatingPointOperations.swift",
+    "FloatingPointParsing.swift",
+    "IntegerArithmetic.swift",
+    "IntegerParsing.swift"
+  ],
+  "Misc": [
+    "CompilerProtocols.swift",
+    "ErrorType.swift",
+    "Existential.swift",
+    "FixedPoint.swift",
+    "ImplicitlyUnwrappedOptional.swift",
+    "InputStream.swift",
+    "LifetimeManager.swift",
+    "ManagedBuffer.swift",
+    "Mirrors.swift",
+    "Misc.swift",
+    "Optional.swift",
+    "OptionSet.swift",
+    "OutputStream.swift",
+    "Pointer.swift",
+    "Policy.swift",
+    "Print.swift",
+    "REPL.swift",
+    "Range.swift",
+    "RangeReplaceableCollectionType.swift",
+    "Reflection.swift",
+    "Runtime.swift",
+    "ShadowProtocols.swift",
+    "Shims.swift",
+    "Unmanaged.swift",
+    "UnsafeBufferPointer.swift",
+    "UnsafePointer.swift",
+    "Availability.swift",
+    "Bit.swift",
+    "Mirror.swift",
+    "Process.swift",
+    "Tuple.swift",
+    "VarArgs.swift"
+  ]
+}
