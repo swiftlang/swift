@@ -3575,6 +3575,39 @@ class DeclGroupNameContext {
     }
   };
 
+  class GroupNameCollectorFromJson : public GroupNameCollector {
+    const std::string GroupInfoFileName = "GroupInfo.json";
+    FileNameToGroupNameMap* pMap = nullptr;
+
+  public:
+    GroupNameCollectorFromJson(bool Enable) : GroupNameCollector(Enable) {}
+    StringRef getGroupNameInternal(const ValueDecl *VD) override {
+      auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
+      if (!PathOp.hasValue())
+        return NullGroupName;
+      StringRef FullPath = StringRef(VD->getASTContext().SourceMgr.
+                                     getIdentifierForBuffer(PathOp.getValue()));
+      if (!pMap) {
+        llvm::SmallString<64> Path;
+
+        // The group info should be in the same directory with the source file.
+        llvm::sys::path::append(Path, llvm::sys::path::parent_path(FullPath),
+                                GroupInfoFileName);
+        YamlGroupInputParser Parser(Path.str());
+        if (!Parser.parse()) {
+
+          // Get the file-name to group map if parsing correctlly.
+          pMap = Parser.getParsedMap();
+        }
+      }
+      if (!pMap)
+        return NullGroupName;
+      StringRef FileName = llvm::sys::path::filename(FullPath);
+      auto Found = pMap->find(FileName);
+      return Found == pMap->end() ? NullGroupName : Found->second;
+    }
+  };
+
   llvm::MapVector<StringRef, unsigned> Map;
   std::vector<StringRef> ViewBuffer;
   std::unique_ptr<GroupNameCollector> pNameCollector;
