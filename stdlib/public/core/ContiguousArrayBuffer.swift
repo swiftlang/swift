@@ -66,39 +66,8 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
 
-// FIXME: This whole class is a workaround for
-// <rdar://problem/18560464> Can't override generic method in generic
-// subclass.  If it weren't for that bug, we'd override
-// _withVerbatimBridgedUnsafeBuffer directly in
-// _ContiguousArrayStorage<Element>.
-class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
-#if _runtime(_ObjC)
-  /// If the `Element` is bridged verbatim, invoke `body` on an
-  /// `UnsafeBufferPointer` to the elements and return the result.
-  /// Otherwise, return `nil`.
-  final override func _withVerbatimBridgedUnsafeBuffer<R>(
-    @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> R
-  ) rethrows -> R? {
-    var result: R? = nil
-    try self._withVerbatimBridgedUnsafeBufferImpl {
-      result = try body($0)
-    }
-    return result
-  }
-
-  /// If `Element` is bridged verbatim, invoke `body` on an
-  /// `UnsafeBufferPointer` to the elements.
-  internal func _withVerbatimBridgedUnsafeBufferImpl(
-    @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> Void
-  ) rethrows {
-    _sanityCheckFailure(
-      "Must override _withVerbatimBridgedUnsafeBufferImpl in derived classes")
-  }
-#endif
-}
-
 // The class that implements the storage for a ContiguousArray<Element>
-final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
+final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorageBase {
 
   deinit {
     __manager._elementPointer.destroy(__manager._valuePointer.memory.count)
@@ -107,9 +76,22 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   }
 
 #if _runtime(_ObjC)
+  /// If the `Element` is bridged verbatim, invoke `body` on an
+  /// `UnsafeBufferPointer` to the elements and return the result.
+  /// Otherwise, return `nil`.
+  internal final override func _withVerbatimBridgedUnsafeBuffer(
+    @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> Element
+  ) rethrows -> Element? {
+    var result: Element? = nil
+    try self._withVerbatimBridgedUnsafeBufferImpl {
+      result = try body($0)
+    }
+    return result
+  }
+    
   /// If `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
-  internal final override func _withVerbatimBridgedUnsafeBufferImpl(
+  internal final func _withVerbatimBridgedUnsafeBufferImpl(
     @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
