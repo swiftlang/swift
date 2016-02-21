@@ -34,10 +34,6 @@
    ;; SIL Types
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
 
-   ;; Statements
-   `(,(regexp-opt '("if" "in" "else" "for" "do" "repeat" "while" "return"
-                    "break" "continue" "switch" "case")
-                  'words) . font-lock-keyword-face)
    ;; SIL Stage
    '("sil_stage" . font-lock-keyword-face)
 
@@ -150,7 +146,7 @@
    `(,(regexp-opt '("unreachable" "return" "br"
                     "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
-                    "checked_cast_br" "throw" "checked_cast_addr_br")
+                    "checked_cast_br" "throw" "checked_cast_addr_br" "case")
                   'words) . font-lock-keyword-face)
    ;; Blocks
    `(,(regexp-opt '("project_block_storage" "init_block_storage_header"
