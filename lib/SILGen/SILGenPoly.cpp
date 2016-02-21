@@ -2860,7 +2860,8 @@ substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
     }
     return t->isEqual(selfParamTy);
   };
-  /*
+
+  #if 0
   llvm::errs() << "--\n";
   for (auto &pair : subs) {
     pair.first->print(llvm::errs());
@@ -2868,7 +2869,7 @@ substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
     pair.second->dump();
     llvm::errs() << "\n";
   }
-  */
+  #endif
 
   // Get the unapplied params.
   auto unappliedParams = reqtTy->getGenericParams().slice(1);
