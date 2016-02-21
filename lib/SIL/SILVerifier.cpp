@@ -2478,9 +2478,12 @@ public:
 
       seenCaseValues.insert(elt);
 
+      requireSameType(I->getOperand()->getType(), casevalue->getType(),
+                      "select_value case value must match type of operand");
+
       // The result value must match the type of the instruction.
       requireSameType(result->getType(), I->getType(),
-                    "select_value case operand must match type of instruction");
+                    "select_value case result must match type of instruction");
     }
 
     require(I->hasDefault(),
