@@ -2642,7 +2642,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   //
   // It'd probably be cleaner to model as `where Self: ...` constraints when
   // we have those.
-  SmallVector<ProtocolConformance *, 4> refinedConformances;
   for (auto refinedProto : behaviorProto->getInheritedProtocols(&TC)) {
     ProtocolConformance *inherited = nullptr;
     
