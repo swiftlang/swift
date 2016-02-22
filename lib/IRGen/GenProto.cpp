@@ -1352,9 +1352,6 @@ namespace {
     ModuleDecl &M;
     CanSILFunctionType FnType;
 
-    /// This is the canonical "mangling" signature of the function type, which
-    /// is minimized in a way such that getAllDependentTypes() excludes
-    /// types with equality constraints to concrete types.
     CanGenericSignature Generics;
 
     std::vector<Source> Sources;
@@ -1541,9 +1538,6 @@ namespace {
                            selfTy);
 
       if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
-        // Don't pass in witness tables for associated types of Self.
-        addImpossibleFulfillments(paramTy);
-
         // The Self type is abstract, so we must pass in a witness table.
         addSelfMetadataFulfillment(paramTy);
 
@@ -1620,48 +1614,6 @@ namespace {
         return;
       }
       llvm_unreachable("bad parameter convention");
-    }
-
-    /// We're binding an archetype for a protocol witness, and we're only
-    /// passing in metadata for Self, so make sure we don't try passing in
-    /// secondary archetypes too, since that would break the calling
-    /// convention.
-    ///
-    /// This works when calling concrete witnesses because there the
-    /// associated types are always known; for default implementations,
-    /// we will need to do some work still to implement default
-    /// implementations for protocols with associated types.
-    void addImpossibleFulfillments(CanGenericTypeParamType arg) {
-      for (auto depTy : getAllDependentTypes()) {
-        // Is this a dependent member?
-        auto depMemTy = dyn_cast<DependentMemberType>(CanType(depTy));
-        if (!depMemTy)
-          continue;
-
-        // Is it rooted in the protocol Self type?
-        CanType rootTy;
-        do {
-          rootTy = depMemTy.getBase();
-        } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
-
-        auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy);
-        if (!rootParamTy)
-          continue;
-
-        // If so, suppress providing metadata for the type by making up a bogus
-        // fulfillment.
-        if (rootParamTy == arg) {
-          MetadataPath path;
-          path.addImpossibleComponent();
-          unsigned source = Sources.size() - 1;
-          Fulfillments.addFulfillment({depTy, nullptr}, source,
-                                      MetadataPath(path));
-          for (auto protocol : getConformsTo(depTy)) {
-            Fulfillments.addFulfillment({depTy, protocol}, source,
-                                        MetadataPath(path));
-          }
-        }
-      }
     }
 
     void addSelfMetadataFulfillment(CanGenericTypeParamType arg) {
