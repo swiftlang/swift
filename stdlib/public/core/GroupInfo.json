@@ -100,10 +100,13 @@
     "UnsafePointer.swift",
     "UnsafeBufferPointer.swift"
   ],
+  "Protocols": [
+    "CompilerProtocols.swift",
+    "ShadowProtocols.swift"
+  ],
   "Misc": [
     "Interval.swift",
     "Hashing.swift",
-    "CompilerProtocols.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
@@ -115,7 +118,6 @@
     "Print.swift",
     "REPL.swift",
     "Runtime.swift",
-    "ShadowProtocols.swift",
     "Shims.swift",
     "Unmanaged.swift",
     "Availability.swift",
