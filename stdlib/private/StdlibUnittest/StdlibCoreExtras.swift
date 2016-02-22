@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
-import SwiftPrivateDarwinExtras
+import SwiftPrivateLibcExtras
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD)

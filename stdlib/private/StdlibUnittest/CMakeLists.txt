@@ -1,6 +1,6 @@
 set(swift_stdlib_unittest_platform_sources)
 set(swift_stdlib_unittest_module_depends
-  SwiftPrivate SwiftPrivatePthreadExtras SwiftPrivateDarwinExtras)
+  SwiftPrivate SwiftPrivatePthreadExtras SwiftPrivateLibcExtras)
 set(swift_stdlib_unittest_framework_depends)
 set(swift_stdlib_unittest_private_link_libraries)
 set(swift_stdlib_unittest_compile_flags)
