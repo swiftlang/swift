@@ -70,13 +70,16 @@ AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
   }
 
   if (auto clangDecl = var->getClangDecl()) {
+    CanGenericSignature genericSig;
+    if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
+      genericSig = sig->getCanonicalSignature();
     auto clangType = getClangType(clangDecl);
-    swiftType = getLoweredBridgedType(AbstractionPattern(swiftType, clangType),
+    swiftType = getLoweredBridgedType(AbstractionPattern(genericSig, swiftType, clangType),
                                       swiftType,
                                SILFunctionTypeRepresentation::CFunctionPointer,
                                       TypeConverter::ForMemory)
       ->getCanonicalType();
-    return AbstractionPattern(swiftType, clangType);
+    return AbstractionPattern(genericSig, swiftType, clangType);
   } else {
     return AbstractionPattern(swiftType);
   }

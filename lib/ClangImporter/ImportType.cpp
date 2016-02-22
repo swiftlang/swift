@@ -504,9 +504,37 @@ namespace {
 
     ImportResult VisitTypedefType(const clang::TypedefType *type) {
       // If the underlying declaration is an Objective-C type parameter,
-      // import the underlying sugar instead.
-      if (isa<clang::ObjCTypeParamDecl>(type->getDecl()))
-        return Visit(type->desugar());
+      // pull the corresponding generic type parameter from the imported class.
+      if (auto *objcTypeParamDecl =
+            dyn_cast<clang::ObjCTypeParamDecl>(type->getDecl())) {
+        const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
+        GenericParamList *genericParams = nullptr;
+        if (auto *category =
+              dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
+          auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category));
+          if (!ext)
+            return Type();
+          genericParams = ext->getGenericParams();
+        } else if (auto *interface =
+            dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
+          auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface));
+          if (!cls)
+            return Type();
+          genericParams = cls->getGenericParams();
+        }
+        unsigned index = objcTypeParamDecl->getIndex();
+        // Pull the generic param decl out of the imported class.
+        if (!genericParams) {
+          // The ObjC type param didn't get imported, possibly because it was
+          // suppressed. Treat it as a typedef.
+          return Visit(objcTypeParamDecl->getUnderlyingType());
+        }
+        if (index > genericParams->size()) {
+          return Type();
+        }
+        GenericTypeParamDecl *paramDecl = genericParams->getParams()[index];
+        return { paramDecl->getArchetype(), ImportHint::ObjCPointer };
+      }
 
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
@@ -680,8 +708,49 @@ namespace {
         if (!imported)
           return nullptr;
 
-        Type importedType = imported->getDeclaredType();
-
+        Type importedType;
+        // If the objc type has any generic args, convert them and bind them to
+        // the imported class type.
+        if (imported->getGenericParams()) {
+          unsigned typeParamCount = imported->getGenericParams()->size();
+          auto typeArgs = type->getObjectType()->getTypeArgs();
+          assert(typeArgs.empty() || typeArgs.size() == typeParamCount);
+          llvm::SmallVector<Type, 2> importedTypeArgs;
+          for (unsigned i = 0; i < typeParamCount; i++) {
+            Type importedTypeArg;
+            auto typeParam = imported->getGenericParams()->getParams()[i];
+            if (!typeArgs.empty()) {
+              auto subresult = Visit(typeArgs[i]);
+              if (!subresult) {
+                return nullptr;
+              }
+              importedTypeArg = subresult.AbstractType;
+            } else if (typeParam->getSuperclass()) {
+              importedTypeArg = typeParam->getSuperclass();
+            } else {
+              auto protocols =
+                typeParam->getConformingProtocols(Impl.getTypeResolver());
+              assert(!protocols.empty() &&
+                  "objc imported type param should have either superclass or "
+                  "protocol requirement");
+              SmallVector<Type, 4> protocolTypes;
+              for (auto protocolDecl : protocols) {
+                protocolTypes.push_back(protocolDecl->getDeclaredType());
+              }
+              importedTypeArg = ProtocolCompositionType::get(
+                  Impl.SwiftContext, protocolTypes);
+            }
+            importedTypeArg = SubstitutedType::get(
+                typeParam->getArchetype(), importedTypeArg, Impl.SwiftContext);
+            importedTypeArgs.push_back(importedTypeArg);
+          }
+          assert(importedTypeArgs.size() == typeParamCount);
+          importedType = BoundGenericClassType::get(
+            imported, nullptr, importedTypeArgs);
+        } else {
+          importedType = imported->getDeclaredType();
+        }
+ 
         if (!type->qual_empty()) {
           // As a special case, turn 'NSObject <NSCopying>' into
           // 'id <NSObject, NSCopying>', which can be imported more usefully.
@@ -1944,6 +2013,7 @@ getForeignErrorInfo(
 }
 
 Type ClangImporter::Implementation::importMethodType(
+       const DeclContext *dc,
        const clang::ObjCMethodDecl *clangDecl,
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
@@ -1989,6 +2059,17 @@ Type ClangImporter::Implementation::importMethodType(
       }
     }
   }
+
+  DeclContext *origDC = importDeclContextOf(clangDecl);
+  assert(origDC);
+  auto mapTypeIntoContext = [&](Type type) -> Type {
+    if (dc != origDC) {
+      type = ArchetypeBuilder::mapTypeOutOfContext(origDC, type);
+      type = dc->getDeclaredTypeInContext()->getTypeOfMember(
+          dc->getParentModule(), type, origDC);
+    }
+    return type;
+  };
 
   // Import the result type.
   CanType origSwiftResultTy;
@@ -2041,6 +2122,7 @@ Type ClangImporter::Implementation::importMethodType(
   }
   if (!swiftResultTy)
     return Type();
+  swiftResultTy = mapTypeIntoContext(swiftResultTy);
 
   CanType errorParamType;
 
@@ -2164,7 +2246,7 @@ Type ClangImporter::Implementation::importMethodType(
       = createDeclWithClangNode<ParamDecl>(param, /*IsLet*/ true,
                                      SourceLoc(), SourceLoc(), name,
                                      importSourceLoc(param->getLocation()),
-                                     bodyName, swiftParamTy, 
+                                     bodyName, mapTypeIntoContext(swiftParamTy), 
                                      ImportedHeaderUnit);
 
     if (addNoEscapeAttr) {
@@ -2238,6 +2320,7 @@ Type ClangImporter::Implementation::importMethodType(
   return FunctionType::get((*bodyParams)->getType(SwiftContext),
                            swiftResultTy, extInfo);
 }
+
 
 Module *ClangImporter::Implementation::getStdlibModule() {
   return SwiftContext.getStdlibModule(true);

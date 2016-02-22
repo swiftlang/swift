@@ -542,6 +542,7 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
   auto unbound = ty->castTo<UnboundGenericType>();
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
               unbound->getDecl()->getName());
+  // TODO: emit fixit for "NSArray" -> "NSArray<AnyObject>", etc.
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.
@@ -2518,7 +2519,7 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
       if (!CD)
         break;
 
-      if (CD->getGenericParams()) {
+      if (!CD->hasClangNode() && CD->getGenericParams()) {
         if (diagnose) {
           tc.diagnose(value->getLoc(), diag::objc_in_generic_extension);
         }

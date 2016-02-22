@@ -767,6 +767,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_infer_iuos)) {
     Opts.InferIUOs = false;
   }
+  Opts.ImportObjCGenerics = Args.hasArg(OPT_enable_import_objc_generics);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 

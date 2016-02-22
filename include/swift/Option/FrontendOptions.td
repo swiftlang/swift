@@ -228,6 +228,10 @@ def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
   HelpText<"Infer when a global could be imported as a member">;
 
+def enable_import_objc_generics :
+  Flag<["-"], "enable-import-objc-generics">,
+  HelpText<"Import Objective-C lightweight generic type params">;
+
 def enable_strip_ns_prefix :
   Flag<["-"], "enable-strip-ns-prefix">,
   HelpText<"Strip 'NS' prefix from Foundation entities">;

@@ -1026,6 +1026,8 @@ WARNING(non_trailing_closure_before_default_args,none,
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
+ERROR(extension_of_objc_generic_class,none,
+      "generic Objective-C class %0 cannot be extended", (Identifier))
 ERROR(extension_access_with_conformances,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
@@ -1451,6 +1453,8 @@ NOTE(class_here,none,
      "class %0 declared here", (Identifier))
 ERROR(inheritance_from_final_class,none,
 "inheritance from a final class %0", (Identifier))
+ERROR(inheritance_from_objc_generic_class,none,
+"inheritance from a generic Objective-C class %0", (Identifier))
 
 
 // Enums
