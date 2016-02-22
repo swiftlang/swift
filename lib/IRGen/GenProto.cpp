@@ -2525,18 +2525,6 @@ static unsigned getDependentTypeIndex(CanGenericSignature generics,
     index++;
   }
 
-#if 0  
-  // Okay, if we didn't find it, we must be in one of the weird cases
-  // where the canonical mangling signature uses different dependent
-  // types from the canonical signature.  Get the representative type
-  // and try again.  This is an expensive enough step that it's worth
-  // trying to avoid.
-  CanType repType = generics->getRepresentative(type, M)->getCanonicalType();
-  assert(repType != type);
-  assert(repType->isTypeParameter());
-  return getDependentTypeIndex(generics, M, repType);
-#endif
-
   llvm_unreachable("didn't find dependent type in all-dependent-types list");
 }
 
