@@ -522,7 +522,7 @@ extension SequenceType where Generator.Element : Equatable {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(message="call 'split(_:maxSplits:omittingEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
+  @swift3_migration(message="call 'split(by:maxSplits:omittingEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   public func split(
     separator: Generator.Element,
