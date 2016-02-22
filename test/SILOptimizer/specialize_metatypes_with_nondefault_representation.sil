@@ -22,15 +22,15 @@ bb0(%0 : $*T):
 }
 
 // CHECK-LABEL: sil @tmp2 : $@convention(thin) () -> () {
-// CHECK: [[FUN1:%[0-9]+]] = function_ref @_TTSg5XPMTP4main9AnyObject___tmp : $@convention(thin) () -> @out @thick AnyObject.Type
+// CHECK: [[FUN1:%[0-9]+]] = function_ref @_TTSg5XPMTP4main9AnyObject___tmp : $@convention(thin) () -> @thick AnyObject.Type
 // CHECK-NEXT: apply [[FUN1]]
-// CHECK: [[FUN2:%[0-9]+]] = function_ref @_TTSg5XPMoP4main9AnyObject___tmp : $@convention(thin) () -> @out @objc_metatype AnyObject.Type
+// CHECK: [[FUN2:%[0-9]+]] = function_ref @_TTSg5XPMoP4main9AnyObject___tmp : $@convention(thin) () -> @objc_metatype AnyObject.Type
 // CHECK-NEXT: apply [[FUN2]]
-// CHECK: [[FUN3:%[0-9]+]] = function_ref @_TTSg5XMTBi32___tmp : $@convention(thin) () -> @out @thick Builtin.Int32.Type
+// CHECK: [[FUN3:%[0-9]+]] = function_ref @_TTSg5XMTBi32___tmp : $@convention(thin) () -> @thick Builtin.Int32.Type
 // CHECK-NEXT: apply [[FUN3]]
-// CHECK: [[FUN4:%[0-9]+]] = function_ref @_TTSg5XMoBi32___tmp : $@convention(thin) () -> @out @objc_metatype Builtin.Int32.Type
+// CHECK: [[FUN4:%[0-9]+]] = function_ref @_TTSg5XMoBi32___tmp : $@convention(thin) () -> @objc_metatype Builtin.Int32.Type
 // CHECK-NEXT: apply [[FUN4]]
-// CHECK: [[FUN5:%[0-9]+]] = function_ref @_TTSg5XMtBi32___tmp : $@convention(thin) () -> @out @thin Builtin.Int32.Type
+// CHECK: [[FUN5:%[0-9]+]] = function_ref @_TTSg5XMtBi32___tmp : $@convention(thin) () -> @thin Builtin.Int32.Type
 // CHECK-NEXT: apply [[FUN5]]
 
 sil @tmp2 : $@convention(thin) () -> () {
