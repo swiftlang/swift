@@ -55,7 +55,7 @@ protocol _ArrayProtocol
   ///
   /// - Complexity: O(`self.count`).
   ///
-  /// - Precondition: `i <= count`.
+  /// - Precondition: `startIndex <= i`, `i <= endIndex`.
   mutating func insert(_ newElement: Iterator.Element, at i: Int)
 
   /// Remove and return the element at the given index.
