@@ -31,6 +31,10 @@ namespace irgen {
   class Address;
   class IRGenFunction;
 
+  /// Emit a type metadata reference for an archetype.
+  llvm::Value *emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
+                                            CanArchetypeType archetype);
+
   /// Emit a witness table reference.
   llvm::Value *emitArchetypeWitnessTableRef(IRGenFunction &IGF,
                                             CanArchetypeType archetype,

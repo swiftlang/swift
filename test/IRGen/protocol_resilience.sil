@@ -284,7 +284,7 @@ sil_witness_table ConformsWithResilientAssoc : HasResilientAssoc module protocol
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc, %swift.type* %T.T, i8** %T.T.OtherResilientProtocol)
+// CHECK-LABEL: define{{( protected)?}} void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc)
 sil @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> () {
 bb0(%0 : $*T):
   %result = tuple ()
@@ -297,8 +297,7 @@ bb0(%0 : $*ConformsWithResilientAssoc):
 
   // CHECK-NEXT: entry:
   // CHECK-NEXT: [[ARG:%.*]] = bitcast %V19protocol_resilience26ConformsWithResilientAssoc* %0 to %swift.opaque*
-  // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @_TWlV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_()
-  // CHECK-NEXT: call void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_TMfV19protocol_resilience26ConformsWithResilientAssoc, i32 0, i32 1) to %swift.type*), i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @_TWPV19protocol_resilience26ConformsWithResilientAssocS_17HasResilientAssocS_, i32 0, i32 0), %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_TMfV19protocol_resilience23ResilientConformingType, i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+  // CHECK-NEXT: call void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_TMfV19protocol_resilience26ConformsWithResilientAssoc, i32 0, i32 1) to %swift.type*), i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @_TWPV19protocol_resilience26ConformsWithResilientAssocS_17HasResilientAssocS_, i32 0, i32 0))
 
   %fn = function_ref @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()
   %ignore = apply %fn<ConformsWithResilientAssoc, ResilientConformingType>(%0) : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()

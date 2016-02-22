@@ -86,7 +86,7 @@ protocol Strategy {
   func disrupt() -> GrowthHack
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @testArchetypeWitnessMethod(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Strategy, %swift.type* %T.GrowthHack, i8** %T.GrowthHack.Pivot)
+// CHECK-LABEL: define{{( protected)?}} void @testArchetypeWitnessMethod(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Strategy)
 // CHECK: entry:
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.Strategy, i32 2
 // CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]

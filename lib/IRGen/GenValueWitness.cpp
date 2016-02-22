@@ -44,6 +44,40 @@
 using namespace swift;
 using namespace irgen;
 
+const char *irgen::getValueWitnessName(ValueWitness witness) {
+  switch (witness) {
+#define CASE(NAME) case ValueWitness::NAME: return #NAME;
+  CASE(AllocateBuffer)
+  CASE(AssignWithCopy)
+  CASE(AssignWithTake)
+  CASE(DeallocateBuffer)
+  CASE(Destroy)
+  CASE(DestroyBuffer)
+  CASE(DestroyArray)
+  CASE(InitializeBufferWithCopyOfBuffer)
+  CASE(InitializeBufferWithCopy)
+  CASE(InitializeWithCopy)
+  CASE(InitializeBufferWithTake)
+  CASE(InitializeWithTake)
+  CASE(ProjectBuffer)
+  CASE(InitializeBufferWithTakeOfBuffer)
+  CASE(InitializeArrayWithCopy)
+  CASE(InitializeArrayWithTakeFrontToBack)
+  CASE(InitializeArrayWithTakeBackToFront)
+  CASE(StoreExtraInhabitant)
+  CASE(GetExtraInhabitantIndex)
+  CASE(GetEnumTag)
+  CASE(DestructiveProjectEnumData)
+  CASE(DestructiveInjectEnumTag)
+  CASE(Size)
+  CASE(Flags)
+  CASE(Stride)
+  CASE(ExtraInhabitantFlags)
+#undef CASE
+  }
+  llvm_unreachable("bad value witness kind");
+}
+
 static bool isNeverAllocated(FixedPacking packing) {
   switch (packing) {
   case FixedPacking::OffsetZero: return true;

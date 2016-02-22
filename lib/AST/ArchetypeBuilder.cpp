@@ -1946,7 +1946,7 @@ addRequirements(
 
 static void
 addNestedRequirements(
-    ArchetypeBuilder &builder, Type type,
+    ArchetypeBuilder &builder,
     ArchetypeBuilder::PotentialArchetype *pa,
     llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
     SmallVectorImpl<Requirement> &requirements) {
@@ -1980,7 +1980,7 @@ addNestedRequirements(
         rep->getDependentType(builder, /*allowUnresolved*/ false);
 
       addRequirements(builder, nestedType, rep, knownPAs, requirements);
-      addNestedRequirements(builder, nestedType, rep, knownPAs, requirements);
+      addNestedRequirements(builder, rep, knownPAs, requirements);
     }
   }
 }
@@ -2034,7 +2034,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
     for (unsigned idx = primaryIdx; idx < lastPrimaryIdx; ++idx) {
       auto param = primary[idx];
       auto pa = builder.resolveArchetype(param)->getRepresentative();
-      addNestedRequirements(builder, param, pa, knownPAs, requirements);
+      addNestedRequirements(builder, pa, knownPAs, requirements);
     }
 
     primaryIdx = lastPrimaryIdx;

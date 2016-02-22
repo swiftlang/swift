@@ -3783,7 +3783,11 @@ private:
       ParentOrOpened(Existential.getPointer()),
       isRecursive(isRecursive) { }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
+BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
+CanArchetypeType getParent() const {
+  return CanArchetypeType(getPointer()->getParent());
+}
+END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 
 /// Abstract class used to describe the type of a generic type parameter
 /// or associated type.
