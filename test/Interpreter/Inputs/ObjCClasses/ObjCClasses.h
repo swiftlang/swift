@@ -1,7 +1,9 @@
 #ifndef SWIFT_TEST_OBJC_CLASSES_H
 #define SWIFT_TEST_OBJC_CLASSES_H
 
-#include <Foundation/NSObject.h>
+#import <Foundation/NSObject.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 /* This class has instance variables which are not apparent in the
    interface.  Subclasses will need to be slid by the ObjC runtime. */
@@ -19,10 +21,12 @@
 
 @interface Container<C> : NSObject
 - (id)initWithObject:(C)object NS_DESIGNATED_INITIALIZER;
+- (id)init NS_UNAVAILABLE;
+
 @property C object;
 
 - (void)processObjectWithBlock:(void (^)(C))block;
-- (void)getObjectWithBlock:(C (^)())block;
+- (void)updateObjectWithBlock:(C (^)())block;
 @end
 
 @interface Container<D> (Cat1)
@@ -45,7 +49,7 @@
 @end
 
 @interface Animal : NSObject
-- (void)makeNoise;
+@property (readonly) NSString *noise;
 @end
 
 @interface Dog : Animal
@@ -53,5 +57,7 @@
 
 @interface AnimalContainer<C: Animal *> : Container<C>
 @end
+
+NS_ASSUME_NONNULL_END
 
 #endif

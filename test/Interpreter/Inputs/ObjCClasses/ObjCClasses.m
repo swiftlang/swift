@@ -26,7 +26,7 @@
   block(self.object);
 }
 
-- (void)getObjectWithBlock:(id (^)())block {
+- (void)updateObjectWithBlock:(id (^)())block {
   self.object = block();
 }
 
@@ -67,14 +67,14 @@
 @end
 
 @implementation Animal
-- (void)makeNoise {
-  printf("eep\n");
+- (NSString *)noise {
+  return @"eep";
 }
 @end
 
 @implementation Dog
-- (void)makeNoise {
-  printf("woof\n");
+- (NSString *)noise {
+  return @"woof";
 }
 @end
 
