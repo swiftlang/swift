@@ -4,6 +4,12 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
+// TODO: Fix specializer to substitute using conformance type witnesses instead
+// of name lookup
+
+// XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_unchecked
+
 import StdlibUnittest
 
 protocol delayedImmutable {
