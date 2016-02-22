@@ -318,6 +318,9 @@ Runtime.test("typeByName") {
   expectTrue(_typeByName("a.SomeSubclass") == SomeSubclass.self)
   // name lookup will be via protocol conformance table
   expectTrue(_typeByName("a.SomeConformingClass") == SomeConformingClass.self)
+  // FIXME: NonObjectiveCBase is slated to die, but I can't think of another
+  // nongeneric public class in the stdlib...
+  expectTrue(_typeByName("Swift.NonObjectiveCBase") == NonObjectiveCBase.self)
 }
 
 Runtime.test("demangleName") {
