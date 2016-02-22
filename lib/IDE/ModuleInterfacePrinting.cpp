@@ -176,6 +176,17 @@ void findExtensionsFromConformingProtocols(Decl *D,
   }
 }
 
+ArrayRef<StringRef>
+swift::ide::collectModuleGroups(Module *M, std::vector<StringRef> &Scratch) {
+  for (auto File : M->getFiles()) {
+    File->collectAllGroups(Scratch);
+  }
+  std::sort(Scratch.begin(), Scratch.end(), [](StringRef L, StringRef R) {
+    return L.compare_lower(R) < 0;
+  });
+  return llvm::makeArrayRef(Scratch);
+}
+
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,
