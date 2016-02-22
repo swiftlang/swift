@@ -50,14 +50,6 @@ set(swift_runtime_sources
     Reflection.cpp
     SwiftObject.cpp)
 
-add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
-  ${swift_runtime_sources}
-  ${swift_runtime_objc_sources}
-  ${swift_runtime_leaks_sources}
-  ${swift_runtime_port_sources}
-  C_COMPILE_FLAGS ${swift_runtime_compile_flags}
-  INSTALL_IN_COMPONENT stdlib)
-
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     Remangle.cpp
@@ -66,6 +58,14 @@ set(LLVM_OPTIONAL_SOURCES
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources})
+
+add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
+  ${swift_runtime_sources}
+  ${swift_runtime_objc_sources}
+  ${swift_runtime_leaks_sources}
+  ${swift_runtime_port_sources}
+  C_COMPILE_FLAGS ${swift_runtime_compile_flags}
+  INSTALL_IN_COMPONENT stdlib)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
   add_swift_library(section_magic_begin IS_STDLIB IS_STDLIB_CORE
