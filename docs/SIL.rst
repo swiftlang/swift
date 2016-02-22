@@ -2350,6 +2350,16 @@ This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
 ``store_weak`` or ``load_weak`` operations on the same address.
 
+load_unowned
+````````````
+
+TODO: Fill this in
+
+store_unowned
+`````````````
+
+TODO: Fill this in
+
 fix_lifetime
 ````````````
 
