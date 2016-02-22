@@ -90,6 +90,15 @@
     "IntegerParsing.swift",
     "SetAlgebra.swift"
   ],
+  "Optional": [
+    "ImplicitlyUnwrappedOptional.swift",
+    "Optional.swift"
+  ],
+  "Pointer": [
+    "Pointer.swift",
+    "UnsafePointer.swift",
+    "UnsafeBufferPointer.swift"
+  ],
   "Misc": [
     "Interval.swift",
     "Hashing.swift",
