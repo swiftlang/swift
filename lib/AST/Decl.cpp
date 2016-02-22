@@ -301,6 +301,13 @@ bool Decl::isUserAccessible() const {
   return true;
 }
 
+bool Decl::canHaveComment() const {
+  return !this->hasClangNode() &&
+         (isa<ValueDecl>(this) || isa<ExtensionDecl>(this)) &&
+         !isa<ParamDecl>(this) &&
+         (!isa<AbstractTypeParamDecl>(this) || isa<AssociatedTypeDecl>(this));
+}
+
 Module *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
