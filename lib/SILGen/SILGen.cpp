@@ -966,7 +966,7 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
 }
 
 static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
-  assert(gen.B.getInsertionBB() == gen.F.begin()
+  assert(gen.B.getInsertionBB()->getIterator() == gen.F.begin()
          && "not at entry point?!");
 
   SILBasicBlock *entry = gen.B.getInsertionBB();
