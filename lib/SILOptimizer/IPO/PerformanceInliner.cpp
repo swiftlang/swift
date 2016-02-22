@@ -508,7 +508,7 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   for (auto &BB : *Callee)
     for (auto &I : BB)
       if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getCalleeFunction() == Callee)
+        if (Apply.getReferencedFunction() == Callee)
           return true;
   return false;
 }
@@ -516,8 +516,8 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
 // Returns the callee of an apply_inst if it is basically inlineable.
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
-  SILFunction *Callee = AI.getCalleeFunction();
-  
+  SILFunction *Callee = AI.getReferencedFunction();
+
   if (!Callee) {
     return nullptr;
   }
@@ -663,8 +663,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               SILLoopAnalysis *LA,
                                               ConstantTracker &callerTracker,
                                               unsigned &NumCallerBlocks) {
-  SILFunction *Callee = AI.getCalleeFunction();
-  
+  SILFunction *Callee = AI.getReferencedFunction();
+
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
   
@@ -832,7 +832,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   // Calculate how many times a callee is called from this caller.
   llvm::DenseMap<SILFunction *, unsigned> CalleeCount;
   for (auto AI : InitialCandidates) {
-    SILFunction *Callee = AI.getCalleeFunction();
+    SILFunction *Callee = AI.getReferencedFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
     CalleeCount[Callee]++;
   }
@@ -840,7 +840,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   // Now copy each candidate callee that has a small enough number of
   // call sites into the final set of call sites.
   for (auto AI : InitialCandidates) {
-    SILFunction *Callee = AI.getCalleeFunction();
+    SILFunction *Callee = AI.getReferencedFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     const unsigned CallsToCalleeThreshold = 1024;
@@ -869,7 +869,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
   // Second step: do the actual inlining.
   for (auto AI : AppliesToInline) {
-    SILFunction *Callee = AI.getCalleeFunction();
+    SILFunction *Callee = AI.getReferencedFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     if (!Callee->shouldOptimize()) {

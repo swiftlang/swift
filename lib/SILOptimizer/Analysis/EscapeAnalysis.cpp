@@ -1171,7 +1171,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
     }
 
-    if (auto *Fn = FAS.getCalleeFunction()) {
+    if (auto *Fn = FAS.getReferencedFunction()) {
       if (Fn->getName() == "swift_bufferAllocate")
         // The call is a buffer allocation, e.g. for Array.
         return;

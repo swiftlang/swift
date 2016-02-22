@@ -64,7 +64,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       if (!Apply || !Apply.hasSubstitutions())
         continue;
 
-      auto *Callee = Apply.getCalleeFunction();
+      auto *Callee = Apply.getReferencedFunction();
       if (!Callee || !Callee->isDefinition())
         continue;
 

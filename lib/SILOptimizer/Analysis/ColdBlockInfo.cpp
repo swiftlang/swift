@@ -55,8 +55,8 @@ static BranchHint getBranchHint(SILValue Cond) {
   auto AI = dyn_cast<ApplyInst>(Cond);
   if (!AI)
     return BranchHint::None;
-  
-  if (auto *F = AI->getCalleeFunction()) {
+
+  if (auto *F = AI->getReferencedFunction()) {
     if (F->hasSemanticsAttrs()) {
       if (F->hasSemanticsAttr("branchhint")) {
         // A "branchint" model takes a Bool expected value as the second

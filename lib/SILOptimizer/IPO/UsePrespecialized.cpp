@@ -71,7 +71,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
   collectApplyInst(F, NewApplies);
 
   for (auto &AI : NewApplies) {
-    auto *ReferencedF = AI.getCalleeFunction();
+    auto *ReferencedF = AI.getReferencedFunction();
     if (!ReferencedF)
       continue;
 
