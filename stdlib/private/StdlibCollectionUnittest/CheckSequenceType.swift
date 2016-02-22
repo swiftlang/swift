@@ -1699,7 +1699,7 @@ self.test("\(testNamePrefix).split/separator/semantics") {
     )
     let separator = wrapValueIntoEquatable(MinimalEquatableValue(test.separator))
     let result = s.split(
-      separator,
+      by: separator,
       maxSplits: test.maxSplits,
       omittingEmptySubsequences: test.omittingEmptySubsequences)
     expectEqualSequence(
@@ -1726,7 +1726,7 @@ self.test("\(testNamePrefix).split/semantics/separator/negativeMaxSplit") {
   let s = makeWrappedSequenceWithEquatableElement([MinimalEquatableValue(1)])
   let separator = wrapValueIntoEquatable(MinimalEquatableValue(1))
   expectCrashLater()
-  _ = s.split(separator, maxSplits: -1, omittingEmptySubsequences: false)
+  _ = s.split(by: separator, maxSplits: -1, omittingEmptySubsequences: false)
 }
 
 //===----------------------------------------------------------------------===//

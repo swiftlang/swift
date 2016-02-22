@@ -489,7 +489,7 @@ extension Collection where Iterator.Element : Equatable {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    separator: Iterator.Element,
+    by separator: Iterator.Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
   ) -> [SubSequence] {
@@ -766,7 +766,7 @@ extension Collection {
 extension Collection where Iterator.Element : Equatable {
   @available(*, unavailable, message="Please use split(_:maxSplits:omittingEmptySubsequences:) instead")
   public func split(
-    separator: Iterator.Element,
+    by separator: Iterator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [SubSequence] {

@@ -519,7 +519,7 @@ extension Sequence where Iterator.Element : Equatable {
   /// - Precondition: `maxSplits >= 0`
   @warn_unused_result
   public func split(
-    separator: Iterator.Element,
+    by separator: Iterator.Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
   ) -> [AnySequence<Iterator.Element>] {
@@ -673,7 +673,7 @@ extension Sequence {
 extension Sequence where Iterator.Element : Equatable {
   @available(*, unavailable, message="call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   public func split(
-    separator: Iterator.Element,
+    by separator: Iterator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [AnySequence<Iterator.Element>] {
