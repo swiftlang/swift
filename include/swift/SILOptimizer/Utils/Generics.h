@@ -31,7 +31,7 @@ namespace swift {
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
 ///
-/// Specifically, it contains information which paramters and returns are
+/// Specifically, it contains information which parameters and returns are
 /// changed from indirect values to direct values.
 class ReabstractionInfo {
 public:
