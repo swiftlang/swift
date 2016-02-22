@@ -133,8 +133,7 @@ public struct StaticString
   @_transparent
   public var stringValue: String {
     return withUTF8Buffer {
-      (buffer) in
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: buffer)
+      String(validatingCodeUnits: $0, as: UTF8.self)!
     }
   }
 

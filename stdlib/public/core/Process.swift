@@ -17,8 +17,7 @@ public enum Process {
   internal static func _computeArguments() -> [String] {
     var result: [String] = []
     for i in 0..<Int(argc) {
-      result.append(
-       String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? "")
+      result.append(String(cString: unsafeArgv[i]))
     }
     return result 
   }

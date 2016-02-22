@@ -418,7 +418,9 @@ struct _EnumMirror : _MirrorType {
   func _subscript_get<T>(i: Int) -> (T, _MirrorType)
 
   var summary: String {
-    let maybeCaseName = String.fromCString(self.caseName)
+    let caseNamePtr = self.caseName
+    let maybeCaseName = (caseNamePtr != nil) ?
+      String(validatingCString: caseNamePtr) : Optional.None
     let typeName = _typeName(valueType)
     if let caseName = maybeCaseName {
       return typeName + "." + caseName

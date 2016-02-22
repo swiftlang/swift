@@ -114,7 +114,7 @@ public func spawnChild(args: [String])
       &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
-    print(String.fromCString(strerror(spawnResult)))
+    print(String(cString: strerror(spawnResult)))
     preconditionFailure("swift_posix_spawn() failed")
   }
 
@@ -158,8 +158,7 @@ internal func _readAll(fd: CInt) -> String {
     }
     preconditionFailure("read() failed")
   }
-  return String._fromCodeUnitSequenceWithRepair(
-    UTF8.self, input: buffer[0..<usedBytes]).0
+  return String(codeUnits: buffer[0..<usedBytes], as: UTF8.self)
 }
 
 
