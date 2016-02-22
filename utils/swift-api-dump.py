@@ -224,7 +224,7 @@ def main():
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
     if args.swift_3:
-        extra_args = extra_args + ['-enable-omit-needless-words', '-enable-infer-default-arguments', '-enable-strip-ns-prefix']
+        extra_args = extra_args + ['-enable-omit-needless-words', '-enable-infer-default-arguments']
 
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])

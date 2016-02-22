@@ -51,7 +51,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 7; // enum case casing
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 8; // NS prefix stripping
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
