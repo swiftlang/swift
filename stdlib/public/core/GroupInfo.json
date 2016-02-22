@@ -1,16 +1,18 @@
 {
-  "Algorithm": [
+  "Lazy Views": [
     "Algorithm.swift",
     "Flatten.swift",
     "FlatMap.swift",
     "Map.swift",
     "Join.swift",
-    "Sort.swift",
     "Zip.swift",
     "Filter.swift",
-    "Repeat.swift",
     "Reverse.swift",
-    "Stride.swift"
+    "Slice.swift",
+    "SequenceWrapper.swift",
+    "LazyCollection.swift",
+    "LazySequence.swift",
+    "ExistentialCollection.swift"
   ],
   "Array": [
     "ArrayBody.swift",
@@ -21,6 +23,7 @@
     "Arrays.swift",
     "CocoaArray.swift",
     "ContiguousArrayBuffer.swift",
+    "SliceBuffer.swift",
     "SwiftNativeNSArray.swift"
   ],
   "Assert": [
@@ -54,16 +57,14 @@
     "Collection.swift",
     "CollectionAlgorithms.swift",
     "EmptyCollection.swift",
-    "LazyCollection.swift",
+    "Stride.swift",
     "HashedCollections.swift",
-    "ExistentialCollection.swift",
-    "Slice.swift",
-    "SliceBuffer.swift",
+    "Repeat.swift",
+    "Sort.swift",
+    "Range.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
-    "LazySequence.swift",
     "Sequence.swift",
-    "SequenceWrapper.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollectionType.swift",
     "Index.swift",
@@ -77,6 +78,7 @@
   ],
   "Reflection": [
     "Mirrors.swift",
+    "Mirror.swift",
     "Reflection.swift"
   ],
   "Math": [
@@ -93,28 +95,21 @@
     "Hashing.swift",
     "CompilerProtocols.swift",
     "ErrorType.swift",
-    "ImplicitlyUnwrappedOptional.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",
     "Misc.swift",
-    "Optional.swift",
     "OptionSet.swift",
     "OutputStream.swift",
-    "Pointer.swift",
     "Policy.swift",
     "Print.swift",
     "REPL.swift",
-    "Range.swift",
     "Runtime.swift",
     "ShadowProtocols.swift",
     "Shims.swift",
     "Unmanaged.swift",
-    "UnsafeBufferPointer.swift",
-    "UnsafePointer.swift",
     "Availability.swift",
     "Bit.swift",
-    "Mirror.swift",
     "Process.swift",
     "Tuple.swift"
   ]
