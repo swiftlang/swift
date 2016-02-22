@@ -73,6 +73,7 @@
                     "strong_release" "strong_retain_unowned"
                     "unowned_retain" "unowned_release"
                     "load_weak" "store_weak"
+                    "load_unowned" "store_unowned"
                     "fix_lifetime" "mark_dependence"
                     "is_unique" "is_unique_or_pinned"
                     "copy_block"
