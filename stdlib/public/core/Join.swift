@@ -19,7 +19,7 @@ internal enum _JoinIteratorState {
 
 /// An iterator that presents the elements of the sequences traversed
 /// by `Base`, concatenated using a given separator.
-public struct JoinIterator<
+public struct JoinedIterator<
   Base : IteratorProtocol where Base.Element : Sequence
 > : IteratorProtocol {
 
@@ -90,7 +90,7 @@ public struct JoinIterator<
 
 /// A sequence that presents the elements of the `Base` sequences
 /// concatenated using a given separator.
-public struct JoinSequence<
+public struct JoinedSequence<
   Base : Sequence where Base.Iterator.Element : Sequence
 > : Sequence {
 
@@ -110,8 +110,8 @@ public struct JoinSequence<
   /// Return an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> JoinIterator<Base.Iterator> {
-    return JoinIterator(
+  public func iterator() -> JoinedIterator<Base.Iterator> {
+    return JoinedIterator(
       base: _base.iterator(),
       separator: _separator)
   }
@@ -163,37 +163,37 @@ extension Sequence where Iterator.Element : Sequence {
   /// `separator` between the elements of the sequence `self`.
   ///
   /// For example,
-  /// `[[1, 2, 3], [4, 5, 6], [7, 8, 9]].join(separator: [-1, -2])`
+  /// `[[1, 2, 3], [4, 5, 6], [7, 8, 9]].joined(separator: [-1, -2])`
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   @warn_unused_result
-  public func join<
+  public func joined<
     Separator : Sequence
     where
     Separator.Iterator.Element == Iterator.Element.Iterator.Element
-  >(separator separator: Separator) -> JoinSequence<Self> {
-    return JoinSequence(base: self, separator: separator)
+  >(separator separator: Separator) -> JoinedSequence<Self> {
+    return JoinedSequence(base: self, separator: separator)
   }
 }
 
-@available(*, unavailable, renamed="JoinIterator")
+@available(*, unavailable, renamed="JoinedIterator")
 public struct JoinGenerator<
   Base : IteratorProtocol where Base.Element : Sequence
 > {}
 
-extension JoinSequence {
+extension JoinedSequence {
   @available(*, unavailable, renamed="iterator")
-  public func generate() -> JoinIterator<Base.Iterator> {
+  public func generate() -> JoinedIterator<Base.Iterator> {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension Sequence where Iterator.Element : Sequence {
-  @available(*, unavailable, renamed="join")
+  @available(*, unavailable, renamed="joined")
   public func joinWithSeparator<
     Separator : Sequence
     where
     Separator.Iterator.Element == Iterator.Element.Iterator.Element
-  >(separator: Separator) -> JoinSequence<Self> {
+  >(separator: Separator) -> JoinedSequence<Self> {
     fatalError("unavailable function can't be called")
   }
 }

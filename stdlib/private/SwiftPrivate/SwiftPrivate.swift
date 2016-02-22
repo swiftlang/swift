@@ -24,7 +24,7 @@ public func asHex<
 where
   S.Iterator.Element : Integer
 >(x: S) -> String {
-  return "[ " + x.lazy.map { asHex($0) }.join(separator: ", ") + " ]"
+  return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
 }
 
 /// Compute the prefix sum of `seq`.
