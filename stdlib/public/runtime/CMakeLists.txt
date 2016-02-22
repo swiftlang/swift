@@ -17,12 +17,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-# Acknowledge that the following sources are known.
-set(LLVM_OPTIONAL_SOURCES
-    Remangle.cpp
-    CygwinPort.cpp
-    swift_sections.S)
-
 set(swift_runtime_port_sources)
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
   set(swift_runtime_port_sources
@@ -64,8 +58,11 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT stdlib)
 
+# Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     Remangle.cpp
+    swift_sections.S
+    CygwinPort.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources})
