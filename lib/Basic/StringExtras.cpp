@@ -353,6 +353,11 @@ static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
     return typeName.drop_back(3);
   }
 
+  // "Mask" suffix.
+  if (lastWord == "Mask" && typeName.size() > 4) {
+    return typeName.drop_back(4);
+  }
+
   // \d+D for dimensionality.
   if (typeName.back() == 'D' && typeName.size() > 1) {
     unsigned firstDigit = typeName.size() - 1;
