@@ -1197,6 +1197,7 @@ public:
                                            Identifier baseName,
                                            unsigned numParams,
                                            StringRef argumentLabel,
+                                           bool isFirstParameter,
                                            bool isLastParameter);
 
   /// Retrieve a bit vector containing the non-null argument

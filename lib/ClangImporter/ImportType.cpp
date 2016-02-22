@@ -1799,7 +1799,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
           getParamOptionality(param,
                               !nonNullArgs.empty() && nonNullArgs[i]),
           SwiftContext.getIdentifier(baseName), numParams,
-          argumentName, isLastParameter) != DefaultArgumentKind::None;
+          argumentName, i == 0, isLastParameter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
                                                      param->getOriginalType())
@@ -1855,7 +1855,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
                       clang::Preprocessor &pp, clang::QualType type,
                       OptionalTypeKind clangOptionality, Identifier baseName,
                       unsigned numParams, StringRef argumentLabel,
-                      bool isLastParameter) {
+                      bool isFirstParameter, bool isLastParameter) {
   // Don't introduce a default argument for setters with only a single
   // parameter.
   if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
@@ -1878,6 +1878,10 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
       }
     }
   }
+
+  // Don't introduce a empty options default arguments for setters.
+  if (isFirstParameter && camel_case::getFirstWord(baseName.str()) == "set")
+    return DefaultArgumentKind::None;
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
@@ -2228,6 +2232,7 @@ Type ClangImporter::Implementation::importMethodType(
                                              numEffectiveParams,
                                              name.empty() ? StringRef()
                                                           : name.str(),
+                                             paramIndex == 0,
                                              isLastParameter);
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
