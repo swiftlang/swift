@@ -1804,6 +1804,20 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
     Buffer << 'u';
     mangleGenericSignature(sig);
   }
+  
+  if (auto behaviorStorage = conformance->getBehaviorDecl()) {
+    Buffer << 'b';
+    auto topLevelContext =
+      conformance->getDeclContext()->getModuleScopeContext();
+    auto fileUnit = cast<FileUnit>(topLevelContext);
+    mangleIdentifier(
+                    fileUnit->getDiscriminatorForPrivateValue(behaviorStorage));
+    mangleContextOf(behaviorStorage, BindGenerics::None);
+    mangleIdentifier(behaviorStorage->getName());
+    mangleProtocolName(conformance->getProtocol());
+    return;
+  }
+  
   mangleType(conformance->getInterfaceType()->getCanonicalType(), 0);
   mangleProtocolName(conformance->getProtocol());
   mangleModule(conformance->getDeclContext()->getParentModule());

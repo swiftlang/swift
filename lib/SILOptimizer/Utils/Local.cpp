@@ -72,6 +72,21 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   return false;
 }
 
+/// \brief Return true if this is a release instruction and the released value
+/// is a part of a guaranteed parameter.
+bool swift::isGuaranteedParamRelease(SILInstruction *I) {
+  if (!isa<StrongReleaseInst>(I) || !isa<ReleaseValueInst>(I))
+    return false;
+  // OK. we have a release instruction.
+  // Check whether this is a release on part of a guaranteed function argument.
+  SILValue Op = stripValueProjections(I->getOperand(0));
+  SILArgument *Arg = dyn_cast<SILArgument>(Op);
+  if (!Arg || !Arg->isFunctionArg() ||
+      !Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed))
+    return false;
+  return true;
+}
+
 namespace {
   using CallbackTy = std::function<void(SILInstruction *)>;
 } // end anonymous namespace

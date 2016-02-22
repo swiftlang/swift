@@ -1509,6 +1509,19 @@ void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
 }
 
 NormalProtocolConformance *
+ASTContext::getBehaviorConformance(Type conformingType,
+                                   Type conformingInterfaceType,
+                                   ProtocolDecl *protocol,
+                                   SourceLoc loc,
+                                   AbstractStorageDecl *storage,
+                                   ProtocolConformanceState state) {
+  auto conformance = new (*this, AllocationArena::Permanent)
+    NormalProtocolConformance(conformingType, conformingInterfaceType,
+                              protocol, loc, storage, state);
+  return conformance;
+}
+
+NormalProtocolConformance *
 ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
                            SourceLoc loc,

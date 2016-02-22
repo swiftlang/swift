@@ -800,7 +800,8 @@ static bool performCompile(CompilerInstance &Instance,
   // These may change across compiler versions.
   {
     SharedTimer timer("SIL optimization");
-    if (IRGenOpts.Optimize) {
+    if (Invocation.getSILOptions().Optimization >
+        SILOptions::SILOptMode::None) {
       StringRef CustomPipelinePath =
         Invocation.getSILOptions().ExternalPassPipelineFilename;
       if (!CustomPipelinePath.empty()) {

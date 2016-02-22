@@ -403,10 +403,10 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
     args = args.slice(1);
     
     if (auto subTy = depTy->getAs<SubstitutableType>()) {
-      subs[subTy] = replacement;
+      subs[subTy->getCanonicalType().getPointer()] = replacement;
     }
     else if (auto dTy = depTy->getAs<DependentMemberType>()) {
-      subs[dTy] = replacement;
+      subs[dTy->getCanonicalType().getPointer()] = replacement;
     }
   }
   
@@ -502,4 +502,41 @@ Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
   if (!pa->isConcreteType()) return Type();
 
   return pa->getConcreteType();
+}
+
+Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
+  assert(type->isTypeParameter());
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  assert(pa && "not a valid dependent type of this signature?");
+  auto rep = pa->getRepresentative();
+  if (rep->isConcreteType()) return rep->getConcreteType();
+  if (pa == rep) {
+    assert(rep->getDependentType(builder, /*allowUnresolved*/ false)
+              ->getCanonicalType() == type->getCanonicalType());
+    return type;
+  }
+  return rep->getDependentType(builder, /*allowUnresolved*/ false);
+}
+
+bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
+                                                     ModuleDecl &mod) {
+  assert(type1->isTypeParameter());
+  assert(type2->isTypeParameter());
+
+  if (type1.getPointer() == type2.getPointer())
+    return true;
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa1 = builder.resolveArchetype(type1);
+  assert(pa1 && "not a valid dependent type of this signature?");
+  pa1 = pa1->getRepresentative();
+  assert(!pa1->isConcreteType());
+
+  auto pa2 = builder.resolveArchetype(type2);
+  assert(pa2 && "not a valid dependent type of this signature?");
+  pa2 = pa2->getRepresentative();
+  assert(!pa2->isConcreteType());
+
+  return pa1 == pa2;
 }

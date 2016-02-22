@@ -1,0 +1,7 @@
+Name: APINotesTest
+Functions:
+  - Name: moveToPoint
+    SwiftName: 'moveTo(x:y:z:)'
+Globals:
+  - Name: ANTGlobalValue
+    SwiftName: global
