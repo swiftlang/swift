@@ -494,6 +494,9 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     run_tests_group.add_argument("-T", "--validation-test",
         help="run the validation test suite (implies --test)",
         action="store_true")
+    run_tests_group.add_argument("--host-test",
+        help="run executable tests on host devices (such as iOS or tvOS)",
+        action="store_true")
     run_tests_group.add_argument("-B", "--benchmark",
         help="run the Swift Benchmark Suite after building",
         action="store_true")
@@ -528,6 +531,42 @@ build the Debug variant of the Swift standard library and SDK overlay""",
 
     run_build_group.add_argument("--skip-build-benchmarks",
         help="skip building Swift Benchmark Suite",
+        action="store_true")
+
+    skip_test_group = parser.add_argument_group(
+        title="Skip testing specified targets")
+    skip_test_group.add_argument("--skip-test-ios",
+        help="skip testing all iOS targets. Equivalent to specifying both "
+             "--skip-test-ios-simulator and --skip-test-ios-host",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-ios-simulator",
+        help="skip testing iOS simulator targets",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-ios-host",
+        help="skip testing iOS device targets on the host machine (the phone "
+              "itself)",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-tvos",
+        help="skip testing all tvOS targets. Equivalent to specifying both "
+             "--skip-test-tvos-simulator and --skip-test-tvos-host",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-tvos-simulator",
+        help="skip testing tvOS simulator targets",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-tvos-host",
+        help="skip testing tvOS device targets on the host machine (the TV "
+             "itself)",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-watchos",
+        help="skip testing all tvOS targets. Equivalent to specifying both "
+             "--skip-test-watchos-simulator and --skip-test-watchos-host",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-watchos-simulator",
+        help="skip testing watchOS simulator targets",
+        action="store_true")
+    skip_test_group.add_argument("--skip-test-watchos-host",
+        help="skip testing watchOS device targets on the host machine (the "
+             "watch itself)",
         action="store_true")
 
     parser.add_argument("-i", "--ios",
@@ -602,6 +641,15 @@ the number of parallel build jobs to use""",
         '--install-prefix',
         '--install-symroot',
         '--symbols-package',
+        '--skip-test-ios',
+        '--skip-test-ios-simulator',
+        '--skip-test-ios-host',
+        '--skip-test-tvos',
+        '--skip-test-tvos-simulator',
+        '--skip-test-tvos-host',
+        '--skip-test-watchos',
+        '--skip-test-watchos-simulator',
+        '--skip-test-watchos-host',
     ]))
 
     if args.host_target is None:
@@ -681,6 +729,19 @@ the number of parallel build jobs to use""",
     if args.test_optimized:
         args.test = True
 
+    # --skip-test-ios is merely a shorthand for host and simulator tests.
+    if args.skip_test_ios:
+        args.skip_test_ios_host = True
+        args.skip_test_ios_simulator = True
+    # --skip-test-tvos is merely a shorthand for host and simulator tests.
+    if args.skip_test_tvos:
+        args.skip_test_tvos_host = True
+        args.skip_test_tvos_simulator = True
+    # --skip-test-watchos is merely a shorthand for host and simulator tests.
+    if args.skip_test_watchos:
+        args.skip_test_watchos_host = True
+        args.skip_test_watchos_simulator = True
+
     build_script_impl_inferred_args = []
 
     if args.export_compile_commands:
@@ -708,14 +769,24 @@ the number of parallel build jobs to use""",
             "--skip-test-freebsd",
             "--skip-test-cygwin",
             "--skip-test-osx",
-            "--skip-test-ios",
-            "--skip-test-tvos",
-            "--skip-test-watchos",
+            "--skip-test-ios-simulator",
+            "--skip-test-ios-host",
+            "--skip-test-tvos-simulator",
+            "--skip-test-tvos-host",
+            "--skip-test-watchos-simulator",
+            "--skip-test-watchos-host",
         ]
 
     if not args.validation_test:
         build_script_impl_inferred_args += [
             "--skip-test-validation"
+        ]
+
+    if not args.host_test:
+        build_script_impl_inferred_args += [
+            "--skip-test-ios-host",
+            "--skip-test-tvos-host",
+            "--skip-test-watchos-host",
         ]
 
     if not args.benchmark:
@@ -731,19 +802,22 @@ the number of parallel build jobs to use""",
     if not args.ios:
         build_script_impl_inferred_args += [
             "--skip-build-ios",
-            "--skip-test-ios"
+            "--skip-test-ios-simulator",
+            "--skip-test-ios-host",
         ]
 
     if not args.tvos:
         build_script_impl_inferred_args += [
             "--skip-build-tvos",
-            "--skip-test-tvos",
+            "--skip-test-tvos-simulator",
+            "--skip-test-tvos-host",
         ]
 
     if not args.watchos:
         build_script_impl_inferred_args += [
             "--skip-build-watchos",
-            "--skip-test-watchos",
+            "--skip-test-watchos-simulator",
+            "--skip-test-watchos-host",
         ]
 
     if not args.build_lldb:
@@ -794,7 +868,7 @@ the number of parallel build jobs to use""",
             "--skip-build-ios-device",
             "--skip-build-ios-simulator",
             "--skip-build-tvos",
-            "--skip-build-tvos_device",
+            "--skip-build-tvos-device",
             "--skip-build-tvos-simulator",
             "--skip-build-watchos",
             "--skip-build-watchos-device",
@@ -931,6 +1005,18 @@ the number of parallel build jobs to use""",
         build_script_impl_args += ["--skip-test-freebsd"]
     if args.skip_test_cygwin:
         build_script_impl_args += ["--skip-test-cygwin"]
+    if args.skip_test_ios_host:
+        build_script_impl_args += ["--skip-test-ios-host"]
+    if args.skip_test_ios_simulator:
+        build_script_impl_args += ["--skip-test-ios-simulator"]
+    if args.skip_test_tvos_host:
+        build_script_impl_args += ["--skip-test-tvos-host"]
+    if args.skip_test_tvos_simulator:
+        build_script_impl_args += ["--skip-test-tvos-simulator"]
+    if args.skip_test_watchos_host:
+        build_script_impl_args += ["--skip-test-watchos-host"]
+    if args.skip_test_watchos_simulator:
+        build_script_impl_args += ["--skip-test-watchos-simulator"]
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add
