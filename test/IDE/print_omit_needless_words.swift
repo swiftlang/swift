@@ -47,8 +47,8 @@
 // CHECK-FOUNDATION: func copy(with _: Zone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(for _: Copying) -> AnyObject?
-// CHECK-FOUNDATION: func removeObject(for _: Copying)
+// CHECK-FOUNDATION: func object(forKey _: Copying) -> AnyObject?
+// CHECK-FOUNDATION: func removeObject(forKey _: Copying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
