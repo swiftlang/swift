@@ -1495,16 +1495,6 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
     if (auto typedefType = dyn_cast<clang::TypedefType>(typePtr)) {
       auto name = typedefType->getDecl()->getName();
 
-      // For Objective-C type parameters, drop the "Type" suffix if
-      // present.
-      if (isa<clang::ObjCTypeParamDecl>(typedefType->getDecl())) {
-        if (camel_case::getLastWord(name) == "Type") {
-          name = name.drop_back(4);
-        }
-
-        return name;
-      }
-
       // Objective-C selector type.
       if (ctx.hasSameUnqualifiedType(type, ctx.getObjCSelType()) &&
           name == "SEL")
