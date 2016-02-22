@@ -112,7 +112,7 @@ enum Recovery2 {
 enum Recovery3 {
   case UE2(): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
-enum Recovery4 {
+enum Recovery4 { // expected-note {{in declaration of 'Recovery4'}}
   case Self Self // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
 }
 enum Recovery5 {
