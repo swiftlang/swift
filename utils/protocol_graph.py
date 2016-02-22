@@ -56,7 +56,7 @@ def interpolate(string):
 
 # Given the body_text of a protocol definition, return a list of
 # associated type and operator requirements.
-def bodyLines(body_text):
+def body_lines(body_text):
     return [
         cgi.escape(b.group(0)) for b in
         re.finditer(
@@ -81,7 +81,7 @@ with open(args[1]) as src:
 
 genericParameterConstraint = interpolate(r' (%(identifier)s) \s* : \s* (%(identifier)s) ')
 
-def parseGenericOperator(m):
+def parse_generic_operator(m):
     genericParams = m.group(5)
     genericOperator = cgi.escape(m.group(0).strip())
     functionParamStart = m.end(5) - m.start(0)
@@ -103,13 +103,13 @@ def parseGenericOperator(m):
 
         genericOperators.setdefault(protocol, set()).add(abbreviatedSignature)
 
-def parseProtocol(m):
+def parse_protocol(m):
     child = m.group(1)
     # skip irrelevant protocols
     if re.match(r'_Builtin.*Convertible', child):
         return
     graph.setdefault(child, set())
-    body[child] = bodyLines(m.group(3))
+    body[child] = body_lines(m.group(3))
     if m.group(2):
         for parent in m.group(2).strip().split(","):
             if re.match(r'_Builtin.*Convertible', parent):
@@ -127,9 +127,9 @@ protocolsAndOperators = interpolate(r'''
 # Main parsing loop
 for m in re.finditer(protocolsAndOperators, sourceSansComments, reFlags):
     if m.group(1):
-        parseProtocol(m)
+        parse_protocol(m)
     elif m.group(5):
-        parseGenericOperator(m)
+        parse_generic_operator(m)
     # otherwise we matched some non-generic operator
 
 # Find clusters of protocols that have the same name when underscores

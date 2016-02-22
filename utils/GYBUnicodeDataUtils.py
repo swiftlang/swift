@@ -210,10 +210,10 @@ class UnicodeTrieGenerator(object):
     supp_first_level_index_bits = 5
     supp_second_level_index_bits = 8
 
-    def get_BMP_first_level_index(self, cp):
+    def get_bmp_first_level_index(self, cp):
         return cp >> self.BMP_data_offset_bits
 
-    def get_BMP_data_offset(self, cp):
+    def get_bmp_data_offset(self, cp):
         return cp & ((1 << self.BMP_data_offset_bits) - 1)
 
     def get_supp_first_level_index(self, cp):
@@ -287,8 +287,8 @@ class UnicodeTrieGenerator(object):
 
     def set_value(self, cp, value):
         if cp <= 0xffff:
-            data_block_index = self.BMP_lookup[self.get_BMP_first_level_index(cp)]
-            self.BMP_data[data_block_index][self.get_BMP_data_offset(cp)] = value
+            data_block_index = self.BMP_lookup[self.get_bmp_first_level_index(cp)]
+            self.BMP_data[data_block_index][self.get_bmp_data_offset(cp)] = value
         else:
             second_lookup_index = self.supp_lookup1[self.get_supp_first_level_index(cp)]
             data_block_index = self.supp_lookup2[second_lookup_index][self.get_supp_second_level_index(cp)]
@@ -296,8 +296,8 @@ class UnicodeTrieGenerator(object):
 
     def get_value(self, cp):
         if cp <= 0xffff:
-            data_block_index = self.BMP_lookup[self.get_BMP_first_level_index(cp)]
-            return self.BMP_data[data_block_index][self.get_BMP_data_offset(cp)]
+            data_block_index = self.BMP_lookup[self.get_bmp_first_level_index(cp)]
+            return self.BMP_data[data_block_index][self.get_bmp_data_offset(cp)]
         else:
             second_lookup_index = self.supp_lookup1[self.get_supp_first_level_index(cp)]
             data_block_index = self.supp_lookup2[second_lookup_index][self.get_supp_second_level_index(cp)]
@@ -379,7 +379,7 @@ class UnicodeTrieGenerator(object):
                     j += 1
             i += 1
 
-    def _int_to_LE_bytes(self, data, width):
+    def _int_to_le_bytes(self, data, width):
         if width == 1:
             assert(data & ~0xff == 0)
             return [data]
@@ -388,11 +388,11 @@ class UnicodeTrieGenerator(object):
             return [data & 0xff, data & 0xff00]
         assert(False)
 
-    def _int_list_to_LE_bytes(self, ints, width):
+    def _int_list_to_le_bytes(self, ints, width):
         return [
             byte
             for elt in ints
-            for byte in self._int_to_LE_bytes(elt, width)]
+            for byte in self._int_to_le_bytes(elt, width)]
 
     def serialize(self, unicode_property):
         self.BMP_lookup_bytes_per_entry = 1 if len(self.BMP_data) < 256 else 2
@@ -415,16 +415,16 @@ class UnicodeTrieGenerator(object):
             for block in self.supp_data
             for elt in block]
 
-        BMP_lookup_bytes = self._int_list_to_LE_bytes(
+        BMP_lookup_bytes = self._int_list_to_le_bytes(
             BMP_lookup_words, self.BMP_lookup_bytes_per_entry)
-        BMP_data_bytes = self._int_list_to_LE_bytes(
+        BMP_data_bytes = self._int_list_to_le_bytes(
             BMP_data_words, self.BMP_data_bytes_per_entry)
 
-        supp_lookup1_bytes = self._int_list_to_LE_bytes(
+        supp_lookup1_bytes = self._int_list_to_le_bytes(
             supp_lookup1_words, self.supp_lookup1_bytes_per_entry)
-        supp_lookup2_bytes = self._int_list_to_LE_bytes(
+        supp_lookup2_bytes = self._int_list_to_le_bytes(
             supp_lookup2_words, self.supp_lookup2_bytes_per_entry)
-        supp_data_bytes = self._int_list_to_LE_bytes(
+        supp_data_bytes = self._int_list_to_le_bytes(
             supp_data_words, self.supp_data_bytes_per_entry)
 
         self.trie_bytes = []
@@ -502,7 +502,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
 
     return result
 
-def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
+def get_grapheme_cluster_break_tests_as_utf8(grapheme_break_test_file_name):
     def _convert_line(line):
         # Strip comments.
         line = re.sub('#.*', '', line).strip()

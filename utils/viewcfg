@@ -62,14 +62,14 @@ class Block:
                 if canPred:
                     self.preds.append(canPred)
 
-    def addLine(self, text):
+    def add_line(self, text):
         if self.content is None:
             self.content = ""
         escapedText = re.sub(r'([\\<>{}"|])', r'\\\1', text[0:80]).rstrip()
         self.content += escapedText + '\\l'
         self.lastLine = text
 
-    def getSuccs(self):
+    def get_succs(self):
         if self.succs is None:
             self.succs = []
             if self.lastLine is not None:
@@ -114,7 +114,7 @@ def main():
             preds = llvmBlockMatch2.group(2)
         elif line.startswith(' '):
             if curBlock is not None:
-                curBlock.addLine(line)
+                curBlock.add_line(line)
         elif not line[:1].isspace():
             if line.startswith('}') and blocks:
                 break
@@ -122,13 +122,13 @@ def main():
 
         if blockName is not None:
             curBlock = Block(blockName, preds)
-            curBlock.addLine(line)
+            curBlock.add_line(line)
             blocks[blockName] = curBlock
 
     # Add empty blocks which we didn't see, but which are referenced.
     newBlocks = {}
     for name, block in blocks.iteritems():
-        for adjName in (block.preds + block.getSuccs()):
+        for adjName in (block.preds + block.get_succs()):
             if adjName not in blocks:
                 newBlocks[adjName] = Block(adjName, None)
 
@@ -140,8 +140,8 @@ def main():
     for name, block in blocks.iteritems():
         for predName in block.preds:
             predBlock = blocks[predName]
-            if name not in predBlock.getSuccs():
-                predBlock.getSuccs().append(name)
+            if name not in predBlock.get_succs():
+                predBlock.get_succs().append(name)
 
     # Write the output dot file.
 
@@ -157,7 +157,7 @@ def main():
                     " [shape=record,color=gray,fontcolor=gray,label=\"{" +
                     block.name + "}\"];\n")
 
-            for succName in block.getSuccs():
+            for succName in block.get_succs():
                 succBlock = blocks[succName]
                 outFile.write("\tNode" + str(block.index) + " -> Node" +
                     str(succBlock.index) + ";\n")
