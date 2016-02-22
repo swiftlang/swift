@@ -19,7 +19,7 @@ internal enum _JoinGeneratorState {
 
 /// A generator that presents the elements of the sequences generated
 /// by `Base`, concatenated using a given separator.
-@swift3_migration(renamed="JoinIterator")
+@swift3_migration(renamed="JoinedIterator")
 public struct JoinGenerator<
   Base : GeneratorType where Base.Element : SequenceType
 > : GeneratorType {
@@ -96,6 +96,7 @@ public struct JoinGenerator<
 
 /// A sequence that presents the elements of the `Base` sequences
 /// concatenated using a given separator.
+@swift3_migration(renamed="JoinedSequence")
 public struct JoinSequence<
   Base : SequenceType where Base.Generator.Element : SequenceType
 > : SequenceType {

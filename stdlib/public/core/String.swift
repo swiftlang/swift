@@ -623,7 +623,7 @@ extension SequenceType where Generator.Element == String {
   ///
   ///     ["foo", "bar", "baz"].joinWithSeparator("-|-") // "foo-|-bar-|-baz"
   @warn_unused_result
-  @swift3_migration(renamed="join(separator:)")
+  @swift3_migration(renamed="joined(separator:)")
   public func joinWithSeparator(separator: String) -> String {
     var result = ""
 
