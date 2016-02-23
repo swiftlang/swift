@@ -199,7 +199,7 @@ static void analyzeUseOfInOut(Operand *UI, StackSlotState &state) {
   switch (UI->getOperandNumber()) {
   case 0: { // Source
     // Is this copy in the entry block?
-    if (CAI->getParent() != CAI->getFunction()->begin())
+    if (CAI->getParent()->getIterator() != CAI->getFunction()->begin())
       // Any copy from the inout outside of the entry block fails the analysis.
       // We don't need full flow-sensitive analysis for SILGen-ed code.
       return state.setFailed("inout is loaded outside of the entry block");

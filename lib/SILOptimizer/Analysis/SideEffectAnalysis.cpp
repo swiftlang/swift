@@ -204,8 +204,10 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
         SelfEffects.Reads = true;
         SelfEffects.Releases |= !ASC.hasGuaranteedSelf();
         for (auto i : indices(((ApplyInst *)ASC)->getOrigCalleeType()
-                                                ->getIndirectResults()))
+                                                ->getIndirectResults())) {
+          assert(!ASC.hasGetElementDirectResult());
           FE.ParamEffects[i].Writes = true;
+        }
         return true;
       }
       return false;

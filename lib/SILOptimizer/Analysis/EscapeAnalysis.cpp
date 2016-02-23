@@ -1121,20 +1121,25 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         }
         return;
       case ArrayCallKind::kGetElement:
-        // This is like a load from a ref_element_addr.
-        if (FAS.getArgument(0)->getType().isAddress()) {
-          if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
-            if (CGNode *DestNode = ConGraph->getNode(FAS.getArgument(0), this)) {
-              // One content node for going from the array buffer pointer to
-              // the element address (like ref_element_addr).
-              CGNode *RefElement = ConGraph->getContentNode(AddrNode);
-              // Another content node to actually load the element.
-              CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
-              // The content of the destination address.
-              CGNode *DestContent = ConGraph->getContentNode(DestNode);
-              ConGraph->defer(DestContent, ArrayContent);
-              return;
-            }
+        if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
+          CGNode *DestNode = nullptr;
+          // This is like a load from a ref_element_addr.
+          if (ASC.hasGetElementDirectResult()) {
+            DestNode = ConGraph->getNode(FAS.getInstruction(), this);
+          } else {
+            CGNode *DestAddrNode = ConGraph->getNode(FAS.getArgument(0), this);
+            assert(DestAddrNode && "indirect result must have node");
+            // The content of the destination address.
+            DestNode = ConGraph->getContentNode(DestAddrNode);
+          }
+          if (DestNode) {
+            // One content node for going from the array buffer pointer to
+            // the element address (like ref_element_addr).
+            CGNode *RefElement = ConGraph->getContentNode(AddrNode);
+            // Another content node to actually load the element.
+            CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
+            ConGraph->defer(DestNode, ArrayContent);
+            return;
           }
         }
         break;

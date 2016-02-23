@@ -43,9 +43,7 @@ getSubstitutionMaps(GenericParamList *context,
     // Save the conformances from the substitution so that we can substitute
     // them into substitutions that map between archetypes.
     conformanceMap[arch] = sub.getConformances();
-
-    if (arch->isPrimary())
-      typeMap[arch] = sub.getReplacement();
+    typeMap[arch] = sub.getReplacement();
   }
   assert(subs.empty() && "did not use all substitutions?!");
 }

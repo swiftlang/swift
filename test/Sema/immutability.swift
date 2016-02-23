@@ -435,7 +435,7 @@ struct StructWithDelegatingInit {
 func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} expected-error 2 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
-struct F {
+struct F { // expected-note 2 {{in declaration of 'F'}}
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error 2 {{expected declaration}}
   }
   

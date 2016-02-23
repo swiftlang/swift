@@ -109,6 +109,7 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  GroupInfo.json
   )
 
 # The complete list of sources in the core standard library.  Includes
@@ -127,7 +128,7 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   Prespecialized.swift
   )
-
+set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags)
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
@@ -158,6 +159,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_package(BSD REQUIRED)
   list(APPEND swift_core_private_link_libraries
       ${BSD_LIBRARIES})
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
+      OUTPUT_VARIABLE ENV_SYSTEMROOT)
+
+  list(APPEND swift_core_link_flags "${ENV_SYSTEMROOT}/system32/psapi.dll")
 endif()
 
 option(SWIFT_CHECK_ESSENTIAL_STDLIB

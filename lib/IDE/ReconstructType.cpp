@@ -55,6 +55,8 @@
 
 #include "swift/IDE/Utils.h"
 
+#include <cstdio>
+
 typedef const std::string ConstString;
 typedef void Log;
 typedef swift::ASTContext SwiftASTContext;

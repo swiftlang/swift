@@ -928,7 +928,7 @@ extension NSDictionary : Sequence {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
         // requires them, but we don't want to paint ourselves into a corner.
-        return (key: key, value: _dictionary.object(for: key)!)
+        return (key: key, value: _dictionary.object(forKey: key)!)
       }
       return nil
     }
@@ -1314,7 +1314,7 @@ extension NSCoder {
           unsafeBitCast($0, to: NSObject.self)
         })
     }
-    return self.__decodeObjectOf(classes: classesAsNSObjects, forKey: key)
+    return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)
   }
 
   @warn_unused_result

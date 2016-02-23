@@ -143,6 +143,9 @@ WARNING(lex_editor_placeholder_in_playground,none,
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
+NOTE(note_in_decl_extension,none,
+     "in %select{declaration|extension}0 of %1", (bool, Identifier))
+
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
 

@@ -27,6 +27,14 @@ namespace swift {
   using OnceToken_t = dispatch_once_t;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   ::dispatch_once_f(&TOKEN, CONTEXT, FUNC)
+#elif defined(__CYGWIN__)
+  // _swift_once_f() is declared in Private.h.
+  // This prototype is copied instead including the header file.
+  void _swift_once_f(uintptr_t *predicate, void *context,
+                     void (*function)(void *));
+  using OnceToken_t = unsigned long;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  _swift_once_f(&TOKEN, CONTEXT, FUNC)
 #else
   using OnceToken_t = std::once_flag;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \

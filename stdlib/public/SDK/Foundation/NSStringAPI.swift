@@ -162,7 +162,7 @@ extension String {
   public static func localizedNameOfStringEncoding(
     encoding: NSStringEncoding
   ) -> String {
-    return NSString.localizedNameOf(stringEncoding: encoding)
+    return NSString.localizedName(ofStringEncoding: encoding)
   }
 
   // + (instancetype)localizedStringWithFormat:(NSString *)format, ...
@@ -1242,17 +1242,17 @@ extension String {
     locale: NSLocale? = nil
   ) -> Range<Index>? {
     return _optionalRange(
-      locale != nil ? _ns.rangeOf(
-        aString,
+      locale != nil ? _ns.range(
+        of: aString,
         options: mask,
         range: _toNSRange(searchRange ?? self.characters.indices),
         locale: locale
       )
-      : searchRange != nil ? _ns.rangeOf(
-        aString, options: mask, range: _toNSRange(searchRange!)
+      : searchRange != nil ? _ns.range(
+        of: aString, options: mask, range: _toNSRange(searchRange!)
       )
-      : !mask.isEmpty ? _ns.rangeOf(aString, options: mask)
-      : _ns.rangeOf(aString)
+      : !mask.isEmpty ? _ns.range(of: aString, options: mask)
+      : _ns.range(of: aString)
     )
   }
 
@@ -1284,7 +1284,7 @@ extension String {
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func localizedStandardRangeOf(string: String) -> Range<Index>? {
-    return _optionalRange(_ns.localizedStandardRangeOf(string))
+    return _optionalRange(_ns.localizedStandardRange(of: string))
   }
 
   // @property NSStringEncoding smallestEncoding;
@@ -1487,13 +1487,13 @@ extension String {
     range searchRange: Range<Index>? = nil
   ) -> String {
     return (searchRange != nil) || (!options.isEmpty)
-    ? _ns.replacingOccurrencesOf(
-      target,
+    ? _ns.replacingOccurrences(
+      of: target,
       with: replacement,
       options: options,
       range: _toNSRange(searchRange ?? self.characters.indices)
     )
-    : _ns.replacingOccurrencesOf(target, with: replacement)
+    : _ns.replacingOccurrences(of: target, with: replacement)
   }
 
   // - (NSString *)

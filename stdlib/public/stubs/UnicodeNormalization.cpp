@@ -91,7 +91,11 @@ private:
     for (unsigned char c = 0; c < 128; ++c) {
       UErrorCode ErrorCode = U_ZERO_ERROR;
       intptr_t NumCollationElts = 0;
+#if defined(__CYGWIN__)
+      UChar Buffer[1];
+#else
       uint16_t Buffer[1];
+#endif
       Buffer[0] = c;
 
       UCollationElements *CollationIterator =
@@ -129,9 +133,18 @@ int32_t _swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
                                                   int32_t LeftLength,
                                                   const uint16_t *RightString,
                                                   int32_t RightLength) {
+#if defined(__CYGWIN__)
+  // ICU UChar type is platform dependent. In Cygwin, it is defined
+  // as wchar_t which size is 2. It seems that the underlying binary
+  // representation is same with swift utf16 representation.
+  return ucol_strcoll(GetRootCollator(),
+    reinterpret_cast<const UChar *>(LeftString), LeftLength,
+    reinterpret_cast<const UChar *>(RightString), RightLength);
+#else
   return ucol_strcoll(GetRootCollator(),
     LeftString, LeftLength,
     RightString, RightLength);
+#endif
 }
 
 /// Compares the strings via the Unicode Collation Algorithm on the root locale.
@@ -150,7 +163,12 @@ int32_t _swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
   uiter_setUTF8(&LeftIterator, LeftString, LeftLength);
+#if defined(__CYGWIN__)
+  uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
+                  RightLength);
+#else
   uiter_setString(&RightIterator, RightString, RightLength);
+#endif
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
@@ -203,8 +221,13 @@ int32_t _swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
 static intptr_t hashChunk(const UCollator *Collator, intptr_t HashState,
                           const uint16_t *Str, uint32_t Length,
                           UErrorCode *ErrorCode) {
+#if defined(__CYGWIN__)
+  UCollationElements *CollationIterator = ucol_openElements(
+    Collator, reinterpret_cast<const UChar *>(Str), Length, ErrorCode);
+#else
   UCollationElements *CollationIterator = ucol_openElements(
     Collator, Str, Length, ErrorCode);
+#endif
   while (U_SUCCESS(*ErrorCode)) {
     intptr_t Elem = ucol_next(CollationIterator, ErrorCode);
     // Ignore zero valued collation elements. They don't participate in the
@@ -281,9 +304,17 @@ int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                          const uint16_t *Source,
                                          int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
+#if defined(__CYGWIN__)
+  uint32_t OutputLength = u_strToUpper(reinterpret_cast<UChar *>(Destination),
+                                       DestinationCapacity,
+                                       reinterpret_cast<const UChar *>(Source),
+                                       SourceLength,
+                                       "", &ErrorCode);
+#else
   uint32_t OutputLength = u_strToUpper(Destination, DestinationCapacity,
                                        Source, SourceLength,
                                        "", &ErrorCode);
+#endif
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToUpper: Unexpected error uppercasing unicode string.");
   }
@@ -301,9 +332,17 @@ int32_t _swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                          const uint16_t *Source,
                                          int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
+#if defined(__CYGWIN__)
+  uint32_t OutputLength = u_strToLower(reinterpret_cast<UChar *>(Destination),
+                                       DestinationCapacity,
+                                       reinterpret_cast<const UChar *>(Source),
+                                       SourceLength,
+                                       "", &ErrorCode);
+#else
   uint32_t OutputLength = u_strToLower(Destination, DestinationCapacity,
                                        Source, SourceLength,
                                        "", &ErrorCode);
+#endif
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToLower: Unexpected error lowercasing unicode string.");
   }

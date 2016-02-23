@@ -64,6 +64,9 @@ public:
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 
+  /// The DWARF version of debug info.
+  unsigned DWARFVersion;
+
   /// The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;
 

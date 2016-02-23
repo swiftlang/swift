@@ -1472,12 +1472,12 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
 
     DEBUG(llvm::dbgs() << "    Current Worklist:\n");
 #ifndef NDEBUG
-    for (auto *_N : Worklist) {
-      DEBUG(llvm::dbgs() << "        Type: " << _N->getType()
+    for (auto *_work : Worklist) {
+      DEBUG(llvm::dbgs() << "        Type: " << _work->getType()
                    << "; Complete: "
-                   << (AggBuilderMap.isComplete(_N)? "yes" : "no")
+                   << (AggBuilderMap.isComplete(_work)? "yes" : "no")
                    << "; Invalidated: "
-            << (AggBuilderMap.isInvalidated(_N)? "yes" : "no") << "\n");
+            << (AggBuilderMap.isInvalidated(_work)? "yes" : "no") << "\n");
     }
 #endif
 

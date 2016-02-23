@@ -27,6 +27,11 @@ namespace swift {
 // On OS X and iOS, swift_once_t matches dispatch_once_t.
 typedef long swift_once_t;
 
+#elif defined(__CYGWIN__)
+
+// On Cygwin, std::once_flag can not be used because it is larger than the
+// platform word.
+typedef uintptr_t swift_once_t;
 #else
 
 // On other platforms swift_once_t is std::once_flag

@@ -92,7 +92,7 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
   var description: String { return "me" }
   @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
-  @objc(isKindOfClass:) func isKindOf(aClass: AnyClass) -> Bool { return false }
+  @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
 }
 
 // CHECK-LABEL: @interface Initializers

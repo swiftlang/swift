@@ -826,8 +826,9 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
 }
 
 /// Check that the array value stored in \p ArrayStruct is released by \Inst.
-bool isReleaseOfArrayValueAt(AllocStackInst *ArrayStruct, SILInstruction *Inst,
-                             RCIdentityFunctionInfo *RCIA) {
+static bool isReleaseOfArrayValueAt(AllocStackInst *ArrayStruct,
+                                    SILInstruction *Inst,
+                                    RCIdentityFunctionInfo *RCIA) {
   auto *SRI = dyn_cast<StrongReleaseInst>(Inst);
   if (!SRI)
    return false;
@@ -842,15 +843,29 @@ bool isReleaseOfArrayValueAt(AllocStackInst *ArrayStruct, SILInstruction *Inst,
   return false;
 }
 
+static bool isReleaseOfArrayValue(SILValue Array, SILInstruction *Inst,
+                                  RCIdentityFunctionInfo *RCIA) {
+  if (!isa<StrongReleaseInst>(Inst) && !isa<ReleaseValueInst>(Inst))
+    return false;
+  SILValue Root = RCIA->getRCIdentityRoot(Inst->getOperand(0));
+  return Root == Array;
+}
+
 /// Check that the array value is released before a mutating operation happens.
 bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
     SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases) {
-  auto *ASI = dyn_cast<AllocStackInst>(V);
-  if (!ASI)
-    return false;
-
-  for (auto II = std::next(SILBasicBlock::iterator(ASI)),
-            IE = ASI->getParent()->end();
+  AllocStackInst *ASI = nullptr;
+  SILInstruction *StartInst = nullptr;
+  if (V->getType().isAddress()) {
+    ASI = dyn_cast<AllocStackInst>(V);
+    if (!ASI)
+      return false;
+    StartInst = ASI;
+  } else {
+    StartInst = cast<SILInstruction>(V);
+  }
+  for (auto II = std::next(SILBasicBlock::iterator(StartInst)),
+            IE = StartInst->getParent()->end();
        II != IE; ++II) {
     auto *Inst = &*II;
     // Ignore matched releases.
@@ -861,9 +876,16 @@ bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
       if (MatchedReleases.count(&RVI->getOperandRef()))
         continue;
 
-    if (isReleaseOfArrayValueAt(ASI, &*II, RCIA)) {
-      Releases.erase(&*II);
-      return true;
+    if (ASI) {
+      if (isReleaseOfArrayValueAt(ASI, &*II, RCIA)) {
+        Releases.erase(&*II);
+        return true;
+      }
+    } else {
+      if (isReleaseOfArrayValue(V, &*II, RCIA)) {
+        Releases.erase(&*II);
+        return true;
+      }
     }
 
     if (isa<RetainValueInst>(II) || isa<StrongRetainInst>(II))
@@ -1198,9 +1220,11 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
         // We must make sure that any non-trivial generated values (== +1)
         // are release before we hit a make_unique instruction.
         ApplyInst *SemCall = Sem;
-        if (Sem.getKind() == ArrayCallKind::kGetElement &&
-            !SemCall->getArgument(0)->getType().isTrivial(Module)) {
-          CreatedNonTrivialValues.insert(SemCall->getArgument(0));
+        if (Sem.getKind() == ArrayCallKind::kGetElement) {
+          SILValue Elem = (Sem.hasGetElementDirectResult() ? Inst :
+                           SemCall->getArgument(0));
+          if (!Elem->getType().isTrivial(Module))
+            CreatedNonTrivialValues.insert(Elem);
         } else if (Sem.getKind() == ArrayCallKind::kMakeMutable) {
           MakeMutableCalls.push_back(Sem);
         }

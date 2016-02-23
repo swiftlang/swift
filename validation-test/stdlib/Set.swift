@@ -121,13 +121,13 @@ func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
 
 func isNativeNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NativeSetStorage").length > 0
+  return className.range(of: "NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NSSet").length > 0 ||
-    className.rangeOf("NSCFSet").length > 0
+  return className.range(of: "NSSet").length > 0 ||
+    className.range(of: "NSCFSet").length > 0
 }
 
 func getBridgedEmptyNSSet() -> NSSet {

@@ -104,7 +104,7 @@ func _typeByName(name: String) -> Any.Type? {
   // actually a class.
   var name = "C"
   if components[0] == "Swift" {
-    name += "Ss"
+    name += "s"
   } else {
     name += String(components[0].characters.count) + components[0]
   }
