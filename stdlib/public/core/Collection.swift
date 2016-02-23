@@ -336,7 +336,7 @@ extension Collection {
     rangeEnd: Index,
     boundsStart: Index,
     boundsEnd: Index
-    ) {
+  ) {
       // Can't perform range checks in O(1) on non-RandomAccessIndexables.
   }
   
