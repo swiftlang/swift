@@ -13,12 +13,11 @@
 // TODO: swift-3-indexing-model - Add in RandomAccessCollection protocol documentation
 public protocol RandomAccessCollection : BidirectionalCollection {
   
-  // TODO: swift-3-indexing-model - require Strideable index??
   associatedtype Index : Strideable // FIXME: where Index.Distance == IndexDistance
   
 }
 
-/// Default implementation for random access indexable collections
+/// Default implementation for random access collections.
 extension RandomAccessCollection {
 
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
@@ -34,7 +33,7 @@ extension RandomAccessCollection {
       fatalError("implement") // TODO: swift-3-indexing-model - implement
   }
   
-  // TODO: swift-3-indexing-model - implement optimized version of the following
+// TODO: swift-3-indexing-model - implement optimized version of the following
   // advance(i: Index, by n: IndexDistance) -> Index
   // advance(i: Index, by n: IndexDistance, limit: Index) -> Index
   // distance(from start: Index, to end: Index) -> IndexDistance

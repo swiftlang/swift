@@ -33,7 +33,7 @@ public protocol Indexable {
   ///
   /// - Complexity: O(1)
   var startIndex: Index { get }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -99,10 +99,11 @@ public protocol Indexable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  func _failEarlyRangeCheck(rangeStart rangeStart: Index,
-                            rangeEnd: Index,
-                            boundsStart: Index,
-                            boundsEnd: Index)
+  func _failEarlyRangeCheck(
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index)
   
 // TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
   /// Returns the next consecutive `Index` in a discrete sequence of
@@ -314,7 +315,7 @@ public protocol Collection : Indexable, Sequence {
 }
 
 // TODO: swift-3-indexing-model - new forward indexing default implementation
-/// Default implementation for forward indexable collections
+/// Default implementation for forward collections.
 extension Collection {
   // TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
   public func next(i: Index) -> Index {

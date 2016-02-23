@@ -12,7 +12,7 @@
 
 // TODO: swift-3-indexing-model - Add in BidirectionalCollection protocol documentation
 public protocol BidirectionalCollection : Collection {
-  // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
+// TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the previous consecutive `Index` in a discrete sequence of
   /// `Index` values.
   ///
@@ -27,9 +27,9 @@ public protocol BidirectionalCollection : Collection {
   func _previousInPlace(inout i: Index)
 }
 
-/// Default implementation for bidirectional indexable collections
+/// Default implementation for bidirectional collections.
 extension BidirectionalCollection {
-  // TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
+// TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
   public func previous(i: Index) -> Index {
     fatalError("collections need to implement, this is a temp stub to make things compile")
   }
@@ -64,7 +64,7 @@ extension BidirectionalCollection {
     return i
   }
   
-  // TODO: swift-3-indexing-model - once Index is Comparable something like following is possible, right?
+// TODO: swift-3-indexing-model - once Index is Comparable something like following is possible, right?
   //  @warn_unused_result
   //  public func distance(from start: Index, to end: Index) -> IndexDistance {
   //    var start = start
