@@ -21,14 +21,14 @@ extension ALAssetsLibrary {
       usingBlock enumerationBlock: ALAssetsLibraryGroupsEnumerationResultsBlock!,
       failureBlock: ALAssetsLibraryAccessFailureBlock!) {
     var types = types
-    if (types == ALAssetsGroupAll) {
+    if types == ALAssetsGroupAll {
       types = ALAssetsGroupLibrary | ALAssetsGroupAlbum | ALAssetsGroupEvent | 
               ALAssetsGroupFaces | ALAssetsGroupSavedPhotos | 
               ALAssetsGroupPhotoStream
     }
-    return enumerateGroupsWithTypes(ALAssetsGroupType(types), 
-                                    usingBlock: enumerationBlock, 
-                                    failureBlock: failureBlock)
-
+    return enumerateGroups(
+      types: ALAssetsGroupType(types), 
+      using: enumerationBlock, 
+      failureBlock: failureBlock)
   }
 }
