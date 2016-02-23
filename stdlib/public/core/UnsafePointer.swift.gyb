@@ -143,7 +143,7 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
   // FIXME: add tests (since the `count` has been added)
-  public func initialize(with: newValue: Pointee, count: Int = 1) {
+  public func initialize(with newValue: Pointee, count: Int = 1) {
     _stdlibAssert(count >= 0,
       "${Self}.initialize(with:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
@@ -156,7 +156,7 @@ public struct ${Self}<Pointee>
   /// Retrieve the `pointee`, returning the referenced memory to an
   /// uninitialized state.
   ///
-  /// Equivalent to `{ defer { deinitializePointee() }; return pointee }()`, but
+  /// Equivalent to `{ defer { deinitialize() }; return pointee }()`, but
   /// more efficient.
   ///
   /// - Precondition: The pointee is initialized.
@@ -358,8 +358,8 @@ public struct ${Self}<Pointee>
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func deinitializePointee(count count: Int = 1) {
-    _stdlibAssert(count >= 0, "${Self}.deinitializePointee with negative count")
+  public func deinitialize(count count: Int = 1) {
+    _stdlibAssert(count >= 0, "${Self}.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)

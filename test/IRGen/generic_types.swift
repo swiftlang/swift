@@ -121,7 +121,7 @@ class A<T> {
 class B<T> {
   var ptr : UnsafeMutablePointer<T> = nil
   deinit {
-    ptr.deinitializePointee()
+    ptr.deinitialize()
   }
 }
 

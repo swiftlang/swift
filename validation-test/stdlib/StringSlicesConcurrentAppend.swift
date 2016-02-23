@@ -116,7 +116,7 @@ StringTestSuite.test("SliceConcurrentAppend") {
   ret = _stdlib_pthread_barrier_destroy(barrierVar)
   expectEqual(0, ret)
 
-  barrierVar.deinitializePointee()
+  barrierVar.deinitialize()
   barrierVar.deallocateCapacity(1)
 }
 

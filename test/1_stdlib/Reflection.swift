@@ -206,7 +206,7 @@ dump(randomUnsafeMutablePointerString)
 var sanePointerString = UnsafeMutablePointer<String>(allocatingCapacity: 1)
 sanePointerString.initialize(with: "Hello panda")
 dump(sanePointerString.pointee)
-sanePointerString.deinitializePointee()
+sanePointerString.deinitialize()
 sanePointerString.deallocateCapacity(1)
 
 // Don't crash on types with opaque metadata. rdar://problem/19791252

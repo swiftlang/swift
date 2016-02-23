@@ -2028,7 +2028,7 @@ public func checkSequence<
       expectTrue(sameValue(expected[j], buf[i]))
       j = j.successor()
     }
-    buf.deinitializePointee(count: end - buf)
+    buf.deinitialize(count: end - buf)
     buf.deallocateCapacity(count)
   }
 }

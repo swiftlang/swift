@@ -156,7 +156,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     if let bridgedStorage = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
-      heapBuffer.baseAddress.deinitializePointee(count: count)
+      heapBuffer.baseAddress.deinitialize(count: count)
     }
   }
 

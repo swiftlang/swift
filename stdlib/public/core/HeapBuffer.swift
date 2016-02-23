@@ -48,7 +48,7 @@ class _HeapBufferStorage<Value, Element> : NonObjectiveCBase {
   /// `_HeapBufferStorage<Value,Element>`.
   typealias Buffer = _HeapBuffer<Value, Element>
   deinit {
-    Buffer(self)._value.deinitializePointee()
+    Buffer(self)._value.deinitialize()
   }
 
   @warn_unused_result

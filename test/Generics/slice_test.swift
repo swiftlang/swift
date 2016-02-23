@@ -76,7 +76,7 @@ class Vector<T> {
 
   deinit {
     for i in 0..<length {
-      (base + i).deinitializePointee()
+      (base + i).deinitialize()
     }
     c_free(base)
   }

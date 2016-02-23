@@ -1845,7 +1845,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     if !_isPOD(Key.self) {
       for i in 0 ..< capacity {
         if initializedEntries[i] {
-          (keys+i).deinitializePointee()
+          (keys+i).deinitialize()
         }
       }
     }
@@ -1854,12 +1854,12 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     if !_isPOD(Value.self) {
       for i in 0 ..< capacity {
         if initializedEntries[i] {
-          (values+i).deinitializePointee()
+          (values+i).deinitialize()
         }
       }
     }
 %end
-    buffer._valuePointer.deinitializePointee()
+    buffer._valuePointer.deinitialize()
     _fixLifetime(self)
   }
 }
@@ -1968,9 +1968,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func destroyEntry(at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
-    (keys + i).deinitializePointee()
+    (keys + i).deinitialize()
 %if Self == 'Dictionary':
-    (values + i).deinitializePointee()
+    (values + i).deinitialize()
 %end
     initializedEntries[i] = false
     _fixLifetime(self)

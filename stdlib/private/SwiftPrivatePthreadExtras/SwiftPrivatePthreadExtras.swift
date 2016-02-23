@@ -90,7 +90,7 @@ public func _stdlib_pthread_join<Result>(
   let result = pthread_join(thread, &threadResultPtr)
   if result == 0 {
     let threadResult = UnsafeMutablePointer<Result>(threadResultPtr).pointee
-    threadResultPtr.deinitializePointee()
+    threadResultPtr.deinitialize()
     threadResultPtr.deallocateCapacity(1)
     return (result, threadResult)
   } else {

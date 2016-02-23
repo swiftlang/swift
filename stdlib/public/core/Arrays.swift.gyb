@@ -1135,13 +1135,13 @@ internal func _arrayOutOfPlaceUpdate<
     // its real first element
     let backingStart = backing.firstElementAddress
     let sourceOffset = sourceStart - backingStart
-    backingStart.deinitializePointee(count: sourceOffset)
+    backingStart.deinitialize(count: sourceOffset)
 
     // Move the head items
     destStart.moveInitializeFrom(sourceStart, count: headCount)
 
     // Destroy unused source items
-    oldStart.deinitializePointee(count: oldCount)
+    oldStart.deinitialize(count: oldCount)
 
     initializeNewElements.call(newStart, count: newCount)
 
@@ -1152,7 +1152,7 @@ internal func _arrayOutOfPlaceUpdate<
     // its real last element
     let backingEnd = backingStart + backing.count
     let sourceEnd = sourceStart + sourceCount
-    sourceEnd.deinitializePointee(count: backingEnd - sourceEnd)
+    sourceEnd.deinitialize(count: backingEnd - sourceEnd)
     backing.count = 0
   }
   else {

@@ -207,7 +207,7 @@ extension _ArrayBufferProtocol {
         newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subRange
-        (newTailStart + tailCount).deinitializePointee(
+        (newTailStart + tailCount).deinitialize(
           count: shrinkage - tailCount)
       }
     }

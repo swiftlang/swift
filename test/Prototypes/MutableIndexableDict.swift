@@ -107,7 +107,7 @@ class FixedSizedRefArrayOfOptionalStorage<T> : _HeapBufferStorage<Int, T?> {
   deinit {
     let buffer = Buffer(self)
     for i in 0..<buffer.value {
-      (buffer.baseAddress + i).deinitializePointee()
+      (buffer.baseAddress + i).deinitialize()
     }
   }
 }
