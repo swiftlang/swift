@@ -90,7 +90,7 @@ For example::
   // Public API that uses CVaListPointer, so CVarArgType has to be public, too.
   public func withVaList<R>(
     args: [CVarArgType],
-    @noescape f: (CVaListPointer) -> R
+    @noescape invoke body: (CVaListPointer) -> R
   ) -> R
 
 High-order functions on collections return ``Array``\ s

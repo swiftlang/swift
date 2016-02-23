@@ -1403,7 +1403,7 @@ Reflection.test("DictionaryIterator/Mirror") {
     [ MinimalHashableValue(0) : OpaqueValue(0) ]
 
   var output = ""
-  dump(d.iterator(), to: &output)
+  dump(d.makeIterator(), to: &output)
 
   let expected =
     "- Swift.DictionaryIterator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
@@ -1415,7 +1415,7 @@ Reflection.test("SetIterator/Mirror") {
   let s: Set<MinimalHashableValue> = [ MinimalHashableValue(0)]
 
   var output = ""
-  dump(s.iterator(), to: &output)
+  dump(s.makeIterator(), to: &output)
 
   let expected =
     "- Swift.SetIterator<StdlibUnittest.MinimalHashableValue>\n"

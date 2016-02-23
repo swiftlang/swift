@@ -21,7 +21,7 @@ struct S<A: Collection where A.Index == Int> : Collection {
     return base[baseRange.startIndex + i]
   }
   
-  func iterator() -> IndexingIterator<S> {
+  func makeIterator() -> IndexingIterator<S> {
     return IndexingIterator(_elements: self)
   }
   

@@ -558,7 +558,7 @@ internal func _copySequenceToNativeArrayBuffer<
     _UnsafePartiallyInitializedContiguousArrayBuffer<S.Iterator.Element>(
       initialCapacity: initialCapacity)
 
-  var iterator = source.iterator()
+  var iterator = source.makeIterator()
 
   // FIXME(performance): use _initializeTo().
 

@@ -44,8 +44,8 @@ public struct LazyMapSequence<Base : Sequence, Element>
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> LazyMapIterator<Base.Iterator, Element> {
-    return LazyMapIterator(_base: _base.iterator(), _transform: _transform)
+  public func makeIterator() -> LazyMapIterator<Base.Iterator, Element> {
+    return LazyMapIterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
   /// Returns a value less than or equal to the number of elements in
@@ -99,8 +99,8 @@ public struct LazyMapCollection<Base : Collection, Element>
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> LazyMapIterator<Base.Iterator, Element> {
-    return LazyMapIterator(_base: _base.iterator(), _transform: _transform)
+  public func makeIterator() -> LazyMapIterator<Base.Iterator, Element> {
+    return LazyMapIterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
   public var underestimatedCount: Int {

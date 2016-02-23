@@ -91,7 +91,7 @@ public struct _StringBuffer {
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
-    let inputStream = input.iterator()
+    let inputStream = input.makeIterator()
     guard let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
         repairIllFormedSequences: repairIllFormedSequences) else {
       return (nil, true)
@@ -110,7 +110,7 @@ public struct _StringBuffer {
         p += 1
       }
       let hadError = transcode(
-        encoding, UTF32.self, input.iterator(), sink,
+        encoding, UTF32.self, input.makeIterator(), sink,
         stoppingOnError: true)
       _sanityCheck(!hadError, "string cannot be ASCII if there were decoding errors")
       return (result, hadError)
@@ -122,7 +122,7 @@ public struct _StringBuffer {
         p += 1
       }
       let hadError = transcode(
-        encoding, UTF16.self, input.iterator(), sink,
+        encoding, UTF16.self, input.makeIterator(), sink,
         stoppingOnError: !repairIllFormedSequences)
       return (result, hadError)
     }

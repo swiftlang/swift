@@ -1,8 +1,8 @@
 // RUN: %target-parse-verify-swift
 
 struct Q<T: Collection> : Sequence {
-  func iterator() -> T.Iterator {
-    return base.iterator()
+  func makeIterator() -> T.Iterator {
+    return base.makeIterator()
   }
   
   func _adopt(newBuffer: Array<Q<T>.Iterator.Element>) {

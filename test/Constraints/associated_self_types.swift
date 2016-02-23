@@ -32,7 +32,7 @@ class X<XT> : Q {
   func f<SX : Sequence where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
   }
   
-  func iterator() -> No<XT> {
+  func makeIterator() -> No<XT> {
     return No<XT>()
   }
 }

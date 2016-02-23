@@ -109,8 +109,8 @@ struct A<T> : MutableCollection {
     return impl.count
   }
 
-  func iterator() -> Array<T>.Iterator {
-    return impl.iterator()
+  func makeIterator() -> Array<T>.Iterator {
+    return impl.makeIterator()
   }
 
   subscript(i: Int) -> T {

@@ -13,7 +13,7 @@ protocol Collection : Indexable, Sequence {}
 public struct IndexingIterator<Elements : Indexable>
   : IteratorProtocol, Sequence {
   
-  public func iterator() -> IndexingIterator {
+  public func makeIterator() -> IndexingIterator {
     return self
   }
   
@@ -23,7 +23,7 @@ public struct IndexingIterator<Elements : Indexable>
 }
 
 extension Sequence where Self : Collection {
-  func iterator() -> IndexingIterator<Self> {
+  func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(self)
   }
 }

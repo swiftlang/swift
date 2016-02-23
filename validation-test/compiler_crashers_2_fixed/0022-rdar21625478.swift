@@ -118,9 +118,9 @@ extension LoggingSequenceType {
 
 extension LoggingSequenceType
   where Log == SequenceLog, Iterator == LoggingIterator<Base.Iterator> {
-  public func iterator() -> LoggingIterator<Base.Iterator> {
+  public func makeIterator() -> LoggingIterator<Base.Iterator> {
     ++Log.iterator[selfType]
-    return LoggingIterator(base.iterator())
+    return LoggingIterator(base.makeIterator())
   }
 
   public func map<T>(
@@ -252,8 +252,8 @@ public struct LoggingCollection<Base_: Collection> : LoggingCollectionType {
   public typealias Base = Base_
   public typealias SubSequence = Base.SubSequence
 
-  public func iterator() -> Iterator {
-    return Iterator(base.iterator())
+  public func makeIterator() -> Iterator {
+    return Iterator(base.makeIterator())
   }
   public init(_ base: Base_) {
     self.base = base

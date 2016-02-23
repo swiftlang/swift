@@ -18,9 +18,9 @@ struct Foo: Fooable {
 }
 
 // rdar://problem/19049566
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_Rxs8Sequence_zWx8Iterator7Element_rGV17witness_same_type14LazySequenceOfxq__S_S2_FS_8iterator
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_Rxs8Sequence_zWx8Iterator7Element_rGV17witness_same_type14LazySequenceOfxq__S_S2_FS_12makeIterator
 public struct LazySequenceOf<SS : Sequence, A where SS.Iterator.Element == A> : Sequence {
-  public func iterator() -> AnyIterator<A> { 
+  public func makeIterator() -> AnyIterator<A> { 
     var opt: AnyIterator<A>?
     return opt!
   }

@@ -73,7 +73,9 @@ extension LazyCollection : Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> Base.Iterator { return _base.iterator() }
+  public func makeIterator() -> Base.Iterator {
+    return _base.makeIterator()
+  }
   
   /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.

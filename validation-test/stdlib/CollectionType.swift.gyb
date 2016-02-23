@@ -28,7 +28,7 @@ struct CollectionWithDefaultUnderestimatedCount : Collection {
     self._count = count
   }
 
-  func iterator() -> MinimalIterator<OpaqueValue<Int>> {
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
     expectUnreachable()
     return MinimalIterator([])
   }
@@ -67,8 +67,8 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func iterator() -> MinimalIterator<Element> {
-    return _data.iterator()
+  func makeIterator() -> MinimalIterator<Element> {
+    return _data.makeIterator()
   }
 
   var startIndex: MinimalForwardIndex {
@@ -199,8 +199,8 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func iterator() -> MinimalIterator<Element> {
-    return _data.iterator()
+  func makeIterator() -> MinimalIterator<Element> {
+    return _data.makeIterator()
   }
 
   var startIndex: MinimalForwardIndex {
@@ -350,7 +350,7 @@ struct CollectionWithCustomUnderestimatedCount : Collection {
     self._underestimatedCount = underestimatedCount
   }
 
-  func iterator() -> MinimalIterator<OpaqueValue<Int>> {
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
     expectUnreachable()
     return MinimalIterator([])
   }
@@ -390,7 +390,7 @@ CollectionTypeTests.test("underestimatedCount/Collection/CustomImplementation") 
 }
 
 //===----------------------------------------------------------------------===//
-// Collection.iterator(), Collection.Iterator
+// Collection.makeIterator(), Collection.Iterator
 //===----------------------------------------------------------------------===//
 
 struct MinimalForwardCollectionWithDefaultIterator : Collection {
@@ -415,16 +415,16 @@ struct MinimalForwardCollectionWithDefaultIterator : Collection {
 }
 
 func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
-  return sequence.iterator()
+  return sequence.makeIterator()
 }
 
-CollectionTypeTests.test("Collection.iterator()/DefaultImplementation") {
+CollectionTypeTests.test("Collection.makeIterator()/DefaultImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithDefaultIterator(count: count)
 
     do {
       // Check the return type of the function when called statically.
-      var iter = collection.iterator()
+      var iter = collection.makeIterator()
       expectType(
         IndexingIterator<MinimalForwardCollectionWithDefaultIterator>.self,
         &iter)
@@ -452,7 +452,7 @@ struct MinimalForwardCollectionWithCustomIterator : Collection {
 
   static var timesIteratorWasCalled: Int = 0
 
-  func iterator() -> MinimalIterator<OpaqueValue<Int>> {
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
     ++MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled
     return MinimalIterator<OpaqueValue<Int>>(
       Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
@@ -475,14 +475,14 @@ struct MinimalForwardCollectionWithCustomIterator : Collection {
   var _count: Int
 }
 
-CollectionTypeTests.test("Collection.iterator()/CustomImplementation") {
+CollectionTypeTests.test("Collection.makeIterator()/CustomImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithCustomIterator(count: count)
 
     do {
       // Check the return type of the function when called statically.
       MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled = 0
-      var iter = collection.iterator()
+      var iter = collection.makeIterator()
       expectType(
         MinimalIterator<OpaqueValue<Int>>.self,
         &iter)
