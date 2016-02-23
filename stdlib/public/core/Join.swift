@@ -136,17 +136,17 @@ public struct JoinedSequence<
 
     if separatorSize == 0 {
       for x in _base {
-        result.appendContentsOf(x)
+        result.appendContents(of: x)
       }
       return result._buffer
     }
 
     var iter = _base.iterator()
     if let first = iter.next() {
-      result.appendContentsOf(first)
+      result.appendContents(of: first)
       while let next = iter.next() {
-        result.appendContentsOf(_separator)
-        result.appendContentsOf(next)
+        result.appendContents(of: _separator)
+        result.appendContents(of: next)
       }
     }
 

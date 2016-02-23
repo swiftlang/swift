@@ -589,11 +589,11 @@ extension String {
     }
   }
   
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence where S.Iterator.Element == Character
-  >(newElements: S) {
+  >(of newElements: S) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.appendContentsOf(newElements)
+      (inout v: CharacterView) in v.appendContents(of: newElements)
     }
   }
   
@@ -988,7 +988,14 @@ extension String.Index {
 
 extension String {
   @available(*, unavailable, renamed="append")
-  public mutating func appendContentsOf(other: String) {
+  public mutating func appendContents(of other: String) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="appendContents(of:)")
+  public mutating func appendContentsOf<
+    S : Sequence where S.Iterator.Element == Character
+  >(newElements: S) {
     fatalError("unavailable function can't be called")
   }
 

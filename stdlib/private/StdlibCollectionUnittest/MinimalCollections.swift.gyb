@@ -207,7 +207,7 @@ internal enum _CollectionOperation : Equatable {
       result.append(nextStateId)
 
     case AppendContentsOf(let count):
-      result.appendContentsOf(
+      result.appendContents(of:
         repeatElement(nextStateId, count: count))
 
     case ReplaceRange(let subRange, let replacementCount):
@@ -1122,11 +1122,11 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     elements.append(x)
   }
 
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence where S.Iterator.Element == T
-  >(newElements: S) {
+  >(of newElements: S) {
     let oldCount = count
-    elements.appendContentsOf(newElements)
+    elements.appendContents(of: newElements)
     let newCount = count
     _willMutate(.AppendContentsOf(count: newCount - oldCount))
   }

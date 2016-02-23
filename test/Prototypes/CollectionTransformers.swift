@@ -90,17 +90,17 @@ public protocol CollectionBuilder {
   /// added at the end.
   ///
   /// Complexity: amortized O(n), where `n` is equal to `count(elements)`.
-  mutating func appendContentsOf<
+  mutating func appendContents<
     C : Collection
     where
     C.Iterator.Element == Element
-  >(elements: C)
+  >(of elements: C)
 
   /// Append elements from `otherBuilder` to `self`, emptying `otherBuilder`.
   ///
   /// Equivalent to::
   ///
-  ///   self.appendContentsOf(otherBuilder.takeResult())
+  ///   self.appendContents(of: otherBuilder.takeResult())
   ///
   /// but is more efficient.
   ///
@@ -146,12 +146,12 @@ public struct ArrayBuilder<T> : CollectionBuilder {
     _resultTail.append(element)
   }
 
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     C : Collection
     where
     C.Iterator.Element == T
-  >(elements: C) {
-    _resultTail.appendContentsOf(elements)
+  >(of elements: C) {
+    _resultTail.appendContents(of: elements)
   }
 
   public mutating func moveContentsOf(inout otherBuilder: ArrayBuilder<T>) {
@@ -160,7 +160,7 @@ public struct ArrayBuilder<T> : CollectionBuilder {
     _resultParts.append(_resultTail)
     _resultTail = []
     // FIXME: not O(1)!
-    _resultParts.appendContentsOf(otherBuilder._resultParts)
+    _resultParts.appendContents(of: otherBuilder._resultParts)
     otherBuilder._resultParts = []
     swap(&_resultTail, &otherBuilder._resultTail)
   }
@@ -1058,11 +1058,11 @@ struct _ElementCollectorOneToMaybeOne<
     }
   }
 
-  mutating func appendContentsOf<
+  mutating func appendContents<
     C : Collection
     where
     C.Iterator.Element == Element
-  >(elements: C) {
+  >(of elements: C) {
     for e in elements {
       append(e)
     }
@@ -1076,11 +1076,11 @@ protocol _ElementCollector {
 
   mutating func append(element: Element)
 
-  mutating func appendContentsOf<
+  mutating func appendContents<
     C : Collection
     where
     C.Iterator.Element == Element
-  >(elements: C)
+  >(of elements: C)
 }
 
 class _CollectionTransformerFinalizer<PipelineInputElement, Result> {
@@ -1141,11 +1141,11 @@ struct _ElementCollectorReduce<Element_, Result> : _ElementCollector {
     _current = _combine(_current, element)
   }
 
-  mutating func appendContentsOf<
+  mutating func appendContents<
     C : Collection
     where
     C.Iterator.Element == Element
-  >(elements: C) {
+  >(of elements: C) {
     for e in elements {
       append(e)
     }
@@ -1209,12 +1209,12 @@ struct _ElementCollectorCollectTo<
     _builder.append(element)
   }
 
-  mutating func appendContentsOf<
+  mutating func appendContents<
     C : Collection
     where
     C.Iterator.Element == Element
-  >(elements: C) {
-    _builder.appendContentsOf(elements)
+  >(of elements: C) {
+    _builder.appendContents(of: elements)
   }
 
   mutating func takeResult() -> BuildableCollection {
@@ -1394,7 +1394,7 @@ func _parallelMap(input: [Int], transform: (Int) -> Int, range: Range<Int>)
 
   var builder = Array<Int>.Builder()
   if range.count < 1_000 {
-    builder.appendContentsOf(input[range].map(transform))
+    builder.appendContents(of: input[range].map(transform))
   } else {
     let tasks = input.split(range).map {
       (subRange) in
