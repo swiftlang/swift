@@ -12,6 +12,10 @@ sil @user : $@convention(thin) (@box Builtin.Int32) -> ()
 
 sil @owned_user : $@convention(thin) (@owned @box Builtin.Int32) -> ()
 
+struct Int {
+  var value : Builtin.Int64
+}
+
 struct S {
   var x : Builtin.NativeObject
 }
@@ -46,11 +50,23 @@ class C {
   var w : FakeOptional<Builtin.NativeObject>
 }
 
+sil @cls_use : $@convention(thin) (@owned Cls) -> ()
+
 class Container {
   @sil_stored var c : Cls
   init()
 }
 
+struct SContainer {
+  @sil_stored var c : Cls
+  init()
+}
+
+struct SContainer2 {
+  @sil_stored var b : Cls
+  @sil_stored var c : Cls
+  init()
+}
 
 class RetainUser { }
 
@@ -2067,3 +2083,76 @@ bb2(%4 : $ErrorType):
   strong_release %0 : $Builtin.NativeObject
   throw %4 : $ErrorType
 }
+
+// CHECK-LABEL: sil @retain_release_struct_with_single_nontrivial
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: return
+sil @retain_release_struct_with_single_nontrivial : $@convention(thin) (SContainer) -> () {
+bb0(%0 : $SContainer):
+  retain_value %0 : $SContainer
+  %1 = struct_extract %0 : $SContainer, #SContainer.c
+  strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @retain_release_struct_with_multiple_nontrivials
+// CHECK: retain_value 
+// CHECK: strong_release 
+// CHECK: return
+sil @retain_release_struct_with_multiple_nontrivials : $@convention(thin) (SContainer2) -> () {
+bb0(%0 : $SContainer2):
+  retain_value %0 : $SContainer2
+  %1 = struct_extract %0 : $SContainer2, #SContainer2.c
+  strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+// Make sure the RR pair is not removed here as a result of the decrement and use.
+//
+// CHECK-LABEL: sil @retain_release_struct_with_single_nontrivial_with_use_and_decrement
+// CHECK: retain_value
+// CHECK: release_value
+sil @retain_release_struct_with_single_nontrivial_with_use_and_decrement : $@convention(thin) (SContainer) -> () {
+bb0(%0 : $SContainer):
+  retain_value %0 : $SContainer
+  %1 = struct_extract %0 : $SContainer, #SContainer.c
+  %2 = function_ref @cls_use : $@convention(thin) (@owned Cls) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Cls) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Cls) -> ()
+  release_value %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+// Make sure %0 and %1 are identified as rc-identical and the RR can be removed.
+//
+// CHECK-LABEL: sil @retain_release_tuple_with_single_nontrivial
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @retain_release_tuple_with_single_nontrivial : $@convention(thin) ((Cls, Int)) -> () {
+bb0(%0 : $(Cls, Int)):
+  %1 = tuple_extract %0 : $(Cls, Int), 0 
+  retain_value  %0 : $(Cls, Int)
+  strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+// Make sure %0 and %1 are not rc-identical and RR are not removed.
+//
+// CHECK-LABEL: sil @retain_release_tuple_with_multiple_nontrivials
+// CHECK: retain_value 
+// CHECK: strong_release
+sil @retain_release_tuple_with_multiple_nontrivials : $@convention(thin) ((Cls, Cls)) -> () {
+bb0(%0 : $(Cls, Cls)):
+  %1 = tuple_extract %0 : $(Cls, Cls), 0 
+  retain_value  %0 : $(Cls, Cls)
+  strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+
