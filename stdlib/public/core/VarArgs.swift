@@ -17,16 +17,20 @@
 /// Swift.  It only works for APIs that have a `va_list` variant, so
 /// for example, it isn't much use if all you have is:
 ///
-///     int f(int n, ...)
+/// ~~~ c
+/// int c_api(int n, ...)
+/// ~~~
 ///
 /// Given a version like this, though,
 ///
-///     int f(int, va_list arguments)
+/// ~~~ c
+/// int c_api(int, va_list arguments)
+/// ~~~
 ///
 /// you can write:
 ///
-///     func swiftF(x: Int, arguments: CVarArg...) -> Int {
-///       return withVaList(arguments) { f(x, $0) }
+///     func swiftAPI(x: Int, arguments: CVarArg...) -> Int {
+///       return withVaList(arguments) { c_api(x, $0) }
 ///     }
 public protocol CVarArg {
   // Note: the protocol is public, but its requirement is stdlib-private.
