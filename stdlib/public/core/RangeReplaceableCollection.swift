@@ -361,11 +361,11 @@ public func +<
     S : Sequence
     where S.Iterator.Element == C.Iterator.Element
 >(lhs: C, rhs: S) -> C {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.underestimatedCount))
-  lhs.appendContents(of: rhs)
-  return lhs
+  var result = C()
+  result.reserveCapacity(lhs.count + numericCast(rhs.underestimatedCount))
+  result.appendContents(of: lhs)
+  result.appendContents(of: rhs)
+  return result
 }
 
 @warn_unused_result
@@ -387,11 +387,11 @@ public func +<
   RRC2 : RangeReplaceableCollection
   where RRC1.Iterator.Element == RRC2.Iterator.Element
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContents(of: rhs)
-  return lhs
+  var result = RRC1()
+  result.reserveCapacity(lhs.count + numericCast(rhs.count))
+  result.appendContents(of: lhs)
+  result.appendContents(of: rhs)
+  return result
 }
 
 @available(*, unavailable, renamed="RangeReplaceableCollection")
