@@ -55,9 +55,9 @@ func expectWrapperDispatch<R1, R2>(
     message(), stackTrace: newTrace)
 }
 
-sequenceWrapperTests.test("Dispatch/iterator()") {
+sequenceWrapperTests.test("Dispatch/makeIterator()") {
   expectWrapperDispatch(
-    direct.iterator(), indirect.iterator(), dispatchLog.iterator)
+    direct.makeIterator(), indirect.makeIterator(), dispatchLog.makeIterator)
 }
 
 sequenceWrapperTests.test("Dispatch/underestimatedCount") {

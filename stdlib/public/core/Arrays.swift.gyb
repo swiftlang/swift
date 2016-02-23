@@ -1234,7 +1234,7 @@ internal func _arrayAppendSequence<
 >(
   inout buffer: Buffer, _ newItems: S
 ) {
-  var stream = newItems.iterator()
+  var stream = newItems.makeIterator()
   var nextItem = stream.next()
 
   if nextItem == nil {
@@ -1283,8 +1283,8 @@ public func == <Element : Equatable>(
 
 %if Self == 'ArraySlice':
 
-  var streamLHS = lhs.iterator()
-  var streamRHS = rhs.iterator()
+  var streamLHS = lhs.makeIterator()
+  var streamRHS = rhs.makeIterator()
 
   var nextLHS = streamLHS.next()
   while nextLHS != nil {

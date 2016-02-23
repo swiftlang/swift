@@ -54,7 +54,7 @@ public struct EmptyCollection<Element> : Collection {
   /// Returns an empty iterator.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> EmptyIterator<Element> {
+  public func makeIterator() -> EmptyIterator<Element> {
     return EmptyIterator()
   }
 

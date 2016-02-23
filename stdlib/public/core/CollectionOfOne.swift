@@ -58,7 +58,7 @@ public struct CollectionOfOne<Element> : Collection {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> IteratorOverOne<Element> {
+  public func makeIterator() -> IteratorOverOne<Element> {
     return IteratorOverOne(_elements: _element)
   }
 

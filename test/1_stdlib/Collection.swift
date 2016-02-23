@@ -44,7 +44,7 @@ public struct PermutationGenerator<
   /// - Precondition: `elements[i]` is valid for every `i` in `indices`.
   public init(elements: C, indices: Indices) {
     self.seq = elements
-    self.indices = indices.iterator()
+    self.indices = indices.makeIterator()
   }
 }
 
@@ -93,7 +93,7 @@ func isPalindrome0<
   let a = seq.indices
   var i = seq.indices
   var ir = i.lazy.reversed()
-  var b = ir.iterator()
+  var b = ir.makeIterator()
   for i in a {
     if seq[i] != seq[b.next()!] {
       return false
@@ -115,7 +115,7 @@ func isPalindrome1<
 >(seq: S) -> Bool {
 
   var a = PermutationGenerator(elements: seq, indices: seq.indices)
-  var b = seq.lazy.reversed().iterator()
+  var b = seq.lazy.reversed().makeIterator()
   for nextChar in a {
     if nextChar != b.next()! {
       return false
@@ -132,7 +132,7 @@ func isPalindrome1_5<
   S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
 
-  var b = seq.lazy.reversed().iterator()
+  var b = seq.lazy.reversed().makeIterator()
   for nextChar in seq {
     if nextChar != b.next()! {
       return false
@@ -226,7 +226,7 @@ testCount()
 
 struct SequenceOnly<T : Sequence> : Sequence {
   var base: T
-  func iterator() -> T.Iterator { return base.iterator() }
+  func makeIterator() -> T.Iterator { return base.makeIterator() }
 }
 
 func testUnderestimatedCount() {
@@ -269,8 +269,8 @@ struct CollectionOnly<T: Collection> : Collection {
     return base.endIndex
   }
 
-  func iterator() -> T.Iterator {
-    return base.iterator()
+  func makeIterator() -> T.Iterator {
+    return base.makeIterator()
   }
 
   subscript(position: T.Index) -> T.Iterator.Element {

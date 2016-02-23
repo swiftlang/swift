@@ -342,7 +342,7 @@ public struct _StringCore {
           UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
             count: count
-          ).iterator(),
+          ).makeIterator(),
           output,
           stoppingOnError: true
         )
@@ -687,7 +687,7 @@ extension _StringCore : RangeReplaceableCollection {
     }
 
     let growth = s.underestimatedCount
-    var iter = s.iterator()
+    var iter = s.makeIterator()
 
     if _fastPath(growth > 0) {
       let newSize = count + growth

@@ -188,10 +188,10 @@ public protocol Collection : Indexable, Sequence {
   /// type.
   associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
 
-  // FIXME: Needed here so that the Iterator is properly deduced from
-  // a custom iterator() function.  Otherwise we get an
-  // IndexingIterator. <rdar://problem/21539115>
-  func iterator() -> Iterator
+  // FIXME: Needed here so that the `Iterator` is properly deduced from
+  // a custom `makeIterator()` function.  Otherwise we get an
+  // `IndexingIterator`. <rdar://problem/21539115>
+  func makeIterator() -> Iterator
   
   // FIXME: should be constrained to Collection
   // (<rdar://problem/20715009> Implement recursive protocol
@@ -395,11 +395,11 @@ extension Collection {
 }
 
 // TODO: swift-3-indexing-model - review the following
-/// Supply the default `iterator()` method for `Collection` models
+/// Supply the default `makeIterator()` method for `Collection` models
 /// that accept the default associated `Iterator`,
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
-  public func iterator() -> IndexingIterator<Self> {
+  public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
   }
 }
@@ -466,7 +466,7 @@ extension Collection {
     // so instead of testing `isEmpty` and then returning the first element,
     // we'll just rely on the fact that the generator always yields the
     // first element first.
-    var i = iterator()
+    var i = makeIterator()
     return i.next()
   }
 // TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)

@@ -132,8 +132,8 @@ struct SequenceWithCustomUnderestimatedCount : Sequence {
     self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
 
-  func iterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
-    return _data.iterator()
+  func makeIterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
+    return _data.makeIterator()
   }
 
   var underestimatedCount: Int {
@@ -466,7 +466,7 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/Re
 ArrayTestSuite.test(
   "${array_type}/mutationDoesNotAffectIterator/subscript/store") {
   var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
-  var iter = arr.iterator()
+  var iter = arr.makeIterator()
   arr[0] = 1011
   expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
@@ -474,7 +474,7 @@ ArrayTestSuite.test(
 ArrayTestSuite.test(
   "${array_type}/mutationDoesNotAffectIterator/subscript/append") {
   var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
-  var iter = arr.iterator()
+  var iter = arr.makeIterator()
   arr.append(1040)
   expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
@@ -482,7 +482,7 @@ ArrayTestSuite.test(
 ArrayTestSuite.test(
   "${array_type}/mutationDoesNotAffectIterator/subscript/replaceSubrange") {
   var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
-  var iter = arr.iterator()
+  var iter = arr.makeIterator()
   arr.replaceSubrange(1..<3, with: [ 1040, 1050, 1060 ])
   expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }

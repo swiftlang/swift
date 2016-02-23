@@ -228,8 +228,8 @@ public struct LoggingRangeReplaceableCollection<
     return try base.filter(includeElement)
   }
 
-  public func iterator() -> Base.Iterator {
-    return base.iterator()
+  public func makeIterator() -> Base.Iterator {
+    return base.makeIterator()
   }
 }
 
@@ -271,7 +271,7 @@ public class SequenceLog {
     return LoggingSequence(LoggingSequence(s))
   }
   public static var forEach = TypeIndexed(0)
-  public static var iterator = TypeIndexed(0)
+  public static var makeIterator = TypeIndexed(0)
   public static var underestimatedCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
@@ -449,9 +449,9 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   }
 %   end
 
-  public func iterator() -> LoggingIterator<Base.Iterator> {
-    Log.iterator[selfType] += 1
-    return LoggingIterator(base.iterator())
+  public func makeIterator() -> LoggingIterator<Base.Iterator> {
+    Log.makeIterator[selfType] += 1
+    return LoggingIterator(base.makeIterator())
   }
 
   public var underestimatedCount: Int {
