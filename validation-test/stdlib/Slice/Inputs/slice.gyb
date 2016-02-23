@@ -74,7 +74,8 @@ do {
     resiliencyChecks: resiliencyChecks,
     outOfBoundsIndexOffset: 6
 % if WrapperType == 'MutableSlice':
-    , withUnsafeMutableBufferPointerIsSupported: false
+    , withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true
 % end
     )
 }
