@@ -1991,7 +1991,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     from from: Storage, at: Int, toEntryAt: Int
   ) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initializePointee((from.keys + at).take())
+    (keys + toEntryAt).initializePointee((from.keys + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2020,8 +2020,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     from from: Storage, at: Int, toEntryAt: Int
   ) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initializePointee((from.keys + at).take())
-    (values + toEntryAt).initializePointee((from.values + at).take())
+    (keys + toEntryAt).initializePointee((from.keys + at).move())
+    (values + toEntryAt).initializePointee((from.values + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }

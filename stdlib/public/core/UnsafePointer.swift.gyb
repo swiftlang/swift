@@ -163,7 +163,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The memory is uninitialized.
   @warn_unused_result
-  public func take() -> Pointee {
+  public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
 
@@ -571,11 +571,6 @@ extension ${Self} {
 
   @available(*, unavailable, renamed="initializePointee")
   public func initialize(newvalue: Pointee) {
-    fatalError("unavailable function can't be called")
-  }
-
-  @available(*, unavailable, renamed="take")
-  public func move() -> Pointee {
     fatalError("unavailable function can't be called")
   }
 }
