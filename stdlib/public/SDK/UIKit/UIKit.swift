@@ -47,20 +47,20 @@ extension UIOffset : Equatable {}
 #if !os(watchOS) && !os(tvOS)
 public extension UIDeviceOrientation {
   var isLandscape: Bool {
-    return self == .landscapeLeft || self == .landscapeRight
+    return self == .LandscapeLeft || self == .LandscapeRight
   }
 
   var isPortrait: Bool {
-    return self == .portrait || self == .portraitUpsideDown
+    return self == .Portrait || self == .PortraitUpsideDown
   }
 
   var isFlat: Bool {
-    return self == .faceUp || self == .faceDown
+    return self == .FaceUp || self == .FaceDown
   }
 
   var isValidInterfaceOrientation: Bool {
     switch (self) {
-    case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
+    case .Portrait, .PortraitUpsideDown, .LandscapeLeft, .LandscapeRight:
       return true
     default:
       return false
@@ -97,11 +97,11 @@ public func UIDeviceOrientationIsValidInterfaceOrientation(
 #if !os(watchOS) && !os(tvOS)
 public extension UIInterfaceOrientation {
   var isLandscape: Bool {
-    return self == .landscapeLeft || self == .landscapeRight
+    return self == .LandscapeLeft || self == .LandscapeRight
   }
 
   var isPortrait: Bool {
-    return self == .portrait || self == .portraitUpsideDown
+    return self == .Portrait || self == .PortraitUpsideDown
   }
 }
 
@@ -135,9 +135,9 @@ public extension UIActionSheet {
               delegate: delegate,
               cancelButtonTitle: cancelButtonTitle,
               destructiveButtonTitle: destructiveButtonTitle)
-    self.addButton(title: firstButtonTitle)
+    self.addButtonWithTitle(firstButtonTitle)
     for buttonTitle in moreButtonTitles {
-      self.addButton(title: buttonTitle)
+      self.addButtonWithTitle(buttonTitle)
     }
   }
 }
@@ -157,9 +157,9 @@ public extension UIAlertView {
               message: message,
               delegate: delegate,
               cancelButtonTitle: cancelButtonTitle)
-    self.addButton(title: firstButtonTitle)
+    self.addButtonWithTitle(firstButtonTitle)
     for buttonTitle in moreButtonTitles {
-      self.addButton(title: buttonTitle)
+      self.addButtonWithTitle(buttonTitle)
     }
   }
 }
@@ -173,12 +173,12 @@ internal struct _UIViewQuickLookState {
 extension UIView : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     if _UIViewQuickLookState.views.contains(self) {
-      return .view(UIImage())
+      return .View(UIImage())
     } else {
       _UIViewQuickLookState.views.insert(self)
       // in case of an empty rectangle abort the logging
       if (bounds.size.width == 0) || (bounds.size.height == 0) {
-        return .view(UIImage())
+        return .View(UIImage())
       }
   
       UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
@@ -188,14 +188,14 @@ extension UIView : CustomPlaygroundQuickLookable {
       let ctx: CGContext! = UIGraphicsGetCurrentContext()
       UIColor(white:1.0, alpha:0.0).set()
       CGContextFillRect(ctx, bounds)
-      layer.render(in: ctx)
+      layer.renderInContext(ctx)
 
       let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
   
       UIGraphicsEndImageContext()
   
       _UIViewQuickLookState.views.remove(self)
-      return .view(image)
+      return .View(image)
     }
   }
 }
