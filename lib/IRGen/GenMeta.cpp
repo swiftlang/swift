@@ -1965,10 +1965,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
     return classPtr;
   }
   
-  // ObjC-defined classes will always be top-level non-generic classes.
-
-  if (auto classType = dyn_cast<ClassType>(type)) {
-    auto theClass = classType->getDecl();
+  if (ClassDecl *theClass = type->getClassOrBoundGenericClass()) {
     if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
       llvm::Value *result =
         emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);
@@ -1976,10 +1973,6 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
         result = IGF.Builder.CreateBitCast(result, IGF.IGM.TypeMetadataPtrTy);
       return result;
     }
-  } else {
-    auto genericType = cast<BoundGenericClassType>(type);
-    assert(hasKnownSwiftMetadata(IGF.IGM, genericType->getDecl()));
-    (void) genericType;
   }
 
   llvm::Value *result = IGF.emitTypeMetadataRef(type);
