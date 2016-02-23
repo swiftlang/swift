@@ -41,10 +41,10 @@ var x: Int
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>
-// GROUP1-DAG: Lazy Views
 // GROUP1-DAG: Assert
 // GROUP1-DAG: String
 // GROUP1-DAG: Collection
+// GROUP1-DAG: Collection.Lazy Views
 // GROUP1-DAG: Bool
 // GROUP1-DAG: Math
 // GROUP1-DAG: Misc

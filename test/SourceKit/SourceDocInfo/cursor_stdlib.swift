@@ -27,7 +27,7 @@ func foo2(var a : [S1]) {
 
 // RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-GENERATOR %s
 // CHECK-GENERATOR-NOT: _AnyGeneratorBase
-// CHECK-GENERATOR: <Group>Lazy Views</Group>
+// CHECK-GENERATOR: <Group>Collection.Lazy Views</Group>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT1 %s
 // CHECK-REPLACEMENT1: <Group>Collection</Group>
