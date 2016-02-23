@@ -253,7 +253,7 @@ class TestString : CustomStringConvertible, CustomDebugStringConvertible {
   }
 }
 class TestStream : Streamable {
-  func writeTo<Target : OutputStream>(inout target: Target) {
+  func write<Target : OutputStream>(inout to target: Target) {
     target.write("AStream")
   }
 }

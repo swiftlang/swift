@@ -761,7 +761,7 @@ extension String {
   /// Initialize `self` with the textual representation of `instance`.
   ///
   /// * If `Subject` conforms to `Streamable`, the result is obtained by
-  ///   calling `instance.writeTo(s)` on an empty string `s`.
+  ///   calling `instance.write(to: s)` on an empty string `s`.
   /// * Otherwise, if `Subject` conforms to `CustomStringConvertible`, the
   ///   result is `instance`'s `description`
   /// * Otherwise, if `Subject` conforms to `CustomDebugStringConvertible`,
@@ -785,7 +785,7 @@ extension String {
   ///   the result is `subject`'s `description`.
   ///
   /// * Otherwise, if `Subject` conforms to `Streamable`, the result is
-  ///   obtained by calling `subject.writeTo(s)` on an empty string `s`.
+  ///   obtained by calling `subject.write(to: s)` on an empty string `s`.
   ///
   /// * Otherwise, an unspecified result is supplied automatically by
   ///   the Swift standard library.

@@ -282,7 +282,7 @@ JoinTestSuite.test("${Base}.join()") {
       ${Base}(${label} $0)
     })
     let separator = ${Base}(${label} test.separator)
-    let r = Array(elements.join(separator: separator))
+    let r = Array(elements.joined(separator: separator))
     checkSequence(test.expected, r)
   }
 }
@@ -293,7 +293,7 @@ JoinTestSuite.test("${Base}.join()/_copyToNativeArrayBuffer()") {
       ${Base}(${label} $0)
     })
     let separator = ${Base}(${label} test.separator)
-    let r = Array(elements.join(separator: separator))
+    let r = Array(elements.joined(separator: separator))
     checkSequence(test.expected, r)
   }
 }
@@ -301,10 +301,10 @@ JoinTestSuite.test("${Base}.join()/_copyToNativeArrayBuffer()") {
 % end
 
 func join(separator: String, _ elements: [String]) -> String {
-  return elements.join(separator: separator)
+  return elements.joined(separator: separator)
 }
 
-JoinTestSuite.test("String.join(separator:)") {
+JoinTestSuite.test("String.joined(separator:)") {
   //
   // Test the free function.
   //
@@ -341,7 +341,7 @@ JoinTestSuite.test("String.join(separator:)") {
   // Test forwarding instance function.
   //
 
-  expectEqual("abxycdxyef", ["ab", "cd", "ef"].join(separator: "xy"))
+  expectEqual("abxycdxyef", ["ab", "cd", "ef"].joined(separator: "xy"))
 }
 
 runAllTests()

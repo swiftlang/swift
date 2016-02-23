@@ -225,7 +225,8 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
   OptionalTypeKind optionalKind;
   CanType valueType = getOptionalValueType(optType, optionalKind);
 
-  FuncDecl *fn = getASTContext().getGetOptionalValueDecl(nullptr, optionalKind);
+  FuncDecl *fn = getASTContext().getOptionalUnwrappedDecl(
+      nullptr, optionalKind);
   Substitution sub = getSimpleSubstitution(fn, valueType);
 
   // The intrinsic takes its parameter indirectly.

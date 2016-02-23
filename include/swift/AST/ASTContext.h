@@ -449,14 +449,14 @@ public:
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
 
-  /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValueAsBool.
-  FuncDecl *getDoesOptionalHaveValueAsBoolDecl(LazyResolver *resolver,
-                                               OptionalTypeKind kind) const;
+  /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_isSome.
+  FuncDecl *getOptionalIsSomeDecl(LazyResolver *resolver,
+                                  OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of
-  /// Swift._get{,ImplicitlyUnwrapped}OptionalValue.
-  FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
-                                    OptionalTypeKind kind) const;
+  /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_unwrapped.
+  FuncDecl *getOptionalUnwrappedDecl(LazyResolver *resolver,
+                                     OptionalTypeKind kind) const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
@@ -684,6 +684,15 @@ public:
                  SourceLoc loc,
                  DeclContext *dc,
                  ProtocolConformanceState state);
+
+  /// Produce a new normal conformance for a property behavior.
+  NormalProtocolConformance *
+  getBehaviorConformance(Type conformingType,
+                         Type conformingInterfaceType,
+                         ProtocolDecl *protocol,
+                         SourceLoc loc,
+                         AbstractStorageDecl *storage,
+                         ProtocolConformanceState state);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the

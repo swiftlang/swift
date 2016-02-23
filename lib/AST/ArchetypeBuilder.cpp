@@ -1911,7 +1911,7 @@ Type ArchetypeBuilder::substDependentType(Type type) {
 /// potential archetypes to the set of requirements.
 static void
 addRequirements(
-    Module &mod, Type type,
+    ArchetypeBuilder &builder, Type type,
     ArchetypeBuilder::PotentialArchetype *pa,
     llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
     SmallVectorImpl<Requirement> &requirements) {
@@ -1946,7 +1946,7 @@ addRequirements(
 
 static void
 addNestedRequirements(
-    Module &mod, Type type,
+    ArchetypeBuilder &builder,
     ArchetypeBuilder::PotentialArchetype *pa,
     llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
     SmallVectorImpl<Requirement> &requirements) {
@@ -1976,11 +1976,11 @@ addNestedRequirements(
       if (rep->isConcreteType())
         continue;
 
-      auto nestedType = DependentMemberType::get(type, assocType,
-                                                 mod.getASTContext());
+      auto nestedType =
+        rep->getDependentType(builder, /*allowUnresolved*/ false);
 
-      addRequirements(mod, nestedType, rep, knownPAs, requirements);
-      addNestedRequirements(mod, nestedType, rep, knownPAs, requirements);
+      addRequirements(builder, nestedType, rep, knownPAs, requirements);
+      addNestedRequirements(builder, rep, knownPAs, requirements);
     }
   }
 }
@@ -2027,16 +2027,14 @@ static void collectRequirements(ArchetypeBuilder &builder,
       auto pa = builder.resolveArchetype(param)->getRepresentative();
 
       // Add other requirements.
-      addRequirements(builder.getModule(), param, pa, knownPAs,
-                      requirements);
+      addRequirements(builder, param, pa, knownPAs, requirements);
     }
 
     // For each of the primary potential archetypes, add the nested requirements.
     for (unsigned idx = primaryIdx; idx < lastPrimaryIdx; ++idx) {
       auto param = primary[idx];
       auto pa = builder.resolveArchetype(param)->getRepresentative();
-      addNestedRequirements(builder.getModule(), param, pa, knownPAs,
-                            requirements);
+      addNestedRequirements(builder, pa, knownPAs, requirements);
     }
 
     primaryIdx = lastPrimaryIdx;

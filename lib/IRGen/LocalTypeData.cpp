@@ -381,8 +381,9 @@ void LocalTypeDataCache::dump() const {
   }
 
   for (auto &mapEntry : Map) {
-    out << "(" << mapEntry.first.Type.getPointer()
-        << "," << mapEntry.first.Kind.getRawValue() << ") => [";
+    mapEntry.first.print(out);
+    out << " => [";
+
     if (mapEntry.second.Root) out << "\n";
     for (auto cur = mapEntry.second.Root; cur; cur = cur->getNext()) {
       out << "  (";
@@ -409,6 +410,40 @@ void LocalTypeDataCache::dump() const {
       }
     }
     out << "]\n";
+  }
+}
+
+void LocalTypeDataKey::dump() const {
+  print(llvm::errs());
+}
+
+void LocalTypeDataKey::print(llvm::raw_ostream &out) const {
+  out << "(" << Type.getPointer()
+      << " (" << Type << "), ";
+  Kind.print(out);
+  out << ")";
+}
+
+void LocalTypeDataKind::dump() const {
+  print(llvm::errs());
+}
+void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
+  if (isConcreteProtocolConformance()) {
+    out << "ConcreteConformance(";
+    getConcreteProtocolConformance()->printName(out);
+    out << ")";
+  } else if (isAbstractProtocolConformance()) {
+    out << "AbstractConformance("
+        << getAbstractProtocolConformance()->getName()
+        << ")";
+  } else if (Value == TypeMetadata) {
+    out << "TypeMetadata";
+  } else if (Value == ValueWitnessTable) {
+    out << "ValueWitnessTable";
+  } else {
+    assert(isSingletonKind());
+    ValueWitness witness = ValueWitness(Value - ValueWitnessBase);
+    out << getValueWitnessName(witness);
   }
 }
 

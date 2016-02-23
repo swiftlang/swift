@@ -883,7 +883,7 @@ namespace {
     }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
-      return IGF.getLocalTypeData(type, LocalTypeDataKind::forTypeMetadata());
+      return emitArchetypeTypeMetadataRef(IGF, type);
     }
 
     llvm::Value *visitGenericTypeParamType(CanGenericTypeParamType type) {

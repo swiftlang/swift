@@ -45,7 +45,7 @@
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      startIndex[#Index#]; name=startIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]; name=endIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   appendContentsOf({#(newElements): S#})[#Void#]; name=appendContentsOf(newElements: S){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   appendContents({#of: S#})[#Void#]; name=appendContents(of: S){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insertContentsOf({#(newElements): S#}, {#at: Index#})[#Void#]; name=insertContentsOf(newElements: S, at: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   remove({#at: Index#})[#Character#]; name=remove(at: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:      lowercased()[#String#]; name=lowercased(){{$}}
@@ -59,4 +59,4 @@ func giveMeAString() -> Int {
 // LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: appendContentsOf({#(newElements): S#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: appendContents({#of: S#})[#Void#]{{; name=.+$}}

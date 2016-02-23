@@ -119,10 +119,10 @@ ${Self}TestSuite.test("subscript(_:Index)/Set/DifferentCollections") {
 func getTwoInterchangeable${Self}(elements: [Int])
   -> (${Self}<OpaqueValue<Int>>, ${Self}<OpaqueValue<Int>>) {
   var c1 = ${Self}<OpaqueValue<Int>>()
-  c1.appendContentsOf(elements.map(OpaqueValue.init))
+  c1.appendContents(of: elements.map(OpaqueValue.init))
 
   var c2 = ${Self}<OpaqueValue<Int>>()
-  c2.appendContentsOf(elements.map(OpaqueValue.init))
+  c2.appendContents(of: elements.map(OpaqueValue.init))
 
   return (c1, c2)
 }
@@ -199,10 +199,10 @@ ${Self}TestSuite.test("append()/IndexInvalidation") {
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("appendContentsOf()/IndexInvalidation") {
+${Self}TestSuite.test("appendContents(of:)/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.endIndex
-  c1.appendContentsOf([ 4040, 5050 ].map(OpaqueValue.init))
+  c1.appendContents(of: [ 4040, 5050 ].map(OpaqueValue.init))
   let i2 = c1.startIndex.advanced(by: 3)
 
   expectCrashLater()

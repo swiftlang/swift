@@ -501,15 +501,15 @@ self.test("\(testNamePrefix).append()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// appendContentsOf()
+// appendContents(of:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).appendContentsOf()/semantics") {
+self.test("\(testNamePrefix).appendContents(of:)/semantics") {
   for test in appendContentsOfTests {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))
-    c.appendContentsOf(newElements)
+    c.appendContents(of: newElements)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

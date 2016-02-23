@@ -1279,6 +1279,10 @@ public:
     if (VD->isImplicit() || VD->getLoc().isInvalid())
       return false;
     
+    // If the variable is computed, ignore it.
+    if (!VD->hasStorage())
+      return false;
+    
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
     if (VD->isInvalid() || !VD->hasType()) {

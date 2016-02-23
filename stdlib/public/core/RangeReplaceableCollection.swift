@@ -106,11 +106,11 @@ public protocol RangeReplaceableCollection : Collection {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  mutating func appendContentsOf<
+  mutating func appendContents<
     S : Sequence
     where
     S.Iterator.Element == Iterator.Element
-  >(newElements: S)
+  >(of newElements: S)
 
   /// Insert `newElement` at index `i`.
   ///
@@ -191,7 +191,7 @@ extension RangeReplaceableCollection {
     self.init()
     if count != 0 {
       let elements = Repeated(_repeating: repeatedValue, count: count)
-      appendContentsOf(elements)
+      appendContents(of: elements)
     }
   }
 
@@ -199,16 +199,16 @@ extension RangeReplaceableCollection {
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
     self.init()
-    appendContentsOf(elements)
+    appendContents(of: elements)
   }
 
   public mutating func append(newElement: Iterator.Element) {
     insert(newElement, at: endIndex)
   }
 
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence where S.Iterator.Element == Iterator.Element
-  >(newElements: S) {
+  >(of newElements: S) {
     let approximateCapacity = self.count +
       numericCast(newElements.underestimatedCount)
     self.reserveCapacity(approximateCapacity)
@@ -364,7 +364,7 @@ public func +<
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.underestimatedCount))
-  lhs.appendContentsOf(rhs)
+  lhs.appendContents(of: rhs)
   return lhs
 }
 
@@ -376,8 +376,8 @@ public func +<
 >(lhs: S, rhs: C) -> C {
   var result = C()
   result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
-  result.appendContentsOf(lhs)
-  result.appendContentsOf(rhs)
+  result.appendContents(of: lhs)
+  result.appendContents(of: rhs)
   return result
 }
 
@@ -390,7 +390,7 @@ public func +<
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
+  lhs.appendContents(of: rhs)
   return lhs
 }
 
@@ -414,6 +414,15 @@ extension RangeReplaceableCollection {
 
   @available(*, unavailable, renamed="removeSubrange")
   public mutating func removeRange(subRange: Range<Index>) {
+  }
+
+  @available(*, unavailable, renamed="appendContents(of:)")
+  public mutating func appendContentsOf<
+    S : Sequence
+    where
+    S.Iterator.Element == Iterator.Element
+  >(newElements: S) {
+    fatalError("unavailable function can't be called")
   }
 }
 

@@ -16,5 +16,5 @@
 // from ApplyInst to match what GenericSignature expects.
 
 func asHex(a: [UInt8]) -> String {
-  return a.map { "0x" + String($0, radix: 16) }.join(separator: "")
+  return a.map { "0x" + String($0, radix: 16) }.joined(separator: "")
 }

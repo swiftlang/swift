@@ -945,6 +945,11 @@ void BlockState::processUnknownWriteInstForRLE(RLEContext &Ctx,
 
 void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
                                          RLEKind Kind) {
+  // If this is a release on a guaranteed parameter, it can not call deinit,
+  // which might read or write memory.
+  if (isGuaranteedParamRelease(I))
+    return;
+
   // Are we computing the genset and killset ?
   if (isComputeAvailGenKillSet(Kind)) {
     processUnknownWriteInstForGenKillSet(Ctx, I);

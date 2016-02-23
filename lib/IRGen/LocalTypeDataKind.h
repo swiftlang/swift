@@ -141,11 +141,13 @@ public:
       return ProtocolConformanceRef(getConcreteProtocolConformance());
     }
   }
-
   
   RawType getRawValue() const {
     return Value;
   }
+
+  void dump() const;
+  void print(llvm::raw_ostream &out) const;
 
   bool operator==(LocalTypeDataKind other) const {
     return Value == other.Value;
@@ -165,6 +167,9 @@ public:
   bool operator==(const LocalTypeDataKey &other) const {
     return Type == other.Type && Kind == other.Kind;
   }
+
+  void dump() const;
+  void print(llvm::raw_ostream &out) const;
 };
 
 }

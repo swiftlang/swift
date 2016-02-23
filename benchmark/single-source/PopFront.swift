@@ -22,7 +22,7 @@ public func run_PopFrontArray(N: Int) {
   for _ in 1...20*N {
     for _ in 1...reps {
       var result = 0
-      a.appendContentsOf(orig)
+      a.appendContents(of: orig)
       while a.count != 0 {
         result += a[0]
         a.remove(at: 0)

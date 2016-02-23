@@ -901,11 +901,6 @@ void SwiftLangSupport::findModuleGroups(StringRef ModuleName,
     Receiver(Groups, Error);
     return;
   }
-  for (auto File : M->getFiles()) {
-    File->collectAllGroups(Groups);
-  }
-  std::sort(Groups.begin(), Groups.end(), [](StringRef L, StringRef R) {
-    return L.compare_lower(R) < 0;
-  });
-  Receiver(Groups, Error);
+  std::vector<StringRef> Scratch;
+  Receiver(collectModuleGroups(M, Scratch), Error);
 }

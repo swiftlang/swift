@@ -464,6 +464,13 @@ public:
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0) const;
   
+  /// Get the type of `self` in this declaration context, if there is a
+  /// `self`.
+  Type getSelfTypeInContext() const;
+  /// Get the interface type of `self` in this declaration context, if there is
+  /// a `self`.
+  Type getSelfInterfaceType() const;
+  
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));

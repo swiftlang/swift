@@ -54,14 +54,14 @@ def interpolate(string):
     frame = inspect.currentframe()
     return string % frame.f_back.f_locals
 
-# Given the bodyText of a protocol definition, return a list of
+# Given the body_text of a protocol definition, return a list of
 # associated type and operator requirements.
-def bodyLines(bodyText):
+def bodyLines(body_text):
     return [
         cgi.escape(b.group(0)) for b in
         re.finditer(
             r'(typealias\s*' + identifier + r'(\s*[:,]\s*' + identifier + ')?|' + operator + '.*)',
-            bodyText, reFlags)
+            body_text, reFlags)
     ]
 
 # Mapping from protocol to associated type / operator requirements

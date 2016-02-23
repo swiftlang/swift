@@ -124,10 +124,10 @@ extension RangeReplaceableCollection {
     var result = Self()
     var iter = elements.iterator()
     if let first = iter.next() {
-      result.appendContentsOf(first)
+      result.appendContents(of: first)
       while let next = iter.next() {
-        result.appendContentsOf(self)
-        result.appendContentsOf(next)
+        result.appendContents(of: self)
+        result.appendContents(of: next)
       }
     }
     return result

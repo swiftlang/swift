@@ -66,8 +66,8 @@ public enum Process {
 /// Intrinsic entry point invoked on entry to a standalone program's "main".
 @_transparent
 public // COMPILER_INTRINSIC
-func _didEnterMain(
-  argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+func _stdlib_didEnterMain(
+  argc argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
 ) {
   // Initialize the Process.argc and Process.unsafeArgv variables with the
   // values that were passed in to main.

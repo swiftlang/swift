@@ -1469,9 +1469,7 @@ public:
     // No lowering support needed.
   }
 
-  void visitVarDecl(VarDecl *D) {
-    // We handle these in pattern binding.
-  }
+  void visitVarDecl(VarDecl *D);
 
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
   std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd);

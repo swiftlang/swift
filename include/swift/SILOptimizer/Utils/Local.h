@@ -69,6 +69,10 @@ recursivelyDeleteTriviallyDeadInstructions(
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *I);
 
+/// \brief Return true if this is a release instruction and the released value
+/// is a part of a guaranteed parameter, false otherwise.
+bool isGuaranteedParamRelease(SILInstruction *I); 
+
 /// \brief Recursively erase all of the uses of the instruction (but not the
 /// instruction itself) and delete instructions that will become trivially
 /// dead when this instruction is removed.

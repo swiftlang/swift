@@ -692,24 +692,24 @@ extension ${Self} : _ArrayProtocol {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence
     where
     S.Iterator.Element == Element
-  >(newElements: S) {
+  >(of newElements: S) {
     self += newElements
   }
 
-  // An overload of `appendContentsOf()` that uses the += that is optimized for
+  // An overload of `appendContents(of:)` that uses the += that is optimized for
   // collections.
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     C : Collection
     where
     C.Iterator.Element == Element
-  >(newElements: C) {
+  >(of newElements: C) {
     self += newElements
   }
 
@@ -1406,6 +1406,24 @@ extension ${Self} {
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == _Buffer.Element
   >(subRange: Range<Int>, with newElements: C) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="appendContents(of:)")
+  public mutating func appendContentsOf<
+    S : Sequence
+    where
+    S.Iterator.Element == Element
+  >(newElements: S) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="appendContents(of:)")
+  public mutating func appendContentsOf<
+    C : Collection
+    where
+    C.Iterator.Element == Element
+  >(newElements: C) {
     fatalError("unavailable function can't be called")
   }
 }

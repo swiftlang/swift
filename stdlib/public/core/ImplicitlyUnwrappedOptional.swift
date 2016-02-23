@@ -55,10 +55,21 @@ extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
 @_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _getImplicitlyUnwrappedOptionalValue<Wrapped>(v: Wrapped!) -> Wrapped {
-  switch v {
-  case .some(let x):
-    return x
+func _stdlib_ImplicitlyUnwrappedOptional_isSome<Wrapped>
+  (`self`: Wrapped!) -> Bool {
+
+  return `self` != nil
+}
+
+@_transparent
+@warn_unused_result
+public // COMPILER_INTRINSIC
+func _stdlib_ImplicitlyUnwrappedOptional_unwrapped<Wrapped>
+  (`self`: Wrapped!) -> Wrapped {
+
+  switch `self` {
+  case .some(let wrapped):
+    return wrapped
   case .none:
     _preconditionFailure(
       "unexpectedly found nil while unwrapping an Optional value")

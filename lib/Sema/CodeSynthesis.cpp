@@ -23,6 +23,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;
@@ -1184,6 +1185,328 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   return Get;
 }
 
+void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
+                               VarDecl *BehaviorStorage,
+                               FuncDecl *BehaviorInitStorage,
+                               Type SelfTy,
+                               Type StorageTy,
+                               NormalProtocolConformance *BehaviorConformance,
+                               ArrayRef<Substitution> SelfInterfaceSubs,
+                               ArrayRef<Substitution> SelfContextSubs) {
+  assert(BehaviorStorage);
+  assert(BehaviorInitStorage);
+
+  // Substitute the storage type into the conforming context.
+  auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
+
+  TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
+  auto SubstStorageInterfaceTy = StorageTy.subst(VD->getModuleContext(),
+                                        interfaceMap, SubstOptions());
+  assert(SubstStorageInterfaceTy && "storage type substitution failed?!");
+
+  TypeSubstitutionMap contextMap = sig->getSubstitutionMap(SelfContextSubs);
+  auto SubstStorageContextTy = StorageTy.subst(VD->getModuleContext(),
+                                               contextMap, SubstOptions());
+  assert(SubstStorageContextTy && "storage type substitution failed?!");
+
+  auto DC = VD->getDeclContext();
+  SmallString<64> NameBuf = VD->getName().str();
+  NameBuf += ".storage";
+  auto StorageName = Context.getIdentifier(NameBuf);
+  auto *Storage = new (Context) VarDecl(VD->isStatic(),
+                                       /*let*/ !BehaviorStorage->isSettable(DC),
+                                       VD->getLoc(),
+                                       StorageName,
+                                       SubstStorageContextTy,
+                                       DC);
+  Storage->setInterfaceType(SubstStorageInterfaceTy);
+  Storage->setUserAccessible(false);
+  // Mark the vardecl to be final, implicit, and private.  In a class, this
+  // prevents it from being dynamically dispatched.
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+    makeFinal(Context, Storage);
+  Storage->setImplicit();
+  Storage->setAccessibility(Accessibility::Private);
+  Storage->setSetterAccessibility(Accessibility::Private);
+  
+  addMemberToContextIfNeeded(Storage, DC);
+  
+  // Build the initializer expression, 'Self.initStorage()', using the
+  // conformance.
+  auto SelfTypeRef = TypeExpr::createImplicit(SelfTy, Context);
+  auto SpecializeInitStorage = ConcreteDeclRef(Context, BehaviorInitStorage,
+                                               SelfContextSubs);
+  
+  auto InitStorageRef = new (Context) DeclRefExpr(SpecializeInitStorage,
+                                                  DeclNameLoc(),
+                                                  /*implicit*/ true);
+  auto InitStorageMethodTy = FunctionType::get(Context.TheEmptyTupleType,
+                                               SubstStorageContextTy);
+  auto InitStorageRefTy = FunctionType::get(SelfTypeRef->getType(),
+                                            InitStorageMethodTy);
+  InitStorageRef->setType(InitStorageRefTy);
+
+  auto SelfApply = new (Context) DotSyntaxCallExpr(InitStorageRef,
+                                                   SourceLoc(),
+                                                   SelfTypeRef);
+  SelfApply->setImplicit();
+  SelfApply->setType(InitStorageMethodTy);
+  SelfApply->setThrows(false);
+  auto EmptyTuple = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
+                                           /*implicit*/ true);
+  auto InitStorageExpr = new (Context) CallExpr(SelfApply, EmptyTuple,
+                                                /*implicit*/ true);
+  InitStorageExpr->setImplicit();
+  InitStorageExpr->setType(SubstStorageContextTy);
+  InitStorageExpr->setThrows(false);
+  
+  // Create the pattern binding decl for the storage decl.  This will get
+  // default initialized using the protocol's initStorage() method.
+  Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
+  PBDPattern = new (Context) TypedPattern(PBDPattern,
+                                  TypeLoc::withoutLoc(SubstStorageContextTy),
+                                  /*implicit*/true);
+  auto *PBD = PatternBindingDecl::create(Context, /*staticloc*/SourceLoc(),
+                             VD->getParentPatternBinding()->getStaticSpelling(),
+                             /*varloc*/VD->getLoc(),
+                             PBDPattern, /*init*/InitStorageExpr,
+                             VD->getDeclContext());
+  PBD->setImplicit();
+  PBD->setInitializerChecked(0);
+  addMemberToContextIfNeeded(PBD, VD->getDeclContext(), VD);
+  
+  // Add accessors to the storage, since we'll need them to satisfy the
+  // conformance requirements.
+  addTrivialAccessorsToStorage(Storage, *this);
+  
+  // Add the witnesses to the conformance.
+  ArrayRef<Substitution> MemberSubs;
+  if (DC->isGenericTypeContext()) {
+    MemberSubs = DC->getGenericParamsOfContext()
+                   ->getForwardingSubstitutions(Context);
+  }
+  
+  BehaviorConformance->setWitness(BehaviorStorage,
+                                 ConcreteDeclRef(Context, Storage, MemberSubs));
+  BehaviorConformance->setWitness(BehaviorStorage->getGetter(),
+                    ConcreteDeclRef(Context, Storage->getGetter(), MemberSubs));
+  if (BehaviorStorage->isSettable(DC))
+    BehaviorConformance->setWitness(BehaviorStorage->getSetter(),
+                    ConcreteDeclRef(Context, Storage->getSetter(), MemberSubs));
+}
+
+void TypeChecker::completePropertyBehaviorInitialValue(VarDecl *VD,
+                               VarDecl *BehaviorInitialValue,
+                               NormalProtocolConformance *BehaviorConformance,
+                               ArrayRef<Substitution> SelfInterfaceSubs,
+                               ArrayRef<Substitution> SelfContextSubs) {
+  // Create a property to witness the requirement.
+  auto DC = VD->getDeclContext();
+  SmallString<64> NameBuf = VD->getName().str();
+  NameBuf += ".initialValue";
+  auto InitialValueName = Context.getIdentifier(NameBuf);
+  // TODO: non-static initialValue
+  assert(BehaviorInitialValue->isStatic());
+  auto *InitialValue = new (Context) VarDecl(/*static*/ true,
+                                             /*let*/ false,
+                                             VD->getLoc(),
+                                             InitialValueName,
+                                            SelfContextSubs[1].getReplacement(),
+                                             DC);
+  InitialValue->setInterfaceType(SelfInterfaceSubs[1].getReplacement());
+  InitialValue->setUserAccessible(false);
+  // Mark the vardecl to be final, implicit, and private.  In a class, this
+  // prevents it from being dynamically dispatched.
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+    makeFinal(Context, InitialValue);
+  InitialValue->setImplicit();
+  InitialValue->setAccessibility(Accessibility::Private);
+  InitialValue->setIsBeingTypeChecked();
+
+  addMemberToContextIfNeeded(InitialValue, DC);
+  
+  Pattern *InitialPBDPattern = new (Context) NamedPattern(InitialValue,
+                                                          /*implicit*/true);
+  InitialPBDPattern = new (Context) TypedPattern(InitialPBDPattern,
+                      TypeLoc::withoutLoc(SelfContextSubs[1].getReplacement()),
+                      /*implicit*/ true);
+  auto *InitialPBD = PatternBindingDecl::create(Context,
+                                              /*staticloc*/SourceLoc(),
+                                              StaticSpellingKind::KeywordStatic,
+                                              VD->getLoc(),
+                                              InitialPBDPattern, nullptr,
+                                              VD->getDeclContext());
+  InitialPBD->setImplicit();
+  InitialPBD->setInitializerChecked(0);
+  addMemberToContextIfNeeded(InitialPBD, VD->getDeclContext(), VD);
+  
+  // Create a getter.
+  auto Get = createGetterPrototype(InitialValue, *this);
+  addMemberToContextIfNeeded(Get, DC);
+  
+  // Take the initializer from the PatternBindingDecl for VD.
+  auto *InitValue = VD->getParentInitializer();
+  auto PBD = VD->getParentPatternBinding();
+  unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
+  PBD->setInit(entryIndex, nullptr);
+  PBD->setInitializerChecked(entryIndex);
+
+  // Recontextualize any closure declcontexts nested in the initializer to
+  // realize that they are in the getter function.
+  InitValue->walk(RecontextualizeClosures(Get));
+  
+  // Return the expression value.
+  auto Ret = new (Context) ReturnStmt(SourceLoc(), InitValue,
+                                             /*implicit*/ true);
+  auto Body = BraceStmt::create(Context, SourceLoc(), ASTNode(Ret),
+                                SourceLoc(), /*implicit*/ true);
+  Get->setBody(Body);
+  
+  InitialValue->makeComputed(SourceLoc(), Get, nullptr, nullptr, SourceLoc());
+  InitialValue->setIsBeingTypeChecked(false);
+
+  // Add the witnesses to the conformance.
+  ArrayRef<Substitution> MemberSubs;
+  if (DC->isGenericTypeContext()) {
+    MemberSubs = DC->getGenericParamsOfContext()
+    ->getForwardingSubstitutions(Context);
+  }
+
+  BehaviorConformance->setWitness(BehaviorInitialValue,
+                            ConcreteDeclRef(Context, InitialValue, MemberSubs));
+  BehaviorConformance->setWitness(BehaviorInitialValue->getGetter(),
+                            ConcreteDeclRef(Context, Get, MemberSubs));
+}
+
+void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
+                                       VarDecl *ValueImpl,
+                                       ArrayRef<Substitution> SelfInterfaceSubs,
+                                       ArrayRef<Substitution> SelfContextSubs) {
+  auto selfTy = SelfContextSubs[0].getReplacement();
+  auto valueTy = SelfContextSubs[1].getReplacement();
+  
+  SmallVector<ASTNode, 3> bodyStmts;
+  
+  auto makeSelfExpr = [&](FuncDecl *fromAccessor,
+                          FuncDecl *toAccessor) -> Expr * {
+    Expr *selfExpr;
+    if (VD->getDeclContext()->isTypeContext()) {
+      ConcreteDeclRef selfRef = fromAccessor->getImplicitSelfDecl();
+      selfExpr = new (Context) DeclRefExpr(selfRef, DeclNameLoc(),
+                                           /*implicit*/ true);
+      
+    } else {
+      // self is the empty tuple outside of a type.
+      selfExpr = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
+                                        /*implicit*/ true);
+    }
+
+    // If forwarding from a nonmutating to a mutating accessor, we need to put
+    // `self` in a mutable temporary.
+    auto fromMutating = VD->getDeclContext()->isTypeContext()
+      && fromAccessor->getImplicitSelfDecl()->isSettable(fromAccessor);
+    
+    if (!fromMutating
+        && toAccessor->getImplicitSelfDecl()->isSettable(toAccessor)) {
+      selfExpr->setType(selfTy);
+      auto var = new (Context) VarDecl(/*static*/false, /*let*/false,
+                                       SourceLoc(),
+                                       Context.getIdentifier("tempSelf"),
+                                       selfTy, fromAccessor);
+      auto varPat = new (Context) NamedPattern(var);
+      auto pbd = PatternBindingDecl::create(Context, SourceLoc(),
+                                            StaticSpellingKind::None,
+                                            SourceLoc(),
+                                            varPat, selfExpr,
+                                            fromAccessor);
+      bodyStmts.push_back(var);
+      bodyStmts.push_back(pbd);
+      selfExpr = new (Context) DeclRefExpr(var, DeclNameLoc(),
+                                           /*implicit*/ true);
+    }
+    assert((!fromMutating
+            || toAccessor->getImplicitSelfDecl()->isSettable(toAccessor))
+           && "can't forward from mutating to nonmutating");
+    if (!toAccessor->isMutating()) {
+      selfExpr->setType(selfTy);
+    } else {
+      // Access the base as inout if the accessor is mutating.
+      auto lvTy = LValueType::get(selfTy);
+      selfExpr->setType(lvTy);
+      selfExpr->propagateLValueAccessKind(AccessKind::ReadWrite);
+      auto inoutTy = InOutType::get(selfTy);
+      selfExpr = new (Context) InOutExpr(SourceLoc(),
+                                         selfExpr, inoutTy, /*implicit*/ true);
+    }
+    return selfExpr;
+  };
+  
+  {
+    auto getter = VD->getGetter();
+    assert(getter);
+    validateDecl(getter);
+    
+    Expr *selfExpr = makeSelfExpr(getter, ValueImpl->getGetter());
+    
+    auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
+    auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
+                                                      SourceLoc(),
+                                                      implRef,
+                                                      DeclNameLoc(),
+                                                      /*implicit*/ true);
+    Expr *returnExpr;
+    if (ValueImpl->isSettable(VD->getDeclContext())) {
+      auto valueLVTy = LValueType::get(valueTy);
+      implMemberExpr->setType(valueLVTy);
+      implMemberExpr->propagateLValueAccessKind(AccessKind::Read);
+      returnExpr = new (Context) LoadExpr(implMemberExpr,
+                                          valueTy);
+      returnExpr->setImplicit();
+    } else {
+      implMemberExpr->setType(valueTy);
+      returnExpr = implMemberExpr;
+    }
+    auto returnStmt = new (Context) ReturnStmt(SourceLoc(), returnExpr,
+                                               /*implicit*/ true);
+    bodyStmts.push_back(returnStmt);
+    auto body = BraceStmt::create(Context, SourceLoc(), bodyStmts, SourceLoc(),
+                                  /*implicit*/ true);
+    getter->setBody(body);
+    getter->setBodyTypeCheckedIfPresent();
+  }
+  
+  bodyStmts.clear();
+  
+  if (auto setter = VD->getSetter()) {
+    validateDecl(setter);
+
+    Expr *selfExpr = makeSelfExpr(setter, ValueImpl->getSetter());
+    auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
+    auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
+                                                      SourceLoc(),
+                                                      implRef,
+                                                      DeclNameLoc(),
+                                                      /*implicit*/ true);
+    auto valueLVTy = LValueType::get(valueTy);
+    implMemberExpr->setType(valueLVTy);
+    implMemberExpr->propagateLValueAccessKind(AccessKind::Write);
+
+    ConcreteDeclRef newValueRef = getFirstParamDecl(setter);
+    auto newValueExpr = new (Context) DeclRefExpr(newValueRef, DeclNameLoc(),
+                                                  /*implicit*/ true);
+    newValueExpr->setType(valueTy);
+    
+    auto assign = new (Context) AssignExpr(implMemberExpr, SourceLoc(),
+                                           newValueExpr, /*implicit*/ true);
+    assign->setType(TupleType::getEmpty(Context));
+    
+    bodyStmts.push_back(assign);
+    auto body = BraceStmt::create(Context, SourceLoc(), bodyStmts, SourceLoc(),
+                                  /*implicit*/ true);
+    setter->setBody(body);
+    setter->setBodyTypeCheckedIfPresent();
+  }
+}
 
 void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   assert(VD->getAttrs().hasAttribute<LazyAttr>());
@@ -1216,7 +1539,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
                                          VD->getDeclContext());
   PBD->setImplicit();
   addMemberToContextIfNeeded(PBD, VD->getDeclContext());
-
 
   // Now that we've got the storage squared away, synthesize the getter.
   auto *Get = completeLazyPropertyGetter(VD, Storage, *this);
@@ -1303,11 +1625,151 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->getGetter() || var->isBeingTypeChecked())
     return;
 
-  // Local variables don't get accessors.
-  if (var->getDeclContext()->isLocalContext())
-    return;
-
   assert(!var->hasAccessorFunctions());
+
+  // Introduce accessors for a property with behaviors.
+  if (var->hasBehavior()) {
+    assert(!var->getBehavior()->Conformance.hasValue());
+    
+    // The property should be considered computed by the time we're through.
+    defer {
+      assert(!var->hasStorage() && "behavior var was not made computed");
+    };
+    
+    var->setIsBeingTypeChecked();
+
+    auto behavior = var->getMutableBehavior();
+    auto dc = var->getDeclContext();
+    NormalProtocolConformance *conformance = nullptr;
+    VarDecl *valueProp = nullptr;
+
+    bool mightBeMutating = dc->isTypeContext()
+      && !var->isStatic()
+      && !dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
+
+    auto makeBehaviorAccessors = [&]{
+      FuncDecl *getter;
+      FuncDecl *setter = nullptr;
+      if (valueProp && valueProp->getGetter()) {
+        getter = createGetterPrototype(var, TC);
+        // The getter is mutating if the behavior implementation is, unless
+        // we're in a class or non-instance context.
+        getter->setMutating(mightBeMutating &&
+                            valueProp->getGetter()->isMutating());
+        getter->setAccessibility(var->getFormalAccess());
+        
+        // Make a setter if the behavior property has one.
+        if (auto valueSetter = valueProp->getSetter()) {
+          ParamDecl *newValueParam = nullptr;
+          setter = createSetterPrototype(var, newValueParam, TC);
+          setter->setMutating(mightBeMutating && valueSetter->isMutating());
+          // TODO: max of property and implementation setter visibility?
+          setter->setAccessibility(var->getFormalAccess());
+        }
+      } else {
+        // Even if we couldn't find a value property, still make up a stub
+        // getter and setter, so that subsequent diagnostics make sense for a
+        // computed-ish property.
+        getter = createGetterPrototype(var, TC);
+        getter->setAccessibility(var->getFormalAccess());
+        ParamDecl *newValueParam = nullptr;
+        setter = createSetterPrototype(var, newValueParam, TC);
+        setter->setMutating(false);
+        setter->setAccessibility(var->getFormalAccess());
+      }
+      
+      var->makeComputed(var->getLoc(), getter, setter, nullptr, var->getLoc());
+      
+      // Save the conformance and 'value' decl for later type checking.
+      behavior->Conformance = conformance;
+      behavior->ValueDecl = valueProp;
+      var->setIsBeingTypeChecked(false);
+
+      addMemberToContextIfNeeded(getter, var->getDeclContext());
+      if (setter)
+        addMemberToContextIfNeeded(setter, var->getDeclContext());
+    };
+
+    // Try to resolve the behavior to a protocol.
+    auto behaviorType = TC.resolveType(behavior->ProtocolName, dc,
+                                       TypeResolutionOptions());
+    if (!behaviorType) {
+      return makeBehaviorAccessors();
+    }
+    
+    {
+      // The type must refer to a protocol.
+      auto behaviorProtoTy = behaviorType->getAs<ProtocolType>();
+      if (!behaviorProtoTy) {
+        TC.diagnose(behavior->getLoc(),
+                    diag::property_behavior_not_protocol);
+        behavior->Conformance = (NormalProtocolConformance*)nullptr;
+        return makeBehaviorAccessors();
+      }
+      auto behaviorProto = behaviorProtoTy->getDecl();
+
+      // Validate the behavior protocol and all its extensions so we can do
+      // name lookup.
+      TC.validateDecl(behaviorProto);
+      for (auto ext : behaviorProto->getExtensions()) {
+        TC.validateExtension(ext);
+      }
+      
+      // Look up the behavior protocol's "value" property, or bail if it doesn't
+      // have one. The property's accessors will decide whether the getter
+      // is mutating, and whether there's a setter. We'll type-check to make
+      // sure the property type matches later after validation.
+      auto lookup = TC.lookupMember(dc, behaviorProtoTy, TC.Context.Id_value);
+      for (auto found : lookup) {
+        if (auto foundVar = dyn_cast<VarDecl>(found.Decl)) {
+          if (valueProp) {
+            TC.diagnose(behavior->getLoc(),
+                        diag::property_behavior_protocol_reqt_ambiguous,
+                        TC.Context.Id_value);
+            TC.diagnose(valueProp->getLoc(),
+                        diag::property_behavior_protocol_reqt_here,
+                        TC.Context.Id_value);
+            TC.diagnose(foundVar->getLoc(),
+                        diag::property_behavior_protocol_reqt_here,
+                        TC.Context.Id_value);
+            break;
+          }
+            
+          valueProp = foundVar;
+        }
+      }
+      
+      if (!valueProp) {
+        TC.diagnose(behavior->getLoc(),
+                    diag::property_behavior_protocol_no_value);
+        return makeBehaviorAccessors();
+      }
+      
+      TC.validateDecl(valueProp);
+      
+      // Set up a conformance to represent the behavior instantiation.
+      // The conformance will be on the containing 'self' type, or '()' if the
+      // property is in a non-type context.
+      Type behaviorSelf;
+      Type behaviorInterfaceSelf;
+      if (dc->isTypeContext()) {
+        behaviorSelf = dc->getSelfTypeInContext();
+        behaviorInterfaceSelf = dc->getSelfInterfaceType();
+        assert(behaviorSelf && "type context doesn't have self type?!");
+        if (var->isStatic())
+          behaviorSelf = MetatypeType::get(behaviorSelf);
+      } else {
+        behaviorSelf = behaviorInterfaceSelf = TC.Context.TheEmptyTupleType;
+      }
+      
+      conformance = TC.Context.getBehaviorConformance(behaviorSelf,
+                                            behaviorInterfaceSelf,
+                                            behaviorProto,
+                                            behavior->getLoc(), var,
+                                            ProtocolConformanceState::Checking);
+    }
+    return makeBehaviorAccessors();
+  }
 
   // Lazy properties require special handling.
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1333,11 +1795,16 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     return;
   }
 
+  // Local variables don't otherwise get accessors.
+  if (var->getDeclContext()->isLocalContext())
+    return;
+
   // Implicit properties don't get accessors.
   if (var->isImplicit())
     return;
 
-  auto nominal = var->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = var->getDeclContext()
+                    ->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominal) {
     // Fixed-layout global variables don't get accessors.
     if (var->hasFixedLayout())

@@ -2732,6 +2732,16 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   }
 }
 
+void AbstractStorageDecl::addBehavior(SourceLoc LBracketLoc,
+                                      TypeRepr *Type,
+                                      SourceLoc RBracketLoc) {
+  assert(BehaviorInfo.getPointer() == nullptr && "already set behavior!");
+  auto mem = getASTContext().Allocate(sizeof(BehaviorRecord),
+                                      alignof(BehaviorRecord));
+  auto behavior = new (mem) BehaviorRecord{LBracketLoc, Type, RBracketLoc};
+  BehaviorInfo.setPointer(behavior);
+}
+
 void AbstractStorageDecl::makeComputedWithMutableAddress(SourceLoc lbraceLoc,
                                                 FuncDecl *get, FuncDecl *set,
                                                 FuncDecl *materializeForSet,
@@ -3294,7 +3304,32 @@ ParamDecl::ParamDecl(ParamDecl *PD)
 
 
 /// \brief Retrieve the type of 'self' for the given context.
-static Type getSelfTypeForContext(DeclContext *dc) {
+Type DeclContext::getSelfTypeInContext() const {
+  // For a protocol or extension thereof, the type is 'Self'.
+  if (getAsProtocolOrProtocolExtensionContext()) {
+    // In the parser, generic parameters won't be wired up yet, just give up on
+    // producing a type.
+    if (getGenericParamsOfContext() == nullptr)
+      return Type();
+    return getProtocolSelf()->getArchetype();
+  }
+  return getDeclaredTypeInContext();
+}
+
+/// \brief Retrieve the interface type of 'self' for the given context.
+Type DeclContext::getSelfInterfaceType() const {
+  // For a protocol or extension thereof, the type is 'Self'.
+  if (getAsProtocolOrProtocolExtensionContext()) {
+    if (getGenericParamsOfContext() == nullptr)
+      return Type();
+    return getProtocolSelf()->getDeclaredType();
+  }
+  return getDeclaredInterfaceType();
+}
+
+/// \brief Retrieve the type of 'self' for the given context.
+/// FIXME: Can this be integrated with getSelfTypeInContext above?
+static Type getSelfTypeOfContext(DeclContext *dc) {
   // For a protocol or extension thereof, the type is 'Self'.
   // FIXME: Weird that we're producing an archetype for protocol Self,
   // but the declared type of the context in non-protocol cases.
@@ -3308,7 +3343,6 @@ static Type getSelfTypeForContext(DeclContext *dc) {
   return dc->getDeclaredTypeOfContext();
 }
 
-
 /// Create an implicit 'self' decl for a method in the specified decl context.
 /// If 'static' is true, then this is self for a static method in the type.
 ///
@@ -3319,7 +3353,7 @@ static Type getSelfTypeForContext(DeclContext *dc) {
 ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = getSelfTypeForContext(DC);
+  auto selfType = getSelfTypeOfContext(DC);
 
   // If we have a selfType (i.e. we're not in the parser before we know such
   // things, configure it.
@@ -4100,8 +4134,10 @@ SourceRange FuncDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { StartLoc, BodyRange.End };
 
-  if (auto *B = getBody())
-    return { StartLoc, B->getEndLoc() };
+  if (auto *B = getBody()) {
+    if (!B->isImplicit())
+      return { StartLoc, B->getEndLoc() };
+  }
   if (getBodyResultTypeLoc().hasLocation() &&
       getBodyResultTypeLoc().getSourceRange().End.isValid() &&
       !this->isAccessor())

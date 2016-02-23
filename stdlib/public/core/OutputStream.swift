@@ -36,7 +36,7 @@ extension OutputStream {
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
   /// Write a textual representation of `self` into `target`.
-  func writeTo<Target : OutputStream>(inout target: Target)
+  func write<Target : OutputStream>(inout to target: Target)
 }
 
 /// A type with a customized textual representation.
@@ -186,21 +186,21 @@ internal func _print_unlocked<T, TargetStream : OutputStream>(
   // protocol if its wrapped type conforms to that protocol.
   if _isOptional(value.dynamicType) {
     let debugPrintable = value as! CustomDebugStringConvertible
-    debugPrintable.debugDescription.writeTo(&target)
+    debugPrintable.debugDescription.write(to: &target)
     return
   }
   if case let streamableObject as Streamable = value {
-    streamableObject.writeTo(&target)
+    streamableObject.write(to: &target)
     return
   }
 
   if case let printableObject as CustomStringConvertible = value {
-    printableObject.description.writeTo(&target)
+    printableObject.description.write(to: &target)
     return
   }
 
   if case let debugPrintableObject as CustomDebugStringConvertible = value {
-    debugPrintableObject.debugDescription.writeTo(&target)
+    debugPrintableObject.debugDescription.write(to: &target)
     return
   }
 
@@ -218,7 +218,7 @@ internal func _print_unlocked<T, TargetStream : OutputStream>(
 @inline(never) @effects(readonly)
 func _toStringReadOnlyStreamable<T : Streamable>(x: T) -> String {
   var result = ""
-  x.writeTo(&result)
+  x.write(to: &result)
   return result
 }
 
@@ -236,17 +236,17 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
     value: T, inout _ target: TargetStream
 ) {
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
-    debugPrintableObject.debugDescription.writeTo(&target)
+    debugPrintableObject.debugDescription.write(to: &target)
     return
   }
 
   if let printableObject = value as? CustomStringConvertible {
-    printableObject.description.writeTo(&target)
+    printableObject.description.write(to: &target)
     return
   }
 
   if let streamableObject = value as? Streamable {
-    streamableObject.writeTo(&target)
+    streamableObject.write(to: &target)
     return
   }
 
@@ -282,17 +282,17 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
   }
 
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
-    debugPrintableObject.debugDescription.writeTo(&target)
+    debugPrintableObject.debugDescription.write(to: &target)
     return
   }
 
   if let printableObject = value as? CustomStringConvertible {
-    printableObject.description.writeTo(&target)
+    printableObject.description.write(to: &target)
     return
   }
 
   if let streamableObject = value as? Streamable {
-    streamableObject.writeTo(&target)
+    streamableObject.write(to: &target)
     return
   }
 
@@ -355,21 +355,21 @@ extension String : OutputStream {
 
 extension String : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStream>(inout target: Target) {
+  public func write<Target : OutputStream>(inout to target: Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStream>(inout target: Target) {
+  public func write<Target : OutputStream>(inout to target: Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStream>(inout target: Target) {
+  public func write<Target : OutputStream>(inout to target: Target) {
     target.write(String(Character(self)))
   }
 }
@@ -389,7 +389,7 @@ internal struct _TeeStream<
   { left.write(string); right.write(string) }
 
   mutating func _lock() { left._lock(); right._lock() }
-  mutating func _unlock() { left._unlock(); right._unlock() }
+  mutating func _unlock() { right._unlock(); left._unlock() }
 }
 
 @available(*, unavailable, renamed="OutputStream")
