@@ -47,7 +47,7 @@ int swift::_swift_dl_iterate_phdr(int (*Callback)(struct dl_phdr_info *info,
   BOOL ret = EnumProcessModules(procHandle, modules.data(),
                                 modules.size() * sizeof(HMODULE), &neededSize);
 
-  if (ret == FALSE) {
+  if (!ret) {
     swift::fatalError(/* flags = */ 0, "EnumProcessModules() failed");
     return 0;
   }
@@ -58,7 +58,7 @@ int swift::_swift_dl_iterate_phdr(int (*Callback)(struct dl_phdr_info *info,
                              modules.size() * sizeof(HMODULE), &neededSize);
   }
 
-  if (ret == FALSE) {
+  if (!ret) {
     swift::fatalError(/* flags = */ 0, "EnumProcessModules() failed");
     return 0;
   }
@@ -95,7 +95,7 @@ uint8_t *swift::_swift_getSectionDataPE(void *handle, const char *sectionName,
 
   bool assert1 =
       peStart[ntHeadersOffset] == 'P' && peStart[ntHeadersOffset + 1] == 'E';
-  if (assert1 == false) {
+  if (!assert1) {
     swift::fatalError(/* flags = */ 0, "_swift_getSectionDataPE()'s finding PE failed");
   }
 
