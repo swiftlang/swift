@@ -182,6 +182,8 @@ function(_add_variant_link_flags
     list(APPEND result "-lpthread" "-ldl")
   elseif("${sdk}" STREQUAL "FREEBSD")
     list(APPEND result "-lpthread")
+  elseif("${sdk}" STREQUAL "CYGWIN")
+    # No extra libraries required.
   else()
     list(APPEND result "-lobjc")
   endif()
@@ -967,6 +969,10 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Cygwin")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/windows")
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)

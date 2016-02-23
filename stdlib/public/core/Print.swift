@@ -28,6 +28,11 @@ public func print(
   separator: String = " ",
   terminator: String = "\n"
 ) {
+#if os(Windows)
+  // FIXME: This fix is for 'crash at hook(output.left)' in cygwin.
+  //        Proper fix is needed. see: https://bugs.swift.org/browse/SR-612
+  let _playgroundPrintHook: ((String)->Void)? = nil
+#endif
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
     _print(

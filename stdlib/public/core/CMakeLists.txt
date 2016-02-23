@@ -160,6 +160,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       ${BSD_LIBRARIES})
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
+      OUTPUT_VARIABLE ENV_SYSTEMROOT)
+
+  list(APPEND swift_core_link_flags "${ENV_SYSTEMROOT}/system32/psapi.dll")
+endif()
+
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Private.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Debug.h"
 #include <type_traits>
@@ -40,6 +41,8 @@ static_assert(sizeof(swift_once_t) <= sizeof(void*),
 void swift::swift_once(swift_once_t *predicate, void (*fn)(void *)) {
 #if defined(__APPLE__)
   dispatch_once_f(predicate, nullptr, fn);
+#elif defined(__CYGWIN__)
+  _swift_once_f(predicate, nullptr, fn);
 #else
   // FIXME: We're relying here on the coincidence that libstdc++ uses pthread's
   // pthread_once, and that on glibc pthread_once follows a compatible init
