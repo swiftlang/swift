@@ -91,3 +91,17 @@ public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   }
   return result
 }
+
+extension String {
+  @available(*, unavailable, message="Please use String.init?(validatingUTF8:) instead. Note that it no longer accepts NULL as a valid input. Also consider using String(cString:), that will attempt to repair ill-formed code units.")
+  @warn_unused_result
+  public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="Please use String.init(cString:) instead. Note that it no longer accepts NULL as a valid input. See also String.decodeCString if you need more control.")
+  @warn_unused_result
+  public static func fromCStringRepairingIllFormedUTF8(
+    fatalError("unavailable function can't be called")
+  }
+}
