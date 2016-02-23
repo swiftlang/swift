@@ -82,11 +82,11 @@ public:
   /// as a direct result (and not as an indirect result).
   bool hasGetElementDirectResult() const;
 
-  /// Returns the the wasNativeTypeChecked argument of this
+  /// Returns the wasNativeTypeChecked argument of this
   /// array.get_element call.
   SILValue getTypeCheckedArgument() const;
 
-  /// Returns the the matchingSubscriptCheck argument of this
+  /// Returns the matchingSubscriptCheck argument of this
   /// array.get_element call.
   SILValue getSubscriptCheckArgument() const;
 

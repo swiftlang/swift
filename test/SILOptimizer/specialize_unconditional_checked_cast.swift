@@ -57,7 +57,7 @@ ArchetypeToArchetype(t: b, t2: f)
 // x -> y where x is a super class of y.
 // CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1C_CS_1D___TF37specialize_unconditional_checked_cast20ArchetypeToArchetype{{.*}} : $@convention(thin) (@owned C, @owned D) -> @owned D {
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $C
-// TODO: This should be optimized to a unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
+// TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
 // CHECK: unconditional_checked_cast_addr take_always C in [[STACK]] : $*C to D in
 
 // y -> x where x is a super class of y.
@@ -162,7 +162,7 @@ ArchetypeToConcreteConvertD(t: c)
 // CHECK-DAG: [[STACK_C:%[0-9]+]] = alloc_stack $C
 // CHECK-DAG: store %0 to [[STACK_C]]
 // CHECK-DAG: [[STACK_D:%[0-9]+]] = alloc_stack $D
-// TODO: This should be optimized to a unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
+// TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
 // CHECK-DAG: unconditional_checked_cast_addr take_always C in [[STACK_C]] : $*C to D in [[STACK_D]] : $*D
 // CHECK-DAG: [[LOAD:%[0-9]+]] = load [[STACK_D]]
 // CHECK: return [[LOAD]]
@@ -247,7 +247,7 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // CHECK-DAG: [[STACK_C:%[0-9]+]] = alloc_stack $C
 // CHECK-DAG: store %0 to [[STACK_C]]
 // CHECK-DAG: [[STACK_D:%[0-9]+]] = alloc_stack $D
-// TODO: This should be optimized to a unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
+// TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
 // CHECK-DAG: unconditional_checked_cast_addr take_always C in [[STACK_C]] : $*C to D in [[STACK_D]] : $*D
 // CHECK-DAG: strong_release %1
 // CHECK-DAG: strong_release %0
@@ -366,7 +366,7 @@ ExistentialToArchetype(o: o, t: o)
 // CHECK-DAG: [[STACK_D:%[0-9]+]] = alloc_stack $D
 // CHECK-DAG: [[STACK_C:%[0-9]+]] = alloc_stack $Optional<C>
 // CHECK-DAG: store %0 to [[STACK_C]]
-// TODO: This should be optimized to a unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
+// TODO: This should be optimized to an unconditional_checked_cast without the need of alloc_stack: rdar://problem/24775038
 // CHECK-DAG: unconditional_checked_cast_addr take_always Optional<C> in [[STACK_C]] : $*Optional<C> to D in [[STACK_D]] : $*D
 // CHECK-DAG: [[LOAD:%[0-9]+]] = load [[STACK_D]]
 // CHECK: return [[LOAD]]

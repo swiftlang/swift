@@ -31,7 +31,7 @@ namespace swift {
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
 ///
-/// Specifically, it contains information which paramters and returns are
+/// Specifically, it contains information which parameters and returns are
 /// changed from indirect values to direct values.
 class ReabstractionInfo {
 public:
@@ -121,7 +121,7 @@ private:
 /// Tries to specialize an \p Apply of a generic function. It can be a full
 /// apply site or a partial apply.
 /// Replaced and now dead instructions are returned in \p DeadApplies.
-/// New created functions, like the specialized calle and thunks, are returned
+/// New created functions, like the specialized callee and thunks, are returned
 /// in \p NewFunctions.
 void trySpecializeApplyOfGeneric(ApplySite Apply,
                         llvm::SmallVectorImpl<SILInstruction *> &DeadApplies,
