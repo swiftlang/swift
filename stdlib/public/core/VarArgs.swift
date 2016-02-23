@@ -70,7 +70,7 @@ public func withVaList<R>(args: [CVarArg],
   for a in args {
     builder.append(a)
   }
-  return _withVaList(builder, invoke: f)
+  return _withVaList(builder, invoke: body)
 }
 
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
@@ -78,7 +78,7 @@ internal func _withVaList<R>(
   builder: _VaListBuilder,
   @noescape invoke body: CVaListPointer -> R
 ) -> R {
-  let result = f(builder.va_list())
+  let result = body(builder.va_list())
   _fixLifetime(builder)
   return result
 }
