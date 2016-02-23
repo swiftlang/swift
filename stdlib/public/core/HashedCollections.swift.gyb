@@ -419,8 +419,8 @@ public struct Set<Element : Hashable> :
   /// Returns an iterator over the members.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> SetIterator<Element> {
-    return _variantStorage.iterator()
+  public func makeIterator() -> SetIterator<Element> {
+    return _variantStorage.makeIterator()
   }
 
   //
@@ -1132,8 +1132,8 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Returns an iterator over the `(Key, Value)` pairs.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> DictionaryIterator<Key, Value> {
-    return _variantStorage.iterator()
+  public func makeIterator() -> DictionaryIterator<Key, Value> {
+    return _variantStorage.makeIterator()
   }
 
   //
@@ -3527,7 +3527,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   /// Returns an iterator over the `(Key, Value)` pairs.
   ///
   /// - Complexity: O(1).
-  internal func iterator() -> ${Self}Iterator<${TypeParameters}> {
+  internal func makeIterator() -> ${Self}Iterator<${TypeParameters}> {
     switch self {
     case .Native(let owner):
       return
@@ -4226,6 +4226,11 @@ extension Set {
 
   @available(*, unavailable, renamed="iterator")
   public func generate() -> SetIterator<Element> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="index(of:)")
+  public func indexOf(member: Element) -> Index? {
     fatalError("unavailable function can't be called")
   }
 }

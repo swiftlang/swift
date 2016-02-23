@@ -64,9 +64,9 @@ public struct LazyFilterSequence<Base : Sequence>
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> LazyFilterIterator<Base.Iterator> {
+  public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
-      _base: base.iterator(), whereElementsSatisfy: _include)
+      _base: base.makeIterator(), whereElementsSatisfy: _include)
   }
 
   /// Creates an instance consisting of the elements `x` of `base` for
@@ -214,9 +214,9 @@ public struct LazyFilterCollection<
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> LazyFilterIterator<Base.Iterator> {
+  public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
-      _base: _base.iterator(), whereElementsSatisfy: _predicate)
+      _base: _base.makeIterator(), whereElementsSatisfy: _predicate)
   }
 
   var _base: Base

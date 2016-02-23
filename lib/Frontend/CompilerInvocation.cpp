@@ -164,6 +164,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.DumpAPIPath = A->getValue();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_group_info_path)) {
+    Opts.GroupInfoPath = A->getValue();
+  }
+
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
@@ -835,7 +839,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (UnsupportedOS) {
-    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents.back() : "";
+    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents[2] : "";
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 

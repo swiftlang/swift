@@ -214,8 +214,8 @@ struct SequenceWithCustomUnderestimatedCount : Sequence {
     self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
 
-  func iterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
-    return _data.iterator()
+  func makeIterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
+    return _data.makeIterator()
   }
 
   var underestimatedCount: Int {
@@ -401,7 +401,7 @@ func expectSequencePassthrough<
 >(s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
   let baseType = base.dynamicType
 
-  SequenceLog.iterator.expectIncrement(baseType) { _ = s.iterator() }
+  SequenceLog.makeIterator.expectIncrement(baseType) { _ = s.makeIterator() }
   SequenceLog.underestimatedCount.expectIncrement(baseType) {
     _ = s.underestimatedCount
   }
@@ -528,8 +528,8 @@ tests.test("MapSequence/Passthrough") {
     _ = mapped.underestimatedCount
   }
   // Not exactly passthrough because we wrap the result
-  CollectionLog.iterator.expectIncrement(base.dynamicType) {
-    _ = mapped.iterator()
+  CollectionLog.makeIterator.expectIncrement(base.dynamicType) {
+    _ = mapped.makeIterator()
   }
 }
 
@@ -589,8 +589,8 @@ tests.test("LazyMapCollection/Passthrough") {
     _ = mapped.underestimatedCount
   }
   // Not exactly passthrough because we wrap the result
-  CollectionLog.iterator.expectIncrement(base.dynamicType) {
-    _ = mapped.iterator()
+  CollectionLog.makeIterator.expectIncrement(base.dynamicType) {
+    _ = mapped.makeIterator()
   }
 }
 
@@ -685,7 +685,7 @@ func checkFilterIteratorBase<
   S.Iterator == LazyFilterIterator<I>,
   I.Element == OpaqueValue<Int>
 >(s1: S, _ s2: S) {
-  var iter1 = s1.iterator()
+  var iter1 = s1.makeIterator()
   expectEqual(0, iter1.next()!.value)
   expectEqual(2, iter1.next()!.value)
   expectEqual(4, iter1.next()!.value)
@@ -694,7 +694,7 @@ func checkFilterIteratorBase<
   expectEqual(6, h1.next()!.value)
   expectEqual(7, h1.next()!.value)
 
-  var iter2 = s2.iterator()
+  var iter2 = s2.makeIterator()
   expectEqual(1, iter2.next()!.value)
   expectEqual(3, iter2.next()!.value)
   expectEqual(5, iter2.next()!.value)

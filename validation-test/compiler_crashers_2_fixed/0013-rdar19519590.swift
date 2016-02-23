@@ -62,7 +62,7 @@ struct PiecewiseTransformedSequenceOf<
         self.transformers = transformers
     }
     
-    func iterator() -> Iterator {
-        return PiecewiseTransformedIteratorOf(sourceIterator: inputs.iterator(), transformerIterator: transformers.iterator())
+    func makeIterator() -> Iterator {
+        return PiecewiseTransformedIteratorOf(sourceIterator: inputs.makeIterator(), transformerIterator: transformers.makeIterator())
     }
 }

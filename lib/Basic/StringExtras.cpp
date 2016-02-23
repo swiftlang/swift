@@ -82,13 +82,19 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
   }
 
   // "auto" tends to be used as a verb prefix.
-  if (word.startswith("auto") && word.size() > 4) {
+  if (startsWithIgnoreFirstCase(word, "auto") && word.size() > 4) {
     if (getPartOfSpeech(word.substr(4)) == PartOfSpeech::Verb)
       return PartOfSpeech::Verb;
   }
 
   // "re" can prefix a verb.
-  if (word.startswith("re") && word.size() > 2) {
+  if (startsWithIgnoreFirstCase(word, "re") && word.size() > 2) {
+    if (getPartOfSpeech(word.substr(2)) == PartOfSpeech::Verb)
+      return PartOfSpeech::Verb;
+  }
+
+  // "de" can prefix a verb.
+  if (startsWithIgnoreFirstCase(word, "de") && word.size() > 2) {
     if (getPartOfSpeech(word.substr(2)) == PartOfSpeech::Verb)
       return PartOfSpeech::Verb;
   }
@@ -888,18 +894,6 @@ static bool shouldPlacePrepositionOnArgLabel(StringRef beforePreposition,
       afterPreposition == "Y" ||
       afterPreposition == "Z")
     return false;
-
-  // The preposition "of" binds tightly to the left word, except in
-  // rare cases.
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "of")) {
-    auto following = camel_case::getFirstWord(afterPreposition);
-    if (!camel_case::sameWordIgnoreFirstCase(following, "type") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "types") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "kind") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "size") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "length"))
-      return false;
-  }
 
   return true;
 }

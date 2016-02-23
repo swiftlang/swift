@@ -29,7 +29,8 @@ static const StringRef SupportedConditionalCompilationOSs[] = {
   "watchOS",
   "iOS",
   "Linux",
-  "FreeBSD"
+  "FreeBSD",
+  "Windows"
 };
 
 static const StringRef SupportedConditionalCompilationArches[] = {
@@ -108,6 +109,8 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue("os", "Linux");
   else if (triple.isOSFreeBSD())
     addPlatformConditionValue("os", "FreeBSD");
+  else if (triple.isOSWindows())
+    addPlatformConditionValue("os", "Windows");
   else {
     UnsupportedOS = true;
   }

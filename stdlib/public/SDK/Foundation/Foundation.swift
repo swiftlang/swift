@@ -726,7 +726,7 @@ extension NSArray : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  final public func iterator() -> NSFastEnumerationIterator {
+  final public func makeIterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }
@@ -770,7 +770,7 @@ extension NSSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> NSFastEnumerationIterator {
+  public func makeIterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }
@@ -779,7 +779,7 @@ extension NSOrderedSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> NSFastEnumerationIterator {
+  public func makeIterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }
@@ -817,7 +817,7 @@ extension NSIndexSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> NSIndexSetIterator {
+  public func makeIterator() -> NSIndexSetIterator {
     return NSIndexSetIterator(set: self)
   }
 }
@@ -928,7 +928,7 @@ extension NSDictionary : Sequence {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
         // requires them, but we don't want to paint ourselves into a corner.
-        return (key: key, value: _dictionary.object(for: key)!)
+        return (key: key, value: _dictionary.object(forKey: key)!)
       }
       return nil
     }
@@ -941,7 +941,7 @@ extension NSDictionary : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> Iterator {
+  public func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }
@@ -950,7 +950,7 @@ extension NSEnumerator : Sequence {
   /// Return an *iterator* over the *enumerator*.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> NSFastEnumerationIterator {
+  public func makeIterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }
@@ -1314,7 +1314,7 @@ extension NSCoder {
           unsafeBitCast($0, to: NSObject.self)
         })
     }
-    return self.__decodeObjectOf(classes: classesAsNSObjects, forKey: key)
+    return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)
   }
 
   @warn_unused_result

@@ -182,6 +182,8 @@ function(_add_variant_link_flags
     list(APPEND result "-lpthread" "-ldl")
   elseif("${sdk}" STREQUAL "FREEBSD")
     list(APPEND result "-lpthread")
+  elseif("${sdk}" STREQUAL "CYGWIN")
+    # No extra libraries required.
   else()
     list(APPEND result "-lobjc")
   endif()
@@ -334,6 +336,8 @@ function(_compile_swift_files dependency_target_out_var_name)
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
+    list(APPEND swift_flags "-Xfrontend" "-group-info-path"
+                            "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
       list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
     endif()
@@ -967,6 +971,10 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Cygwin")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/windows")
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)

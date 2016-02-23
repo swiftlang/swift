@@ -296,7 +296,7 @@ func ivars(hive: Hive) {
 class NSObjectable : NSObjectProtocol {
   @objc var description : String { return "" }
   @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
-  @objc(isKindOfClass:) func isKindOf(aClass: AnyClass) -> Bool { return false }
+  @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
 }
 
 

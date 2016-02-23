@@ -188,19 +188,6 @@ bool ArrayAllocation::analyseArrayValueUses() {
   return recursivelyCollectUses(ArrayValue);
 }
 
-static bool doesNotChangeArray(ArraySemanticsCall &C) {
-  switch (C.getKind()) {
-  default: return false;
-  case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
-  case ArrayCallKind::kCheckSubscript:
-  case ArrayCallKind::kCheckIndex:
-  case ArrayCallKind::kGetCount:
-  case ArrayCallKind::kGetCapacity:
-  case ArrayCallKind::kGetElement:
-    return true;
-  }
-}
-
 /// Recursively look at all uses of this definition. Abort if the array value
 /// could escape or be changed. Collect all uses that are calls to array.count.
 bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
@@ -219,7 +206,7 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
 
     // Check array semantic calls.
     ArraySemanticsCall ArrayOp(User);
-    if (ArrayOp && doesNotChangeArray(ArrayOp)) {
+    if (ArrayOp && ArrayOp.doesNotChangeArray()) {
       if (ArrayOp.getKind() == ArrayCallKind::kGetElement)
         GetElementCalls.insert(ArrayOp);
       continue;

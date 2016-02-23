@@ -80,7 +80,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> UnsafeBufferPointerIterator<Element> {
+  public func makeIterator() -> UnsafeBufferPointerIterator<Element> {
     return UnsafeBufferPointerIterator(_position: _position, _end: _end)
   }
 

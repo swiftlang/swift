@@ -37,3 +37,22 @@ bb3:                                              // Preds: bb1 bb2
   return %20 : $Int32                             // id: %22
 }
 
+struct S {}
+
+sil hidden @handle_unreachable : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S, var, name "x"
+  %1 = struct $S ()
+  store %1 to %0 : $*S
+  unreachable
+
+bb1:
+  debug_value_addr %0 : $*S, let, name "newvalue", argno 1
+  br bb2
+
+bb2:
+  %3 = load %0 : $*S
+  dealloc_stack %0 : $*S
+  %4 = tuple ()
+  return %4 : $()
+}

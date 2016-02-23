@@ -641,7 +641,7 @@ extension Sequence where Iterator.Element == String {
       return result
     }
 
-    var iter = iterator()
+    var iter = makeIterator()
     if let first = iter.next() {
       result.append(first)
       while let next = iter.next() {

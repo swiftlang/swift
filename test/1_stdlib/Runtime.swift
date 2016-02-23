@@ -318,6 +318,9 @@ Runtime.test("typeByName") {
   expectTrue(_typeByName("a.SomeSubclass") == SomeSubclass.self)
   // name lookup will be via protocol conformance table
   expectTrue(_typeByName("a.SomeConformingClass") == SomeConformingClass.self)
+  // FIXME: NonObjectiveCBase is slated to die, but I can't think of another
+  // nongeneric public class in the stdlib...
+  expectTrue(_typeByName("Swift.NonObjectiveCBase") == NonObjectiveCBase.self)
 }
 
 Runtime.test("demangleName") {
@@ -1400,7 +1403,7 @@ Reflection.test("DictionaryIterator/Mirror") {
     [ MinimalHashableValue(0) : OpaqueValue(0) ]
 
   var output = ""
-  dump(d.iterator(), to: &output)
+  dump(d.makeIterator(), to: &output)
 
   let expected =
     "- Swift.DictionaryIterator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
@@ -1412,7 +1415,7 @@ Reflection.test("SetIterator/Mirror") {
   let s: Set<MinimalHashableValue> = [ MinimalHashableValue(0)]
 
   var output = ""
-  dump(s.iterator(), to: &output)
+  dump(s.makeIterator(), to: &output)
 
   let expected =
     "- Swift.SetIterator<StdlibUnittest.MinimalHashableValue>\n"

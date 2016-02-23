@@ -19,7 +19,7 @@ func benchCaptureProp<S : Sequence
 >(
   s:S, _ f:(S.Iterator.Element, S.Iterator.Element)->S.Iterator.Element) -> S.Iterator.Element {
 
-  var it = s.iterator()
+  var it = s.makeIterator()
   let initial = it.next()!
   return IteratorSequence(it).reduce(initial, combine: f)
 }

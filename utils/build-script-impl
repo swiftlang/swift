@@ -247,6 +247,9 @@ function set_deployment_target_based_options() {
         linux-powerpc64le)
             SWIFT_HOST_VARIANT_ARCH="powerpc64le"
             ;;
+        cygwin-x86_64)
+            SWIFT_HOST_VARIANT_ARCH="x86_64"
+            ;;
         macosx-* | iphoneos-* | iphonesimulator-* | \
           appletvos-* | appletvsimulator-* | \
             watchos-* | watchsimulator-*)
@@ -802,6 +805,12 @@ case "$(uname -s -m)" in
         )
         ;;
 
+    CYGWIN_NT-10.0\ x86_64)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "cygwin-x86_64"
+        )
+        ;;
+
     *)
         echo "Unknown operating system"
         exit 1
@@ -901,6 +910,10 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             test_this_target=1
             ;;
         freebsd-*)
+            build_for_this_target=1
+            test_this_target=1
+            ;;
+        cygwin-*)
             build_for_this_target=1
             test_this_target=1
             ;;
@@ -1690,6 +1703,24 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             "${LLDB_SOURCE_DIR}"
                         )
                         ;;
+                    CYGWIN_NT-10.0)
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
+                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
+                            "${LLDB_SOURCE_DIR}"
+                        )
+                        ;;
                     Darwin)
                         # Set up flags to pass to xcodebuild
                         lldb_xcodebuild_options=(
@@ -1878,7 +1909,7 @@ tests_busted ()
 
 for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     case ${deployment_target} in
-        linux-* | freebsd-* | macosx-*)
+        linux-* | freebsd-* | macosx-* | cygwin-*)
             # OK, we can run tests directly.
             ;;
         iphoneos-* | iphonesimulator-* | appletvos-* | appletvsimulator-* | watchos-* | watchsimulator-*)
@@ -2105,6 +2136,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                         ;;
                     FreeBSD)
                         ;;
+                    CYGWIN_NT-10.0)
+                        ;;
                     Darwin)
                         set_lldb_build_mode
                         pushd ${LLDB_SOURCE_DIR}
@@ -2147,6 +2180,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 if [[ $(uname -s) == "FreeBSD" ]]; then
                     LIB_TARGET="freebsd"
                     ARCH_FLAG="--arch=\"${SWIFT_HOST_VARIANT_ARCH}\""
+                fi
+                if [[ $(uname -s) == "CYGWIN_NT-10.0" ]]; then
+                    LIB_TARGET="windows"
                 fi
                 if [[ $(uname -s) == "Darwin" ]]; then
                     LIB_TARGET="macosx"

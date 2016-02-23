@@ -121,13 +121,13 @@ func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
 
 func isNativeNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NativeSetStorage").length > 0
+  return className.range(of: "NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NSSet").length > 0 ||
-    className.rangeOf("NSCFSet").length > 0
+  return className.range(of: "NSSet").length > 0 ||
+    className.range(of: "NSCFSet").length > 0
 }
 
 func getBridgedEmptyNSSet() -> NSSet {
@@ -1004,7 +1004,7 @@ SetTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
   var s = getCOWFastSet()
   var identity1 = unsafeBitCast(s, to: Int.self)
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   var items: [Int] = []
   while let value = iter.next() {
     items += [value]
@@ -1017,7 +1017,7 @@ SetTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var s = getCOWSlowSet()
   var identity1 = unsafeBitCast(s, to: Int.self)
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   var items: [Int] = []
   while let value = iter.next() {
     items.append(value.value)
@@ -1903,7 +1903,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isCocoaSet(s))
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   var members: [Int] = []
   while let member = iter.next() {
     members.append((member as! TestObjCKeyTy).value)
@@ -1922,7 +1922,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isNativeSet(s))
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   var members: [Int] = []
   while let member = iter.next() {
     members.append(member.value)
@@ -1941,7 +1941,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isCocoaSet(s))
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   expectEmpty(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
@@ -1956,7 +1956,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isNativeSet(s))
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   expectEmpty(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
@@ -1971,7 +1971,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isCocoaSet(s))
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   var members = [Int]()
   while let member = iter.next() {
     members.append((member as! TestObjCKeyTy).value)
@@ -1990,7 +1990,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isNativeSet(s))
 
-  var iter = s.iterator()
+  var iter = s.makeIterator()
   var members = [Int]()
   while let member = iter.next() as AnyObject? {
     members.append((member as! TestBridgedKeyTy).value)
@@ -2091,7 +2091,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
   var a = nsa as [AnyObject] as! [Set<NSObject>]
   for i in 0..<3 {
     var s = a[i]
-    var iter = s.iterator()
+    var iter = s.makeIterator()
     var items: [Int] = []
     while let value = iter.next() {
       let v = (value as! TestObjCKeyTy).value
@@ -2112,7 +2112,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
   for i in 0..<3 {
     var d = a[i]
-    var iter = d.iterator()
+    var iter = d.makeIterator()
     var items: [Int] = []
     while let value = iter.next() {
       items.append(value.value)
@@ -3680,7 +3680,7 @@ SetTestSuite.test("Operator.Precedence") {
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
   var set = Set([ 1010, 1020, 1030 ])
-  var iter = set.iterator()
+  var iter = set.makeIterator()
   expectOptionalEqual(1010, set.remove(1010))
 
   expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
@@ -3688,7 +3688,7 @@ SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
   var set = Set([ 1010, 1020, 1030 ])
-  var iter = set.iterator()
+  var iter = set.makeIterator()
   expectOptionalEqual(1010, set.remove(1010))
   expectOptionalEqual(1020, set.remove(1020))
   expectOptionalEqual(1030, set.remove(1030))
@@ -3698,7 +3698,7 @@ SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
   var set = Set([ 1010, 1020, 1030 ])
-  var iter = set.iterator()
+  var iter = set.makeIterator()
   set.removeAll(keepingCapacity: false)
 
   expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
@@ -3706,7 +3706,7 @@ SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=false
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
   var set = Set([ 1010, 1020, 1030 ])
-  var iter = set.iterator()
+  var iter = set.makeIterator()
   set.removeAll(keepingCapacity: true)
 
   expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))

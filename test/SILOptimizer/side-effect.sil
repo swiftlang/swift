@@ -51,7 +51,7 @@ enum EP {
 sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
 sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
-sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> @out Int32
+sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<Int32>) -> @out Int32
 sil [_semantics "array.make_mutable"] @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
 sil [_semantics "array.get_element_address"] @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
 sil [_semantics "array.get_count"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
@@ -348,8 +348,8 @@ bb0(%io : $*Int32, %1 : $Array<Int32>):
   %bl = integer_literal $Builtin.Int1, 0
   %b = struct $Bool (%bl : $Builtin.Int1)
 
-  %f = function_ref @get_element_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> @out Int32
-  %a = apply %f(%io, %i, %b, %1) : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> @out Int32
+  %f = function_ref @get_element_Int : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<Int32>) -> @out Int32
+  %a = apply %f(%io, %i, %b, %b, %1) : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<Int32>) -> @out Int32
 
   %r = tuple()
   return %r : $()

@@ -24,7 +24,9 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Basic/Demangle.h"
 #include <cxxabi.h>
+#if !defined(__CYGWIN__)
 #include <execinfo.h>
+#endif
 
 #ifdef __APPLE__
 #include <asl.h>
@@ -36,6 +38,7 @@ enum: uint32_t {
 };
 } // end namespace FatalErrorFlags
 
+#if !defined(__CYGWIN__)
 LLVM_ATTRIBUTE_ALWAYS_INLINE
 static bool
 isIdentifier(char c)
@@ -141,7 +144,7 @@ reportBacktrace(int *count)
 
   return symbols;
 }
-
+#endif
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 #include <malloc/malloc.h>
@@ -199,6 +202,7 @@ reportNow(uint32_t flags, const char *message)
 #ifdef __APPLE__
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
 #endif
+#if !defined(__CYGWIN__)
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
     int count = 0;
@@ -208,6 +212,7 @@ reportNow(uint32_t flags, const char *message)
     }
     free(trace);
   }
+#endif
 }
 
 /// Report a fatal error to system console, stderr, and crash logs.

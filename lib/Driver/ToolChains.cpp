@@ -1241,3 +1241,121 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   return {"clang++", Arguments};
 }
 
+ToolChain::InvocationInfo
+toolchains::Windows::constructInvocation(const InterpretJobAction &job,
+                                         const JobContext &context) const {
+  InvocationInfo II = ToolChain::constructInvocation(job, context);
+
+  SmallString<128> runtimeLibraryPath;
+  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
+
+  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
+                                     ":", options::OPT_L, context.Args,
+                                     runtimeLibraryPath);
+  return II;
+}
+
+ToolChain::InvocationInfo
+toolchains::Windows::constructInvocation(const AutolinkExtractJobAction &job,
+                                         const JobContext &context) const {
+  assert(context.Output.getPrimaryOutputType() == types::TY_AutolinkFile);
+
+  ArgStringList Arguments;
+  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, types::TY_Object);
+
+  Arguments.push_back("-o");
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return {"swift-autolink-extract", Arguments};
+}
+
+ToolChain::InvocationInfo
+toolchains::Windows::constructInvocation(const LinkJobAction &job,
+                                         const JobContext &context) const {
+  const Driver &D = getDriver();
+
+  assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
+         "Invalid linker output type.");
+
+  ArgStringList Arguments;
+
+  switch (job.getKind()) {
+  case LinkKind::None:
+    llvm_unreachable("invalid link kind");
+  case LinkKind::Executable:
+    // Default case, nothing extra needed
+    break;
+  case LinkKind::DynamicLibrary:
+    Arguments.push_back("-shared");
+    break;
+  }
+
+  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, types::TY_Object);
+
+  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgs(Arguments, options::OPT_F);
+
+  if (!context.OI.SDKPath.empty()) {
+    Arguments.push_back("--sysroot");
+    Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
+  }
+
+  // Add the runtime library link path, which is platform-specific and found
+  // relative to the compiler.
+  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
+  // library link path and the standard library module import path don't
+  // need to be the same.
+  llvm::SmallString<128> RuntimeLibPath;
+
+  if (const Arg *A = context.Args.getLastArg(options::OPT_resource_dir)) {
+    RuntimeLibPath = A->getValue();
+  } else {
+    RuntimeLibPath = D.getSwiftProgramPath();
+    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
+    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
+    llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
+  }
+  llvm::sys::path::append(RuntimeLibPath,
+                          getPlatformNameForTriple(getTriple()));
+  Arguments.push_back("-L");
+  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+
+  if (context.Args.hasArg(options::OPT_profile_generate)) {
+    SmallString<128> LibProfile(RuntimeLibPath);
+    llvm::sys::path::remove_filename(LibProfile); // remove platform name
+    llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
+
+    llvm::sys::path::append(LibProfile, "lib", getTriple().getOSName(),
+                            Twine("libclang_rt.profile-") +
+                                getTriple().getArchName() + ".a");
+    Arguments.push_back(context.Args.MakeArgString(LibProfile));
+  }
+
+  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+  // of time the standard library won't be copied.
+  Arguments.push_back("-Xlinker");
+  Arguments.push_back("-rpath");
+  Arguments.push_back("-Xlinker");
+  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+
+  // Always add the stdlib
+  Arguments.push_back("-lswiftCore");
+
+  // Add any autolinking scripts to the arguments
+  for (const Job *Cmd : context.Inputs) {
+    auto &OutputInfo = Cmd->getOutput();
+    if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
+      Arguments.push_back(context.Args.MakeArgString(
+          Twine("@") + OutputInfo.getPrimaryOutputFilename()));
+  }
+
+  // This should be the last option, for convenience in checking output.
+  Arguments.push_back("-o");
+  Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
+
+  return {"clang++", Arguments};
+}

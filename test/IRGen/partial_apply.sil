@@ -535,3 +535,41 @@ entry:
   %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned @box (), @inout ()) -> ()
   return undef : $()
 }
+
+protocol P0 {}
+protocol P1 { associatedtype X : P0 }
+protocol P2 { associatedtype Y : P1 }
+
+sil hidden_external @complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> ()
+
+sil @partial_apply_complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
+bb0(%0 : $Int):
+  %fn = function_ref @complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> ()
+  %pa = partial_apply %fn <T, T.Y, T.Y.X, T.Y.Y, T.Y.Y.X>(%0) : $@convention(thin) <T where T : P2, T.Y : P1, T.Y : P2, T.Y.X : P0, T.Y.Y : P1, T.Y.Y.X : P0> (Int) -> ()
+  %result = tuple ()
+  return %result : $()
+}
+// CHECK-LABEL: define void @partial_apply_complex_generic_function(i64, %swift.type* %T, i8** %T.P2, i8** %T.Y.P2)
+// CHECK:      [[T0:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}}, i64 48, i64 7)
+// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.refcounted* [[T0]] to <{ %swift.refcounted, [24 x i8], %Si }>*
+// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %Si }>, <{ %swift.refcounted, [24 x i8], %Si }>* [[T1]], i32 0, i32 1
+// CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T2]] to %swift.type**
+// CHECK-NEXT: store %swift.type* %T, %swift.type** [[BUFFER]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 1
+// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
+// CHECK-NEXT: store i8** %T.P2, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 2
+// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
+// CHECK-NEXT: store i8** %T.Y.P2, i8*** [[T1]], align 8
+
+// CHECK-LABEL: define internal void @_TPA_complex_generic_function(%swift.refcounted*)
+// CHECK:      [[T0:%.*]] = bitcast %swift.refcounted* %0 to <{ %swift.refcounted, [24 x i8], %Si }>*
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %Si }>, <{ %swift.refcounted, [24 x i8], %Si }>* [[T0]], i32 0, i32 1
+// CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T1]] to %swift.type**
+// CHECK-NEXT: %T = load %swift.type*, %swift.type** [[BUFFER]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 1
+// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
+// CHECK-NEXT: %T.P2 = load i8**, i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 2
+// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
+// CHECK-NEXT: %T.Y.P2 = load i8**, i8*** [[T1]], align 8

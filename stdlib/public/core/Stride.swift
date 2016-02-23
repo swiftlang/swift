@@ -145,7 +145,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> StrideToIterator<Element> {
+  public func makeIterator() -> StrideToIterator<Element> {
     return StrideToIterator(_current: _start, _end: _end, _stride: _stride)
   }
 
@@ -210,7 +210,7 @@ public struct StrideThrough<Element : Strideable> : Sequence, CustomReflectable 
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> StrideThroughIterator<Element> {
+  public func makeIterator() -> StrideThroughIterator<Element> {
     return StrideThroughIterator(
       _current: _start, _end: _end, _stride: _stride, _done: false)
   }

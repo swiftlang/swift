@@ -148,17 +148,17 @@ extension String {
             self._ascii = true
             self._asciiBase = UnsafeBufferPointer<UInt8>(
               start: UnsafePointer(_base._baseAddress),
-              count: _base.count).iterator()
+              count: _base.count).makeIterator()
           } else {
             self._ascii = false
             self._base = UnsafeBufferPointer<UInt16>(
               start: UnsafePointer(_base._baseAddress),
-              count: _base.count).iterator()
+              count: _base.count).makeIterator()
           }
         } else {
           self._ascii = false
           self._baseSet = false
-          self._iterator = _base.iterator()
+          self._iterator = _base.makeIterator()
         }
       }
 
@@ -205,7 +205,7 @@ extension String {
     ///
     /// - Complexity: O(1).
     @warn_unused_result
-    public func iterator() -> Iterator {
+    public func makeIterator() -> Iterator {
       return Iterator(_core)
     }
 

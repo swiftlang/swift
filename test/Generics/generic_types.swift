@@ -72,7 +72,7 @@ func getFirst<R : IteratorProtocol>(r: R) -> R.Element {
 }
 
 func testGetFirst(ir: Range<Int>) {
-  _ = getFirst(ir.iterator()) as Int
+  _ = getFirst(ir.makeIterator()) as Int
 }
 
 struct XT<T> {
@@ -159,7 +159,7 @@ struct SequenceY : Sequence, IteratorProtocol {
   typealias Element = Y
 
   func next() -> Element? { return Y() }
-  func iterator() -> Iterator { return self }
+  func makeIterator() -> Iterator { return self }
 }
 
 func useRangeOfPrintables(roi : RangeOfPrintables<[Int]>) {

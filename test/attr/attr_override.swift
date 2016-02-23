@@ -3,7 +3,7 @@
 @override // expected-error {{'override' can only be specified on class members}} {{1-11=}} expected-error {{'override' is a declaration modifier, not an attribute}} {{1-2=}}
 func virtualAttributeCanNotBeUsedInSource() {}
 
-class MixedKeywordsAndAttributes {
+class MixedKeywordsAndAttributes { // expected-note {{in declaration of 'MixedKeywordsAndAttributes'}}
   // expected-error@+1 {{expected declaration}} expected-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}}
   override @inline(never) func f1() {}
 }

@@ -60,10 +60,10 @@ FilterTests.test("filtering collections") {
 }
 
 FilterTests.test("filtering sequences") {
-  let f0 = (0..<30).iterator().lazy.filter { $0 % 7 == 0 }
+  let f0 = (0..<30).makeIterator().lazy.filter { $0 % 7 == 0 }
   expectEqualSequence([0, 7, 14, 21, 28], f0)
 
-  let f1 = (1..<30).iterator().lazy.filter { $0 % 7 == 0 }
+  let f1 = (1..<30).makeIterator().lazy.filter { $0 % 7 == 0 }
   expectEqualSequence([7, 14, 21, 28], f1)
 }
 

@@ -76,9 +76,9 @@
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
 ///       : LazySequenceProtocol // Chained operations on self are lazy, too
 ///     {
-///       func iterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
+///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.iterator(), combine: combine)
+///           nextElement: initial, base: base.makeIterator(), combine: combine)
 ///       }
 ///       private let initial: ResultElement
 ///       private let base: Base

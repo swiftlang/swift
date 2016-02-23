@@ -42,7 +42,7 @@ let a = Array((2..<8).lazy.map { $0 * 3 })
 print(a)
 
 // Test mapping a sequence
-let s = a.iterator().lazy.map { $0 / 3 }
+let s = a.makeIterator().lazy.map { $0 / 3 }
 // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
 print("<", terminator: "")
 var prefix = ""
@@ -81,7 +81,7 @@ class Counter : IteratorProtocol {
 
 // A Sequence with value semantics
 struct IntRange : Sequence {
-  func iterator() -> Counter {
+  func makeIterator() -> Counter {
     return Counter(start, end)
   }
   

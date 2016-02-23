@@ -50,6 +50,20 @@ public:
   ~GenericUnix() = default;
 };
 
+class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {
+protected:
+  InvocationInfo constructInvocation(const InterpretJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const LinkJobAction &job,
+                                     const JobContext &context) const override;
+
+public:
+  Windows(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~Windows() = default;
+};
+
 } // end namespace toolchains
 } // end namespace driver
 } // end namespace swift

@@ -41,8 +41,8 @@ extension Sequence
   /// Return an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> Base.Iterator {
-    return self._base.iterator()
+  public func makeIterator() -> Base.Iterator {
+    return self._base.makeIterator()
   }
 
   @warn_unused_result
