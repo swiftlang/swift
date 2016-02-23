@@ -53,7 +53,7 @@ extension String {
   /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
   /// UTF-8 code unit sequences.
   @warn_unused_result
-  @available(*, deprecated, message="Use String(validatingCString:) initializer")
+  @available(*, deprecated, message="Use String(cString:) or String(validatingCString:) with nullness check instead")
   public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
     if cs._isNull {
       return nil
