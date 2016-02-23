@@ -389,7 +389,7 @@ internal struct _TeeStream<
   { left.write(string); right.write(string) }
 
   mutating func _lock() { left._lock(); right._lock() }
-  mutating func _unlock() { left._unlock(); right._unlock() }
+  mutating func _unlock() { right._unlock(); left._unlock() }
 }
 
 @available(*, unavailable, renamed="OutputStream")
