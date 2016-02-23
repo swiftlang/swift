@@ -4228,6 +4228,11 @@ extension Set {
   public func generate() -> SetIterator<Element> {
     fatalError("unavailable function can't be called")
   }
+
+  @available(*, unavailable, renamed="index(of:)")
+  public func indexOf(member: Element) -> Index? {
+    fatalError("unavailable function can't be called")
+  }
 }
 
 extension Dictionary {
