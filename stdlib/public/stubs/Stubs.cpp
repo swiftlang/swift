@@ -32,7 +32,7 @@
 #if defined(__CYGWIN__)
 #include <sstream>
 #include <cmath>
-#define  fmodl(lhs, rhs)  std::fmod(lhs, rhs)
+#define fmodl(lhs, rhs) std::fmod(lhs, rhs)
 #else
 #include <xlocale.h>
 #endif
@@ -171,7 +171,7 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
   ValueStream.precision(Precision);
   ValueStream.imbue(std::locale::classic());
   ValueStream << Value;
-  std::string  ValueString(ValueStream.str());
+  std::string ValueString(ValueStream.str());
   size_t i = ValueString.length();
 
   if (i < BufferLength) {
