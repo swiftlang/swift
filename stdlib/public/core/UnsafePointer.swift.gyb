@@ -186,7 +186,6 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
-  @swift3_migration(renamed="take()")
   @warn_unused_result
   public func move() -> Memory {
     return Builtin.take(_rawValue)
