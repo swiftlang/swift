@@ -29,7 +29,7 @@ extension RandomAccessCollection {
     rangeEnd: Index,
     boundsStart: Index,
     boundsEnd: Index
-    ) {
+  ) {
       fatalError("implement") // TODO: swift-3-indexing-model - implement
   }
   
