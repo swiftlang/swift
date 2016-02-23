@@ -102,8 +102,7 @@ ImportedObjCGenerics.test("ProtocolConstraints") {
   }
 
   let cs = CopyingContainer<NSString>(object: "Happy 2012")
-  // TODO: Fixed in next commit.
-  // expectEqual("Happy 2012", copyContainerContents(cs))
+  expectEqual("Happy 2012", copyContainerContents(cs))
 }
 
 ImportedObjCGenerics.test("ClassConstraints") {

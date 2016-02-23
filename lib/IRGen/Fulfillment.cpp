@@ -236,6 +236,9 @@ bool FulfillmentMap::searchBoundGenericTypeMetadata(IRGenModule &IGM,
                                                     unsigned source,
                                                     MetadataPath &&path,
                                          const InterestingKeysCallback &keys) {
+  if (type->getDecl()->hasClangNode())
+    return false;
+
   bool hadFulfillment = false;
 
   GenericTypeRequirements requirements(IGM, type->getDecl());
