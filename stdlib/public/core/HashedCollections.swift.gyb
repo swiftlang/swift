@@ -360,6 +360,7 @@ public struct Set<Element : Hashable> :
 
   /// Returns the `Index` of a given member, or `nil` if the member is not
   /// present in the set.
+  @swift3_migration(renamed="index(of:)")
   @warn_unused_result
   public func indexOf(member: Element) -> Index? {
     return _variantStorage.indexForKey(member)

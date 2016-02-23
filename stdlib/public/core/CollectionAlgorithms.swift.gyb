@@ -37,6 +37,7 @@ extension CollectionType where ${GElement} : Equatable {
   /// `value` is not found.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="index(of:)")
   @warn_unused_result
   public func indexOf(element: ${GElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
@@ -57,6 +58,7 @@ extension CollectionType {
   /// corresponding value, or `nil` if such value is not found.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="index(where:)")
   @warn_unused_result
   public func indexOf(
     @noescape predicate: (${GElement}) throws -> Bool
