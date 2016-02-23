@@ -90,8 +90,8 @@ bb0(%0 : $*Self):
 
   // CHECK-NEXT: [[WTABLE:%.*]] = bitcast i8** %SelfWitnessTable to i8*
   // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
-  // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, [{{8|16}} x i8], i8* }>*
-  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{8|16}} x i8], i8* }>, <{ %swift.refcounted, [{{8|16}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
+  // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, [{{4|8}} x i8], i8* }>*
+  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], i8* }>, <{ %swift.refcounted, [{{4|8}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
   // CHECK-NEXT: store i8* [[WTABLE]], i8** [[WTABLE_ADDR]]
 
   %fn3 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
