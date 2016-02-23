@@ -48,6 +48,7 @@ class GenericSpecializer : public SILFunctionTransform {
 } // end anonymous namespace
 
 bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
+  bool Changed = false;
   llvm::SmallVector<SILInstruction *, 8> DeadApplies;
 
   for (auto &BB : F) {
@@ -70,24 +71,41 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       // We have a call that can potentially be specialized, so
       // attempt to do so.
 
-      llvm::SmallVector<SILFunction *, 2> NewFunctions;
-      trySpecializeApplyOfGeneric(Apply, DeadApplies, NewFunctions);
+      // The specializer helper function currently expects a collector
+      // argument, but we aren't going to make use of the results so
+      // we'll have our filter always return false;
+      auto Filter = [](SILInstruction *I) -> bool { return false; };
+      CloneCollector Collector(Filter);
 
-      // If calling the specialization utility resulted in new functions
-      // (as opposed to returning a previous specialization), we need to notify
-      // the pass manager so that the new functions get optimized.
-      for (SILFunction *NewF : reverse(NewFunctions)) {
-        notifyPassManagerOfFunction(NewF);
+      SILFunction *SpecializedFunction;
+
+      auto Specialized =
+          trySpecializeApplyOfGeneric(Apply, SpecializedFunction, Collector);
+
+      if (Specialized) {
+        Changed = true;
+
+        // If calling the specialization utility resulted in a new
+        // function (as opposed to returning a previous
+        // specialization), we need to notify the pass manager so that
+        // the new function gets optimized.
+        if (SpecializedFunction)
+          notifyPassManagerOfFunction(SpecializedFunction);
+
+        auto *AI = Apply.getInstruction();
+
+        if (!isa<TryApplyInst>(AI))
+          AI->replaceAllUsesWith(Specialized.getInstruction());
+
+        DeadApplies.push_back(AI);
       }
     }
   }
 
   // Remove all the now-dead applies.
-  bool Changed = false;
   while (!DeadApplies.empty()) {
     auto *AI = DeadApplies.pop_back_val();
     recursivelyDeleteTriviallyDeadInstructions(AI, true);
-    Changed = true;
   }
 
   return Changed;
