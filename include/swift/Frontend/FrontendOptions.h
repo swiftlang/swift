@@ -125,6 +125,9 @@ public:
   /// The path to output swift interface files for the compiled source files.
   std::string DumpAPIPath;
 
+  /// The path to collect the group information for the compiled source files.
+  std::string GroupInfoPath;
+
   enum ActionType {
     NoneAction, ///< No specific action
     Parse, ///< Parse and type-check only

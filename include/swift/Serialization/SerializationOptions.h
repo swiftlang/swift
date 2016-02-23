@@ -30,6 +30,7 @@ namespace swift {
     const char *OutputPath = nullptr;
     const char *DocOutputPath = nullptr;
 
+    StringRef GroupInfoPath;
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
     ArrayRef<std::string> ExtraClangOptions;

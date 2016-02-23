@@ -338,7 +338,8 @@ public:
                             const SerializationOptions &options);
 
   /// Serialize module documentation to the given stream.
-  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC);
+  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                               StringRef GroupInfoPath);
 
   /// Records the use of the given Type.
   ///

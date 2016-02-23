@@ -336,6 +336,8 @@ function(_compile_swift_files dependency_target_out_var_name)
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
+    list(APPEND swift_flags "-Xfrontend" "-group-info-path"
+                            "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
       list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
     endif()
