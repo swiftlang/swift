@@ -1344,18 +1344,13 @@ function(add_swift_library name)
   # All Swift code depends on the standard library, except for the standard
   # library itself.
   if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
-    list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core SwiftOnoneSupport)
-  endif()
-
-  if("${name}" STREQUAL "swiftSwiftOnoneSupport")
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-      SwiftOnoneSupport)
+    list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
   endif()
 
   if((NOT "${SWIFT_BUILD_STDLIB}") AND
      (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
     list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-      Core SwiftOnoneSupport)
+        Core)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
