@@ -26,6 +26,7 @@ set(SWIFTLIB_ESSENTIAL
   Arrays.swift.gyb
   Assert.swift
   AssertCommon.swift
+  BidirectionalCollection.swift
   Bool.swift
   Boolean.swift
   BridgeObjectiveC.swift
@@ -75,6 +76,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   Print.swift
   REPL.swift
+  RandomAccessCollection.swift
   Range.swift
   RangeReplaceableCollection.swift
   Reflection.swift
