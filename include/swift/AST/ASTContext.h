@@ -449,14 +449,14 @@ public:
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
 
-  /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValueAsBool.
-  FuncDecl *getDoesOptionalHaveValueAsBoolDecl(LazyResolver *resolver,
-                                               OptionalTypeKind kind) const;
+  /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_isSome.
+  FuncDecl *getOptionalIsSomeDecl(LazyResolver *resolver,
+                                  OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of
-  /// Swift._get{,ImplicitlyUnwrapped}OptionalValue.
-  FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
-                                    OptionalTypeKind kind) const;
+  /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_unwrapped.
+  FuncDecl *getOptionalUnwrappedDecl(LazyResolver *resolver,
+                                     OptionalTypeKind kind) const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.

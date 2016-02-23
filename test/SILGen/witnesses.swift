@@ -365,7 +365,7 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
   
-  // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue{{.*}} : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
+  // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x{{.*}} : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
   // CHECK:   [[RESULT_TEMP:%[0-9]+]] = alloc_stack $IUOFailableModel
   // CHECK:   apply [[FORCE_FN]]<IUOFailableModel>([[RESULT_TEMP]], [[IUO_RESULT_TEMP]]) : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
   // CHECK:   [[RESULT:%[0-9]+]] = load [[RESULT_TEMP]] : $*IUOFailableModel
@@ -408,7 +408,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementS_FS1_C{{.*}}
-  // CHECK: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue{{.*}}
+  // CHECK: function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
   // CHECK: return [[RESULT:%[0-9]+]] : $IUOFailableClassModel
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_27IUOFailableClassRequirementS_FS1_C{{.*}}

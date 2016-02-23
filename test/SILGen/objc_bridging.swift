@@ -17,7 +17,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:  [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+// CHECK:  [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:  return [[NATIVE]] 
@@ -39,7 +39,7 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+// CHECK:   [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
@@ -160,7 +160,7 @@ func callBar() -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+// CHECK:   [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]

@@ -160,11 +160,11 @@ struct ASTContext::Implementation {
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// func _doesOptionalHaveValueAsBool<T>(v: Optional<T>) -> Bool
-  FuncDecl *DoesOptionalHaveValueAsBoolDecls[NumOptionalTypeKinds] = {};
+  /// func _stdlib_Optional_isSome<T>(v: Optional<T>) -> Bool
+  FuncDecl *OptionalIsSomeSomeDecls[NumOptionalTypeKinds] = {};
 
-  /// func _getOptionalValue<T>(v : Optional<T>) -> T
-  FuncDecl *GetOptionalValueDecls[NumOptionalTypeKinds] = {};
+  /// func _stdlib_Optional_unwrapped<T>(v: Optional<T>) -> T
+  FuncDecl *OptionalUnwrappedDecls[NumOptionalTypeKinds] = {};
 
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.
   EnumDecl *ImplicitlyUnwrappedOptionalDecl = nullptr;
@@ -1096,14 +1096,14 @@ static unsigned asIndex(OptionalTypeKind optionalKind) {
     ? (PREFIX "Optional" SUFFIX)                       \
     : (PREFIX "ImplicitlyUnwrappedOptional" SUFFIX))
 
-FuncDecl *ASTContext::getDoesOptionalHaveValueAsBoolDecl(
+FuncDecl *ASTContext::getOptionalIsSomeDecl(
     LazyResolver *resolver, OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.DoesOptionalHaveValueAsBoolDecls[asIndex(optionalKind)];
+  auto &cache = Impl.OptionalIsSomeSomeDecls[asIndex(optionalKind)];
   if (cache)
     return cache;
 
   auto name =
-      getOptionalIntrinsicName("_does", optionalKind, "HaveValueAsBool");
+      getOptionalIntrinsicName("_stdlib_", optionalKind, "_isSome");
 
   // Look for a generic function.
   CanType input, output, param;
@@ -1125,12 +1125,13 @@ FuncDecl *ASTContext::getDoesOptionalHaveValueAsBoolDecl(
   return decl;
 }
 
-FuncDecl *ASTContext::getGetOptionalValueDecl(LazyResolver *resolver,
+FuncDecl *ASTContext::getOptionalUnwrappedDecl(LazyResolver *resolver,
                                          OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.GetOptionalValueDecls[asIndex(optionalKind)];
+  auto &cache = Impl.OptionalUnwrappedDecls[asIndex(optionalKind)];
   if (cache) return cache;
 
-  auto name = getOptionalIntrinsicName("_get", optionalKind, "Value");
+  auto name = getOptionalIntrinsicName(
+      "_stdlib_", optionalKind, "_unwrapped");
 
   // Look for the function.
   CanType input, output, param;
@@ -1152,7 +1153,8 @@ FuncDecl *ASTContext::getGetOptionalValueDecl(LazyResolver *resolver,
 
 static bool hasOptionalIntrinsics(const ASTContext &ctx, LazyResolver *resolver,
                                   OptionalTypeKind optionalKind) {
-  return ctx.getGetOptionalValueDecl(resolver, optionalKind);
+  return ctx.getOptionalIsSomeDecl(resolver, optionalKind) &&
+    ctx.getOptionalUnwrappedDecl(resolver, optionalKind);
 }
 
 bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {

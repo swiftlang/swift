@@ -102,33 +102,33 @@ extension Optional : CustomDebugStringConvertible {
   }
 }
 
-// Intrinsics for use by language features.
 @_transparent
+@warn_unused_result
 public // COMPILER_INTRINSIC
-func _doesOptionalHaveValueAsBool<Wrapped>(v: Wrapped?) -> Bool {
-  return v != nil
+func _stdlib_Optional_isSome<Wrapped>(`self`: Wrapped?) -> Bool {
+  return `self` != nil
 }
 
 @_transparent
+@warn_unused_result
 public // COMPILER_INTRINSIC
-func _diagnoseUnexpectedNilOptional() {
-  _preconditionFailure(
-                "unexpectedly found nil while unwrapping an Optional value")
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
-func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
-  switch v {
-  case let x?:
-    return x
+func _stdlib_Optional_unwrapped<Wrapped>(`self`: Wrapped?) -> Wrapped {
+  switch `self` {
+  case let wrapped?:
+    return wrapped
   case .none:
     _preconditionFailure(
       "unexpectedly found nil while unwrapping an Optional value")
   }
 }
 
-// Comparisons
+@_transparent
+public // COMPILER_INTRINSIC
+func _diagnoseUnexpectedNilOptional() {
+  _preconditionFailure(
+    "unexpectedly found nil while unwrapping an Optional value")
+}
+
 @warn_unused_result
 public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {

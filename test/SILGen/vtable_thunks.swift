@@ -91,7 +91,7 @@ class F: D {
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuo
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
-// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
+// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
 // CHECK:         apply [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%[0-9]*]],
 // CHECK:         [[UNWRAP_Y:%.*]] = load [[UNWRAP_Y_ADDR]]
 // CHECK:         [[RES:%.*]] = apply {{%.*}}([[WRAP_X]], [[UNWRAP_Y]], %2, %3)
