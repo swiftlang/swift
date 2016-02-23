@@ -24,7 +24,7 @@ public func asHex<
 where
   S.Iterator.Element : Integer
 >(x: S) -> String {
-  return "[ " + x.lazy.map { asHex($0) }.join(separator: ", ") + " ]"
+  return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
 }
 
 /// Compute the prefix sum of `seq`.
@@ -83,7 +83,7 @@ public func withArrayOfCStrings<R>(
   var argsBuffer: [UInt8] = []
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
-    argsBuffer.appendContentsOf(arg.utf8)
+    argsBuffer.appendContents(of: arg.utf8)
     argsBuffer.append(0)
   }
 

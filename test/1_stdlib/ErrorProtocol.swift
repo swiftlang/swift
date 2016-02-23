@@ -55,8 +55,8 @@ ErrorProtocolTests.test("reflection") {
     let e: ErrorProtocol = ne
 
     var neDump = "", eDump = ""
-    dump(ne, &neDump)
-    dump(e, &eDump)
+    dump(ne, to: &neDump)
+    dump(e, to: &eDump)
 
     expectEqual(eDump, neDump)
   }

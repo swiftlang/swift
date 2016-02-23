@@ -263,10 +263,10 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence where S.Iterator.Element == UnicodeScalar
-  >(newElements: S) {
-    _core.appendContentsOf(newElements.lazy.flatMap { $0.utf16 })
+  >(of newElements: S) {
+    _core.appendContents(of: newElements.lazy.flatMap { $0.utf16 })
   }
   /// Replace the elements within `bounds` with `newElements`.
   ///

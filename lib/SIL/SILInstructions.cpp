@@ -138,7 +138,7 @@ static void declareWitnessTable(SILModule &Mod,
                                 ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) return;
   auto C = conformanceRef.getConcrete();
-  if (!Mod.lookUpWitnessTable(C, false).first)
+  if (!Mod.lookUpWitnessTable(C, false))
     Mod.createWitnessTableDeclaration(C,
         TypeConverter::getLinkageForProtocolConformance(
                                                   C->getRootNormalConformance(),
@@ -907,14 +907,6 @@ SelectValueInst::SelectValueInst(SILDebugLocation Loc, SILValue Operand,
   if (auto OperandTy = Operand->getType().getAs<BuiltinIntegerType>()) {
     OperandBitWidth = OperandTy->getGreatestWidth();
   }
-
-  for (unsigned i = 0; i < NumCases; ++i) {
-    auto *IL = dyn_cast<IntegerLiteralInst>(CaseValuesAndResults[i * 2]);
-    assert(IL && "select_value case value should be of an integer type");
-    assert(IL->getValue().getBitWidth() == OperandBitWidth &&
-           "select_value case value is not same bit width as operand");
-    (void)IL;
-  }
 }
 
 SelectValueInst::~SelectValueInst() {
@@ -1178,6 +1170,10 @@ DynamicMethodBranchInst::create(SILDebugLocation Loc, SILValue Operand,
 SILLinkage
 TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
                                                 ForDefinition_t definition) {
+  // Behavior conformances are always private.
+  if (C->isBehaviorConformance())
+    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+  
   // If the conformance is imported from Clang, give it shared linkage.
   auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
   auto typeUnit = typeDecl->getModuleScopeContext();

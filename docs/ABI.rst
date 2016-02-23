@@ -1042,6 +1042,14 @@ declared the conformance.
 
 ::
 
+  // Property behavior conformance
+  protocol-conformance ::= ('u' generic-signature)?
+                           'b' identifier context identifier protocol
+
+Property behaviors are implemented using private protocol conformances.
+
+::
+
   generic-signature ::= (generic-param-count+)? ('R' requirement*)? 'r'
   generic-param-count ::= 'z'       // zero parameters
   generic-param-count ::= index     // N+1 parameters

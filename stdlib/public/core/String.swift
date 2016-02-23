@@ -589,11 +589,11 @@ extension String {
     }
   }
   
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence where S.Iterator.Element == Character
-  >(newElements: S) {
+  >(of newElements: S) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.appendContentsOf(newElements)
+      (inout v: CharacterView) in v.appendContents(of: newElements)
     }
   }
   
@@ -610,9 +610,9 @@ extension Sequence where Iterator.Element == String {
   /// Interpose the `separator` between elements of `self`, then concatenate
   /// the result.  For example:
   ///
-  ///     ["foo", "bar", "baz"].join(separator: "-|-") // "foo-|-bar-|-baz"
+  ///     ["foo", "bar", "baz"].joined(separator: "-|-") // "foo-|-bar-|-baz"
   @warn_unused_result
-  public func join(separator separator: String) -> String {
+  public func joined(separator separator: String) -> String {
     var result = ""
 
     // FIXME(performance): this code assumes UTF-16 in-memory representation.
@@ -988,7 +988,14 @@ extension String.Index {
 
 extension String {
   @available(*, unavailable, renamed="append")
-  public mutating func appendContentsOf(other: String) {
+  public mutating func appendContents(of other: String) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="appendContents(of:)")
+  public mutating func appendContentsOf<
+    S : Sequence where S.Iterator.Element == Character
+  >(newElements: S) {
     fatalError("unavailable function can't be called")
   }
 

@@ -27,7 +27,8 @@ class Foo<Bar> {
       }
 
       func two<Baz>(x: Baz) {
-    // CHECK: !DILocalVariable(name: "$swift.type.Bar"
+    // TODO: leave breadcrumbs for how to dynamically derive T in the debugger
+    // CHECK- FIXME: !DILocalVariable(name: "$swift.type.Bar"
     // CHECK: !DILocalVariable(name: "$swift.type.Baz"
       }
 }
@@ -37,5 +38,5 @@ class Foo<Bar> {
 // RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix=CHECK-LLVM
 // CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "x"
 // CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.T"
-// CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.Bar"
+// CHECK- FIXME -LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.Bar"
 // CHECK-LLVM-DAG:  .debug_str[{{.*}}] = "$swift.type.Baz"

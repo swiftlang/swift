@@ -153,11 +153,11 @@ public struct LoggingRangeReplaceableCollection<
     base.append(newElement)
   }
 
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence where S.Iterator.Element == Base.Iterator.Element
-  >(newElements: S) {
+  >(of newElements: S) {
     Log.appendContentsOf[selfType] += 1
-    base.appendContentsOf(newElements)
+    base.appendContents(of: newElements)
   }
 
   public mutating func insert(

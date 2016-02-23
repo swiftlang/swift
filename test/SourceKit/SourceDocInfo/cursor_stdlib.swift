@@ -27,7 +27,7 @@ func foo2(var a : [S1]) {
 
 // RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-ITERATOR %s
 // CHECK-ITERATOR-NOT: _AnyIteratorBase
-// CHECK-ITERATOR: <Group>Collection</Group>
+// CHECK-ITERATOR: <Group>Lazy Views</Group>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT1 %s
 // CHECK-REPLACEMENT1: <Group>Collection</Group>

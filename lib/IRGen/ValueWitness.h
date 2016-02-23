@@ -372,6 +372,8 @@ static inline bool isValueWitnessFunction(ValueWitness witness) {
         && ord <= unsigned(ValueWitness::Last_EnumValueWitness));
 }
 
+const char *getValueWitnessName(ValueWitness witness);
+
 } // end namespace irgen
 } // end namespace swift
 

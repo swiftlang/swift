@@ -458,7 +458,7 @@ func testSingleQuoteStringLiterals() {
 
 // <rdar://problem/17128913>
 var s = ""
-s.appendContentsOf(["x"])
+s.appendContents(of: ["x"])
 
 //===----------------------------------------------------------------------===//
 // InOut arguments
@@ -674,8 +674,8 @@ func invalidDictionaryLiteral() {
 
     
 // FIXME: The issue here is a type compatibility problem, there is no ambiguity.
-[4].join(separator: [1]) // expected-error {{type of expression is ambiguous without more context}}
-[4].join(separator: [[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
+[4].joined(separator: [1]) // expected-error {{type of expression is ambiguous without more context}}
+[4].joined(separator: [[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons

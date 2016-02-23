@@ -1588,8 +1588,8 @@ public:
       auto conformance = AMI->getConformance().getConcrete();
       require(conformance->getType()->isEqual(AMI->getLookupType()),
               "concrete type lookup requires conformance that matches type");
-      require(AMI->getModule().lookUpWitnessTable(conformance, false).first,
-              "Could not find witness table for conformance.");
+      require(AMI->getModule().lookUpWitnessTable(conformance, false),
+              "Could not find witness table for conformance");
     }
   }
 
@@ -1949,7 +1949,7 @@ public:
 
       if (conformances[i].isConcrete()) {
         auto conformance = conformances[i].getConcrete();
-        require(F.getModule().lookUpWitnessTable(conformance, false).first,
+        require(F.getModule().lookUpWitnessTable(conformance, false),
                 "Could not find witness table for conformance.");
 
       }
@@ -2478,9 +2478,12 @@ public:
 
       seenCaseValues.insert(elt);
 
+      requireSameType(I->getOperand()->getType(), casevalue->getType(),
+                      "select_value case value must match type of operand");
+
       // The result value must match the type of the instruction.
       requireSameType(result->getType(), I->getType(),
-                    "select_value case operand must match type of instruction");
+                    "select_value case result must match type of instruction");
     }
 
     require(I->hasDefault(),

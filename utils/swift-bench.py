@@ -312,10 +312,10 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
 
 
 class Test:
-  def __init__(self, name, source, processedSource, binary):
+  def __init__(self, name, source, processed_source, binary):
     self.name = name
     self.source = source
-    self.processedSource = processedSource
+    self.processed_source = processed_source
     self.binary = binary
     self.status = ""
 

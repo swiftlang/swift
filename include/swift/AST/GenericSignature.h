@@ -221,6 +221,17 @@ public:
   /// constraint.
   Type getConcreteType(Type type, ModuleDecl &mod);
 
+  /// Return the preferred representative of the given type parameter within
+  /// this generic signature.  This may yield a concrete type or a
+  /// different type parameter.
+  Type getRepresentative(Type type, ModuleDecl &mod);
+
+  /// Return whether two type parameters represent the same type under this
+  /// generic signature.
+  ///
+  /// The type parameters must be known to not be concrete within the context.
+  bool areSameTypeParameterInContext(Type type1, Type type2, ModuleDecl &mod);
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);

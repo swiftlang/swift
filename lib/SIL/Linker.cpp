@@ -231,7 +231,7 @@ bool SILLinkerVisitor::visitProtocolConformance(
 
   // Otherwise try and lookup a witness table for C.
   auto C = ref.getConcrete();
-  SILWitnessTable *WT = Mod.lookUpWitnessTable(C).first;
+  SILWitnessTable *WT = Mod.lookUpWitnessTable(C);
 
   // If we don't find any witness table for the conformance, bail and return
   // false.

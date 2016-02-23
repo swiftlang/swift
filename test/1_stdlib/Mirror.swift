@@ -37,7 +37,7 @@ extension Mirror {
     return "[" +
       children.lazy
         .map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
-        .join(separator: ", ")
+        .joined(separator: ", ")
       + "]"
   }
 }

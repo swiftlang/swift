@@ -649,9 +649,9 @@ extension _StringCore : RangeReplaceableCollection {
             : representableAsASCII() && !newElements.contains { $0 > 0x7f } ? 1
             : 2
         ))
-      r.appendContentsOf(self[0..<bounds.startIndex])
-      r.appendContentsOf(newElements)
-      r.appendContentsOf(self[bounds.endIndex..<count])
+      r.appendContents(of: self[0..<bounds.startIndex])
+      r.appendContents(of: newElements)
+      r.appendContents(of: self[bounds.endIndex..<count])
       self = r
     }
   }
@@ -674,9 +674,9 @@ extension _StringCore : RangeReplaceableCollection {
       minElementWidth: 1)
   }
 
-  public mutating func appendContentsOf<
+  public mutating func appendContents<
     S : Sequence where S.Iterator.Element == UTF16.CodeUnit
-  >(s: S) {
+  >(of s: S) {
     var width = elementWidth
     if width == 1 {
       if let hasNonAscii = s._preprocessingPass({

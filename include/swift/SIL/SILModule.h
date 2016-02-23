@@ -487,9 +487,9 @@ public:
   ///        table.
   /// \arg deserializeLazily If we cannot find the witness table should we
   ///                        attempt to lazily deserialize it.
-  std::pair<SILWitnessTable *, ArrayRef<Substitution>>
+  SILWitnessTable *
   lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily=true);
-  std::pair<SILWitnessTable *, ArrayRef<Substitution>>
+  SILWitnessTable *
   lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
 
   /// Attempt to lookup \p Member in the witness table for C.

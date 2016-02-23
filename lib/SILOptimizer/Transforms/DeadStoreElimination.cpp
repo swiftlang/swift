@@ -1041,6 +1041,11 @@ void DSEContext::processUnknownReadInstForDSE(SILInstruction *I) {
 }
 
 void DSEContext::processUnknownReadInst(SILInstruction *I, DSEKind Kind) {
+  // If this is a release on a guaranteed parameter, it can not call deinit,
+  // which might read or write memory.
+  if (isGuaranteedParamRelease(I))
+    return;
+
   // Are we building genset and killset.
   if (isBuildingGenKillSet(Kind)) {
     processUnknownReadInstForGenKillSet(I);

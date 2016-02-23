@@ -16,6 +16,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 
+#include <vector>
+
 namespace swift {
 class ASTContext;
 class ASTPrinter;
@@ -37,6 +39,9 @@ enum class ModuleTraversal : unsigned {
 
 /// Options used to describe the traversal of a module for printing.
 typedef OptionSet<ModuleTraversal> ModuleTraversalOptions;
+
+ArrayRef<StringRef> collectModuleGroups(ModuleDecl *M,
+                                        std::vector<StringRef> &Scratch);
 
 void printModuleInterface(ModuleDecl *M,
                           ModuleTraversalOptions TraversalOptions,
