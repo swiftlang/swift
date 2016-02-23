@@ -87,7 +87,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> UnsafeBufferPointerGenerator<Element> {
     return UnsafeBufferPointerGenerator(position: _position, end: _end)
   }

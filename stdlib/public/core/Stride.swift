@@ -152,7 +152,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> StrideToGenerator<Element> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -229,7 +229,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> StrideThroughGenerator<Element> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)

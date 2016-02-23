@@ -207,7 +207,7 @@ extension String {
     /// this sequence.
     ///
     /// - Complexity: O(1).
-    @swift3_migration(renamed="iterator()")
+    @swift3_migration(renamed="makeIterator()")
     @warn_unused_result
     public func generate() -> Generator {
       return Generator(_core)

@@ -272,7 +272,7 @@ public struct AnySequence<Element> : SequenceType {
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> AnyGenerator<Element> {
     return _box.generate()
   }
@@ -648,7 +648,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// Returns a generator over the elements of this collection.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> AnyGenerator<Element> {
     return _box.generate()
   }

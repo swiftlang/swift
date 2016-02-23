@@ -419,7 +419,7 @@ public struct Set<Element : Hashable> :
   /// Returns a generator over the members.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> SetGenerator<Element> {
     return _variantStorage.generate()
   }
@@ -1135,7 +1135,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Returns a generator over the (key, value) pairs.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> DictionaryGenerator<Key, Value> {
     return _variantStorage.generate()
   }

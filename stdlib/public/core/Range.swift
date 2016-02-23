@@ -20,7 +20,7 @@ public struct RangeGenerator<
   public typealias T = Element
 
   /// Construct an instance that traverses the elements of `bounds`.
-  @swift3_migration(message="use the 'iterator()' method on the collection")
+  @swift3_migration(message="call the 'makeIterator()' method on the collection")
   @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'generate()' method on the collection.")
   @_transparent
   public init(_ bounds: Range<Element>) {
