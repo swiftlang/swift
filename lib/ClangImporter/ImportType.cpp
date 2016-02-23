@@ -1870,7 +1870,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     }
   }
 
-  // Don't introduce a empty options default arguments for setters.
+  // Don't introduce an empty options default arguments for setters.
   if (isFirstParameter && camel_case::getFirstWord(baseName.str()) == "set")
     return DefaultArgumentKind::None;
 
