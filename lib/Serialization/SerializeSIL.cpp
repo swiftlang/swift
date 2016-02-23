@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
-#include "swift/Strings.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
@@ -1683,16 +1682,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // Go through all the SILFunctions in SILMod and write out any
   // mandatory function bodies.
   for (const SILFunction &F : *SILMod) {
-    if (shouldEmitFunctionBody(F) || ShouldSerializeAll) {
-      if (F.getModule().getSwiftModule()->getNameStr() == SWIFT_ONONE_SUPPORT) {
-        // Serialize only the declarations so that it is possible to check the
-        // existance of this function later.
-        // FIXME: SILLinker::lookupFunction does not work with functions having
-        // empty bodies, otherwise we could have serialized only declarations.
-        //writeSILFunction(F, true);
-      }
+    if (shouldEmitFunctionBody(F) || ShouldSerializeAll)
       writeSILFunction(F);
-    }
   }
 
   if (ShouldSerializeAll)

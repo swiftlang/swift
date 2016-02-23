@@ -126,6 +126,7 @@ set(SWIFTLIB_SOURCES
   Tuple.swift.gyb
   VarArgs.swift
   Zip.swift
+  Prespecialized.swift
   )
 
 set(swift_core_link_flags)
