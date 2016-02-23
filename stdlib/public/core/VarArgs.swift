@@ -61,6 +61,7 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 #endif
 
 /// Invoke `f` with a C `va_list` argument derived from `args`.
+@swift3_migration(renamed="withVaList(_:invoke:)")
 public func withVaList<R>(args: [CVarArgType],
   @noescape _ f: CVaListPointer -> R) -> R {
   let builder = VaListBuilder()
