@@ -39,7 +39,7 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
+// CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
 
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool

@@ -502,7 +502,7 @@ extension Collection {
   //  }
 
 // TODO: swift-3-indexing-model - renaming the following to  the following _customIndexOfEquatable(element)?
-  /// Customization point for `Sequence.indexOf()`.
+  /// Customization point for `Sequence.index(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.

@@ -559,10 +559,10 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
 
   // Find an existing key.
   do {
-    var foundIndex1 = s.indexOf(1010)!
+    var foundIndex1 = s.index(of: 1010)!
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
-    var foundIndex2 = s.indexOf(1010)!
+    var foundIndex2 = s.index(of: 1010)!
     expectEqual(foundIndex1, foundIndex2)
 
     expectEqual(1010, s[foundIndex1])
@@ -571,7 +571,7 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
 
   // Try to find a key that is not present.
   do {
-    var foundIndex1 = s.indexOf(1111)
+    var foundIndex1 = s.index(of: 1111)
     expectEmpty(foundIndex1)
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
   }
@@ -580,7 +580,7 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
-    expectEmpty(s2.indexOf(MinimalHashableValue(42)))
+    expectEmpty(s2.index(of: MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
@@ -595,10 +595,10 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
 
   // Find an existing key.
   do {
-    var foundIndex1 = s.indexOf(TestKeyTy(1010))!
+    var foundIndex1 = s.index(of: TestKeyTy(1010))!
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
-    var foundIndex2 = s.indexOf(TestKeyTy(1010))!
+    var foundIndex2 = s.index(of: TestKeyTy(1010))!
     expectEqual(foundIndex1, foundIndex2)
 
     expectEqual(TestKeyTy(1010), s[foundIndex1])
@@ -607,7 +607,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
 
   // Try to find a key that is not present.
   do {
-    var foundIndex1 = s.indexOf(TestKeyTy(1111))
+    var foundIndex1 = s.index(of: TestKeyTy(1111))
     expectEmpty(foundIndex1)
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
   }
@@ -616,7 +616,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
-    expectEmpty(s2.indexOf(MinimalHashableClass(42)))
+    expectEmpty(s2.index(of: MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
@@ -630,7 +630,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
     var s = getCOWFastSet()
     var identity1 = unsafeBitCast(s, to: Int.self)
 
-    let foundIndex1 = s.indexOf(1010)!
+    let foundIndex1 = s.index(of: 1010)!
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
     expectEqual(1010, s[foundIndex1])
@@ -639,7 +639,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
     expectEqual(1010, removed)
 
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
-    expectEmpty(s.indexOf(1010))
+    expectEmpty(s.index(of: 1010))
   }
 
   do {
@@ -650,7 +650,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
 
-    var foundIndex1 = s2.indexOf(1010)!
+    var foundIndex1 = s2.index(of: 1010)!
     expectEqual(1010, s2[foundIndex1])
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
@@ -660,7 +660,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
 
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectNotEqual(identity1, unsafeBitCast(s2, to: Int.self))
-    expectEmpty(s2.indexOf(1010))
+    expectEmpty(s2.index(of: 1010))
   }
 }
 
@@ -669,7 +669,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
     var s = getCOWSlowSet()
     var identity1 = unsafeBitCast(s, to: Int.self)
 
-    let foundIndex1 = s.indexOf(TestKeyTy(1010))!
+    let foundIndex1 = s.index(of: TestKeyTy(1010))!
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
     expectEqual(TestKeyTy(1010), s[foundIndex1])
@@ -678,7 +678,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
     expectEqual(TestKeyTy(1010), removed)
 
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
-    expectEmpty(s.indexOf(TestKeyTy(1010)))
+    expectEmpty(s.index(of: TestKeyTy(1010)))
   }
 
   do {
@@ -689,7 +689,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
 
-    var foundIndex1 = s2.indexOf(TestKeyTy(1010))!
+    var foundIndex1 = s2.index(of: TestKeyTy(1010))!
     expectEqual(TestKeyTy(1010), s2[foundIndex1])
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
@@ -699,7 +699,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
 
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectNotEqual(identity1, unsafeBitCast(s2, to: Int.self))
-    expectEmpty(s2.indexOf(TestKeyTy(1010)))
+    expectEmpty(s2.index(of: TestKeyTy(1010)))
   }
 }
 
@@ -1312,17 +1312,17 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.IndexForMember") {
   expectTrue(isCocoaSet(s))
 
   // Find an existing key.
-  var member = s[s.indexOf(TestObjCKeyTy(1010))!]
+  var member = s[s.index(of: TestObjCKeyTy(1010))!]
   expectEqual(TestObjCKeyTy(1010), member)
 
-  member = s[s.indexOf(TestObjCKeyTy(2020))!]
+  member = s[s.index(of: TestObjCKeyTy(2020))!]
   expectEqual(TestObjCKeyTy(2020), member)
 
-  member = s[s.indexOf(TestObjCKeyTy(3030))!]
+  member = s[s.index(of: TestObjCKeyTy(3030))!]
   expectEqual(TestObjCKeyTy(3030), member)
 
   // Try to find a key that does not exist.
-  expectEmpty(s.indexOf(TestObjCKeyTy(4040)))
+  expectEmpty(s.index(of: TestObjCKeyTy(4040)))
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 }
 
@@ -1331,17 +1331,17 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForMember") {
   var identity1 = unsafeBitCast(s, to: Int.self)
 
   do {
-    var member = s[s.indexOf(TestBridgedKeyTy(1010))!]
+    var member = s[s.index(of: TestBridgedKeyTy(1010))!]
     expectEqual(TestBridgedKeyTy(1010), member)
 
-    member = s[s.indexOf(TestBridgedKeyTy(2020))!]
+    member = s[s.index(of: TestBridgedKeyTy(2020))!]
     expectEqual(TestBridgedKeyTy(2020), member)
 
-    member = s[s.indexOf(TestBridgedKeyTy(3030))!]
+    member = s[s.index(of: TestBridgedKeyTy(3030))!]
     expectEqual(TestBridgedKeyTy(3030), member)
   }
 
-  expectEmpty(s.indexOf(TestBridgedKeyTy(4040)))
+  expectEmpty(s.index(of: TestBridgedKeyTy(4040)))
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 }
 
@@ -1601,7 +1601,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   let identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isCocoaSet(s))
 
-  let foundIndex1 = s.indexOf(TestObjCKeyTy(1010))!
+  let foundIndex1 = s.index(of: TestObjCKeyTy(1010))!
   expectEqual(TestObjCKeyTy(1010), s[foundIndex1])
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
@@ -1610,7 +1610,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   expectTrue(isNativeSet(s))
   expectEqual(2, s.count)
   expectEqual(TestObjCKeyTy(1010), removedElement)
-  expectEmpty(s.indexOf(TestObjCKeyTy(1010)))
+  expectEmpty(s.index(of: TestObjCKeyTy(1010)))
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
@@ -1618,7 +1618,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   let identity1 = unsafeBitCast(s, to: Int.self)
   expectTrue(isNativeSet(s))
 
-  let foundIndex1 = s.indexOf(TestBridgedKeyTy(1010))!
+  let foundIndex1 = s.index(of: TestBridgedKeyTy(1010))!
   expectEqual(1010, s[foundIndex1].value)
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
@@ -1627,7 +1627,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   expectTrue(isNativeSet(s))
   expectEqual(1010, removedElement.value)
   expectEqual(2, s.count)
-  expectEmpty(s.indexOf(TestBridgedKeyTy(1010)))
+  expectEmpty(s.index(of: TestBridgedKeyTy(1010)))
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
@@ -3383,7 +3383,7 @@ SetTestSuite.test("∉") {
 SetTestSuite.test("memberAtIndex") {
   let s1 = Set([1010, 2020, 3030])
 
-  let foundIndex = s1.indexOf(1010)!
+  let foundIndex = s1.index(of: 1010)!
   expectEqual(1010, s1[foundIndex])
 }
 
@@ -3510,12 +3510,12 @@ SetTestSuite.test("_customContainsEquatableElement") {
   expectFalse(Set<Int>()._customContainsEquatableElement(1010)!)
 }
 
-SetTestSuite.test("indexOf") {
+SetTestSuite.test("index(of:)") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let foundIndex1 = s1.indexOf(1010)!
+  let foundIndex1 = s1.index(of: 1010)!
   expectEqual(1010, s1[foundIndex1])
 
-  expectEmpty(s1.indexOf(999))
+  expectEmpty(s1.index(of: 999))
 }
 
 SetTestSuite.test("popFirst") {
@@ -3543,10 +3543,10 @@ SetTestSuite.test("removeAt") {
   // Test removing from the startIndex, the middle, and the end of a set.
   for i in 1...3 {
     var s = Set<Int>([1010, 2020, 3030])
-    let removed = s.remove(at: s.indexOf(i*1010)!)
+    let removed = s.remove(at: s.index(of: i*1010)!)
     expectEqual(i*1010, removed)
     expectEqual(2, s.count)
-    expectEmpty(s.indexOf(i*1010))
+    expectEmpty(s.index(of: i*1010))
     let origKeys: [Int] = [1010, 2020, 3030]
     expectEqual(origKeys.filter { $0 != (i*1010) }, [Int](s).sorted())
   }

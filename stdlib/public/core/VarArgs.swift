@@ -17,16 +17,20 @@
 /// Swift.  It only works for APIs that have a `va_list` variant, so
 /// for example, it isn't much use if all you have is:
 ///
-///     int f(int n, ...)
+/// ~~~ c
+/// int c_api(int n, ...)
+/// ~~~
 ///
 /// Given a version like this, though,
 ///
-///     int f(int, va_list arguments)
+/// ~~~ c
+/// int c_api(int, va_list arguments)
+/// ~~~
 ///
 /// you can write:
 ///
-///     func swiftF(x: Int, arguments: CVarArg...) -> Int {
-///       return withVaList(arguments) { f(x, $0) }
+///     func swiftAPI(x: Int, arguments: CVarArg...) -> Int {
+///       return withVaList(arguments) { c_api(x, $0) }
 ///     }
 public protocol CVarArg {
   // Note: the protocol is public, but its requirement is stdlib-private.
@@ -59,22 +63,22 @@ let _x86_64SSERegisterWords = 2
 let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
 #endif
 
-/// Invoke `f` with a C `va_list` argument derived from `args`.
+/// Invoke `body` with a C `va_list` argument derived from `args`.
 public func withVaList<R>(args: [CVarArg],
-  @noescape _ f: CVaListPointer -> R) -> R {
+  @noescape invoke body: CVaListPointer -> R) -> R {
   let builder = _VaListBuilder()
   for a in args {
     builder.append(a)
   }
-  return _withVaList(builder, f)
+  return _withVaList(builder, invoke: body)
 }
 
-/// Invoke `f` with a C `va_list` argument derived from `builder`.
+/// Invoke `body` with a C `va_list` argument derived from `builder`.
 internal func _withVaList<R>(
   builder: _VaListBuilder,
-  @noescape _ f: CVaListPointer -> R
+  @noescape invoke body: CVaListPointer -> R
 ) -> R {
-  let result = f(builder.va_list())
+  let result = body(builder.va_list())
   _fixLifetime(builder)
   return result
 }

@@ -1049,19 +1049,21 @@ else
     )
 fi
 
+
+CMAKE_JOBS="${BUILD_JOBS}"
 if [[ "${DISTCC}" ]] ; then
-    BUILD_ARGS="${BUILD_ARGS} -j $(distcc -j)"
+    CMAKE_JOBS="$(distcc -j)"
 fi
 
 case "${CMAKE_GENERATOR}" in
     Ninja)
-        BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
+        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} -v"
         fi
         ;;
     'Unix Makefiles')
-        BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
+        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} VERBOSE=1"
         fi
@@ -1071,7 +1073,7 @@ case "${CMAKE_GENERATOR}" in
         # but since we're not using proper Xcode 4 schemes, this is the
         # only way to get target-level parallelism.
         BUILD_ARGS="${BUILD_ARGS} -parallelizeTargets"
-        BUILD_ARGS="${BUILD_ARGS} -jobs ${BUILD_JOBS}"
+        BUILD_ARGS="${BUILD_ARGS} -jobs ${CMAKE_JOBS}"
         BUILD_TARGET_FLAG="-target"
         COMMON_CMAKE_OPTIONS=(
             "${COMMON_CMAKE_OPTIONS[@]}"

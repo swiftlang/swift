@@ -142,23 +142,23 @@
 //
 //     for i in c.indices { ... } // No change.
 //
-// API of collection algorithms does not change, even for algorithms
-// that accept indices as parameters or return indices (e.g.,
-// `indexOf()`, `min()`, `sort()`, `prefix()`, `prefixUpTo()` etc.)
+// API of collection algorithms does not change, even for algorithms that
+// accept indices as parameters or return indices (e.g., `index(of:)`,
+// `index(where:)`, `min()`, `sort()`, `prefix()`, `prefixUpTo()` etc.)
 //
 // Code that moves indices (`i.successor()`, `i.predecessor()`,
 // `i.advancedBy()`) needs to change to use a method on the
 // collection.
 //
 //     // Before:
-//     var i = c.indexOf { $0 % 2 == 0 }
+//     var i = c.index { $0 % 2 == 0 }
 //     i = i.successor()
 //     print(c[i])
 //
 //     // After:
-//     var i = c.indexOf { $0 % 2 == 0 } // No change in algorithm API.
-//     i = c.next(i)                     // Advancing an index requires a collection instance.
-//     print(c[i])                       // No change in subscripting.
+//     var i = c.index { $0 % 2 == 0 } // No change in algorithm API.
+//     i = c.next(i)                   // Advancing an index requires a collection instance.
+//     print(c[i])                     // No change in subscripting.
 //
 
 // Implementation difficulties
@@ -698,7 +698,7 @@ extension MyForwardCollectionType
   Generator.Element : Equatable,
   IndexRange.Generator.Element == Index // FIXME
 {
-  public func indexOf(element: Generator.Element) -> Index? {
+  public func index(of element: Generator.Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
@@ -1940,9 +1940,9 @@ import ObjectiveC
 
 var NewCollection = TestSuite("NewCollection")
 
-NewCollection.test("indexOf") {
-  expectEqual(1, MyArray([1,2,3]).indexOf(2))
-  expectEmpty(MyArray([1,2,3]).indexOf(42))
+NewCollection.test("index") {
+  expectEqual(1, MyArray([1,2,3]).index(of: 2))
+  expectEmpty(MyArray([1,2,3]).index(of: 42))
 }
 
 NewCollection.test("bubbleSortInPlace") {

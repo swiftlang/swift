@@ -20,7 +20,7 @@ import ObjectiveC
 let PrintTests = TestSuite("PrintFloat")
 
 PrintTests.setUp {
-  if let localeArgIndex = Process.arguments.indexOf("--locale") {
+  if let localeArgIndex = Process.arguments.index(of: "--locale") {
     let locale = Process.arguments[localeArgIndex + 1]
     expectEqual("ru_RU.UTF-8", locale)
     setlocale(LC_ALL, locale)

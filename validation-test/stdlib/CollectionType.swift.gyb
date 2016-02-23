@@ -561,12 +561,12 @@ CollectionTypeTests.test("count/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// indexOf()
+// index(of:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("indexOf/WhereElementIsEquatable/dispatch") {
+CollectionTypeTests.test("index(of:)/WhereElementIsEquatable/dispatch") {
   let tester = CollectionLog.dispatchTester([MinimalEquatableValue(1)])
-  _ = tester.indexOf(MinimalEquatableValue(1))
+  _ = tester.index(of: MinimalEquatableValue(1))
   expectCustomizable(tester, tester.log._customIndexOfEquatableElement)
 }
 
@@ -576,14 +576,14 @@ CollectionTypeTests.test("indexOf/WhereElementIsEquatable/dispatch") {
 func callGenericFind_<
   C : Collection where C.Iterator.Element : Equatable
 >(collection: C, _ element: C.Iterator.Element) -> C.Index? {
-  return collection.indexOf(element)
+  return collection.index(of: element)
 }
 
 func callStaticFind_(
   set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
-  return set.indexOf(element)
+  return set.index(of: element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -638,7 +638,7 @@ extension Collection where
   func _test_indicesOf(element: Iterator.Element) -> [Index] {
     var result: [Index] = []
     var tail = self[indices]
-    while let foundIndex = tail.indexOf(element) {
+    while let foundIndex = tail.index(of: element) {
       result.append(foundIndex)
       tail = tail[foundIndex.successor()..<endIndex]
     }
@@ -646,7 +646,7 @@ extension Collection where
   }
 }
 
-CollectionTypeTests.test("indexOf/ContinueSearch") {
+CollectionTypeTests.test("index(of:)/ContinueSearch") {
   do {
     let c = MinimalForwardCollection(elements: [] as [MinimalEquatableValue])
     expectEqualSequence(

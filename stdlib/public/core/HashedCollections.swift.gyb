@@ -364,7 +364,7 @@ public struct Set<Element : Hashable> :
   /// Returns the `Index` of a given member, or `nil` if the member is not
   /// present in the set.
   @warn_unused_result
-  public func indexOf(member: Element) -> Index? {
+  public func index(of member: Element) -> Index? {
     return _variantStorage.index(forKey: member)
   }
 
@@ -639,7 +639,7 @@ public struct Set<Element : Hashable> :
 
   @warn_unused_result
   public func _customIndexOfEquatableElement(member: Element) -> Index?? {
-    return Optional(indexOf(member))
+    return Optional(index(of: member))
   }
 
   //

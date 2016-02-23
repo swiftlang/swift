@@ -145,7 +145,7 @@ extension LazyCollection : Collection {
     return _base.count
   }
   
-  // The following requirement enables dispatching for indexOf when
+  // The following requirement enables dispatching for index(of:) when
   // the element type is Equatable.
   
   /// Returns `Optional(Optional(index))` if an element was found;

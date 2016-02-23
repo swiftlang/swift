@@ -418,7 +418,7 @@ extension Mirror {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
       if case let label as String = e {
-        position = children.indexOf { $0.label == label } ?? children.endIndex
+        position = children.index { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
         position = children.startIndex.advanced(
