@@ -589,6 +589,7 @@ extension String {
     }
   }
   
+  @swift3_migration(renamed="appendContents(of:)")
   public mutating func appendContentsOf<
       S : SequenceType
   where S.Generator.Element == Character

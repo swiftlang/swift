@@ -671,6 +671,7 @@ extension _StringCore : RangeReplaceableCollectionType {
     _copyInPlace(newSize: count, newCapacity: max(count, n), minElementWidth: 1)
   }
 
+  @swift3_migration(renamed="appendContents(of:)")
   public mutating func appendContentsOf<
     S : SequenceType
       where S.Generator.Element == UTF16.CodeUnit

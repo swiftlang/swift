@@ -103,6 +103,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
+  @swift3_migration(renamed="appendContents(of:)")
   mutating func appendContentsOf<
     S : SequenceType
     where S.Generator.Element == Generator.Element
@@ -197,6 +198,7 @@ extension RangeReplaceableCollectionType {
     insert(newElement, atIndex: endIndex)
   }
 
+  @swift3_migration(renamed="appendContents(of:)")
   public mutating func appendContentsOf<
     S : SequenceType where S.Generator.Element == Generator.Element
   >(newElements: S) {
