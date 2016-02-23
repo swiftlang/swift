@@ -14,7 +14,7 @@ struct MyError : ErrorType {
 	}
 }
 
-// We need a reabstruction thunk to convert from direct args/result to indirect
+// We need a reabstraction thunk to convert from direct args/result to indirect
 // args/result, which is expected in the returned closure.
 
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Si___TF4test16generic_get_funcurFTxSb_Fxx : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int {
@@ -85,7 +85,7 @@ func testit3(b: Bool) -> Int {
 
 // The same three test cases again, but with throwing functions.
 
-// We need a reabstruction thunk to convert from direct args/result to indirect
+// We need a reabstraction thunk to convert from direct args/result to indirect
 // args/result, which is expected in the returned closure.
 
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Si___TF4test25generic_get_func_throwingurFSbFzxx : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error ErrorType) {

@@ -390,13 +390,13 @@ SILFunction *swift::getExistingSpecialization(SILModule &M,
   return Specialization;
 }
 
-/// Create a re-abstruction thunk for a partial_apply.
+/// Create a re-abstraction thunk for a partial_apply.
 /// This is needed in case we converted some parameters/results of the
 /// specialized function from indirect to direct but the result function of the
 /// partial_apply still needs them as indirect.
 /// We create a thunk which converts the direct parameters/results back to
 /// indirect ones.
-static SILFunction *createReabstructionThunk(const ReabstractionInfo &ReInfo,
+static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
                                      PartialApplyInst *OrigPAI,
                                      SILFunction *SpecializedFunc) {
   SILFunction *OrigF = OrigPAI->getCalleeFunction();
@@ -591,7 +591,7 @@ void swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     // original function with indirect parameters/results.
     auto *PAI = cast<PartialApplyInst>(Apply.getInstruction());
     SILBuilderWithScope Builder(PAI);
-    SILFunction *Thunk = createReabstructionThunk(ReInfo, PAI, SpecializedF);
+    SILFunction *Thunk = createReabstractionThunk(ReInfo, PAI, SpecializedF);
     NewFunctions.push_back(Thunk);
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);
     SmallVector<SILValue, 4> Arguments;
