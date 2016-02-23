@@ -480,7 +480,7 @@ Reflection.test("nested existential containers") {
 
 Reflection.test("dumpToAStream") {
   var output = ""
-  dump([ 42, 4242 ], &output)
+  dump([ 42, 4242 ], to: &output)
   expectEqual("▿ 2 elements\n  - 42\n  - 4242\n", output)
 }
 
@@ -495,7 +495,7 @@ struct StructWithDefaultMirror {
 Reflection.test("Struct/NonGeneric/DefaultMirror") {
   do {
     var output = ""
-    dump(StructWithDefaultMirror("123"), &output)
+    dump(StructWithDefaultMirror("123"), to: &output)
     expectEqual("▿ a.StructWithDefaultMirror\n  - s: \"123\"\n", output)
   }
 
@@ -503,7 +503,7 @@ Reflection.test("Struct/NonGeneric/DefaultMirror") {
     // Build a String around an interpolation as a way of smoke-testing that
     // the internal _Mirror implementation gets memory management right.
     var output = ""
-    dump(StructWithDefaultMirror("\(456)"), &output)
+    dump(StructWithDefaultMirror("\(456)"), to: &output)
     expectEqual("▿ a.StructWithDefaultMirror\n  - s: \"456\"\n", output)
   }
 
@@ -523,7 +523,7 @@ Reflection.test("Struct/Generic/DefaultMirror") {
       first: 123,
       second: [ "abc", 456, 789.25 ])
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ a.GenericStructWithDefaultMirror<Swift.Int, Swift.Array<Swift.Optional<protocol<>>>>\n" +
@@ -550,7 +550,7 @@ Reflection.test("Enum/NoPayload/DefaultMirror") {
     let value: [NoPayloadEnumWithDefaultMirror] =
         [.A, .ß]
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ 2 elements\n" +
@@ -569,7 +569,7 @@ Reflection.test("Enum/SingletonNonGeneric/DefaultMirror") {
   do {
     let value = SingletonNonGenericEnumWithDefaultMirror.OnlyOne(5)
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ a.SingletonNonGenericEnumWithDefaultMirror.OnlyOne\n" +
@@ -587,7 +587,7 @@ Reflection.test("Enum/SingletonGeneric/DefaultMirror") {
   do {
     let value = SingletonGenericEnumWithDefaultMirror.OnlyOne("IIfx")
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ a.SingletonGenericEnumWithDefaultMirror<Swift.String>.OnlyOne\n" +
@@ -601,7 +601,7 @@ Reflection.test("Enum/SingletonGeneric/DefaultMirror") {
         LifetimeTracked(0))
     expectEqual(1, LifetimeTracked.instances)
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
   }
   expectEqual(0, LifetimeTracked.instances)
 }
@@ -619,7 +619,7 @@ Reflection.test("Enum/SinglePayloadNonGeneric/DefaultMirror") {
          .Dog,
          .Volleyball("Wilson", 2000)]
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ 3 elements\n" +
@@ -647,7 +647,7 @@ Reflection.test("Enum/SinglePayloadGeneric/DefaultMirror") {
          .Faucet,
          .Pipe(408, [415])]
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ 3 elements\n" +
@@ -678,7 +678,7 @@ Reflection.test("Enum/MultiPayloadTagBitsNonGeneric/DefaultMirror") {
          .Classic(mhz: 16),
          .Performa(model: 220)]
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ 4 elements\n" +
@@ -723,7 +723,7 @@ Reflection.test("Enum/MultiPayloadSpareBitsNonGeneric/DefaultMirror") {
          .HyperCard(cdrom: CDROM(capacity: 600))]
 
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ 5 elements\n" +
@@ -759,7 +759,7 @@ Reflection.test("Enum/MultiPayloadTagBitsSmallNonGeneric/DefaultMirror") {
          .HyperCard(cdrom: false)]
 
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ 5 elements\n" +
@@ -795,7 +795,7 @@ Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
          .PowerBookDuo220]
 
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
 
     let expected =
       "▿ 6 elements\n" +
@@ -817,7 +817,7 @@ Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
         .Quadra(hdd: LifetimeTracked(0))
     expectEqual(1, LifetimeTracked.instances)
     var output = ""
-    dump(value, &output)
+    dump(value, to: &output)
   }
   expectEqual(0, LifetimeTracked.instances)
 }
@@ -868,7 +868,7 @@ class Irradiant : Brilliant {
 Reflection.test("CustomMirror") {
   do {
     var output = ""
-    dump(Brilliant(123, "four five six"), &output)
+    dump(Brilliant(123, "four five six"), to: &output)
 
     let expected =
       "▿ a.Brilliant #0\n" +
@@ -881,13 +881,13 @@ Reflection.test("CustomMirror") {
 
   do {
     var output = ""
-    dump(Brilliant(123, "four five six"), &output, maxDepth: 0)
+    dump(Brilliant(123, "four five six"), to: &output, maxDepth: 0)
     expectEqual("▹ a.Brilliant #0\n", output)
   }
 
   do {
     var output = ""
-    dump(Brilliant(123, "four five six"), &output, maxItems: 3)
+    dump(Brilliant(123, "four five six"), to: &output, maxItems: 3)
 
     let expected =
       "▿ a.Brilliant #0\n" +
@@ -900,7 +900,7 @@ Reflection.test("CustomMirror") {
 
   do {
     var output = ""
-    dump(Brilliant(123, "four five six"), &output, maxItems: 2)
+    dump(Brilliant(123, "four five six"), to: &output, maxItems: 2)
 
     let expected =
       "▿ a.Brilliant #0\n" +
@@ -912,7 +912,7 @@ Reflection.test("CustomMirror") {
 
   do {
     var output = ""
-    dump(Brilliant(123, "four five six"), &output, maxItems: 1)
+    dump(Brilliant(123, "four five six"), to: &output, maxItems: 1)
 
     let expected =
       "▿ a.Brilliant #0\n" +
@@ -952,7 +952,7 @@ Reflection.test("CustomMirror") {
 Reflection.test("CustomMirrorIsInherited") {
   do {
     var output = ""
-    dump(Irradiant(), &output)
+    dump(Irradiant(), to: &output)
 
     let expected =
       "▿ a.Brilliant #0\n" +
@@ -971,31 +971,31 @@ Reflection.test("MetatypeMirror") {
   do {
     var output = ""
     let concreteMetatype = Int.self
-    dump(concreteMetatype, &output)
+    dump(concreteMetatype, to: &output)
 
     let expectedInt = "- Swift.Int #0\n"
     expectEqual(expectedInt, output)
 
     let anyMetatype: Any.Type = Int.self
     output = ""
-    dump(anyMetatype, &output)
+    dump(anyMetatype, to: &output)
     expectEqual(expectedInt, output)
 
     let nativeProtocolMetatype: SomeNativeProto.Type = Int.self
     output = ""
-    dump(nativeProtocolMetatype, &output)
+    dump(nativeProtocolMetatype, to: &output)
     expectEqual(expectedInt, output)
 
     let concreteClassMetatype = SomeClass.self
     let expectedSomeClass = "- a.SomeClass #0\n"
     output = ""
-    dump(concreteClassMetatype, &output)
+    dump(concreteClassMetatype, to: &output)
     expectEqual(expectedSomeClass, output)
 
     let nativeProtocolConcreteMetatype = SomeNativeProto.self
     let expectedNativeProtocolConcrete = "- a.SomeNativeProto #0\n"
     output = ""
-    dump(nativeProtocolConcreteMetatype, &output)
+    dump(nativeProtocolConcreteMetatype, to: &output)
     expectEqual(expectedNativeProtocolConcrete, output)
   }
 }
@@ -1005,7 +1005,7 @@ Reflection.test("TupleMirror") {
     var output = ""
     let tuple =
       (Brilliant(384, "seven six eight"), StructWithDefaultMirror("nine"))
-    dump(tuple, &output)
+    dump(tuple, to: &output)
 
     let expected =
       "▿ (2 elements)\n" +
@@ -1025,7 +1025,7 @@ Reflection.test("TupleMirror") {
     // A tuple of stdlib types with mirrors.
     var output = ""
     let tuple = (1, 2.5, false, "three")
-    dump(tuple, &output)
+    dump(tuple, to: &output)
 
     let expected =
       "▿ (4 elements)\n" +
@@ -1041,7 +1041,7 @@ Reflection.test("TupleMirror") {
     // A nested tuple.
     var output = ""
     let tuple = (1, ("Hello", "World"))
-    dump(tuple, &output)
+    dump(tuple, to: &output)
 
     let expected =
       "▿ (2 elements)\n" +
@@ -1063,7 +1063,7 @@ Reflection.test("ClassReflection") {
 Reflection.test("String/Mirror") {
   do {
     var output = ""
-    dump("", &output)
+    dump("", to: &output)
 
     let expected =
       "- \"\"\n"
@@ -1077,7 +1077,7 @@ Reflection.test("String/Mirror") {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     // U+1F425 FRONT-FACING BABY CHICK
     var output = ""
-    dump("\u{61}\u{304b}\u{3099}\u{1f425}", &output)
+    dump("\u{61}\u{304b}\u{3099}\u{1f425}", to: &output)
 
     let expected =
       "- \"\u{61}\u{304b}\u{3099}\u{1f425}\"\n"
@@ -1091,7 +1091,7 @@ Reflection.test("String.UTF8View/Mirror") {
   // U+304B HIRAGANA LETTER KA
   // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
   var output = ""
-  dump("\u{61}\u{304b}\u{3099}".utf8, &output)
+  dump("\u{61}\u{304b}\u{3099}".utf8, to: &output)
 
   let expected =
     "▿ UTF8View(\"\u{61}\u{304b}\u{3099}\")\n" +
@@ -1112,7 +1112,7 @@ Reflection.test("String.UTF16View/Mirror") {
   // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
   // U+1F425 FRONT-FACING BABY CHICK
   var output = ""
-  dump("\u{61}\u{304b}\u{3099}\u{1f425}".utf16, &output)
+  dump("\u{61}\u{304b}\u{3099}\u{1f425}".utf16, to: &output)
 
   let expected =
     "▿ StringUTF16(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
@@ -1131,7 +1131,7 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
   // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
   // U+1F425 FRONT-FACING BABY CHICK
   var output = ""
-  dump("\u{61}\u{304b}\u{3099}\u{1f425}".unicodeScalars, &output)
+  dump("\u{61}\u{304b}\u{3099}\u{1f425}".unicodeScalars, to: &output)
 
   let expected =
     "▿ StringUnicodeScalarView(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
@@ -1148,7 +1148,7 @@ Reflection.test("Character/Mirror") {
     // U+0061 LATIN SMALL LETTER A
     let input: Character = "\u{61}"
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- \"\u{61}\"\n"
@@ -1161,7 +1161,7 @@ Reflection.test("Character/Mirror") {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let input: Character = "\u{304b}\u{3099}"
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- \"\u{304b}\u{3099}\"\n"
@@ -1173,7 +1173,7 @@ Reflection.test("Character/Mirror") {
     // U+1F425 FRONT-FACING BABY CHICK
     let input: Character = "\u{1f425}"
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- \"\u{1f425}\"\n"
@@ -1187,7 +1187,7 @@ Reflection.test("UnicodeScalar") {
     // U+0061 LATIN SMALL LETTER A
     let input: UnicodeScalar = "\u{61}"
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- \"\u{61}\"\n"
@@ -1199,7 +1199,7 @@ Reflection.test("UnicodeScalar") {
     // U+304B HIRAGANA LETTER KA
     let input: UnicodeScalar = "\u{304b}"
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- \"\\u{304B}\"\n"
@@ -1211,7 +1211,7 @@ Reflection.test("UnicodeScalar") {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let input: UnicodeScalar = "\u{3099}"
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- \"\\u{3099}\"\n"
@@ -1223,7 +1223,7 @@ Reflection.test("UnicodeScalar") {
     // U+1F425 FRONT-FACING BABY CHICK
     let input: UnicodeScalar = "\u{1f425}"
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- \"\\u{0001F425}\"\n"
@@ -1235,7 +1235,7 @@ Reflection.test("UnicodeScalar") {
 Reflection.test("Bool") {
   do {
     var output = ""
-    dump(false, &output)
+    dump(false, to: &output)
 
     let expected =
       "- false\n"
@@ -1245,7 +1245,7 @@ Reflection.test("Bool") {
 
   do {
     var output = ""
-    dump(true, &output)
+    dump(true, to: &output)
 
     let expected =
       "- true\n"
@@ -1260,7 +1260,7 @@ Reflection.test("Bool") {
 Reflection.test("Float") {
   do {
     var output = ""
-    dump(Float.NaN, &output)
+    dump(Float.NaN, to: &output)
 
     let expected =
       "- nan\n"
@@ -1270,7 +1270,7 @@ Reflection.test("Float") {
 
   do {
     var output = ""
-    dump(Float.infinity, &output)
+    dump(Float.infinity, to: &output)
 
     let expected =
       "- inf\n"
@@ -1281,7 +1281,7 @@ Reflection.test("Float") {
   do {
     var input: Float = 42.125
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- 42.125\n"
@@ -1293,7 +1293,7 @@ Reflection.test("Float") {
 Reflection.test("Double") {
   do {
     var output = ""
-    dump(Double.NaN, &output)
+    dump(Double.NaN, to: &output)
 
     let expected =
       "- nan\n"
@@ -1303,7 +1303,7 @@ Reflection.test("Double") {
 
   do {
     var output = ""
-    dump(Double.infinity, &output)
+    dump(Double.infinity, to: &output)
 
     let expected =
       "- inf\n"
@@ -1314,7 +1314,7 @@ Reflection.test("Double") {
   do {
     var input: Double = 42.125
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- 42.125\n"
@@ -1339,7 +1339,7 @@ Reflection.test("FieldNamesBug") {
       "▿ a.EightByteFieldNamesStruct\n" +
       "  - abcdef: 42\n"
     var output = ""
-    dump(EightByteFieldNamesStruct(), &output)
+    dump(EightByteFieldNamesStruct(), to: &output)
     expectEqual(expected, output)
   }
 
@@ -1348,7 +1348,7 @@ Reflection.test("FieldNamesBug") {
       "▿ a.EightByteFieldNamesClass #0\n" +
       "  - abcdef: 42\n"
     var output = ""
-    dump(EightByteFieldNamesClass(), &output)
+    dump(EightByteFieldNamesClass(), to: &output)
     expectEqual(expected, output)
   }
 }
@@ -1372,7 +1372,7 @@ Reflection.test("OpaquePointer/null") {
 Reflection.test("StaticString/Mirror") {
   do {
     var output = ""
-    dump("" as StaticString, &output)
+    dump("" as StaticString, to: &output)
 
     let expected =
       "- \"\"\n"
@@ -1386,7 +1386,7 @@ Reflection.test("StaticString/Mirror") {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     // U+1F425 FRONT-FACING BABY CHICK
     var output = ""
-    dump("\u{61}\u{304b}\u{3099}\u{1f425}" as StaticString, &output)
+    dump("\u{61}\u{304b}\u{3099}\u{1f425}" as StaticString, to: &output)
 
     let expected =
       "- \"\u{61}\u{304b}\u{3099}\u{1f425}\"\n"
@@ -1400,7 +1400,7 @@ Reflection.test("DictionaryIterator/Mirror") {
     [ MinimalHashableValue(0) : OpaqueValue(0) ]
 
   var output = ""
-  dump(d.iterator(), &output)
+  dump(d.iterator(), to: &output)
 
   let expected =
     "- Swift.DictionaryIterator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
@@ -1412,7 +1412,7 @@ Reflection.test("SetIterator/Mirror") {
   let s: Set<MinimalHashableValue> = [ MinimalHashableValue(0)]
 
   var output = ""
-  dump(s.iterator(), &output)
+  dump(s.iterator(), to: &output)
 
   let expected =
     "- Swift.SetIterator<StdlibUnittest.MinimalHashableValue>\n"

@@ -151,60 +151,80 @@ public func _reflect<T>(x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(
-    x: T, inout _ targetStream: TargetStream,
-    name: String? = nil, indent: Int = 0,
-    maxDepth: Int = .max, maxItems: Int = .max
+  value: T,
+  inout to target: TargetStream,
+  name: String? = nil,
+  indent: Int = 0,
+  maxDepth: Int = .max,
+  maxItems: Int = .max
 ) -> T {
   var maxItemCounter = maxItems
   var visitedItems = [ObjectIdentifier : Int]()
-  targetStream._lock()
-  defer { targetStream._unlock() }
-  _dumpObject_unlocked(
-    x, name, indent, maxDepth, &maxItemCounter, &visitedItems,
-    &targetStream)
-  return x
+  target._lock()
+  defer { target._unlock() }
+  _dump_unlocked(
+    value,
+    to: &target,
+    name: name,
+    indent: indent,
+    maxDepth: maxDepth,
+    maxItemCounter: &maxItemCounter,
+    visitedItems: &visitedItems)
+  return value
 }
 
 /// Dump an object's contents using its mirror to standard output.
-public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
-             maxDepth: Int = .max, maxItems: Int = .max) -> T {
+public func dump<T>(
+  value: T,
+  name: String? = nil,
+  indent: Int = 0,
+  maxDepth: Int = .max,
+  maxItems: Int = .max
+) -> T {
   var stdoutStream = _Stdout()
   return dump(
-    x, &stdoutStream, name: name, indent: indent, maxDepth: maxDepth,
+    value,
+    to: &stdoutStream,
+    name: name,
+    indent: indent,
+    maxDepth: maxDepth,
     maxItems: maxItems)
 }
 
 /// Dump an object's contents. User code should use dump().
-internal func _dumpObject_unlocked<TargetStream : OutputStream>(
-    object: Any, _ name: String?, _ indent: Int, _ maxDepth: Int,
-    inout _ maxItemCounter: Int,
-    inout _ visitedItems: [ObjectIdentifier : Int],
-    inout _ targetStream: TargetStream
+internal func _dump_unlocked<TargetStream : OutputStream>(
+  value: Any,
+  inout to target: TargetStream,
+  name: String?,
+  indent: Int,
+  maxDepth: Int,
+  inout maxItemCounter: Int,
+  inout visitedItems: [ObjectIdentifier : Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
 
-  for _ in 0..<indent { targetStream.write(" ") }
+  for _ in 0..<indent { target.write(" ") }
 
-  let mirror = Mirror(reflecting: object)
+  let mirror = Mirror(reflecting: value)
   let count = mirror.children.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
-  targetStream.write(bullet)
-  targetStream.write(" ")
+  target.write(bullet)
+  target.write(" ")
 
   if let nam = name {
-    targetStream.write(nam)
-    targetStream.write(": ")
+    target.write(nam)
+    target.write(": ")
   }
   // This takes the place of the old mirror API's 'summary' property
-  _dumpPrint_unlocked(object, mirror, &targetStream)
+  _dumpPrint_unlocked(value, mirror, &target)
 
   let id: ObjectIdentifier?
-  if let classInstance = object as? AnyObject where object.dynamicType is AnyObject.Type {
+  if let classInstance = value as? AnyObject where value.dynamicType is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
     id = ObjectIdentifier(classInstance)
-  } else if let metatypeInstance = object as? Any.Type {
+  } else if let metatypeInstance = value as? Any.Type {
     // Object is a metatype
     id = ObjectIdentifier(metatypeInstance)
   } else {
@@ -212,100 +232,125 @@ internal func _dumpObject_unlocked<TargetStream : OutputStream>(
   }
   if let theId = id {
     if let previous = visitedItems[theId] {
-      targetStream.write(" #")
-      _print_unlocked(previous, &targetStream)
-      targetStream.write("\n")
+      target.write(" #")
+      _print_unlocked(previous, &target)
+      target.write("\n")
       return
     }
     let identifier = visitedItems.count
     visitedItems[theId] = identifier
-    targetStream.write(" #")
-    _print_unlocked(identifier, &targetStream)
+    target.write(" #")
+    _print_unlocked(identifier, &target)
   }
 
-  targetStream.write("\n")
+  target.write("\n")
 
   guard maxDepth > 0 else { return }
 
   if let superclassMirror = mirror.superclassMirror {
-    _dumpSuperclass_unlocked(superclassMirror, indent + 2, maxDepth - 1, &maxItemCounter, &visitedItems, &targetStream)
+    _dumpSuperclass_unlocked(
+      mirror: superclassMirror,
+      to: &target,
+      indent: indent + 2,
+      maxDepth: maxDepth - 1,
+      maxItemCounter: &maxItemCounter,
+      visitedItems: &visitedItems)
   }
 
   var currentIndex = mirror.children.startIndex
   for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
-        _print_unlocked(" ", &targetStream)
+        _print_unlocked(" ", &target)
       }
       let remainder = count - i
-      targetStream.write("(")
-      _print_unlocked(remainder, &targetStream)
-      if i > 0 { targetStream.write(" more") }
+      target.write("(")
+      _print_unlocked(remainder, &target)
+      if i > 0 { target.write(" more") }
       if remainder == 1 {
-        targetStream.write(" child)\n")
+        target.write(" child)\n")
       } else {
-        targetStream.write(" children)\n")
+        target.write(" children)\n")
       }
       return
     }
 
     let (name, child) = mirror.children[currentIndex]
     currentIndex = currentIndex.successor()
-    _dumpObject_unlocked(child, name, indent + 2, maxDepth - 1,
-                         &maxItemCounter, &visitedItems, &targetStream)
+    _dump_unlocked(
+      child,
+      to: &target,
+      name: name,
+      indent: indent + 2,
+      maxDepth: maxDepth - 1,
+      maxItemCounter: &maxItemCounter,
+      visitedItems: &visitedItems)
   }
 }
 
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
 internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
-    mirror: Mirror, _ indent: Int, _ maxDepth: Int,
-    inout _ maxItemCounter: Int,
-    inout _ visitedItems: [ObjectIdentifier : Int],
-    inout _ targetStream: TargetStream
+  mirror mirror: Mirror,
+  inout to target: TargetStream,
+  indent: Int,
+  maxDepth: Int,
+  inout maxItemCounter: Int,
+  inout visitedItems: [ObjectIdentifier : Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
 
-  for _ in 0..<indent { targetStream.write(" ") }
+  for _ in 0..<indent { target.write(" ") }
 
   let count = mirror.children.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
-  targetStream.write(bullet)
-  targetStream.write(" super: ")
-  _debugPrint_unlocked(mirror.subjectType, &targetStream)
-  targetStream.write("\n")
+  target.write(bullet)
+  target.write(" super: ")
+  _debugPrint_unlocked(mirror.subjectType, &target)
+  target.write("\n")
 
   guard maxDepth > 0 else { return }
 
   if let superclassMirror = mirror.superclassMirror {
-    _dumpSuperclass_unlocked(superclassMirror, indent + 2, maxDepth - 1,
-                             &maxItemCounter, &visitedItems, &targetStream)
+    _dumpSuperclass_unlocked(
+      mirror: superclassMirror,
+      to: &target,
+      indent: indent + 2,
+      maxDepth: maxDepth - 1,
+      maxItemCounter: &maxItemCounter,
+      visitedItems: &visitedItems)
   }
 
   var currentIndex = mirror.children.startIndex
   for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
-        targetStream.write(" ")
+        target.write(" ")
       }
       let remainder = count - i
-      targetStream.write("(")
-      _print_unlocked(remainder, &targetStream)
-      if i > 0 { targetStream.write(" more") }
+      target.write("(")
+      _print_unlocked(remainder, &target)
+      if i > 0 { target.write(" more") }
       if remainder == 1 {
-        targetStream.write(" child)\n")
+        target.write(" child)\n")
       } else {
-        targetStream.write(" children)\n")
+        target.write(" children)\n")
       }
       return
     }
 
     let (name, child) = mirror.children[currentIndex]
     currentIndex = currentIndex.successor()
-    _dumpObject_unlocked(child, name, indent + 2, maxDepth - 1,
-                         &maxItemCounter, &visitedItems, &targetStream)
+    _dump_unlocked(
+      child,
+      to: &target,
+      name: name,
+      indent: indent + 2,
+      maxDepth: maxDepth - 1,
+      maxItemCounter: &maxItemCounter,
+      visitedItems: &visitedItems)
   }
 }
 

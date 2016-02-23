@@ -280,7 +280,7 @@ ArrayTestSuite.test("${array_type}/Mirror") {
   do {
     let input: ${array_type}<Int> = []
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "- 0 elements\n"
@@ -290,7 +290,7 @@ ArrayTestSuite.test("${array_type}/Mirror") {
   do {
     let input: ${array_type}<Int> = [ 10, 20, 30, 40 ]
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "▿ 4 elements\n" +
@@ -306,7 +306,7 @@ ArrayTestSuite.test("${array_type}/Mirror") {
     let base = [ 10, 20, 30, 40 ]
     let input: ArraySlice<Int> = base[1..<3]
     var output = ""
-    dump(input, &output)
+    dump(input, to: &output)
 
     let expected =
       "▿ 2 elements\n" +
