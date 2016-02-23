@@ -116,7 +116,7 @@ mirrors.test("BidirectionalStructure") {
   let description = y.testDescription
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
-    description[description.startIndex..<description.characters.indexOf("d")!])
+    description[description.startIndex..<description.characters.index(of: "d")!])
 }
 
 mirrors.test("LabeledStructure") {

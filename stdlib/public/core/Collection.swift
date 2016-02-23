@@ -275,7 +275,7 @@ extension Collection {
     return startIndex.distance(to: endIndex)
   }
 
-  /// Customization point for `Sequence.indexOf()`.
+  /// Customization point for `Sequence.index(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.

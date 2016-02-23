@@ -492,13 +492,13 @@ self.test("\(testNamePrefix).count/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// indexOf()
+// index(of:)/index(where:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).indexOf()/WhereElementIsEquatable/semantics") {
+self.test("\(testNamePrefix).index(of:)/semantics") {
   for test in findTests {
     let c = makeWrappedCollectionWithEquatableElement(test.sequence)
-    var result = c.indexOf(wrapValueIntoEquatable(test.element))
+    var result = c.index(of: wrapValueIntoEquatable(test.element))
     expectType(
       Optional<CollectionWithEquatableElement.Index>.self,
       &result)
@@ -512,12 +512,12 @@ self.test("\(testNamePrefix).indexOf()/WhereElementIsEquatable/semantics") {
   }
 }
 
-self.test("\(testNamePrefix).indexOf()/Predicate/semantics") {
+self.test("\(testNamePrefix).index(where:)/semantics") {
   for test in findTests {
     let c = makeWrappedCollectionWithEquatableElement(test.sequence)
     let closureLifetimeTracker = LifetimeTracked(0)
     expectEqual(1, LifetimeTracked.instances)
-    let result = c.indexOf {
+    let result = c.index {
       (candidate) in
       _blackHole(closureLifetimeTracker)
       return extractValueFromEquatable(candidate).value == test.element.value

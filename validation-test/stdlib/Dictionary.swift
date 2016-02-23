@@ -3806,11 +3806,11 @@ DictionaryTestSuite.test("misc") {
     expectOptionalEqual(4, d3["four"])
     expectOptionalEqual(5, d3["five"])
 
-    expectEqual(3, d.values[d.keys.indexOf("three")!])
-    expectEqual(4, d.values[d.keys.indexOf("four")!])
+    expectEqual(3, d.values[d.keys.index(of: "three")!])
+    expectEqual(4, d.values[d.keys.index(of: "four")!])
 
-    expectEqual(3, d3.values[d.keys.indexOf("three")!])
-    expectEqual(4, d3.values[d.keys.indexOf("four")!])
+    expectEqual(3, d3.values[d.keys.index(of: "three")!])
+    expectEqual(4, d3.values[d.keys.index(of: "four")!])
   }
 }
 

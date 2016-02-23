@@ -583,7 +583,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.indexOf{$0 === testClosure} // expected-error {{cannot convert value of type 'MyClosure' (aka 'Array<Int> -> Bool') to expected argument type 'AnyObject?'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot convert value of type 'MyClosure' (aka 'Array<Int> -> Bool') to expected argument type 'AnyObject?'}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil

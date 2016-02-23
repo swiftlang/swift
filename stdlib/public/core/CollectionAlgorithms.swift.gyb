@@ -14,7 +14,7 @@
 
 # We know we will eventually get a Sequence.Element type.  Define
 # a shorthand that we can use today.
-GElement = "Iterator.Element"
+IElement = "Iterator.Element"
 
 }%
 
@@ -29,16 +29,16 @@ extension Collection where Index : BidirectionalIndex {
 }
 
 //===----------------------------------------------------------------------===//
-// indexOf()
+// index(of:)/index(where:)
 //===----------------------------------------------------------------------===//
 
-extension Collection where ${GElement} : Equatable {
+extension Collection where ${IElement} : Equatable {
   /// Returns the first index where `value` appears in `self` or `nil` if
   /// `value` is not found.
   ///
   /// - Complexity: O(`self.count`).
   @warn_unused_result
-  public func indexOf(element: ${GElement}) -> Index? {
+  public func index(of element: ${IElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
@@ -58,8 +58,8 @@ extension Collection {
   ///
   /// - Complexity: O(`self.count`).
   @warn_unused_result
-  public func indexOf(
-    @noescape predicate: (${GElement}) throws -> Bool
+  public func index(
+    @noescape where predicate: (${IElement}) throws -> Bool
   ) rethrows -> Index? {
     for i in self.indices {
       if try predicate(self[i]) {
@@ -130,13 +130,13 @@ ${orderingRequirementForPredicate}
   @warn_unused_result
   public mutating func partition(
     @noescape isOrderedBefore isOrderedBefore:
-      (${GElement}, ${GElement}) -> Bool
+      (${IElement}, ${IElement}) -> Bool
   ) -> Index {
 
 %   else:
 
 extension MutableCollection
-  where Index : RandomAccessIndex, ${GElement} : Comparable {
+  where Index : RandomAccessIndex, ${IElement} : Comparable {
 
 ${partitionDocComment}
   ///
@@ -164,7 +164,7 @@ ${orderingRequirementForComparable}
 
 %   if preds:
     typealias EscapingBinaryPredicate =
-      (${GElement}, ${GElement}) -> Bool
+      (${IElement}, ${IElement}) -> Bool
     var escapableIsOrderedBefore =
       unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
     return _partition(&self, indices, &escapableIsOrderedBefore)
@@ -230,7 +230,7 @@ ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant="sort"' if Self == 'MutableCollection' else ''})
   public func sorted(
     @noescape isOrderedBefore isOrderedBefore:
-      (${GElement}, ${GElement}) -> Bool
+      (${IElement}, ${IElement}) -> Bool
   ) -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sort(isOrderedBefore: isOrderedBefore)
@@ -273,7 +273,7 @@ ${sortIsUnstableForPredicate}
 ${orderingRequirementForPredicate}
   public mutating func sort(
     @noescape isOrderedBefore isOrderedBefore:
-      (${GElement}, ${GElement}) -> Bool
+      (${IElement}, ${IElement}) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
       (Iterator.Element, Iterator.Element) -> Bool
@@ -300,14 +300,14 @@ extension MutableCollection
   @swift3_migration(message="slice the collection using the range, and call partition(isOrderedBefore:)")
   public mutating func partition(
     range: Range<Index>,
-    isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+    isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) -> Index {
     fatalError("unavailable function can't be called")
   }
 }
 
 extension MutableCollection
-  where Index : RandomAccessIndex, ${GElement} : Comparable {
+  where Index : RandomAccessIndex, ${IElement} : Comparable {
 
   @swift3_migration(message="slice the collection using the range, and call partition()")
   public mutating func partition(range: Range<Index>) -> Index {
