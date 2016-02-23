@@ -259,11 +259,6 @@ SkipParameterNames("skip-parameter-names",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-AlwaysArgumentLabels("always-argument-labels",
-  llvm::cl::desc("Whether to always print separate argument labels"),
-  llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 DisableAccessControl("disable-access-control",
     llvm::cl::desc("Disables access control, like a debugger"));
 
@@ -2576,9 +2571,6 @@ int main(int argc, char *argv[]) {
     if (options::SkipParameterNames) {
       PrintOpts.ArgAndParamPrinting
         = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
-    } else if (options::AlwaysArgumentLabels) {
-      PrintOpts.ArgAndParamPrinting
-        = PrintOptions::ArgAndParamPrintingMode::BothAlways;
     }
   }
   if (options::SkipUnderscoredStdlibProtocols)

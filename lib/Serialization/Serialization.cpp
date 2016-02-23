@@ -3576,11 +3576,12 @@ class DeclGroupNameContext {
   };
 
   class GroupNameCollectorFromJson : public GroupNameCollector {
-    const std::string GroupInfoFileName = "GroupInfo.json";
+    StringRef RecordPath;
     FileNameToGroupNameMap* pMap = nullptr;
 
   public:
-    GroupNameCollectorFromJson(bool Enable) : GroupNameCollector(Enable) {}
+    GroupNameCollectorFromJson(StringRef RecordPath) :
+      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath) {}
     StringRef getGroupNameInternal(const ValueDecl *VD) override {
       auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
       if (!PathOp.hasValue())
@@ -3588,12 +3589,7 @@ class DeclGroupNameContext {
       StringRef FullPath = StringRef(VD->getASTContext().SourceMgr.
                                      getIdentifierForBuffer(PathOp.getValue()));
       if (!pMap) {
-        llvm::SmallString<64> Path;
-
-        // The group info should be in the same directory with the source file.
-        llvm::sys::path::append(Path, llvm::sys::path::parent_path(FullPath),
-                                GroupInfoFileName);
-        YamlGroupInputParser Parser(Path.str());
+        YamlGroupInputParser Parser(RecordPath);
         if (!Parser.parse()) {
 
           // Get the file-name to group map if parsing correctly.
@@ -3613,8 +3609,8 @@ class DeclGroupNameContext {
   std::unique_ptr<GroupNameCollector> pNameCollector;
 
 public:
-  DeclGroupNameContext(bool Enable) :
-    pNameCollector(new GroupNameCollectorFromJson(Enable)) {}
+  DeclGroupNameContext(StringRef RecordPath) :
+    pNameCollector(new GroupNameCollectorFromJson(RecordPath)) {}
   uint32_t getGroupSequence(const ValueDecl *VD) {
     return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
                                      Map.size())).first->second;
@@ -3995,16 +3991,9 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 
-static bool isStdlibModule(ModuleOrSourceFile DC) {
-  if (auto M = DC.dyn_cast<ModuleDecl*>()) {
-    return M->isStdlibModule();
-  }
-  return false;
-}
-
-void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
+void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                                  StringRef GroupInfoPath) {
   Serializer S{MODULE_DOC_SIGNATURE, DC};
-  bool isStdlib = isStdlibModule(DC);
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
 
@@ -4013,7 +4002,7 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
     S.writeDocHeader();
     {
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
-      DeclGroupNameContext GroupContext(isStdlib);
+      DeclGroupNameContext GroupContext(GroupInfoPath);
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
       writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
       comment_block::GroupNamesLayout GroupNames(S.Out);
@@ -4093,7 +4082,7 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization (swiftdoc)");
-      Serializer::writeDocToStream(out, DC);
+      Serializer::writeDocToStream(out, DC, options.GroupInfoPath);
     });
   }
 }

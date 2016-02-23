@@ -164,6 +164,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.DumpAPIPath = A->getValue();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_group_info_path)) {
+    Opts.GroupInfoPath = A->getValue();
+  }
+
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 

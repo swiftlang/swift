@@ -109,6 +109,7 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  GroupInfo.json
   )
 
 # The complete list of sources in the core standard library.  Includes
@@ -128,7 +129,7 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   Prespecialized.swift
   )
-
+set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags)
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
