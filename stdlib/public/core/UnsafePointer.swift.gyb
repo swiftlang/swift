@@ -314,7 +314,7 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
-  @swift3_migration(renamed="deinitializePointee()")
+  @swift3_migration(renamed="deinitialize()")
   public func destroy() {
     Builtin.destroy(Memory.self, _rawValue)
   }
@@ -324,7 +324,7 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
-  @swift3_migration(renamed="deinitializePointee(count:)")
+  @swift3_migration(renamed="deinitialize(count:)")
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
     Builtin.destroyArray(Memory.self, _rawValue, count._builtinWordValue)
