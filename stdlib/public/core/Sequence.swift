@@ -228,8 +228,8 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
   internal let _limit: Int
   internal var _dropped: Int
 
-  internal init(_ iterator: Base, limit: Int, dropped: Int = 0) {
-    self._iterator = iterator
+  internal init(_iterator: Base, limit: Int, dropped: Int = 0) {
+    self._iterator = _iterator
     self._limit = limit
     self._dropped = dropped
   }
@@ -256,7 +256,8 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
     // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
     // [1,2,3,4].dropFirst(2).
     return AnySequence(
-      _DropFirstSequence(_iterator, limit: _limit + n, dropped: _dropped))
+      _DropFirstSequence(
+        _iterator: _iterator, limit: _limit + n, dropped: _dropped))
   }
 }
 
@@ -273,8 +274,8 @@ internal class _PrefixSequence<Base : IteratorProtocol>
   internal var _iterator: Base
   internal var _taken: Int
 
-  internal init(_ iterator: Base, maxLength: Int, taken: Int = 0) {
-    self._iterator = iterator
+  internal init(_iterator: Base, maxLength: Int, taken: Int = 0) {
+    self._iterator = _iterator
     self._maxLength = maxLength
     self._taken = taken
   }
@@ -297,8 +298,10 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 
   internal func prefix(maxLength: Int) -> AnySequence<Base.Element> {
     return AnySequence(
-      _PrefixSequence(_iterator,
-        maxLength: Swift.min(maxLength, self._maxLength), taken: _taken))
+      _PrefixSequence(
+        _iterator: _iterator,
+        maxLength: Swift.min(maxLength, self._maxLength),
+        taken: _taken))
   }
 }
 
@@ -543,7 +546,7 @@ extension Sequence where
   public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
     precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
-    return AnySequence(_DropFirstSequence(makeIterator(), limit: n))
+    return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
   }
 
   /// Returns a subsequence containing all but the last `n` elements.
@@ -584,7 +587,8 @@ extension Sequence where
     if maxLength == 0 {
       return AnySequence(EmptyCollection<Iterator.Element>())
     }
-    return AnySequence(_PrefixSequence(makeIterator(), maxLength: maxLength))
+    return AnySequence(
+      _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
   }
 }
 
