@@ -351,19 +351,28 @@ internal class _ForwardIndexBox<
   }
 
   func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance {
-    return numericCast(base.distance(to: unsafeUnbox(other)))
+// FIXME: swift-3-indexing-model - Review what we need to do here
+//    return numericCast(base.distance(to: unsafeUnbox(other)))
+    fatalError("swift-3-indexing-model FIXME")
+    return 0
   }
 
   func _advanced(by n: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol {
-    return self.dynamicType.init(base.advanced(by: numericCast(n)))
+// FIXME: swift-3-indexing-model - Review what we need to do here
+//    return self.dynamicType.init(base.advanced(by: numericCast(n)))
+    fatalError("swift-3-indexing-model FIXME")
+    return self.dynamicType.init(base)
   }
 
   func _advanced(
     by n: AnyForwardIndex.Distance,
     limit: _ForwardIndexBoxProtocol
   ) -> _ForwardIndexBoxProtocol {
-    return self.dynamicType.init(
-      base.advanced(by: numericCast(n), limit: unsafeUnbox(limit)))
+// FIXME: swift-3-indexing-model - Review what we need to do here
+//    return self.dynamicType.init(
+//      base.advanced(by: numericCast(n), limit: unsafeUnbox(limit)))
+    fatalError("swift-3-indexing-model FIXME")
+    return self.dynamicType.init(base)
   }
 
   func _unbox<T : ForwardIndex>() -> T? {

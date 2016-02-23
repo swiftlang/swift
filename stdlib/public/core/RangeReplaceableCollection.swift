@@ -245,7 +245,7 @@ extension RangeReplaceableCollection {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it has")
-    let end = startIndex.advanced(by: numericCast(n))
+    let end = advance(startIndex, by: numericCast(n))
     removeSubrange(startIndex..<end)
   }
 
@@ -290,7 +290,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[startIndex.advanced(by: numericCast(n))..<endIndex]
+    self = self[advance(startIndex, by: numericCast(n))..<endIndex]
   }
 }
 

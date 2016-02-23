@@ -23,7 +23,6 @@ public protocol BidirectionalCollection : Collection {
   @warn_unused_result
   func previous(i: Index) -> Index
   
-  // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   func _previousInPlace(inout i: Index)
 }
 

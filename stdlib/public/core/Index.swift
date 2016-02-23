@@ -104,7 +104,7 @@ public protocol ForwardIndex : _Incrementable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) // DONE: swift-3-indexing-model - replicated
+//  static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) // DONE: swift-3-indexing-model - replicated
 
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
@@ -127,11 +127,11 @@ public protocol ForwardIndex : _Incrementable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  static func _failEarlyRangeCheck2( // DONE: swift-3-indexing-model - replicated
-    rangeStart rangeStart: Self,
-    rangeEnd: Self,
-    boundsStart: Self,
-    boundsEnd: Self)
+//  static func _failEarlyRangeCheck2( // DONE: swift-3-indexing-model - replicated
+//    rangeStart rangeStart: Self,
+//    rangeEnd: Self,
+//    boundsStart: Self,
+//    boundsEnd: Self)
   // FIXME: the suffix `2` in the name, and passing `startIndex` and `endIndex`
   // separately (rather than as a range) are workarounds for a compiler defect.
   // <rdar://problem/21855350> Rejects-valid: rejects code that has two Self
@@ -148,8 +148,8 @@ public protocol ForwardIndex : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`abs(n)`) otherwise
-  @warn_unused_result
-  func advanced(by n: Distance) -> Self // DONE: swift-3-indexing-model - replicated
+//  @warn_unused_result
+//  func advanced(by n: Distance) -> Self // DONE: swift-3-indexing-model - replicated
 
   /// Returns the result of advancing `self` by `n` positions, or until it
   /// equals `limit`.
@@ -166,8 +166,8 @@ public protocol ForwardIndex : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`abs(n)`) otherwise
-  @warn_unused_result
-  func advanced(by n: Distance, limit: Self) -> Self // DONE: swift-3-indexing-model - replicated
+//  @warn_unused_result
+//  func advanced(by n: Distance, limit: Self) -> Self // DONE: swift-3-indexing-model - replicated
 
   /// Measure the distance between `self` and `end`.
   ///
@@ -179,25 +179,25 @@ public protocol ForwardIndex : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`n`) otherwise, where `n` is the function's result.
-  @warn_unused_result
-  func distance(to end: Self) -> Distance // DONE: swift-3-indexing-model - replicated
+//  @warn_unused_result
+//  func distance(to end: Self) -> Distance // DONE: swift-3-indexing-model - replicated
 }
 
 // advance and distance implementations
 
 extension ForwardIndex {
-  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) { // DONE: swift-3-indexing-model - replicated
-    // Can't perform range checks in O(1) on forward indices.
-  }
-
-  public static func _failEarlyRangeCheck2( // DONE: swift-3-indexing-model - replicated
-    rangeStart rangeStart: Self,
-    rangeEnd: Self,
-    boundsStart: Self,
-    boundsEnd: Self
-  ) {
-    // Can't perform range checks in O(1) on forward indices.
-  }
+//  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) { // DONE: swift-3-indexing-model - replicated
+//    // Can't perform range checks in O(1) on forward indices.
+//  }
+//
+//  public static func _failEarlyRangeCheck2( // DONE: swift-3-indexing-model - replicated
+//    rangeStart rangeStart: Self,
+//    rangeEnd: Self,
+//    boundsStart: Self,
+//    boundsEnd: Self
+//  ) {
+//    // Can't perform range checks in O(1) on forward indices.
+//  }
 
   /// Do not use this method directly; call advanced(by: n) instead.
   @_transparent
@@ -230,26 +230,26 @@ extension ForwardIndex {
     return p
   }
 
-  @warn_unused_result
-  public func advanced(by n: Distance) -> Self { // DONE: swift-3-indexing-model - replicated
-    return self._advanceForward(n)
-  }
+//  @warn_unused_result
+//  public func advanced(by n: Distance) -> Self { // DONE: swift-3-indexing-model - replicated
+//    return self._advanceForward(n)
+//  }
 
-  @warn_unused_result
-  public func advanced(by n: Distance, limit: Self) -> Self { // DONE: swift-3-indexing-model - replicated
-    return self._advanceForward(n, limit)
-  }
+//  @warn_unused_result
+//  public func advanced(by n: Distance, limit: Self) -> Self { // DONE: swift-3-indexing-model - replicated
+//    return self._advanceForward(n, limit)
+//  }
 
-  @warn_unused_result
-  public func distance(to end: Self) -> Distance { // DONE: swift-3-indexing-model - replicated
-    var p = self
-    var count: Distance = 0
-    while p != end {
-      count += 1
-      p._successorInPlace()
-    }
-    return count
-  }
+//  @warn_unused_result
+//  public func distance(to end: Self) -> Distance { // DONE: swift-3-indexing-model - replicated
+//    var p = self
+//    var count: Distance = 0
+//    while p != end {
+//      count += 1
+//      p._successorInPlace()
+//    }
+//    return count
+//  }
 }
 
 //===----------------------------------------------------------------------===//
