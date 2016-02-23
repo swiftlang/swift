@@ -895,18 +895,6 @@ static bool shouldPlacePrepositionOnArgLabel(StringRef beforePreposition,
       afterPreposition == "Z")
     return false;
 
-  // The preposition "of" binds tightly to the left word, except in
-  // rare cases.
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "of")) {
-    auto following = camel_case::getFirstWord(afterPreposition);
-    if (!camel_case::sameWordIgnoreFirstCase(following, "type") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "types") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "kind") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "size") &&
-        !camel_case::sameWordIgnoreFirstCase(following, "length"))
-      return false;
-  }
-
   return true;
 }
 

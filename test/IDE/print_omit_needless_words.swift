@@ -37,10 +37,10 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
+// CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
 
 // Note: Class -> "Class"
-// CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
+// CHECK-OBJECTIVEC: func isKind(of aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; preposition splitting.
 //
@@ -279,11 +279,8 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>)
 
-// "Of" associates left.
-// CHECK-OMIT-NEEDLESS-WORDS: func typeOf(_: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func typeOf(namedString _: String)
-
-// ... except for some properties of the result.
+// CHECK-OMIT-NEEDLESS-WORDS: func type(of _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func type(ofNamedString _: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func type(ofTypeNamed _: String)
 
 // Look for preposition prior to "of".
