@@ -679,6 +679,61 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //                        Witness Method Optimization
 //===----------------------------------------------------------------------===//
 
+static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
+                                          ArrayRef<Substitution> Subs,
+                                          SmallVectorImpl<Substitution> &NewSubs) {
+  auto &Module = AI.getModule();
+
+  auto CalleeCanType = F->getLoweredFunctionType();
+
+  ProtocolDecl *proto = nullptr;
+  if (CalleeCanType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    proto = CalleeCanType->getDefaultWitnessMethodProtocol(
+        *Module.getSwiftModule());
+  }
+
+  ArrayRef<Substitution> origSubs = AI.getSubstitutions();
+
+  if (proto != nullptr) {
+    // If the callee is a default witness method thunk, preserve substitutions
+    // from the call site.
+    NewSubs.append(origSubs.begin(), origSubs.end());
+    return;
+  }
+
+  // If the callee is a concrete witness method thunk, apply substitutions
+  // from the conformance, and drop any substitutions derived from the Self
+  // type.
+  NewSubs.append(Subs.begin(), Subs.end());
+
+  if (auto generics = AI.getOrigCalleeType()->getGenericSignature()) {
+    for (auto genericParam : generics->getAllDependentTypes()) {
+      auto origSub = origSubs.front();
+      origSubs = origSubs.slice(1);
+
+      // If the callee is a concrete witness method thunk, we ignore
+      // generic parameters derived from 'self', the generic parameter at
+      // depth 0, index 0.
+      auto type = genericParam->getCanonicalType();
+      while (auto memberType = dyn_cast<DependentMemberType>(type)) {
+        type = memberType.getBase();
+      }
+      auto paramType = cast<GenericTypeParamType>(type);
+      if (paramType->getDepth() == 0) {
+        // There shouldn't be any other parameters at this depth.
+        assert(paramType->getIndex() == 0);
+        continue;
+      }
+
+      // Okay, remember this substitution.
+      NewSubs.push_back(origSub);
+    }
+  }
+
+  assert(origSubs.empty() && "subs not parallel to dependent types");
+}
+
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
@@ -693,38 +748,15 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // The complete set of substitutions may be different, e.g. because the found
   // witness thunk F may have been created by a specialization pass and have
   // additional generic parameters.
-  SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
-  if (auto generics = AI.getOrigCalleeType()->getGenericSignature()) {
-    ArrayRef<Substitution> origSubs = AI.getSubstitutions();
-    for (auto genericParam : generics->getAllDependentTypes()) {
-      auto origSub = origSubs.front();
-      origSubs = origSubs.slice(1);
+  SmallVector<Substitution, 4> NewSubs;
 
-      // Ignore generic parameters derived from 'self', the generic
-      // parameter at depth 0, index 0.
-      auto type = genericParam->getCanonicalType();
-      while (auto memberType = dyn_cast<DependentMemberType>(type)) {
-        type = memberType.getBase();
-      }
-      auto paramType = cast<GenericTypeParamType>(type);
-      if (paramType->getDepth() == 0) {
-        // There shouldn't be any other parameters at this depth.
-        assert(paramType->getIndex() == 0);
-        continue;
-      }
-
-      // Okay, remember this substitution.
-      NewSubstList.push_back(origSub);
-    }
-
-    assert(origSubs.empty() && "subs not parallel to dependent types");
-  }
+  getWitnessMethodSubstitutions(AI, F, Subs, NewSubs);
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
   auto CalleeCanType = F->getLoweredFunctionType();
   auto SubstCalleeCanType = CalleeCanType->substGenericArgs(
-    Module, Module.getSwiftModule(), NewSubstList);
+    Module, Module.getSwiftModule(), NewSubs);
 
   // Collect arguments from the apply instruction.
   auto Arguments = SmallVector<SILValue, 4>();
@@ -754,15 +786,15 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
 
   if (auto *A = dyn_cast<ApplyInst>(AI))
     SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
-                              ResultSILType, NewSubstList, Arguments,
+                              ResultSILType, NewSubs, Arguments,
                               A->isNonThrowing());
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     SAI = Builder.createTryApply(Loc, FRI, SubstCalleeSILType,
-                                 NewSubstList, Arguments,
+                                 NewSubs, Arguments,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI))
     SAI = Builder.createPartialApply(Loc, FRI, SubstCalleeSILType,
-                                     NewSubstList, Arguments, PAI->getType());
+                                     NewSubs, Arguments, PAI->getType());
 
   NumWitnessDevirt++;
   return SAI;
