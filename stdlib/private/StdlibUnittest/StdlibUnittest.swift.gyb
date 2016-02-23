@@ -2008,7 +2008,7 @@ public func checkSequence<
 ) {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
-    expected, sequence.iterator(), ${trace},
+    expected, sequence.makeIterator(), ${trace},
     resiliencyChecks: resiliencyChecks,
     sameValue: sameValue)
 

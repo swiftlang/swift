@@ -34,7 +34,7 @@ public class AnyIterator<T> : _AnyIteratorBase, IteratorProtocol {
 /// traversing the sequence consumes the iterator.
 extension AnyIterator : Sequence {
   /// Returns `self`.
-  public func iterator() -> AnyIterator { return self }
+  public func makeIterator() -> AnyIterator { return self }
 }
 
 /// Return a `IteratorProtocol` instance that wraps `base` but whose type
@@ -48,7 +48,7 @@ extension AnyIterator : Sequence {
 ///       // This is a really complicated type of no interest to our
 ///       // clients.
 ///       let g: MapSequenceIterator<RangeIterator<Int>, String>
-///         = lazyStrings.iterator()
+///         = lazyStrings.makeIterator()
 ///       return anyIterator(g)
 ///     }
 public func anyIterator<I: IteratorProtocol>(base: I) -> AnyIterator<I.Element> {

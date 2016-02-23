@@ -98,9 +98,9 @@ extension LoggingSequenceType {
     self.base = base
   }
   
-  public func iterator() -> LoggingIterator<Base.Iterator> {
+  public func makeIterator() -> LoggingIterator<Base.Iterator> {
     ++SequenceLog.iterator[selfType]
-    return LoggingIterator(base.iterator())
+    return LoggingIterator(base.makeIterator())
   }
 
   public func underestimatedCount() -> Int {

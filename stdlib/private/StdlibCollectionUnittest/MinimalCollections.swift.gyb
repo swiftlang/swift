@@ -22,7 +22,7 @@
 import StdlibUnittest
 
 /// State that is created every time a fresh generator is created with
-/// `MinimalSequence.iterator()`.
+/// `MinimalSequence.makeIterator()`.
 internal class _MinimalIteratorPrivateState<T> {
   internal init() {}
 
@@ -130,8 +130,8 @@ extension StrictSequence {
 }
 
 extension StrictSequence where Iterator : _MinimalIterator {
-  public func iterator() -> MinimalIterator<Element> {
-    return base.iterator()
+  public func makeIterator() -> MinimalIterator<Element> {
+    return base.makeIterator()
   }
 }
 
@@ -162,7 +162,7 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
     }
   }
 
-  public func iterator() -> MinimalIterator<T> {
+  public func makeIterator() -> MinimalIterator<T> {
     return MinimalIterator(_sharedState)
   }
 
@@ -885,8 +885,8 @@ extension ${Protocol} {
 }
 
 extension ${Protocol} where Iterator : _MinimalIterator {
-  public func iterator() -> MinimalIterator<Element> {
-    return base.iterator()
+  public func makeIterator() -> MinimalIterator<Element> {
+    return base.makeIterator()
   }
 }
 
@@ -939,7 +939,7 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
     }
   }
 
-  public func iterator() -> MinimalIterator<T> {
+  public func makeIterator() -> MinimalIterator<T> {
     return MinimalIterator(_elements)
   }
 
@@ -1010,8 +1010,8 @@ extension ${Protocol} {
 }
 
 extension ${Protocol} where Iterator : _MinimalIterator {
-  public func iterator() -> MinimalIterator<Element> {
-    return base.iterator()
+  public func makeIterator() -> MinimalIterator<Element> {
+    return base.makeIterator()
   }
 }
 
@@ -1080,7 +1080,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
       _CollectionState(newRootStateForElementCount: self.elements.count)
   }
 
-  public func iterator() -> MinimalIterator<T> {
+  public func makeIterator() -> MinimalIterator<T> {
     return MinimalIterator(elements)
   }
 
@@ -1332,7 +1332,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       base: Base(elements: elements))
   }
 
-  public func iterator() -> MinimalIterator<Element> {
+  public func makeIterator() -> MinimalIterator<Element> {
     return MinimalIterator(Array(self))
   }
 

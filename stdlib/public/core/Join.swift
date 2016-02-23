@@ -43,7 +43,7 @@ public struct JoinedIterator<
       switch _state {
       case .start:
         if let nextSubSequence = _base.next() {
-          _inner = nextSubSequence.iterator()
+          _inner = nextSubSequence.makeIterator()
           _state = .generatingElements
         } else {
           _state = .end
@@ -55,13 +55,13 @@ public struct JoinedIterator<
         if _fastPath(result != nil) {
           return result
         }
-        _inner = _base.next()?.iterator()
+        _inner = _base.next()?.makeIterator()
         if _inner == nil {
           _state = .end
           return nil
         }
         if !_separatorData.isEmpty {
-          _separator = _separatorData.iterator()
+          _separator = _separatorData.makeIterator()
           _state = .generatingSeparator
         }
 
@@ -110,9 +110,9 @@ public struct JoinedSequence<
   /// Return an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> JoinedIterator<Base.Iterator> {
+  public func makeIterator() -> JoinedIterator<Base.Iterator> {
     return JoinedIterator(
-      base: _base.iterator(),
+      base: _base.makeIterator(),
       separator: _separator)
   }
 
@@ -141,7 +141,7 @@ public struct JoinedSequence<
       return result._buffer
     }
 
-    var iter = _base.iterator()
+    var iter = _base.makeIterator()
     if let first = iter.next() {
       result.appendContents(of: first)
       while let next = iter.next() {

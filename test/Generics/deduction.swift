@@ -213,8 +213,8 @@ func rangeOfIsBefore<
 >(range: R) { }
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
-  rangeOfIsBefore(ia.iterator())
-  rangeOfIsBefore(da.iterator()) // expected-error{{ambiguous reference to member 'iterator()'}}
+  rangeOfIsBefore(ia.makeIterator())
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{ambiguous reference to member 'makeIterator()'}}
 }
 
 //===----------------------------------------------------------------------===//

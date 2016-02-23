@@ -71,7 +71,7 @@ public struct GeneratorOf<T> : IteratorProtocol, Sequence {
 
   /// `GeneratorOf<T>` is also a `Sequence`, so it `generate`\ s
   /// a copy of itself
-  public func iterator() -> GeneratorOf {
+  public func makeIterator() -> GeneratorOf {
     return self
   }
   let _next: () -> T?
@@ -79,7 +79,7 @@ public struct GeneratorOf<T> : IteratorProtocol, Sequence {
 
 // rdar://problem/19009056
 public struct LazySequenceOf<S : Sequence, A where S.Iterator.Element == A> : Sequence {
-  public func iterator() -> GeneratorOf<A> { 
+  public func makeIterator() -> GeneratorOf<A> { 
     return GeneratorOf<A>({ return nil })
   }
   public subscript(i : A) -> A { return i }
@@ -91,7 +91,7 @@ public func iterate<A>(f : A -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? 
 
 public final class Iterate<A> : Sequence {
   typealias IteratorProtocol = IterateGenerator<A>
-  public func iterator() -> IterateGenerator<A> {
+  public func makeIterator() -> IterateGenerator<A> {
     return IterateGenerator<A>()
   }
 }
@@ -219,9 +219,9 @@ func GGWrap<I1 : IteratorProtocol, I2 : IteratorProtocol where I1.Element == I2.
 }
 
 func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
-  GGWrap(a.iterator(), s.iterator())
-  TTGenWrap(a.iterator())
-  IntIntGenWrap(s.iterator())
+  GGWrap(a.makeIterator(), s.makeIterator())
+  TTGenWrap(a.makeIterator())
+  IntIntGenWrap(s.makeIterator())
 }
 
 // rdar://problem/20256475

@@ -115,7 +115,7 @@ public struct Range<
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> RangeIterator<Element> {
+  public func makeIterator() -> RangeIterator<Element> {
     return RangeIterator(_bounds: self)
   }
 
@@ -233,7 +233,7 @@ public func ~= <I : ForwardIndex where I : Comparable> (
 public struct RangeGenerator<Element : ForwardIndex> {}
 
 extension RangeIterator {
-  @available(*, unavailable, message="use the 'iterator()' method on the collection")
+  @available(*, unavailable, message="use the 'makeIterator()' method on the collection")
   public init(_ bounds: Range<Element>) {
     fatalError("unavailable function can't be called")
   }

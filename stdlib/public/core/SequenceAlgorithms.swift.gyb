@@ -74,7 +74,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
       (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
-    var it = iterator()
+    var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
 %   if preds:
@@ -97,7 +97,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
       (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
-    var it = iterator()
+    var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
 %   if preds:
@@ -149,7 +149,7 @@ else:
     @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
-    var possiblePrefixIterator = possiblePrefix.iterator()
+    var possiblePrefixIterator = possiblePrefix.makeIterator()
     for e0 in self {
       if let e1 = possiblePrefixIterator.next() {
         if ${"try !isEquivalent(e0, e1)" if preds else "e0 != e1"} {
@@ -202,8 +202,8 @@ else:
     @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
-    var iter1 = self.iterator()
-    var iter2 = other.iterator()
+    var iter1 = self.makeIterator()
+    var iter2 = other.makeIterator()
     while true {
       switch (iter1.next(), iter2.next()) {
       case let (e1?, e2?):
@@ -270,8 +270,8 @@ else:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
-    var iter1 = self.iterator()
-    var iter2 = other.iterator()
+    var iter1 = self.makeIterator()
+    var iter2 = other.makeIterator()
     while true {
       if let e1 = iter1.next() {
         if let e2 = iter2.next() {
