@@ -34,7 +34,7 @@ func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Dou
       var delta = outputA ^ outputB
       for outputBit in 0..<bits {
         if delta & 1 == 1 {
-          ++bitFlips[outputBit]
+          bitFlips[outputBit] += 1
         }
         delta = delta >> 1
       }
