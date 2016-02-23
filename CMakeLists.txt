@@ -140,9 +140,6 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
 
-set(SWIFT_DARWIN_ICU_INCLUDE_PATH "" CACHE STRING
-    "Path to the directory where the ICU headers are located")
-
 set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "@rpath" CACHE STRING
     "The directory of the install_name for standard library dylibs")
 
