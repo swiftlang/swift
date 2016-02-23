@@ -602,7 +602,7 @@ extension Sequence
     } else {
       var p = ptr
       for x in self {
-        p.initializePointee(x)
+        p.initialize(with: x)
         p += 1
       }
       return p

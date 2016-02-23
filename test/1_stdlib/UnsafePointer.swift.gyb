@@ -142,40 +142,40 @@ func checkPointerCorrectness(check: Check,
   let ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
   switch check {
   case .RightOverlap:
-    ptr.initializePointee(Missile(1))
-    (ptr + 1).initializePointee(Missile(2))
+    ptr.initialize(with: Missile(1))
+    (ptr + 1).initialize(with: Missile(2))
     if withMissiles {
-      (ptr + 2).initializePointee(Missile(3))
+      (ptr + 2).initialize(with: Missile(3))
     }
     f(ptr + 1)(ptr, count: 2)
     expectEqual(1, ptr[1].number)
     expectEqual(2, ptr[2].number)
   case .LeftOverlap:
     if withMissiles {
-      ptr.initializePointee(Missile(1))
+      ptr.initialize(with: Missile(1))
     }
-    (ptr + 1).initializePointee(Missile(2))
-    (ptr + 2).initializePointee(Missile(3))
+    (ptr + 1).initialize(with: Missile(2))
+    (ptr + 2).initialize(with: Missile(3))
     f(ptr)(ptr + 1, count: 2)
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
   case .Disjoint:
     if withMissiles {
-      ptr.initializePointee(Missile(0))
-      (ptr + 1).initializePointee(Missile(1))
+      ptr.initialize(with: Missile(0))
+      (ptr + 1).initialize(with: Missile(1))
     }
-    (ptr + 2).initializePointee(Missile(2))
-    (ptr + 3).initializePointee(Missile(3))
+    (ptr + 2).initialize(with: Missile(2))
+    (ptr + 3).initialize(with: Missile(3))
     f(ptr)(ptr + 2, count: 2)
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
     // backwards
     let ptr2 = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
-    ptr2.initializePointee(Missile(0))
-    (ptr2 + 1).initializePointee(Missile(1))
+    ptr2.initialize(with: Missile(0))
+    (ptr2 + 1).initialize(with: Missile(1))
     if withMissiles {
-      (ptr2 + 2).initializePointee(Missile(2))
-      (ptr2 + 3).initializePointee(Missile(3))
+      (ptr2 + 2).initialize(with: Missile(2))
+      (ptr2 + 3).initialize(with: Missile(3))
     }
     f(ptr2 + 2)(ptr2, count: 2)
     expectEqual(0, ptr2[2].number)

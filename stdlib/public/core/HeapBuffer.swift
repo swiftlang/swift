@@ -181,7 +181,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
       size: totalSize,
       alignmentMask: alignMask)
     self._storage = Builtin.castToNativeObject(object)
-    self._value.initializePointee(initializer)
+    self._value.initialize(with: initializer)
   }
 
   public // @testable

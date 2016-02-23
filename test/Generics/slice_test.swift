@@ -44,13 +44,13 @@ class Vector<T> {
       let size = Int(Builtin.sizeof(T.self))
       let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
       for i in 0..<length {
-        (newbase + i).initializePointee((base+i).move())
+        (newbase + i).initialize(with: (base+i).move())
       }
       c_free(base)
       base = newbase
       capacity = newcapacity
     }
-    (base+length).initializePointee(elem)
+    (base+length).initialize(with: elem)
     length += 1
   }
 

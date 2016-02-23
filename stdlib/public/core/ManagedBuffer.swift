@@ -190,7 +190,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
     // initialize the value field
     withUnsafeMutablePointerToValue {
-      $0.initializePointee(
+      $0.initialize(with: 
         initialValue(
           buffer: self.buffer,
           capacity: {

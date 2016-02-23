@@ -169,7 +169,7 @@ extension _ArrayBufferProtocol {
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initializePointee(newValues[i])
+        (elements + j).initialize(with: newValues[i])
         i._successorInPlace()
       }
       _expectEnd(i, newValues)
