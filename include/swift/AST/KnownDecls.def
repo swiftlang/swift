@@ -65,7 +65,7 @@ FUNC_DECL(ForceBridgeFromObjectiveCBridgeable,
 FUNC_DECL(ConditionallyBridgeFromObjectiveCBridgeable,
           "_conditionallyBridgeFromObjectiveC_bridgeable")
 
-FUNC_DECL(DidEnterMain, "_didEnterMain")
+FUNC_DECL(DidEnterMain, "_stdlib_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
 #undef FUNC_DECL

@@ -978,8 +978,8 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   auto argv = new (gen.F.getModule()) SILArgument(
                                   entry, FnTy->getParameters()[1].getSILType());
 
-  // If the standard library provides a _didEnterMain intrinsic, call it first
-  // thing.
+  // If the standard library provides a _stdlib_didEnterMain intrinsic, call it
+  // first thing.
   if (auto didEnterMain = C.getDidEnterMain(nullptr)) {
     ManagedValue params[] = {
       ManagedValue::forUnmanaged(argc),
