@@ -229,7 +229,7 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments']
+    cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments', '-always-argument-labels']
 
     # Add -F / -I arguments.
     if args.framework_dir:
