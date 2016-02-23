@@ -48,7 +48,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> LazyMapGenerator<Base.Generator, Element> {
     return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
   }
@@ -110,7 +110,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> LazyMapGenerator<Base.Generator, Element> {
     return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
   }

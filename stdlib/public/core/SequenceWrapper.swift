@@ -30,7 +30,7 @@ extension SequenceType
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> Base.Generator {
     return self._base.generate()
   }

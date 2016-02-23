@@ -80,7 +80,7 @@ public protocol SequenceType {
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   @warn_unused_result
   func generate() -> Generator
 
@@ -212,7 +212,7 @@ public protocol SequenceType {
 extension SequenceType
   where Self.Generator == Self, Self : GeneratorType {
 
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> Self {
     return self
   }

@@ -93,7 +93,7 @@ public struct IndexingGenerator<Elements : Indexable>
   
   /// Create a generator over the given collection.
   @available(*, deprecated, message="it will be removed in Swift 3, call '.generator()' on the collection instead")
-  @swift3_migration(message="call '.iterator()' on the collection")
+  @swift3_migration(message="call '.makeIterator()' on the collection")
   public init(_ elements: Elements) {
     self._elements = elements
     self._position = elements.startIndex
@@ -142,7 +142,7 @@ public protocol CollectionType : Indexable, SequenceType {
   // FIXME: Needed here so that the Generator is properly deduced from
   // a custom generate() function.  Otherwise we get an
   // IndexingGenerator. <rdar://problem/21539115>
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   func generate() -> Generator
   
   // FIXME: should be constrained to CollectionType
