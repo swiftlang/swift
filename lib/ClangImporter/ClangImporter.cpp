@@ -262,6 +262,27 @@ void ClangImporter::clearTypeResolver() {
 #define SHIMS_INCLUDE_FLAG "-I"
 #endif
 
+static StringRef
+getMinVersionOptNameForDarwinTriple(const llvm::Triple &triple) {
+  switch(getDarwinPlatformKind(triple)) {
+    case DarwinPlatformKind::MacOS:
+      return "-mmacosx-version-min=";
+    case DarwinPlatformKind::IPhoneOS:
+      return "-mios-version-min=";
+    case DarwinPlatformKind::IPhoneOSSimulator:
+      return "-mios-simulator-version-min=";
+    case DarwinPlatformKind::TvOS:
+      return "-mtvos-version-min=";
+    case DarwinPlatformKind::TvOSSimulator:
+      return "-mtvos-simulator-version-min=";
+    case DarwinPlatformKind::WatchOS:
+      return "-mwatchos-version-min=";
+    case DarwinPlatformKind::WatchOSSimulator:
+      return "-mwatchos-simulator-version-min=";
+  }
+  llvm_unreachable("Unsupported Darwin platform");
+}
+
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -343,31 +364,15 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   if (triple.isOSDarwin()) {
     std::string minVersionBuf;
     llvm::raw_string_ostream minVersionOpt{minVersionBuf};
+    minVersionOpt << getMinVersionOptNameForDarwinTriple(triple);
+
     unsigned major, minor, micro;
     if (triple.isiOS()) {
-      bool isiOSSimulator = swift::tripleIsiOSSimulator(triple);
-      if (triple.isTvOS()) {
-        if (isiOSSimulator)
-          minVersionOpt << "-mtvos-simulator-version-min=";
-        else
-          minVersionOpt << "-mtvos-version-min=";
-      } else {
-        if (isiOSSimulator)
-          minVersionOpt << "-mios-simulator-version-min=";
-        else
-          minVersionOpt << "-mios-version-min=";
-      }
-
       triple.getiOSVersion(major, minor, micro);
     } else if(triple.isWatchOS()) {
-      if (tripleIsWatchSimulator(triple))
-          minVersionOpt << "-mwatchos-simulator-version-min=";
-      else
-          minVersionOpt << "-mwatchos-version-min=";
-      triple.getOSVersion(major, minor, micro);
+      triple.getWatchOSVersion(major, minor, micro);
     } else {
       assert(triple.isMacOSX());
-      minVersionOpt << "-mmacosx-version-min=";
       triple.getMacOSXVersion(major, minor, micro);
     }
     minVersionOpt << clang::VersionTuple(major, minor, micro);
