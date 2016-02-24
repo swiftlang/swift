@@ -2,6 +2,8 @@
 
 // RUN: %target-swift-frontend -emit-ir -sanitize=address %s | FileCheck %s -check-prefix=ASAN
 
+// XFAIL: linux
+
 func test() {
 }
 
