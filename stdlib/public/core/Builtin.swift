@@ -201,6 +201,7 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
 /// not much you can do with this other than use it to identify the
 /// object.
+@swift3_migration(renamed="unsafeAddress(of:)")
 @_transparent
 @warn_unused_result
 public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {

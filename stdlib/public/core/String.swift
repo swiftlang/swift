@@ -715,6 +715,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
+  @swift3_migration(renamed="insertContents(of:at:)")
   public mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, at i: Index) {

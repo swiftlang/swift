@@ -122,6 +122,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
+  @swift3_migration(renamed="insertContents(of:at:)")
   mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == Generator.Element
   >(newElements: S, at i: Index)
@@ -214,6 +215,7 @@ extension RangeReplaceableCollectionType {
     replaceRange(i..<i, with: CollectionOfOne(newElement))
   }
 
+  @swift3_migration(renamed="insertContents(of:at:)")
   public mutating func insertContentsOf<
     C : CollectionType where C.Generator.Element == Generator.Element
   >(newElements: C, at i: Index) {
