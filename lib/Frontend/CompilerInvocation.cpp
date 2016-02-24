@@ -15,6 +15,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/SanitizerOptions.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
@@ -1222,6 +1223,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         Opts.CmdArgs.push_back('\0');
       }
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
+    Opts.Sanitize = parseSanitizerArgValues(A, &Diags);;
   }
 
   if (Args.hasArg(OPT_enable_reflection_metadata)) {

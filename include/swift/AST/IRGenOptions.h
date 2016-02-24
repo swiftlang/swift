@@ -19,6 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/SanitizerOptions.h"
 #include <string>
 #include <vector>
 
@@ -84,6 +85,9 @@ public:
   /// Whether or not to run optimization passes.
   unsigned Optimize : 1;
 
+  /// Which sanitizer is turned on.
+  SanitizerKind Sanitize : 2;
+
   /// Whether we should emit debug info.
   IRGenDebugInfoKind DebugInfoKind : 2;
 
@@ -143,7 +147,8 @@ public:
   std::vector<uint8_t> CmdArgs;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-                   Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
+                   Optimize(false), Sanitize(SanitizerKind::None),
+                   DebugInfoKind(IRGenDebugInfoKind::None),
                    UseJIT(false), DisableLLVMOptzns(false),
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), Playground(false),
@@ -168,6 +173,7 @@ public:
     Hash = (Hash << 1) | Optimize;
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableLLVMARCOpts;
+    Hash = (Hash << 2) | (unsigned)Sanitize;
     return Hash;
   }
 };

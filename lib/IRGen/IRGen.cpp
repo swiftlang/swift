@@ -84,7 +84,13 @@ static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftStackPromotionPass());
 }
 
-// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
+static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
+                                      legacy::PassManagerBase &PM) {
+  PM.add(createAddressSanitizerFunctionPass());
+  PM.add(createAddressSanitizerModulePass());
+}
+
+// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp.
 // These should be moved to a single definition shared by clang and swift.
 enum ImageInfoFlags {
   eImageInfo_FixAndContinue      = (1 << 0),
@@ -148,6 +154,13 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                            addSwiftARCOptPass);
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addSwiftContractPass);
+  }
+
+  if (Opts.Sanitize == SanitizerKind::Address) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addAddressSanitizerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addAddressSanitizerPasses);
   }
   
   // Configure the function passes.

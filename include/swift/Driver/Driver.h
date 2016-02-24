@@ -112,6 +112,8 @@ public:
   /// The path to the SDK against which to build.
   /// (If empty, this implies no SDK.)
   std::string SDKPath;
+
+  enum SanitizerKind SelectedSanitizer;
 };
 
 class Driver {

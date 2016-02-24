@@ -1099,6 +1099,12 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       }
     }
   }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
+    OI.SelectedSanitizer = parseSanitizerArgValues(A, &Diags);
+  else
+    OI.SelectedSanitizer = SanitizerKind::None;
+
 }
 
 void Driver::buildActions(const ToolChain &TC,

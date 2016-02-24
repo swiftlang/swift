@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
@@ -46,6 +47,12 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
     // after we're done with this function.
     IGM.DebugInfo->pushLoc();
   }
+
+  // Apply sanitizer attributes to the function.
+  // TODO: Check if the function is ASan black listed either in the external
+  // file or via annotations.
+  if (IGM.Opts.Sanitize == SanitizerKind::Address)
+    Fn->addFnAttr(llvm::Attribute::SanitizeAddress);
 
   emitPrologue();
 }
