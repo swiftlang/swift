@@ -229,7 +229,7 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
       var sliceForSetter = slice
       for i in bounds {
         // Test setter.
-        sliceForSetter[i].value++
+        sliceForSetter[i].value += 1
         expectEqual(base[i].value + 1, sliceForSetter[i].value)
       }
     }
@@ -241,7 +241,7 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
         expectEqual(base[index].value, slice[index].value)
 
         // Test setter.
-        sliceForSetter[index].value++
+        sliceForSetter[index].value += 1
         expectEqual(base[index].value + 1, sliceForSetter[index].value)
       } else {
         // `MutableSlice` disallows out-of-bounds indices when the underlying
@@ -254,7 +254,7 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
 
         // Test setter.
         expectFailure {
-          sliceForSetter[index].value++
+          sliceForSetter[index].value += 1
         }
       }
     }

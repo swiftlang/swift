@@ -1318,22 +1318,22 @@ class CustomImmutableNSDictionary : NSDictionary {
   }
 
   @objc override func copyWithZone(zone: NSZone) -> AnyObject {
-    ++CustomImmutableNSDictionary.timesCopyWithZoneWasCalled
+    CustomImmutableNSDictionary.timesCopyWithZoneWasCalled += 1
     return self
   }
 
   override func objectForKey(aKey: AnyObject) -> AnyObject? {
-    ++CustomImmutableNSDictionary.timesObjectForKeyWasCalled
+    CustomImmutableNSDictionary.timesObjectForKeyWasCalled += 1
     return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).objectForKey(aKey)
   }
 
   override func keyEnumerator() -> NSEnumerator {
-    ++CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled
+    CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled += 1
     return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).keyEnumerator()
   }
 
   override var count: Int {
-    ++CustomImmutableNSDictionary.timesCountWasCalled
+    CustomImmutableNSDictionary.timesCountWasCalled += 1
     return 3
   }
 
@@ -1545,7 +1545,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, Int.self))
 
   var pairs = Array<(Int, Int)>()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var (key, value) = d[i]
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs += [kv]
@@ -1573,7 +1573,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, Int.self))
 
   var pairs = Array<(Int, Int)>()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var (key, value) = d[i]
     let kv = (key.value, value.value)
     pairs += [kv]
@@ -3451,7 +3451,7 @@ class MockDictionaryWithCustomCount : NSDictionary {
   }
 
   override var count: Int {
-    ++MockDictionaryWithCustomCount.timesCountWasCalled
+    MockDictionaryWithCustomCount.timesCountWasCalled += 1
     return _count
   }
 

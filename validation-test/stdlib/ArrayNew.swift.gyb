@@ -137,7 +137,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
   }
 
   func underestimateCount() -> Int {
-    ++SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled
+    SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled += 1
     return _data.underestimateCount()
   }
 
@@ -731,7 +731,7 @@ class CustomImmutableNSArray : NSArray {
 
   @objc
   override func copyWithZone(zone: NSZone) -> AnyObject {
-    ++CustomImmutableNSArray.timesCopyWithZoneWasCalled
+    CustomImmutableNSArray.timesCopyWithZoneWasCalled += 1
     return self
   }
 
@@ -743,7 +743,7 @@ class CustomImmutableNSArray : NSArray {
 
   @objc
   override var count: Int {
-    ++CustomImmutableNSArray.timesCountWasCalled
+    CustomImmutableNSArray.timesCountWasCalled += 1
     return _data.count
   }
 

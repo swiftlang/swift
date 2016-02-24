@@ -36,7 +36,7 @@ extension SequenceLog {
 
 extension LoggingSequence {
   func nonCustomizableOperation() {
-    ++Log.nonCustomizableOperation[self.dynamicType]
+    Log.nonCustomizableOperation[self.dynamicType] += 1
     return base.nonCustomizableOperation()
   }
 }
@@ -103,7 +103,7 @@ SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
     var timesClosureWasCalled = 0
     var maybeResult = s.${algorithmKind}Element {
       (lhs, rhs) -> Bool in
-      ++timesClosureWasCalled
+      timesClosureWasCalled += 1
       return lhs.value < rhs.value
     }
     expectType(Optional<OpaqueValue<Int>>.self, &maybeResult)
@@ -670,7 +670,7 @@ SequenceTypeTests.test("reduce") {
     let result = s.reduce(OpaqueValue<[Int]>([])) {
       (partialResult: OpaqueValue<[Int]>, element: OpaqueValue<Int>)
         -> OpaqueValue<[Int]> in
-      ++timesClosureWasCalled
+      timesClosureWasCalled += 1
       return OpaqueValue<[Int]>(partialResult.value + [ element.value ])
     }
     expectEqual(test.sequence, result.value)
@@ -766,7 +766,7 @@ SequenceTypeTests.test("filter/SequenceType/Semantics") {
       var result = s.filter {
         (element) in
         _blackHole(closureLifetimeTracker)
-        ++timesClosureWasCalled
+        timesClosureWasCalled += 1
         return test.includeElement(element.value)
       }
       expectType([OpaqueValue<Int>].self, &result)
@@ -819,7 +819,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
   func map<T>(
     @noescape transform: (Element) throws -> T
   ) rethrows -> [T] {
-    ++MinimalSequenceWithCustomMap.timesMapWasCalled
+    MinimalSequenceWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
   }
 
@@ -880,7 +880,7 @@ SequenceTypeTests.test(
       var result = call${dispatch}SequenceMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
-        ++timesClosureWasCalled
+        timesClosureWasCalled += 1
         return OpaqueValue(Int32(test.transform(element.value)))
       }
       expectType([OpaqueValue<Int32>].self, &result)
@@ -920,7 +920,7 @@ SequenceTypeTests.test("flatMap/SequenceType") {
       var result = s.flatMap {
         (element: OpaqueValue<Int>) -> MinimalSequence<OpaqueValue<Int32>> in
         _blackHole(closureLifetimeTracker)
-        ++timesClosureWasCalled
+        timesClosureWasCalled += 1
         return MinimalSequence<OpaqueValue<Int32>>(
           elements: test.transform(element.value).map { OpaqueValue(Int32($0)) })
       }
@@ -959,7 +959,7 @@ SequenceTypeTests.test("flatMap/SequenceType/TransformProducesOptional") {
       var result = s.flatMap {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32>? in
         _blackHole(closureLifetimeTracker)
-        ++timesClosureWasCalled
+        timesClosureWasCalled += 1
         return test.transform(element.value).map { OpaqueValue(Int32($0)) }
       }
       expectType([OpaqueValue<Int32>].self, &result)

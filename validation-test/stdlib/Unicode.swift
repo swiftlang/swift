@@ -113,7 +113,8 @@ class EOFCountingGenerator<T> : GeneratorType {
       numTimesReturnedEOF += 1
       return .None
     }
-    return array[index++]
+    index += 1
+    return array[index - 1]
   }
 }
 
