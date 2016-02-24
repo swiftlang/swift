@@ -167,7 +167,7 @@ static bool isPromotableAllocInst(SILInstruction *I) {
   // Check for array buffer allocation.
   auto *AI = dyn_cast<ApplyInst>(I);
   if (AI && AI->getNumArguments() == 3) {
-    if (auto *Callee = AI->getCalleeFunction()) {
+    if (auto *Callee = AI->getReferencedFunction()) {
       if (Callee->getName() == "swift_bufferAllocate")
         return true;
     }

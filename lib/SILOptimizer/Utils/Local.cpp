@@ -236,7 +236,7 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   if (PAI->getNumArguments() != 1)
     return SILValue();
 
-  auto *Fun = PAI->getCalleeFunction();
+  auto *Fun = PAI->getReferencedFunction();
   if (!Fun)
     return SILValue();
 
@@ -732,7 +732,7 @@ public:
 /// Returns false if optimization is not possible.
 /// Returns true and initializes internal fields if optimization is possible.
 bool StringConcatenationOptimizer::extractStringConcatOperands() {
-  auto *Fn = AI->getCalleeFunction();
+  auto *Fn = AI->getReferencedFunction();
   if (!Fn)
     return false;
 

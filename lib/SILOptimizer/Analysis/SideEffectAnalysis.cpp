@@ -288,7 +288,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
       }
     }
 
-    if (SILFunction *SingleCallee = FAS.getCalleeFunction()) {
+    if (SILFunction *SingleCallee = FAS.getReferencedFunction()) {
       // Does the function have any @effects?
       if (getDefinedEffects(FInfo->FE, SingleCallee))
         return;
@@ -467,7 +467,7 @@ void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite
       return;
   }
 
-  if (SILFunction *SingleCallee = FAS.getCalleeFunction()) {
+  if (SILFunction *SingleCallee = FAS.getReferencedFunction()) {
     // Does the function have any @effects?
     if (getDefinedEffects(ApplyEffects, SingleCallee))
       return;

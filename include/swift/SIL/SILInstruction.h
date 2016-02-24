@@ -294,6 +294,9 @@ combineMemoryBehavior(SILInstruction::MemoryBehavior B1,
 /// Pretty-print the MemoryBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               SILInstruction::MemoryBehavior B);
+/// Pretty-print the ReleasingBehavior.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                              SILInstruction::ReleasingBehavior B);
 #endif
 
 /// A template base class for instructions that take a single SILValue operand
@@ -680,11 +683,19 @@ public:
 
   SILValue getCallee() const { return Operands[Callee].get(); }
 
+  /// Gets the referenced function by looking through partial apply,
+  /// convert_function, and thin to thick function until we find a function_ref.
+  ///
+  /// This is defined out of line to work around incomplete definition
+  /// issues. It is at the bottom of the file.
+  SILFunction *getCalleeFunction() const;
+
   /// Gets the referenced function if the callee is a function_ref instruction.
-  SILFunction *getCalleeFunction() const {
-    if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
-      return FRI->getReferencedFunction();
-    return nullptr;
+  SILFunction *getReferencedFunction() const {
+    auto *FRI = dyn_cast<FunctionRefInst>(getCallee());
+    if (!FRI)
+      return nullptr;
+    return FRI->getReferencedFunction();
   }
 
   /// Get the type of the callee without the applied substitutions.
@@ -4354,10 +4365,16 @@ public:
     FOREACH_IMPL_RETURN(getCallee());
   }
 
-  /// Return the referenced function if the callee is a function_ref
-  /// instruction.
+  /// Gets the referenced function by looking through partial apply,
+  /// convert_function, and thin to thick function until we find a function_ref.
   SILFunction *getCalleeFunction() const {
     FOREACH_IMPL_RETURN(getCalleeFunction());
+  }
+
+  /// Return the referenced function if the callee is a function_ref
+  /// instruction.
+  SILFunction *getReferencedFunction() const {
+    FOREACH_IMPL_RETURN(getReferencedFunction());
   }
 
   /// Return the type.
@@ -4551,6 +4568,32 @@ public:
             inst->getKind() == ValueKind::TryApplyInst);
   }
 };
+
+// This is defined out of line to work around the fact that this depends on
+// PartialApplyInst being defined, but PartialApplyInst is a subclass of
+// ApplyInstBase, so we can not place ApplyInstBase after it.
+template <class Impl, class Base>
+SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
+  SILValue Callee = getCallee();
+
+  while (true) {
+    if (auto *FRI = dyn_cast<FunctionRefInst>(Callee)) {
+      return FRI->getReferencedFunction();
+    }
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(Callee)) {
+      Callee = PAI->getCallee();
+      continue;
+    }
+
+    if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
+      Callee = TTTFI->getCallee();
+      continue;
+    }
+
+    return nullptr;
+  }
+}
 
 } // end swift namespace
 
