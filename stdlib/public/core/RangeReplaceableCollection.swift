@@ -424,5 +424,12 @@ extension RangeReplaceableCollection {
   >(newElements: S) {
     fatalError("unavailable function can't be called")
   }
+
+  @available(*, unavailable, renamed="insertContents(of:at:)")
+  public mutating func insertContentsOf<
+    C : Collection where C.Iterator.Element == Iterator.Element
+  >(newElements: C, at i: Index) {
+    fatalError("unavailable function can't be called")
+  }
 }
 

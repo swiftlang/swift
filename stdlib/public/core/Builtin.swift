@@ -206,6 +206,11 @@ public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
 
+@available(*, unavailable, renamed="unsafeAddress(of:)")
+public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+  fatalError("unavailable function can't be called")
+}
+
 /// Converts a reference of type `T` to a reference of type `U` after
 /// unwrapping one level of Optional.
 ///

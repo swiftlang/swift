@@ -999,6 +999,13 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
+  @available(*, unavailable, renamed="insertContents(of:at:)")
+  public mutating func insertContentsOf<
+    S : Collection where S.Iterator.Element == Character
+  >(newElements: S, at i: Index) {
+    fatalError("unavailable function can't be called")
+  }
+
   @available(*, unavailable, renamed="replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Character
