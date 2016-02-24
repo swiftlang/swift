@@ -40,11 +40,11 @@ public struct StaticString
 
   /// Either a pointer to the start of UTF-8 data, or an integer representation
   /// of a single Unicode scalar.
-  var _startPtrOrData: Builtin.RawPointer
+  internal var _startPtrOrData: Builtin.RawPointer
 
   /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
   /// in bytes.
-  var _utf8CodeUnitCount: Builtin.Word
+  internal var _utf8CodeUnitCount: Builtin.Word
 
   /// Extra flags:
   ///
@@ -53,7 +53,7 @@ public struct StaticString
   ///
   /// - bit 1: set to 1 if `_startPtrOrData` is a pointer and string data is
   ///   ASCII.
-  var _flags: Builtin.Int8
+  internal var _flags: Builtin.Int8
 
   /// A pointer to the beginning of UTF-8 code units.
   ///
@@ -137,11 +137,11 @@ public struct StaticString
 
   @_transparent
   internal init(
-    start: Builtin.RawPointer,
+    _start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-    self._startPtrOrData = start
+    self._startPtrOrData = _start
     self._utf8CodeUnitCount = utf8CodeUnitCount
     self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
@@ -203,7 +203,7 @@ public struct StaticString
     isASCII: Builtin.Int1
   ) {
     self = StaticString(
-      start: start,
+      _start: start,
       utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII)
   }
