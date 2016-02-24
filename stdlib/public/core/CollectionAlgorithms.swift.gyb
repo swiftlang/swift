@@ -167,9 +167,10 @@ ${orderingRequirementForComparable}
       (${IElement}, ${IElement}) -> Bool
     var escapableIsOrderedBefore =
       unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
-    return _partition(&self, indices, &escapableIsOrderedBefore)
+    return _partition(
+      &self, subRange: indices, isOrderedBefore: &escapableIsOrderedBefore)
 %   else:
-    return _partition(&self, indices)
+    return _partition(&self, subRange: indices)
 %   end
   }
 }
@@ -260,7 +261,7 @@ ${orderingRequirementForComparable}
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, self.indices)
+      _introSort(&self, subRange: self.indices)
     }
   }
 }
@@ -289,7 +290,10 @@ ${orderingRequirementForPredicate}
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, self.indices, escapableIsOrderedBefore)
+      _introSort(
+        &self,
+        subRange: self.indices,
+        isOrderedBefore: escapableIsOrderedBefore)
     }
   }
 }
