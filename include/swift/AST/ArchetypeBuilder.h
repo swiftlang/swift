@@ -133,7 +133,8 @@ private:
                                  ProtocolDecl *Proto,
                                  RequirementSource Source,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
-  
+
+public:
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
   bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
@@ -145,7 +146,8 @@ private:
   bool addSameTypeRequirementToConcrete(PotentialArchetype *T,
                                         Type Concrete,
                                         RequirementSource Source);
-  
+
+private:
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
   bool addSuperclassRequirement(PotentialArchetype *T, 
