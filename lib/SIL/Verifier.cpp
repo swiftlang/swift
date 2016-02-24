@@ -877,6 +877,18 @@ public:
       require(resultInfo->getResult() == expectedResult,
               "result type of result function type for partially applied "
               "@unowned_inner_pointer function should have @unowned convention");
+
+    // The "autoreleased" convention doesn't survive through a
+    // partial application, since the thunk takes responsibility for
+    // retaining the return value.
+    } else if (expectedResult.getConvention() == ResultConvention::Autoreleased)
+    {
+      expectedResult = SILResultInfo(expectedResult.getType(),
+                                     ResultConvention::Owned);
+      require(resultInfo->getResult() == expectedResult,
+              "result type of result function type for partially applied "
+              "@autoreleased function should have @owned convention");
+
     } else {
       require(resultInfo->getResult() == expectedResult,
               "result type of result function type does not match original "
