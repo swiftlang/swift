@@ -34,6 +34,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Basic/Defer.h" // Must come after include of Tokens.def.
 #include "swift/Config.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -1809,6 +1810,11 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
+  Printer.callPrintDeclPre(param);
+  defer {
+    Printer.printDeclPost(param);
+  };
+
   auto printArgName = [&]() {
     // Print argument name.
     auto ArgName = param->getArgumentName();
