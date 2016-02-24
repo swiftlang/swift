@@ -69,8 +69,20 @@ static StringRef LocalParamNameTag = "decl.var.parameter.name.local";
 /// key substructure of the declaration for CursorInfo/DocInfo.
 ///
 /// Prints declarations with decl- and type-specific tags derived from the
-/// UIDs used for decl/refs.  For example,
-/// <decl.function.free>func foo(x: <ref.struct usr="Si">Int</...>)</...>
+/// UIDs used for decl/refs. For example (including newlines purely for ease of
+/// reading):
+///
+/// \verbatim
+///   <decl.function.free>
+///     func <decl.name>foo</decl.name>
+///     (
+///     <decl.var.parameter>
+///       <decl.var.parameter.name.local>x</decl.var.parameter.name.local>:
+///       <ref.struct usr="Si">Int</ref.struct>
+///     </decl.var.parameter>
+///     ) -> <ref.struct usr="Si">Int</ref.struct>
+///  </decl.function.free>
+/// \endverbatim
 class FullyAnnotatedDeclarationPrinter final : public XMLEscapingPrinter {
 public:
   FullyAnnotatedDeclarationPrinter(raw_ostream &OS) : XMLEscapingPrinter(OS) {}
