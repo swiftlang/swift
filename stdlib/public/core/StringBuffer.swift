@@ -17,14 +17,14 @@ struct _StringBufferIVars {
     capacityAndElementShift = _elementWidth - 1
   }
 
-  init(
-    usedEnd: UnsafeMutablePointer<_RawByte>,
+  internal init(
+    _usedEnd: UnsafeMutablePointer<_RawByte>,
     byteCapacity: Int,
     elementWidth: Int
   ) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     _sanityCheck((byteCapacity & 0x1) == 0)
-    self.usedEnd = usedEnd
+    self.usedEnd = _usedEnd
     self.capacityAndElementShift = byteCapacity + (elementWidth - 1)
   }
 
