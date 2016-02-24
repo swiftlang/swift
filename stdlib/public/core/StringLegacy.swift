@@ -34,11 +34,11 @@ extension String {
   }
   
   public var _lines : [String] {
-    return _split("\n")
+    return _split(separator: "\n")
   }
   
   @warn_unused_result
-  public func _split(separator: UnicodeScalar) -> [String] {
+  public func _split(separator separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
@@ -141,7 +141,7 @@ extension String {
 extension String {
   /// Produce a substring of the given string from the given character
   /// index to the end of the string.
-  func _substr(start: Int) -> String {
+  func _substr(from start: Int) -> String {
     let rng = unicodeScalars
     var startIndex = rng.startIndex
     for _ in 0..<start {
@@ -153,7 +153,7 @@ extension String {
   /// Split the given string at the given delimiter character, returning the
   /// strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
-  public func _splitFirst(delim: UnicodeScalar)
+  public func _splitFirst(separator delim: UnicodeScalar)
     -> (before: String, after: String, wasFound : Bool)
   {
     let rng = unicodeScalars

@@ -450,7 +450,7 @@ func _stdlib_installTrapInterceptor()
 func _childProcess() {
   _stdlib_installTrapInterceptor()
   while let line = _stdlib_getline() {
-    let parts = line._split(";")
+    let parts = line._split(separator: ";")
     let testSuiteName = parts[0]
     let testName = parts[1]
 
@@ -559,7 +559,8 @@ struct _ParentProcess {
         _childStdout.read()
         while var line = _childStdout.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            let controlMessage = line[index..<line.endIndex]._split(";")
+            let controlMessage =
+                line[index..<line.endIndex]._split(separator: ";")
             switch controlMessage[1] {
             case "expectCrash":
               stdoutSeenCrashDelimiter = true
@@ -586,7 +587,8 @@ struct _ParentProcess {
         _childStderr.read()
         while var line = _childStderr.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            let controlMessage = line[index..<line.endIndex]._split(";")
+            let controlMessage =
+                line[index..<line.endIndex]._split(separator: ";")
             switch controlMessage[1] {
             case "expectCrash":
               stderrSeenCrashDelimiter = true
@@ -1060,7 +1062,7 @@ public enum OSVersion : CustomStringConvertible {
 }
 
 func _parseDottedVersion(s: String) -> [Int] {
-  return Array(s._split(".").lazy.map { Int($0)! })
+  return Array(s._split(separator: ".").lazy.map { Int($0)! })
 }
 
 public func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {

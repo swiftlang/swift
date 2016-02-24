@@ -84,10 +84,11 @@ public struct _StringBuffer {
 
   @warn_unused_result
   static func fromCodeUnits<
-    Encoding : UnicodeCodec, Input : Collection // Sequence?
+    Input : Collection, // Sequence?
+    Encoding : UnicodeCodec
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
-    encoding: Encoding.Type, input: Input, repairIllFormedSequences: Bool,
+    input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
@@ -194,7 +195,7 @@ public struct _StringBuffer {
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
   mutating func grow(
-    bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
+    oldBounds bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
   ) -> Bool {
     var newUsedCount = newUsedCount
     // The substring to be grown could be pointing in the middle of this
