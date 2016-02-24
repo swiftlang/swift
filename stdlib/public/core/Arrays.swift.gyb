@@ -329,8 +329,9 @@ public struct ${Self}<Element>
   static internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       uninitializedCount: buffer.count, minimumCapacity: buffer.count)
-    buffer._uninitializedCopy(
-      buffer.indices, target: newBuffer.firstElementAddress)
+    buffer._copyContents(
+      subRange: buffer.indices,
+      initializing: newBuffer.firstElementAddress)
     buffer = _Buffer(newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
 
@@ -629,8 +630,9 @@ extension ${Self} : _ArrayProtocol {
       let newBuffer = _ContiguousArrayBuffer<Element>(
         uninitializedCount: count, minimumCapacity: minimumCapacity)
 
-      _buffer._uninitializedCopy(
-        _buffer.indices, target: newBuffer.firstElementAddress)
+      _buffer._copyContents(
+        subRange: _buffer.indices,
+        initializing: newBuffer.firstElementAddress)
       _buffer = _Buffer(newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
     _sanityCheck(capacity >= minimumCapacity)
@@ -1158,12 +1160,13 @@ internal func _arrayOutOfPlaceUpdate<
   else {
     let headStart = source.startIndex
     let headEnd = headStart + headCount
-    let newStart = source._uninitializedCopy(headStart..<headEnd,
-      target: destStart)
+    let newStart = source._copyContents(
+      subRange: headStart..<headEnd,
+      initializing: destStart)
     initializeNewElements.call(newStart, count: newCount)
     let tailStart = headEnd + oldCount
     let tailEnd = source.endIndex
-    source._uninitializedCopy(tailStart..<tailEnd, target: newEnd)
+    source._copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
   }
   source = _Buffer(dest!, shiftedToStartIndex: source.startIndex)
 }

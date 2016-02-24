@@ -378,8 +378,9 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  public func _uninitializedCopy(
-    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
+  public func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _sanityCheck(bounds.startIndex >= 0)
     _sanityCheck(bounds.endIndex >= bounds.startIndex)

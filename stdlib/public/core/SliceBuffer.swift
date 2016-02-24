@@ -181,8 +181,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return nil
   }
 
-  public func _uninitializedCopy(
-    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
+  public func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
     _sanityCheck(bounds.startIndex >= startIndex)

@@ -202,12 +202,13 @@ extension _ArrayBuffer {
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  public func _uninitializedCopy(
-    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
+  public func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _typeCheck(bounds)
     if _fastPath(_isNative) {
-      return _native._uninitializedCopy(bounds, target: target)
+      return _native._copyContents(subRange: bounds, initializing: target)
     }
 
     let nonNative = _nonNative
