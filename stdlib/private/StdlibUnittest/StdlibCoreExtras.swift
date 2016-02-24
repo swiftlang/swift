@@ -32,7 +32,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     return string.startIndex
   }
 #if _runtime(_ObjC)
-  return string.rangeOf(substring)?.startIndex
+  return string.range(of: substring)?.startIndex
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
