@@ -105,7 +105,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
     
     withUnsafeMutablePointerToElements {
       (x: UnsafeMutablePointer<T>) -> () in
-      for i in 0.strideTo(count, by: 2) {
+      for i in stride(from: 0, to: count, by: 2) {
         (x + i).deinitialize()
       }
     }

@@ -95,7 +95,7 @@ RangeTestSuite.test("Pattern matching") {
 
 RangeTestSuite.test("stride") {
   var result = [Double]()
-  for i in (1.4).strideThrough(3.4, by: 1) {
+  for i in stride(from: 1.4, through: 3.4, by: 1) {
     result.append(i)
   }
   expectEqual([ 1.4, 2.4, 3.4 ], result)
