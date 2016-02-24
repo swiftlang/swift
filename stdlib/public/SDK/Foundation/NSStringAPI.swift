@@ -158,6 +158,7 @@ extension String {
   // + (NSString *)localizedNameOfStringEncoding:(NSStringEncoding)encoding
 
   /// Returns a human-readable string giving the name of a given encoding.
+  @swift3_migration(renamed="localizedName(ofStringEncoding:)")
   @warn_unused_result
   public static func localizedNameOfStringEncoding(
     encoding: NSStringEncoding
@@ -183,6 +184,7 @@ extension String {
   /// Returns a string built from the strings in a given array
   /// by concatenating them with a path separator between each pair.
   @available(*, unavailable, message="Use fileURLWithPathComponents on NSURL instead.")
+  @swift3_migration(message="Use fileURL(withPathComponents:) on NSURL instead.")
   public static func pathWithComponents(components: [String]) -> String {
     return NSString.pathWithComponents(components)
   }
@@ -251,6 +253,7 @@ extension String {
   /// `String` can be converted to a given encoding without loss of
   /// information.
   @warn_unused_result
+  @swift3_migration(renamed="canBeConverted(toEncoding:)")
   public func canBeConvertedToEncoding(encoding: NSStringEncoding) -> Bool {
     return _ns.canBeConvertedToEncoding(encoding)
   }
@@ -277,6 +280,7 @@ extension String {
   /// Returns a capitalized representation of the `String`
   /// using the specified locale.
   @warn_unused_result
+  @swift3_migration(renamed="capitalizedString(with:)")
   public func capitalizedStringWithLocale(locale: NSLocale?) -> String {
     return _ns.capitalizedStringWithLocale(locale) as String
   }
@@ -304,6 +308,7 @@ extension String {
   /// given string have in common, starting from the beginning of each
   /// up to the first characters that aren't equivalent.
   @warn_unused_result
+  @swift3_migration(renamed="commonPrefix(with:)")
   public func commonPrefixWithString(
     aString: String, options: NSStringCompareOptions) -> String {
     return _ns.commonPrefixWithString(aString, options: options)
@@ -362,6 +367,7 @@ extension String {
   /// reference the longest path that matches the `String`.
   /// Returns the actual number of matching paths.
   @warn_unused_result
+  @swift3_migration(renamed="completePath(into:outputName:caseSensitive:matchesInto:filterTypes:)")
   public func completePathIntoString(
     outputName: UnsafeMutablePointer<String> = nil,
     caseSensitive: Bool,
@@ -399,6 +405,7 @@ extension String {
   /// Returns an array containing substrings from the `String`
   /// that have been divided by characters in a given set.
   @warn_unused_result
+  @swift3_migration(renamed="componentsSeparatedByCharacters(in:)")
   public func componentsSeparatedByCharactersInSet(
     separator: NSCharacterSet
   ) -> [String] {
@@ -414,6 +421,7 @@ extension String {
 
   /// Returns an array containing substrings from the `String`
   /// that have been divided by a given separator.
+  @swift3_migration(renamed="componentsSeparated(by:)")
   public func componentsSeparatedByString(separator: String) -> [String] {
     let nsa = _ns.componentsSeparatedByString(separator) as NSArray
     // Since this function is effectively a bridge thunk, use the
@@ -426,6 +434,7 @@ extension String {
   /// Returns a representation of the `String` as a C string
   /// using a given encoding.
   @warn_unused_result
+  @swift3_migration(renamed="cString(usingEncoding:)")
   public func cStringUsingEncoding(encoding: NSStringEncoding) -> [CChar]? {
     return withExtendedLifetime(_ns) {
       (s: NSString) -> [CChar]? in
@@ -442,6 +451,7 @@ extension String {
   /// Returns an `NSData` object containing a representation of
   /// the `String` encoded using a given encoding.
   @warn_unused_result
+  @swift3_migration(renamed="data(usingEncoding:allowLossyConversion:)")
   public func dataUsingEncoding(
     encoding: NSStringEncoding,
     allowLossyConversion: Bool = false
@@ -505,6 +515,7 @@ extension String {
   /// Performs linguistic analysis on the specified string by
   /// enumerating the specific range of the string, providing the
   /// Block with the located tags.
+  @swift3_migration(renamed="enumerateLinguisticTags(in:scheme:options:orthography:_:)")
   public func enumerateLinguisticTagsInRange(
     range: Range<Index>,
     scheme tagScheme: String,
@@ -540,6 +551,7 @@ extension String {
 
   /// Enumerates the substrings of the specified type in the
   /// specified range of the string.
+  @swift3_migration(renamed="enumerateSubstrings(in:options:_:)")
   public func enumerateSubstringsInRange(
     range: Range<Index>,
     options opts:NSStringEnumerationOptions,
@@ -619,6 +631,7 @@ extension String {
   ///   conversion isn't possible due to the chosen encoding.
   ///
   /// - Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
+  @swift3_migration(renamed="getBytes(_:maxLength:usedLength:encoding:options:range:remaining:)")
   public func getBytes(
     inout buffer: [UInt8],
     maxLength maxBufferCount: Int,
@@ -678,6 +691,7 @@ extension String {
 
   /// Returns by reference the beginning of the first line and
   /// the end of the last line touched by the given range.
+  @swift3_migration(renamed="getLineStart(_:end:contentsEnd:for:)")
   public func getLineStart(
     start: UnsafeMutablePointer<Index>,
     end: UnsafeMutablePointer<Index>,
@@ -704,6 +718,7 @@ extension String {
 
   /// Returns by reference the beginning of the first paragraph
   /// and the end of the last paragraph touched by the given range.
+  @swift3_migration(renamed="getParagraphStart(_:end:contentsEnd:for:)")
   public func getParagraphStart(
     start: UnsafeMutablePointer<Index>,
     end: UnsafeMutablePointer<Index>,
@@ -994,6 +1009,7 @@ extension String {
   /// Returns the number of bytes required to store the
   /// `String` in a given encoding.
   @warn_unused_result
+  @swift3_migration(renamed="lengthOfBytes(usingEncoding:)")
   public func lengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
     return _ns.lengthOfBytesUsingEncoding(encoding)
   }
@@ -1003,6 +1019,7 @@ extension String {
   /// Returns the range of characters representing the line or lines
   /// containing a given range.
   @warn_unused_result
+  @swift3_migration(renamed="lineRange(for:)")
   public func lineRangeForRange(aRange: Range<Index>) -> Range<Index> {
     return _range(_ns.lineRangeForRange(_toNSRange(aRange)))
   }
@@ -1017,6 +1034,7 @@ extension String {
   /// Returns an array of linguistic tags for the specified
   /// range and requested tags within the receiving string.
   @warn_unused_result
+  @swift3_migration(renamed="linguisticTags(in:scheme:options:orthography:tokenRanges:)")
   public func linguisticTagsInRange(
     range: Range<Index>,
     scheme tagScheme: String,
@@ -1085,6 +1103,7 @@ extension String {
   /// converted to lowercase, taking into account the specified
   /// locale.
   @warn_unused_result
+  @swift3_migration(renamed="lowercaseString(with:)")
   public func lowercaseStringWithLocale(locale: NSLocale?) -> String {
     return _ns.lowercaseStringWithLocale(locale)
   }
@@ -1095,6 +1114,7 @@ extension String {
   /// `String` in a given encoding.
   @warn_unused_result
   public
+  @swift3_migration(renamed="maximumLengthOfBytes(usingEncoding:)")
   func maximumLengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
     return _ns.maximumLengthOfBytesUsingEncoding(encoding)
   }
@@ -1104,6 +1124,7 @@ extension String {
   /// Returns the range of characters representing the
   /// paragraph or paragraphs containing a given range.
   @warn_unused_result
+  @swift3_migration(renamed="paragraphRange(for:)")
   public func paragraphRangeForRange(aRange: Range<Index>) -> Range<Index> {
     return _range(_ns.paragraphRangeForRange(_toNSRange(aRange)))
   }
@@ -1177,6 +1198,7 @@ extension String {
   /// character from a given character set found in a given range with
   /// given options.
   @warn_unused_result
+  @swift3_migration(renamed="rangeOfCharacter(from:options:range:)")
   public func rangeOfCharacterFromSet(
     aSet: NSCharacterSet,
     options mask:NSStringCompareOptions = [],
@@ -1193,6 +1215,7 @@ extension String {
   /// Returns the range in the `String` of the composed
   /// character sequence located at a given index.
   @warn_unused_result
+  @swift3_migration(renamed="rangeOfComposedCharacterSequence(at:)")
   public
   func rangeOfComposedCharacterSequenceAtIndex(anIndex: Index) -> Range<Index> {
     return _range(
@@ -1204,6 +1227,7 @@ extension String {
   /// Returns the range in the string of the composed character
   /// sequences for a given range.
   @warn_unused_result
+  @swift3_migration(renamed="rangeOfComposedCharacterSequences(for:)")
   public func rangeOfComposedCharacterSequencesForRange(
     range: Range<Index>
   ) -> Range<Index> {
@@ -1234,6 +1258,7 @@ extension String {
   /// given string within a given range of the `String`, subject to
   /// given options, using the specified locale, if any.
   @warn_unused_result
+  @swift3_migration(renamed="range(of:options:range:locale:)")
   public func rangeOfString(
     aString: String,
     options mask: NSStringCompareOptions = [],
@@ -1281,6 +1306,7 @@ extension String {
   /// options applied may change over time.
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
+  @swift3_migration(renamed="localizedStandardRange(of:)")
   public func localizedStandardRangeOfString(string: String) -> Range<Index>? {
     return _optionalRange(_ns.localizedStandardRangeOfString(string))
   }
@@ -1311,6 +1337,7 @@ extension String {
   /// all characters not in the specified set with percent encoded
   /// characters.
   @warn_unused_result
+  @swift3_migration(renamed="addingPercentEncoding(withAllowedCharacters:)")
   public func stringByAddingPercentEncodingWithAllowedCharacters(
     allowedCharacters: NSCharacterSet
   ) -> String? {
@@ -1335,6 +1362,7 @@ extension String {
   /// encoding to determine the percent escapes necessary to convert
   /// the `String` into a legal URL string.
   @available(*, deprecated, message="Use stringByAddingPercentEncodingWithAllowedCharacters(_:) instead, which always uses the recommended UTF-8 encoding, and which encodes for a specific URL component or subcomponent since each URL component or subcomponent has different rules for what characters are valid.")
+  @swift3_migration(renamed="addingPercentEscapes(usingEncoding:)")
   public func stringByAddingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
@@ -1421,6 +1449,7 @@ extension String {
   /// Returns a string with the given character folding options
   /// applied.
   @warn_unused_result
+  @swift3_migration(renamed="folding(_:locale:)")
   public func stringByFoldingWithOptions(
     options: NSStringCompareOptions, locale: NSLocale?
   ) -> String {
@@ -1435,6 +1464,7 @@ extension String {
   /// removing characters from the end, or by appending as many
   /// occurrences as necessary of a given pad string.
   @warn_unused_result
+  @swift3_migration(renamed="padding(toLength:with:startingAt:)")
   public func stringByPaddingToLength(
     newLength: Int, withString padString: String, startingAtIndex padIndex: Int
   ) -> String {
@@ -1458,6 +1488,7 @@ extension String {
   /// Returns a new string in which the characters in a
   /// specified range of the `String` are replaced by a given string.
   @warn_unused_result
+  @swift3_migration(renamed="replacingCharacters(in:with:)")
   public func stringByReplacingCharactersInRange(
     range: Range<Index>, withString replacement: String
   ) -> String {
@@ -1479,6 +1510,7 @@ extension String {
   /// string in a specified range of the `String` are replaced by
   /// another given string.
   @warn_unused_result
+  @swift3_migration(renamed="replacingOccurrences(of:with:options:range:)")
   public func stringByReplacingOccurrencesOfString(
     target: String,
     withString replacement: String,
@@ -1501,6 +1533,7 @@ extension String {
   /// all percent escapes with the matching characters as determined
   /// by a given encoding.
   @available(*, deprecated, message="Use stringByRemovingPercentEncoding instead, which always uses the recommended UTF-8 encoding.")
+  @swift3_migration(renamed="replacingPercentEscapes(usingEncoding:)")
   public func stringByReplacingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
@@ -1530,6 +1563,7 @@ extension String {
   /// Returns a new string made by removing from both ends of
   /// the `String` characters contained in a given character set.
   @warn_unused_result
+  @swift3_migration(renamed="trimmingCharacters(in:)")
   public func stringByTrimmingCharactersInSet(set: NSCharacterSet) -> String {
     return _ns.stringByTrimmingCharactersInSet(set)
   }
@@ -1539,6 +1573,7 @@ extension String {
   /// Returns an array of strings made by separately appending
   /// to the `String` each string in a given array.
   @available(*, unavailable, message="map over paths with URLByAppendingPathComponent instead.")
+  @swift3_migration(renamed="strings(byAppendingPaths:)")
   public func stringsByAppendingPaths(paths: [String]) -> [String] {
     return _ns.stringsByAppendingPaths(paths)
   }
@@ -1548,6 +1583,7 @@ extension String {
   /// Returns a new string containing the characters of the
   /// `String` from the one at a given index to the end.
   @warn_unused_result
+  @swift3_migration(renamed="substring(from:)")
   public func substringFromIndex(index: Index) -> String {
     return _ns.substringFromIndex(index._utf16Index)
   }
@@ -1557,6 +1593,7 @@ extension String {
   /// Returns a new string containing the characters of the
   /// `String` up to, but not including, the one at a given index.
   @warn_unused_result
+  @swift3_migration(renamed="substring(to:)")
   public func substringToIndex(index: Index) -> String {
     return _ns.substringToIndex(index._utf16Index)
   }
@@ -1566,6 +1603,7 @@ extension String {
   /// Returns a string object containing the characters of the
   /// `String` that lie within a given range.
   @warn_unused_result
+  @swift3_migration(renamed="substring(with:)")
   public func substringWithRange(aRange: Range<Index>) -> String {
     return _ns.substringWithRange(_toNSRange(aRange))
   }
@@ -1585,6 +1623,7 @@ extension String {
   /// converted to uppercase, taking into account the specified
   /// locale.
   @warn_unused_result
+  @swift3_migration(renamed="uppercaseString(with:)")
   public func uppercaseStringWithLocale(locale: NSLocale?) -> String {
     return _ns.uppercaseStringWithLocale(locale)
   }
@@ -1600,6 +1639,7 @@ extension String {
 
   /// Writes the contents of the `String` to a file at a given
   /// path using a given encoding.
+  @swift3_migration(renamed="write(toFile:atomically:encoding:)")
   public func writeToFile(
     path: String, atomically useAuxiliaryFile:Bool,
     encoding enc: NSStringEncoding
@@ -1616,6 +1656,7 @@ extension String {
 
   /// Writes the contents of the `String` to the URL specified
   /// by url using the specified encoding.
+  @swift3_migration(renamed="write(to:atomically:encoding:)")
   public func writeToURL(
     url: NSURL, atomically useAuxiliaryFile: Bool,
     encoding enc: NSStringEncoding
