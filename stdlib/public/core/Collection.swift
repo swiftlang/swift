@@ -115,19 +115,6 @@ public protocol Indexable {
   func _nextInPlace(inout i: Index)
 }
 
-// TODO: swift-3-indexing-model - deal with MutableIndexable
-/// A type that supports subscript assignment to a mutable collection.
-public protocol MutableIndexable {
-  associatedtype Index : ForwardIndex
-
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-
-  associatedtype _Element
-
-  subscript(position: Index) -> _Element { get set }
-}
-
 // TODO: swift-3-indexing-model - deal with IndexingIterator
 /// The iterator used for collections that don't specify one.
 public struct IndexingIterator<Elements : Indexable>
@@ -846,123 +833,6 @@ extension Collection {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
-/// A *collection* that supports subscript assignment.
-///
-/// For any instance `a` of a type conforming to
-/// `MutableCollection`, :
-///
-///     a[i] = x
-///     let y = a[i]
-///
-/// is equivalent to:
-///
-///     a[i] = x
-///     let y = x
-///
-public protocol MutableCollection : MutableIndexable, Collection {
-  // FIXME: should be constrained to MutableCollection
-  // (<rdar://problem/20715009> Implement recursive protocol
-  // constraints)
-  associatedtype SubSequence : Collection /*: MutableCollection*/
-    = MutableSlice<Self>
-
-  /// Access the element at `position`.
-  ///
-  /// - Precondition: `position` indicates a valid position in `self` and
-  ///   `position != endIndex`.
-  ///
-  /// - Complexity: O(1)
-  subscript(position: Index) -> Iterator.Element {get set}
-
-  /// Returns a collection representing a contiguous sub-range of
-  /// `self`'s elements.
-  ///
-  /// - Complexity: O(1) for the getter, O(`bounds.count`) for the setter.
-  subscript(bounds: Range<Index>) -> SubSequence {get set}
-
-  /// Call `body(p)`, where `p` is a pointer to the collection's
-  /// mutable contiguous storage.  If no such storage exists, it is
-  /// first created.  If the collection does not support an internal
-  /// representation in a form of mutable contiguous storage, `body` is not
-  /// called and `nil` is returned.
-  ///
-  /// Often, the optimizer can eliminate bounds- and uniqueness-checks
-  /// within an algorithm, but when that fails, invoking the
-  /// same algorithm on `body`\ 's argument lets you trade safety for
-  /// speed.
-  mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
-  ) rethrows -> R?
-  // FIXME: the signature should use UnsafeMutableBufferPointer, but the
-  // compiler can't handle that.
-  //
-  // <rdar://problem/21933004> Restore the signature of
-  // _withUnsafeMutableBufferPointerIfSupported() that mentions
-  // UnsafeMutableBufferPointer
-}
-
-// TODO: swift-3-indexing-model - review the following
-extension MutableCollection {
-  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
-  ) rethrows -> R? {
-    return nil
-  }
-
-  public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
-    get {
-      _failEarlyRangeCheck(
-        rangeStart: bounds.startIndex,
-        rangeEnd: bounds.endIndex,
-        boundsStart: startIndex,
-        boundsEnd: endIndex)
-      return MutableSlice(_base: self, bounds: bounds)
-    }
-    set {
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
-    }
-  }
-}
-
-// TODO: swift-3-indexing-model - review the following
-internal func _writeBackMutableSlice<
-  C : MutableCollection,
-  Slice_ : Collection
-  where
-  C._Element == Slice_.Iterator.Element,
-  C.Index == Slice_.Index
->(inout self_: C, bounds: Range<C.Index>, slice: Slice_) {
-//  C._failEarlyRangeCheck(
-//    rangeStart: bounds.startIndex,
-//    rangeEnd: bounds.endIndex,
-//    boundsStart: self_.startIndex,
-//    boundsEnd: self_.endIndex)
-//  // FIXME(performance): can we use
-//  // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
-//  // aliasing violations if the newValue points to the same buffer?
-//
-//  var selfElementIndex = bounds.startIndex
-//  let selfElementsEndIndex = bounds.endIndex
-//  var newElementIndex = slice.startIndex
-//  let newElementsEndIndex = slice.endIndex
-//
-//  while selfElementIndex != selfElementsEndIndex &&
-//    newElementIndex != newElementsEndIndex {
-//
-//    self_[selfElementIndex] = slice[newElementIndex]
-//    selfElementIndex._successorInPlace()
-//    newElementIndex._successorInPlace()
-//  }
-//
-//  _precondition(
-//    selfElementIndex == selfElementsEndIndex,
-//    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
-//  _precondition(
-//    newElementIndex == newElementsEndIndex,
-//    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
-}
-
 @available(*, unavailable, message="Bit enum has been deprecated. Please use Int instead.")
 public enum Bit {}
 
@@ -1006,11 +876,6 @@ extension Collection where Iterator.Element : Equatable {
     fatalError("unavailable function can't be called")
   }
 }
-@available(*, unavailable, renamed="MutableCollection")
-public typealias MutableCollectionType = MutableCollection
 
 @available(*, unavailable, message="PermutationGenerator has been removed in Swift 3")
 public struct PermutationGenerator<C : Collection, Indices : Sequence> {}
-
-@available(*, unavailable, message="Please use 'Collection where SubSequence : MutableCollection'")
-public typealias MutableSliceable = Collection

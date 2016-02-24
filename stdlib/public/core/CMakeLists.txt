@@ -68,6 +68,7 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift
   Mirrors.swift.gyb
   Misc.swift
+  MutableCollection.swift
   ObjCMirrors.swift
   Optional.swift
   OptionSet.swift
