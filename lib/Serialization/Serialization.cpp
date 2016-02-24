@@ -3487,7 +3487,7 @@ class YamlGroupInputParser {
   static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
 
   bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
-                 StringRef ParentName) {
+                 const llvm::Twine &ParentName) {
     llvm::yaml::MappingNode *MapNode = dyn_cast<llvm::yaml::MappingNode>(Root);
     if (!MapNode) {
       return true;
@@ -3500,21 +3500,22 @@ class YamlGroupInputParser {
         return true;
       }
       llvm::SmallString<16> GroupNameStorage;
-      llvm::SmallString<16> CombinedNameStorage;
       StringRef GroupName = Key->getValue(GroupNameStorage);
-      if (!ParentName.empty()) {
-        CombinedNameStorage.append(ParentName);
-        CombinedNameStorage.append(Separator);
+      std::unique_ptr<llvm::Twine> pCombined;
+      if (!ParentName.isTriviallyEmpty()) {
+        pCombined.reset(new llvm::Twine(ParentName.concat(Separator).
+                                        concat(GroupName)));
+      } else {
+        pCombined.reset(new llvm::Twine(GroupName));
       }
-      CombinedNameStorage.append(GroupName);
-      StringRef CombinedName = CombinedNameStorage.str();
+      std::string CombinedName = pCombined->str();
       for (llvm::yaml::Node &Entry : *Value) {
         if (auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry)) {
           llvm::SmallString<16> FileNameStorage;
           StringRef FileName = FileEntry->getValue(FileNameStorage);
           Map[FileName] = CombinedName;
         } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
-          if(parseRoot(Map, &Entry, CombinedName))
+          if(parseRoot(Map, &Entry, *pCombined))
             return true;
         } else
           return true;
@@ -3563,7 +3564,7 @@ public:
       return true;
     }
     pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
-    if(parseRoot(*pMap, Root, ""))
+    if(parseRoot(*pMap, Root, llvm::Twine()))
       return true;
 
     // Save the parsed map to the owner.
