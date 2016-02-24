@@ -424,7 +424,7 @@ extension Mirror {
 // FIXME: swift-3-indexing-model - Review what we need to do here
 //        position = children.advance(children.startIndex,
 //          by: offset, limit: children.endIndex)
-        fatalError("swift-3-indexing-model FIXME")
+        fatalError("FIXME: swift-3-indexing-model")
       }
       else {
         _preconditionFailure(

@@ -30,7 +30,7 @@ public protocol BidirectionalCollection : Collection {
 extension BidirectionalCollection {
 // TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
   public func previous(i: Index) -> Index {
-    fatalError("collections need to implement, this is a temp stub to make things compile")
+    fatalError("FIXME: swift-3-indexing-model")
   }
   
   @inline(__always)

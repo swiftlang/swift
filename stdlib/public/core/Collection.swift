@@ -102,6 +102,8 @@ public protocol Indexable {
     rangeEnd: Index,
     boundsStart: Index,
     boundsEnd: Index)
+// TODO: swift-3-indexing-model - can we change the above to the following? (possible compiler issue)
+//  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
   
   /// Returns the next consecutive `Index` in a discrete sequence of
   /// `Index` values.
@@ -311,7 +313,7 @@ public protocol Collection : Indexable, Sequence {
 extension Collection {
   // TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
   public func next(i: Index) -> Index {
-    fatalError("collections need to implement, this is a temp stub to make things compile")
+    fatalError("FIXME: swift-3-indexing-model")
   }
   
   @inline(__always)
@@ -485,7 +487,7 @@ extension Collection {
   public var count: Index.Distance {
 // FIXME: swift-3-indexing-model - Need to fix up Index.Distance to make the following happy
 //    return distance(from: startIndex, to: endIndex)
-    fatalError("swift-3-indexing-model FIXME")
+    fatalError("FIXME: swift-3-indexing-model")
     return 0
   }
 
