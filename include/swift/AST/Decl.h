@@ -4112,11 +4112,6 @@ public:
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
 
-  /// Retrieve the default Objective-C selector for the getter of a
-  /// property of the given name.
-  static ObjCSelector getDefaultObjCGetterSelector(ASTContext &ctx,
-                                                   Identifier propertyName);
-
   /// Retrieve the default Objective-C selector for the setter of a
   /// property of the given name.
   static ObjCSelector getDefaultObjCSetterSelector(ASTContext &ctx,
