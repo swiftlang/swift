@@ -102,6 +102,8 @@ extension String {
   @available(*, unavailable, message="Please use String.init(cString:) instead. Note that it no longer accepts NULL as a valid input. See also String.decodeCString if you need more control.")
   @warn_unused_result
   public static func fromCStringRepairingIllFormedUTF8(
+    cs: UnsafePointer<CChar>
+  ) -> (String?, hadError: Bool) {
     fatalError("unavailable function can't be called")
   }
 }
