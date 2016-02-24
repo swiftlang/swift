@@ -175,7 +175,7 @@ extension Strideable {
   /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
-  @swift3_migration(renamed="strideTo(_:by:)")
+  @swift3_migration(message="Use stride(from:to:by:) free function instead")
   @warn_unused_result
   public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
     return StrideTo(start: self, end: end, stride: stride)
@@ -253,7 +253,7 @@ extension Strideable {
   /// the progression less than or equal to `end`.
   ///
   /// - Note: There is no guarantee that `end` is an element of the sequence.
-  @swift3_migration(renamed="strideThrough(_:by:)")
+  @swift3_migration(message="Use stride(from:through:by:) free function instead")
   @warn_unused_result
   public func stride(
     through end: Self, by stride: Stride
