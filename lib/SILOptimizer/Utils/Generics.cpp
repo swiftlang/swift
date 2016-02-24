@@ -145,7 +145,7 @@ static bool cacheSpecialization(SILModule &M, SILFunction *F) {
 
   if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
       F->getLinkage() != SILLinkage::Public &&
-      F->getModule().getSwiftModule()->getName().str() == STDLIB_NAME) {
+      F->getModule().getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT) {
     if (F->getLinkage() != SILLinkage::Public &&
         isWhitelistedSpecialization(F->getName())) {
 
@@ -209,7 +209,8 @@ SILFunction *swift::getExistingSpecialization(SILModule &M,
     assert((Specialization->isExternalDeclaration() ||
             convertExternalDefinitionIntoDeclaration(Specialization)) &&
            "Could not remove body of the found specialization");
-    if (!convertExternalDefinitionIntoDeclaration(Specialization)) {
+    if (!Specialization->isExternalDeclaration() &&
+        !convertExternalDefinitionIntoDeclaration(Specialization)) {
       DEBUG(
           llvm::dbgs() << "Could not remove body of specialization: "
                        << FunctionName << '\n');

@@ -1355,6 +1355,28 @@ function(add_swift_library name)
         Core)
   endif()
 
+  is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
+  if(NOT optimized)
+    # All Swift code depends on the SwiftOnoneSupport in non-optmized mode,
+    # except for the standard library itself.
+    if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
+      list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
+    endif()
+  endif()
+
+  if((NOT "${SWIFT_BUILD_STDLIB}") AND
+    (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
+    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
+        SwiftOnoneSupport)
+  endif()
+
+  # swiftSwiftOnoneSupport does not depend on itself,
+  # obviously.
+  if("${name}" STREQUAL "swiftSwiftOnoneSupport")
+    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
+        SwiftOnoneSupport)
+  endif()
+
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
 
   if("${SWIFTLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
