@@ -150,6 +150,11 @@ else:
   rethrows_ = ""
 }%
   ${comment}
+%   if preds:
+  @swift3_migration(renamed="starts(with:isEquivalent:)")
+%   else:
+  @swift3_migration(renamed="starts(with:)")
+%   end
   @warn_unused_result
   public func startsWith<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
