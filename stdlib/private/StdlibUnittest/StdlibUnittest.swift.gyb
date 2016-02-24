@@ -2459,7 +2459,7 @@ func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return [ lhs.first, lhs.second ].lexicographicalCompare(
+  return [ lhs.first, lhs.second ].lexicographicallyPrecedes(
     [ rhs.first, rhs.second ])
 }
 
@@ -2474,7 +2474,7 @@ public func expectEqualsUnordered<
     expected: Expected, _ actual: Actual, ${TRACE}
 ) {
   func comparePairLess(lhs: (T, T), rhs: (T, T)) -> Bool {
-    return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
+    return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
   }
 
   let x: [(T, T)] =

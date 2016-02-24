@@ -223,7 +223,7 @@ else:
 % end
 
 //===----------------------------------------------------------------------===//
-// lexicographicalCompare()
+// lexicographicallyPrecedes()
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -262,7 +262,7 @@ else:
 
   ${comment}
   @warn_unused_result
-  public func lexicographicalCompare<
+  public func lexicographicallyPrecedes<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
@@ -457,6 +457,15 @@ extension Sequence {
     fatalError("unavailable function can't be called")
   }
 
+  @available(*, unavailable, renamed="lexicographicallyPrecedes")
+  public func lexicographicalCompare<
+    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
+  >(
+    other: OtherSequence,
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
+  ) rethrows -> Bool {
+    fatalError("unavailable function can't be called")
+  }
 }
 
 extension Sequence where Iterator.Element : Comparable {
@@ -475,6 +484,15 @@ extension Sequence where Iterator.Element : Comparable {
     PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
   >(
     with possiblePrefix: PossiblePrefix
+  ) -> Bool {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lexicographicallyPrecedes")
+  public func lexicographicalCompare<
+    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
+  >(
+    other: OtherSequence
   ) -> Bool {
     fatalError("unavailable function can't be called")
   }

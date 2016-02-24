@@ -463,11 +463,11 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
 }
 
 //===----------------------------------------------------------------------===//
-// lexicographicalCompare()
+// lexicographicallyPrecedes()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
-  for test in lexicographicalCompareTests {
+SequenceTypeTests.test("lexicographicallyPrecedes(_:)/WhereElementIsComparable") {
+  for test in lexicographicallyPrecedesTests {
     do {
       let s = MinimalSequence<MinimalComparableValue>(
         elements: test.sequence.map(MinimalComparableValue.init))
@@ -475,7 +475,7 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
         elements: test.other.map(MinimalComparableValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other),
+        s.lexicographicallyPrecedes(other),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -493,7 +493,7 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
         elements: test.other.map(MinimalComparableValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other),
+        s.lexicographicallyPrecedes(other),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -505,8 +505,8 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
   }
 }
 
-SequenceTypeTests.test("lexicographicalCompare/Predicate") {
-  for test in lexicographicalCompareTests {
+SequenceTypeTests.test("lexicographicallyPrecedes(_:)/Predicate") {
+  for test in lexicographicallyPrecedesTests {
     do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
@@ -514,7 +514,7 @@ SequenceTypeTests.test("lexicographicalCompare/Predicate") {
         elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other) { $0.value < $1.value },
+        s.lexicographicallyPrecedes(other) { $0.value < $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -532,7 +532,7 @@ SequenceTypeTests.test("lexicographicalCompare/Predicate") {
         elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected.isLT(),
-        s.lexicographicalCompare(other) { $0.value < $1.value },
+        s.lexicographicallyPrecedes(other) { $0.value < $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
