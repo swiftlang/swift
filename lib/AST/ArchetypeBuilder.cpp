@@ -259,7 +259,7 @@ void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
 /// \param pa The potential archetype whose superclass constraint is being
 /// queried.
 ///
-/// \param proto The protocol to which we are establisting conformance.
+/// \param proto The protocol to which we are establishing conformance.
 ///
 /// \param cache A cache of the result, so we don't perform this query
 /// multiple times.
