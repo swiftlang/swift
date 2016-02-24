@@ -1,5 +1,8 @@
 // RUN: %target-parse-verify-swift
 
+// RUN: %target-parse-verify-swift -parse -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: FileCheck %s < %t.dump
+
 class A {
   func foo() { }
 }
@@ -32,3 +35,29 @@ func f10<T : GB<A> where T : GA<A>>(_: T) { }
 func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'GA<T>' is recursive}}
 func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'GA<U>' is recursive}}
 func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{inheritance from non-protocol, non-class type 'U'}}
+
+// rdar://problem/24730536
+// Superclass constraints can be used to resolve nested types to concrete types.
+
+protocol P3 {
+  associatedtype T
+}
+
+protocol P2 {
+  associatedtype T : P3
+}
+
+class C : P3 {
+  typealias T = Int
+}
+
+class S : P2 {
+  typealias T = C
+}
+
+extension P2 where Self.T : C {
+  // CHECK: superclass_constraint.(file).P2.concreteTypeWitnessViaSuperclass1
+  // CHECK: Generic signature: <Self where Self : P2, Self.T : C, Self.T : P3, Self.T.T == T>
+  // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P2, τ_0_0.T : C, τ_0_0.T : P3, τ_0_0.T.T == Int>
+  func concreteTypeWitnessViaSuperclass1(x: Self.T.T) {}
+}
