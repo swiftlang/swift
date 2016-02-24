@@ -475,7 +475,6 @@ extension Collection {
 // FIXME: swift-3-indexing-model - Need to fix up Index.Distance to make the following happy
 //    return distance(from: startIndex, to: endIndex)
     fatalError("FIXME: swift-3-indexing-model")
-    return 0
   }
 
 // TODO: swift-3-indexing-model - rename the following to _customIndexOfEquatable(element)?

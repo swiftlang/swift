@@ -200,6 +200,7 @@ internal func _writeBackMutableSlice<
   C._Element == Slice_.Iterator.Element,
   C.Index == Slice_.Index
 >(inout self_: C, bounds: Range<C.Index>, slice: Slice_) {
+  fatalError("FIXME: swift-3-indexing-model")
 //  C._failEarlyRangeCheck(
 //    rangeStart: bounds.startIndex,
 //    rangeEnd: bounds.endIndex,
