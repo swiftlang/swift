@@ -1681,3 +1681,305 @@ extension String {
   }
 }
 
+// Pre-Swift-3 method names
+extension String {
+
+  @available(*, unavailable, renamed="localizedName(ofStringEncoding:)")
+  public static func localizedNameOfStringEncoding(
+    encoding: NSStringEncoding
+  ) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, message="Use fileURL(withPathComponents:) on NSURL instead.")
+  public static func pathWithComponents(components: [String]) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="canBeConverted(toEncoding:)")
+  public func canBeConvertedToEncoding(encoding: NSStringEncoding) -> Bool {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="capitalizedString(with:)")
+  public func capitalizedStringWith(locale: NSLocale?) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="commonPrefix(with:options:)")
+  public func commonPrefixWith(
+    aString: String, options: NSStringCompareOptions) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="completePath(into:outputName:caseSensitive:matchesInto:filterTypes:)")
+  public func completePathInto(
+    outputName: UnsafeMutablePointer<String> = nil,
+    caseSensitive: Bool,
+    matchesInto matchesIntoArray: UnsafeMutablePointer<[String]> = nil,
+    filterTypes: [String]? = nil
+  ) -> Int {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="componentsSeparatedByCharacters(in:)")
+  public func componentsSeparatedByCharactersIn(
+    separator: NSCharacterSet
+  ) -> [String] {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="componentsSeparated(by:)")
+  public func componentsSeparatedBy(separator: String) -> [String] {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="cString(usingEncoding:)")
+  public func cStringUsingEncoding(encoding: NSStringEncoding) -> [CChar]? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="data(usingEncoding:allowLossyConversion:)")
+  public func dataUsingEncoding(
+    encoding: NSStringEncoding,
+    allowLossyConversion: Bool = false
+  ) -> NSData? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="enumerateLinguisticTags(in:scheme:options:orthography:_:)")
+  public func enumerateLinguisticTagsIn(
+    range: Range<Index>,
+    scheme tagScheme: String,
+    options opts: NSLinguisticTaggerOptions,
+    orthography: NSOrthography?,
+    _ body:
+      (String, Range<Index>, Range<Index>, inout Bool) -> ()
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="enumerateSubstrings(in:options:_:)")
+  public func enumerateSubstringsIn(
+    range: Range<Index>,
+    options opts:NSStringEnumerationOptions = [],
+    _ body: (
+      substring: String?, substringRange: Range<Index>,
+      enclosingRange: Range<Index>, inout Bool
+    ) -> ()
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="getBytes(_:maxLength:usedLength:encoding:options:range:remaining:)")
+  public func getBytes(
+    inout buffer: [UInt8],
+    maxLength maxBufferCount: Int,
+    usedLength usedBufferCount: UnsafeMutablePointer<Int>,
+    encoding: NSStringEncoding,
+    options: NSStringEncodingConversionOptions = [],
+    range: Range<Index>,
+    remainingRange leftover: UnsafeMutablePointer<Range<Index>>
+  ) -> Bool {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="getLineStart(_:end:contentsEnd:for:)")
+  public func getLineStart(
+    start: UnsafeMutablePointer<Index>,
+    end: UnsafeMutablePointer<Index>,
+    contentsEnd: UnsafeMutablePointer<Index>,
+    forRange: Range<Index>
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="getParagraphStart(_:end:contentsEnd:for:)")
+  public func getParagraphStart(
+    start: UnsafeMutablePointer<Index>,
+    end: UnsafeMutablePointer<Index>,
+    contentsEnd: UnsafeMutablePointer<Index>,
+    forRange: Range<Index>
+  ) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lengthOfBytes(usingEncoding:)")
+  public func lengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lineRange(for:)")
+  public func lineRangeFor(aRange: Range<Index>) -> Range<Index> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="linguisticTags(in:scheme:options:orthography:tokenRanges:)")
+  public func linguisticTagsIn(
+    range: Range<Index>,
+    scheme tagScheme: String,
+    options opts: NSLinguisticTaggerOptions = [],
+    orthography: NSOrthography? = nil,
+    tokenRanges: UnsafeMutablePointer<[Range<Index>]> = nil
+  ) -> [String] {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lowercaseString(with:)")
+  public func lowercaseStringWith(locale: NSLocale?) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="maximumLengthOfBytes(usingEncoding:)")
+  public
+  func maximumLengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="paragraphRange(for:)")
+  public func paragraphRangeFor(aRange: Range<Index>) -> Range<Index> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="rangeOfCharacter(from:options:range:)")
+  public func rangeOfCharacterFrom(
+    aSet: NSCharacterSet,
+    options mask:NSStringCompareOptions = [],
+    range aRange: Range<Index>? = nil
+  ) -> Range<Index>? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="rangeOfComposedCharacterSequence(at:)")
+  public
+  func rangeOfComposedCharacterSequenceAt(anIndex: Index) -> Range<Index> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="rangeOfComposedCharacterSequences(for:)")
+  public func rangeOfComposedCharacterSequencesFor(
+    range: Range<Index>
+  ) -> Range<Index> {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="range(of:options:range:locale:)")
+  public func rangeOf(
+    aString: String,
+    options mask: NSStringCompareOptions = [],
+    range searchRange: Range<Index>? = nil,
+    locale: NSLocale? = nil
+  ) -> Range<Index>? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="localizedStandardRange(of:)")
+  public func localizedStandardRangeOf(string: String) -> Range<Index>? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="addingPercentEncoding(withAllowedCharacters:")
+  public func addingPercentEncodingWithAllowedCharacters(
+    allowedCharacters: NSCharacterSet
+  ) -> String? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="addingPercentEscapes(usingEncoding:)")
+  public func addingPercentEscapesUsingEncoding(
+    encoding: NSStringEncoding
+  ) -> String? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="stringByAppendingFormat")
+  public func appendingFormat(
+    format: String, _ arguments: CVarArg...
+  ) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="folding(_:locale:)")
+  public func folding(
+    options options: NSStringCompareOptions = [], locale: NSLocale?
+  ) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="padding(toLength:with:startingAt:)")
+  public func byPaddingToLength(
+    newLength: Int, withString padString: String, startingAt padIndex: Int
+  ) -> String {
+    fatalError("unavailable function can't be called")
+  }
+  
+  @available(*, unavailable, renamed="replacingCharacters(in:with:)")
+  public func replacingCharactersIn(
+    range: Range<Index>, withString replacement: String
+  ) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="replacingOccurrences(of:with:options:range:)")
+  public func replacingOccurrencesOf(
+    target: String,
+    withString replacement: String,
+    options: NSStringCompareOptions = [],
+    range searchRange: Range<Index>? = nil
+  ) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="replacingPercentEscapes(usingEncoding:)")
+  public func replacingPercentEscapesUsingEncoding(
+    encoding: NSStringEncoding
+  ) -> String? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="trimmingCharacters(in:)")
+  public func byTrimmingCharactersIn(set: NSCharacterSet) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="strings(byAppendingPaths:)")
+  public func stringsByAppendingPaths(paths: [String]) -> [String] {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="substring(from:)")
+  public func substringFrom(index: Index) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="substring(to:)")
+  public func substringTo(index: Index) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="substring(with:)")
+  public func substringWith(aRange: Range<Index>) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="uppercaseString(with:)")
+  public func uppercaseStringWith(locale: NSLocale?) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="write(toFile:atomically:encoding:)")
+  public func writeToFile(
+    path: String, atomically useAuxiliaryFile:Bool,
+    encoding enc: NSStringEncoding
+  ) throws {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="write(to:atomically:encoding:)")
+  public func writeToURL(
+    url: NSURL, atomically useAuxiliaryFile: Bool,
+    encoding enc: NSStringEncoding
+  ) throws {
+    fatalError("unavailable function can't be called")
+  }
+}
