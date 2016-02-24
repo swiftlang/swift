@@ -4263,10 +4263,16 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   // function (?!)
   auto fnTy = method.getType().castTo<SILFunctionType>();
   // If the original method has an @unowned_inner_pointer return, the partial
-  // application thunk will lifetime-extend 'self' for us.
+  // application thunk will lifetime-extend 'self' for us, converting the
+  // return value to @unowned.
+  //
+  // If the original method has an @autoreleased return, the partial application
+  // thunk will retain it for us, converting the return value to @owned.
   auto resultInfo = fnTy->getResult();
   if (resultInfo.getConvention() == ResultConvention::UnownedInnerPointer)
     resultInfo = SILResultInfo(resultInfo.getType(), ResultConvention::Unowned);
+  else if (resultInfo.getConvention() == ResultConvention::Autoreleased)
+    resultInfo = SILResultInfo(resultInfo.getType(), ResultConvention::Owned);
 
   auto partialApplyTy = SILFunctionType::get(fnTy->getGenericSignature(),
                      fnTy->getExtInfo()
