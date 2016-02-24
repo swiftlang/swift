@@ -1844,29 +1844,22 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
 static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                               CanSILFunctionType origCalleeType,
                                               ArrayRef<Substitution> subs) {
+  auto &M = *IGF.IGM.SILMod->getSwiftModule();
   llvm::Value *wtable;
 
-  // The type of the self parameter in the witness. This may be abstract
-  // or concrete.
-  CanType origSelfType = origCalleeType->getSelfParameter().getType();
-
-  if (auto genericParamType = dyn_cast<GenericTypeParamType>(origSelfType)) {
+  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol(M)) {
     // The generic signature for a witness method with abstract Self must
     // have exactly one protocol requirement.
     //
     // We recover the witness table from the substitution that was used to
     // produce the substituted callee type.
-    assert(genericParamType->getDepth() == 0);
-    assert(genericParamType->getIndex() == 0);
-    (void) genericParamType;
-
+    //
     // There can be multiple substitutions, but the first one is the Self type.
     assert(subs.size() >= 1);
     assert(subs[0].getConformances().size() == 1);
 
     auto conformance = subs[0].getConformances()[0];
     auto substSelfType = subs[0].getReplacement()->getCanonicalType();
-    auto *proto = conformance.getRequirement();
 
     llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
     wtable = emitWitnessTableRef(IGF, substSelfType, &argMetadata,
