@@ -65,7 +65,7 @@ bb0(%0 : $X):
   apply %6(%0) : $@callee_owned @convention(thick) (@owned X) -> () 
   apply %7() : $@callee_owned @convention(thick) () -> ()
 
-  // Make sure we properly handle full apply sites for whcih we can not
+  // Make sure we properly handle full apply sites for which we can not
   // trivially find an absolute referenced function.
   apply %8(%0) : $@convention(method) (@guaranteed X) -> ()
   return undef : $()
