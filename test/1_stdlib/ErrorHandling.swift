@@ -197,9 +197,9 @@ ErrorHandlingTests.test("ErrorHandling/min") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/startsWith") {
+ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
   do {
-    let x: Bool = try [1, 2, 3].startsWith([1, 2]) { _, _ in
+    let x: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
       throw SillyError.JazzHands
       return false
     }

@@ -113,7 +113,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 % end
 
 //===----------------------------------------------------------------------===//
-// startsWith()
+// starts(with:)
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -141,10 +141,10 @@ else:
 }%
   ${comment}
   @warn_unused_result
-  public func startsWith<
+  public func starts<
     PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
   >(
-    possiblePrefix: PossiblePrefix${"," if preds else ""}
+    with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
     @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
@@ -446,6 +446,17 @@ extension Sequence {
   public func reverse() -> [Iterator.Element] {
     fatalError("unavailable function can't be called")
   }
+
+  @available(*, unavailable, renamed="starts")
+  public func startsWith<
+    PossiblePrefix : Sequence where PossiblePrefix.Iterator.Element == Iterator.Element
+  >(
+    with possiblePrefix: PossiblePrefix,
+    @noescape isEquivalent: (Iterator.Element, Iterator.Element) throws -> Bool
+  ) rethrows-> Bool {
+    fatalError("unavailable function can't be called")
+  }
+
 }
 
 extension Sequence where Iterator.Element : Comparable {
@@ -456,6 +467,15 @@ extension Sequence where Iterator.Element : Comparable {
 
   @available(*, unavailable, renamed="max")
   public func maxElement() -> Iterator.Element? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="starts")
+  public func startsWith<
+    PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
+  >(
+    with possiblePrefix: PossiblePrefix
+  ) -> Bool {
     fatalError("unavailable function can't be called")
   }
 }

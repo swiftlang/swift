@@ -58,7 +58,7 @@ var SequenceTypeTests = TestSuite("Sequence")
 //
 // - NaN behavior of floating point types, combined with these generic
 // algorithms, should make sense if possible.  For example,
-// [1.0, Double.NaN].startsWith([1.0, 2.0]) should be false.
+// [1.0, Double.NaN].starts(with: [1.0, 2.0]) should be false.
 
 //===----------------------------------------------------------------------===//
 // min(), max()
@@ -283,10 +283,10 @@ SequenceTypeTests.test("enumerated()") {
 }
 
 //===----------------------------------------------------------------------===//
-// startsWith()
+// starts(with:)
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
+SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
   for test in startsWithTests {
     do {
       let s = MinimalSequence<MinimalEquatableValue>(
@@ -295,7 +295,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
         elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix),
+        s.starts(with: prefix),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -313,7 +313,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
         elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix),
+        s.starts(with: prefix),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -325,7 +325,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
   }
 }
 
-SequenceTypeTests.test("startsWith/Predicate") {
+SequenceTypeTests.test("starts(with:)/Predicate") {
   for test in startsWithTests {
     do {
       let s = MinimalSequence<OpaqueValue<Int>>(
@@ -334,7 +334,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix) { $0.value == $1.value },
+        s.starts(with: prefix) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -350,7 +350,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix) { $0.value / 2 == $1.value },
+        s.starts(with: prefix) { $0.value / 2 == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value / 2 },
@@ -368,7 +368,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.startsWith(prefix) { $0.value == $1.value },
+        s.starts(with: prefix) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },

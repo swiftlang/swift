@@ -247,11 +247,11 @@ func checkHasPrefixHasSuffix(
     rhs.decomposedStringWithCanonicalMapping.characters.map {
       Array(String($0).unicodeScalars)
     }
-  let expectHasPrefix = lhsNFDGraphemeClusters.startsWith(
-    rhsNFDGraphemeClusters, isEquivalent: (==))
+  let expectHasPrefix = lhsNFDGraphemeClusters.starts(
+    with: rhsNFDGraphemeClusters, isEquivalent: (==))
   let expectHasSuffix =
-    lhsNFDGraphemeClusters.lazy.reversed().startsWith(
-      rhsNFDGraphemeClusters.lazy.reversed(), isEquivalent: (==))
+    lhsNFDGraphemeClusters.lazy.reversed().starts(
+      with: rhsNFDGraphemeClusters.lazy.reversed(), isEquivalent: (==))
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(
