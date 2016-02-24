@@ -202,7 +202,7 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
 /// object.
 @_transparent
 @warn_unused_result
-public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
 
@@ -287,7 +287,7 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
   return swift_objc_class_usesNativeSwiftReferenceCounting(
-    unsafeAddressOf(theClass)
+    unsafeAddress(of: theClass)
   )
 #else
   return true

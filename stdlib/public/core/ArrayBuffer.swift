@@ -445,7 +445,7 @@ extension _ArrayBuffer {
       return _native.identity
     }
     else {
-      return unsafeAddressOf(_nonNative)
+      return unsafeAddress(of: _nonNative)
     }
   }
   
