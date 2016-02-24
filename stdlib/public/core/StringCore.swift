@@ -352,7 +352,8 @@ public struct _StringCore {
     else if (hasCocoaBuffer) {
 #if _runtime(_ObjC)
       _StringCore(
-        _cocoaStringToContiguous(cocoaBuffer!, 0..<count, minimumCapacity: 0)
+        _cocoaStringToContiguous(
+          source: cocoaBuffer!, range: 0..<count, minimumCapacity: 0)
       ).encode(encoding, output: output)
 #else
       _sanityCheckFailure("encode: non-native string without objc runtime")
