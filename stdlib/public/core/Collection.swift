@@ -227,9 +227,9 @@ public protocol Collection : Indexable, Sequence {
   ///   O(N) otherwise.
   var count: Index.Distance { get }
   
-  /// The following requirement enables dispatching for indexOf when
-  /// the element type is Equatable.
-  ///
+  // The following requirement enables dispatching for indexOf when
+  // the element type is Equatable.
+
   /// Returns `Optional(Optional(index))` if an element was found;
   /// `nil` otherwise.
   ///
