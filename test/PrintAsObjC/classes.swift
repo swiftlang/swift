@@ -6,15 +6,15 @@
 // RUN: mkdir %t
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t -enable-omit-needless-words %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t -enable-omit-needless-words  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t -enable-omit-needless-words  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t -enable-omit-needless-words  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 // FIXME: END -enable-source-import hackaround
 
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -enable-omit-needless-words -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library -enable-omit-needless-words %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
@@ -91,8 +91,11 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 // CHECK-NEXT: @end
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
   var description: String { return "me" }
-  @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
-  @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
+  @objc(conformsToProtocol:)
+  func conforms(to _: Protocol) -> Bool { return false }
+
+  @objc(isKindOfClass:)
+  func isKind(of aClass: AnyClass) -> Bool { return false }
 }
 
 // CHECK-LABEL: @interface Initializers
@@ -394,6 +397,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (double)staticDouble;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
+// CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
 // CHECK-NEXT: @property (nonatomic, getter=register, setter=setRegister:) BOOL register_;
 // CHECK-NEXT: @property (nonatomic, readonly, strong, getter=this) Properties * _Nonnull this_;
 // CHECK-NEXT: init
@@ -467,6 +471,8 @@ public class NonObjCClass { }
     @objc(isEnabled) get { return true }
     @objc(setIsEnabled:) set { }
   }
+
+  var isAnimated: Bool = true
 
   var register: Bool = false
   var this: Properties { return self }

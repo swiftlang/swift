@@ -1171,22 +1171,22 @@ class CustomImmutableNSSet : NSSet {
 
   @objc(copyWithZone:)
   override func copy(with zone: NSZone) -> AnyObject {
-    ++CustomImmutableNSSet.timesCopyWithZoneWasCalled
+    CustomImmutableNSSet.timesCopyWithZoneWasCalled += 1
     return self
   }
 
   override func member(object: AnyObject) -> AnyObject? {
-    ++CustomImmutableNSSet.timesMemberWasCalled
+    CustomImmutableNSSet.timesMemberWasCalled += 1
     return getAsNSSet([ 1010, 1020, 1030 ]).member(object)
   }
 
   override func objectEnumerator() -> NSEnumerator {
-    ++CustomImmutableNSSet.timesObjectEnumeratorWasCalled
+    CustomImmutableNSSet.timesObjectEnumeratorWasCalled += 1
     return getAsNSSet([ 1010, 1020, 1030 ]).objectEnumerator()
   }
 
   override var count: Int {
-    ++CustomImmutableNSSet.timesCountWasCalled
+    CustomImmutableNSSet.timesCountWasCalled += 1
     return 3
   }
 
@@ -1402,7 +1402,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
@@ -1430,7 +1430,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
@@ -3434,7 +3434,7 @@ class MockSetWithCustomCount : NSSet {
   }
 
   override var count: Int {
-    ++MockSetWithCustomCount.timesCountWasCalled
+    MockSetWithCustomCount.timesCountWasCalled += 1
     return _count
   }
 

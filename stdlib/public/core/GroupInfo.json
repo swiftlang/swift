@@ -1,19 +1,4 @@
 {
-  "Lazy Views": [
-    "Algorithm.swift",
-    "Flatten.swift",
-    "FlatMap.swift",
-    "Map.swift",
-    "Join.swift",
-    "Zip.swift",
-    "Filter.swift",
-    "Reverse.swift",
-    "Slice.swift",
-    "SequenceWrapper.swift",
-    "LazyCollection.swift",
-    "LazySequence.swift",
-    "ExistentialCollection.swift"
-  ],
   "Array": [
     "ArrayBody.swift",
     "ArrayBuffer.swift",
@@ -68,7 +53,23 @@
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
     "Index.swift",
-    "Existential.swift"
+    "Existential.swift",
+    {
+      "Lazy Views": [
+        "Algorithm.swift",
+        "Flatten.swift",
+        "FlatMap.swift",
+        "Map.swift",
+        "Join.swift",
+        "Zip.swift",
+        "Filter.swift",
+        "Reverse.swift",
+        "Slice.swift",
+        "SequenceWrapper.swift",
+        "LazyCollection.swift",
+        "LazySequence.swift",
+        "ExistentialCollection.swift"]
+      }
   ],
   "C": [
     "BridgeObjectiveC.swift",

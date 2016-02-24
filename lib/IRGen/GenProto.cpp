@@ -1367,9 +1367,6 @@ namespace {
         : M(M), FnType(fnType) {
       initGenerics();
 
-      auto params = fnType->getParameters();
-      unsigned selfIndex = ~0U;
-
       auto rep = fnType->getRepresentation();
 
       if (rep == SILFunctionTypeRepresentation::WitnessMethod) {
@@ -1377,17 +1374,17 @@ namespace {
         // information from the Self argument. We also *cannot* consider other
         // arguments; doing so would potentially make the signature
         // incompatible with other witnesses for the same method.
-        selfIndex = params.size() - 1;
-        considerWitnessSelf(params[selfIndex], selfIndex);
+        considerWitnessSelf(fnType);
       } else if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
         // Objective-C thunks for generic methods also always derive all
         // polymorphic parameter information from the Self argument.
-        selfIndex = params.size() - 1;
-        considerObjCGenericSelf(params[selfIndex], selfIndex);
+        considerObjCGenericSelf(fnType);
       } else {
         // We don't need to pass anything extra as long as all of the
         // archetypes (and their requirements) are producible from
         // arguments.
+        unsigned selfIndex = ~0U;
+        auto params = fnType->getParameters();
 
         // Consider 'self' first.
         if (fnType->hasSelfParam()) {
@@ -1527,24 +1524,21 @@ namespace {
 
     /// Testify to generic parameters in the Self type of a protocol
     /// witness method.
-    void considerWitnessSelf(SILParameterInfo param, unsigned paramIndex) {
-      // If this is a static method, get the instance type.
-      CanType selfTy = param.getType();
-      if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
-        selfTy = metaTy.getInstanceType();
+    void considerWitnessSelf(CanSILFunctionType fnType) {
+      CanType selfTy = fnType->getSelfInstanceType();
 
       // First, bind type metadata for Self.
       Sources.emplace_back(SourceKind::SelfMetadata, InvalidSourceIndex,
                            selfTy);
 
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+      if (auto *proto = fnType->getDefaultWitnessMethodProtocol(M)) {
         // The Self type is abstract, so we must pass in a witness table.
-        addSelfMetadataFulfillment(paramTy);
+        addSelfMetadataFulfillment(selfTy);
 
         // Look at the witness table for the conformance.
         Sources.emplace_back(SourceKind::SelfWitnessTable, InvalidSourceIndex,
                              selfTy);
-        addSelfWitnessTableFulfillment(paramTy);
+        addSelfWitnessTableFulfillment(selfTy, proto);
       } else {
         // If the Self type is concrete, we have a witness thunk with a
         // fully substituted Self type. The witness table parameter is not
@@ -1555,18 +1549,17 @@ namespace {
 
     /// Testify to generic parameters in the Self type of an @objc
     /// generic or protocol method.
-    void considerObjCGenericSelf(SILParameterInfo param, unsigned paramIndex) {
+    void considerObjCGenericSelf(CanSILFunctionType fnType) {
       // If this is a static method, get the instance type.
-      CanType selfTy = param.getType();
-      if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
-        selfTy = metaTy.getInstanceType();
+      CanType selfTy = fnType->getSelfInstanceType();
+      unsigned paramIndex = fnType->getParameters().size() - 1;
 
       // Bind type metadata for Self.
       Sources.emplace_back(SourceKind::ClassPointer, paramIndex,
                            selfTy);
 
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy))
-        addSelfMetadataFulfillment(paramTy);
+      if (isa<GenericTypeParamType>(selfTy))
+        addSelfMetadataFulfillment(selfTy);
       else
         considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
     }
@@ -1616,23 +1609,14 @@ namespace {
       llvm_unreachable("bad parameter convention");
     }
 
-    void addSelfMetadataFulfillment(CanGenericTypeParamType arg) {
-      assert(arg->getDepth() == 0 && arg->getIndex() == 0);
-
+    void addSelfMetadataFulfillment(CanType arg) {
       unsigned source = Sources.size() - 1;
       Fulfillments.addFulfillment({arg, nullptr}, source, MetadataPath());
     }
 
-    void addSelfWitnessTableFulfillment(CanGenericTypeParamType arg) {
-      assert(arg->getDepth() == 0 && arg->getIndex() == 0);
-
+    void addSelfWitnessTableFulfillment(CanType arg, ProtocolDecl *proto) {
       unsigned source = Sources.size() - 1;
-      auto protos = getConformsTo(arg);
-      assert(protos.size() == 1);
-      for (auto protocol : protos) {
-        //considerWitnessTable(arg, protocol, Sources.size() - 1, MetadataPath());
-        Fulfillments.addFulfillment({arg, protocol}, source, MetadataPath());
-      }
+      Fulfillments.addFulfillment({arg, proto}, source, MetadataPath());
     }
   };
 
@@ -1684,9 +1668,10 @@ namespace {
         assert(witnessMetadata && "no metadata for witness method");
         llvm::Value *metadata = witnessMetadata->SelfMetadata;
         assert(metadata && "no Self metadata for witness method");
-        
+
         // Mark this as the cached metatype for Self.
-        CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
+        auto selfTy = FnType->getSelfInstanceType();
+        CanType argTy = getTypeInContext(selfTy);
         setTypeMetadataName(IGF.IGM, metadata, argTy);
         IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata);
         return;
@@ -1698,16 +1683,15 @@ namespace {
         assert(wtable && "no Self witness table for witness method");
         
         // Mark this as the cached witness table for Self.
-        CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
 
-        if (auto archetypeTy = dyn_cast<ArchetypeType>(argTy)) {
-          auto protos = archetypeTy->getConformsTo();
-          assert(protos.size() == 1);
-          auto *protocol = protos[0];
+        if (auto *proto = FnType->getDefaultWitnessMethodProtocol(M)) {
+          auto selfTy = FnType->getSelfInstanceType();
+          CanType argTy = getTypeInContext(selfTy);
+          auto archetype = cast<ArchetypeType>(argTy);
 
-          setProtocolWitnessTableName(IGF.IGM, wtable, argTy, protocol);
-          IGF.setUnscopedLocalTypeData(CanType(archetypeTy),
-              LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
+          setProtocolWitnessTableName(IGF.IGM, wtable, argTy, proto);
+          IGF.setUnscopedLocalTypeData(archetype,
+                      LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
                                        wtable);
         }
         return;

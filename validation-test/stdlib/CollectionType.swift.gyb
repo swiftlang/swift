@@ -100,7 +100,7 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
   func filter(
     @noescape transform: (Element) throws -> Bool
   ) rethrows -> [Element] {
-    ++MinimalForwardCollectionWithCustomFilter.timesFilterWasCalled
+    MinimalForwardCollectionWithCustomFilter.timesFilterWasCalled += 1
     return try _data.filter(transform)
   }
 
@@ -160,7 +160,7 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
       var result = call${dispatch}CollectionFilter(s) {
         (element) in
         _blackHole(closureLifetimeTracker)
-        ++timesClosureWasCalled
+        timesClosureWasCalled += 1
         return test.includeElement(element.value)
       }
       expectType([OpaqueValue<Int>].self, &result)
@@ -232,7 +232,7 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
   func map<T>(
     @noescape transform: (Element) throws -> T
   ) rethrows -> [T] {
-    ++MinimalForwardCollectionWithCustomMap.timesMapWasCalled
+    MinimalForwardCollectionWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
   }
 
@@ -298,7 +298,7 @@ CollectionTypeTests.test(
       var result = call${dispatch}CollectionMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
-        ++timesClosureWasCalled
+        timesClosureWasCalled += 1
         return OpaqueValue(Int32(test.transform(element.value)))
       }
       expectType([OpaqueValue<Int32>].self, &result)
@@ -453,7 +453,7 @@ struct MinimalForwardCollectionWithCustomIterator : Collection {
   static var timesIteratorWasCalled: Int = 0
 
   func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
-    ++MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled
+    MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled += 1
     return MinimalIterator<OpaqueValue<Int>>(
       Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
     )
@@ -768,7 +768,8 @@ do {
     extractValueFromComparable: identityComp,
     checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks,
-    withUnsafeMutableBufferPointerIsSupported: false)
+    withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true)
 %       end
 }
 
@@ -822,7 +823,8 @@ do {
     extractValueFromComparable: identityComp,
     checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks,
-    withUnsafeMutableBufferPointerIsSupported: false)
+    withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true)
 %       end
 }
 

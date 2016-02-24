@@ -3483,8 +3483,46 @@ typedef std::unique_ptr<FileNameToGroupNameMap> pFileNameToGroupNameMap;
 
 class YamlGroupInputParser {
   StringRef RecordPath;
-
+  std::string Separator = ".";
   static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
+
+  bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
+                 const llvm::Twine &ParentName) {
+    llvm::yaml::MappingNode *MapNode = dyn_cast<llvm::yaml::MappingNode>(Root);
+    if (!MapNode) {
+      return true;
+    }
+    for (auto Pair : *MapNode) {
+      auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
+      auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
+
+      if (!Key || !Value) {
+        return true;
+      }
+      llvm::SmallString<16> GroupNameStorage;
+      StringRef GroupName = Key->getValue(GroupNameStorage);
+      std::unique_ptr<llvm::Twine> pCombined;
+      if (!ParentName.isTriviallyEmpty()) {
+        pCombined.reset(new llvm::Twine(ParentName.concat(Separator).
+                                        concat(GroupName)));
+      } else {
+        pCombined.reset(new llvm::Twine(GroupName));
+      }
+      std::string CombinedName = pCombined->str();
+      for (llvm::yaml::Node &Entry : *Value) {
+        if (auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry)) {
+          llvm::SmallString<16> FileNameStorage;
+          StringRef FileName = FileEntry->getValue(FileNameStorage);
+          Map[FileName] = CombinedName;
+        } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
+          if(parseRoot(Map, &Entry, *pCombined))
+            return true;
+        } else
+          return true;
+      }
+    }
+    return false;
+  }
 
 public:
   YamlGroupInputParser(StringRef RecordPath): RecordPath(RecordPath) {}
@@ -3526,22 +3564,8 @@ public:
       return true;
     }
     pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
-    for (auto Pair : *Map) {
-      auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
-      auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
-
-      if (!Key || !Value) {
-        return true;
-      }
-      llvm::SmallString<16> GroupNameStorage;
-      StringRef GroupName = Key->getValue(GroupNameStorage);
-      for (llvm::yaml::Node &Entry : *Value) {
-        auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry);
-        llvm::SmallString<16> FileNameStorage;
-        StringRef FileName = FileEntry->getValue(FileNameStorage);
-        (*pMap)[FileName] = GroupName;
-      }
-    }
+    if(parseRoot(*pMap, Root, llvm::Twine()))
+      return true;
 
     // Save the parsed map to the owner.
     AllMaps[RecordPath] = std::move(pMap);

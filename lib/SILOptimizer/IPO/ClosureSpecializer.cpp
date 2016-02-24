@@ -739,7 +739,7 @@ void ClosureSpecializer::gatherCallSites(
 
         // If AI does not have a function_ref definition as its callee, we can
         // not do anything here... so continue...
-        SILFunction *ApplyCallee = AI.getCalleeFunction();
+        SILFunction *ApplyCallee = AI.getReferencedFunction();
         if (!ApplyCallee || ApplyCallee->isExternalDeclaration())
           continue;
 

@@ -702,12 +702,16 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     }
   }
 
-  // Handle functions that have an effects attribute.
-  if (auto *AI = dyn_cast<ApplyInst>(this))
-    if (auto *F = AI->getCalleeFunction())
+  // Handle full apply sites that have a resolvable callee function with an
+  // effects attribute.
+  if (isa<FullApplySite>(this)) {
+    FullApplySite Site(const_cast<SILInstruction *>(this));
+    if (auto *F = Site.getCalleeFunction()) {
       return F->getEffectsKind() == EffectsKind::ReadNone
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
+    }
+  }
 
   switch (getKind()) {
 #define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
@@ -937,6 +941,16 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
       return OS << "MayReadWrite";
     case SILInstruction::MemoryBehavior::MayHaveSideEffects:
       return OS << "MayHaveSideEffects";
+  }
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     SILInstruction::ReleasingBehavior B) {
+  switch (B) {
+  case SILInstruction::ReleasingBehavior::DoesNotRelease:
+    return OS << "DoesNotRelease";
+  case SILInstruction::ReleasingBehavior::MayRelease:
+    return OS << "MayRelease";
   }
 }
 #endif

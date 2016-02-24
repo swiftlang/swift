@@ -890,7 +890,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 //===----------------------------------------------------------------------===//
 
 static bool ignorableApplyInstInUnreachableBlock(const ApplyInst *AI) {
-  const auto *Fn = AI->getCalleeFunction();
+  const auto *Fn = AI->getReferencedFunction();
   if (!Fn)
     return false;
 

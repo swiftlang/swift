@@ -67,6 +67,30 @@ SILType SILFunctionType::getCSemanticResult() {
   }
 }
 
+CanType SILFunctionType::getSelfInstanceType() const {
+  auto selfTy = getSelfParameter().getType();
+
+  // If this is a static method, get the instance type.
+  if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
+    return metaTy.getInstanceType();
+
+  return selfTy;
+}
+
+ProtocolDecl *
+SILFunctionType::getDefaultWitnessMethodProtocol(ModuleDecl &M) const {
+  assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
+  auto selfTy = getSelfInstanceType();
+  if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
+    auto protos = GenericSig->getConformsTo(paramTy, M);
+    assert(protos.size() == 1);
+    return protos[0];
+  }
+
+  return nullptr;
+}
+
 static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
                             StringRef moduleName, StringRef typeName) {
   if (!cacheSlot) {

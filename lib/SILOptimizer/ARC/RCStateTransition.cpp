@@ -29,7 +29,7 @@ static bool isAutoreleasePoolCall(SILInstruction *I) {
   if (!AI)
     return false;
 
-  auto *Fn = AI->getCalleeFunction();
+  auto *Fn = AI->getReferencedFunction();
   if (!Fn)
     return false;
 

@@ -151,7 +151,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 
 /// If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
-  SILFunction *F = AI->getCalleeFunction();
+  SILFunction *F = AI->getReferencedFunction();
   if (!F || !F->isGlobalInit())
     return;
 
@@ -347,8 +347,8 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
   ApplyInst *AI = dyn_cast<ApplyInst>(CBR->getCondition());
   if (!AI)
     return false;
-  
-  SILFunction *F = AI->getCalleeFunction();
+
+  SILFunction *F = AI->getReferencedFunction();
   if (!F || !F->hasSemanticsAttrs())
     return false;
 

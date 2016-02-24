@@ -137,7 +137,7 @@ struct SequenceWithCustomUnderestimatedCount : Sequence {
   }
 
   var underestimatedCount: Int {
-    ++SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled
+    SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled += 1
     return _data.underestimatedCount
   }
 
@@ -731,7 +731,7 @@ class CustomImmutableNSArray : NSArray {
 
   @objc(copyWithZone:)
   override func copy(with zone: NSZone) -> AnyObject {
-    ++CustomImmutableNSArray.timesCopyWithZoneWasCalled
+    CustomImmutableNSArray.timesCopyWithZoneWasCalled += 1
     return self
   }
 
@@ -743,7 +743,7 @@ class CustomImmutableNSArray : NSArray {
 
   @objc
   override var count: Int {
-    ++CustomImmutableNSArray.timesCountWasCalled
+    CustomImmutableNSArray.timesCountWasCalled += 1
     return _data.count
   }
 
@@ -1768,6 +1768,103 @@ ArrayTestSuite.tearDown {
     expectNoLeaksOfDictionaryKeysValues()
   }
 }
+
+//===----------------------------------------------------------------------===//
+// MutableCollectionType and RangeReplaceableCollectionType conformance tests.
+//===----------------------------------------------------------------------===//
+
+% for array_type in all_array_types:
+%     collection_or_slice = 'Slice' if 'Slice' in array_type else 'Collection'
+
+do {
+  // `Array`, `ArraySlice`, and `ContiguousArrayBuffer` have no expectation of
+  // failure for advancing their indexes "out of bounds", because they are just
+  // `Int`.
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .None
+  
+  // Test MutableCollectionType conformance with value type elements.
+  ArrayTestSuite.addRandomAccessMutableCollectionTests(
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ${array_type}(elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${array_type}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
+      return ${array_type}(elements)
+    },
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+    resiliencyChecks: resiliencyChecks,
+    withUnsafeMutableBufferPointerIsSupported: true,
+    isFixedLengthCollection: false)
+
+
+  // Test MutableCollectionType conformance with reference type elements.
+  ArrayTestSuite.addRandomAccessMutableCollectionTests(
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return ${array_type}(elements)
+    },
+    wrapValue: { (element: OpaqueValue<Int>) in
+      LifetimeTracked(element.value, identity: element.identity)
+    },
+    extractValue: { (element: LifetimeTracked) in
+      OpaqueValue(element.value, identity: element.identity)
+    },
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${array_type}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${array_type}(elements)
+    },
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+    resiliencyChecks: resiliencyChecks,
+    withUnsafeMutableBufferPointerIsSupported: true,
+    isFixedLengthCollection: false)
+
+
+  // Test RangeReplaceableCollectionType conformance with value type elements.
+  ArrayTestSuite.addRandomAccessRangeReplaceable${collection_or_slice}Tests(
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ${array_type}(elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${array_type}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    resiliencyChecks: resiliencyChecks)
+
+
+  // Test RangeReplaceableCollectionType conformance with reference type elements.
+  ArrayTestSuite.addRandomAccessRangeReplaceable${collection_or_slice}Tests(
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return ${array_type}(elements)
+    },
+    wrapValue: { (element: OpaqueValue<Int>) in LifetimeTracked(element.value) },
+    extractValue: { (element: LifetimeTracked) in OpaqueValue(element.value) },
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${array_type}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    resiliencyChecks: resiliencyChecks)
+}
+  
+% end
 
 runAllTests()
 

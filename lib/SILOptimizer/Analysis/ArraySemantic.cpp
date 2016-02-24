@@ -85,7 +85,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
       if (!AllocBufferAI)
         return false;
 
-      auto *AllocFn = AllocBufferAI->getCalleeFunction();
+      auto *AllocFn = AllocBufferAI->getReferencedFunction();
       if (!AllocFn)
         return false;
 
@@ -109,7 +109,7 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
                                               StringRef SemanticStr,
                                               bool MatchPartialName) {
   if (auto *AI = dyn_cast<ApplyInst>(V))
-    if (auto *Fn = AI->getCalleeFunction())
+    if (auto *Fn = AI->getReferencedFunction())
       if ((MatchPartialName &&
            Fn->hasSemanticsAttrThatStartsWith(SemanticStr)) ||
           (!MatchPartialName && Fn->hasSemanticsAttr(SemanticStr))) {

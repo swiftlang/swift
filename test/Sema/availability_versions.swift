@@ -665,16 +665,16 @@ func castingUnavailableClass(o : AnyObject) {
       // expected-note@-2 {{add 'if #available' version check}}
 }
 
-protocol Createable {
+protocol Creatable {
   init()
 }
 
 @available(OSX, introduced=10.51)
-class ClassAvailableOn10_51_Createable : Createable { 
+class ClassAvailableOn10_51_Creatable : Creatable {
   required init() {}
 }
 
-func create<T : Createable>() -> T {
+func create<T : Creatable>() -> T {
   return T()
 }
 
@@ -683,13 +683,13 @@ class ClassWithGenericTypeParameter<T> { }
 class ClassWithTwoGenericTypeParameter<T, S> { }
 
 func classViaTypeParameter() {
-  let _ : ClassAvailableOn10_51_Createable = // expected-error {{'ClassAvailableOn10_51_Createable' is only available on OS X 10.51 or newer}}
+  let _ : ClassAvailableOn10_51_Creatable = // expected-error {{'ClassAvailableOn10_51_Creatable' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
       create()
       
   let _ = create() as
-      ClassAvailableOn10_51_Createable // expected-error {{'ClassAvailableOn10_51_Createable' is only available on OS X 10.51 or newer}}
+      ClassAvailableOn10_51_Creatable // expected-error {{'ClassAvailableOn10_51_Creatable' is only available on OS X 10.51 or newer}}
           // expected-note@-1 {{add @available attribute to enclosing global function}}
           // expected-note@-2 {{add 'if #available' version check}}
 

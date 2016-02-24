@@ -113,7 +113,8 @@ class EOFCountingIterator<T> : IteratorProtocol {
       numTimesReturnedEOF += 1
       return .none
     }
-    return array[index++]
+    index += 1
+    return array[index - 1]
   }
 }
 

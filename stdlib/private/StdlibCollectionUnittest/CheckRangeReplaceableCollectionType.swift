@@ -332,6 +332,44 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
     expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
 ]
 
+let replaceRangeTests: [ReplaceRangeTest] = [
+  ReplaceRangeTest(
+    collection: [],
+    newElements: [],
+    rangeSelection: .EmptyRange,
+    expected: []),
+
+  ReplaceRangeTest(
+    collection: [],
+    newElements: [1010, 2020, 3030],
+    rangeSelection: .EmptyRange,
+    expected: [1010, 2020, 3030]),
+
+  ReplaceRangeTest(
+    collection: [4040],
+    newElements: [1010, 2020, 3030],
+    rangeSelection: .LeftEdge,
+    expected: [1010, 2020, 3030, 4040]),
+
+  ReplaceRangeTest(
+    collection: [1010],
+    newElements: [2020, 3030, 4040],
+    rangeSelection: .RightEdge,
+    expected: [1010, 2020, 3030, 4040]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030],
+    newElements: [4040],
+    rangeSelection: .RightEdge,
+    expected: [1010, 2020, 3030, 4040]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    newElements: [9090],
+    rangeSelection: .Middle,
+    expected: [1010, 9090, 5050]),
+]
+
 extension TestSuite {
   /// Adds a set of tests for `RangeReplaceableCollection`.
   ///
@@ -416,45 +454,7 @@ self.test("\(testNamePrefix).init(Sequence)/semantics") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).replaceSubrange()/semantics") {
-  let tests: [ReplaceRangeTest] = [
-    ReplaceRangeTest(
-      collection: [],
-      newElements: [],
-      rangeSelection: .EmptyRange,
-      expected: []),
-
-    ReplaceRangeTest(
-      collection: [],
-      newElements: [1010, 2020, 3030],
-      rangeSelection: .EmptyRange,
-      expected: [1010, 2020, 3030]),
-
-    ReplaceRangeTest(
-      collection: [4040],
-      newElements: [1010, 2020, 3030],
-      rangeSelection: .LeftEdge,
-      expected: [1010, 2020, 3030, 4040]),
-
-    ReplaceRangeTest(
-      collection: [1010],
-      newElements: [2020, 3030, 4040],
-      rangeSelection: .RightEdge,
-      expected: [1010, 2020, 3030, 4040]),
-
-    ReplaceRangeTest(
-      collection: [1010, 2020, 3030],
-      newElements: [4040],
-      rangeSelection: .RightEdge,
-      expected: [1010, 2020, 3030, 4040]),
-
-    ReplaceRangeTest(
-      collection: [1010, 2020, 3030, 4040, 5050],
-      newElements: [9090],
-      rangeSelection: .Middle,
-      expected: [1010, 9090, 5050]),
-  ]
-
-  for test in tests {
+  for test in replaceRangeTests {
     var c = makeWrappedCollection(test.collection)
     let rangeToReplace = test.rangeSelection.rangeOf(c)
     let newElements =

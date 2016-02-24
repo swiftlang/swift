@@ -654,12 +654,12 @@ tests.test("UTF8 indexes") {
             expectEmpty(u16i0a.successor().samePositionIn(u8))
           }
           
-          ++dsa // we're moving off the beginning of a new Unicode scalar
+          dsa = dsa.advanced(by: 1) // we're moving off the beginning of a new Unicode scalar
         }
         else {
           expectEmpty(u8i0a.samePositionIn(u16))
         }
-        ++u8i0a
+        u8i0a = u8i0a.advanced(by: 1)
       }
 
       expectEqual(u8i0a, u8i1) // We should be there now
@@ -671,10 +671,10 @@ tests.test("UTF8 indexes") {
         for n1 in 0..<8 {
           expectEqual(u8i0b, u8i1b, sameValue: n0 == n1 ? (==) : (!=))
           if u8i1b == u8.endIndex { break }
-          ++u8i1b
+          u8i1b = u8i1b.advanced(by: 1)
         }
         if u8i0b == u8.endIndex { break }
-        ++u8i0b
+        u8i0b = u8i0b.advanced(by: 1)
       }
     }
   }

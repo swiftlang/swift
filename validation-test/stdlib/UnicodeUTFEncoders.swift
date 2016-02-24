@@ -116,7 +116,8 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     let nsEncoded = nsEncodeBuffer[0..<(used/sizeof(CodeUnit.self))]
     var encodeIndex = encodeBuffer.startIndex
     let encodeOutput: (CodeUnit) -> Void = {
-      self.encodeBuffer[encodeIndex++] = $0
+      self.encodeBuffer[encodeIndex] = $0
+      encodeIndex += 1
     }
 
     var iter = nsEncoded.makeIterator()

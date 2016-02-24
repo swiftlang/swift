@@ -873,7 +873,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   // Check if it is legal to perform the propagation.
   if (!AI.hasSubstitutions())
     return nullptr;
-  auto *Callee = AI.getCalleeFunction();
+  auto *Callee = AI.getReferencedFunction();
   if (!Callee || !Callee->getDeclContext())
     return nullptr;
 
@@ -1187,7 +1187,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         }
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *SF = AI->getCalleeFunction();
+  SILFunction *SF = AI->getReferencedFunction();
   if (SF && SF->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
@@ -1321,7 +1321,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   }
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *Fn = AI->getCalleeFunction();
+  SILFunction *Fn = AI->getReferencedFunction();
   if (Fn && Fn->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {
