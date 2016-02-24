@@ -768,7 +768,8 @@ do {
     extractValueFromComparable: identityComp,
     checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks,
-    withUnsafeMutableBufferPointerIsSupported: false)
+    withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true)
 %       end
 }
 
@@ -822,7 +823,8 @@ do {
     extractValueFromComparable: identityComp,
     checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks,
-    withUnsafeMutableBufferPointerIsSupported: false)
+    withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true)
 %       end
 }
 
