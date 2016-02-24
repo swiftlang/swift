@@ -20,6 +20,7 @@ extension String {
   ///
   /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
   /// UTF-8 code unit sequences.
+  @swift3_migration(message="Please use String.init?(validatingUTF8:). Note however that is does not accept NULL as a valid pointer.")
   @warn_unused_result
   public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
     if cs._isNull {
@@ -36,6 +37,7 @@ extension String {
   /// Returns `nil` if the `CString` is `NULL`.  If `CString` contains
   /// ill-formed UTF-8 code unit sequences, replaces them with replacement
   /// characters (U+FFFD).
+  @swift3_migration(message="Please use String.init(cString:). Note however that is does not accept NULL as a valid pointer. String.decodeCString might also be an option, should you need more control.")
   @warn_unused_result
   public static func fromCStringRepairingIllFormedUTF8(
     cs: UnsafePointer<CChar>)
