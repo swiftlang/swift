@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 struct _StringBufferIVars {
-  init(_ elementWidth: Int) {
-    _sanityCheck(elementWidth == 1 || elementWidth == 2)
+  internal init(_elementWidth: Int) {
+    _sanityCheck(_elementWidth == 1 || _elementWidth == 2)
     usedEnd = nil
-    capacityAndElementShift = elementWidth - 1
+    capacityAndElementShift = _elementWidth - 1
   }
 
   init(
@@ -74,7 +74,7 @@ public struct _StringBuffer {
     let divRound = 1 &- elementShift
     _storage = _Storage(
       HeapBufferStorage.self,
-      _StringBufferIVars(elementWidth),
+      _StringBufferIVars(_elementWidth: elementWidth),
       (capacity + capacityBump + divRound) >> divRound
     )
     self.usedEnd = start + (initialSize << elementShift)
