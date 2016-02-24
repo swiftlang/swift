@@ -65,6 +65,17 @@ static StringRef getTagForDecl(const Decl *D, bool isRef) {
 static StringRef ExternalParamNameTag = "decl.var.parameter.name.external";
 static StringRef LocalParamNameTag = "decl.var.parameter.name.local";
 
+static StringRef getTagForPrintNameContext(PrintNameContext context) {
+  switch (context) {
+  case PrintNameContext::FunctionParameterExternal:
+    return ExternalParamNameTag;
+  case PrintNameContext::FunctionParameterLocal:
+    return LocalParamNameTag;
+  default:
+    return "";
+  }
+}
+
 /// An ASTPrinter for annotating declarations with XML tags that describe the
 /// key substructure of the declaration for CursorInfo/DocInfo.
 ///
@@ -106,28 +117,14 @@ private:
   }
 
   void printNamePre(PrintNameContext context) override {
-    switch (context) {
-    case PrintNameContext::FunctionParameterExternal:
-      openTag(ExternalParamNameTag);
-      break;
-    case PrintNameContext::FunctionParameterLocal:
-      openTag(LocalParamNameTag);
-      break;
-    default:
-      break;
-    }
+    auto tag = getTagForPrintNameContext(context);
+    if (!tag.empty())
+      openTag(tag);
   }
   void printNamePost(PrintNameContext context) override {
-    switch (context) {
-    case PrintNameContext::FunctionParameterExternal:
-      closeTag(ExternalParamNameTag);
-      break;
-    case PrintNameContext::FunctionParameterLocal:
-      closeTag(LocalParamNameTag);
-      break;
-    default:
-      break;
-    }
+    auto tag = getTagForPrintNameContext(context);
+    if (!tag.empty())
+      closeTag(tag);
   }
 
   void printTypeRef(const TypeDecl *TD, Identifier name) override {
