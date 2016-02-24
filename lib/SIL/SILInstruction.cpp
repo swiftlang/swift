@@ -702,7 +702,7 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     }
   }
 
-  // Handle full apply sites that have a resolveable callee function with an
+  // Handle full apply sites that have a resolvable callee function with an
   // effects attribute.
   if (isa<FullApplySite>(this)) {
     FullApplySite Site(const_cast<SILInstruction *>(this));
