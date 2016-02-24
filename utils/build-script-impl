@@ -104,6 +104,9 @@ KNOWN_SETTINGS=(
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
+    skip-build-linux            ""               "set to skip building Swift stdlibs for Linux"
+    skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
+    skip-build-cygwin           ""               "set to skip building Swift stdlibs for Cygwin"
     skip-build-osx              ""               "set to skip building Swift stdlibs for OSX"
     skip-build-ios              ""               "set to skip building Swift stdlibs for iOS"
     skip-build-ios-device       ""               "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
@@ -129,6 +132,9 @@ KNOWN_SETTINGS=(
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
+    skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
+    skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
+    skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
@@ -906,16 +912,16 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     test_benchmark_this_target=
     case ${deployment_target} in
         linux-*)
-            build_for_this_target=1
-            test_this_target=1
+            build_for_this_target=$(not ${SKIP_BUILD_LINUX})
+            test_this_target=$(not ${SKIP_TEST_LINUX})
             ;;
         freebsd-*)
-            build_for_this_target=1
-            test_this_target=1
+            build_for_this_target=$(not ${SKIP_BUILD_FREEBSD})
+            test_this_target=$(not ${SKIP_TEST_FREEBSD})
             ;;
         cygwin-*)
-            build_for_this_target=1
-            test_this_target=1
+            build_for_this_target=$(not ${SKIP_BUILD_CYGWIN})
+            test_this_target=$(not ${SKIP_TEST_CYGWIN})
             ;;
         macosx-*)
             build_for_this_target=$(not ${SKIP_BUILD_OSX})
