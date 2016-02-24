@@ -24,7 +24,8 @@ public protocol Indexable {
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  associatedtype Index : ForwardIndex
+// TODO: swift-3-indexing-model - Index only needs to be comparable or must be comparable..?
+  associatedtype Index : ForwardIndex //Comparable
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -56,8 +57,67 @@ public protocol Indexable {
   ///
   /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get }
+  
+// TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  /// Performs a range check in O(1), or a no-op when a range check is not
+  /// implementable in O(1).
+  ///
+  /// The range check, if performed, is equivalent to:
+  ///
+  ///     precondition(bounds.contains(index))
+  ///
+  /// Use this function to perform a cheap range check for QoI purposes when
+  /// memory safety is not a concern.  Do not rely on this range check for
+  /// memory safety.
+  ///
+  /// The default implementation for forward and bidirectional indices is a
+  /// no-op.  The default implementation for random access indices performs a
+  /// range check.
+  ///
+  /// - Complexity: O(1).
+  func _failEarlyRangeCheck(index: Index, bounds: Range<Index>)
+  
+// TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  /// Performs a range check in O(1), or a no-op when a range check is not
+  /// implementable in O(1).
+  ///
+  /// The range check, if performed, is equivalent to:
+  ///
+  ///     precondition(
+  ///       bounds.contains(range.startIndex) ||
+  ///       range.startIndex == bounds.endIndex)
+  ///     precondition(
+  ///       bounds.contains(range.endIndex) ||
+  ///       range.endIndex == bounds.endIndex)
+  ///
+  /// Use this function to perform a cheap range check for QoI purposes when
+  /// memory safety is not a concern.  Do not rely on this range check for
+  /// memory safety.
+  ///
+  /// The default implementation for forward and bidirectional indices is a
+  /// no-op.  The default implementation for random access indices performs a
+  /// range check.
+  ///
+  /// - Complexity: O(1).
+  func _failEarlyRangeCheck(
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index)
+  
+// TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  /// Returns the next consecutive `Index` in a discrete sequence of
+  /// `Index` values.
+  ///
+  /// - Precondition: `i` has a well-defined successor.
+  @warn_unused_result
+  func next(i: Index) -> Index
+  
+// TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  func _nextInPlace(inout i: Index)
 }
 
+// TODO: swift-3-indexing-model - deal with MutableIndexable
 /// A type that supports subscript assignment to a mutable collection.
 public protocol MutableIndexable {
   associatedtype Index : ForwardIndex
@@ -70,6 +130,7 @@ public protocol MutableIndexable {
   subscript(position: Index) -> _Element { get set }
 }
 
+// TODO: swift-3-indexing-model - deal with IndexingIterator
 /// The iterator used for collections that don't specify one.
 public struct IndexingIterator<Elements : Indexable>
  : IteratorProtocol, Sequence {
@@ -111,6 +172,14 @@ public struct IndexingIterator<Elements : Indexable>
 ///       let x = self[i]
 ///     }
 public protocol Collection : Indexable, Sequence {
+  // TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  /// A type that can represent the number of steps between pairs of
+  /// `Index` values where one value is reachable from the other.
+  ///
+  /// Reachability is defined by the ability to produce one value from
+  /// the other via zero or more applications of `next(i)`.
+  associatedtype IndexDistance : SignedInteger = Int
+  
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   ///
@@ -185,8 +254,147 @@ public protocol Collection : Indexable, Sequence {
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   var first: Iterator.Element? { get }
+  
+// TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  /// Returns the result of advancing `i` by `n` positions.
+  ///
+  /// - Returns:
+  ///   - If `n > 0`, returns a new index applying `next` on `i` `n`
+  ///     times.
+  ///   - If `n < 0`, returns a new index by applying `previous` on `i`
+  ///     `-n` times.
+  ///   - Otherwise, `i` unmodified.
+  ///
+  /// - Precondition: `n >= 0` if only conforming to `Collection`
+  ///
+  /// - Complexity:
+  ///   - O(1) if conforming to `RandomAccessCollection`
+  ///   - O(`abs(n)`) otherwise
+  @warn_unused_result
+  func advance(i: Index, by n: IndexDistance) -> Index
+  
+// TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  /// Returns the result of advancing `self` by `n` positions, or until it
+  /// equals `limit`.
+  ///
+  /// - Returns:
+  ///   - If `n > 0`, returns `i` modified by applying `next` on `i` `n`
+  ///     times but not past `limit`.
+  ///   - If `n < 0`, returns `i` modified by applying `previous` on `i`
+  ///     `-n` times but not past `limit`.
+  ///   - Otherwise, return `i` unmodified.
+  ///
+  /// - Precondition: `n >= 0` if only conforming to `Collection`.
+  ///
+  /// - Complexity:
+  ///   - O(1) if conforming to `RandomAccessCollection`
+  ///   - O(`abs(n)`) otherwise
+  @warn_unused_result
+  func advance(i: Index, by n: IndexDistance, limit: Index) -> Index
+  
+// TODO: swift-3-indexing-model - replaces functionality in ForwardIndex
+  /// Measure the distance between `start` and `end` indexes.
+  ///
+  /// - Precondition:
+  ///   - `start` and `end` are part of the same sequence when conforming to
+  ///     `RandomAccessSequenceType`.
+  ///   - `end` is reachable from `start` by incrementation otherwise.
+  ///
+  /// - Complexity:
+  ///   - O(1) if conforming to `RandomAccessIndex`
+  ///   - O(`n`) otherwise, where `n` is the function's result.
+  @warn_unused_result
+  func distance(from start: Index, to end: Index) -> IndexDistance
+
+// TODO: swift-3-indexing-model - need to add the associatedtypes for the following
+//  var indices: IndexRangeType { get }
+  
+// TODO: swift-3-indexing-model - need to add the associatedtypes for the following
+//  init(from handle: UnownedHandle)
+//  var unownedHandle: UnownedHandle { get }
 }
 
+// TODO: swift-3-indexing-model - new forward indexing default implementation
+/// Default implementation for forward collections.
+extension Collection {
+  // TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
+  public func next(i: Index) -> Index {
+    fatalError("collections need to implement, this is a temp stub to make things compile")
+  }
+  
+  @inline(__always)
+  public func _nextInPlace(inout i: Index) {
+    i = next(i)
+  }
+  
+  public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
+    // Can't perform range checks in O(1) on non-RandomAccessIndexables.
+  }
+  
+  public func _failEarlyRangeCheck(
+    rangeStart rangeStart: Index,
+    rangeEnd: Index,
+    boundsStart: Index,
+    boundsEnd: Index
+  ) {
+      // Can't perform range checks in O(1) on non-RandomAccessIndexables.
+  }
+  
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    return self._advanceForward(i, by: n)
+  }
+  
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    return self._advanceForward(i, by: n, limit: limit)
+  }
+  
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // TODO: swift-3-indexing-model - once Index is Comparable the following is possible, right?
+    //    _precondition(start <= end,
+    //      "Only BidirectionalCollections can have end come before start")
+    var start = start
+    var count: IndexDistance = 0
+    while start != end {
+      count = count + 1
+      _nextInPlace(&start)
+    }
+    return count
+  }
+  
+  /// Do not use this method directly; call advancedBy(n) instead.
+  @inline(__always)
+  @warn_unused_result
+  internal func _advanceForward(i: Index, by n: IndexDistance) -> Index {
+    _precondition(n >= 0,
+      "Only BidirectionalCollections can be advanced by a negative amount")
+    
+    var i = i
+    for var offset: IndexDistance = 0; offset != n; offset = offset + 1 {
+      _nextInPlace(&i)
+    }
+    return i
+  }
+  
+  /// Do not use this method directly; call advancedBy(n, limit) instead.
+  @inline(__always)
+  @warn_unused_result
+  internal
+  func _advanceForward(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    _precondition(n >= 0,
+      "Only BidirectionalCollections can be advanced by a negative amount")
+    
+    var i = i
+    for var offset: IndexDistance = 0; offset != n && i != limit; offset = offset + 1 {
+      _nextInPlace(&i)
+    }
+    return i
+  }
+}
+
+// TODO: swift-3-indexing-model - review the following
 /// Supply the default `makeIterator()` method for `Collection` models
 /// that accept the default associated `Iterator`,
 /// `IndexingIterator<Self>`.
@@ -196,6 +404,7 @@ extension Collection where Iterator == IndexingIterator<Self> {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 /// Supply the default "slicing" `subscript`  for `Collection` models
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
 extension Collection where SubSequence == Slice<Self> {
@@ -209,6 +418,7 @@ extension Collection where SubSequence == Slice<Self> {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Collection where SubSequence == Self {
   /// If `!self.isEmpty`, remove the first element and return it, otherwise
   /// return `nil`.
@@ -223,6 +433,7 @@ extension Collection where SubSequence == Self {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Collection where
     SubSequence == Self, Index : BidirectionalIndex {
   /// If `!self.isEmpty`, remove the last element and return it, otherwise
@@ -258,7 +469,15 @@ extension Collection {
     var i = makeIterator()
     return i.next()
   }
+// TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  ///
+  /// - Complexity: O(1)
+  //  public var first: Iterator.Element? {
+  //    return isEmpty ? nil : self[startIndex]
+  //  }
 
+// TODO: swift-3-indexing-model - review the following
   /// Returns a value less than or equal to the number of elements in
   /// `self`, *nondestructively*.
   ///
@@ -274,7 +493,16 @@ extension Collection {
   public var count: Index.Distance {
     return startIndex.distance(to: endIndex)
   }
+// TODO: swift-3-indexing-model - uncomment and replace above ready
+  /// Returns the number of elements.
+  ///
+  /// - Complexity: O(1) if `self` conforms to `RandomAccessCollection`;
+  ///   O(N) otherwise.
+  //  public var count: IndexDistance {
+  //    return distance(from: startIndex, to: endIndex)
+  //  }
 
+// TODO: swift-3-indexing-model - renaming the following to  the following _customIndexOfEquatable(element)?
   /// Customization point for `Sequence.index(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
@@ -297,6 +525,7 @@ extension Collection {
 //===----------------------------------------------------------------------===//
 
 extension Collection {
+// TODO: swift-3-indexing-model - review the following
   /// Returns an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
@@ -324,6 +553,7 @@ extension Collection {
     return Array(result)
   }
 
+// TODO: swift-3-indexing-model - review the following
   /// Returns a subsequence containing all but the first `n` elements.
   ///
   /// - Precondition: `n >= 0`
@@ -334,6 +564,13 @@ extension Collection {
     let start = startIndex.advanced(by: numericCast(n), limit: endIndex)
     return self[start..<endIndex]
   }
+// TODO: swift-3-indexing-model - uncomment and replace above ready
+//  @warn_unused_result
+//  public func dropFirst(n: Int) -> SubSequence {
+//    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
+//    let start = advance(startIndex, by: numericCast(n), limit: endIndex)
+//    return self[start..<endIndex]
+//  }
 
   /// Returns a subsequence containing all but the last `n` elements.
   ///
@@ -347,7 +584,15 @@ extension Collection {
     let end = startIndex.advanced(by: numericCast(amount), limit: endIndex)
     return self[startIndex..<end]
   }
-
+// TODO: swift-3-indexing-model - uncomment and replace above ready
+//  @warn_unused_result
+//  public func dropLast(n: Int) -> SubSequence {
+//    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
+//    let amount = max(0, numericCast(count) - n)
+//    let end = advance(startIndex, by: numericCast(amount), limit: endIndex)
+//    return self[startIndex..<end]
+//  }
+  
   /// Returns a subsequence, up to `maxLength` in length, containing the
   /// initial elements.
   ///
@@ -364,7 +609,14 @@ extension Collection {
     let end = startIndex.advanced(by: numericCast(maxLength), limit: endIndex)
     return self[startIndex..<end]
   }
-
+// TODO: swift-3-indexing-model - uncomment and replace above ready
+//  @warn_unused_result
+//  public func prefix(maxLength: Int) -> SubSequence {
+//    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
+//    let end = advance(startIndex, by: numericCast(maxLength), limit: endIndex)
+//    return self[startIndex..<end]
+//  }
+  
   /// Returns a slice, up to `maxLength` in length, containing the
   /// final elements of `self`.
   ///
@@ -382,7 +634,15 @@ extension Collection {
     let start = startIndex.advanced(by: numericCast(amount), limit: endIndex)
     return self[start..<endIndex]
   }
-
+// TODO: swift-3-indexing-model - uncomment and replace above ready
+//  @warn_unused_result
+//  public func suffix(maxLength: Int) -> SubSequence {
+//    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
+//    let amount = max(0, numericCast(count) - maxLength)
+//    let start = advance(startIndex, by: numericCast(amount), limit: endIndex)
+//    return self[start..<endIndex]
+//  }
+  
   /// Returns `self[startIndex..<end]`
   ///
   /// - Complexity: O(1)
@@ -406,7 +666,13 @@ extension Collection {
   public func prefix(through position: Index) -> SubSequence {
     return prefix(upTo: position.successor())
   }
-
+// TODO: swift-3-indexing-model - uncomment and replace above ready
+//  @warn_unused_result
+//  public func prefix(through position: Index) -> SubSequence {
+//    return prefix(upTo: position.next())
+//  }
+  
+// TODO: swift-3-indexing-model - review the following
   /// Returns the maximal `SubSequence`s of `self`, in order, that
   /// don't contain elements satisfying the predicate `isSeparator`.
   ///
@@ -470,6 +736,7 @@ extension Collection {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Collection where Iterator.Element : Equatable {
   /// Returns the maximal `SubSequence`s of `self`, in order, around a
   /// `separator` element.
@@ -500,6 +767,7 @@ extension Collection where Iterator.Element : Equatable {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Collection where Index : BidirectionalIndex {
   /// Returns a subsequence containing all but the last `n` elements.
   ///
@@ -531,6 +799,7 @@ extension Collection where Index : BidirectionalIndex {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Collection where SubSequence == Self {
   /// Remove the element at `startIndex` and return it.
   ///
@@ -558,6 +827,7 @@ extension Collection where SubSequence == Self {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Collection
   where
   SubSequence == Self,
@@ -588,6 +858,7 @@ extension Collection
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Sequence
   where Self : _ArrayProtocol, Self.Element == Self.Iterator.Element {
   // A fast implementation for when you are backed by a contiguous array.
@@ -610,12 +881,14 @@ extension Sequence
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension Collection {
   public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
     return preprocess()
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 /// A *collection* that supports subscript assignment.
 ///
 /// For any instance `a` of a type conforming to
@@ -671,6 +944,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   // UnsafeMutableBufferPointer
 }
 
+// TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
@@ -693,6 +967,7 @@ extension MutableCollection {
   }
 }
 
+// TODO: swift-3-indexing-model - review the following
 internal func _writeBackMutableSlice<
   C : MutableCollection,
   Slice_ : Collection
