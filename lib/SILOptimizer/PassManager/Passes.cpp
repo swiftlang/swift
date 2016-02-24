@@ -172,18 +172,52 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.addSwiftArrayOpts();
 }
 
+// Perform classic SSA optimizations.
 void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
-  AddSimplifyCFGSILCombine(PM);
+  // Promote box allocations to stack allocations.
   PM.addAllocBoxToStack();
+
+  // Propagate copies through stack locations.  Should run after
+  // box-to-stack promotion since it is limited to propagating through
+  // stack locations. Should run before aggregate lowering since that
+  // splits up copy_addr.
   PM.addCopyForwarding();
+
+  // Split up opaque operations (copy_addr, retain_value, etc.).
   PM.addLowerAggregateInstrs();
-  PM.addSILCombine();
+
+  // Split up operations on stack-allocated aggregates (struct, tuple).
   PM.addSROA();
+
+  // Promote stack allocations to values.
   PM.addMem2Reg();
 
-  // Perform classic SSA optimizations.
-  PM.addGlobalOpt();
-  PM.addLetPropertiesOpt();
+  // Run the devirtualizer, specializer, and inliner. If any of these
+  // makes a change we'll end up restarting the function passes on the
+  // current function (after optimizing any new callees).
+  PM.addDevirtualizer();
+  PM.addGenericSpecializer();
+  switch (OpLevel) {
+    case OptimizationLevelKind::HighLevel:
+      // Does not inline functions with defined semantics.
+      PM.addEarlyInliner();
+      break;
+    case OptimizationLevelKind::MidLevel:
+      // Does inline semantics-functions (except "availability"), but not
+      // global-init functions.
+      PM.addPerfInliner();
+      PM.addGlobalOpt();
+      PM.addLetPropertiesOpt();
+      break;
+    case OptimizationLevelKind::LowLevel:
+      // Inlines everything
+      PM.addLateInliner();
+      break;
+  }
+
+  PM.addMem2Reg();
+  AddSimplifyCFGSILCombine(PM);
+
   PM.addPerformanceConstantPropagation();
   PM.addDCE();
   PM.addCSE();
@@ -203,26 +237,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
   PM.addSILLinker();
 
-  // Run the devirtualizer, specializer, and inliner. If any of these
-  // makes a change we'll end up restarting the function passes on the
-  // current function (after optimizing any new callees).
-  PM.addDevirtualizer();
-  PM.addGenericSpecializer();
-  switch (OpLevel) {
-    case OptimizationLevelKind::HighLevel:
-      // Does not inline functions with defined semantics.
-      PM.addEarlyInliner();
-      break;
-    case OptimizationLevelKind::MidLevel:
-      // Does inline semantics-functions (except "availability"), but not
-      // global-init functions.
-      PM.addPerfInliner();
-      break;
-    case OptimizationLevelKind::LowLevel:
-      // Inlines everything
-      PM.addLateInliner();
-      break;
-  }
   PM.addSimplifyCFG();
   // Only hoist releases very late.
   if (OpLevel == OptimizationLevelKind::LowLevel)
