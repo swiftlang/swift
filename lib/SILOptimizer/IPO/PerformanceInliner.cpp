@@ -46,9 +46,6 @@ namespace {
   llvm::cl::opt<int> TestThreshold("sil-inline-test-threshold",
                                         llvm::cl::init(-1), llvm::cl::Hidden);
 
-  llvm::cl::opt<int> TestOpt("sil-inline-test",
-                                   llvm::cl::init(0), llvm::cl::Hidden);
-
   // The following constants define the cost model for inlining.
 
   // The base value for every call: it represents the benefit of removing the
@@ -713,7 +710,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     SILBasicBlock *takenBlock = getTakenBlock(block->getTerminator(),
                                               constTracker);
     if (takenBlock) {
-      Benefit += ConstTerminatorBenefit + TestOpt;
+      Benefit += ConstTerminatorBenefit;
       domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
         return child->getSinglePredecessor() != block || child == takenBlock;
       });
