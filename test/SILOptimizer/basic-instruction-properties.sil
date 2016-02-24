@@ -12,16 +12,15 @@ class X {
   func foo()
 }
 
+class Y : X {}
+
 sil_vtable X {}
+sil_vtable Y {}
 
 sil [readnone] @full_apply_site_effects_callee_1 : $@convention(thin) (@owned X) -> ()
 sil [readnone] @full_apply_site_effects_callee_2 : $@convention(thin) (@owned X, @owned X, @owned X) -> ()
 
 // CHECK-LABEL: @full_apply_site_effects
-// CHECK: Inst #: 8
-// CHECK:     apply
-// CHECK:     Mem Behavior: None
-// CHECK:     Release Behavior: MayRelease
 // CHECK: Inst #: 9
 // CHECK:     apply
 // CHECK:     Mem Behavior: None
@@ -44,7 +43,16 @@ sil [readnone] @full_apply_site_effects_callee_2 : $@convention(thin) (@owned X,
 // CHECK:     Release Behavior: MayRelease
 // CHECK: Inst #: 14
 // CHECK:     apply
+// CHECK:     Mem Behavior: None
+// CHECK:     Release Behavior: MayRelease
+// CHECK: Inst #: 15
+// CHECK:     apply
 // CHECK:     Mem Behavior: MayHaveSideEffects
+// CHECK:     Release Behavior: MayRelease
+// CHECK: Inst #: 16
+// CHECK: Inst #: 17
+// CHECK:     apply
+// CHECK:     Mem Behavior: None
 // CHECK:     Release Behavior: MayRelease
 sil @full_apply_site_effects : $@convention(thin) (@owned X) ->  () {
 bb0(%0 : $X):
@@ -56,6 +64,7 @@ bb0(%0 : $X):
   %6 = partial_apply %5(%0) : $@callee_owned @convention(thick) (@owned X, @owned X) -> ()
   %7 = partial_apply %6(%0) : $@callee_owned @convention(thick) (@owned X) -> ()
   %8 = class_method %0 : $X, #X.foo!1 : X -> () -> (), $@convention(method) (@guaranteed X) -> ()
+  %9 = convert_function %6 : $@callee_owned @convention(thick) (@owned X) -> () to $@callee_owned @convention(thick) (@owned Y) -> ()
 
   apply %1(%0) : $@convention(thin) (@owned X) -> ()
   apply %2() : $@callee_owned @convention(thick) () -> ()
@@ -68,5 +77,8 @@ bb0(%0 : $X):
   // Make sure we properly handle full apply sites for whcih we can not
   // trivially find an absolute referenced function.
   apply %8(%0) : $@convention(method) (@guaranteed X) -> ()
+
+  %10 = unchecked_ref_cast %0 : $X to $Y
+  apply %9(%10) : $@callee_owned @convention(thick) (@owned Y) -> ()
   return undef : $()
 }

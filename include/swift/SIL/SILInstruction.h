@@ -692,10 +692,9 @@ public:
 
   /// Gets the referenced function if the callee is a function_ref instruction.
   SILFunction *getReferencedFunction() const {
-    auto *FRI = dyn_cast<FunctionRefInst>(getCallee());
-    if (!FRI)
-      return nullptr;
-    return FRI->getReferencedFunction();
+    if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
+      return FRI->getReferencedFunction();
+    return nullptr;
   }
 
   /// Get the type of the callee without the applied substitutions.
@@ -4588,6 +4587,11 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
 
     if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
       Callee = TTTFI->getCallee();
+      continue;
+    }
+
+    if (auto *CFI = dyn_cast<ConvertFunctionInst>(Callee)) {
+      Callee = CFI->getConverted();
       continue;
     }
 
