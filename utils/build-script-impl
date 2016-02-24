@@ -1779,11 +1779,17 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 continue
                 ;;
             xctest)
-                SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
-                SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
-                set -x
-                "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}"
-                { set +x; } 2>/dev/null
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    set -x
+                    xcodebuild -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj -scheme SwiftXCTest SKIP_INSTALL=NO DEPLOYMENT_LOCATION=YES DSTROOT="${build_dir}" INSTALL_PATH="/"
+                    { set +x; } 2>/dev/null
+                else
+                    SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
+                    SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
+                    set -x
+                    "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}"
+                    { set +x; } 2>/dev/null
+                fi
 
                 # XCTest builds itself and doesn't rely on cmake
                 continue
@@ -2026,7 +2032,21 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 if [[ "${SKIP_TEST_XCTEST}" ]]; then
                     continue
                 fi
-                # FIXME: We don't test xctest, yet...
+                echo "--- Running tests for ${product} ---"
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    set -x
+                    xcodebuild -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj -scheme SwiftXCTestFunctionalTests
+                    { set +x; } 2>/dev/null
+                else
+                    SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
+                    SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
+                    set -x
+                    # FIXME: This re-builds swift-corelibs-xctest. Instead, 'build_script.py' should take
+                    # a top-level 'test' command that only tests an already built XCTest.
+                    "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}" --test
+                    { set +x; } 2>/dev/null
+                fi
+                echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
             foundation)
