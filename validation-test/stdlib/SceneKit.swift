@@ -305,8 +305,8 @@ if #available(iOS 8.0, *) {
       " </scene>" +
       "</COLLADA>"
 
-    let sceneData = sceneDescription.dataUsingEncoding(
-      NSUTF8StringEncoding,
+    let sceneData = sceneDescription.data(
+      usingEncoding: NSUTF8StringEncoding,
       allowLossyConversion: true)!
     let sceneSource = SCNSceneSource(data: sceneData, options: nil)!
 
