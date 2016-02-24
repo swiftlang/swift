@@ -333,9 +333,11 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   
   const Decl *PreD = PendingDeclPreCallback;
   const Decl *LocD = PendingDeclLocCallback;
+  auto NameContext = PendingNamePreCallback;
   PendingDeclPreCallback = nullptr;
   PendingDeclLocCallback = nullptr;
-  
+  PendingNamePreCallback.reset();
+
   if (PreD) {
     if (SynthesizeTarget && PreD->getKind() == DeclKind::Extension)
       printSynthesizedExtensionPre(cast<ExtensionDecl>(PreD), SynthesizeTarget);
@@ -344,6 +346,9 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   }
   if (LocD) {
     printDeclLoc(LocD);
+  }
+  if (NameContext) {
+    printNamePre(*NameContext);
   }
 
   printText(Text);
@@ -395,12 +400,16 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
 
-  case PrintNameContext::FunctionParameter:
+  case PrintNameContext::FunctionParameterExternal:
+  case PrintNameContext::FunctionParameterLocal:
     return !canBeArgumentLabel(keyword);
   }
 }
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
+  callPrintNamePre(Context);
+  defer { printNamePost(Context); };
+
   if (Name.empty()) {
     *this << "_";
     return;
@@ -1821,25 +1830,25 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
       if (!ArgNameIsAPIByDefault && !ArgName.empty())
         Printer << " _";
       break;
     case PrintOptions::ArgAndParamPrintingMode::MatchSource:
       if (ArgName == BodyName && ArgNameIsAPIByDefault) {
-        Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+        Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
         break;
       }
       if (ArgName.empty() && !ArgNameIsAPIByDefault) {
-        Printer.printName(BodyName, PrintNameContext::FunctionParameter);
+        Printer.printName(BodyName, PrintNameContext::FunctionParameterLocal);
         break;
       }
       SWIFT_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::BothAlways:
-      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
       Printer << " ";
-      Printer.printName(BodyName, PrintNameContext::FunctionParameter);
+      Printer.printName(BodyName, PrintNameContext::FunctionParameterLocal);
       break;
     }
     Printer << ": ";
@@ -2843,7 +2852,8 @@ public:
       }
 
       if (TD.hasName()) {
-        Printer.printName(TD.getName(), PrintNameContext::FunctionParameter);
+        Printer.printName(TD.getName(),
+                          PrintNameContext::FunctionParameterExternal);
         Printer << ": ";
       }
 

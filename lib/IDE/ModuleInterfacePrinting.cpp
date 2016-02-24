@@ -78,6 +78,13 @@ private:
     return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
   }
 
+  void printNamePre(PrintNameContext Context) override {
+    return OtherPrinter.printNamePre(Context);
+  }
+  void printNamePost(PrintNameContext Context) override {
+    return OtherPrinter.printNamePost(Context);
+  }
+
   // Prints regular comments of the header the clang node comes from, until
   // the location of the node. Keeps track of the comments that were printed
   // from the file and resumes printing for the next node from the same file.
