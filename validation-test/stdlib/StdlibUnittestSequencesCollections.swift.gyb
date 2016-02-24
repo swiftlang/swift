@@ -234,10 +234,10 @@ ${Self}TestSuite.test("insert()/IndexInvalidation") {
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("insertContentsOf()/IndexInvalidation") {
+${Self}TestSuite.test("insertContents(of:at:)/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.startIndex.advanced(by: 1)
-  c1.insertContentsOf([ 4040, 5050 ].map(OpaqueValue.init), at: i1)
+  c1.insertContents(of: [ 4040, 5050 ].map(OpaqueValue.init), at: i1)
   let i2 = c1.startIndex.advanced(by: 1)
 
   expectCrashLater()

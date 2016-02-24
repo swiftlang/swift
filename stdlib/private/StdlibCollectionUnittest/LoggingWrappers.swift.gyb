@@ -207,11 +207,11 @@ public struct LoggingRangeReplaceableCollection<
     base.reserveCapacity(n)
   }
 
-  public mutating func insertContentsOf<
+  public mutating func insertContents<
     C : Collection where C.Iterator.Element == Base.Iterator.Element
-  >(newElements: C, at i: Base.Index) {
+  >(of newElements: C, at i: Base.Index) {
     Log.insertContentsOf[selfType] += 1
-    base.insertContentsOf(newElements, at: i)
+    base.insertContents(of: newElements, at: i)
   }
 
   @warn_unused_result

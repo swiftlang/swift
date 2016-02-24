@@ -229,8 +229,8 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
     case InsertContentsOf(let atIndex, let count):
-      result.insertContentsOf(
-        repeatElement(nextStateId, count: count),
+      result.insertContents(
+        of: repeatElement(nextStateId, count: count),
         at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
@@ -1151,11 +1151,11 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     elements.insert(newElement, at: i.position)
   }
 
-  public mutating func insertContentsOf<
+  public mutating func insertContents<
     S : Collection where S.Iterator.Element == T
-  >(newElements: S, at i: ${Index}) {
+  >(of newElements: S, at i: ${Index}) {
     let oldCount = count
-    elements.insertContentsOf(newElements, at: i.position)
+    elements.insertContents(of: newElements, at: i.position)
     let newCount = count
 
     if newCount - oldCount != 0 {

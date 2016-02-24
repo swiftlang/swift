@@ -147,7 +147,7 @@ internal struct InsertContentsOfTest {
     self.newElements = newElements.map(OpaqueValue.init)
     self.indexSelection = indexSelection
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "insertContentsOf() test data")
+    self.loc = SourceLoc(file, line, comment: "insertContents(of:at:) test data")
   }
 }
 
@@ -572,10 +572,10 @@ self.test("\(testNamePrefix).insert()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// insertContentsOf()
+// insertContents(of:at:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).insertContentsOf()/semantics") {
+self.test("\(testNamePrefix).insertContents(of:at:)/semantics") {
   let tests: [InsertContentsOfTest] = [
     InsertContentsOfTest(
       collection: [],
@@ -648,7 +648,7 @@ self.test("\(testNamePrefix).insertContentsOf()/semantics") {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))
-    c.insertContentsOf(newElements, at: test.indexSelection.indexIn(c))
+    c.insertContents(of: newElements, at: test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

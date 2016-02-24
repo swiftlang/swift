@@ -700,11 +700,11 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func insertContentsOf<
+  public mutating func insertContents<
     S : Collection where S.Iterator.Element == Character
-  >(newElements: S, at i: Index) {
+  >(of newElements: S, at i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.insertContentsOf(newElements, at: i)
+      (inout v: CharacterView) in v.insertContents(of: newElements, at: i)
     }
   }
 

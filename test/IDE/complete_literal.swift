@@ -46,7 +46,7 @@
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]; name=endIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   appendContents({#of: S#})[#Void#]; name=appendContents(of: S){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insertContentsOf({#(newElements): S#}, {#at: Index#})[#Void#]; name=insertContentsOf(newElements: S, at: Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insertContents({#of: S#}, {#at: Index#})[#Void#]; name=insertContents(of: S, at: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   remove({#at: Index#})[#Character#]; name=remove(at: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:      lowercased()[#String#]; name=lowercased(){{$}}
 
