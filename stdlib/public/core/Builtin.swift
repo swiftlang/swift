@@ -248,10 +248,11 @@ public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
 @inline(__always)
 @warn_unused_result
 public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
-    return x
+  guard let x = nonEmpty else {
+    _debugPreconditionFailure("unsafeUnwrap of nil optional")
   }
-  _debugPreconditionFailure("unsafeUnwrap of nil optional")
+
+  return x
 }
 
 /// - Returns: `unsafeUnwrap(nonEmpty)`.
@@ -262,10 +263,11 @@ public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
 @warn_unused_result
 public // SPI(SwiftExperimental)
 func _unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
-    return x
+  guard let x = nonEmpty else {
+    _sanityCheckFailure("_unsafeUnwrap of nil optional")
   }
-  _sanityCheckFailure("_unsafeUnwrap of nil optional")
+
+  return x
 }
 
 @inline(__always)
