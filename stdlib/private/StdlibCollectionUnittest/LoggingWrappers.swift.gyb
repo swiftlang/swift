@@ -283,7 +283,7 @@ public class SequenceLog {
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToNativeArrayBuffer = TypeIndexed(0)
-  public static var _initializeTo = TypeIndexed(0)
+  public static var _copyContents = TypeIndexed(0)
 }
 
 public class CollectionLog : SequenceLog {
@@ -559,10 +559,11 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>)
-    -> UnsafeMutablePointer<Base.Iterator.Element> {
-    Log._initializeTo[selfType] += 1
-    return base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    Log._copyContents[selfType] += 1
+    return base._copyContents(initializing: ptr)
   }
   
   public var base: Base

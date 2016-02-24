@@ -201,7 +201,7 @@ public protocol Sequence {
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
-  func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
+  func _copyContents(initializing ptr: UnsafeMutablePointer<Iterator.Element>)
     -> UnsafeMutablePointer<Iterator.Element>
 }
 
@@ -609,8 +609,9 @@ extension Sequence {
 }
 
 extension Sequence {
-  public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
-    -> UnsafeMutablePointer<Iterator.Element> {
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Iterator.Element>
+  ) -> UnsafeMutablePointer<Iterator.Element> {
     var p = UnsafeMutablePointer<Iterator.Element>(ptr)
     for x in IteratorSequence(self.makeIterator()) {
       p.initialize(with: x)

@@ -88,10 +88,10 @@ extension LazyCollection : Sequence {
     return _base._copyToNativeArrayBuffer()
   }
   
-  public func _initializeTo(
-    ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
   ) -> UnsafeMutablePointer<Base.Iterator.Element> {
-    return _base._initializeTo(ptr)
+    return _base._copyContents(initializing: ptr)
   }
 
   public func _customContainsEquatableElement(

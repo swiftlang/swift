@@ -2015,14 +2015,14 @@ public func checkSequence<
   expectGE(
     expectedCount, sequence.underestimatedCount, ${trace})
 
-  // Check that _initializeTo does the right thing if we can do so
+  // Check that _copyContents does the right thing if we can do so
   // without destroying the sequence.
   sequence._preprocessingPass { () -> Void in 
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
-    let end = sequence._initializeTo(buf)
-    expectTrue(end == buf + count, "_initializeTo returned the wrong value")
+    let end = sequence._copyContents(initializing: buf)
+    expectTrue(end == buf + count, "_copyContents returned the wrong value")
     var j = expected.startIndex
     for i in 0..<(end - buf) {
       expectTrue(sameValue(expected[j], buf[i]))

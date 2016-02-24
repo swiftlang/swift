@@ -412,10 +412,10 @@ func expectSequencePassthrough<
     _ = s._copyToNativeArrayBuffer()
   }
 
-  SequenceLog._initializeTo.expectIncrement(baseType) { () -> Void in
+  SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
   
-    let end = s._initializeTo(buf)
+    let end = s._copyContents(initializing: buf)
     expectTrue(end <= buf + count)
     buf.deinitialize(count: end - buf)
     buf.deallocateCapacity(count)

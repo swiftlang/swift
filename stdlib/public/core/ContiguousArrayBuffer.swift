@@ -560,7 +560,7 @@ internal func _copySequenceToNativeArrayBuffer<
 
   var iterator = source.makeIterator()
 
-  // FIXME(performance): use _initializeTo().
+  // FIXME(performance): use _copyContents(initializing:).
 
   // Add elements up to the initial capacity without checking for regrowth.
   for _ in 0..<initialCapacity {
@@ -613,7 +613,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   var p = result.firstElementAddress
   var i = source.startIndex
   for _ in 0..<count {
-    // FIXME(performance): use _initializeTo().
+    // FIXME(performance): use _copyContents(initializing:).
     p.initialize(with: source[i])
     i._successorInPlace()
     p._successorInPlace()

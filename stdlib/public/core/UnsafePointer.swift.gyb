@@ -319,7 +319,7 @@ public struct ${Self}<Pointee>
   public func initializeFrom<
     C : Collection where C.Iterator.Element == Pointee
   >(source: C) {
-    source._initializeTo(self)
+    source._copyContents(initializing: self)
   }
 
   /// Replace `count` initialized `Pointee`s starting at `self` with

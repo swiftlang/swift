@@ -81,8 +81,9 @@ extension Sequence
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>)
-    -> UnsafeMutablePointer<Base.Iterator.Element> {
-    return _base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    return _base._copyContents(initializing: ptr)
   }
 }

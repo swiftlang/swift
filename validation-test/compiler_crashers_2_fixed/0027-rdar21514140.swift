@@ -40,8 +40,10 @@ extension Sequence
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>) {
-    return _base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) {
+    return _base._copyContents(initializing: ptr)
   }
 }
 
