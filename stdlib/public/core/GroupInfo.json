@@ -1,16 +1,4 @@
 {
-  "Array": [
-    "ArrayBody.swift",
-    "ArrayBuffer.swift",
-    "ArrayBufferType.swift",
-    "ArrayCast.swift",
-    "ArrayType.swift",
-    "Arrays.swift",
-    "CocoaArray.swift",
-    "ContiguousArrayBuffer.swift",
-    "SliceBuffer.swift",
-    "SwiftNativeNSArray.swift"
-  ],
   "Assert": [
     "Assert.swift",
     "AssertCommon.swift"
@@ -68,8 +56,19 @@
         "SequenceWrapper.swift",
         "LazyCollection.swift",
         "LazySequence.swift",
-        "ExistentialCollection.swift"]
-      }
+        "ExistentialCollection.swift"],
+      "Array": [
+        "ArrayBody.swift",
+        "ArrayBuffer.swift",
+        "ArrayBufferType.swift",
+        "ArrayCast.swift",
+        "ArrayType.swift",
+        "Arrays.swift",
+        "CocoaArray.swift",
+        "ContiguousArrayBuffer.swift",
+        "SliceBuffer.swift",
+        "SwiftNativeNSArray.swift"]
+    }
   ],
   "C": [
     "BridgeObjectiveC.swift",
