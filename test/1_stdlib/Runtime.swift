@@ -1502,24 +1502,24 @@ AvailabilityVersionsTestSuite.test("lexicographic_compare") {
     )
   }
 
-  checkComparable(.EQ, version(0, 0, 0), version(0, 0, 0))
+  checkComparable(.eq, version(0, 0, 0), version(0, 0, 0))
 
-  checkComparable(.LT, version(0, 0, 0), version(0, 0, 1))
-  checkComparable(.LT, version(0, 0, 0), version(0, 1, 0))
-  checkComparable(.LT, version(0, 0, 0), version(1, 0, 0))
+  checkComparable(.lt, version(0, 0, 0), version(0, 0, 1))
+  checkComparable(.lt, version(0, 0, 0), version(0, 1, 0))
+  checkComparable(.lt, version(0, 0, 0), version(1, 0, 0))
 
-  checkComparable(.LT,version(10, 9, 0), version(10, 10, 0))
-  checkComparable(.LT,version(10, 9, 11), version(10, 10, 0))
-  checkComparable(.LT,version(10, 10, 3), version(10, 11, 0))
+  checkComparable(.lt,version(10, 9, 0), version(10, 10, 0))
+  checkComparable(.lt,version(10, 9, 11), version(10, 10, 0))
+  checkComparable(.lt,version(10, 10, 3), version(10, 11, 0))
 
-  checkComparable(.LT, version(8, 3, 0), version(9, 0, 0))
+  checkComparable(.lt, version(8, 3, 0), version(9, 0, 0))
 
-  checkComparable(.LT, version(0, 11, 0), version(10, 10, 4))
-  checkComparable(.LT, version(0, 10, 0), version(10, 10, 4))
-  checkComparable(.LT, version(3, 2, 1), version(4, 3, 2))
-  checkComparable(.LT, version(1, 2, 3), version(2, 3, 1))
+  checkComparable(.lt, version(0, 11, 0), version(10, 10, 4))
+  checkComparable(.lt, version(0, 10, 0), version(10, 10, 4))
+  checkComparable(.lt, version(3, 2, 1), version(4, 3, 2))
+  checkComparable(.lt, version(1, 2, 3), version(2, 3, 1))
 
-  checkComparable(.EQ, version(10, 11, 12), version(10, 11, 12))
+  checkComparable(.eq, version(10, 11, 12), version(10, 11, 12))
 
   checkEquatable(true, version(1, 2, 3), version(1, 2, 3))
   checkEquatable(false, version(1, 2, 3), version(1, 2, 42))

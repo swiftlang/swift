@@ -103,27 +103,27 @@ public protocol RaceTestWithPerTrialData {
 /// according to it.
 public enum RaceTestObservationEvaluation : Equatable, CustomStringConvertible {
   /// Normal 'pass'.
-  case Pass
+  case pass
 
   /// An unusual 'pass'.
-  case PassInteresting(String)
+  case passInteresting(String)
 
   /// A failure.
-  case Failure
-  case FailureInteresting(String)
+  case failure
+  case failureInteresting(String)
 
   public var description: String {
     switch self {
-    case .Pass:
+    case .pass:
       return "Pass"
 
-    case .PassInteresting(let s):
+    case .passInteresting(let s):
       return "Pass(\(s))"
 
-    case .Failure:
+    case .failure:
       return "Failure"
 
-    case .FailureInteresting(let s):
+    case .failureInteresting(let s):
       return "Failure(\(s))"
     }
   }
@@ -133,11 +133,11 @@ public func == (
   lhs: RaceTestObservationEvaluation, rhs: RaceTestObservationEvaluation
 ) -> Bool {
   switch (lhs, rhs) {
-  case (.Pass, .Pass),
-       (.Failure, .Failure):
+  case (.pass, .pass),
+       (.failure, .failure):
     return true
 
-  case (.PassInteresting(let s1), .PassInteresting(let s2)):
+  case (.passInteresting(let s1), .passInteresting(let s2)):
     return s1 == s2
 
   default:
@@ -325,10 +325,10 @@ public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
   let first = observations.first!
   for x in observations {
     if x != first {
-      return .Failure
+      return .failure
     }
   }
-  return .Pass
+  return .pass
 }
 
 struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
@@ -341,19 +341,19 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 
   mutating func addEvaluation(evaluation: RaceTestObservationEvaluation) {
     switch evaluation {
-    case .Pass:
+    case .pass:
       passCount += 1
 
-    case .PassInteresting(let s):
+    case .passInteresting(let s):
       if passInterestingCount[s] == nil {
         passInterestingCount[s] = 0
       }
       passInterestingCount[s] = passInterestingCount[s]! + 1
 
-    case .Failure:
+    case .failure:
       failureCount += 1
 
-    case .FailureInteresting(let s):
+    case .failureInteresting(let s):
       if failureInterestingCount[s] == nil {
         failureInterestingCount[s] = 0
       }

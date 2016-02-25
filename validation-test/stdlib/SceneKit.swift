@@ -138,8 +138,8 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)")
     .skip(.iOSAny("does not support COLLADA files"))
     .skip(.iOSSimulatorAny("does not support COLLADA files"))
-    .skip(.TVOSAny("does not support COLLADA files"))
-    .skip(.TVOSSimulatorAny("does not support COLLADA files"))
+    .skip(.tvOSAny("does not support COLLADA files"))
+    .skip(.tvOSSimulatorAny("does not support COLLADA files"))
     .skip(.watchOSAny("does not support COLLADA files"))
     .skip(.watchOSSimulatorAny("does not support COLLADA files"))
     .code {

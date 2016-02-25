@@ -32,7 +32,7 @@ struct ComparisonTest {
   init(
     _ expectedUnicodeCollation: ExpectedComparisonResult,
     _ lhs: String, _ rhs: String,
-    xfail: TestRunPredicate = .Custom({false}, reason: ""),
+    xfail: TestRunPredicate = .custom({false}, reason: ""),
     file: String = #file, line: UInt = #line
   ) {
     self.expectedUnicodeCollation = expectedUnicodeCollation
@@ -44,22 +44,22 @@ struct ComparisonTest {
 }
 
 let comparisonTests = [
-  ComparisonTest(.EQ, "", ""),
-  ComparisonTest(.LT, "", "a"),
+  ComparisonTest(.eq, "", ""),
+  ComparisonTest(.lt, "", "a"),
 
   // ASCII cases
-  ComparisonTest(.LT, "t", "tt"),
-  ComparisonTest(.GT, "t", "Tt",
-    xfail: .NativeRuntime(
+  ComparisonTest(.lt, "t", "tt"),
+  ComparisonTest(.gt, "t", "Tt",
+    xfail: .nativeRuntime(
       "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
-  ComparisonTest(.GT, "\u{0}", "",
-    xfail: .NativeRuntime(
+  ComparisonTest(.gt, "\u{0}", "",
+    xfail: .nativeRuntime(
       "Null-related issue: https://bugs.swift.org/browse/SR-630")),
-  ComparisonTest(.EQ, "\u{0}", "\u{0}"),
+  ComparisonTest(.eq, "\u{0}", "\u{0}"),
   // Currently fails:
-  // ComparisonTest(.LT, "\r\n", "t"),
-  // ComparisonTest(.GT, "\r\n", "\n"),
-  // ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}"),
+  // ComparisonTest(.lt, "\r\n", "t"),
+  // ComparisonTest(.gt, "\r\n", "\n"),
+  // ComparisonTest(.lt, "\u{0}", "\u{0}\u{0}"),
 
   // Whitespace
   // U+000A LINE FEED (LF)
@@ -68,59 +68,59 @@ let comparisonTests = [
   // U+0085 NEXT LINE (NEL)
   // U+2028 LINE SEPARATOR
   // U+2029 PARAGRAPH SEPARATOR
-  ComparisonTest(.GT, "\u{0085}", "\n"),
-  ComparisonTest(.GT, "\u{000b}", "\n"),
-  ComparisonTest(.GT, "\u{000c}", "\n"),
-  ComparisonTest(.GT, "\u{2028}", "\n"),
-  ComparisonTest(.GT, "\u{2029}", "\n"),
-  ComparisonTest(.GT, "\r\n\r\n", "\r\n"),
+  ComparisonTest(.gt, "\u{0085}", "\n"),
+  ComparisonTest(.gt, "\u{000b}", "\n"),
+  ComparisonTest(.gt, "\u{000c}", "\n"),
+  ComparisonTest(.gt, "\u{2028}", "\n"),
+  ComparisonTest(.gt, "\u{2029}", "\n"),
+  ComparisonTest(.gt, "\r\n\r\n", "\r\n"),
 
   // U+0301 COMBINING ACUTE ACCENT
   // U+00E1 LATIN SMALL LETTER A WITH ACUTE
-  ComparisonTest(.EQ, "a\u{301}", "\u{e1}"),
-  ComparisonTest(.LT, "a", "a\u{301}"),
-  ComparisonTest(.LT, "a", "\u{e1}"),
+  ComparisonTest(.eq, "a\u{301}", "\u{e1}"),
+  ComparisonTest(.lt, "a", "a\u{301}"),
+  ComparisonTest(.lt, "a", "\u{e1}"),
 
   // U+304B HIRAGANA LETTER KA
   // U+304C HIRAGANA LETTER GA
   // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
-  ComparisonTest(.EQ, "\u{304b}", "\u{304b}"),
-  ComparisonTest(.EQ, "\u{304c}", "\u{304c}"),
-  ComparisonTest(.LT, "\u{304b}", "\u{304c}"),
-  ComparisonTest(.LT, "\u{304b}", "\u{304c}\u{3099}"),
-  ComparisonTest(.EQ, "\u{304c}", "\u{304b}\u{3099}"),
-  ComparisonTest(.LT, "\u{304c}", "\u{304c}\u{3099}"),
+  ComparisonTest(.eq, "\u{304b}", "\u{304b}"),
+  ComparisonTest(.eq, "\u{304c}", "\u{304c}"),
+  ComparisonTest(.lt, "\u{304b}", "\u{304c}"),
+  ComparisonTest(.lt, "\u{304b}", "\u{304c}\u{3099}"),
+  ComparisonTest(.eq, "\u{304c}", "\u{304b}\u{3099}"),
+  ComparisonTest(.lt, "\u{304c}", "\u{304c}\u{3099}"),
 
   // U+212B ANGSTROM SIGN
   // U+030A COMBINING RING ABOVE
   // U+00C5 LATIN CAPITAL LETTER A WITH RING ABOVE
-  ComparisonTest(.EQ, "\u{212b}", "A\u{30a}"),
-  ComparisonTest(.EQ, "\u{212b}", "\u{c5}"),
-  ComparisonTest(.EQ, "A\u{30a}", "\u{c5}"),
-  ComparisonTest(.LT, "A\u{30a}", "a",
-    xfail: .NativeRuntime(
+  ComparisonTest(.eq, "\u{212b}", "A\u{30a}"),
+  ComparisonTest(.eq, "\u{212b}", "\u{c5}"),
+  ComparisonTest(.eq, "A\u{30a}", "\u{c5}"),
+  ComparisonTest(.lt, "A\u{30a}", "a",
+    xfail: .nativeRuntime(
       "Compares in reverse with ICU, https://bugs.swift.org/browse/SR-530")),
-  ComparisonTest(.LT, "A", "A\u{30a}"),
+  ComparisonTest(.lt, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
   // U+03A9 GREEK CAPITAL LETTER OMEGA
-  ComparisonTest(.EQ, "\u{2126}", "\u{03a9}"),
+  ComparisonTest(.eq, "\u{2126}", "\u{03a9}"),
 
   // U+0323 COMBINING DOT BELOW
   // U+0307 COMBINING DOT ABOVE
   // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
   // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
-  ComparisonTest(.EQ, "\u{1e69}", "s\u{323}\u{307}"),
-  ComparisonTest(.EQ, "\u{1e69}", "s\u{307}\u{323}"),
-  ComparisonTest(.EQ, "\u{1e69}", "\u{1e63}\u{307}"),
-  ComparisonTest(.EQ, "\u{1e63}", "s\u{323}"),
-  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
-  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
-  ComparisonTest(.LT, "s\u{323}", "\u{1e69}"),
+  ComparisonTest(.eq, "\u{1e69}", "s\u{323}\u{307}"),
+  ComparisonTest(.eq, "\u{1e69}", "s\u{307}\u{323}"),
+  ComparisonTest(.eq, "\u{1e69}", "\u{1e63}\u{307}"),
+  ComparisonTest(.eq, "\u{1e63}", "s\u{323}"),
+  ComparisonTest(.eq, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
+  ComparisonTest(.eq, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
+  ComparisonTest(.lt, "s\u{323}", "\u{1e69}"),
 
   // U+FB01 LATIN SMALL LIGATURE FI
-  ComparisonTest(.EQ, "\u{fb01}", "\u{fb01}"),
-  ComparisonTest(.LT, "fi", "\u{fb01}"),
+  ComparisonTest(.eq, "\u{fb01}", "\u{fb01}"),
+  ComparisonTest(.lt, "fi", "\u{fb01}"),
 
   // Test that Unicode collation is performed in deterministic mode.
   //
@@ -135,11 +135,11 @@ let comparisonTests = [
   //
   // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
   // U+0341 has a canonical decomposition mapping of U+0301.
-  ComparisonTest(.EQ, "\u{0301}", "\u{0341}"),
-  ComparisonTest(.LT, "\u{0301}", "\u{0954}",
-    xfail: .NativeRuntime("Compares as equal with ICU")),
-  ComparisonTest(.LT, "\u{0341}", "\u{0954}",
-    xfail: .NativeRuntime("Compares as equal with ICU")),
+  ComparisonTest(.eq, "\u{0301}", "\u{0341}"),
+  ComparisonTest(.lt, "\u{0301}", "\u{0954}",
+    xfail: .nativeRuntime("Compares as equal with ICU")),
+  ComparisonTest(.lt, "\u{0341}", "\u{0954}",
+    xfail: .nativeRuntime("Compares as equal with ICU")),
 ]
 
 func checkStringComparison(
@@ -263,7 +263,7 @@ func checkHasPrefixHasSuffix(
 }
 
 StringTests.test("hasPrefix,hasSuffix")
-  .skip(.NativeRuntime(
+  .skip(.nativeRuntime(
     "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
   for test in comparisonTests {
@@ -273,21 +273,21 @@ StringTests.test("hasPrefix,hasSuffix")
 }
 
 StringTests.test("Failures{hasPrefix,hasSuffix}-CF")
-  .xfail(.Custom({ true }, reason: "rdar://problem/19034601"))
-  .skip(.NativeRuntime(
+  .xfail(.custom({ true }, reason: "rdar://problem/19034601"))
+  .skip(.nativeRuntime(
     "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
-  let test = ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}")
+  let test = ComparisonTest(.lt, "\u{0}", "\u{0}\u{0}")
   checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
 }
 
 StringTests.test("Failures{hasPrefix,hasSuffix}")
-  .xfail(.Custom({ true }, reason: "blocked on rdar://problem/19036555"))
-  .skip(.NativeRuntime(
+  .xfail(.custom({ true }, reason: "blocked on rdar://problem/19036555"))
+  .skip(.nativeRuntime(
     "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
   let tests =
-    [ComparisonTest(.LT, "\r\n", "t"), ComparisonTest(.GT, "\r\n", "\n")]
+    [ComparisonTest(.lt, "\r\n", "t"), ComparisonTest(.gt, "\r\n", "\n")]
   tests.forEach {
     checkHasPrefixHasSuffix($0.lhs, $0.rhs, $0.loc.withCurrentLoc())
   }
@@ -310,7 +310,7 @@ StringTests.test("SameTypeComparisons") {
 
 StringTests.test("CompareStringsWithUnpairedSurrogates")
   .xfail(
-    .Custom({ true },
+    .custom({ true },
     reason: "<rdar://problem/18029104> Strings referring to underlying " +
       "storage with unpaired surrogates compare unequal"))
   .code {

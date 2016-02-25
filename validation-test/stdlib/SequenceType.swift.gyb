@@ -751,9 +751,9 @@ SequenceTypeTests.test("filter/Sequence/Dispatch") {
 SequenceTypeTests.test("filter/Sequence/Semantics") {
   for test in filterTests {
     for underestimatedCountBehavior in [
-      UnderestimatedCountBehavior.Precise,
-      UnderestimatedCountBehavior.Half,
-      UnderestimatedCountBehavior.Value(0)
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       
       let s = DefaultedSequence<OpaqueValue<Int>>(
@@ -864,9 +864,9 @@ SequenceTypeTests.test(
 ) {
   for test in mapTests {
     for underestimatedCountBehavior in [
-      UnderestimatedCountBehavior.Precise,
-      UnderestimatedCountBehavior.Half,
-      UnderestimatedCountBehavior.Value(0)
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalSequenceWith${Implementation}Map<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
@@ -909,8 +909,8 @@ SequenceTypeTests.test(
 SequenceTypeTests.test("flatMap/Sequence") {
   for test in flatMapTests {
     for underestimatedCountBehavior in [
-      UnderestimatedCountBehavior.Precise,
-      UnderestimatedCountBehavior.Value(0)
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
@@ -947,8 +947,8 @@ ${LazyFlatMapTest}
 SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
   for test in flatMapToOptionalTests {
     for underestimatedCountBehavior in [
-      UnderestimatedCountBehavior.Precise,
-      UnderestimatedCountBehavior.Value(0)
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
@@ -1148,13 +1148,13 @@ SequenceTypeTests.test("underestimatedCount/Sequence/CustomImplementation") {
 // _copyToNativeArrayBuffer()
 //===----------------------------------------------------------------------===//
 SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let s = MinimalSequence<OpaqueValue<Int>>(
     elements: [ 1, 2, 3 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(4))
+    underestimatedCount: .value(4))
   expectCrashLater()
   let array = s._copyToNativeArrayBuffer()
   _blackHole(array)

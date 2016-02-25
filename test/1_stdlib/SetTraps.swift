@@ -20,7 +20,7 @@ import ObjectiveC
 var SetTraps = TestSuite("SetTraps")
 
 SetTraps.test("RemoveInvalidIndex1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -31,7 +31,7 @@ SetTraps.test("RemoveInvalidIndex1")
 }
 
 SetTraps.test("RemoveInvalidIndex2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -42,7 +42,7 @@ SetTraps.test("RemoveInvalidIndex2")
 }
 
 SetTraps.test("RemoveInvalidIndex3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -53,7 +53,7 @@ SetTraps.test("RemoveInvalidIndex3")
 }
 
 SetTraps.test("RemoveInvalidIndex4")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -66,7 +66,7 @@ SetTraps.test("RemoveInvalidIndex4")
 }
 
 SetTraps.test("RemoveFirstFromEmpty")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?

@@ -670,36 +670,36 @@ public let dropLastTests = [
 ]
 
 public let lexicographicallyPrecedesTests = [
-  LexicographicallyPrecedesTest(.EQ, [], [], [], []),
-  LexicographicallyPrecedesTest(.EQ, [ 1 ], [ 1 ], [], []),
+  LexicographicallyPrecedesTest(.eq, [], [], [], []),
+  LexicographicallyPrecedesTest(.eq, [ 1 ], [ 1 ], [], []),
 
-  LexicographicallyPrecedesTest(.GT, [ 1 ], [], [], []),
+  LexicographicallyPrecedesTest(.gt, [ 1 ], [], [], []),
 
-  LexicographicallyPrecedesTest(.GT, [ 1 ], [ 0 ], [], []),
-  LexicographicallyPrecedesTest(.EQ, [ 1 ], [ 1 ], [], []),
-  LexicographicallyPrecedesTest(.LT, [ 1 ], [ 2 ], [], []),
+  LexicographicallyPrecedesTest(.gt, [ 1 ], [ 0 ], [], []),
+  LexicographicallyPrecedesTest(.eq, [ 1 ], [ 1 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1 ], [ 2 ], [], []),
 
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [], [ 2 ], []),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [], [ 2 ], []),
 
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 0 ], [ 2 ], []),
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 1 ], [], []),
-  LexicographicallyPrecedesTest(.LT, [ 1, 2 ], [ 2 ], [ 2 ], []),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0 ], [ 2 ], []),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 1 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2 ], [ 2 ], []),
 
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 0, 0 ], [ 2 ], [ 0 ]),
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 1, 0 ], [], []),
-  LexicographicallyPrecedesTest(.LT, [ 1, 2 ], [ 2, 0 ], [ 2 ], [ 0 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 0 ], [ 2 ], [ 0 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 1, 0 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 0 ], [ 2 ], [ 0 ]),
 
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 0, 1 ], [ 2 ], [ 1 ]),
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 1, 1 ], [], []),
-  LexicographicallyPrecedesTest(.LT, [ 1, 2 ], [ 2, 1 ], [ 2 ], [ 1 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 1 ], [ 2 ], [ 1 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 1, 1 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 1 ], [ 2 ], [ 1 ]),
 
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 0, 2 ], [ 2 ], [ 2 ]),
-  LexicographicallyPrecedesTest(.EQ, [ 1, 2 ], [ 1, 2 ], [], []),
-  LexicographicallyPrecedesTest(.LT, [ 1, 2 ], [ 2, 2 ], [ 2 ], [ 2 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 2 ], [ 2 ], [ 2 ]),
+  LexicographicallyPrecedesTest(.eq, [ 1, 2 ], [ 1, 2 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 2 ], [ 2 ], [ 2 ]),
 
-  LexicographicallyPrecedesTest(.GT, [ 1, 2 ], [ 0, 3 ], [ 2 ], [ 3 ]),
-  LexicographicallyPrecedesTest(.LT, [ 1, 2 ], [ 1, 3 ], [], []),
-  LexicographicallyPrecedesTest(.LT, [ 1, 2 ], [ 2, 3 ], [ 2 ], [ 3 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 3 ], [ 2 ], [ 3 ]),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 1, 3 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 3 ], [ 2 ], [ 3 ]),
 ].flatMap { [ $0, $0.flip() ] }
 
 public let mapTests = [

@@ -101,8 +101,8 @@ infix operator <=> {}
 
 public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
   return lhs < rhs
-    ? .LT
-    : lhs > rhs ? .GT : .EQ
+    ? .lt
+    : lhs > rhs ? .gt : .eq
 }
 
 public struct TypeIdentifier : Hashable, Comparable {

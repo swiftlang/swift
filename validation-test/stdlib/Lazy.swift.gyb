@@ -171,7 +171,7 @@ extension LazySequence where Base : TestProtocol1 {
 LazyTestSuite.test("LazySequence<Sequence>/underestimatedCount") {
   let s = MinimalSequence(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedCount: .value(42))
   var lazySeq = s.lazy
   expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
   expectEqual(42, lazySeq.underestimatedCount)
@@ -182,7 +182,7 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimatedCount") {
 LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimatedCount") {
   let s = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedCount: .value(42))
   var lazySeq = s.lazy
   expectType(
     LazyCollection<
@@ -201,7 +201,7 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimatedCount") {
 LazyTestSuite.test("MapSequence<Sequence>/underestimatedCount") {
   let s = MinimalSequence(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedCount: .value(42))
   var lazyMap = s.lazy.map { OpaqueValue(Int32($0.value)) }
   expectType(
     LazyMapSequence<MinimalSequence<OpaqueValue<Int>>, OpaqueValue<Int32>>.self,
@@ -250,7 +250,7 @@ LazyTestSuite.test("LazySequence.array") {
 LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimatedCount") {
   let s = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedCount: .value(42))
   var lazyMap = s.lazy.map {
     (input: OpaqueValue<Int>) -> OpaqueValue<Int32> in
     OpaqueValue(Int32(input.value))
@@ -284,7 +284,7 @@ extension LazyCollection where Base : TestProtocol1 {
 
 LazyTestSuite.test("LazyCollection.array") {
   let base = Minimal${traversal}Collection(
-    elements: [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+    elements: [ 0, 30, 10, 90 ], underestimatedCount: .value(42))
   let lazyCollection = base.lazy
   let arrayFromLazy = Array(lazyCollection)
 
@@ -300,7 +300,7 @@ LazyTestSuite.test("LazyCollection.array") {
 LazyTestSuite.test("LazyCollection.reversed") {
   let base = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedCount: .value(42))
   let lazyCollection = base.lazy
   var reversed = lazyCollection.reversed()
   expectType(

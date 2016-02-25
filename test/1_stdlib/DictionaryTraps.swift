@@ -67,7 +67,7 @@ DictionaryTraps.test("sanity") {
 }
 
 DictionaryTraps.test("DuplicateKeys1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -78,7 +78,7 @@ DictionaryTraps.test("DuplicateKeys1")
 }
 
 DictionaryTraps.test("DuplicateKeys2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -89,7 +89,7 @@ DictionaryTraps.test("DuplicateKeys2")
 }
 
 DictionaryTraps.test("DuplicateKeys3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -99,7 +99,7 @@ DictionaryTraps.test("DuplicateKeys3")
 }
 
 DictionaryTraps.test("RemoveInvalidIndex1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -110,7 +110,7 @@ DictionaryTraps.test("RemoveInvalidIndex1")
 }
 
 DictionaryTraps.test("RemoveInvalidIndex2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -121,7 +121,7 @@ DictionaryTraps.test("RemoveInvalidIndex2")
 }
 
 DictionaryTraps.test("RemoveInvalidIndex3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -132,7 +132,7 @@ DictionaryTraps.test("RemoveInvalidIndex3")
 }
 
 DictionaryTraps.test("RemoveInvalidIndex4")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -205,7 +205,7 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
 }
 
 DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("unrecognized selector sent to instance").code {
@@ -217,7 +217,7 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
 }
 
 DictionaryTraps.test("BridgedKeyIsNotNSCopyable2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -241,7 +241,7 @@ DictionaryTraps.test("Downcast1") {
 }
 
 DictionaryTraps.test("Downcast2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

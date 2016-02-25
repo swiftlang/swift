@@ -122,7 +122,7 @@ StringTests.test("ForeignIndexes/Valid") {
 
 StringTests.test("ForeignIndexes/UnexpectedCrash")
   .xfail(
-    .Always("<rdar://problem/18029290> String.Index caches the grapheme " +
+    .always("<rdar://problem/18029290> String.Index caches the grapheme " +
       "cluster size, but it is not always correct to use"))
   .code {
 
@@ -242,7 +242,7 @@ StringTests.test("_splitFirst") {
 }
 
 StringTests.test("hasPrefix")
-  .skip(.NativeRuntime("String.hasPrefix undefined without _runtime(_ObjC)"))
+  .skip(.nativeRuntime("String.hasPrefix undefined without _runtime(_ObjC)"))
   .code {
 #if _runtime(_ObjC)
   expectFalse("".hasPrefix(""))
@@ -614,7 +614,7 @@ func asciiString<
 }
 
 StringTests.test("stringCoreExtensibility")
-  .skip(.NativeRuntime("Foundation dependency"))
+  .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
   let ascii = UTF16.CodeUnit(UnicodeScalar("X").value)
@@ -655,7 +655,7 @@ StringTests.test("stringCoreExtensibility")
 }
 
 StringTests.test("stringCoreReserve")
-  .skip(.NativeRuntime("Foundation dependency"))
+  .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
   for k in 0...5 {
@@ -912,7 +912,7 @@ StringTests.test("Conversions") {
 // Check the internal functions are correct for ASCII values
 StringTests.test(
   "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y")
-  .skip(.NativeRuntime("String._compareASCII undefined without _runtime(_ObjC)"))
+  .skip(.nativeRuntime("String._compareASCII undefined without _runtime(_ObjC)"))
   .code {
 #if _runtime(_ObjC)
   let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
@@ -1065,7 +1065,7 @@ StringTests.test("unicodeViews") {
 // Validate that index conversion does something useful for Cocoa
 // programmers.
 StringTests.test("indexConversion")
-  .skip(.NativeRuntime("Foundation dependency"))
+  .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
   let re : NSRegularExpression

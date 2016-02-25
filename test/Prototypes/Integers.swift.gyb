@@ -1287,7 +1287,7 @@ tests.test("Equality") {
 
 func indexOrder<T: RandomAccessIndex>(x: T, y: T)
   -> ExpectedComparisonResult {
-  return x < y ? .LT : x > y ? .GT : .EQ
+  return x < y ? .lt : x > y ? .gt : .eq
 }
 
 tests.test("Ordering") {

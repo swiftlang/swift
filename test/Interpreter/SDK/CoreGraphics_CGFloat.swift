@@ -70,19 +70,19 @@ CGFloatTestSuite.test("comparisons") {
   expectFalse(x <= z)
   expectTrue(x >= z)
   expectTrue(x > z)
-  checkComparable(.GT, x, z)
+  checkComparable(.gt, x, z)
 
   expectTrue(z < x)
   expectTrue(z <= x)
   expectFalse(z >= x)
   expectFalse(z > x)
-  checkComparable(.LT, z, x)
+  checkComparable(.lt, z, x)
 
   expectFalse(x < y)
   expectTrue(x <= y)
   expectTrue(x >= y)
   expectFalse(x > y)
-  checkComparable(.EQ, x, y)
+  checkComparable(.eq, x, y)
 }
 
 

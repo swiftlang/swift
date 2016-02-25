@@ -137,11 +137,11 @@ extension TestSuite {
 // subscript(_: Index)
 //===----------------------------------------------------------------------===//
 
-if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
+if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Set") {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
@@ -156,7 +156,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/Empty/Set") {
     var c = makeWrappedCollection([])
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
@@ -489,11 +489,11 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
 // subscript(_: Index)
 //===----------------------------------------------------------------------===//
 
-if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
+if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/NonEmpty/Set") {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
@@ -508,7 +508,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/Empty/Set") {
     var c = makeWrappedCollection([])
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))

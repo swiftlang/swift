@@ -25,9 +25,9 @@ NSSetAPI.test("Sequence") {
 private func compareAnythingAtAll(x: AnyObject, y: AnyObject)
   -> ExpectedComparisonResult {
   switch (x.description < y.description, x.description == y.description) {
-  case (true, _): return .LT
-  case (_, true): return .EQ
-  default: return .GT
+  case (true, _): return .lt
+  case (_, true): return .eq
+  default: return .gt
   }
 }
 

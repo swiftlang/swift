@@ -144,9 +144,9 @@ func callGenericCollectionFilter<S : Collection>(
 CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
   for test in filterTests {
     for underestimatedCountBehavior in [
-      UnderestimatedCountBehavior.Precise,
-      UnderestimatedCountBehavior.Half,
-      UnderestimatedCountBehavior.Value(0)
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Filter<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
@@ -278,9 +278,9 @@ CollectionTypeTests.test(
 ) {
   for test in mapTests {
     for underestimatedCountBehavior in [
-      UnderestimatedCountBehavior.Precise,
-      UnderestimatedCountBehavior.Half,
-      UnderestimatedCountBehavior.Value(0)
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Map<
         OpaqueValue<Int>
@@ -733,7 +733,7 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
 do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .expectationFailure
 
   CollectionTypeTests.add${traversal}CollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
@@ -777,7 +777,7 @@ do {
 do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .expectationFailure
 
   CollectionTypeTests.add${traversal}CollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in

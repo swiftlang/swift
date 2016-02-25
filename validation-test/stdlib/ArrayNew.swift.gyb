@@ -1689,7 +1689,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   }
   
   ArrayTestSuite.test("\(testPrefix)/SequenceMap")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -1781,7 +1781,7 @@ do {
   // failure for advancing their indexes "out of bounds", because they are just
   // `Int`.
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .None
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .none
   
   // Test MutableCollectionType conformance with value type elements.
   ArrayTestSuite.addRandomAccessMutableCollectionTests(

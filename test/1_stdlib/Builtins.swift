@@ -59,7 +59,7 @@ tests.test("_isUniquelyReferenced/OptionalNativeObject") {
 class XObjC : NSObject {}
 
 tests.test("_isUnique_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -70,7 +70,7 @@ tests.test("_isUnique_native/SpareBitTrap")
 }
 
 tests.test("_isUniqueOrPinned_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -81,7 +81,7 @@ tests.test("_isUniqueOrPinned_native/SpareBitTrap")
 }
 
 tests.test("_isUnique_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -91,7 +91,7 @@ tests.test("_isUnique_native/NonNativeTrap")
 }
 
 tests.test("_isUniqueOrPinned_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {

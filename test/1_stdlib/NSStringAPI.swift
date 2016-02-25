@@ -1443,7 +1443,7 @@ NSStringAPIs.test("padding(toLength:with:startingAtIndex:)") {
 }
 
 NSStringAPIs.test("removingPercentEncoding/OSX 10.9")
-  .xfail(.OSXMinor(10, 9, reason: "looks like a bug in Foundation in OS X 10.9"))
+  .xfail(.osxMinor(10, 9, reason: "looks like a bug in Foundation in OS X 10.9"))
   .xfail(.iOSMajor(7, reason: "same bug in Foundation in iOS 7.*"))
   .skip(.iOSSimulatorAny("same bug in Foundation in iOS Simulator 7.*"))
   .code {
@@ -1608,7 +1608,7 @@ NSStringAPIs.test("replacingPercentEscapes(usingEncoding:)") {
 
 NSStringAPIs.test("replacingPercentEscapes(usingEncoding:)/rdar18029471")
   .xfail(
-    .Custom({ true },
+    .custom({ true },
     reason: "<rdar://problem/18029471> NSString " +
       "replacingPercentEscapesUsingEncoding: does not return nil " +
       "when a byte sequence is not legal in ASCII"))
@@ -1884,7 +1884,7 @@ NSStringAPIs.test("MixedTypeComparisons") {
 
 NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
   .xfail(
-    .Custom({ true },
+    .custom({ true },
     reason: "<rdar://problem/18029104> Strings referring to underlying " +
       "storage with unpaired surrogates compare unequal"))
   .code {

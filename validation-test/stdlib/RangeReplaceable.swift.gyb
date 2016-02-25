@@ -119,7 +119,7 @@ func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
 %     collection_or_slice = 'Slice' if 'Slice' in Base else 'Collection'
 do {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .expectationFailure
 
   RangeReplaceableTestSuite.add${traversal}RangeReplaceable${collection_or_slice}Tests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
