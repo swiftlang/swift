@@ -82,12 +82,12 @@ func protocol_types(a: A,
                     abc: protocol<A, B, C>,
                     abco: protocol<A, B, C, O>) {
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i64 1, %swift.protocol** {{%.*}})
+  // CHECK: call %swift.type* @rt_swift_getExistentialTypeMetadata(i64 1, %swift.protocol** {{%.*}})
   reify_metadata(a)
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1B
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1C
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i64 3, %swift.protocol** {{%.*}})
+  // CHECK: call %swift.type* @rt_swift_getExistentialTypeMetadata(i64 3, %swift.protocol** {{%.*}})
   reify_metadata(abc)
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1B
@@ -95,7 +95,7 @@ func protocol_types(a: A,
   // CHECK: [[O_REF:%.*]] = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP17protocol_metadata1O_"
   // CHECK: [[O_REF_BITCAST:%.*]] = bitcast i8* [[O_REF]] to %swift.protocol*
   // CHECK: store %swift.protocol* [[O_REF_BITCAST]]
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i64 4, %swift.protocol** {{%.*}})
+  // CHECK: call %swift.type* @rt_swift_getExistentialTypeMetadata(i64 4, %swift.protocol** {{%.*}})
   reify_metadata(abco)
 }
 

@@ -48,7 +48,7 @@ bb0(%0 : $*A, %1 : $Optional<C>):
 // CHECK-NEXT: %4 = inttoptr
 // CHECK-NEXT: call void bitcast (void ([[WEAK]]*, [[REF]]*)* @swift_weakAssign to void ([[WEAK]]*, [[C]]*)*)([[WEAK]]* [[X]], [[C]]* %4)
 // CHECK-NEXT: %5 = inttoptr i64 %3 to %swift.refcounted*
-// CHECK-NEXT: call void @swift_release([[REF]]* %5)
+// CHECK-NEXT: call void @rt_swift_release([[REF]]* %5)
 // CHECK-NEXT: ret void
 
 struct B {

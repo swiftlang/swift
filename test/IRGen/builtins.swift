@@ -143,7 +143,7 @@ func assign_test(value: Builtin.Int64, ptr: Builtin.RawPointer) {
 // CHECK: define hidden %swift.refcounted* @_TF8builtins16load_object_test
 func load_object_test(ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call void @swift_retain([[REFCOUNT]]* [[T0]])
+  // CHECK: call void @rt_swift_retain([[REFCOUNT]]* [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.load(ptr)
 }
@@ -425,7 +425,7 @@ func destroyPODArray(array: Builtin.RawPointer, count: Builtin.Word) {
 // CHECK-LABEL: define hidden void @_TF8builtins18destroyNonPODArray{{.*}}(i8*, i64) {{.*}} {
 // CHECK:       iter:
 // CHECK:       loop:
-// CHECK:         call {{.*}} @swift_release
+// CHECK:         call {{.*}} @rt_swift_release
 // CHECK:         br label %iter
 func destroyNonPODArray(array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(C.self, array, count)
@@ -456,7 +456,7 @@ func copyPODArray(dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Buil
 // CHECK-LABEL: define hidden void @_TF8builtins11copyBTArray{{.*}}(i8*, i8*, i64) {{.*}} {
 // CHECK:       iter:
 // CHECK:       loop:
-// CHECK:         call {{.*}} @swift_retain
+// CHECK:         call {{.*}} @rt_swift_retain
 // CHECK:         br label %iter
 // CHECK:         mul nuw i64 8, %2
 // CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
@@ -570,7 +570,7 @@ func isUnique(inout ref: Builtin.NativeObject?) -> Bool {
 // CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRBoBi1_(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %1)
+// CHECK-NEXT: call i1 @rt_swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %1)
 // CHECK-NEXT: ret i1 %2
 func isUnique(inout ref: Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
@@ -581,7 +581,7 @@ func isUnique(inout ref: Builtin.NativeObject) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_native(%swift.refcounted* %2)
+// CHECK-NEXT: call i1 @rt_swift_isUniquelyReferencedOrPinned_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
 func isUniqueOrPinned(inout ref: Builtin.NativeObject?) -> Bool {
   return Builtin.isUniqueOrPinned(&ref)
@@ -591,7 +591,7 @@ func isUniqueOrPinned(inout ref: Builtin.NativeObject?) -> Bool {
 // CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRBoBi1_(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %1)
+// CHECK-NEXT: call i1 @rt_swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %1)
 // CHECK-NEXT: ret i1 %2
 func isUniqueOrPinned(inout ref: Builtin.NativeObject) -> Bool {
   return Builtin.isUniqueOrPinned(&ref)
@@ -656,7 +656,7 @@ func isUniqueOrPinned(inout ref: Builtin.BridgeObject) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %2)
+// CHECK-NEXT: call i1 @rt_swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
 func isUnique_native(inout ref: Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique_native(&ref)
@@ -667,7 +667,7 @@ func isUnique_native(inout ref: Builtin.BridgeObject) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %2)
+// CHECK-NEXT: call i1 @rt_swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
 func isUniqueOrPinned_native(inout ref: Builtin.BridgeObject) -> Bool {
   return Builtin.isUniqueOrPinned_native(&ref)

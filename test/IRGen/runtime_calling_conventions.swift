@@ -9,21 +9,21 @@
 public class C {
 }
 
-// CHECK-LABEL: define void @_TF27runtime_calling_conventions3fooFCS_1CT_(%C27runtime_calling_conventions1C*)
+// CHECK-LABEL: define {{(protected )?}}void @_TF27runtime_calling_conventions3fooFCS_1CT_(%C27runtime_calling_conventions1C*)
 // Check that runtime functions use a proper calling convention.
-// CHECK: call void {{.*}} @swift_release
+// CHECK: call void {{.*}} @rt_swift_release
 public func foo(c: C) {
 }
 
-// OPT-CHECK-LABEL: define void @_TF27runtime_calling_conventions3booFCS_1CT_(%C27runtime_calling_conventions1C*)
+// OPT-CHECK-LABEL: define {{(protected )?}}void @_TF27runtime_calling_conventions3booFCS_1CT_(%C27runtime_calling_conventions1C*)
 // Check that runtime functions use a proper calling convention.
-// OPT-CHECK: tail call void @swift_release
+// OPT-CHECK: tail call void @rt_swift_release
 public func boo(c: C) {
 }
 
 // Check that wrappers were generated, have a proper calling convention, linkage
 // and linkonce_odr flags.
-// CHECK: define linkonce_odr hidden void @swift_release(%swift.refcounted*) #[[ATTR_REF:[0-9]+]]
+// CHECK: define linkonce_odr hidden void @rt_swift_release(%swift.refcounted*) #[[ATTR_REF:[0-9]+]]
 // CHECK: load void (%swift.refcounted*)*, void (%swift.refcounted*)** @_swift_release
 // CHECK-NEXT: tail call void %load(%swift.refcounted* %0)
 // CHECK-NEXT: ret void
@@ -31,7 +31,7 @@ public func boo(c: C) {
 
 // Check that wrappers were generated, have a proper calling convention, linkage
 // and linkonce_odr flags.
-// OPT-CHECK: define linkonce_odr hidden void @swift_release(%swift.refcounted*) #[[ATTR_REF:[0-9]+]]
+// OPT-CHECK: define linkonce_odr hidden void @rt_swift_release(%swift.refcounted*) #[[ATTR_REF:[0-9]+]]
 // OPT-CHECK: load void (%swift.refcounted*)*, void (%swift.refcounted*)** @_swift_release
 // OPT-CHECK-NEXT: tail call void %load(%swift.refcounted* %0)
 // OPT-CHECK-NEXT: ret void

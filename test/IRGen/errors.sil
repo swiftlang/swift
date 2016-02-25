@@ -58,7 +58,7 @@ entry(%0 : $AnyObject):
 // CHECK-objc:        [[T0:%.*]] = phi %objc_object* [ [[RESULT]],
 // CHECK-objc-NEXT:   call void @swift_unknownRelease(%objc_object* [[T0]])
 // CHECK-native:      [[T0:%.*]] = phi %swift.refcounted* [ [[RESULT]],
-// CHECK-native-NEXT: call void @swift_release(%swift.refcounted* [[T0]])
+// CHECK-native-NEXT: call void @rt_swift_release(%swift.refcounted* [[T0]])
 // CHECK-NEXT:        br label [[CONT:%[0-9]+]]
 bb1(%2 : $AnyObject):
   strong_release %2 : $AnyObject
@@ -67,7 +67,7 @@ bb1(%2 : $AnyObject):
 // CHECK:             [[T0:%.*]] = phi %swift.error* [ [[ERR]],
 // CHECK-NEXT:        store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 // CHECK-objc-NEXT:   call void @swift_errorRelease(%swift.error* [[T0]])
-// CHECK-native-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%swift.error*)*)(%swift.error* [[T0]])
+// CHECK-native-NEXT: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%swift.error*)*)(%swift.error* [[T0]])
 // CHECK-NEXT:        br label [[CONT]]
 bb2(%3 : $ErrorType):
   release_value %3 : $ErrorType

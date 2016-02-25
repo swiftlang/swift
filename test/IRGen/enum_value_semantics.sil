@@ -198,7 +198,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT:   i64 4, label [[NOT_PRESENT]]
 // CHECK-NEXT: ]
 // CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_retain(%swift.refcounted* [[T0]])
+// CHECK-NEXT: call void @rt_swift_retain(%swift.refcounted* [[T0]])
 // CHECK-NEXT: br label [[NOT_PRESENT]]
 // CHECK:      switch i64 %0, label [[PRESENT:%.*]] [
 // CHECK-NEXT:   i64 0, label [[NOT_PRESENT:%.*]]
@@ -206,7 +206,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT:   i64 4, label [[NOT_PRESENT]]
 // CHECK-NEXT: ]
 // CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_release(%swift.refcounted* [[T0]])
+// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[T0]])
 // CHECK-NEXT: br label [[NOT_PRESENT]]
 // CHECK:      ret void
 
@@ -274,7 +274,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define linkonce_odr hidden i32 @_TwugO20enum_value_semantics20SinglePayloadTrivial
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics20SinglePayloadTrivial*
 // CHECK-NEXT: [[OPAQUE:%.*]] = bitcast %O20enum_value_semantics20SinglePayloadTrivial* [[SELF]] to %swift.opaque*
-// CHECK-NEXT: [[TAG:%.*]] = call i32 @swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 3)
+// CHECK-NEXT: [[TAG:%.*]] = call i32 @rt_swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 3)
 // CHECK-NEXT: ret i32 [[TAG]]
 
 
@@ -292,7 +292,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define linkonce_odr hidden void @_TwuiO20enum_value_semantics20SinglePayloadTrivial
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics20SinglePayloadTrivial*
 // CHECK-NEXT: [[OPAQUE:%.*]] = bitcast %O20enum_value_semantics20SinglePayloadTrivial* [[SELF]] to %swift.opaque*
-// CHECK-NEXT: call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 %tag, i32 3)
+// CHECK-NEXT: call void @rt_swift_storeEnumTagSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 %tag, i32 3)
 // CHECK-NEXT: ret void
 
 
@@ -310,7 +310,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:      ; <label>:[[RELEASE_PAYLOAD]]
 // CHECK-NEXT: [[DATA_ADDR:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]] to %swift.refcounted**
 // CHECK-NEXT: [[DATA:%.*]] = load %swift.refcounted*, %swift.refcounted** [[DATA_ADDR]], align 8
-// CHECK-NEXT: call void @swift_release(%swift.refcounted* [[DATA]])
+// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[DATA]])
 // CHECK-NEXT: br label %[[DONE]]
 
 // CHECK:      ; <label>:[[DONE]]
@@ -482,7 +482,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:      ]
 // CHECK:      ; <label>:[[PAYLOAD1_DESTROY]]
 // CHECK-NEXT: [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
+// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
 // CHECK-NEXT: br label %[[END]]
 // CHECK:      ; <label>:[[PAYLOAD3_DESTROY]]
 // CHECK-NEXT: [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_1]] to %objc_object*
@@ -537,7 +537,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:      ]
 // CHECK:      ; <label>:[[PAYLOAD1_DESTROY]]
 // CHECK-NEXT: [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
-// CHECK-NEXT: call void @swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
+// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
 // CHECK-NEXT: br label %[[END]]
 // CHECK:      ; <label>:[[PAYLOAD3_DESTROY]]
 // CHECK-NEXT: [[MASKED:%.*]] = and i64 [[PAYLOAD_1]]

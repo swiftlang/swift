@@ -22,7 +22,7 @@ sil_vtable TestClass {}
 // CHECK: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
-// CHECK: call {{.*}} @swift_release {{.*}} [[R]])
+// CHECK: call {{.*}} @rt_swift_release {{.*}} [[R]])
 // CHECK: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to %swift.refcounted*
 // CHECK: call void @swift_verifyEndOfLifetime(%swift.refcounted* [[O2]])
 // CHECK: ret void
@@ -44,7 +44,7 @@ bb0:
 // CHECK: alloca {{.*}}TestStruct
 // CHECK-NOT: alloca
 // CHECK: call %swift.refcounted* @swift_initStackObject
-// CHECK: call noalias %swift.refcounted* @swift_allocObject
+// CHECK: call noalias %swift.refcounted* @rt_swift_allocObject
 // CHECK: ret void
 sil @exceed_limit : $@convention(thin) () -> () {
 bb0:

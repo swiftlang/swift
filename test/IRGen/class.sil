@@ -100,7 +100,7 @@ bb0(%0 : $@thick C.Type):
   // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
   // CHECK:   [[ALIGN32:%.*]] = load i32, i32* [[T1]], align 4
   // CHECK:   [[ALIGN:%.*]] = zext i32 [[ALIGN32]] to i64
-  // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]])
+  // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]])
   %1 = alloc_ref_dynamic %0 : $@thick C.Type, $C
   return %1 : $C
 }

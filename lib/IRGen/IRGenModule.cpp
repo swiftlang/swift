@@ -482,7 +482,15 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
                                     llvm::ArrayRef<llvm::Type *> argTypes,
                                     ArrayRef<Attribute::AttrKind> attrs) {
   assert(symbol && "Symbol name should be defined for a wrapper function");
-  auto fn = getRuntimeFn(Module, cache, name, cc, retTypes, argTypes, attrs);
+  // Wrapper names should have a prefix to distinguish them from the
+  // actual runtime functions.
+  llvm::SmallString<128> wrapperNameStr;
+  llvm::raw_svector_ostream buffer(wrapperNameStr);
+  buffer << SWIFT_WRAPPER_PREFIX;
+  buffer << name;
+  const char *wrapperName = wrapperNameStr.c_str();
+  auto fn = getRuntimeFn(Module, cache, wrapperName, cc,
+                         retTypes, argTypes, attrs);
   auto *fun = dyn_cast<llvm::Function>(fn);
   assert(fun && "Wrapper should be an llvm::Function");
   // Do not inline wrappers, because this would result in a code size increase.
@@ -537,25 +545,41 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FOR_CONV_DefaultCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)                 \
+#define FUNCTION_FOR_CONV_DefaultCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)        \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
-#define FOR_CONV_C_CC(ID, NAME, CC, RETURNS, ARGS, ATTRS)                      \
+#define FUNCTION_FOR_CONV_C_CC(ID, NAME, CC, RETURNS, ARGS, ATTRS)             \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
-#define FOR_CONV_RegisterPreservingCC(ID, NAME, CC, RETURNS, ARGS, ATTRS)      \
+#define FUNCTION_FOR_CONV_RegisterPreservingCC(ID, NAME, CC, RETURNS, ARGS,    \
+                                               ATTRS)                          \
   FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SWIFT_RT_ENTRY_REF(NAME), CC,     \
                                    QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)                           \
-  FOR_CONV_##CC(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+  FUNCTION_FOR_CONV_##CC(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS),            \
+                         QUOTE(ATTRS))
 
-#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(ID, NAME, SYMBOL, IMPL, CC,       \
-                                              RETURNS, ARGS, ATTRS)            \
+#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_DefaultCC(ID, NAME, SYMBOL, CC,   \
+                                                       RETURNS, ARGS, ATTRS)   \
+  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
+#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_C_CC(ID, NAME, SYMBOL, CC,        \
+                                                  RETURNS, ARGS, ATTRS)        \
+  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
+#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_RegisterPreservingCC(             \
+    ID, NAME, SYMBOL, CC, RETURNS, ARGS, ATTRS)                                \
   FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL, CC, QUOTE(RETURNS),       \
                                    QUOTE(ARGS), QUOTE(ATTRS))
 
-#define RETURNS(...) { __VA_ARGS__ }
+#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(ID, NAME, SYMBOL, IMPL, CC,       \
+                                             RETURNS, ARGS, ATTRS)             \
+  FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_##CC(                                   \
+      ID, NAME, SYMBOL, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
+#define RETURNS(...)                                                           \
+  { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
 #define NO_ARGS {}
 #define ATTRS(...) { __VA_ARGS__ }

@@ -88,7 +88,7 @@ import Swift
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
 // CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* null)
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
+// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
@@ -102,7 +102,7 @@ import Swift
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
 // CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* null)
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
+// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*

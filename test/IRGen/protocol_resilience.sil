@@ -90,7 +90,7 @@ bb0(%0 : $*Self):
   // implementation
 
   // CHECK-NEXT: [[WTABLE:%.*]] = bitcast i8** %SelfWitnessTable to i8*
-  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
+  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject({{.*}})
   // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, [{{4|8}} x i8], i8* }>*
   // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], i8* }>, <{ %swift.refcounted, [{{4|8}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
   // CHECK-NEXT: store i8* [[WTABLE]], i8** [[WTABLE_ADDR]]
@@ -130,7 +130,7 @@ bb0(%0 : $@thick Self.Type):
   // implementation
 
   // CHECK-NEXT: [[WTABLE:%.*]] = bitcast i8** %SelfWitnessTable to i8*
-  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
+  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject({{.*}})
   // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, [{{4|8}} x i8], i8* }>*
   // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], i8* }>, <{ %swift.refcounted, [{{4|8}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
   // CHECK-NEXT: store i8* [[WTABLE]], i8** [[WTABLE_ADDR]]
@@ -206,7 +206,7 @@ bb0(%0 : $*ConformingStruct):
 
   // Make sure we can partially apply direct references to default implementations
 
-  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
+  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject({{.*}})
   // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
   // CHECK-NEXT: [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
   // CHECK-NEXT: store i8* bitcast ([8 x i8*]* @_TWPV19protocol_resilience16ConformingStructS_17ResilientProtocolS_ to i8*), i8** [[WTABLE]]
@@ -281,7 +281,7 @@ bb0(%0 : $*ResilientConformingType):
 
 // CHECK-LABEL: define{{( protected)?}} i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_, %swift.type* null, i8** null)
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_, %swift.type* null, i8** null)
 // CHECK-NEXT:    ret i8** [[WTABLE]]
 
 
