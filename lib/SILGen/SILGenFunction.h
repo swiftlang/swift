@@ -938,6 +938,8 @@ public:
 
   void emitConditionalPBD(PatternBindingDecl *PBD, SILBasicBlock *FailBB);
 
+  void usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt *stmt,
+                                        const llvm::function_ref<void(void)> &f);
   void emitSwitchStmt(SwitchStmt *S);
   void emitSwitchFallthrough(FallthroughStmt *S);
 

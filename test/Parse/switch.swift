@@ -197,13 +197,13 @@ default:
 var t = (1, 2)
 
 switch t {
-case (var a, 2), (1, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
+case (var a, 2), (1, _): // expected-error {{'a' must be bound in every pattern}}
   ()
 
-case (_, 2), (var a, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
+case (_, 2), (var a, _): // expected-error {{'a' must be bound in every pattern}}
   ()
 
-case (var a, 2), (1, var b): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
+case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}}
   ()
 
 case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
@@ -221,16 +221,30 @@ case (1, var b):
 case (1, let b): // let bindings
   ()
 
-case (_, 2), (let a, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
+case (_, 2), (let a, _): // expected-error {{'a' must be bound in every pattern}}
   ()
 
 // OK
 case (_, 2), (1, _):
   ()
+  
+case (_, var a), (_, var a):
+  ()
+  
+case (var a, var b), (var b, var a):
+  ()
 
 case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
 case (1, _):
   ()
+}
+
+func patternVarUsedInAnotherPattern(x: Int) {
+  switch x {
+  case let a, // expected-error {{'a' must be bound in every pattern}}
+       a:
+    break
+  }
 }
 
 // Fallthroughs can't transfer control into a case label with bindings.
