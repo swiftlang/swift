@@ -90,6 +90,7 @@ public protocol ErrorType {
   var _code: Builtin.Int32 { get }
 }
 
+sil [fragile] @use : $@convention(thin) (Builtin.NativeObject) -> ()
 sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
 sil [fragile] @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
@@ -99,7 +100,6 @@ sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin
 /////////////////
 // Basic Tests //
 /////////////////
-
 // CHECK-LABEL: sil @simple_retain_release_pair : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK: bb0
 // CHECK-NEXT: tuple ()
@@ -2071,5 +2071,49 @@ bb1(%3 : $()):
 bb2(%4 : $ErrorType):
   strong_release %0 : $Builtin.NativeObject
   throw %4 : $ErrorType
+}
+
+// In this control flow, ARC runs multiple iterations to get rid of and move the retain and releases.
+// In the first iteration, we will try to move id1/id3 towards each other.
+// we create new instructions and remove the old ones. However we had a bug to insert these newly created
+// instructions into the "interesting" instruction list. As a result, the in second iteration,
+// we end up ignoring the newly created id3. and will be able to move id2 across a potential release (id3).
+//
+// CHECK-LABEL: sil @interleaved_retain_release_with_multiple_arc_iteration
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: apply
+// CHECK: strong_retain
+// CHECK: strong_release
+sil @interleaved_retain_release_with_multiple_arc_iteration : $@convention(thin) (Builtin.NativeObject, @inout Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  %6 = function_ref @use : $@convention(thin) (Builtin.NativeObject) -> ()
+  %2 = load %1 : $*Builtin.NativeObject
+
+  strong_retain %2 : $Builtin.NativeObject   // id 1
+  apply %6(%2) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %6(%2) : $@convention(thin) (Builtin.NativeObject) -> ()
+
+  strong_retain %0 : $Builtin.NativeObject   // id 2
+
+  %10 = tuple()
+
+  strong_release %2 : $Builtin.NativeObject  // id 3
+
+  strong_retain %0 : $Builtin.NativeObject   // id 4
+  apply %6(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %6(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject  // id 5
+  strong_release %0 : $Builtin.NativeObject  // id 6
+br bb2
+
+// These are here to make sure we run 2nd iteration in arcopt.
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
 }
 
