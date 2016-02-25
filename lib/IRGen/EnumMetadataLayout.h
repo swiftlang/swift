@@ -60,8 +60,7 @@ public:
       asImpl().addPayloadSize();
     
     // Add fields for generic cases.
-    if (auto generics = Target->getGenericParamsOfContext())
-      asImpl().addGenericFields(*generics);
+    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
   }
 };
 
@@ -82,9 +81,8 @@ public:
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addParentMetadataRef() { addPointer(); }
-  void addGenericArgument(ArchetypeType *argument) { addPointer(); }
-  void addGenericWitnessTable(ArchetypeType *argument,
-                              ProtocolDecl *protocol) {
+  void addGenericArgument(CanType argument) { addPointer(); }
+  void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
     addPointer();
   }
   void addPayloadSize() { addPointer(); }

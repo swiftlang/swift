@@ -44,3 +44,11 @@
 // CHECK-MUTATING-ATTR: mutating func
 
 // NO-FIXMES-NOT: FIXME
+// RUN: %target-swift-ide-test -print-module-groups -module-to-print=Swift -source-filename %s -print-interface > %t-group.txt
+// RUN: FileCheck -check-prefix=CHECK-GROUPS1 %s < %t-group.txt
+// CHECK-GROUPS1: Module groups begin:
+// CHECK-GROUPS1-DAG: Array
+// CHECK-GROUPS1-DAG: Assert
+// CHECK-GROUPS1-DAG: Collection
+// CHECK-GROUPS1-NOT: <NULL>
+// CHECK-GROUPS1: Module groups end.

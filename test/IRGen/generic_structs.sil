@@ -53,24 +53,24 @@ import Builtin
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
 // CHECK: @_TMnV15generic_structs23DynamicWithRequirements = {{(protected )?}}constant <{ {{.*}} i32 }> <{
 // --       name
-// CHECK:   [44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
+// CHECK-SAME: [44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
 // --       field count
-// CHECK:   i32 2,
+// CHECK-SAME: i32 2,
 // --       field offset vector offset
-// CHECK:   i32 3,
+// CHECK-SAME: i32 3,
 // --       field names
-// CHECK:   [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]]
+// CHECK-SAME: [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]]
 // --       generic metadata pattern
-// CHECK:   i32 add ({{.*}}@_TMPV15generic_structs23DynamicWithRequirements{{.*}}, i32 1)
+// CHECK-SAME: i32 add ({{.*}}@_TMPV15generic_structs23DynamicWithRequirements{{.*}}, i32 1)
 // --       generic parameter vector offset
-// CHECK:   i32 5,
-// --       generic parameter count; primary count; generic parameter witness counts
-// CHECK:   i32 3, i32 2, i32 1, i32 1, i32 0
-// CHECK: }>
+// CHECK-SAME: i32 5,
+// --       generic requirements count; generic arguments count; flags; generic parameter witness counts
+// CHECK-SAME: i32 4, i32 2, i32 0
+// CHECK-SAME: }>
 
 // CHECK: @_TMPV15generic_structs23DynamicWithRequirements = {{(protected )?}}global <{ {{.*}}* }> <{
 // -- field offset vector; generic parameter vector
-// CHECK:   i64 0, i64 0, %swift.type* null, %swift.type* null, %swift.type* null, i8** null, i8** null,
+// CHECK:   i64 0, i64 0, %swift.type* null, %swift.type* null, i8** null, i8** null,
 // CHECK: }>
 
 // -- Fixed-layout struct metadata contains fixed field offsets
@@ -88,7 +88,7 @@ struct SingleDynamic<T> {
   var x : T
 }
 
-protocol Req1 { typealias Assoc1 }
+protocol Req1 { associatedtype Assoc1 }
 protocol Req2 {}
 
 struct DynamicWithRequirements<T: Req1, U: Req2> {
@@ -279,8 +279,8 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK-NEXT: ret %swift.opaque* [[T2]]
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_SingleDynamic(%swift.type_pattern*, i8**)
-// CHECK:   [[T0:%.*]] = load i8*, i8** %1, align 8
-// CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %T = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 //   Fill type argument.
@@ -299,3 +299,33 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK:   call void @swift_initStructMetadata_UniversalStrategy(i64 1, i8*** [[TYPES]], i64* [[T1]], i8** [[VWTABLE_ADDR]])
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
+
+protocol HasAssociatedType {
+  associatedtype Assoc
+}
+protocol ParentHasAssociatedType : HasAssociatedType {
+  associatedtype Assoc : HasAssociatedType
+}
+
+struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
+  var x: T.Assoc
+  var y: T.Assoc.Assoc
+}
+// CHECK-LABEL: define private %swift.type* @create_generic_metadata_GenericLayoutWithAssocType(
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %T = load %swift.type*, %swift.type** [[T0]], align 8
+// CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
+// CHECK:   [[T2:%.*]] = bitcast %swift.type** [[T1]] to i8***
+// CHECK:   %T.ParentHasAssociatedType = load i8**, i8*** [[T2]],
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 1
+// CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]],
+// CHECK:   [[T2:%.*]] = bitcast i8* [[T1]] to %swift.type* (%swift.type*, i8**)*
+// CHECK:   %T.Assoc = call %swift.type* [[T2]](%swift.type* %T, i8** %T.ParentHasAssociatedType)
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 2
+// CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]],
+// CHECK:   [[T2:%.*]] = bitcast i8* [[T1]] to i8** (%swift.type*, %swift.type*, i8**)*
+// CHECK:   %T.Assoc.HasAssociatedType = call i8** [[T2]](%swift.type* %T.Assoc, %swift.type* %T, i8** %T.ParentHasAssociatedType)
+// CHECK:   [[T0:%.*]] = load i8*, i8** %T.Assoc.HasAssociatedType,
+// CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to %swift.type* (%swift.type*, i8**)*
+// CHECK:   %T.Assoc.Assoc = call %swift.type* [[T1]](%swift.type* %T.Assoc, i8** %T.Assoc.HasAssociatedType)

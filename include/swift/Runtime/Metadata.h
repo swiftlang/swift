@@ -1208,34 +1208,37 @@ struct HeapMetadata : Metadata {
 /// structure that describes how to find and parse a generic parameter vector
 /// within the type metadata for an instance of a nominal type.
 struct GenericParameterDescriptor {
-  /// The offset of the descriptor in the metadata record. If NumParams is zero,
-  /// this value is meaningless.
+  /// The offset of the descriptor in the metadata record.  This is
+  /// meaningful if either NumGenericRequirements is nonzero or 
+  /// (for classes) if Flags.hasParent() is true.
   uint32_t Offset;
-  /// The number of type parameters. A value of zero means there is no generic
-  /// parameter vector. This includes associated types of the primary type
-  /// parameters.
-  uint32_t NumParams;
-  /// The number of primary type parameters. This is always less than or equal
-  /// to NumParams; it counts only the primary type parameters and not their
-  /// associated types.
-  uint32_t NumPrimaryParams;
-  
-  /// True if the nominal type has generic parameters.
-  bool hasGenericParams() const { return NumParams > 0; }
-  
-  /// A type parameter.
-  struct Parameter {
-    /// The number of protocol witness tables required by this type parameter.
-    uint32_t NumWitnessTables;
-    
-    // TODO: This is the bare minimum to be able to parse an opaque generic
-    // parameter vector. Should we include additional info, such as the
-    // required protocols?
-  };
 
-  /// The parameter descriptors are in a tail-emplaced array of NumParams
-  /// elements.
-  Parameter Parameters[1];
+  /// The amount of generic requirement data in the metadata record, in
+  /// words, excluding the lexical parent type.  A value of zero means
+  /// there is no generic requirement data.
+  ///
+  /// This may include protocol witness tables for type parameters or
+  /// their associated types.
+  uint32_t NumGenericRequirements;
+
+  /// The number of primary type parameters. This is always less than or equal
+  /// to NumGenericRequirements; it counts only the type parameters
+  /// and not any required witness tables.
+  uint32_t NumPrimaryParams;
+
+  /// Flags for this generic parameter descriptor.
+  GenericParameterDescriptorFlags Flags;
+
+  /// True if the nominal type has generic requirements other than its
+  /// parent metadata.
+  bool hasGenericRequirements() const { return NumGenericRequirements > 0; }
+
+  /// True if the nominal type is generic in any way.
+  bool isGeneric() const {
+    return hasGenericRequirements() || Flags.hasGenericParent();
+  }
+
+  // TODO: add meaningful descriptions of the generic requirements.
 };
   
 struct ClassTypeDescriptor;
@@ -1566,6 +1569,16 @@ public:
     return getter(this);
   }
 
+  /// Return the parent type for a given level in the class hierarchy, or
+  /// null if that level does not have a parent type.
+  const Metadata *getParentType(const NominalTypeDescriptor *theClass) const {
+    if (!theClass->GenericParams.Flags.hasParent())
+      return nullptr;
+
+    auto metadataAsWords = reinterpret_cast<const Metadata * const *>(this);
+    return metadataAsWords[theClass->GenericParams.Offset - 1];
+  }
+
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::Class;
   }
@@ -1739,12 +1752,11 @@ struct ValueMetadata : public Metadata {
   
   /// Retrieve the generic arguments of this type.
   const Metadata * const *getGenericArgs() const {
-    if (Description->GenericParams.NumParams == 0)
+    if (!Description->GenericParams.hasGenericRequirements())
       return nullptr;
 
-    const void* const *asWords = reinterpret_cast<const void * const *>(this);
-    asWords += Description->GenericParams.Offset;
-    return reinterpret_cast<const Metadata * const *>(asWords);
+    auto asWords = reinterpret_cast<const Metadata * const *>(this);
+    return (asWords + Description->GenericParams.Offset);
   }
 };
 

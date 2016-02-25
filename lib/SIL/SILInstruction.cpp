@@ -927,7 +927,6 @@ bool SILInstruction::mayTrap() const {
 //                                 Utilities
 //===----------------------------------------------------------------------===//
 
-#ifndef NDEBUG
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      SILInstruction::MemoryBehavior B) {
   switch (B) {
@@ -953,4 +952,3 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
     return OS << "MayRelease";
   }
 }
-#endif

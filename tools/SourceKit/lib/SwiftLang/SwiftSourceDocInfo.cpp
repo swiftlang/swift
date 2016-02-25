@@ -62,12 +62,49 @@ static StringRef getTagForDecl(const Decl *D, bool isRef) {
   return UID.getName().drop_front(strlen(prefix));
 }
 
+static StringRef ExternalParamNameTag = "decl.var.parameter.name.external";
+static StringRef LocalParamNameTag = "decl.var.parameter.name.local";
+
+static StringRef getTagForPrintNameContext(PrintNameContext context) {
+  switch (context) {
+  case PrintNameContext::FunctionParameterExternal:
+    return ExternalParamNameTag;
+  case PrintNameContext::FunctionParameterLocal:
+    return LocalParamNameTag;
+  default:
+    return "";
+  }
+}
+
+static StringRef getDeclNameTagForDecl(const Decl *D) {
+  switch (D->getKind()) {
+  case DeclKind::Param:
+    // When we're examining the parameter itself, it is the local name that is
+    // the name of the variable.
+    return LocalParamNameTag;
+  default:
+    return "decl.name";
+  }
+}
+
 /// An ASTPrinter for annotating declarations with XML tags that describe the
 /// key substructure of the declaration for CursorInfo/DocInfo.
 ///
 /// Prints declarations with decl- and type-specific tags derived from the
-/// UIDs used for decl/refs.  For example,
-/// <decl.function.free>func foo(x: <ref.struct usr="Si">Int</...>)</...>
+/// UIDs used for decl/refs. For example (including newlines purely for ease of
+/// reading):
+///
+/// \verbatim
+///   <decl.function.free>
+///     func <decl.name>foo</decl.name>
+///     (
+///     <decl.var.parameter>
+///       <decl.var.parameter.name.local>x</decl.var.parameter.name.local>:
+///       <ref.struct usr="Si">Int</ref.struct>
+///     </decl.var.parameter>
+///     ) -> <ref.struct usr="Si">Int</ref.struct>
+///  </decl.function.free>
+/// \endverbatim
 class FullyAnnotatedDeclarationPrinter final : public XMLEscapingPrinter {
 public:
   FullyAnnotatedDeclarationPrinter(raw_ostream &OS) : XMLEscapingPrinter(OS) {}
@@ -77,17 +114,46 @@ private:
   // MARK: The ASTPrinter callback interface.
 
   void printDeclPre(const Decl *D) override {
+    DeclStack.emplace_back(D);
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
   void printDeclPost(const Decl *D) override {
+    assert(DeclStack.back() == D && "unmatched printDeclPre");
+    DeclStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
+  }
+  void avoidPrintDeclPost(const Decl *D) override {
+    assert(DeclStack.back() == D && "unmatched printDeclPre");
+    DeclStack.pop_back();
   }
 
   void printDeclLoc(const Decl *D) override {
-    openTag("decl.name");
+    openTag(getDeclNameTagForDecl(D));
   }
   void printDeclNameEndLoc(const Decl *D) override {
-    closeTag("decl.name");
+    closeTag(getDeclNameTagForDecl(D));
+  }
+
+  void printTypePre(const TypeLoc &TL) override {
+    auto tag = getTypeTagForCurrentDecl();
+    if (!tag.empty())
+      openTag(tag);
+  }
+  void printTypePost(const TypeLoc &TL) override {
+    auto tag = getTypeTagForCurrentDecl();
+    if (!tag.empty())
+      closeTag(tag);
+  }
+
+  void printNamePre(PrintNameContext context) override {
+    auto tag = getTagForPrintNameContext(context);
+    if (!tag.empty())
+      openTag(tag);
+  }
+  void printNamePost(PrintNameContext context) override {
+    auto tag = getTagForPrintNameContext(context);
+    if (!tag.empty())
+      closeTag(tag);
   }
 
   void printTypeRef(const TypeDecl *TD, Identifier name) override {
@@ -103,6 +169,31 @@ private:
 
   void openTag(StringRef tag) { OS << "<" << tag << ">"; }
   void closeTag(StringRef tag) { OS << "</" << tag << ">"; }
+
+  // MARK: Misc.
+
+  StringRef getTypeTagForCurrentDecl() const {
+    if (const Decl *D = currentDecl()) {
+      switch (D->getKind()) {
+      case DeclKind::Param:
+        return "decl.var.parameter.type";
+      case DeclKind::Func:
+        return "decl.function.returntype";
+      default:
+        break;
+      }
+    }
+    return "";
+  }
+
+  const Decl *currentDecl() const {
+    return DeclStack.empty() ? nullptr : DeclStack.back();
+  }
+
+private:
+  /// A stack of declarations being printed, used to determine the context for
+  /// other ASTPrinter callbacks.
+  llvm::SmallVector<const Decl *, 3> DeclStack;
 };
 
 static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {

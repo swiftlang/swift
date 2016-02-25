@@ -24,6 +24,7 @@ namespace swift {
   class ModuleEntity;
   class TypeDecl;
   class Type;
+  struct TypeLoc;
   class Pattern;
   class ExtensionDecl;
   class NominalTypeDecl;
@@ -38,7 +39,8 @@ enum class PrintNameContext {
   GenericParameter,
   /// Function parameter context, where keywords other than let/var/inout are
   /// not escaped.
-  FunctionParameter,
+  FunctionParameterExternal,
+  FunctionParameterLocal,
 };
 
 /// An abstract class used to print an AST.
@@ -47,6 +49,7 @@ class ASTPrinter {
   unsigned PendingNewlines = 0;
   const Decl *PendingDeclPreCallback = nullptr;
   const Decl *PendingDeclLocCallback = nullptr;
+  Optional<PrintNameContext> PendingNamePreCallback;
   const NominalTypeDecl *SynthesizeTarget = nullptr;
 
   void printTextImpl(StringRef Text);
@@ -71,7 +74,13 @@ public:
   /// Called after finishing printing of a declaration.
   virtual void printDeclPost(const Decl *D) {}
 
-  /// Called when printing the referenced name of a type declaration.
+  /// Called before printing a type.
+  virtual void printTypePre(const TypeLoc &TL) {}
+  /// Called after printing a type.
+  virtual void printTypePost(const TypeLoc &TL) {}
+
+  /// Called when printing the referenced name of a type declaration, possibly
+  /// from deep inside another type.
   virtual void printTypeRef(const TypeDecl *TD, Identifier Name);
 
   /// Called when printing the referenced name of a module.
@@ -84,6 +93,11 @@ public:
   /// Called after printing a synthesized extension.
   virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                              const NominalTypeDecl *NTD) {}
+
+  /// Called before printing a name in the given context.
+  virtual void printNamePre(PrintNameContext Context) {}
+  /// Called after printing a name in the given context.
+  virtual void printNamePost(PrintNameContext Context) {}
 
   // Helper functions.
 
@@ -128,8 +142,16 @@ public:
     PendingDeclPreCallback = D;
   }
 
+  /// Schedule a \c printDeclLoc callback to be called as soon as a
+  /// non-whitespace character is printed.
   void callPrintDeclLoc(const Decl *D) {
     PendingDeclLocCallback = D;
+  }
+
+  /// Schedule a \c printNamePre callback to be called as soon as a
+  /// non-whitespace character is printed.
+  void callPrintNamePre(PrintNameContext Context) {
+    PendingNamePreCallback = Context;
   }
 
   /// To sanitize a malformed utf8 string to a well-formed one.

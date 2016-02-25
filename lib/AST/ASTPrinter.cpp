@@ -34,6 +34,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Basic/Defer.h" // Must come after include of Tokens.def.
 #include "swift/Config.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -332,9 +333,11 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   
   const Decl *PreD = PendingDeclPreCallback;
   const Decl *LocD = PendingDeclLocCallback;
+  auto NameContext = PendingNamePreCallback;
   PendingDeclPreCallback = nullptr;
   PendingDeclLocCallback = nullptr;
-  
+  PendingNamePreCallback.reset();
+
   if (PreD) {
     if (SynthesizeTarget && PreD->getKind() == DeclKind::Extension)
       printSynthesizedExtensionPre(cast<ExtensionDecl>(PreD), SynthesizeTarget);
@@ -343,6 +346,9 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   }
   if (LocD) {
     printDeclLoc(LocD);
+  }
+  if (NameContext) {
+    printNamePre(*NameContext);
   }
 
   printText(Text);
@@ -394,12 +400,16 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
 
-  case PrintNameContext::FunctionParameter:
+  case PrintNameContext::FunctionParameterExternal:
+  case PrintNameContext::FunctionParameterLocal:
     return !canBeArgumentLabel(keyword);
   }
 }
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
+  callPrintNamePre(Context);
+  defer { printNamePost(Context); };
+
   if (Name.empty()) {
     *this << "_";
     return;
@@ -590,11 +600,17 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printTypeLoc(const TypeLoc &TL) {
     if (Options.TransformContext && TL.getType()) {
       if (auto RT = Options.TransformContext->transform(TL.getType())) {
+        Printer.printTypePre(TypeLoc::withoutLoc(RT));
         PrintOptions FreshOptions;
         RT.print(Printer, FreshOptions);
+        Printer.printTypePost(TypeLoc::withoutLoc(RT));
         return;
       }
     }
+
+    Printer.printTypePre(TL);
+    defer { Printer.printTypePost(TL); };
+
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
     if ((Options.PreferTypeRepr && TL.hasLocation()) ||
@@ -1003,6 +1019,14 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       }
       if (!HasMemberToPrint)
         return false;
+    }
+  }
+
+  // If asked to skip overrides and witnesses, do so.
+  if (Options.SkipOverrides) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->getOverriddenDecl()) return false;
+      if (!VD->getSatisfiedProtocolRequirements().empty()) return false;
     }
   }
 
@@ -1809,31 +1833,36 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
+  Printer.callPrintDeclPre(param);
+  defer {
+    Printer.printDeclPost(param);
+  };
+
   auto printArgName = [&]() {
     // Print argument name.
     auto ArgName = param->getArgumentName();
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
       if (!ArgNameIsAPIByDefault && !ArgName.empty())
         Printer << " _";
       break;
     case PrintOptions::ArgAndParamPrintingMode::MatchSource:
       if (ArgName == BodyName && ArgNameIsAPIByDefault) {
-        Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+        Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
         break;
       }
       if (ArgName.empty() && !ArgNameIsAPIByDefault) {
-        Printer.printName(BodyName, PrintNameContext::FunctionParameter);
+        Printer.printName(BodyName, PrintNameContext::FunctionParameterLocal);
         break;
       }
       SWIFT_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::BothAlways:
-      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
       Printer << " ";
-      Printer.printName(BodyName, PrintNameContext::FunctionParameter);
+      Printer.printName(BodyName, PrintNameContext::FunctionParameterLocal);
       break;
     }
     Printer << ": ";
@@ -2090,12 +2119,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Type ResultTy = decl->getResultType();
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
-        if (Options.TransformContext) {
-          ResultTy = Options.TransformContext->transform(ResultTy);
-          PrintOptions FreshOptions;
-          ResultTy->print(Printer, FreshOptions);
-        } else
-          ResultTy->print(Printer, Options);
+        // Use the non-repr external type, but reuse the TypeLoc printing code.
+        printTypeLoc(TypeLoc::withoutLoc(ResultTy));
       }
     }
 
@@ -2837,7 +2862,8 @@ public:
       }
 
       if (TD.hasName()) {
-        Printer.printName(TD.getName(), PrintNameContext::FunctionParameter);
+        Printer.printName(TD.getName(),
+                          PrintNameContext::FunctionParameterExternal);
         Printer << ": ";
       }
 

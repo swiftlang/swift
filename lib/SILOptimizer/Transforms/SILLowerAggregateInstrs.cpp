@@ -114,7 +114,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     // If we are not initializing:
     // strong_release %old : $*T
     //   *or*
-    // release_value %new : $*T
+    // release_value %old : $*T
     if (Old) {
       TL.emitLoweredReleaseValue(Builder, CA->getLoc(), Old,
                                  TypeLowering::LoweringStyle::DeepNoEnum);

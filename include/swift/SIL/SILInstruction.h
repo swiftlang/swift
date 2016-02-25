@@ -290,14 +290,12 @@ combineMemoryBehavior(SILInstruction::MemoryBehavior B1,
   return Result;
 }
 
-#ifndef NDEBUG
 /// Pretty-print the MemoryBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               SILInstruction::MemoryBehavior B);
 /// Pretty-print the ReleasingBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               SILInstruction::ReleasingBehavior B);
-#endif
 
 /// A template base class for instructions that take a single SILValue operand
 /// and has no result or a single value result.

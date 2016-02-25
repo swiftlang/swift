@@ -908,6 +908,10 @@ the number of parallel build jobs to use""",
         "--build-jobs", str(args.build_jobs),
         "--workspace", SWIFT_SOURCE_ROOT
     ]
+    if args.install_symroot:
+        build_script_impl_args += [
+            "--install-symroot", os.path.abspath(args.install_symroot)
+        ]
     if args.build_foundation:
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant

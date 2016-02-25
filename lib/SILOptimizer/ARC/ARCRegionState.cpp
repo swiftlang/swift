@@ -599,7 +599,6 @@ void ARCRegionState::addInterestingInst(SILInstruction *TargetInst) {
     // SummarizedInterestingInst.
     while (&*II != *SI && &*II != TargetInst) {
       ++II;
-      return;
     }
 
     // If II == SI and TargetInst == II then there is nothing further to do.
