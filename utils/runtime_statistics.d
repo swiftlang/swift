@@ -29,8 +29,8 @@ pid$target:libswiftCore:swift_retain:entry / arg0 != 0 /
     this->metadata = (ClassMetadata *)copyin(this->ptr->M, sizeof(ClassMetadata));
     this->descriptor = (NominalTypeDescriptor *)copyin((uintptr_t)this->metadata->Descriptor, sizeof(NominalTypeDescriptor));
     this->clsname = copyinstr(this->descriptor->Name);
-    @counts["swift_retain", this->clsname] = count();
-    @counts["swift_retain"] = count();
+    @type_count["swift_retain", this->clsname] = count();
+    @counts["swift_retain", "global"] = count();
 }
 
 pid$target:*:swift_release:entry
@@ -39,16 +39,16 @@ pid$target:*:swift_release:entry
     this->metadata = (ClassMetadata *)copyin(this->ptr->M, sizeof(ClassMetadata));
     this->descriptor = (NominalTypeDescriptor *)copyin((uintptr_t)this->metadata->Descriptor, sizeof(NominalTypeDescriptor));
     this->clsname = copyinstr(this->descriptor->Name);
-    @counts["swift_release", this->clsname] = count();
-    @counts["swift_release"] = count();
+    @type_count["swift_release", this->clsname] = count();
+    @counts["swift_release", "global"] = count();
 }
 
 pid$target:*:objc_retain:entry
 {
-    @counts["objc_retain"] = count();
+    @counts["objc_retain", "global"] = count();
 }
 
 pid$target:*:objc_release:entry
 {
-    @counts["objc_release"] = count();
+    @counts["objc_release", "global"] = count();
 }
