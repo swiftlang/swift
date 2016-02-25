@@ -302,6 +302,12 @@ details of the setups of other systems or automated environments.""")
              "target. The built LLVM and Clang will be used to compile Swift "
              "for the cross-compilation targets.",
         default=swift_build_support.targets.host_target())
+    targets_group.add_argument(
+        "--cross-compile-stdlib-targets",
+        help="The cross-compliation targets. The Swift stdlib will be built for"
+             "these targets using the host-target LLVM, Clang and Swift",
+        metavar="TARGET",
+        nargs='*')
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
@@ -1037,7 +1043,33 @@ the number of parallel build jobs to use""",
             'watchsimulator',
         ])
 
-    check_call(build_script_impl_args)
+    host_build_script_impl_args = []
+
+    if platform.system() != 'Linux':
+        host_build_script_impl_args += [
+            "--skip-build-linux"
+        ]
+
+    check_call(build_script_impl_args + host_build_script_impl_args)
+
+    if args.cross_compile_stdlib_targets:
+        # Currently only cross-compiling the swift libraries is supported.
+        # Building the swift compiler would require building llvm too.
+        llvm_path = os.path.join(build_dir, "llvm-"+args.host_target, 'bin')
+        swift_path = os.path.join(build_dir, "swift-"+args.host_target, 'bin')
+        build_script_impl_args += [
+            "--native-llvm-tools-path=" + llvm_path,
+            "--native-clang-tools-path=" + llvm_path,
+            "--native-swift-tools-path=" + swift_path,
+            "--skip-build-cmark=1",
+            "--skip-build-llvm=1",
+            "--skip-build-osx=1", # FIXME only if host is osx
+            "--build-swift-tools=0"
+            ]
+
+        for target in args.cross_compile_stdlib_targets:
+            check_call(build_script_impl_args +
+                    ["--cross-compile-deployment-targets=" + target])
 
     if args.symbols_package:
         print('--- Creating symbols package ---')
