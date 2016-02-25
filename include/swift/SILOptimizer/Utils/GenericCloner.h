@@ -23,7 +23,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/Generics.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include <functional>
@@ -31,32 +30,30 @@
 namespace swift {
 
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
-  const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
 
 public:
   friend class SILCloner<GenericCloner>;
 
   GenericCloner(SILFunction *F,
-                const ReabstractionInfo &ReInfo,
+                TypeSubstitutionMap &InterfaceSubs,
                 TypeSubstitutionMap &ContextSubs,
                 StringRef NewName,
                 ArrayRef<Substitution> ApplySubs,
                 CloneCollector::CallbackType Callback)
-  : TypeSubstCloner(*initCloned(F, ReInfo, NewName), *F, ContextSubs,
-                    ApplySubs), ReInfo(ReInfo), Callback(Callback) {
+  : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
+                    ApplySubs), Callback(Callback) {
     assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
   /// Clone and remap the types in \p F according to the substitution
-  /// list in \p Subs. Parameters are re-abstracted (changed from indirect to
-  /// direct) according to \p ReInfo.
+  /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F,
-                                    const ReabstractionInfo &ReInfo,
+                                    TypeSubstitutionMap &InterfaceSubs,
                                     TypeSubstitutionMap &ContextSubs,
                                     StringRef NewName, ApplySite Caller,
                             CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
-    GenericCloner SC(F, ReInfo, ContextSubs, NewName,
+    GenericCloner SC(F, InterfaceSubs, ContextSubs, NewName,
                      Caller.getSubstitutions(), Callback);
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
@@ -80,7 +77,7 @@ protected:
 
 private:
   static SILFunction *initCloned(SILFunction *Orig,
-                                 const ReabstractionInfo &ReInfo,
+                                 TypeSubstitutionMap &InterfaceSubs,
                                  StringRef NewName);
   /// Clone the body of the function into the empty function that was created
   /// by initCloned.
