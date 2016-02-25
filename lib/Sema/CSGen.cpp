@@ -75,9 +75,9 @@ namespace {
   /// Internal struct for tracking information about types within a series
   /// of "linked" expressions. (Such as a chain of binary operator invocations.)
   struct LinkedTypeInfo {
-    uint haveIntLiteral : 1;
-    uint haveFloatLiteral : 1;
-    uint haveStringLiteral : 1;
+    unsigned int haveIntLiteral : 1;
+    unsigned int haveFloatLiteral : 1;
+    unsigned int haveStringLiteral : 1;
     
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
 
