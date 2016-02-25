@@ -507,9 +507,9 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
   // If the outstanding weak retain count is 1 (i.e. only the initial
   // weak retain), we can immediately call swift_slowDealloc.  This is
   // useful both as a way to eliminate an unnecessary atomic
-  // operation, and as a way to avoid calling swift_weakRelease on an
+  // operation, and as a way to avoid calling swift_unownedRelease on an
   // object that might be a class object, which simplifies the logic
-  // required in swift_weakRelease for determining the size of the
+  // required in swift_unownedRelease for determining the size of the
   // object.
   //
   // If we see that there is an outstanding weak retain of the object,
@@ -564,7 +564,7 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
   // Note that it is okay for there to be a race involving a weak
   // *release* which happens after the strong reference count drops to
   // 0.  However, this is harmless: if our load fails to see the
-  // release, we will fall back on swift_weakRelease, which does an
+  // release, we will fall back on swift_unownedRelease, which does an
   // atomic decrement (and has the ability to reconstruct
   // allocatedSize and allocatedAlignMask).
   if (object->weakRefCount.getCount() == 1) {
