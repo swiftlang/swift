@@ -30,7 +30,7 @@ public enum UnicodeDecodingResult {
 
   /// Returns `true` if `self` indicates no more unicode scalars are
   /// available.
-  @swift3_migration(renamedToProperty="isEmptyInput")
+  @swift3_migration(message="use 'x == .emptyInput' instead")
   @warn_unused_result
   public func isEmptyInput() -> Bool {
     switch self {
