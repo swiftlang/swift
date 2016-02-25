@@ -41,7 +41,7 @@ extension String {
     }
 
     @warn_unused_result
-    func _toInternalIndex(i: Int) -> Int {
+    func _internalIndex(at i: Int) -> Int {
       return _core.startIndex + _offset + i
     }
 
@@ -54,7 +54,7 @@ extension String {
       _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
-      let index = _toInternalIndex(position)
+      let index = _internalIndex(at: position)
       let u = _core[index]
       if _fastPath((u >> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
@@ -106,7 +106,7 @@ extension String {
     public subscript(bounds: Range<Index>) -> UTF16View {
       return UTF16View(
         _core,
-        offset: _toInternalIndex(bounds.startIndex._offset),
+        offset: _internalIndex(at: bounds.startIndex._offset),
         length: bounds.endIndex._offset - bounds.startIndex._offset)
     }
 
@@ -123,8 +123,8 @@ extension String {
     }
 
     public var description: String {
-      let start = _toInternalIndex(0)
-      let end = _toInternalIndex(_length)
+      let start = _internalIndex(at: 0)
+      let end = _internalIndex(at: _length)
       return String(_core[start..<end])
     }
 
