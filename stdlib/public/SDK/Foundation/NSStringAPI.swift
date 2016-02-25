@@ -1113,8 +1113,8 @@ extension String {
   /// Returns the maximum number of bytes needed to store the
   /// `String` in a given encoding.
   @warn_unused_result
-  public
   @swift3_migration(renamed="maximumLengthOfBytes(usingEncoding:)")
+  public
   func maximumLengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
     return _ns.maximumLengthOfBytesUsingEncoding(encoding)
   }
