@@ -113,8 +113,7 @@ func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) ->
 // CHECK3-NEXT: s:vF11cursor_info3gooFSiT_L_1xSi{{$}}
 // CHECK3-NEXT: Int{{$}}
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
-// CHECK3-NEXT: <decl.var.parameter>let <decl.name>x</decl.name>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
-// FIXME: decl.name should be decl.var.parameter.name.local
+// CHECK3-NEXT: <decl.var.parameter>let <decl.var.parameter.name.local>x</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:18 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK4 %s
 // CHECK4:      source.lang.swift.ref.var.global ({{.*}}Foo.framework/Headers/Foo.h:62:12-62:21)
@@ -172,14 +171,12 @@ func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) ->
 // RUN: %sourcekitd-test -req=cursor -pos=26:20 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK11 %s
 // CHECK11: source.lang.swift.decl.var.parameter (26:19-26:23)
 // CHECK11: <Declaration>let arg1: <Type usr="s:Si">Int</Type></Declaration>
-// CHECK11: <decl.var.parameter>let <decl.name>arg1</decl.name>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
-// FIXME: decl.name should be decl.var.parameter.name.local
+// CHECK11: <decl.var.parameter>let <decl.var.parameter.name.local>arg1</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=28:24 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK12 %s
 // CHECK12: source.lang.swift.decl.var.parameter (28:23-28:27)
 // CHECK12: <Declaration>var arg1: <Type usr="s:Si">Int</Type></Declaration>
-// CHECK12: <decl.var.parameter>var <decl.name>arg1</decl.name>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
-// FIXME: decl.name should be decl.var.parameter.name.local
+// CHECK12: <decl.var.parameter>var <decl.var.parameter.name.local>arg1</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)

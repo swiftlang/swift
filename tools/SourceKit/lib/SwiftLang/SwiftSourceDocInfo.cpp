@@ -76,6 +76,17 @@ static StringRef getTagForPrintNameContext(PrintNameContext context) {
   }
 }
 
+static StringRef getDeclNameTagForDecl(const Decl *D) {
+  switch (D->getKind()) {
+  case DeclKind::Param:
+    // When we're examining the parameter itself, it is the local name that is
+    // the name of the variable.
+    return LocalParamNameTag;
+  default:
+    return "decl.name";
+  }
+}
+
 /// An ASTPrinter for annotating declarations with XML tags that describe the
 /// key substructure of the declaration for CursorInfo/DocInfo.
 ///
@@ -117,10 +128,10 @@ private:
   }
 
   void printDeclLoc(const Decl *D) override {
-    openTag("decl.name");
+    openTag(getDeclNameTagForDecl(D));
   }
   void printDeclNameEndLoc(const Decl *D) override {
-    closeTag("decl.name");
+    closeTag(getDeclNameTagForDecl(D));
   }
 
   void printTypePre(const TypeLoc &TL) override {
