@@ -92,34 +92,6 @@ extension BidirectionalIndex {
   public mutating func _predecessorInPlace() { // DONE: swift-3-indexing-model - replicated
     self = self.predecessor()
   }
-
-  @warn_unused_result
-  public func advanced(by n: Distance) -> Self { // DONE: swift-3-indexing-model - replicated
-    if n >= 0 {
-      fatalError("removed _advanceForward")
-    }
-    var p = self
-    var i: Distance = n
-    while i != 0 {
-      p._predecessorInPlace()
-      i._successorInPlace()
-    }
-    return p
-  }
-
-  @warn_unused_result
-  public func advanced(by n: Distance, limit: Self) -> Self { // DONE: swift-3-indexing-model - replicated
-    if n >= 0 {
-      fatalError("removed _advanceForward")
-    }
-    var p = self
-    var i: Distance = n
-    while i != 0 && p != limit {
-      p._predecessorInPlace()
-      i._successorInPlace()
-    }
-    return p
-  }
 }
 
 //===----------------------------------------------------------------------===//

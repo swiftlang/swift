@@ -308,24 +308,24 @@ extension RangeReplaceableCollection {
 
 extension RangeReplaceableCollection
   where
-  Index : BidirectionalIndex,
+  Self : BidirectionalCollection,
   SubSequence == Self {
 
   @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     let element = last!
-    self = self[startIndex..<endIndex.predecessor()]
+    self = self[startIndex..<previous(endIndex)]
     return element
   }
 
   @warn_unused_result
   public mutating func _customRemoveLast(n: Int) -> Bool {
-    self = self[startIndex..<endIndex.advanced(by: numericCast(-n))]
+    self = self[startIndex..<advance(endIndex, by: numericCast(-n))]
     return true
   }
 }
 
-extension RangeReplaceableCollection where Index : BidirectionalIndex {
+extension RangeReplaceableCollection where Self : BidirectionalCollection {
   /// Remove an element from the end.
   ///
   /// - Complexity: O(1)
@@ -335,7 +335,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
     if let result = _customRemoveLast() {
       return result
     }
-    return remove(at: endIndex.predecessor())
+    return remove(at: previous(endIndex))
   }
 
   /// Remove the last `n` elements.
@@ -351,7 +351,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
       return
     }
     let end = endIndex
-    removeSubrange(end.advanced(by: numericCast(-n))..<end)
+    removeSubrange(advance(end, by: numericCast(-n))..<end)
   }
 }
 
