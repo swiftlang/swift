@@ -270,8 +270,8 @@ extension String {
   public init?(_ utf8: UTF8View) {
     let wholeString = String(utf8._core)
 
-    if let start = utf8.startIndex.samePositionIn(wholeString),
-       let end = utf8.endIndex.samePositionIn(wholeString) {
+    if let start = utf8.startIndex.samePosition(in: wholeString),
+       let end = utf8.endIndex.samePosition(in: wholeString) {
       self = wholeString[start..<end]
       return
     }
@@ -379,8 +379,8 @@ extension String.UTF8View.Index {
   ///
   /// - Precondition: `self` is an element of `String(utf16)!.utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -391,8 +391,8 @@ extension String.UTF8View.Index {
   /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
@@ -402,8 +402,8 @@ extension String.UTF8View.Index {
   ///
   /// - Precondition: `self` is an element of `characters.utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    characters: String
+  public func samePosition(
+    in characters: String
   ) -> String.Index? {
     return String.Index(self, within: characters)
   }

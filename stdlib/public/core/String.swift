@@ -923,9 +923,9 @@ extension String.Index {
     _ utf16Index: String.UTF16Index,
     within characters: String
   ) {
-    if let me = utf16Index.samePositionIn(
-      characters.unicodeScalars
-    )?.samePositionIn(characters) {
+    if let me = utf16Index.samePosition(
+      in: characters.unicodeScalars
+    )?.samePosition(in: characters) {
       self = me
     }
     else {
@@ -942,9 +942,9 @@ extension String.Index {
     _ utf8Index: String.UTF8Index,
     within characters: String
   ) {
-    if let me = utf8Index.samePositionIn(
-      characters.unicodeScalars
-    )?.samePositionIn(characters) {
+    if let me = utf8Index.samePosition(
+      in: characters.unicodeScalars
+    )?.samePosition(in: characters) {
       self = me
     }
     else {
@@ -957,8 +957,8 @@ extension String.Index {
   ///
   /// - Precondition: `self` is an element of `String(utf8).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf8: String.UTF8View
+  public func samePosition(
+    in utf8: String.UTF8View
   ) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -968,8 +968,8 @@ extension String.Index {
   ///
   /// - Precondition: `self` is an element of `String(utf16).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -979,8 +979,8 @@ extension String.Index {
   ///
   /// - Precondition: `self` is an element of `String(unicodeScalars).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {
     return String.UnicodeScalarView.Index(self, within: unicodeScalars)
   }

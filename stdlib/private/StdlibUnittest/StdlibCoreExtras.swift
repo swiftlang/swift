@@ -48,7 +48,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     while true {
       if needleIndex == needle.endIndex {
         // if we hit the end of the search string, we found the needle
-        return matchStartIndex.samePositionIn(string)
+        return matchStartIndex.samePosition(in: string)
       }
       if matchIndex == haystack.endIndex {
         // if we hit the end of the string before finding the end of the needle,

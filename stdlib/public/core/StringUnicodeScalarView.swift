@@ -357,7 +357,7 @@ extension String.UnicodeScalarIndex {
   ///
   /// - Precondition: `self` is an element of `String(utf8)!.indices`.
   @warn_unused_result
-  public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
+  public func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
 
@@ -366,8 +366,8 @@ extension String.UnicodeScalarIndex {
   ///
   /// - Precondition: `self` is an element of `String(utf16)!.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -378,7 +378,7 @@ extension String.UnicodeScalarIndex {
   /// - Precondition: `self` is an element of
   ///   `characters.unicodeScalars.indices`.
   @warn_unused_result
-  public func samePositionIn(characters: String) -> String.Index? {
+  public func samePosition(in characters: String) -> String.Index? {
     return String.Index(self, within: characters)
   }
 
