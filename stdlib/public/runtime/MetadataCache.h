@@ -338,7 +338,7 @@ public:
                ValueTy::getName(), (void*) this, value);
 #endif
 
-    // Acquire the lock, set the value, and nofify any waiters.
+    // Acquire the lock, set the value, and notify any waiters.
     {
       auto concurrency = Concurrency.get();
       std::unique_lock<std::mutex> guard(concurrency->Lock);
