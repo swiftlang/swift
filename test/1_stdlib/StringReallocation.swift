@@ -19,7 +19,7 @@ func testReallocation() {
         
         // To avoid dumping a vast string here, just write the first
         // part of the story out each time there's a reallocation.
-        var intro = story._split(":")[0]
+        var intro = story._split(separator: ":")[0]
         print("reallocation \(reallocations), with intro \(intro)")
         
         if reallocations >= 30 {
