@@ -122,7 +122,7 @@ public struct StaticString
         buffer = buffer | (UInt64($0) << (UInt64(i) * 8))
         i += 1
       }
-      UTF8.encode(unicodeScalar, output: sink)
+      UTF8.encode(unicodeScalar, sendingOutputTo: sink)
       return body(UnsafeBufferPointer(
         start: UnsafePointer(Builtin.addressof(&buffer)),
         count: i))

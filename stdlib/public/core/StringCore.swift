@@ -336,17 +336,19 @@ public struct _StringCore {
           start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
           count: count
         ) {
-          Encoding.encode(UnicodeScalar(UInt32(x)), output: output)
+          Encoding.encode(UnicodeScalar(UInt32(x)), sendingOutputTo: output)
         }
       }
       else {
-        let hadError = transcode(UTF16.self, encoding,
+        let hadError = transcode(
           UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
             count: count
           ).makeIterator(),
-          output,
-          stoppingOnError: true
+          from: UTF16.self,
+          to: encoding,
+          stoppingOnError: true,
+          sendingOutputTo: output
         )
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
       }
