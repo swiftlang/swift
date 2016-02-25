@@ -1357,7 +1357,7 @@ function(add_swift_library name)
 
   is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
   if(NOT optimized)
-    # All Swift code depends on the SwiftOnoneSupport in non-optmized mode,
+    # All Swift code depends on the SwiftOnoneSupport in non-optimized mode,
     # except for the standard library itself.
     if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
       list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
