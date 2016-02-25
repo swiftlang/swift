@@ -3607,6 +3607,9 @@ class DeclGroupNameContext {
     GroupNameCollectorFromJson(StringRef RecordPath) :
       GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath) {}
     StringRef getGroupNameInternal(const ValueDecl *VD) override {
+      // We need the file path, so there has to be a location.
+      if (VD->getLoc().isInvalid())
+        return NullGroupName;
       auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
       if (!PathOp.hasValue())
         return NullGroupName;
@@ -3646,6 +3649,10 @@ public:
       ViewBuffer.push_back(It->first);
     }
     return llvm::makeArrayRef(ViewBuffer);
+  }
+
+  bool isEnable() {
+    return pNameCollector->Enable;
   }
 };
 
@@ -3691,7 +3698,7 @@ static void writeDeclCommentTable(
 
       // Skip the decl if it does not have a comment.
       RawComment Raw = VD->getRawComment();
-      if (Raw.Comments.empty())
+      if (Raw.Comments.empty() && !GroupContext.isEnable())
         return true;
 
       // Compute USR.

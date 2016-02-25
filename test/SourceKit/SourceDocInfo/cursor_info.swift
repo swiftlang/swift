@@ -100,6 +100,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK2-NEXT: s:ZFsoi1pFTSiSi_Si
 // CHECK2-NEXT: (Int, Int) -> Int{{$}}
 // CHECK2-NEXT: Swift{{$}}
+// CHECK2-NEXT: <Group>Math</Group>
 // CHECK2-NEXT: SYSTEM
 // CHECK2-NEXT: <Declaration>func +(lhs: <Type usr="s:Si">Int</Type>, rhs: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK2-NEXT: <decl.function.operator.infix>func <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>lhs</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.local>rhs</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.function.operator.infix>
