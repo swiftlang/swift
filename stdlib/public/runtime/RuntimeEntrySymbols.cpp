@@ -46,7 +46,7 @@ typedef void (*RuntimeEntry)();
 // Define a global symbol referring to this implementation.
 
 #define DEFINE_SYMBOL(SymbolName, Name, CC)                                    \
-  SWIFT_RT_ENTRY_VISIBILITY extern "C" void Name()                             \
+  SWIFT_RT_ENTRY_IMPL_VISIBILITY extern "C" void Name()                        \
       SWIFT_CC(CC);                                                            \
   SWIFT_RUNTIME_EXPORT extern "C" RuntimeEntry SymbolName =                    \
       reinterpret_cast<RuntimeEntry>(Name);
