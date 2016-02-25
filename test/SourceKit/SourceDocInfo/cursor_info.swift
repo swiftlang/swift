@@ -85,6 +85,8 @@ enum E1<T, U where T == U> {}
 
 func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: Int, external4 _: Int, _: Int) {}
 
+func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) -> Int) -> Int) { return closure }
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -103,7 +105,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK2-NEXT: <Group>Math</Group>
 // CHECK2-NEXT: SYSTEM
 // CHECK2-NEXT: <Declaration>func +(lhs: <Type usr="s:Si">Int</Type>, rhs: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type></Declaration>
-// CHECK2-NEXT: <decl.function.operator.infix>func <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>lhs</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.local>rhs</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.function.operator.infix>
+// CHECK2-NEXT: <decl.function.operator.infix>func <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>lhs</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.local>rhs</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.operator.infix>
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:12 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK3 %s
 // CHECK3:      source.lang.swift.ref.var.local (8:10-8:11)
@@ -137,7 +139,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK6-NEXT: () -> Int
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
-// CHECK6-NEXT: <decl.function.free>func <decl.name>fooSwiftFunc</decl.name>() -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.function.free>
+// CHECK6-NEXT: <decl.function.free>func <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
 // CHECK6-NEXT: {{^}}<Function><Name>fooSwiftFunc()</Name><USR>s:F14FooSwiftModule12fooSwiftFuncFT_Si</USR><Declaration>func fooSwiftFunc() -&gt; Int</Declaration><Abstract><Para>This is &apos;fooSwiftFunc&apos; from &apos;FooSwiftModule&apos;.</Para></Abstract></Function>{{$}}
 
 // RUN: %sourcekitd-test -req=cursor -pos=14:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK7 %s
@@ -155,7 +157,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK8-NEXT: s:FC11cursor_info2CCcFT1xSi_S0_
 // CHECK8-NEXT: CC.Type -> (x: Int) -> CC
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK8-NEXT: <decl.function.constructor>convenience <decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>)</decl.function.constructor>
+// CHECK8-NEXT: <decl.function.constructor>convenience <decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
 // RUN: %sourcekitd-test -req=cursor -pos=23:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK9 %s
 // CHECK9:      source.lang.swift.decl.var.global (23:5-23:15)
@@ -182,7 +184,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)
 // CHECK13: <Declaration>func testDefaultParam(arg1: <Type usr="s:Si">Int</Type> = default)</Declaration>
-// CHECK13: <decl.function.free>func <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>arg1</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct> = default</decl.var.parameter>)</decl.function.free>
+// CHECK13: <decl.function.free>func <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>arg1</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type> = default</decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=34:4 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK14 %s
 // CHECK14: source.lang.swift.ref.function.free ({{.*}}Foo.framework/Frameworks/FooSub.framework/Headers/FooSub.h:4:5-4:16)
@@ -194,7 +196,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK15: source.lang.swift.decl.function.free (38:6-38:40)
 // CHECK15: myFunc
 // CHECK15: <Declaration>func myFunc(arg1: <Type usr="s:SS">String</Type>, options: <Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK15: <decl.function.free>func <decl.name>myFunc</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>arg1</decl.var.parameter.name.local>: <ref.struct usr="s:SS">String</ref.struct></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>options</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>)</decl.function.free>
+// CHECK15: <decl.function.free>func <decl.name>myFunc</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>arg1</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:SS">String</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>options</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 // CHECK15: RELATED BEGIN
 // CHECK15-NEXT: <RelatedName usr="s:F11cursor_info6myFuncFSST_">myFunc(_:)</RelatedName>
 // CHECK15-NEXT: RELATED END
@@ -249,11 +251,13 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK27 %s
 // CHECK27: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK27: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
+// CHECK27: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
+// FIXME: returntype
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK28 %s
 // CHECK28: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK28: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
+// CHECK28: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
+// FIXME: returntype
 
 // RUN: %sourcekitd-test -req=cursor -pos=74:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK29
 // CHECK29: source.lang.swift.decl.function.destructor (74:3-74:9)
@@ -269,7 +273,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK30-NEXT: s:FC11cursor_info2C3cFT1xSi_GSQS0__
 // CHECK30-NEXT: C3.Type -> (x: Int) -> C3!
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK30-NEXT: <decl.function.constructor><decl.name>init</decl.name>!(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>)</decl.function.constructor>
+// CHECK30-NEXT: <decl.function.constructor><decl.name>init</decl.name>!(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
 // RUN: %sourcekitd-test -req=cursor -pos=76:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK31
 // CHECK31: source.lang.swift.decl.function.constructor (76:3-76:16)
@@ -277,7 +281,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK31-NEXT: s:FC11cursor_info2C3cFT1ySi_GSqS0__
 // CHECK31-NEXT: C3.Type -> (y: Int) -> C3?
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK31-NEXT: <decl.function.constructor><decl.name>init</decl.name>?(<decl.var.parameter><decl.var.parameter.name.external>y</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>)</decl.function.constructor>
+// CHECK31-NEXT: <decl.function.constructor><decl.name>init</decl.name>?(<decl.var.parameter><decl.var.parameter.name.external>y</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
 // RUN: %sourcekitd-test -req=cursor -pos=77:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK32
 // CHECK32: source.lang.swift.decl.function.constructor (77:3-77:15)
@@ -285,7 +289,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK32-NEXT: s:FC11cursor_info2C3cFzT1zSi_S0_
 // CHECK32-NEXT: C3.Type -> (z: Int) throws -> C3
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
-// CHECK32-NEXT: <decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>z</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>) throws</decl.function.constructor>
+// CHECK32-NEXT: <decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>z</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) throws</decl.function.constructor>
 
 // RUN: %sourcekitd-test -req=cursor -pos=80:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK33
 // CHECK33: source.lang.swift.decl.struct (80:8-80:10)
@@ -301,7 +305,7 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK34-NEXT: s:FV11cursor_info2S23foou0_rFFT_T_FT_T_
 // CHECK34-NEXT: <T, U> (S2<T, U>) -> <V, W> (() -> ()) -> () -> ()
 // CHECK34-NEXT: <Declaration>func foo&lt;V, W&gt;(closure: () -&gt; ()) -&gt; () -&gt; ()</Declaration>
-// CHECK34-NEXT: <decl.function.method.instance>func <decl.name>foo</decl.name>&lt;V, W&gt;(<decl.var.parameter><decl.var.parameter.name.local>closure</decl.var.parameter.name.local>: () -&gt; ()</decl.var.parameter>) -&gt; () -&gt; ()</decl.function.method.instance>
+// CHECK34-NEXT: <decl.function.method.instance>func <decl.name>foo</decl.name>&lt;V, W&gt;(<decl.var.parameter><decl.var.parameter.name.local>closure</decl.var.parameter.name.local>: <decl.var.parameter.type>() -&gt; ()</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; ()</decl.function.returntype></decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=83:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK35
 // CHECK35: source.lang.swift.decl.class (83:7-83:9)
@@ -325,4 +329,8 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 // CHECK37-NEXT: s:F11cursor_info18nonDefaultArgNamesFT9external1SiSi9external3Si9external4SiSi_T_
 // CHECK37-NEXT: (external1: Int, Int, external3: Int, external4: Int, Int) -> ()
 // CHECK37-NEXT: <Declaration>func nonDefaultArgNames(external1 local1: <Type usr="s:Si">Int</Type>, _ local2: <Type usr="s:Si">Int</Type>, external3 local3: <Type usr="s:Si">Int</Type>, external4 _: <Type usr="s:Si">Int</Type>, _: <Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK37-NEXT: <decl.function.free>func <decl.name>nonDefaultArgNames</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>external1</decl.var.parameter.name.external> <decl.var.parameter.name.local>local1</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>local2</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>external3</decl.var.parameter.name.external> <decl.var.parameter.name.local>local3</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>external4</decl.var.parameter.name.external> <decl.var.parameter.name.local>_</decl.var.parameter.name.local>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>)</decl.function.free>
+// CHECK37-NEXT: <decl.function.free>func <decl.name>nonDefaultArgNames</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>external1</decl.var.parameter.name.external> <decl.var.parameter.name.local>local1</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>local2</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>external3</decl.var.parameter.name.external> <decl.var.parameter.name.local>local3</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>external4</decl.var.parameter.name.external> <decl.var.parameter.name.local>_</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+
+// RUN: %sourcekitd-test -req=cursor -pos=88:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK38
+// CHECK38: <decl.function.free>func <decl.name>nestedFunctionType</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>closure</decl.var.parameter.name.local>: <decl.var.parameter.type>(y: (z: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>(<decl.var.parameter.name.external>y</decl.var.parameter.name.external>: (<decl.var.parameter.name.external>z</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
+// FIXME: inconsistent use of parameter inside type

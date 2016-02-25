@@ -103,10 +103,17 @@ private:
   // MARK: The ASTPrinter callback interface.
 
   void printDeclPre(const Decl *D) override {
+    DeclStack.emplace_back(D);
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
   void printDeclPost(const Decl *D) override {
+    assert(DeclStack.back() == D && "unmatched printDeclPre");
+    DeclStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
+  }
+  void avoidPrintDeclPost(const Decl *D) override {
+    assert(DeclStack.back() == D && "unmatched printDeclPre");
+    DeclStack.pop_back();
   }
 
   void printDeclLoc(const Decl *D) override {
@@ -114,6 +121,17 @@ private:
   }
   void printDeclNameEndLoc(const Decl *D) override {
     closeTag("decl.name");
+  }
+
+  void printTypePre(const TypeLoc &TL) override {
+    auto tag = getTypeTagForCurrentDecl();
+    if (!tag.empty())
+      openTag(tag);
+  }
+  void printTypePost(const TypeLoc &TL) override {
+    auto tag = getTypeTagForCurrentDecl();
+    if (!tag.empty())
+      closeTag(tag);
   }
 
   void printNamePre(PrintNameContext context) override {
@@ -140,6 +158,31 @@ private:
 
   void openTag(StringRef tag) { OS << "<" << tag << ">"; }
   void closeTag(StringRef tag) { OS << "</" << tag << ">"; }
+
+  // MARK: Misc.
+
+  StringRef getTypeTagForCurrentDecl() const {
+    if (const Decl *D = currentDecl()) {
+      switch (D->getKind()) {
+      case DeclKind::Param:
+        return "decl.var.parameter.type";
+      case DeclKind::Func:
+        return "decl.function.returntype";
+      default:
+        break;
+      }
+    }
+    return "";
+  }
+
+  const Decl *currentDecl() const {
+    return DeclStack.empty() ? nullptr : DeclStack.back();
+  }
+
+private:
+  /// A stack of declarations being printed, used to determine the context for
+  /// other ASTPrinter callbacks.
+  llvm::SmallVector<const Decl *, 3> DeclStack;
 };
 
 static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {

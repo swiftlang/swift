@@ -600,11 +600,17 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printTypeLoc(const TypeLoc &TL) {
     if (Options.TransformContext && TL.getType()) {
       if (auto RT = Options.TransformContext->transform(TL.getType())) {
+        Printer.printTypePre(TypeLoc::withoutLoc(RT));
         PrintOptions FreshOptions;
         RT.print(Printer, FreshOptions);
+        Printer.printTypePost(TypeLoc::withoutLoc(RT));
         return;
       }
     }
+
+    Printer.printTypePre(TL);
+    defer { Printer.printTypePost(TL); };
+
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
     if ((Options.PreferTypeRepr && TL.hasLocation()) ||
@@ -2113,12 +2119,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Type ResultTy = decl->getResultType();
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
-        if (Options.TransformContext) {
-          ResultTy = Options.TransformContext->transform(ResultTy);
-          PrintOptions FreshOptions;
-          ResultTy->print(Printer, FreshOptions);
-        } else
-          ResultTy->print(Printer, Options);
+        // Use the non-repr external type, but reuse the TypeLoc printing code.
+        printTypeLoc(TypeLoc::withoutLoc(ResultTy));
       }
     }
 

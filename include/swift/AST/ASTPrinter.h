@@ -24,6 +24,7 @@ namespace swift {
   class ModuleEntity;
   class TypeDecl;
   class Type;
+  struct TypeLoc;
   class Pattern;
   class ExtensionDecl;
   class NominalTypeDecl;
@@ -73,7 +74,13 @@ public:
   /// Called after finishing printing of a declaration.
   virtual void printDeclPost(const Decl *D) {}
 
-  /// Called when printing the referenced name of a type declaration.
+  /// Called before printing a type.
+  virtual void printTypePre(const TypeLoc &TL) {}
+  /// Called after printing a type.
+  virtual void printTypePost(const TypeLoc &TL) {}
+
+  /// Called when printing the referenced name of a type declaration, possibly
+  /// from deep inside another type.
   virtual void printTypeRef(const TypeDecl *TD, Identifier Name);
 
   /// Called when printing the referenced name of a module.
