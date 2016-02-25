@@ -558,7 +558,7 @@ struct MonoStruct {
     return 0
   }
 
-  static var zang = UnicodeScalar()
+  static var zang = UnicodeScalar("\0")
 
   static var zung: UInt16 {
     get {

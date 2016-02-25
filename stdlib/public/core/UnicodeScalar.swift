@@ -33,11 +33,6 @@ public struct UnicodeScalar :
     self = value
   }
 
-  /// Creates an instance of the NUL scalar value.
-  public init() {
-    self._value = 0
-  }
-
   /// Create an instance with numeric value `v`.
   ///
   /// - Precondition: `v` is a valid Unicode scalar value.
@@ -323,5 +318,13 @@ public // SPI(SwiftExperimental)
 func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
+}
+
+extension UnicodeScalar {
+  /// Creates an instance of the NUL scalar value.
+  @available(*, unavailable, message="use the 'UnicodeScalar(\"\\0\")'")
+  public init() {
+    fatalError("unavailable function can't be called")
+  }
 }
 
