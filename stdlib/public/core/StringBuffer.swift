@@ -93,8 +93,10 @@ public struct _StringBuffer {
   ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
-    guard let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
-        repairIllFormedSequences: repairIllFormedSequences) else {
+    guard let (utf16Count, isAscii) = UTF16.transcodedLength(
+        of: inputStream,
+        decodedAs: encoding,
+        repairingIllFormedSequences: repairIllFormedSequences) else {
       return (nil, true)
     }
 

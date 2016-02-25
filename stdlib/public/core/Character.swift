@@ -199,9 +199,10 @@ public struct Character :
 
   struct _SmallUTF16 : Collection {
     init(_ u8: UInt64) {
-      let count = UTF16.measure(
-        UTF8.self, input: _SmallUTF8(u8).makeIterator(),
-        repairIllFormedSequences: true)!.0
+      let count = UTF16.transcodedLength(
+        of: _SmallUTF8(u8).makeIterator(),
+        decodedAs: UTF8.self,
+        repairingIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
       var u16: UInt64 = 0

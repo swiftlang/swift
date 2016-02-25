@@ -931,12 +931,14 @@ extension UTF16 {
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
   @warn_unused_result
-  public static func measure<
-      Encoding : UnicodeCodec, Input : IteratorProtocol
-      where Encoding.CodeUnit == Input.Element
+  public static func transcodedLength<
+    Encoding : UnicodeCodec, Input : IteratorProtocol
+    where Encoding.CodeUnit == Input.Element
   >(
-    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-  ) -> (Int, Bool)? {
+    of input: Input,
+    decodedAs sourceEncoding: Encoding.Type,
+    repairingIllFormedSequences: Bool
+  ) -> (count: Int, isASCII: Bool)? {
     var input = input
     var count = 0
     var isAscii = true
@@ -953,7 +955,7 @@ extension UTF16 {
       case .emptyInput:
         break loop
       case .error:
-        if !repairIllFormedSequences {
+        if !repairingIllFormedSequences {
           return nil
         }
         isAscii = false
@@ -979,5 +981,17 @@ public func transcode<
   stoppingOnError stopOnError: Bool
 ) -> Bool {
   fatalError("unavailable function can't be called")
+}
+
+extension UTF16 {
+  @available(*, unavailable, message="use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
+  public static func measure<
+    Encoding : UnicodeCodec, Input : IteratorProtocol
+    where Encoding.CodeUnit == Input.Element
+  >(
+    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
+  ) -> (Int, Bool)? {
+    fatalError("unavailable function can't be called")
+  }
 }
 

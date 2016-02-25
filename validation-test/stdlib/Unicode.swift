@@ -1904,11 +1904,13 @@ UTF8Decoder.test("Noncharacters") {
 
 var UTF16Decoder = TestSuite("UTF16Decoder")
 
-UTF16Decoder.test("measure") {
+UTF16Decoder.test("UTF16.transcodedLength") {
   do {
     var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
-    let (count, isASCII) = UTF16.measure(
-      UTF8.self, input: u8.makeIterator(), repairIllFormedSequences: false)!
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u8.makeIterator(),
+      decodedAs: UTF8.self,
+      repairingIllFormedSequences: false)!
     expectEqual(6, count)
     expectTrue(isASCII)
   }
@@ -1916,16 +1918,20 @@ UTF16Decoder.test("measure") {
   do {
     // "€" == U+20AC.
     var u8: [UTF8.CodeUnit] = [ 0xF0, 0xA4, 0xAD, 0xA2 ]
-    let (count, isASCII) = UTF16.measure(
-      UTF8.self, input: u8.makeIterator(), repairIllFormedSequences: false)!
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u8.makeIterator(),
+      decodedAs: UTF8.self,
+      repairingIllFormedSequences: false)!
     expectEqual(2, count)
     expectFalse(isASCII)
   }
 
   do {
     let u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
-    let (count, isASCII) = UTF16.measure(
-      UTF16.self, input: u16.makeIterator(), repairIllFormedSequences: false)!
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u16.makeIterator(),
+      decodedAs: UTF16.self,
+      repairingIllFormedSequences: false)!
     expectEqual(6, count)
     expectTrue(isASCII)
   }
