@@ -67,8 +67,8 @@ func evaluateLazy() -> Int {
 }
 
 class Foo {
-  var [delayedImmutable] x: Int
-  var [lazy] y = evaluateLazy()
+  var x: Int __behavior delayedImmutable
+  var y = evaluateLazy() __behavior lazy
 }
 
 var DelayedImmutable = TestSuite("DelayedImmutable")

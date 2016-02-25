@@ -126,6 +126,7 @@ KEYWORD(__LINE__)
 KEYWORD(__COLUMN__)
 KEYWORD(__FUNCTION__)
 KEYWORD(__DSO_HANDLE__)
+KEYWORD(__behavior)
 
 // Pattern keywords.
 KEYWORD(_)

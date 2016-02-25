@@ -3801,10 +3801,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
 
-  bool HasBehavior = false;
-  SourceLoc BehaviorLBracket, BehaviorRBracket;
-  TypeRepr *BehaviorType;
-
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
   defer {
@@ -3849,27 +3845,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
   };
   
-  // Check for a behavior declaration.
-  if (Context.LangOpts.EnableExperimentalPropertyBehaviors
-      && Tok.is(tok::l_square)) {
-    BehaviorLBracket = consumeToken(tok::l_square);
-    // TODO: parse visibility (public/private/internal)
-    auto type = parseType(diag::expected_behavior_name,
-                          /*handle completion*/ true);
-    // TODO: recovery. could scan to next closing bracket
-    if (type.isParseError())
-      return makeParserError();
-    if (type.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    BehaviorType = type.get();
-    if (!Tok.is(tok::r_square)) {
-      diagnose(Tok.getLoc(), diag::expected_rsquare_after_behavior_name);
-      return makeParserError();
-    }
-    BehaviorRBracket = consumeToken(tok::r_square);
-    HasBehavior = true;
-  }
-
   do {
     Pattern *pattern;
     {
@@ -3889,8 +3864,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
-      if (HasBehavior)
-        VD->addBehavior(BehaviorLBracket, BehaviorType, BehaviorRBracket);
       VD->getAttrs() = Attributes;
       Decls.push_back(VD);
     });
@@ -3976,9 +3949,22 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         return makeParserError();
     }
     
+    // Parse a behavior block if present.
+    if (consumeIf(tok::kw___behavior)) {
+      auto type = parseType(diag::expected_behavior_name,
+                            /*handle completion*/ true);
+      // TODO: recovery. could scan to next closing bracket
+      if (type.isParseError())
+        return makeParserError();
+      if (type.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+
+      pattern->forEachVariable([&](VarDecl *VD) {
+        VD->addBehavior(type.get(), nullptr);
+      });
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
-    if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
+    } else if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
       HasAccessors = true;
       
       if (auto *boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc,

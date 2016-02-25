@@ -2732,13 +2732,12 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   }
 }
 
-void AbstractStorageDecl::addBehavior(SourceLoc LBracketLoc,
-                                      TypeRepr *Type,
-                                      SourceLoc RBracketLoc) {
+void AbstractStorageDecl::addBehavior(TypeRepr *Type,
+                                      FuncDecl *Param) {
   assert(BehaviorInfo.getPointer() == nullptr && "already set behavior!");
   auto mem = getASTContext().Allocate(sizeof(BehaviorRecord),
                                       alignof(BehaviorRecord));
-  auto behavior = new (mem) BehaviorRecord{LBracketLoc, Type, RBracketLoc};
+  auto behavior = new (mem) BehaviorRecord{Type, Param};
   BehaviorInfo.setPointer(behavior);
 }
 
