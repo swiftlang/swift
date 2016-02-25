@@ -23,7 +23,7 @@ extension CFError : ErrorProtocol {
 // An error value to use when an Objective-C API indicates error
 // but produces a nil error object.
 public enum _GenericObjCError : ErrorProtocol {
-  case NilError
+  case nilError
 }
 
 /// An internal protocol to represent Swift error enums that map to standard
@@ -149,206 +149,206 @@ public func ~=(match: NSCocoaError, error: ErrorProtocol) -> Bool {
 }
 
 public extension NSCocoaError {
-  public static var FileNoSuchFileError: NSCocoaError {
+  public static var fileNoSuchFileError: NSCocoaError {
     return NSCocoaError(rawValue: 4)
   }
-  public static var FileLockingError: NSCocoaError {
+  public static var fileLockingError: NSCocoaError {
     return NSCocoaError(rawValue: 255)
   }
-  public static var FileReadUnknownError: NSCocoaError {
+  public static var fileReadUnknownError: NSCocoaError {
     return NSCocoaError(rawValue: 256)
   }
-  public static var FileReadNoPermissionError: NSCocoaError {
+  public static var fileReadNoPermissionError: NSCocoaError {
     return NSCocoaError(rawValue: 257)
   }
-  public static var FileReadInvalidFileNameError: NSCocoaError {
+  public static var fileReadInvalidFileNameError: NSCocoaError {
     return NSCocoaError(rawValue: 258)
   }
-  public static var FileReadCorruptFileError: NSCocoaError {
+  public static var fileReadCorruptFileError: NSCocoaError {
     return NSCocoaError(rawValue: 259)
   }
-  public static var FileReadNoSuchFileError: NSCocoaError {
+  public static var fileReadNoSuchFileError: NSCocoaError {
     return NSCocoaError(rawValue: 260)
   }
-  public static var FileReadInapplicableStringEncodingError: NSCocoaError {
+  public static var fileReadInapplicableStringEncodingError: NSCocoaError {
     return NSCocoaError(rawValue: 261)
   }
-  public static var FileReadUnsupportedSchemeError: NSCocoaError {
+  public static var fileReadUnsupportedSchemeError: NSCocoaError {
     return NSCocoaError(rawValue: 262)
   }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  public static var FileReadTooLargeError: NSCocoaError {
+  public static var fileReadTooLargeError: NSCocoaError {
     return NSCocoaError(rawValue: 263)
   }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  public static var FileReadUnknownStringEncodingError: NSCocoaError {
+  public static var fileReadUnknownStringEncodingError: NSCocoaError {
     return NSCocoaError(rawValue: 264)
   }
 
-  public static var FileWriteUnknownError: NSCocoaError {
+  public static var fileWriteUnknownError: NSCocoaError {
     return NSCocoaError(rawValue: 512)
   }
-  public static var FileWriteNoPermissionError: NSCocoaError {
+  public static var fileWriteNoPermissionError: NSCocoaError {
     return NSCocoaError(rawValue: 513)
   }
-  public static var FileWriteInvalidFileNameError: NSCocoaError {
+  public static var fileWriteInvalidFileNameError: NSCocoaError {
     return NSCocoaError(rawValue: 514)
   }
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=5.0)
-  public static var FileWriteFileExistsError: NSCocoaError {
+  public static var fileWriteFileExistsError: NSCocoaError {
     return NSCocoaError(rawValue: 516)
   }
 
-  public static var FileWriteInapplicableStringEncodingError: NSCocoaError {
+  public static var fileWriteInapplicableStringEncodingError: NSCocoaError {
     return NSCocoaError(rawValue: 517)
   }
-  public static var FileWriteUnsupportedSchemeError: NSCocoaError {
+  public static var fileWriteUnsupportedSchemeError: NSCocoaError {
     return NSCocoaError(rawValue: 518)
   }
-  public static var FileWriteOutOfSpaceError: NSCocoaError {
+  public static var fileWriteOutOfSpaceError: NSCocoaError {
     return NSCocoaError(rawValue: 640)
   }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  public static var FileWriteVolumeReadOnlyError: NSCocoaError {
+  public static var fileWriteVolumeReadOnlyError: NSCocoaError {
     return NSCocoaError(rawValue: 642)
   }
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  public static var FileManagerUnmountUnknownError: NSCocoaError {
+  public static var fileManagerUnmountUnknownError: NSCocoaError {
     return NSCocoaError(rawValue: 768)
   }
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  public static var FileManagerUnmountBusyError: NSCocoaError {
+  public static var fileManagerUnmountBusyError: NSCocoaError {
     return NSCocoaError(rawValue: 769)
   }
 
-  public static var KeyValueValidationError: NSCocoaError {
+  public static var keyValueValidationError: NSCocoaError {
     return NSCocoaError(rawValue: 1024)
   }
-  public static var FormattingError: NSCocoaError {
+  public static var formattingError: NSCocoaError {
     return NSCocoaError(rawValue: 2048)
   }
-  public static var UserCancelledError: NSCocoaError {
+  public static var userCancelledError: NSCocoaError {
     return NSCocoaError(rawValue: 3072)
   }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  public static var FeatureUnsupportedError: NSCocoaError {
+  public static var featureUnsupportedError: NSCocoaError {
     return NSCocoaError(rawValue: 3328)
   }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  public static var ExecutableNotLoadableError: NSCocoaError {
+  public static var executableNotLoadableError: NSCocoaError {
     return NSCocoaError(rawValue: 3584)
   }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  public static var ExecutableArchitectureMismatchError: NSCocoaError {
+  public static var executableArchitectureMismatchError: NSCocoaError {
     return NSCocoaError(rawValue: 3585)
   }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  public static var ExecutableRuntimeMismatchError: NSCocoaError {
+  public static var executableRuntimeMismatchError: NSCocoaError {
     return NSCocoaError(rawValue: 3586)
   }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  public static var ExecutableLoadError: NSCocoaError {
+  public static var executableLoadError: NSCocoaError {
     return NSCocoaError(rawValue: 3587)
   }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  public static var ExecutableLinkError: NSCocoaError {
+  public static var executableLinkError: NSCocoaError {
     return NSCocoaError(rawValue: 3588)
   }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  public static var PropertyListReadCorruptError: NSCocoaError {
+  public static var propertyListReadCorruptError: NSCocoaError {
     return NSCocoaError(rawValue: 3840)
   }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  public static var PropertyListReadUnknownVersionError: NSCocoaError {
+  public static var propertyListReadUnknownVersionError: NSCocoaError {
     return NSCocoaError(rawValue: 3841)
   }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  public static var PropertyListReadStreamError: NSCocoaError {
+  public static var propertyListReadStreamError: NSCocoaError {
     return NSCocoaError(rawValue: 3842)
   }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  public static var PropertyListWriteStreamError: NSCocoaError {
+  public static var propertyListWriteStreamError: NSCocoaError {
     return NSCocoaError(rawValue: 3851)
   }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  public static var PropertyListWriteInvalidError: NSCocoaError {
+  public static var propertyListWriteInvalidError: NSCocoaError {
     return NSCocoaError(rawValue: 3852)
   }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  public static var XPCConnectionInterrupted: NSCocoaError {
+  public static var xpcConnectionInterrupted: NSCocoaError {
     return NSCocoaError(rawValue: 4097)
   }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  public static var XPCConnectionInvalid: NSCocoaError {
+  public static var xpcConnectionInvalid: NSCocoaError {
     return NSCocoaError(rawValue: 4099)
   }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  public static var XPCConnectionReplyInvalid: NSCocoaError {
+  public static var xpcConnectionReplyInvalid: NSCocoaError {
     return NSCocoaError(rawValue: 4101)
   }
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  public static var UbiquitousFileUnavailableError: NSCocoaError {
+  public static var ubiquitousFileUnavailableError: NSCocoaError {
     return NSCocoaError(rawValue: 4353)
   }
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  public static var UbiquitousFileNotUploadedDueToQuotaError: NSCocoaError {
+  public static var ubiquitousFileNotUploadedDueToQuotaError: NSCocoaError {
     return NSCocoaError(rawValue: 4354)
   }
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  public static var UbiquitousFileUbiquityServerNotAvailable: NSCocoaError {
+  public static var ubiquitousFileUbiquityServerNotAvailable: NSCocoaError {
     return NSCocoaError(rawValue: 4355)
   }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  public static var UserActivityHandoffFailedError: NSCocoaError {
+  public static var userActivityHandoffFailedError: NSCocoaError {
     return NSCocoaError(rawValue: 4608)
   }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  public static var UserActivityConnectionUnavailableError: NSCocoaError {
+  public static var userActivityConnectionUnavailableError: NSCocoaError {
     return NSCocoaError(rawValue: 4609)
   }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  public static var UserActivityRemoteApplicationTimedOutError: NSCocoaError {
+  public static var userActivityRemoteApplicationTimedOutError: NSCocoaError {
     return NSCocoaError(rawValue: 4610)
   }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  public static var UserActivityHandoffUserInfoTooLargeError: NSCocoaError {
+  public static var userActivityHandoffUserInfoTooLargeError: NSCocoaError {
     return NSCocoaError(rawValue: 4611)
   }
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  public static var CoderReadCorruptError: NSCocoaError {
+  public static var coderReadCorruptError: NSCocoaError {
     return NSCocoaError(rawValue: 4864)
   }
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  public static var CoderValueNotFoundError: NSCocoaError {
+  public static var coderValueNotFoundError: NSCocoaError {
     return NSCocoaError(rawValue: 4865)
   }
 
@@ -396,71 +396,540 @@ public extension NSCocoaError {
   }
 }
 
+extension NSCocoaError {
+  @available(*, unavailable, renamed="fileNoSuchFileError")
+  public static var FileNoSuchFileError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileLockingError")
+  public static var FileLockingError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadUnknownError")
+  public static var FileReadUnknownError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadNoPermissionError")
+  public static var FileReadNoPermissionError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadInvalidFileNameError")
+  public static var FileReadInvalidFileNameError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadCorruptFileError")
+  public static var FileReadCorruptFileError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadNoSuchFileError")
+  public static var FileReadNoSuchFileError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadInapplicableStringEncodingError")
+  public static var FileReadInapplicableStringEncodingError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadUnsupportedSchemeError")
+  public static var FileReadUnsupportedSchemeError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadTooLargeError")
+  public static var FileReadTooLargeError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileReadUnknownStringEncodingError")
+  public static var FileReadUnknownStringEncodingError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteUnknownError")
+  public static var FileWriteUnknownError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteNoPermissionError")
+  public static var FileWriteNoPermissionError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteInvalidFileNameError")
+  public static var FileWriteInvalidFileNameError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteFileExistsError")
+  public static var FileWriteFileExistsError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteInapplicableStringEncodingError")
+  public static var FileWriteInapplicableStringEncodingError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteUnsupportedSchemeError")
+  public static var FileWriteUnsupportedSchemeError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteOutOfSpaceError")
+  public static var FileWriteOutOfSpaceError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileWriteVolumeReadOnlyError")
+  public static var FileWriteVolumeReadOnlyError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileManagerUnmountUnknownError")
+  public static var FileManagerUnmountUnknownError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileManagerUnmountBusyError")
+  public static var FileManagerUnmountBusyError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="keyValueValidationError")
+  public static var KeyValueValidationError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="formattingError")
+  public static var FormattingError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="userCancelledError")
+  public static var UserCancelledError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="featureUnsupportedError")
+  public static var FeatureUnsupportedError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="executableNotLoadableError")
+  public static var ExecutableNotLoadableError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="executableArchitectureMismatchError")
+  public static var ExecutableArchitectureMismatchError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="executableRuntimeMismatchError")
+  public static var ExecutableRuntimeMismatchError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="executableLoadError")
+  public static var ExecutableLoadError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="executableLinkError")
+  public static var ExecutableLinkError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="propertyListReadCorruptError")
+  public static var PropertyListReadCorruptError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="propertyListReadUnknownVersionError")
+  public static var PropertyListReadUnknownVersionError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="propertyListReadStreamError")
+  public static var PropertyListReadStreamError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="propertyListWriteStreamError")
+  public static var PropertyListWriteStreamError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="propertyListWriteInvalidError")
+  public static var PropertyListWriteInvalidError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="xpcConnectionInterrupted")
+  public static var XPCConnectionInterrupted: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="xpcConnectionInvalid")
+  public static var XPCConnectionInvalid: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="xpcConnectionReplyInvalid")
+  public static var XPCConnectionReplyInvalid: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="ubiquitousFileUnavailableError")
+  public static var UbiquitousFileUnavailableError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="ubiquitousFileNotUploadedDueToQuotaError")
+  public static var UbiquitousFileNotUploadedDueToQuotaError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="ubiquitousFileUbiquityServerNotAvailable")
+  public static var UbiquitousFileUbiquityServerNotAvailable: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="userActivityHandoffFailedError")
+  public static var UserActivityHandoffFailedError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="userActivityConnectionUnavailableError")
+  public static var UserActivityConnectionUnavailableError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="userActivityRemoteApplicationTimedOutError")
+  public static var UserActivityRemoteApplicationTimedOutError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="userActivityHandoffUserInfoTooLargeError")
+  public static var UserActivityHandoffUserInfoTooLargeError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="coderReadCorruptError")
+  public static var CoderReadCorruptError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="coderValueNotFoundError")
+  public static var CoderValueNotFoundError: NSCocoaError {
+    fatalError("unavailable accessor can't be called")
+  }
+}
+
 /// Enumeration that describes the error codes within the NSURL error
 /// domain.
 @objc public enum NSURLError : Int, _BridgedNSError {
-  case Unknown = -1
-  case Cancelled = -999
-  case BadURL = -1000
-  case TimedOut = -1001
-  case UnsupportedURL = -1002
-  case CannotFindHost = -1003
-  case CannotConnectToHost = -1004
-  case NetworkConnectionLost = -1005
-  case DNSLookupFailed = -1006
-  case HTTPTooManyRedirects = -1007
-  case ResourceUnavailable = -1008
-  case NotConnectedToInternet = -1009
-  case RedirectToNonExistentLocation = -1010
-  case BadServerResponse = -1011
-  case UserCancelledAuthentication = -1012
-  case UserAuthenticationRequired = -1013
-  case ZeroByteResource = -1014
-  case CannotDecodeRawData = -1015
-  case CannotDecodeContentData = -1016
-  case CannotParseResponse = -1017
-  case FileDoesNotExist = -1100
-  case FileIsDirectory = -1101
-  case NoPermissionsToReadFile = -1102
-  case SecureConnectionFailed = -1200
-  case ServerCertificateHasBadDate = -1201
-  case ServerCertificateUntrusted = -1202
-  case ServerCertificateHasUnknownRoot = -1203
-  case ServerCertificateNotYetValid = -1204
-  case ClientCertificateRejected = -1205
-  case ClientCertificateRequired = -1206
-  case CannotLoadFromNetwork = -2000
-  case CannotCreateFile = -3000
-  case CannotOpenFile = -3001
-  case CannotCloseFile = -3002
-  case CannotWriteToFile = -3003
-  case CannotRemoveFile = -3004
-  case CannotMoveFile = -3005
-  case DownloadDecodingFailedMidStream = -3006
-  case DownloadDecodingFailedToComplete = -3007
+  case unknown = -1
+  case cancelled = -999
+  case badURL = -1000
+  case timedOut = -1001
+  case unsupportedURL = -1002
+  case cannotFindHost = -1003
+  case cannotConnectToHost = -1004
+  case networkConnectionLost = -1005
+  case dnsLookupFailed = -1006
+  case httpTooManyRedirects = -1007
+  case resourceUnavailable = -1008
+  case notConnectedToInternet = -1009
+  case redirectToNonExistentLocation = -1010
+  case badServerResponse = -1011
+  case userCancelledAuthentication = -1012
+  case userAuthenticationRequired = -1013
+  case zeroByteResource = -1014
+  case cannotDecodeRawData = -1015
+  case cannotDecodeContentData = -1016
+  case cannotParseResponse = -1017
+  case fileDoesNotExist = -1100
+  case fileIsDirectory = -1101
+  case noPermissionsToReadFile = -1102
+  case secureConnectionFailed = -1200
+  case serverCertificateHasBadDate = -1201
+  case serverCertificateUntrusted = -1202
+  case serverCertificateHasUnknownRoot = -1203
+  case serverCertificateNotYetValid = -1204
+  case clientCertificateRejected = -1205
+  case clientCertificateRequired = -1206
+  case cannotLoadFromNetwork = -2000
+  case cannotCreateFile = -3000
+  case cannotOpenFile = -3001
+  case cannotCloseFile = -3002
+  case cannotWriteToFile = -3003
+  case cannotRemoveFile = -3004
+  case cannotMoveFile = -3005
+  case downloadDecodingFailedMidStream = -3006
+  case downloadDecodingFailedToComplete = -3007
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
-  case InternationalRoamingOff = -1018
+  case internationalRoamingOff = -1018
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
-  case CallIsActive = -1019
+  case callIsActive = -1019
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
-  case DataNotAllowed = -1020
+  case dataNotAllowed = -1020
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
-  case RequestBodyStreamExhausted = -1021
+  case requestBodyStreamExhausted = -1021
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case BackgroundSessionRequiresSharedContainer = -995
+  case backgroundSessionRequiresSharedContainer = -995
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case BackgroundSessionInUseByAnotherProcess = -996
+  case backgroundSessionInUseByAnotherProcess = -996
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case BackgroundSessionWasDisconnected = -997
+  case backgroundSessionWasDisconnected = -997
 
   public static var _nsErrorDomain: String { return NSURLErrorDomain }
+}
+
+extension NSURLError {
+  @available(*, unavailable, renamed="unknown")
+  static var Unknown: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cancelled")
+  static var Cancelled: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="badURL")
+  static var BadURL: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="timedOut")
+  static var TimedOut: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="unsupportedURL")
+  static var UnsupportedURL: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotFindHost")
+  static var CannotFindHost: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotConnectToHost")
+  static var CannotConnectToHost: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="networkConnectionLost")
+  static var NetworkConnectionLost: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="dnsLookupFailed")
+  static var DNSLookupFailed: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="httpTooManyRedirects")
+  static var HTTPTooManyRedirects: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="resourceUnavailable")
+  static var ResourceUnavailable: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="notConnectedToInternet")
+  static var NotConnectedToInternet: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="redirectToNonExistentLocation")
+  static var RedirectToNonExistentLocation: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="badServerResponse")
+  static var BadServerResponse: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="userCancelledAuthentication")
+  static var UserCancelledAuthentication: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="userAuthenticationRequired")
+  static var UserAuthenticationRequired: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="zeroByteResource")
+  static var ZeroByteResource: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotDecodeRawData")
+  static var CannotDecodeRawData: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotDecodeContentData")
+  static var CannotDecodeContentData: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotParseResponse")
+  static var CannotParseResponse: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileDoesNotExist")
+  static var FileDoesNotExist: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="fileIsDirectory")
+  static var FileIsDirectory: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="noPermissionsToReadFile")
+  static var NoPermissionsToReadFile: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="secureConnectionFailed")
+  static var SecureConnectionFailed: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="serverCertificateHasBadDate")
+  static var ServerCertificateHasBadDate: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="serverCertificateUntrusted")
+  static var ServerCertificateUntrusted: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="serverCertificateHasUnknownRoot")
+  static var ServerCertificateHasUnknownRoot: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="serverCertificateNotYetValid")
+  static var ServerCertificateNotYetValid: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="clientCertificateRejected")
+  static var ClientCertificateRejected: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="clientCertificateRequired")
+  static var ClientCertificateRequired: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotLoadFromNetwork")
+  static var CannotLoadFromNetwork: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotCreateFile")
+  static var CannotCreateFile: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotOpenFile")
+  static var CannotOpenFile: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotCloseFile")
+  static var CannotCloseFile: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotWriteToFile")
+  static var CannotWriteToFile: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotRemoveFile")
+  static var CannotRemoveFile: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="cannotMoveFile")
+  static var CannotMoveFile: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="downloadDecodingFailedMidStream")
+  static var DownloadDecodingFailedMidStream: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="downloadDecodingFailedToComplete")
+  static var DownloadDecodingFailedToComplete: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="internationalRoamingOff")
+  static var InternationalRoamingOff: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="callIsActive")
+  static var CallIsActive: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="dataNotAllowed")
+  static var DataNotAllowed: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="requestBodyStreamExhausted")
+  static var RequestBodyStreamExhausted: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="backgroundSessionRequiresSharedContainer")
+  static var BackgroundSessionRequiresSharedContainer: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="backgroundSessionInUseByAnotherProcess")
+  static var BackgroundSessionInUseByAnotherProcess: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed="backgroundSessionWasDisconnected")
+  static var BackgroundSessionWasDisconnected: NSURLError {
+    fatalError("unavailable accessor can't be called")
+  }
 }
 
 extension POSIXError : _BridgedNSError {
