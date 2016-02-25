@@ -164,7 +164,12 @@
 // can be directly referenced only inside the runtime library.
 // User code can access these runtime entries only indirectly
 // via a global function pointer.
-#define SWIFT_RT_ENTRY_VISIBILITY LLVM_LIBRARY_VISIBILITY
+// NOTE: In principle, entries may have LLVM_LIBRARY_VISIBILITY,
+// because they are never called directly from the code
+// produced by IRGen.
+// But some of the runtime entries are invoked directly from
+// the foundation. Therefore they should be visible.
+#define SWIFT_RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
 #define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
 // Prefix of wrappers generated for runtime functions.
