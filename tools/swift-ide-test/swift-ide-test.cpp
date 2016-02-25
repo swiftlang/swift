@@ -1612,9 +1612,10 @@ public:
 };
 }
 
-struct GroupNamesPrinter : public StreamPrinter {
+struct GroupNamesPrinter {
   llvm::StringSet<> Groups;
-  GroupNamesPrinter(raw_ostream &OS) : StreamPrinter(OS) {}
+  raw_ostream &OS;
+  GroupNamesPrinter(raw_ostream &OS) : OS(OS) {}
   ~GroupNamesPrinter() {
     OS << "Module groups begin:\n";
     for (auto &Entry : Groups) {
@@ -1622,17 +1623,61 @@ struct GroupNamesPrinter : public StreamPrinter {
     }
     OS << "Module groups end.\n";
   }
-  void printText(StringRef Text) override { } // Drop Declarations.
 
-  void printDeclPre(const Decl *D) override {
-    StreamPrinter::printDeclPre(D);
-    // If we have raw comment, we should have group name.
-    if (!D->getRawComment().Comments.empty()) {
-      StringRef Name = D->getGroupName().getValue();
-      Groups.insert(Name.empty() ? "<NULL>" : Name);
+  void addDecl(const Decl *D) {
+    if(auto VD = dyn_cast<ValueDecl>(D)) {
+      if (!VD->isImplicit() && !VD->isPrivateStdlibDecl()) {
+        StringRef Name = VD->getGroupName().getValue();
+        Groups.insert(Name.empty() ? "<NULL>" : Name);
+      }
     }
   }
 };
+
+static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
+                               const std::vector<std::string> ModulesToPrint) {
+  CompilerInvocation Invocation(InitInvok);
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+
+  auto &Context = CI.getASTContext();
+
+  // Load standard library so that Clang importer can use it.
+  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
+  if (!Stdlib) {
+    llvm::errs() << "Failed loading stdlib\n";
+    return 1;
+  }
+
+  int ExitCode = 0;
+  for (StringRef ModuleToPrint : ModulesToPrint) {
+    if (ModuleToPrint.empty()) {
+      ExitCode = 1;
+      continue;
+    }
+
+    // Get the (sub)module to print.
+    auto *M = getModuleByFullName(Context, ModuleToPrint);
+    if (!M) {
+      ExitCode = 1;
+      continue;
+    }
+    {
+      GroupNamesPrinter Printer(llvm::outs());
+      llvm::SmallVector<Decl*, 256> Results;
+      M->getDisplayDecls(Results);
+      for (auto R : Results) {
+        Printer.addDecl(R);
+      }
+    }
+  }
+  return ExitCode;
+}
 
 static int doPrintModules(const CompilerInvocation &InitInvok,
                           const std::vector<std::string> ModulesToPrint,
@@ -1640,8 +1685,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           ide::ModuleTraversalOptions TraversalOptions,
                           const PrintOptions &Options,
                           bool AnnotatePrint,
-                          bool SynthesizeExtensions,
-                          bool PrintGroupNames) {
+                          bool SynthesizeExtensions) {
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI;
@@ -1663,9 +1707,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   int ExitCode = 0;
 
   std::unique_ptr<ASTPrinter> Printer;
-  if (PrintGroupNames)
-    Printer.reset(new GroupNamesPrinter(llvm::outs()));
-  else if (AnnotatePrint)
+  if (AnnotatePrint)
     Printer.reset(new AnnotatingPrinter(llvm::outs()));
   else
     Printer.reset(new StreamPrinter(llvm::outs()));
@@ -2706,11 +2748,13 @@ int main(int argc, char *argv[]) {
     if (options::ModulePrintSkipOverlay)
       TraversalOptions |= ide::ModuleTraversal::SkipOverlay;
 
-    ExitCode = doPrintModules(
+    if (options::Action == ActionType::PrintModuleGroups)
+      ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
+    else
+      ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,
-        options::SynthesizeExtension,
-        options::Action == ActionType::PrintModuleGroups);
+        options::SynthesizeExtension);
     break;
   }
 
