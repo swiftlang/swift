@@ -56,7 +56,7 @@ public func _stdlib_bridgeNSErrorToErrorProtocol<
 /// Helper protocol for _BridgedNSError, which used to provide
 /// default implementations.
 public protocol __BridgedNSError : RawRepresentable, ErrorProtocol {
-  static var _NSErrorDomain: String { get }
+  static var _nsErrorDomain: String { get }
 }
 
 // Allow two bridged NSError types to be compared.
@@ -69,7 +69,7 @@ public func ==<T: __BridgedNSError where T.RawValue: SignedInteger>(
 }
 
 public extension __BridgedNSError where RawValue: SignedInteger {
-  public final var _domain: String { return Self._NSErrorDomain }
+  public final var _domain: String { return Self._nsErrorDomain }
   public final var _code: Int { return Int(rawValue.toIntMax()) }
 
   public init?(rawValue: RawValue) {
@@ -77,7 +77,7 @@ public extension __BridgedNSError where RawValue: SignedInteger {
   }
 
   public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._NSErrorDomain {
+    if _bridgedNSError.domain != Self._nsErrorDomain {
       return nil
     }
 
@@ -98,7 +98,7 @@ public func ==<T: __BridgedNSError where T.RawValue: UnsignedInteger>(
 
 
 public extension __BridgedNSError where RawValue: UnsignedInteger {
-  public final var _domain: String { return Self._NSErrorDomain }
+  public final var _domain: String { return Self._nsErrorDomain }
   public final var _code: Int {
     return Int(bitPattern: UInt(rawValue.toUIntMax()))
   }
@@ -108,7 +108,7 @@ public extension __BridgedNSError where RawValue: UnsignedInteger {
   }
 
   public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._NSErrorDomain {
+    if _bridgedNSError.domain != Self._nsErrorDomain {
       return nil
     }
 
@@ -127,7 +127,7 @@ public protocol _BridgedNSError : __BridgedNSError,
                                   _ObjectiveCBridgeableErrorProtocol,
                                   Hashable {
   /// The NSError domain to which this type is bridged.
-  static var _NSErrorDomain: String { get }
+  static var _nsErrorDomain: String { get }
 }
 
 /// Enumeration that describes the error codes within the Cocoa error
@@ -139,7 +139,7 @@ public struct NSCocoaError : RawRepresentable, _BridgedNSError {
     self.rawValue = rawValue
   }
 
-  public static var _NSErrorDomain: String { return NSCocoaErrorDomain }
+  public static var _nsErrorDomain: String { return NSCocoaErrorDomain }
 }
 
 @warn_unused_result
@@ -460,13 +460,13 @@ public extension NSCocoaError {
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
   case BackgroundSessionWasDisconnected = -997
 
-  public static var _NSErrorDomain: String { return NSURLErrorDomain }
+  public static var _nsErrorDomain: String { return NSURLErrorDomain }
 }
 
 extension POSIXError : _BridgedNSError {
-  public static var _NSErrorDomain: String { return NSPOSIXErrorDomain }
+  public static var _nsErrorDomain: String { return NSPOSIXErrorDomain }
 }
 
 extension MachError : _BridgedNSError {
-  public static var _NSErrorDomain: String { return NSMachErrorDomain }
+  public static var _nsErrorDomain: String { return NSMachErrorDomain }
 }

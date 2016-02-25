@@ -15,7 +15,7 @@ import Foundation
 
 @available(iOS 8.2, *)
 extension WatchKitErrorCode : _BridgedNSError {
-  public static var _NSErrorDomain: String { return WatchKitErrorDomain }
+  public static var _nsErrorDomain: String { return WatchKitErrorDomain }
 }
 
 @available(iOS, introduced=8.2)

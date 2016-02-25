@@ -3,5 +3,5 @@ import Foundation
 
 @available(iOS, introduced=9.0)
 extension WCErrorCode : _BridgedNSError {
-  public static var _NSErrorDomain: String { return WCErrorDomain }
+  public static var _nsErrorDomain: String { return WCErrorDomain }
 }

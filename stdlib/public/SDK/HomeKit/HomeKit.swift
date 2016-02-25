@@ -3,7 +3,7 @@ import Foundation
 
 @available(iOS 8.0, *)
 extension HMErrorCode : _BridgedNSError {
-  public static var _NSErrorDomain: String {
+  public static var _nsErrorDomain: String {
     return HMErrorDomain
   }
 }
