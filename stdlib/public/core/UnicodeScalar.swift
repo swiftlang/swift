@@ -83,6 +83,7 @@ public struct UnicodeScalar :
   ///
   /// - parameter forceASCII: If `true`, forces most values into a numeric
   ///   representation.
+  @swift3_migration(renamed="escaped(asASCII:)")
   @warn_unused_result
   public func escape(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
