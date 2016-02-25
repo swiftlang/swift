@@ -702,7 +702,7 @@ extension ${Self} : _ArrayProtocol {
     self += newElements
   }
 
-  // An overload of `appendContents(of:)` that uses the += that is optimized for
+  // An overload of `append(contentsOf:)` that uses the += that is optimized for
   // collections.
   /// Append the elements of `newElements` to `self`.
   ///
@@ -1412,21 +1412,12 @@ extension ${Self} {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="appendContents(of:)")
+  @available(*, unavailable, renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence
     where
     S.Iterator.Element == Element
   >(newElements: S) {
-    fatalError("unavailable function can't be called")
-  }
-
-  @available(*, unavailable, renamed="appendContents(of:)")
-  public mutating func appendContentsOf<
-    C : Collection
-    where
-    C.Iterator.Element == Element
-  >(newElements: C) {
     fatalError("unavailable function can't be called")
   }
 }

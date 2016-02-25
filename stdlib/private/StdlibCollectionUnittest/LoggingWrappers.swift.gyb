@@ -153,11 +153,11 @@ public struct LoggingRangeReplaceableCollection<
     base.append(newElement)
   }
 
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == Base.Iterator.Element
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     Log.appendContentsOf[selfType] += 1
-    base.appendContents(of: newElements)
+    base.append(contentsOf: newElements)
   }
 
   public mutating func insert(
@@ -207,11 +207,11 @@ public struct LoggingRangeReplaceableCollection<
     base.reserveCapacity(n)
   }
 
-  public mutating func insertContents<
+  public mutating func insert<
     C : Collection where C.Iterator.Element == Base.Iterator.Element
-  >(of newElements: C, at i: Base.Index) {
+  >(contentsOf newElements: C, at i: Base.Index) {
     Log.insertContentsOf[selfType] += 1
-    base.insertContents(of: newElements, at: i)
+    base.insert(contentsOf: newElements, at: i)
   }
 
   @warn_unused_result

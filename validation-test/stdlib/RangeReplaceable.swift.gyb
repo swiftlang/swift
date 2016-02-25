@@ -30,7 +30,7 @@ RangeReplaceableTestSuite.test("append/dispatch") {
 
 RangeReplaceableTestSuite.test("appendContentsOf/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.appendContents(of: [ 2, 3 ].map(OpaqueValue.init))
+  tester.append(contentsOf: [ 2, 3 ].map(OpaqueValue.init))
   expectCustomizable(tester, tester.log.appendContentsOf)
 }
 
@@ -40,10 +40,10 @@ RangeReplaceableTestSuite.test("insert/dispatch") {
   expectCustomizable(tester, tester.log.insert)
 }
 
-RangeReplaceableTestSuite.test("insertContents(of:at:)/dispatch") {
+RangeReplaceableTestSuite.test("insert(contentsOf:at:)/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.insertContents(
-    of: [ 2, 3 ].map(OpaqueValue.init),
+  tester.insert(
+    contentsOf: [ 2, 3 ].map(OpaqueValue.init),
     at: tester.base.endIndex)
   expectCustomizable(tester, tester.log.insertContentsOf)
 }

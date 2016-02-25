@@ -608,7 +608,7 @@ func asciiString<
   S: Sequence where S.Iterator.Element == Character
 >(content: S) -> String {
   var s = String()
-  s.appendContents(of: content)
+  s.append(contentsOf: content)
   expectEqual(1, s._core.elementWidth)
   return s
 }
@@ -633,11 +633,11 @@ StringTests.test("stringCoreExtensibility")
         if k == 0 { expectEqual(1, x.elementWidth) }
         
         for i in 0..<count {
-          x.appendContents(of:
+          x.append(contentsOf:
             repeatElement(i < boundary ? ascii : nonAscii, count: 3))
         }
         // Make sure we can append pure ASCII to wide storage
-        x.appendContents(of: repeatElement(ascii, count: 2))
+        x.append(contentsOf: repeatElement(ascii, count: 2))
         
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
@@ -721,7 +721,7 @@ func makeStringCore(base: String) -> _StringCore {
   var x = _StringCore()
   // make sure some - but not all - replacements will have to grow the buffer
   x.reserveCapacity(base._core.count * 3 / 2)
-  x.appendContents(of: base._core)
+  x.append(contentsOf: base._core)
   // In case the core was widened and lost its capacity
   x.reserveCapacity(base._core.count * 3 / 2)
   return x
@@ -784,17 +784,17 @@ StringTests.test("reserveCapacity") {
   let id0 = s.bufferID
   let oldCap = s.capacity
   let x: Character = "x" // Help the typechecker - <rdar://problem/17128913>
-  s.insertContents(of: repeatElement(x, count: s.capacity + 1), at: s.endIndex)
+  s.insert(contentsOf: repeatElement(x, count: s.capacity + 1), at: s.endIndex)
   expectNotEqual(id0, s.bufferID)
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
   print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   let id1 = s.bufferID
-  s.insertContents(of: repeatElement(x, count: oldCap + 2), at: s.endIndex)
+  s.insert(contentsOf: repeatElement(x, count: oldCap + 2), at: s.endIndex)
   print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   expectEqual(id1, s.bufferID)
-  s.insertContents(of: repeatElement(x, count: s.capacity + 100), at: s.endIndex)
+  s.insert(contentsOf: repeatElement(x, count: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
 }
 

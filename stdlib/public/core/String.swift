@@ -589,11 +589,11 @@ extension String {
     }
   }
   
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == Character
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.appendContents(of: newElements)
+      (inout v: CharacterView) in v.append(contentsOf: newElements)
     }
   }
   
@@ -700,11 +700,11 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func insertContents<
+  public mutating func insert<
     S : Collection where S.Iterator.Element == Character
-  >(of newElements: S, at i: Index) {
+  >(contentsOf newElements: S, at i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.insertContents(of: newElements, at: i)
+      (inout v: CharacterView) in v.insert(contentsOf: newElements, at: i)
     }
   }
 
@@ -988,18 +988,18 @@ extension String.Index {
 
 extension String {
   @available(*, unavailable, renamed="append")
-  public mutating func appendContents(of other: String) {
+  public mutating func appendContentsOf(other: String) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="appendContents(of:)")
+  @available(*, unavailable, renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="insertContents(of:at:)")
+  @available(*, unavailable, renamed="insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     S : Collection where S.Iterator.Element == Character
   >(newElements: S, at i: Index) {

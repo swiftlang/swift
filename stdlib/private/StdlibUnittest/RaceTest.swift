@@ -419,12 +419,12 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
   let rt = RT()
 
   sharedState.raceData.removeAll(keepingCapacity: true)
-  sharedState.raceData.appendContents(of:
+  sharedState.raceData.append(contentsOf:
     (0..<raceDataCount).lazy.map { i in rt.makeRaceData() })
 
   let identityShuffle = Array(0..<sharedState.raceData.count)
   sharedState.workerStates.removeAll(keepingCapacity: true)
-  sharedState.workerStates.appendContents(of:
+  sharedState.workerStates.append(contentsOf:
     (0..<racingThreadCount).lazy.map {
       i in
       let workerState = _RaceTestWorkerState<RT>()

@@ -207,7 +207,7 @@ internal enum _CollectionOperation : Equatable {
       result.append(nextStateId)
 
     case appendContentsOf(let count):
-      result.appendContents(of:
+      result.append(contentsOf:
         repeatElement(nextStateId, count: count))
 
     case replaceRange(let subRange, let replacementCount):
@@ -229,8 +229,8 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
     case insertContentsOf(let atIndex, let count):
-      result.insertContents(
-        of: repeatElement(nextStateId, count: count),
+      result.insert(
+        contentsOf: repeatElement(nextStateId, count: count),
         at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
@@ -1122,11 +1122,11 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     elements.append(x)
   }
 
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == T
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     let oldCount = count
-    elements.appendContents(of: newElements)
+    elements.append(contentsOf: newElements)
     let newCount = count
     _willMutate(.appendContentsOf(count: newCount - oldCount))
   }
@@ -1151,11 +1151,11 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     elements.insert(newElement, at: i.position)
   }
 
-  public mutating func insertContents<
+  public mutating func insert<
     S : Collection where S.Iterator.Element == T
-  >(of newElements: S, at i: ${Index}) {
+  >(contentsOf newElements: S, at i: ${Index}) {
     let oldCount = count
-    elements.insertContents(of: newElements, at: i.position)
+    elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
 
     if newCount - oldCount != 0 {

@@ -458,7 +458,7 @@ func testSingleQuoteStringLiterals() {
 
 // <rdar://problem/17128913>
 var s = ""
-s.appendContents(of: ["x"])
+s.append(contentsOf: ["x"])
 
 //===----------------------------------------------------------------------===//
 // InOut arguments

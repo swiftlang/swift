@@ -119,10 +119,10 @@ ${Self}TestSuite.test("subscript(_:Index)/Set/DifferentCollections") {
 func getTwoInterchangeable${Self}(elements: [Int])
   -> (${Self}<OpaqueValue<Int>>, ${Self}<OpaqueValue<Int>>) {
   var c1 = ${Self}<OpaqueValue<Int>>()
-  c1.appendContents(of: elements.map(OpaqueValue.init))
+  c1.append(contentsOf: elements.map(OpaqueValue.init))
 
   var c2 = ${Self}<OpaqueValue<Int>>()
-  c2.appendContents(of: elements.map(OpaqueValue.init))
+  c2.append(contentsOf: elements.map(OpaqueValue.init))
 
   return (c1, c2)
 }
@@ -199,10 +199,10 @@ ${Self}TestSuite.test("append()/IndexInvalidation") {
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("appendContents(of:)/IndexInvalidation") {
+${Self}TestSuite.test("append(contentsOf:)/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.endIndex
-  c1.appendContents(of: [ 4040, 5050 ].map(OpaqueValue.init))
+  c1.append(contentsOf: [ 4040, 5050 ].map(OpaqueValue.init))
   let i2 = c1.startIndex.advanced(by: 3)
 
   expectCrashLater()
@@ -234,10 +234,10 @@ ${Self}TestSuite.test("insert()/IndexInvalidation") {
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("insertContents(of:at:)/IndexInvalidation") {
+${Self}TestSuite.test("insert(contentsOf:at:)/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.startIndex.advanced(by: 1)
-  c1.insertContents(of: [ 4040, 5050 ].map(OpaqueValue.init), at: i1)
+  c1.insert(contentsOf: [ 4040, 5050 ].map(OpaqueValue.init), at: i1)
   let i2 = c1.startIndex.advanced(by: 1)
 
   expectCrashLater()
