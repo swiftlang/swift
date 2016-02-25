@@ -83,7 +83,8 @@ static BranchHint getBranchHint(SILValue Cond) {
 
 /// \return true if the CFG edge FromBB->ToBB is directly gated by a _slowPath
 /// branch hint.
-bool ColdBlockInfo::isSlowPath(const SILBasicBlock *FromBB, const SILBasicBlock *ToBB) {
+bool ColdBlockInfo::isSlowPath(const SILBasicBlock *FromBB,
+                               const SILBasicBlock *ToBB) {
   auto *CBI = dyn_cast<CondBranchInst>(FromBB->getTerminator());
   if (!CBI)
     return false;

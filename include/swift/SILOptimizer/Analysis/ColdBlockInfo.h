@@ -36,7 +36,8 @@ class ColdBlockInfo {
 public:
   ColdBlockInfo(DominanceAnalysis *DA): DA(DA) {}
 
-  static bool isSlowPath(const SILBasicBlock *FromBB, const SILBasicBlock *ToBB);
+  static bool isSlowPath(const SILBasicBlock *FromBB,
+                         const SILBasicBlock *ToBB);
 
   bool isCold(const SILBasicBlock *BB);
 };
