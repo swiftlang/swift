@@ -235,7 +235,7 @@ StringTests.test("ForeignIndexes/removeSubrange/OutOfBoundsTrap/2") {
 }
 
 StringTests.test("_splitFirst") {
-  var (before, after, found) = "foo.bar"._splitFirst(".")
+  var (before, after, found) = "foo.bar"._splitFirst(separator: ".")
   expectTrue(found)
   expectEqual("foo", before)
   expectEqual("bar", after)

@@ -143,7 +143,7 @@ extension String {
     encoding: Encoding.Type, input: Input
   ) -> String? {
     let (stringBufferOptional, _) =
-        _StringBuffer.fromCodeUnits(encoding, input: input,
+        _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: false)
     if let stringBuffer = stringBufferOptional {
       return String(_storage: stringBuffer)
@@ -161,7 +161,7 @@ extension String {
     encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool) {
     let (stringBuffer, hadError) =
-        _StringBuffer.fromCodeUnits(encoding, input: input,
+        _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: true)
     return (String(_storage: stringBuffer!), hadError)
   }

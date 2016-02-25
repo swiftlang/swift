@@ -68,7 +68,7 @@ extension String {
       start: cString, count: len)
 
     let (stringBuffer, hadError) = _StringBuffer.fromCodeUnits(
-      encoding, input: buffer, repairIllFormedSequences: isReparing)
+      buffer, encoding: encoding, repairIllFormedSequences: isReparing)
     return stringBuffer.map {
       (result: String(_storage: $0), repairsMade: hadError)
     }

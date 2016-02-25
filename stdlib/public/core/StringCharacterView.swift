@@ -81,7 +81,8 @@ extension String.CharacterView : Collection {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base
-      self._countUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
+      self._countUTF16 =
+          Index._measureExtendedGraphemeClusterForward(from: _base)
     }
 
     internal init(_base: UnicodeScalarView.Index, _countUTF16: Int) {
@@ -104,7 +105,7 @@ extension String.CharacterView : Collection {
       _precondition(_base != _base._viewStartIndex,
           "cannot decrement startIndex")
       let predecessorLengthUTF16 =
-          Index._measureExtendedGraphemeClusterBackward(_base)
+          Index._measureExtendedGraphemeClusterBackward(from: _base)
       return Index(
         _base: UnicodeScalarView.Index(
           _utf16Index - predecessorLengthUTF16, _base._core))
@@ -132,7 +133,7 @@ extension String.CharacterView : Collection {
     /// code units.
     @warn_unused_result
     internal static func _measureExtendedGraphemeClusterForward(
-        start: UnicodeScalarView.Index
+        from start: UnicodeScalarView.Index
     ) -> Int {
       var start = start
       let end = start._viewEndIndex
@@ -173,7 +174,7 @@ extension String.CharacterView : Collection {
     /// code units.
     @warn_unused_result
     internal static func _measureExtendedGraphemeClusterBackward(
-        end: UnicodeScalarView.Index
+        from end: UnicodeScalarView.Index
     ) -> Int {
       let start = end._viewStartIndex
       if start == end {
