@@ -28,6 +28,10 @@ N: Argyrios Kyrzidis
 E: kyrtzidis@apple.com
 D: IDE, SourceKit, swift-ide-test
 
+N: Luke Larson
+E: llarson@apple.com
+D: Swift Benchmark Suite
+
 N: Chris Lattner
 E: clattner@apple.com
 D: Everything in Swift not covered by someone else
@@ -51,7 +55,3 @@ D: SILOptimizer
 N: Anna Zaks
 E: ganna@apple.com
 D: SIL diagnostics passes
-
-N: Luke Larson
-E: llarson@apple.com
-D: Swift Benchmark Suite
