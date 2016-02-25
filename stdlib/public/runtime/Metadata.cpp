@@ -2071,7 +2071,7 @@ getExistentialValueWitnesses(ExistentialTypeState &E,
   }
 }
 
-ExistentialTypeRepresentation
+template<> ExistentialTypeRepresentation
 ExistentialTypeMetadata::getRepresentation() const {
   // Some existentials use special containers.
   switch (Flags.getSpecialProtocol()) {
@@ -2088,7 +2088,7 @@ ExistentialTypeMetadata::getRepresentation() const {
   return ExistentialTypeRepresentation::Opaque;
 }
 
-bool
+template<> bool
 ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   // Owning a reference to a class existential is equivalent to owning a
@@ -2112,7 +2112,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   }
 }
 
-void
+template<> void
 ExistentialTypeMetadata::deinitExistentialContainer(OpaqueValue *container)
 const {
   switch (getRepresentation()) {
@@ -2135,7 +2135,7 @@ const {
   }
 }
 
-const OpaqueValue *
+template<> const OpaqueValue *
 ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
@@ -2161,7 +2161,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   }
 }
 
-const Metadata *
+template<> const Metadata *
 ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
@@ -2183,7 +2183,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   }
 }
 
-const WitnessTable *
+template<> const WitnessTable *
 ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
                                          unsigned i) const {
   assert(i < Flags.getNumWitnessTables());
@@ -2388,37 +2388,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 
 /*** Other metadata routines ***********************************************/
 
-const NominalTypeDescriptor *
-Metadata::getNominalTypeDescriptor() const {
-  switch (getKind()) {
-  case MetadataKind::Class: {
-    const ClassMetadata *cls = static_cast<const ClassMetadata *>(this);
-    if (!cls->isTypeMetadata())
-      return nullptr;
-    if (cls->isArtificialSubclass())
-      return nullptr;
-    return cls->getDescription();
-  }
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-    return static_cast<const StructMetadata *>(this)->Description;
-  case MetadataKind::ForeignClass:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-    return nullptr;
-  }
-}
-
-const GenericMetadata *
+template<> const GenericMetadata *
 Metadata::getGenericPattern() const {
   auto ntd = getNominalTypeDescriptor();
   if (!ntd)
@@ -2426,7 +2396,7 @@ Metadata::getGenericPattern() const {
   return ntd->getGenericMetadataPattern();
 }
 
-const ClassMetadata *
+template<> const ClassMetadata *
 Metadata::getClassObject() const {
   switch (getKind()) {
   case MetadataKind::Class: {

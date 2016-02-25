@@ -24,7 +24,9 @@ struct objc_class;
 
 namespace swift {
 
-struct Metadata;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
+
 struct HeapObject;
 
 } // end namespace swift

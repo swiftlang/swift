@@ -41,7 +41,7 @@ static const char *class_getName(const ClassMetadata* type) {
     reinterpret_cast<Class>(const_cast<ClassMetadata*>(type)));
 }
 
-void ProtocolConformanceRecord::dump() const {
+template<> void ProtocolConformanceRecord::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
     Dl_info info;
     int ok = dladdr(addr, &info);
@@ -96,7 +96,7 @@ void ProtocolConformanceRecord::dump() const {
 /// Take the type reference inside a protocol conformance record and fetch the
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
-const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata()
+template<> const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata()
 const {
   switch (getTypeKind()) {
   case TypeMetadataRecordKind::UniqueDirectType:
@@ -127,7 +127,9 @@ const {
   }
 }
 
-const WitnessTable *ProtocolConformanceRecord::getWitnessTable(const Metadata *type)
+template<>
+const WitnessTable *
+ProtocolConformanceRecord::getWitnessTable(const Metadata *type)
 const {
   switch (getConformanceKind()) {
   case ProtocolConformanceReferenceKind::WitnessTable:
@@ -441,7 +443,7 @@ recur_inside_cache_lock:
     // For generic and resilient types, nondependent conformances
     // are keyed by the nominal type descriptor rather than the
     // metadata, so try that.
-    auto *description = type->getNominalTypeDescriptor();
+    auto *description = type->getNominalTypeDescriptor().get();
 
     // Hash and lookup the type-protocol pair in the cache.
     if (auto *Value = C.findCached(description, protocol)) {
@@ -483,7 +485,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
 
     // If the type is resilient or generic, see if there's a witness table
     // keyed off the nominal type descriptor.
-    auto *description = type->getNominalTypeDescriptor();
+    auto *description = type->getNominalTypeDescriptor().get();
     if (description == candidate && !candidateIsMetadata)
       return true;
 

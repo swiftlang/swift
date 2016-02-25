@@ -26,11 +26,13 @@
 
 namespace swift {
 
-struct Metadata;
+struct InProcess;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
 
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
-enum class MetadataKind : uintptr_t {
+enum class MetadataKind : uint32_t {
 #define METADATAKIND(name, value) name = value,
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
@@ -38,7 +40,7 @@ enum class MetadataKind : uintptr_t {
 };
 
 /// Kinds of Swift nominal type descriptor records.
-enum class NominalTypeKind : uintptr_t {
+enum class NominalTypeKind : uint32_t {
 #define NOMINALTYPEMETADATAKIND(name, value) name = value,
 #include "MetadataKind.def"
 };
