@@ -274,6 +274,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.setStageName("HighLevel");
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   PM.runOneIteration();
+  PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
   PM.setStageName("EarlyLoopOpt");
@@ -292,6 +293,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Run two iterations of the mid-level SSA passes.
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
+  PM.runOneIteration();
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
