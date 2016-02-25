@@ -435,8 +435,8 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       while (Node) {
         SILBasicBlock *DomParentBB = Node->getBlock();
         if (isAvailabilityCheck(DomParentBB)) {
-          DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb" <<
-                DomParentBB->getDebugID() << "\n");
+          DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb"
+                             << DomParentBB->getDebugID() << "\n");
           break;
         }
         BB = DomParentBB;
@@ -573,20 +573,23 @@ static SILInstruction *convertLoadSequence(SILInstruction *I,
     return Value;
 
   if (auto *LI = dyn_cast<LoadInst>(I)) {
-    Value = convertLoadSequence(cast<SILInstruction>(LI->getOperand()), Value, B);
+    Value =
+        convertLoadSequence(cast<SILInstruction>(LI->getOperand()), Value, B);
     LI->replaceAllUsesWith(Value);
     return Value;
   }
 
   // It is a series of struct_element_addr followed by load.
   if(auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
-    Value = convertLoadSequence(cast<SILInstruction>(SEAI->getOperand()), Value, B);
+    Value =
+        convertLoadSequence(cast<SILInstruction>(SEAI->getOperand()), Value, B);
     auto *SEI = B.createStructExtract(SEAI->getLoc(), Value, SEAI->getField());
     return SEI;
   }
 
   if(auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
-    Value = convertLoadSequence(cast<SILInstruction>(TEAI->getOperand()), Value, B);
+    Value =
+        convertLoadSequence(cast<SILInstruction>(TEAI->getOperand()), Value, B);
     auto *TEI = B.createTupleExtract(TEAI->getLoc(), Value, TEAI->getFieldNo());
     return TEI;
   }
@@ -666,7 +669,8 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
 /// We analyze the body of globalinit_func to see if it can be statically
 /// initialized. If yes, we set the initial value of the SILGlobalVariable and
 /// remove the "once" call to globalinit_func from the addressor.
-void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls) {
+void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
+                                       GlobalInitCalls &Calls) {
   if (UnhandledOnceCallee)
     return;
 
