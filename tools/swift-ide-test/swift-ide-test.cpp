@@ -84,6 +84,7 @@ enum class ActionType {
   PrintComments,
   PrintModuleComments,
   PrintModuleImports,
+  PrintModuleGroups,
   PrintUSRs,
   PrintLocalTypes,
   PrintTypeInterface,
@@ -200,6 +201,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::ReconstructType,
                       "reconstruct-type",
                       "Reconstruct type from mangled name"),
+           clEnumValN(ActionType::PrintModuleGroups,
+                      "print-module-groups",
+                      "Print group names in a module"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -1603,13 +1607,36 @@ public:
 };
 }
 
+struct GroupNamesPrinter : public StreamPrinter {
+  llvm::StringSet<> Groups;
+  GroupNamesPrinter(raw_ostream &OS) : StreamPrinter(OS) {}
+  ~GroupNamesPrinter() {
+    OS << "Module groups begin:\n";
+    for (auto &Entry : Groups) {
+      OS << Entry.getKey() << "\n";
+    }
+    OS << "Module groups end.\n";
+  }
+  void printText(StringRef Text) override { } // Drop Declarations.
+
+  void printDeclPre(const Decl *D) override {
+    StreamPrinter::printDeclPre(D);
+    // If we have raw comment, we should have group name.
+    if (!D->getRawComment().Comments.empty()) {
+      StringRef Name = D->getGroupName().getValue();
+      Groups.insert(Name.empty() ? "<NULL>" : Name);
+    }
+  }
+};
+
 static int doPrintModules(const CompilerInvocation &InitInvok,
                           const std::vector<std::string> ModulesToPrint,
                           const std::vector<std::string> GroupsToPrint,
                           ide::ModuleTraversalOptions TraversalOptions,
                           const PrintOptions &Options,
                           bool AnnotatePrint,
-                          bool SynthesizeExtensions) {
+                          bool SynthesizeExtensions,
+                          bool PrintGroupNames) {
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI;
@@ -1631,7 +1658,9 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   int ExitCode = 0;
 
   std::unique_ptr<ASTPrinter> Printer;
-  if (AnnotatePrint)
+  if (PrintGroupNames)
+    Printer.reset(new GroupNamesPrinter(llvm::outs()));
+  else if (AnnotatePrint)
     Printer.reset(new AnnotatingPrinter(llvm::outs()));
   else
     Printer.reset(new StreamPrinter(llvm::outs()));
@@ -2661,6 +2690,7 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintLocalTypes(InitInvok, options::ModuleToPrint);
     break;
 
+  case ActionType::PrintModuleGroups:
   case ActionType::PrintModule: {
     ide::ModuleTraversalOptions TraversalOptions;
     if (options::ModulePrintSubmodules)
@@ -2673,7 +2703,8 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintModules(
         InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,
-        options::SynthesizeExtension);
+        options::SynthesizeExtension,
+        options::Action == ActionType::PrintModuleGroups);
     break;
   }
 
