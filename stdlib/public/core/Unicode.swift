@@ -694,7 +694,7 @@ public struct UTF32 : UnicodeCodecType {
 /// - parameter stopOnError: Causes encoding to stop when an encoding
 ///   error is detected in `input`, if `true`.  Otherwise, U+FFFD
 ///   replacement characters are inserted for each detected error.
-@swift3_migration(message="use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)' and reorder parameters accordingly")
+@swift3_migration(message="use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)' and reorder arguments accordingly")
 public func transcode<
   Input : GeneratorType,
   InputEncoding : UnicodeCodecType,
@@ -930,6 +930,7 @@ extension UTF16 {
   /// If `repairIllFormedSequences` is `true`, the function always succeeds.
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
+  @swift3_migration(message="use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)' and reorder arguments accordingly")
   @warn_unused_result
   public static func measure<
       Encoding : UnicodeCodecType, Input : GeneratorType
