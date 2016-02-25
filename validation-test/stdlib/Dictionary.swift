@@ -701,7 +701,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
@@ -709,7 +709,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, to: Int.self)
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
@@ -722,19 +722,19 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d, to: Int.self)
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
   }
@@ -763,7 +763,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, to: Int.self)
-    let originalCapacity = d1._variantStorage.native.capacity
+    let originalCapacity = d1._variantStorage.asNative.capacity
     assert(d1.count == 3)
     assert(d1[10] == 1010)
 
@@ -774,7 +774,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
-    assert(d2._variantStorage.native.capacity == originalCapacity)
+    assert(d2._variantStorage.asNative.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[10] == nil)
 
@@ -787,7 +787,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
@@ -795,7 +795,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, to: Int.self)
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
@@ -808,19 +808,19 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d, to: Int.self)
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
   }
@@ -849,7 +849,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, to: Int.self)
-    let originalCapacity = d1._variantStorage.native.capacity
+    let originalCapacity = d1._variantStorage.asNative.capacity
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
@@ -860,7 +860,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity == originalCapacity)
+    assert(d2._variantStorage.asNative.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestKeyTy(10)] == nil)
 
@@ -2001,7 +2001,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2016,7 +2016,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 != unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity >= originalCapacity)
+    assert(d._variantStorage.asNative.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2036,7 +2036,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity < originalCapacity)
+    assert(d2._variantStorage.asNative.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2056,7 +2056,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity >= originalCapacity)
+    assert(d2._variantStorage.asNative.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2084,7 +2084,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2099,7 +2099,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity >= originalCapacity)
+    assert(d._variantStorage.asNative.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2119,7 +2119,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity < originalCapacity)
+    assert(d2._variantStorage.asNative.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
@@ -2139,7 +2139,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity >= originalCapacity)
+    assert(d2._variantStorage.asNative.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }

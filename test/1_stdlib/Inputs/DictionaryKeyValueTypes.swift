@@ -12,9 +12,9 @@ func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   d: Dictionary<KeyTy, ValueTy>) -> Bool {
   switch d._variantStorage {
-  case .Native:
+  case .native:
     return true
-  case .Cocoa:
+  case .cocoa:
     return false
   }
 }
