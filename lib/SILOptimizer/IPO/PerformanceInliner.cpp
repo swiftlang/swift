@@ -684,14 +684,12 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
-      auto ICost = instructionInlineCost(I);
-      
       if (testThreshold >= 0) {
         // We are in test-mode: use a simplified cost model.
         CalleeCost += testCost(&I);
       } else {
         // Use the regular cost model.
-        CalleeCost += unsigned(ICost);
+        CalleeCost += unsigned(instructionInlineCost(I));
       }
       
       if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
@@ -766,14 +764,21 @@ bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
     return false;
   
   unsigned CalleeCost = 0;
-  
+  int testThreshold = TestThreshold;
+
   for (SILBasicBlock &Block : *Callee) {
     for (SILInstruction &I : Block) {
-      auto ICost = instructionInlineCost(I);
-      CalleeCost += (unsigned)ICost;
-
-      if (CalleeCost > TrivialFunctionThreshold)
-        return false;
+      if (testThreshold >= 0) {
+        // We are in test-mode: use a simplified cost model.
+        CalleeCost += testCost(&I);
+        if (CalleeCost > 0)
+          return false;
+      } else {
+        // Use the regular cost model.
+        CalleeCost += unsigned(instructionInlineCost(I));
+        if (CalleeCost > TrivialFunctionThreshold)
+          return false;
+      }
     }
   }
   DEBUG(
