@@ -103,7 +103,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  @swift3_migration(renamed="appendContents(of:)")
+  @swift3_migration(renamed="append(contentsOf:)")
   mutating func appendContentsOf<
     S : SequenceType
     where S.Generator.Element == Generator.Element
@@ -122,7 +122,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  @swift3_migration(renamed="insertContents(of:at:)")
+  @swift3_migration(renamed="insert(contentsOf:at:)")
   mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == Generator.Element
   >(newElements: S, at i: Index)
@@ -199,7 +199,7 @@ extension RangeReplaceableCollectionType {
     insert(newElement, atIndex: endIndex)
   }
 
-  @swift3_migration(renamed="appendContents(of:)")
+  @swift3_migration(renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
     S : SequenceType where S.Generator.Element == Generator.Element
   >(newElements: S) {
@@ -215,7 +215,7 @@ extension RangeReplaceableCollectionType {
     replaceRange(i..<i, with: CollectionOfOne(newElement))
   }
 
-  @swift3_migration(renamed="insertContents(of:at:)")
+  @swift3_migration(renamed="insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     C : CollectionType where C.Generator.Element == Generator.Element
   >(newElements: C, at i: Index) {
