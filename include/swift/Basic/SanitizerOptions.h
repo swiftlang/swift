@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_SANITIZER_OPTIONS_H
 #define SWIFT_BASIC_SANITIZER_OPTIONS_H
 
+#include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
 
 namespace swift {
@@ -28,6 +29,7 @@ enum class SanitizerKind : unsigned {
 /// \param Diag If non null, the argument is used to diagnose invalid values.
 /// \return Returns a SanitizerKind.
 SanitizerKind parseSanitizerArgValues(const llvm::opt::Arg *A,
-                                      DiagnosticEngine *Diag = nullptr);
+                                      const llvm::Triple &Triple,
+                                      DiagnosticEngine &Diag);
 }
 #endif // SWIFT_BASIC_SANITIZER_OPTIONS_H

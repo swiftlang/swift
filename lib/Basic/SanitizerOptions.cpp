@@ -21,19 +21,42 @@
 
 namespace swift {
 
+static StringRef toStringRef(const SanitizerKind kind) {
+  switch(kind) {
+    case SanitizerKind::Address:
+      return "address";
+    case SanitizerKind::None:
+      assert("Getting a name for SanitizerKind::None");
+  }
+  llvm_unreachable("Unsupported sanitizer");
+}
+
 SanitizerKind parseSanitizerArgValues(const llvm::opt::Arg *A,
-                                      DiagnosticEngine *Diags) {
+                                      const llvm::Triple &Triple,
+                                      DiagnosticEngine &Diags) {
   SanitizerKind kind = SanitizerKind::None;
+
+  // Find the sanitizer kind.
+  // TODO: Add support for dealing with multiple sanitizers.
   for (int i = 0, n = A->getNumValues(); i != n; ++i) {
     const char *Value = A->getValue(i);
     if (StringRef(Value).equals("address")) {
       kind = SanitizerKind::Address;
-    } else if (Diags) {
-      Diags->diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                       A->getOption().getName(), A->getValue(i));
+      return kind;
     }
   }
+
+  // Check if the traget is supported for this sanitizer.
+  if (!Triple.isOSDarwin() && kind != SanitizerKind::None) {
+    SmallVector<char, 128> buffer;
+    Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
+      (A->getOption().getName() + toStringRef(kind)).toStringRef(buffer),
+      Triple.getTriple());
+  }
+
   return kind;
 }
-
 }

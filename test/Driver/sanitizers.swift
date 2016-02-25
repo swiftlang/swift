@@ -9,10 +9,10 @@
 // RUN: %swiftc_driver -driver-print-jobs -sanitize=address -target i386-apple-watchos2.0 %s   | FileCheck -check-prefix=ASAN -check-prefix=watchOS_SIM %s
 // RUN: %swiftc_driver -driver-print-jobs -sanitize=address -target armv7k-apple-watchos2.0 %s | FileCheck -check-prefix=ASAN -check-prefix=watchOS %s
 
-// RUN: not %swiftc_driver -driver-print-jobs -sanitize=address,unknown -target x86_64-apple-macosx10.9 %s  2>&1 | FileCheck -check-prefix=BADARG %s
-// RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -sanitize=unknown -target x86_64-apple-macosx10.9 %s 2>&1 | FileCheck -check-prefix=BADARG %s
+// RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -target x86_64-unknown-linux-gnu %s 2>&1 | FileCheck -check-prefix=LINUX %s
 
-// XFAIL: linux
+// RUN: not %swiftc_driver -driver-print-jobs -sanitize=address,unknown %s 2>&1 | FileCheck -check-prefix=BADARG %s
+// RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -sanitize=unknown %s 2>&1 | FileCheck -check-prefix=BADARG %s
 
 // ASAN: swift
 // ASAN: -sanitize=address
@@ -24,6 +24,7 @@
 // tvOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.asan_tvossim_dynamic.dylib
 // watchOS: lib/swift/clang/lib/darwin/libclang_rt.asan_watchos_dynamic.dylib
 // watchOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.asan_watchossim_dynamic.dylib
+// LINUX: unsupported option 'sanitize=address' for target 'x86_64-unknown-linux-gnu'
 
 // ASAN: -rpath @executable_path
 
