@@ -201,6 +201,10 @@ public:
     return 1;
   }
 
+  static const char *getName() {
+    return "BoxCache";
+  }
+
   FullMetadata<GenericBoxHeapMetadata> *getData() {
     return &Metadata;
   }
