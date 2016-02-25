@@ -237,6 +237,63 @@ enum class ProtocolDispatchStrategy: uint8_t {
   Empty = 2,
 };
 
+/// Flags in a generic nominal type descriptor.
+class GenericParameterDescriptorFlags {
+  typedef uint32_t int_type;
+  enum : int_type {
+    HasParent        = 0x01,
+    HasGenericParent = 0x02,
+  };
+  int_type Data;
+  
+  constexpr GenericParameterDescriptorFlags(int_type data) : Data(data) {}
+public:
+  constexpr GenericParameterDescriptorFlags() : Data(0) {}
+
+  constexpr GenericParameterDescriptorFlags withHasParent(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasParent)
+                                             : (Data & ~HasParent));
+  }
+
+  constexpr GenericParameterDescriptorFlags withHasGenericParent(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasGenericParent)
+                                             : (Data & ~HasGenericParent));
+  }
+
+  /// Does this type have a lexical parent type?
+  ///
+  /// For class metadata, if this is true, the storage for the parent type
+  /// appears immediately prior to the first generic argument.  Other
+  /// metadata always have a slot for their parent type.
+  bool hasParent() const {
+    return Data & HasParent;
+  }
+
+  /// Given that this type has a parent type, is that type generic?  If so,
+  /// it forms part of the key distinguishing this metadata from other
+  /// metadata, and the parent metadata will be the first argument to
+  /// the generic metadata access function.
+  bool hasGenericParent() const {
+    return Data & HasGenericParent;
+  }
+
+  int_type getIntValue() const {
+    return Data;
+  }
+  
+  static GenericParameterDescriptorFlags fromIntValue(int_type Data) {
+    return GenericParameterDescriptorFlags(Data);
+  }
+  
+  bool operator==(GenericParameterDescriptorFlags other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(GenericParameterDescriptorFlags other) const {
+    return Data != other.Data;
+  }
+};
+
+
 /// Flags for protocol descriptors.
 class ProtocolDescriptorFlags {
   typedef uint32_t int_type;

@@ -263,7 +263,7 @@ swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
   // Instantiate resilient types.
   if (metadata == nullptr &&
       ntd->getGenericMetadataPattern() &&
-      !ntd->GenericParams.hasGenericParams()) {
+      !ntd->GenericParams.isGeneric()) {
     return swift_getResilientMetadata(ntd->getGenericMetadataPattern());
   }
 

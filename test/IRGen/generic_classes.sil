@@ -317,11 +317,10 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_GenericInheritsGeneric(%swift.type_pattern*, i8**) {{.*}} {
 //   Bind the generic parameters.
-// CHECK:   [[T0:%.*]] = load i8*, i8** %1
-// CHECK:   %A = bitcast i8* [[T0]] to %swift.type*
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %1, i32 1
-// CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]]
-// CHECK:   %B = bitcast i8* [[T1]] to %swift.type*
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %A  = load %swift.type*, %swift.type** [[T0]]
+// CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
+// CHECK:   %B  = load %swift.type*, %swift.type** [[T1]]
 //   Construct the superclass.
 // CHECK:   [[SUPER:%.*]] = call %swift.type* @_TMaC15generic_classes11RootGeneric(%swift.type* %A)
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*

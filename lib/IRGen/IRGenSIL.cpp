@@ -1859,11 +1859,11 @@ static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
     assert(subs[0].getConformances().size() == 1);
 
     auto conformance = subs[0].getConformances()[0];
+    assert(conformance.getRequirement() == proto); (void) proto;
     auto substSelfType = subs[0].getReplacement()->getCanonicalType();
 
     llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
     wtable = emitWitnessTableRef(IGF, substSelfType, &argMetadata,
-                                 proto, IGF.IGM.getProtocolInfo(proto),
                                  conformance);
   } else {
     // Otherwise, we have no way of knowing the original protocol or
@@ -4827,4 +4827,8 @@ void IRGenModule::emitSILStaticInitializer() {
 
     llvm_unreachable("We only handle StructType for now!");
   }
+}
+
+ModuleDecl *IRGenModule::getSwiftModule() const {
+  return SILMod->getSwiftModule();
 }

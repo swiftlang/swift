@@ -1475,7 +1475,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
                                         bool copyFieldOffsetVectors) {
 #if SWIFT_OBJC_INTEROP
   // If the class is generic, we need to give it a name for Objective-C.
-  if (theClass->getDescription()->GenericParams.NumParams > 0)
+  if (theClass->getDescription()->GenericParams.isGeneric())
     _swift_initGenericClassObjCName(theClass);
 #endif
 
@@ -1483,25 +1483,31 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
   if (theSuperclass == nullptr)
     return;
 
-  // If any ancestors had generic parameters or field offset vectors,
-  // inherit them.
+  // If any ancestor classes have generic parameters or field offset
+  // vectors, inherit them.
   auto ancestor = theSuperclass;
   auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
   auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
   while (ancestor && ancestor->isTypeMetadata()) {
     auto description = ancestor->getDescription();
     auto &genericParams = description->GenericParams;
-    if (genericParams.hasGenericParams()) {
-      unsigned numParamWords = 0;
-      for (unsigned i = 0; i < genericParams.NumParams; ++i) {
-        // 1 word for the type metadata, and 1 for every protocol witness
-        numParamWords +=
-            1 + genericParams.Parameters[i].NumWitnessTables;
-      }
+
+    // Copy the parent type.
+    if (genericParams.Flags.hasParent()) {
+      memcpy(classWords + genericParams.Offset - 1,
+             superWords + genericParams.Offset - 1,
+             sizeof(uintptr_t));
+    }
+
+    // Copy the generic requirements.
+    if (genericParams.hasGenericRequirements()) {
+      unsigned numParamWords = genericParams.NumGenericRequirements;
       memcpy(classWords + genericParams.Offset,
              superWords + genericParams.Offset,
              numParamWords * sizeof(uintptr_t));
     }
+
+    // Copy the field offsets.
     if (copyFieldOffsetVectors &&
         description->Class.hasFieldOffsetVector()) {
       unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;

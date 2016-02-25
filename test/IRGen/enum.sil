@@ -2566,8 +2566,8 @@ bb4:
 // -- Fill function for dynamic singleton. The value witness table flags just
 //    get copied over from the element.
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSingleton(%swift.type_pattern*, i8**) {{.*}} {
-// CHECK:   [[T0:%.*]] = load i8*, i8** %1
-// CHECK:   [[T:%.*]] = bitcast i8* [[T0]] to %swift.type*
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[T]] to i8*

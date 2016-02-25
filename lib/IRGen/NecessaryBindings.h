@@ -21,6 +21,7 @@
 #ifndef SWIFT_IRGEN_NECESSARYBINDINGS_H
 #define SWIFT_IRGEN_NECESSARYBINDINGS_H
 
+#include "GenericRequirement.h"
 #include "llvm/ADT/SetVector.h"
 #include "swift/AST/Types.h"
 
@@ -38,7 +39,7 @@ namespace irgen {
 /// NecessaryBindings - The set of metadata that must be saved in
 /// order to perform some set of operations on a type.
 class NecessaryBindings {
-  llvm::SetVector<std::pair<CanType, ProtocolDecl*>> Requirements;
+  llvm::SetVector<GenericRequirement> Requirements;
 
 public:
   NecessaryBindings() = default;

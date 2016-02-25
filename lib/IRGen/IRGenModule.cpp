@@ -377,6 +377,7 @@ IRGenModule::~IRGenModule() {
     delete DebugInfo;
   delete ABITypes;
 }
+
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 
 // Explicitly listing these constants is an unfortunate compromise for
