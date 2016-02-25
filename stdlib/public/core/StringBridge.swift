@@ -230,13 +230,13 @@ public final class _NSContiguousString : _SwiftNativeNSString {
 
     if _core.elementWidth == 2 {
       UTF16._copy(
-        _core.startUTF16 + aRange.location,
+        source: _core.startUTF16 + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
         count: aRange.length)
     }
     else {
       UTF16._copy(
-        _core.startASCII + aRange.location,
+        source: _core.startASCII + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
         count: aRange.length)
     }

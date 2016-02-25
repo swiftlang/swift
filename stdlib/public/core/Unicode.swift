@@ -894,8 +894,9 @@ extension UTF16 {
 
   public // @testable
   static func _copy<T : _StringElement, U : _StringElement>(
-    source: UnsafeMutablePointer<T>,
-    destination: UnsafeMutablePointer<U>, count: Int
+    source source: UnsafeMutablePointer<T>,
+    destination: UnsafeMutablePointer<U>,
+    count: Int
   ) {
     if strideof(T.self) == strideof(U.self) {
       _memcpy(
