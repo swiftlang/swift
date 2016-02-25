@@ -18,20 +18,25 @@
 ///
 /// A unicode scalar value, an indication that no more unicode scalars
 /// are available, or an indication of a decoding error.
-public enum UnicodeDecodingResult {
+public enum UnicodeDecodingResult : Equatable {
   case scalarValue(UnicodeScalar)
   case emptyInput
   case error
+}
 
-  /// Returns `true` if `self` indicates no more unicode scalars are
-  /// available.
-  public var isEmptyInput: Bool {
-    switch self {
-    case .emptyInput:
-      return true
-    default:
-      return false
-    }
+public func == (
+  lhs: UnicodeDecodingResult,
+  rhs: UnicodeDecodingResult
+) -> Bool {
+  switch (lhs, rhs) {
+  case (.scalarValue(let lhsScalar), .scalarValue(let rhsScalar)):
+    return lhsScalar == rhsScalar
+  case (.emptyInput, .emptyInput):
+    return true
+  case (.error, .error):
+    return true
+  default:
+    return false
   }
 }
 
@@ -700,7 +705,7 @@ public func transcode<
   var inputDecoder = inputEncoding.init()
   var hadError = false
   var scalar = inputDecoder.decode(&input)
-  while !scalar.isEmptyInput {
+  while scalar != .emptyInput {
     switch scalar {
     case .scalarValue(let us):
       OutputEncoding.encode(us, output: output)
