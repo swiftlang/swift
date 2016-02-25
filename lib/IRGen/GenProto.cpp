@@ -713,8 +713,6 @@ public:
                                           llvm::Value *selfMetadata,
                                     llvm::function_ref<llvm::Value*()> body);
 
-    void bindArchetypes(IRGenFunction &IGF, llvm::Value *selfMetadata);
-
     /// Allocate another word of private data storage in the conformance table.
     unsigned getNextCacheIndex() {
       RequiresSpecialization = true;
@@ -805,7 +803,6 @@ getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
 
   // Bind local type data from the metadata argument.
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self);
-
 
   // For now, assume that an associated type is cheap enough to access
   // that it doesn't need a new cache entry.
@@ -983,7 +980,6 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
 
   // In the fetch block, bind the archetypes and evaluate the body.
   IGF.Builder.emitBlock(fetchBB);
-  bindArchetypes(IGF, selfMetadata);
 
   llvm::Value *fetchedResult = body();
 
@@ -995,86 +991,6 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   auto fetchedResultBB = IGF.Builder.GetInsertBlock();
   IGF.Builder.CreateBr(contBB);
   result->addIncoming(fetchedResult, fetchedResultBB);
-}
-
-/// Within a metadata or witness-table accessor on this conformance, bind
-/// the type metadata and witness tables for all the associated types.
-void WitnessTableBuilder::bindArchetypes(IRGenFunction &IGF,
-                                         llvm::Value *selfMetadata) {
-  auto generics =
-    Conformance.getDeclContext()->getGenericParamsOfContext();
-  if (!generics) return;
-
-  MetadataPath::Map<llvm::Value*> cache;
-
-  auto &fulfillments = getFulfillmentMap();
-
-  for (auto archetype : generics->getAllArchetypes()) {
-    // FIXME: be lazier.
-
-    // Find the type metadata for the archetype.
-    //
-    // All of the primary archetypes will be fulfilled by the concrete
-    // type; otherwise they'd be free.  Everything else we should be able
-    // to derive from some parent archetype and its known conformances.
-    llvm::Value *archetypeMetadata;
-    if (auto fulfillment =
-          fulfillments.getTypeMetadata(CanType(archetype))) {
-      archetypeMetadata =
-        fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType,
-                                                 selfMetadata, &cache);
-    } else {
-      assert(!archetype->isPrimary() && "free type param in conformance?");
-
-      // getAllArchetypes is in dependency order, so the parent archetype
-      // should always be mapped.
-      auto parentArchetype = CanArchetypeType(archetype->getParent());
-      archetypeMetadata =
-        emitAssociatedTypeMetadataRef(IGF, parentArchetype,
-                                      archetype->getAssocType());
-    }
-
-    // Find the witness tables for the archetype.
-    //
-    // Archetype conformances in a type context can be classified into
-    // three buckets:
-    //
-    //   - They can be inherent to the extended type, e.g. Dictionary's
-    //     requirement that its keys be Equatable.  These should always
-    //     be fulfillable from the concrete type metadata.
-    //
-    //   - If the archetype is an associated type, they can be inherent
-    //     to that associated type's requirements.  These should always
-    //     be available from the associated type's parent conformance.
-    //
-    //   - Otherwise, the conformance must be a free requirement on the
-    //     extension; that is, this must be a conditional conformance.
-    //     We don't support this yet, but when we do they'll have to
-    //     be stored in the private section of the witness table.
-    SmallVector<llvm::Value*, 4> archetypeWitnessTables;
-    for (auto protocol : archetype->getConformsTo()) {
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
-
-      llvm::Value *wtable;
-      if (auto fulfillment =
-            fulfillments.getWitnessTable(CanType(archetype), protocol)) {
-        wtable =
-          fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType,
-                                                   selfMetadata, &cache);
-      } else {
-        assert(!archetype->isPrimary() && "conditional conformance?");
-        auto parentArchetype = CanArchetypeType(archetype->getParent());
-        wtable = emitAssociatedTypeWitnessTableRef(IGF, parentArchetype,
-                                                archetype->getAssocType(),
-                                                   archetypeMetadata,
-                                                   protocol);
-      }
-      archetypeWitnessTables.push_back(wtable);
-    }
-
-    IGF.bindArchetype(archetype, archetypeMetadata, archetypeWitnessTables);
-  }
 }
 
 /// Emit the access function for this witness table.
@@ -1467,11 +1383,6 @@ namespace {
     }
 
     ArrayRef<Source> getSources() const { return Sources; }
-
-    GenericSignatureWitnessIterator getAllDependentTypes() const {
-      return Generics ? Generics->getAllDependentTypes()
-                      : GenericSignatureWitnessIterator::emptyRange();
-    }
 
     using RequirementCallback =
       llvm::function_ref<void(GenericRequirement requirement)>;
