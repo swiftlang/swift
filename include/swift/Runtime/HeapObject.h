@@ -60,6 +60,12 @@ HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredAlignmentMask)
     SWIFT_CC(RegisterPreservingCC);
 
+SWIFT_RUNTIME_EXPORT
+extern "C"
+HeapObject *(*SWIFT_CC(RegisterPreservingCC) _swift_allocObject)(
+                                              HeapMetadata const *metadata,
+                                              size_t requiredSize,
+                                              size_t requiredAlignmentMask);
 
 /// Initializes the object header of a stack allocated object.
 ///

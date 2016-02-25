@@ -42,10 +42,22 @@
 using namespace swift;
 
 SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
 HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
                          size_t requiredAlignmentMask)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  return SWIFT_RT_ENTRY_REF(swift_allocObject)(metadata, requiredSize,
+                                               requiredAlignmentMask);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+HeapObject *
+SWIFT_RT_ENTRY_IMPL(swift_allocObject)(HeapMetadata const *metadata,
+                                       size_t requiredSize,
+                                       size_t requiredAlignmentMask)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(isAlignmentMask(requiredAlignmentMask));
   auto object = reinterpret_cast<HeapObject *>(
