@@ -440,17 +440,17 @@ extension Mirror.DisplayStyle {
   /// Construct from a legacy `_MirrorDisposition`
   internal init?(legacy: _MirrorDisposition) {
     switch legacy {
-    case .Struct: self = .`struct`
-    case .Class: self = .`class`
-    case .Enum: self = .`enum`
-    case .Tuple: self = .tuple
-    case .Aggregate: return nil
-    case .IndexContainer: self = .collection
-    case .KeyContainer: self = .dictionary
-    case .MembershipContainer: self = .`set`
-    case .Container: preconditionFailure("unused!")
-    case .Optional: self = .optional
-    case .ObjCObject: self = .`class`
+    case .`struct`: self = .`struct`
+    case .`class`: self = .`class`
+    case .`enum`: self = .`enum`
+    case .tuple: self = .tuple
+    case .aggregate: return nil
+    case .indexContainer: self = .collection
+    case .keyContainer: self = .dictionary
+    case .membershipContainer: self = .`set`
+    case .container: preconditionFailure("unused!")
+    case .optional: self = .optional
+    case .objCObject: self = .`class`
     }
   }
 }
