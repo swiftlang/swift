@@ -33,7 +33,7 @@ pid$target:libswiftCore:swift_retain:entry / arg0 != 0 /
     @counts["swift_retain", "global"] = count();
 }
 
-pid$target:*:swift_release:entry
+pid$target:*:swift_release:entry / arg0 != 0 /
 {
     this->ptr = (HeapObject *)copyin(arg0, sizeof(HeapObject));
     this->metadata = (ClassMetadata *)copyin(this->ptr->M, sizeof(ClassMetadata));
