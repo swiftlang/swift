@@ -244,10 +244,16 @@ namespace {
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
 
-        // If we're analyzing a nested closure, continue to recurse, so we can
-        //make further connections amongst the arguments.
         return { false, expr };
       }
+
+      // Optimize branches of a conditional expression separately.
+      if (auto IE = dyn_cast<IfExpr>(expr)) {
+        CS.optimizeConstraints(IE->getCondExpr());
+        CS.optimizeConstraints(IE->getThenExpr());
+        CS.optimizeConstraints(IE->getElseExpr());
+        return { false, expr };
+      }      
 
       // TODO: The systems that we need to solve for interpolated string expressions
       // require bespoke logic that don't currently work with this approach.
