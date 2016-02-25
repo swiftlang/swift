@@ -51,3 +51,7 @@ D: SILOptimizer
 N: Anna Zaks
 E: ganna@apple.com
 D: SIL diagnostics passes
+
+N: Luke Larson
+E: llarson@apple.com
+D: Swift Benchmark Suite
