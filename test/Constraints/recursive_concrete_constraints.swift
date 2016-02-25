@@ -22,7 +22,7 @@ struct S<A: CollectionType where A.Index == Int> : CollectionType {
   }
   
   func generate() -> IndexingGenerator<S> {
-    return IndexingGenerator(self)
+    return IndexingGenerator(self) // expected-warning{{init' is deprecated: it will be removed in Swift 3}}
   }
   
   var base: A
