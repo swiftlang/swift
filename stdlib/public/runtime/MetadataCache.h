@@ -333,6 +333,10 @@ public:
     // creating the metadata.
     auto value = builder();
 
+    // Update the linked list.
+    value->Next = Head;
+    Head = value;
+
 #if SWIFT_DEBUG_RUNTIME
         printf("%s(%p): created %p\n",
                ValueTy::getName(), (void*) this, value);
