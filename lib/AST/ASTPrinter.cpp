@@ -2184,7 +2184,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
                        /*isAPINameByDefault*/[](unsigned)->bool{return false;});
   });
   Printer << " -> ";
-  decl->getElementType().print(Printer, Options);
+  printTypeLoc(decl->getElementTypeLoc());
 
   printAccessors(decl);
 }

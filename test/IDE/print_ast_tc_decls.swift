@@ -926,9 +926,15 @@ class d0700_InClassSubscript1 {
     }
   }
   subscript(index i: Float) -> Int { return 42 }
+  class `class` {}
+  subscript(x: Float) -> `class` { return `class`() }
 // PASS_COMMON: {{^}}  subscript(i: Int) -> Int { get }{{$}}
 // PASS_COMMON: {{^}}  subscript(index i: Float) -> Int { get }{{$}}
+// PASS_COMMON: {{^}}  subscript(x: Float) -> {{.*}} { get }{{$}}
 // PASS_COMMON-NOT: subscript
+
+// PASS_ONE_LINE_TYPE: {{^}}  subscript(x: Float) -> d0700_InClassSubscript1.`class` { get }{{$}}
+// PASS_ONE_LINE_TYPEREPR: {{^}}  subscript(x: Float) -> `class` { get }{{$}}
 }
 // PASS_COMMON: {{^}}}{{$}}
 
