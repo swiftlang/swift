@@ -1047,7 +1047,7 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 public typealias ErrorPointer = NSErrorPointer
 
 public // COMPILER_INTRINSIC
-let _nilObjCError: ErrorProtocol = _GenericObjCError.NilError
+let _nilObjCError: ErrorProtocol = _GenericObjCError.nilError
 
 @warn_unused_result
 @_silgen_name("swift_convertNSErrorToErrorProtocol")

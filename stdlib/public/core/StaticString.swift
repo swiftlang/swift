@@ -23,9 +23,9 @@
 /// Logically speaking, each instance looks something like this:
 ///
 ///      enum StaticString {
-///        case ASCII(start: UnsafePointer<UInt8>, count: Int)
-///        case UTF8(start: UnsafePointer<UInt8>, count: Int)
-///        case Scalar(UnicodeScalar)
+///        case ascii(start: UnsafePointer<UInt8>, count: Int)
+///        case utf8(start: UnsafePointer<UInt8>, count: Int)
+///        case scalar(UnicodeScalar)
 ///      }
 public struct StaticString
   : _BuiltinUnicodeScalarLiteralConvertible,
