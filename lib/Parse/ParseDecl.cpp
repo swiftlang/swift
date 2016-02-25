@@ -2596,13 +2596,13 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
   bool foundActive = false;
   SmallVector<IfConfigDeclClause, 4> Clauses;
-  
+
+  ConfigParserState ConfigState;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     
-    ConfigParserState ConfigState;
     if (isElse) {
       ConfigState.setConditionActive(!foundActive);
     } else {
@@ -2631,16 +2631,21 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       scope.emplace(this, ScopeKind::Brace, /*inactiveConfigBlock=*/true);
     
     SmallVector<Decl*, 8> Decls;
-    ParserStatus Status;
-    while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
-           Tok.isNot(tok::pound_elseif)) {
-      Status = parseDecl(Decls, Flags);
-
-      if (Status.isError()) {
-        diagnose(Tok, diag::expected_close_to_config_stmt);
-        skipUntilConfigBlockClose();
-        break;
-      }
+    if (ConfigState.shouldParse()) {
+      ParserStatus Status;
+      while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
+             Tok.isNot(tok::pound_elseif)) {
+          Status = parseDecl(Decls, Flags);
+          if (Status.isError()) {
+            diagnose(Tok, diag::expected_close_to_config_stmt);
+            skipUntilConfigBlockClose();
+            break;
+          }
+        }
+      } else {
+      DiagnosticTransaction DT(Diags);
+      skipUntilConfigBlockClose();
+      DT.abort();
     }
 
     Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
