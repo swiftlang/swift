@@ -121,7 +121,7 @@ public struct UTF8 : UnicodeCodec {
 
   /// Lookahead buffer used for UTF-8 decoding.  New bytes are inserted at LSB,
   /// and bytes are read at MSB.
-  var _decodeLookahead: UInt32 = 0
+  internal var _decodeLookahead: UInt32 = 0
 
   /// Flags with layout: `0bxxxx_yyyy`.
   ///
@@ -138,12 +138,12 @@ public struct UTF8 : UnicodeCodec {
   ///
   /// This representation is crafted to allow one to consume a byte from a
   /// buffer with a shift, and update flags with a single-bit right shift.
-  var _lookaheadFlags: UInt8 = 0
+  internal var _lookaheadFlags: UInt8 = 0
 
   /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
   /// unit sequence.
   @warn_unused_result
-  static func _isValidUTF8Impl(buffer: UInt32, length: UInt8) -> Bool {
+  internal static func _isValidUTF8Impl(buffer: UInt32, length: UInt8) -> Bool {
     switch length {
     case 4:
       let cu3 = UInt8((buffer >> 24) & 0xff)
@@ -194,7 +194,7 @@ public struct UTF8 : UnicodeCodec {
   /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
   /// unit sequence.
   @warn_unused_result
-  static func _isValidUTF8(buffer: UInt32, validBytes: UInt8) -> Bool {
+  internal static func _isValidUTF8(buffer: UInt32, validBytes: UInt8) -> Bool {
     _sanityCheck(validBytes & 0b0000_1111 != 0,
         "input buffer should not be empty")
 
@@ -224,7 +224,7 @@ public struct UTF8 : UnicodeCodec {
   /// Given an ill-formed sequence, find the length of its maximal subpart.
   @inline(never)
   @warn_unused_result
-  static func _findMaximalSubpartOfIllFormedUTF8Sequence(
+  internal static func _findMaximalSubpartOfIllFormedUTF8Sequence(
       buffer: UInt32, validBytes: UInt8) -> UInt8 {
     var buffer = buffer
     var validBytes = validBytes
@@ -484,8 +484,6 @@ public struct UTF8 : UnicodeCodec {
   public static func isContinuation(byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
-
-  var _value =  UInt8()
 }
 
 /// A codec for [UTF-16](http://www.unicode.org/glossary/#UTF_16).
@@ -629,8 +627,6 @@ public struct UTF16 : UnicodeCodec {
       put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
   }
-
-  var _value = UInt16()
 }
 
 /// A codec for [UTF-32](http://www.unicode.org/glossary/#UTF_32).
