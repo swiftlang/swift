@@ -973,6 +973,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf8).indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     utf8: String.UTF8View
@@ -984,6 +985,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf16).indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
@@ -995,6 +997,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(unicodeScalars).indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView

@@ -367,6 +367,7 @@ extension String.UnicodeScalarIndex {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf8)!.indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
@@ -376,6 +377,7 @@ extension String.UnicodeScalarIndex {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf16)!.indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
@@ -387,6 +389,7 @@ extension String.UnicodeScalarIndex {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.unicodeScalars.indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(characters: String) -> String.Index? {
     return String.Index(self, within: characters)
