@@ -19,9 +19,13 @@
 /// A unicode scalar value, an indication that no more unicode scalars
 /// are available, or an indication of a decoding error.
 public enum UnicodeDecodingResult {
-  @swift3_migration(renamed="ScalarValue")
+  @swift3_migration(renamed="scalarValue")
   case Result(UnicodeScalar)
+
+  @swift3_migration(renamed="emptyInput")
   case EmptyInput
+
+  @swift3_migration(renamed="error")
   case Error
 
   /// Returns `true` if `self` indicates no more unicode scalars are

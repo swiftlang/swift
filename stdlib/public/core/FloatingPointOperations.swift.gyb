@@ -74,6 +74,7 @@ public protocol FloatingPointType : Strideable {
   static var infinity: Self { get }
 
   /// A quiet NaN.
+  @swift3_migration(renamed="nan")
   static var NaN: Self { get }
 
   /// A quiet NaN.

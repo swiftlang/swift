@@ -72,6 +72,7 @@ public struct CGFloat {
     return CGFloat(NativeType.infinity)
   }
 
+  @swift3_migration(renamed="nan")
   public static var NaN: CGFloat {
     return CGFloat(NativeType.NaN)
   }

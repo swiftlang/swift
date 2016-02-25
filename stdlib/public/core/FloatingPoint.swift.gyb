@@ -256,6 +256,7 @@ extension ${Self} : FloatingPointType {
   }
 
   /// A quiet NaN.
+  @swift3_migration(renamed="nan")
   public static var NaN: ${Self} {
     return quietNaN
   }
