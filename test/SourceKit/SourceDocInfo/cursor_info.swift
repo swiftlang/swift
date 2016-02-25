@@ -248,13 +248,11 @@ func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) ->
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK27 %s
 // CHECK27: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK27: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
-// FIXME: returntype
+// CHECK27: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype> { get }</decl.function.subscript>
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK28 %s
 // CHECK28: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK28: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <ref.struct usr="s:Si">Int</ref.struct> { get }</decl.function.subscript>
-// FIXME: returntype
+// CHECK28: <decl.function.subscript>public <decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype> { get }</decl.function.subscript>
 
 // RUN: %sourcekitd-test -req=cursor -pos=74:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK29
 // CHECK29: source.lang.swift.decl.function.destructor (74:3-74:9)
