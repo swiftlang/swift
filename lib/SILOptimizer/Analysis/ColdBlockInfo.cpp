@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 
@@ -25,17 +26,9 @@ static SILValue getCondition(SILValue C) {
   return C;
 }
 
-namespace {
-/// Tri-value return code for checking branch hints.
-enum BranchHint : unsigned {
-  None,
-  LikelyTrue,
-  LikelyFalse
-};
-} // namespace
-
 /// \return a BranchHint if this call is a builtin branch hint.
-static BranchHint getBranchHint(SILValue Cond) {
+ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
+                                                       int recursionDepth) {
   // Handle the fully inlined Builtin.
   if (auto *BI = dyn_cast<BuiltinInst>(Cond)) {
     if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
@@ -47,6 +40,37 @@ static BranchHint getBranchHint(SILValue Cond) {
       }
     }
     return BranchHint::None;
+  }
+
+  if (auto *Arg = dyn_cast<SILArgument>(Cond)) {
+    llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> InValues;
+    if (!Arg->getIncomingValues(InValues))
+      return BranchHint::None;
+
+    if (recursionDepth > RecursionDepthLimit)
+      return BranchHint::None;
+
+    BranchHint Hint = BranchHint::None;
+
+    // Check all predecessor values which come from non-cold blocks.
+    for (auto Pair : InValues) {
+      if (!isCold(Pair.first, recursionDepth + 1)) {
+        auto *IL = dyn_cast<IntegerLiteralInst>(Pair.second);
+        if (!IL)
+          return BranchHint::None;
+        // Check if we have a consistent value for all non-cold predecessors.
+        if (IL->getValue().getBoolValue()) {
+          if (Hint == BranchHint::LikelyFalse)
+            return BranchHint::None;
+          Hint = BranchHint::LikelyTrue;
+        } else {
+          if (Hint == BranchHint::LikelyTrue)
+            return BranchHint::None;
+          Hint = BranchHint::LikelyFalse;
+        }
+      }
+    }
+    return Hint;
   }
   
   // Handle the @semantic function used for branch hints. The generic
@@ -84,14 +108,15 @@ static BranchHint getBranchHint(SILValue Cond) {
 /// \return true if the CFG edge FromBB->ToBB is directly gated by a _slowPath
 /// branch hint.
 bool ColdBlockInfo::isSlowPath(const SILBasicBlock *FromBB,
-                               const SILBasicBlock *ToBB) {
+                               const SILBasicBlock *ToBB,
+                               int recursionDepth) {
   auto *CBI = dyn_cast<CondBranchInst>(FromBB->getTerminator());
   if (!CBI)
     return false;
 
   SILValue C = getCondition(CBI->getCondition());
 
-  BranchHint hint = getBranchHint(C);
+  BranchHint hint = getBranchHint(C, recursionDepth);
   if (hint == BranchHint::None)
     return false;
 
@@ -104,7 +129,7 @@ bool ColdBlockInfo::isSlowPath(const SILBasicBlock *FromBB,
 /// \return true if the given block is dominated by a _slowPath branch hint.
 ///
 /// Cache all blocks visited to avoid introducing quadratic behavior.
-bool ColdBlockInfo::isCold(const SILBasicBlock *BB) {
+bool ColdBlockInfo::isCold(const SILBasicBlock *BB, int recursionDepth) {
   auto I = ColdBlockMap.find(BB);
   if (I != ColdBlockMap.end())
     return I->second;
@@ -121,7 +146,7 @@ bool ColdBlockInfo::isCold(const SILBasicBlock *BB) {
   bool IsCold = false;
   Node = Node->getIDom();
   while (Node) {
-    if (isSlowPath(Node->getBlock(), DomChain.back())) {
+    if (isSlowPath(Node->getBlock(), DomChain.back(), recursionDepth)) {
       IsCold = true;
       break;
     }

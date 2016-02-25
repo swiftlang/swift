@@ -795,6 +795,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   DominanceInfo *DT = DA->get(Caller);
   SILLoopInfo *LI = LA->get(Caller);
 
+  ColdBlockInfo ColdBlocks(DA);
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
 
@@ -822,7 +823,7 @@ void SILPerformanceInliner::collectAppliesToInline(
       }
     }
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
-      if (ColdBlockInfo::isSlowPath(block, child)) {
+      if (ColdBlocks.isSlowPath(block, child)) {
         // Handle cold blocks separately.
         visitColdBlocks(InitialCandidates, child, DT);
         return false;
