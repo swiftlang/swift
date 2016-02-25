@@ -44,6 +44,8 @@ SuppDataBytesOffset = 12817
 
 import SwiftShims
 
+// These case names must be kept in sync with the 'GraphemeClusterBreakProperty'
+// enum in C++ and with the names in the GYBUnicodeDataUtils script.
 public // @testable
 enum _GraphemeClusterBreakPropertyValue : Int {
   case Other = 0
@@ -107,31 +109,31 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
   let _trieData: UnsafePointer<UInt8>
 
 % if BMPLookupBytesPerEntry == 1:
-  @_transparent var _BMPLookup: UnsafePointer<UInt8> {
+  @_transparent var _bmpLookup: UnsafePointer<UInt8> {
     return _trieData + ${BMPLookupBytesOffset}
   }
 % end
 
 % if BMPDataBytesPerEntry == 1:
-  @_transparent var _BMPData: UnsafePointer<UInt8> {
+  @_transparent var _bmpData: UnsafePointer<UInt8> {
     return _trieData + ${BMPDataBytesOffset}
   }
 % end
 
 % if SuppLookup1BytesPerEntry == 1:
-  @_transparent var _SuppLookup1: UnsafePointer<UInt8> {
+  @_transparent var _suppLookup1: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup1BytesOffset}
   }
 % end
 
 % if SuppLookup2BytesPerEntry == 1:
-  @_transparent var _SuppLookup2: UnsafePointer<UInt8> {
+  @_transparent var _suppLookup2: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup2BytesOffset}
   }
 % end
 
 % if SuppDataBytesPerEntry == 1:
-  @_transparent var _SuppData: UnsafePointer<UInt8> {
+  @_transparent var _suppData: UnsafePointer<UInt8> {
     return _trieData + ${SuppDataBytesOffset}
   }
 % end
@@ -184,19 +186,19 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
     // if '+' is used.
 
     if _fastPath(codePoint <= 0xffff) {
-      let dataBlockIndex = Int(_BMPLookup[_getBMPFirstLevelIndex(codePoint)])
+      let dataBlockIndex = Int(_bmpLookup[_getBMPFirstLevelIndex(codePoint)])
       return _GraphemeClusterBreakPropertyRawValue(
-          _BMPData[
+          _bmpData[
               (dataBlockIndex << ${BMPDataOffsetBits}) &+
               _getBMPDataOffset(codePoint)])
     } else {
       _precondition(codePoint <= 0x10ffff)
-      let secondLookupIndex = Int(_SuppLookup1[_getSuppFirstLevelIndex(codePoint)])
-      let dataBlockIndex = Int(_SuppLookup2[
+      let secondLookupIndex = Int(_suppLookup1[_getSuppFirstLevelIndex(codePoint)])
+      let dataBlockIndex = Int(_suppLookup2[
           (secondLookupIndex << ${SuppSecondLevelIndexBits}) &+
           _getSuppSecondLevelIndex(codePoint)])
       return _GraphemeClusterBreakPropertyRawValue(
-          _SuppData[
+          _suppData[
               (dataBlockIndex << ${SuppDataOffsetBits}) &+
               _getSuppDataOffset(codePoint)])
     }

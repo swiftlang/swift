@@ -37,7 +37,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
 
     property_values = [None for i in range(0, 0x110000)]
 
-    # Note: Numeric values should be consistent with
+    # Note: Numeric values (including the names) should be consistent with
     # '_GraphemeClusterBreakPropertyValue' enum on the Swift side, and with
     # 'GraphemeClusterBreakProperty' in the compiler C++ code.  If there is a
     # reason for either of those to differ, then this mapping can be overridden
