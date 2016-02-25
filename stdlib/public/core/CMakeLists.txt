@@ -126,7 +126,6 @@ set(SWIFTLIB_SOURCES
   Tuple.swift.gyb
   VarArgs.swift
   Zip.swift
-  Prespecialized.swift
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags)
