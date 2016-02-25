@@ -54,7 +54,7 @@ public protocol FloatingPoint : Strideable {
   static var infinity: Self { get }
 
   /// A quiet NaN.
-  static var NaN: Self { get }
+  static var nan: Self { get }
 
   /// A quiet NaN.
   static var quietNaN: Self { get }

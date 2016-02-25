@@ -58,7 +58,7 @@ var SequenceTypeTests = TestSuite("Sequence")
 //
 // - NaN behavior of floating point types, combined with these generic
 // algorithms, should make sense if possible.  For example,
-// [1.0, Double.NaN].starts(with: [1.0, 2.0]) should be false.
+// [1.0, Double.nan].starts(with: [1.0, 2.0]) should be false.
 
 //===----------------------------------------------------------------------===//
 // min(), max()

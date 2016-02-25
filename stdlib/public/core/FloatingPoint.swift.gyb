@@ -256,7 +256,7 @@ extension ${Self} : FloatingPoint {
   }
 
   /// A quiet NaN.
-  public static var NaN: ${Self} {
+  public static var nan: ${Self} {
     return quietNaN
   }
 

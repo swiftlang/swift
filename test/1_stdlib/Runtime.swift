@@ -1263,7 +1263,7 @@ Reflection.test("Bool") {
 Reflection.test("Float") {
   do {
     var output = ""
-    dump(Float.NaN, to: &output)
+    dump(Float.nan, to: &output)
 
     let expected =
       "- nan\n"
@@ -1296,7 +1296,7 @@ Reflection.test("Float") {
 Reflection.test("Double") {
   do {
     var output = ""
-    dump(Double.NaN, to: &output)
+    dump(Double.nan, to: &output)
 
     let expected =
       "- nan\n"

@@ -72,8 +72,8 @@ public struct CGFloat {
     return CGFloat(NativeType.infinity)
   }
 
-  public static var NaN: CGFloat {
-    return CGFloat(NativeType.NaN)
+  public static var nan: CGFloat {
+    return CGFloat(NativeType.nan)
   }
 
   public static var quietNaN: CGFloat {
