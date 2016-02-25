@@ -34,6 +34,7 @@ public struct UnicodeScalar :
   }
 
   /// Creates an instance of the NUL scalar value.
+  @swift3_migration(message="use 'UnicodeScalar(\"\\0\")'")
   public init() {
     self._value = 0
   }
