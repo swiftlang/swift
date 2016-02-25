@@ -258,6 +258,11 @@ SkipImports("skip-imports",
             llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+SkipOverrides("skip-overrides",
+            llvm::cl::desc("Whether to skip printing overrides/witnesses"),
+            llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SkipParameterNames("skip-parameter-names",
                    llvm::cl::desc("Whether to skip parameter names"),
                    llvm::cl::init(false));
@@ -2602,6 +2607,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
     PrintOpts.SkipDeinit = options::SkipDeinit;
     PrintOpts.SkipImports = options::SkipImports;
+    PrintOpts.SkipOverrides = options::SkipOverrides;
     if (options::SkipParameterNames) {
       PrintOpts.ArgAndParamPrinting
         = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;

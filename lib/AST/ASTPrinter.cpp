@@ -1016,6 +1016,14 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     }
   }
 
+  // If asked to skip overrides and witnesses, do so.
+  if (Options.SkipOverrides) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->getOverriddenDecl()) return false;
+      if (!VD->getSatisfiedProtocolRequirements().empty()) return false;
+    }
+  }
+
   // We need to handle PatternBindingDecl as a special case here because its
   // attributes can only be retrieved from the inside VarDecls.
   if (auto *PD = dyn_cast<PatternBindingDecl>(D)) {
