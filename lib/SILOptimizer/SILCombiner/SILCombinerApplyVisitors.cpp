@@ -670,7 +670,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   SmallVector<Substitution, 8> Substitutions;
   for (auto Subst : AI.getSubstitutions()) {
     if (Subst.getReplacement().getCanonicalTypeOrNull() ==
-        Self->getType().getSwiftRValueType()) {
+        OpenedArchetype) {
       auto Conformances = AI.getModule().getASTContext()
                             .AllocateUninitialized<ProtocolConformanceRef>(1);
       Conformances[0] = Conformance;

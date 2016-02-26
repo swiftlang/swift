@@ -2908,3 +2908,35 @@ bb0:
   dealloc_stack %2 : $*FakeOptional<B>
   return %7 : $FakeOptional<B>
 }
+
+
+
+struct MyErrorType {}
+
+protocol Socket {
+  static func newWithConfig() throws -> Builtin.Int32
+}
+
+class ClientSocket : Socket {
+  final class func newWithConfig() throws -> Builtin.Int32
+}
+
+// CHECK-LABEL: static_existential
+// CHECK:bb0:
+// CHECK:  [[META:%.*]] = metatype $@thick ClientSocket.Type
+// CHECK:  [[WM:%.*]] = witness_method $ClientSocket
+// CHECK:  try_apply [[WM]]<ClientSocket>([[META]])
+sil @static_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
+bb0:
+  %0 = metatype $@thick ClientSocket.Type
+  %1 = init_existential_metatype %0 : $@thick ClientSocket.Type, $@thick Socket.Type
+  %2 = open_existential_metatype %1 : $@thick Socket.Type to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type
+  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket, #Socket.newWithConfig!1, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  try_apply %3<@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
+
+bb1(%4 : $Builtin.Int32):
+  return %4 : $Builtin.Int32
+
+bb2(%5 : $MyErrorType):
+  throw %5 : $MyErrorType
+}
