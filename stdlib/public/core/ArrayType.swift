@@ -51,7 +51,7 @@ protocol _ArrayType
   /// Operator form of `appendContentsOf`.
   func += <
     S: SequenceType where S.Generator.Element == Generator.Element
-  >(inout lhs: Self, rhs: S)
+  >(lhs: inout Self, rhs: S)
 
   /// Insert `newElement` at index `i`.
   ///

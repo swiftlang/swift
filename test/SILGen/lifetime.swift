@@ -137,7 +137,7 @@ func reftype_arg(a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime17reftype_inout_arg
-func reftype_inout_arg(inout a: Ref) {
+func reftype_inout_arg(a: inout Ref) {
     // CHECK: bb0([[A:%[0-9]+]] : $*Ref):
     // -- initialize local box for inout
     // CHECK: [[A_LOCAL:%.*]] = alloc_box $Ref
@@ -202,7 +202,7 @@ func reftype_call_with_arg(a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime16reftype_reassign
-func reftype_reassign(inout a: Ref, b: Ref) {
+func reftype_reassign(a: inout Ref, b: Ref) {
     var b = b
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
     // CHECK: [[A_LOCAL:%[0-9]+]] = alloc_box $Ref

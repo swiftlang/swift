@@ -127,7 +127,7 @@ struct B : Subscriptable {
 // CHECK:   [[T1:%.*]] = builtin "or_Int32"
 // CHECK:   [[T2:%.*]] = struct $Int32 ([[T1]] : $Builtin.Int32)
 // CHECK:   store [[T2]] to [[ADDR]] : $*Int32
-func test_B(inout b: B) {
+func test_B(b: inout B) {
   b[0] |= 7
 }
 
@@ -144,7 +144,7 @@ func id_int(i: Int32) -> Int32 { return i }
 
 // CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVs5Int32S1__S1_ : $@convention(thin) (@inout CArray<Int32 -> Int32>) -> Int32 {
 // CHECK: bb0([[ARRAY:%.*]] : $*CArray<Int32 -> Int32>):
-func test_carray(inout array: CArray<Int32 -> Int32>) -> Int32 {
+func test_carray(array: inout CArray<Int32 -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSix :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<Int32 -> Int32>({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32 -> Int32>, #UnsafeMutablePointer._rawValue
@@ -195,11 +195,11 @@ struct D : Subscriptable {
 // SILGEN:   return [[T2]] :
 
 func make_int() -> Int32 { return 0 }
-func take_int_inout(inout value: Int32) {}
+func take_int_inout(value: inout Int32) {}
 
 // CHECK-LABEL: sil hidden @_TF10addressors6test_dFRVS_1DVs5Int32 : $@convention(thin) (@inout D) -> Int32
 // CHECK: bb0([[ARRAY:%.*]] : $*D):
-func test_d(inout array: D) -> Int32 {
+func test_d(array: inout D) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TF10addressors8make_intFT_Vs5Int32
 // CHECK:   [[V:%.*]] = apply [[T0]]()
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_

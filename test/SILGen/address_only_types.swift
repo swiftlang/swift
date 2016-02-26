@@ -153,7 +153,7 @@ func address_only_materialize() -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types33address_only_assignment_from_temp
-func address_only_assignment_from_temp(inout dest: Unloadable) {
+func address_only_assignment_from_temp(dest: inout Unloadable) {
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable):
   // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable
   // CHECK: [[PB:%.*]] = project_box [[DEST_LOCAL]]
@@ -168,7 +168,7 @@ func address_only_assignment_from_temp(inout dest: Unloadable) {
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types31address_only_assignment_from_lv
-func address_only_assignment_from_lv(inout dest: Unloadable, v: Unloadable) {
+func address_only_assignment_from_lv(dest: inout Unloadable, v: Unloadable) {
   var v = v
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable, [[VARG:%[0-9]+]] : $*Unloadable):
   // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable

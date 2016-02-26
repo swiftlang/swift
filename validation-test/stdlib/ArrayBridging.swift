@@ -43,7 +43,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsa = raceData.nsa
     let v: AnyObject = nsa.objectAtIndex(0)
@@ -80,7 +80,7 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsa = raceData.nsa
     let objcValues = NSMutableArray()

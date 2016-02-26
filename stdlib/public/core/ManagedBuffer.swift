@@ -465,12 +465,12 @@ public func == <Value, Element>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(inout object: T) -> Bool
+public func isUniquelyReferencedNonObjC<T : AnyObject>(object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
 
-internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T) -> Bool {
+internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T) -> Bool {
   return _isUniqueOrPinned(&object)
 }
 
@@ -497,7 +497,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
-  inout object: T
+  object: inout T
 ) -> Bool {
   return _isUnique(&object)
 }
@@ -526,7 +526,7 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
-  inout object: T?
+  object: inout T?
 ) -> Bool {
   return _isUnique(&object)
 }

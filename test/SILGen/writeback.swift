@@ -39,7 +39,7 @@ var readonly: Foo {
   }
 }
 
-func bar(inout x x: Foo) {}
+func bar(x x: inout Foo) {}
 
 // Writeback to value type 'self' argument
 x.foo()
@@ -102,7 +102,7 @@ var addressOnly: Fungible {
   set {}
 }
 
-func funge(inout x x: Fungible) {}
+func funge(x x: inout Fungible) {}
 
 funge(x: &addressOnly)
 // CHECK: [[FUNGE:%.*]] = function_ref @_TF9writeback5fungeFT1xRPS_8Fungible__T_ : $@convention(thin) (@inout Fungible) -> ()
@@ -132,7 +132,7 @@ protocol Frobable {
 // CHECK-LABEL: sil hidden @_TF9writeback12test_generic 
 // CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
-func test_generic<Runce: Runcible>(inout runce runce: Runce, anse: Runce.Frob.Anse) {
+func test_generic<Runce: Runcible>(runce runce: inout Runce, anse: Runce.Frob.Anse) {
   runce.frob.anse = anse
 }
 

@@ -38,7 +38,7 @@ public func run_SetIsSubsetOf(N: Int) {
 }
 
 @inline(never)
-func sink(inout s: Set<Int>) {
+func sink(s: inout Set<Int>) {
 }
 
 @inline(never)

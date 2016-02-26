@@ -13,6 +13,6 @@ public func sum<T : IntegerArithmeticType>(i : T, _ j : T) -> T {
   return result
 }
 
-public func inc(inout i : Int) {
+public func inc(i: inout Int) {
   i = sum(i, 1)
 }
