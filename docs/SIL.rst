@@ -803,17 +803,17 @@ are bound by the function's caller::
 
 Debug Information
 ~~~~~~~~~~~~~~~~~
-
 ::
- sil-scope-ref ::= 'scope' [0-9]+
- sil-scope ::= 'sil_scope' [0-9]+ '{'
-                 sil-loc
-                 'parent' scope-parent
-                 ('inlined_at' sil-scope-ref )?
-               '}'
- scope-parent ::= sil-function-name ':' sil-type
- scope-parent ::= sil-scope-ref
- sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
+
+  sil-scope-ref ::= 'scope' [0-9]+
+  sil-scope ::= 'sil_scope' [0-9]+ '{'
+                   sil-loc
+                   'parent' scope-parent
+                   ('inlined_at' sil-scope-ref )?
+                '}'
+  scope-parent ::= sil-function-name ':' sil-type
+  scope-parent ::= sil-scope-ref
+  sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
 
 Each instruction may have a debug location and a SIL scope reference
 at the end.  Debug locations consist of a filename, a line number, and
