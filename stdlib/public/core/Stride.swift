@@ -69,11 +69,11 @@ public func - <T : Strideable>(lhs: T, rhs: T) -> T.Stride {
   return rhs.distanceTo(lhs)
 }
 
-public func += <T : Strideable>(inout lhs: T, rhs: T.Stride) {
+public func += <T : Strideable>(lhs: inout T, rhs: T.Stride) {
   lhs = lhs.advancedBy(rhs)
 }
 
-public func -= <T : Strideable>(inout lhs: T, rhs: T.Stride) {
+public func -= <T : Strideable>(lhs: inout T, rhs: T.Stride) {
   lhs = lhs.advancedBy(-rhs)
 }
 
@@ -107,13 +107,13 @@ public func - <T : _DisallowMixedSignArithmetic>(
 }
 
 public func += <T : UnsignedIntegerType>(
-  inout lhs: T, rhs: T._DisallowMixedSignArithmetic
+  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
 ) {
   _sanityCheckFailure("Should not be callable.")
 }
 
 public func -= <T : UnsignedIntegerType>(
-  inout lhs: T, rhs: T._DisallowMixedSignArithmetic
+  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
 ) {
   _sanityCheckFailure("Should not be callable.")
 }

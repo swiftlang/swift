@@ -369,7 +369,7 @@ struct TestBridgedKeyTy
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
+    result: inout TestBridgedKeyTy?
   ) {
     _bridgedKeyBridgeOperations.fetchAndAdd(1)
     result = TestBridgedKeyTy(x.value)
@@ -377,7 +377,7 @@ struct TestBridgedKeyTy
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
+    result: inout TestBridgedKeyTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -434,7 +434,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCValueTy,
-    inout result: TestBridgedValueTy?
+    result: inout TestBridgedValueTy?
   ) {
     TestBridgedValueTy.bridgeOperations += 1
     result = TestBridgedValueTy(x.value)
@@ -442,7 +442,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCValueTy,
-    inout result: TestBridgedValueTy?
+    result: inout TestBridgedValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -492,7 +492,7 @@ struct TestBridgedEquatableValueTy
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCEquatableValueTy,
-    inout result: TestBridgedEquatableValueTy?
+    result: inout TestBridgedEquatableValueTy?
   ) {
     _bridgedEquatableValueBridgeOperations.fetchAndAdd(1)
     result = TestBridgedEquatableValueTy(x.value)
@@ -500,7 +500,7 @@ struct TestBridgedEquatableValueTy
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCEquatableValueTy,
-    inout result: TestBridgedEquatableValueTy?
+    result: inout TestBridgedEquatableValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true

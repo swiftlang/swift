@@ -108,7 +108,7 @@ public func testClassLet1(f: Foo1) -> Int32 {
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
-public func testClassLet1(inout f: Foo1) -> Int32 {
+public func testClassLet1(f: inout Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -130,7 +130,7 @@ public func testClassLet(f: Foo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testClassLet(inout f: Foo) -> Int32 {
+public func testClassLet(f: inout Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -158,7 +158,7 @@ public func testStructLet(b: Boo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testStructLet(inout b: Boo) -> Int32 {
+public func testStructLet(b: inout Boo) -> Int32 {
   return b.Prop1 + b.Prop1 + b.Prop2 + b.Prop3
 }
 

@@ -141,7 +141,7 @@ public protocol ArithmeticType {
   func ${x.operator}(lhs: Self, rhs: Self) -> Self
 
   // defaulted below
-  func ${x.operator}=(inout lhs: Self, rhs: Self)
+  func ${x.operator}=(lhs: inout Self, rhs: Self)
 
   // implementation hook
   mutating func ${x.name}InPlace(rhs: Self)
@@ -161,7 +161,7 @@ public func ${x.operator} <T: ArithmeticType>(lhs: T, rhs: T) -> T {
 }
 
 @_transparent
-public func ${x.operator}= <T: ArithmeticType>(inout lhs: T, rhs: T) {
+public func ${x.operator}= <T: ArithmeticType>(lhs: inout T, rhs: T) {
   lhs.${x.name}InPlace(rhs)
 }
 % end
@@ -416,7 +416,7 @@ public func ${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
 }
 
 @_transparent
-public func ${x.operator}= <T: FixedWidthIntegerType>(inout lhs: T, rhs: T) {
+public func ${x.operator}= <T: FixedWidthIntegerType>(lhs: inout T, rhs: T) {
   lhs = lhs.${x.name}(rhs)
 }
 % end
@@ -429,7 +429,7 @@ public func ${x.operator} <T: FixedWidthIntegerType>(lhs: T, rhs: T) -> T {
 }
 
 @_transparent
-public func ${x.operator}= <T: FixedWidthIntegerType>(inout lhs: T, rhs: T) {
+public func ${x.operator}= <T: FixedWidthIntegerType>(lhs: inout T, rhs: T) {
   lhs = lhs ${x.operator} rhs
 }
 
@@ -444,7 +444,7 @@ public func ${x.operator} <
 @_transparent
 public func ${x.operator}= <
   T: FixedWidthIntegerType, U: IntegerType
->(inout lhs: T, rhs: U) {
+>(lhs: inout T, rhs: U) {
   lhs = lhs ${x.operator} rhs
 }
 
@@ -484,14 +484,14 @@ public func ${x.nonMaskingOperator} <
 @_transparent
 public func ${x.nonMaskingOperator}= <
   T: FixedWidthIntegerType
->(inout lhs: T, rhs: T) {
+>(lhs: inout T, rhs: T) {
   lhs = lhs ${x.nonMaskingOperator} rhs
 }
 
 @_transparent
 public func ${x.nonMaskingOperator}= <
   T: FixedWidthIntegerType, U: IntegerType
->(inout lhs: T, rhs: U) {
+>(lhs: inout T, rhs: U) {
   lhs = lhs ${x.nonMaskingOperator} rhs
 }
 % end
@@ -1059,19 +1059,19 @@ public func ${x.operator}= <
   T: IntegerType
     // FIXME: remove this constraint by refactoring IntegerType
     where T.AbsoluteValue : IntegerType  
->(inout lhs: T, rhs: T) {
+>(lhs: inout T, rhs: T) {
   lhs.${x.name}InPlace(rhs)
 }
 % end
 
 @inline(__always)
-public func +=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
+public func +=<T: IntegerType, U: IntegerType>(lhs: inout T, rhs: U) {
   let overflow = lhs.addInPlace(rhs)
   _assertCond(overflow == .None, "overflow in multiprecision add.")
 }
 
 @inline(__always)
-public func -=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
+public func -=<T: IntegerType, U: IntegerType>(lhs: inout T, rhs: U) {
   let overflow = lhs.subtractInPlace(rhs)
   _assertCond(overflow == .None, "overflow in multiprecision subtract.")
 }
@@ -1159,7 +1159,7 @@ func *= <
   LHS : IntegerType, RHS : IntegerType 
     // FIXME: remove this constraint by refactoring IntegerType
     where LHS.AbsoluteValue : IntegerType, RHS.AbsoluteValue : IntegerType
->(inout lhs: LHS, rhs: RHS) {
+>(lhs: inout LHS, rhs: RHS) {
   
   let (newLHS, overflow) = LHS.multiply(lhs, rhs)
   _assertCond(overflow == .None, "Overflow in multiprecision in-place multiply")

@@ -494,11 +494,11 @@ ArrayTestSuite.test(
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func withInoutInt(inout x: Int, body: (inout x: Int) -> Void) {
+func withInoutInt(x: inout Int, body: (x: inout Int) -> Void) {
   body(x: &x)
 }
 
-func withInoutT<T>(inout x: T, body: (inout x: T) -> Void) {
+func withInoutT<T>(x: inout T, body: (x: inout T) -> Void) {
   body(x: &x)
 }
 
@@ -539,14 +539,14 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a) {
-    (inout x: ${array_type}<${array_type}<${element_type}>>) in
+    (x: inout ${array_type}<${array_type}<${element_type}>>) in
     x[0][2].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0]) {
-    (inout x: ${array_type}<${element_type}>) in
+    (x: inout ${array_type}<${element_type}>) in
     x[3].value += 1000
   }
 
@@ -554,7 +554,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
 
   // This will reallocate storage unless Array uses addressors for subscript.
   //withInoutT(&a[0][4]) {
-  //  (inout x: ${element_type}) in
+  //  (x: inout ${element_type}) in
   //  x.value += 1000
   //}
 
@@ -614,28 +614,28 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a) {
-    (inout x: ${array_type}<${array_type}<${element_type}>>) in
+    (x: inout ${array_type}<${array_type}<${element_type}>>) in
     x[0..<1][0][2].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1]) {
-    (inout x: ArraySlice<${array_type}<${element_type}>>) in
+    (x: inout ArraySlice<${array_type}<${element_type}>>) in
     x[0][3].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1][0]) {
-    (inout x: ${array_type}<${element_type}>) in
+    (x: inout ${array_type}<${element_type}>) in
     x[4].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1][0][5]) {
-    (inout x: ${element_type}) in
+    (x: inout ${element_type}) in
     x.value += 1000
   }
 
@@ -647,14 +647,14 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   identityInner = a[0].identity
 
   withInoutT(&a[0..<1][0][6].value) {
-    (inout x: Int) in
+    (x: inout Int) in
     x += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutInt(&a[0..<1][0][7].value) {
-    (inout x: Int) in
+    (x: inout Int) in
     x += 1000
   }
 

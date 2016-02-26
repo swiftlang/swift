@@ -718,7 +718,7 @@ internal func _writeBackMutableSlice<
   where
   Collection._Element == Slice_.Generator.Element,
   Collection.Index == Slice_.Index
->(inout self_: Collection, bounds: Range<Collection.Index>, slice: Slice_) {
+>(self_: inout Collection, bounds: Range<Collection.Index>, slice: Slice_) {
   Collection.Index._failEarlyRangeCheck2(
     bounds.startIndex, rangeEnd: bounds.endIndex,
     boundsStart: self_.startIndex, boundsEnd: self_.endIndex)

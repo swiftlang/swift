@@ -13,7 +13,7 @@ struct S1 {
   func method2(a: Int, b: Int) -> Int { return 1 }
   func method3(a a: Int, b: Int) {}
   func method4(_: Int, _: Int) {}
-  func method5(inout _: Int, inout b: Int) {}
+  func method5(_: inout Int, b: inout Int) {}
   func method6(c: Int) throws {}
   func method7(callback: () -> () throws) rethrows {}
   func method8<T, U>(d: (T, U) -> T, e: T -> U) {}

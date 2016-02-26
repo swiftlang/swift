@@ -53,12 +53,12 @@ extension String : _ObjectiveCBridgeable {
   }
   public static func _forceBridgeFromObjectiveC(
     x: NSString,
-    inout result: String?
+    result: inout String?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSString,
-    inout result: String?
+    result: inout String?
   ) -> Bool {
     return true
   }
@@ -77,12 +77,12 @@ extension Int : _ObjectiveCBridgeable {
   }
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Int?
+    result: inout Int?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
-    inout result: Int?
+    result: inout Int?
   ) -> Bool {
     return true
   }
@@ -97,12 +97,12 @@ extension Array : _ObjectiveCBridgeable {
   }
   public static func _forceBridgeFromObjectiveC(
     x: NSArray,
-    inout result: Array?
+    result: inout Array?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSArray,
-    inout result: Array?
+    result: inout Array?
   ) -> Bool {
     return nil
   }
@@ -120,12 +120,12 @@ extension Dictionary : _ObjectiveCBridgeable {
   }
   public static func _forceBridgeFromObjectiveC(
     x: NSDictionary,
-  inout result: Dictionary?
+  result: inout Dictionary?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSDictionary,
-    inout result: Dictionary?
+    result: inout Dictionary?
   ) -> Bool {
     return true
   }
