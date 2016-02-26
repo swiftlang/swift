@@ -4137,6 +4137,74 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   }
 }
 
+namespace {
+  class DefaultWitnessChecker : public WitnessChecker {
+    
+  public:
+    DefaultWitnessChecker(TypeChecker &tc,
+                          ProtocolDecl *proto)
+      : WitnessChecker(tc, proto, proto->getDeclaredType(), proto) { }
+
+    ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
+    void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
+  };
+}
+
+ResolveWitnessResult
+DefaultWitnessChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Must be a value witness");
+
+  // Find the best default witness for the requirement.
+  SmallVector<RequirementMatch, 4> matches;
+  unsigned numViable = 0;
+  unsigned bestIdx = 0;
+  bool doNotDiagnoseMatches = false;
+
+  if (findBestWitness(
+                 requirement, nullptr, nullptr,
+                 /* out parameters: */
+                 matches, numViable, bestIdx, doNotDiagnoseMatches)) {
+
+    auto &best = matches[bestIdx];
+
+    // Perform the same checks as conformance witness matching, but silently
+    // ignore the candidate instead of diagnosing anything.
+    auto check = checkWitness(Accessibility::Public, requirement, best);
+    if (check.Kind != CheckKind::Success)
+      return ResolveWitnessResult::ExplicitFailed;
+
+    // Record the match.
+    recordWitness(requirement, best);
+    return ResolveWitnessResult::Success;
+  }
+
+  // We have either no matches or an ambiguous match.
+  return ResolveWitnessResult::Missing;
+}
+
+void DefaultWitnessChecker::recordWitness(ValueDecl *requirement,
+                                          const RequirementMatch &match) {
+  Proto->setDefaultWitness(requirement, match.getWitness(TC.Context));
+
+  // FIXME: Synthesize accessors (or really, just materializeForSet) if this
+  // is a computed property?
+}
+
+void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
+  DefaultWitnessChecker checker(*this, proto);
+
+  for (auto *requirement : proto->getMembers()) {
+    if (isa<AssociatedTypeDecl>(requirement))
+      continue;
+
+    if (requirement->isInvalid())
+      continue;
+
+    if (auto *valueDecl = dyn_cast<ValueDecl>(requirement))
+      checker.resolveWitnessViaLookup(valueDecl);
+  }
+}
+
 bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
                                             ExtensionDecl *protocolExtension) {
   using namespace constraints;

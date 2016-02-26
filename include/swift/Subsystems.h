@@ -165,6 +165,10 @@ namespace swift {
                            OptionSet<TypeCheckingFlags> Options,
                            unsigned StartElem = 0);
 
+  /// Once type checking is complete, this walks protocol requirements
+  /// to resolve default witnesses.
+  void finishTypeChecking(SourceFile &SF);
+
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
   /// override checking.
