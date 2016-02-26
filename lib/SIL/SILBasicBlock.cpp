@@ -197,21 +197,6 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
   }
 }
 
-/// ScopeCloner expects NewFn to be a clone of the original
-/// function, with all debug scopes and locations still pointing to
-/// the original function.
-ScopeCloner::ScopeCloner(SILFunction &NewFn) : NewFn(NewFn) {
-  // Some clients of SILCloner copy over the original function's
-  // debug scope. Create a new one here.
-  // FIXME: Audit all call sites and make them create the function
-  // debug scope.
-  auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
-  if (SILFn != &NewFn) {
-    SILFn->setInlined();
-    NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));
-  }
-}
-
 const SILDebugScope *
 ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
   if (!OrigScope)

@@ -59,7 +59,7 @@ func funcToUpcast(x: () -> Domesticated) -> () -> Feral {
 }
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion12funcToUpcastFFCS_5FeralT_FCS_12DomesticatedT_ : $@convention(thin) (@owned @callee_owned (@owned Feral) -> ()) -> @owned @callee_owned (@owned Domesticated) -> ()
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned (@owned Feral) -> () to $@callee_owned (@owned Domesticated) -> (){{.*}} // user: %3
+// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned (@owned Feral) -> () to $@callee_owned (@owned Domesticated) -> () // user: %3
 // CHECK:         return [[FUNC]]
 func funcToUpcast(x: Feral -> ()) -> Domesticated -> () {
   return x

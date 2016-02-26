@@ -1715,7 +1715,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       SILFunction::NotRelevant, InlineStrategy);
 
   f->setDebugScope(new (M)
-                   SILDebugScope(RegularLocation(witness.getDecl()), f));
+                   SILDebugScope(RegularLocation(witness.getDecl()), *f));
 
   PrettyStackTraceSILFunction trace("generating protocol witness thunk", f);
 

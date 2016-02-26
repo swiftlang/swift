@@ -442,7 +442,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   const SILDebugScope *DS = fn->getDebugScope();
   if (!DS) {
-    DS = new (SILMod) SILDebugScope(loc, fn);
+    DS = new (SILMod) SILDebugScope(loc, *fn);
     fn->setDebugScope(DS);
   }
 

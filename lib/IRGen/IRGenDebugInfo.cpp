@@ -285,7 +285,7 @@ llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
       auto *Parent = CS->Parent.get<const SILDebugScope *>();
       auto *ParentScope = getOrCreateScope(Parent);
       auto L = CS->Loc.decodeDebugLoc(SM);
-      InlinedAt = llvm::DebugLoc::get(L.Line, L.Column, ParentScope, InlinedAt);
+      InlinedAt = llvm::DebugLoc::get(L.Line, L.Col, ParentScope, InlinedAt);
     }
   }
   return InlinedAt;
@@ -366,7 +366,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   auto *InlinedAt = createInlinedAt(DS);
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
-  auto DL = llvm::DebugLoc::get(L.Line, L.Column, Scope, InlinedAt);
+  auto DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
   // TODO: Write a strongly-worded letter to the person that came up
   // with a pair of functions spelled "get" and "Set".
   Builder.SetCurrentDebugLocation(DL);
@@ -416,7 +416,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   assert(DS->Parent && "lexical block must have a parent subprogram");
   auto L = getStartLocation(DS->Loc, SM);
   llvm::DIFile *File = getOrCreateFile(L.Filename);
-  auto *DScope = DBuilder.createLexicalBlock(Parent, File, L.Line, L.Column);
+  auto *DScope = DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
 
   // Cache it.
   ScopeCache[DS] = llvm::TrackingMDNodeRef(DScope);
@@ -1061,14 +1061,14 @@ void IRGenDebugInfo::emitVariableDeclaration(
                       : SizeOfByte);
     }
     emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
-                     Loc.Column, Scope, DS);
+                     Loc.Col, Scope, DS);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
     auto *undef = llvm::UndefValue::get(DbgTy.StorageType);
-    emitDbgIntrinsic(BB, undef, Var, DBuilder.createExpression(), Line,
-                     Loc.Column, Scope, DS);
+    emitDbgIntrinsic(BB, undef, Var, DBuilder.createExpression(), Line, Loc.Col,
+                     Scope, DS);
   }
 }
 

@@ -303,7 +303,7 @@ func calls(i:Int, j:Int, k:Int) {
 
 // -- Curried entry points
 // CHECK-LABEL: sil shared @_TFV9functions10SomeStruct6method{{.*}} : $@convention(thin) (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
-// CHECK:   [[UNCURRIED:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}} : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> (){{.*}} // user: %2
+// CHECK:   [[UNCURRIED:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}} : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> () // user: %2
 // CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]
 // CHECK:   return [[CURRIED]]
 

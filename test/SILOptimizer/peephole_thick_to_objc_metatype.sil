@@ -20,7 +20,7 @@ class XImpl : X {
 //
 // CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype36test_thick_to_objc_metatype_metatypeFT_Ps9AnyObject_ : $@convention(thin) () -> @owned AnyObject
 // CHECK-NOT: metatype $@thick
-// CHECK-NOT: {{thick_to_objc_metatype }}
+// CHECK-NOT: thick_to_objc_metatype
 // CHECK: metatype $@objc_metatype
 // CHECK: return
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_metatype () -> Swift.AnyObject
@@ -36,7 +36,7 @@ bb0:
 //
 // CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype48test_thick_to_objc_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @owned AnyObject
 // CHECK-NOT: existential_metatype $@thick
-// CHECK-NOT: {{thick_to_objc_metatype }}
+// CHECK-NOT: thick_to_objc_metatype
 // CHECK: existential_metatype $@objc_metatype
 // CHECK: return
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_existential_metatype (peephole_thick_to_objc_metatype.X) -> Swift.AnyObject
@@ -55,7 +55,7 @@ bb0(%0 : $X):
 //
 // CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype42test_thick_to_objc_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned An
 // CHECK-NOT: value_metatype $@thick
-// CHECK-NOT: {{thick_to_objc_metatype }}
+// CHECK-NOT: thick_to_objc_metatype
 // CHECK: value_metatype $@objc_metatype
 // CHECK: return
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_value_metatype <A : Swift.AnyObject>(A) -> Swift.AnyObject
@@ -74,7 +74,7 @@ bb0(%0 : $T):
 //
 // CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype36test_objc_to_thick_metatype_metatypeFT_Ps9AnyObject_ : $@convention(thin) () -> @thick XImpl.Type
 // CHECK-NOT: metatype $@objc_metatype
-// CHECK-NOT: {{objc_to_thick_metatype }}
+// CHECK-NOT: objc_to_thick_metatype
 // CHECK: metatype $@thick
 // CHECK: return
 sil @_TF31peephole_thick_to_objc_metatype36test_objc_to_thick_metatype_metatypeFT_Ps9AnyObject_ : $@convention(thin) () -> @thick XImpl.Type {
@@ -88,7 +88,7 @@ bb0:
 //
 // CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype48test_objc_to_thick_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @thick X.Type
 // CHECK-NOT: existential_metatype $@objc_metatype
-// CHECK-NOT: {{objc_to_thick_metatype }}
+// CHECK-NOT: objc_to_thick_metatype
 // CHECK: existential_metatype $@thick
 // CHECK: return
 sil @_TF31peephole_thick_to_objc_metatype48test_objc_to_thick_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @thick X.Type {
@@ -104,7 +104,7 @@ bb0(%0 : $X):
 //
 // CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype42test_objc_to_thick_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @thick T.Type
 // CHECK-NOT: value_metatype $@objc_metatype
-// CHECK-NOT: {{objc_to_thick_metatype }}
+// CHECK-NOT: objc_to_thick_metatype
 // CHECK: value_metatype $@thick
 // CHECK: return
 sil @_TF31peephole_thick_to_objc_metatype42test_objc_to_thick_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @thick T.Type {

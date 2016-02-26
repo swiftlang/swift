@@ -86,7 +86,6 @@ SIL_KEYWORD(sil_global)
 SIL_KEYWORD(sil_witness_table)
 SIL_KEYWORD(sil_default_witness_table)
 SIL_KEYWORD(sil_coverage_map)
-SIL_KEYWORD(sil_scope)
 
 // Statement keywords.
 STMT_KEYWORD(defer)

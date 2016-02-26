@@ -68,9 +68,9 @@ sil_global @test_global : $Int64
 /// Make sure we don't ignore aliasing stores.
 //
 // CHECK-LABEL: sil @aliasing_store
-// CHECK: {{store }}
-// CHECK-NOT: {{store }}
-// CHECK-NOT: {{load }}
+// CHECK: store
+// CHECK-NOT: store
+// CHECK-NOT: load 
 // CHECK: return 
 sil @aliasing_store : $@convention(thin) (@inout A) -> () {
 bb0(%0: $*A):
@@ -96,9 +96,9 @@ bb0(%0: $*A):
 
 // CHECK-LABEL: sil @testit
 // CHECK: {{^bb1:}}
-// CHECK-NOT: {{load  }}
+// CHECK-NOT: load
 // CHECK: {{^bb2(.*):}}
-// CHECK-NOT: {{store }}
+// CHECK-NOT: store
 // CHECK: bb3:
 sil @testit : $@convention(thin) () -> () {
 bb0:
@@ -134,8 +134,8 @@ bb3:
 
 // CHECK-LABEL: sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
 // CHECK: bb0([[INPUT_PTR1:%[0-9]+]] : $*Builtin.Int32):
-// CHECK: {{load }}
-// CHECK-NOT: {{store }}
+// CHECK: load
+// CHECK-NOT: store
 // CHECK: return
 sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
 bb0(%0 : $*Builtin.Int32):
@@ -159,10 +159,10 @@ bb0(%0 : $*Builtin.Int32):
 // Check that we can perform partial load forwarding.
 // CHECK-LABEL: sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
 // CHECK: bb0([[INPUT_PTR:%.*]] : $*AA):
-// CHECK: {{load }}
-// CHECK: {{load }}
-// CHECK: {{load }}
-// CHECK-NOT: {{load }}
+// CHECK: load
+// CHECK: load
+// CHECK: load
+// CHECK-NOT: load
 // CHECK: return 
 sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
 bb0(%0 : $*AA):

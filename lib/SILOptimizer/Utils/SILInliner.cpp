@@ -75,7 +75,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // Performance inlining. Construct a proper inline scope pointing
     // back to the call site.
     CallSiteScope = new (F.getModule())
-      SILDebugScope(AI.getLoc(), &F, AIScope);
+      SILDebugScope(AI.getLoc(), F, AIScope);
     assert(CallSiteScope->getParentFunction() == &F);
   }
   assert(CallSiteScope && "call site has no scope");

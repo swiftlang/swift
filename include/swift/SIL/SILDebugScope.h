@@ -20,13 +20,12 @@
 
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILFunction.h"
 
 namespace swift {
 
 class SILDebugLocation;
 class SILDebugScope;
-class SILFunction;
-class SILInstruction;
 
 /// This class stores a lexical scope as it is represented in the
 /// debug info. In contrast to LLVM IR, SILDebugScope also holds all
@@ -49,16 +48,14 @@ public:
   /// SILDebugScope represents an inline tree.
   const SILDebugScope *InlinedCallSite;
 
-  SILDebugScope(SILLocation Loc, SILFunction *SILFn,
+  SILDebugScope(SILLocation Loc, SILFunction &SILFn,
                 const SILDebugScope *ParentScope = nullptr,
                 const SILDebugScope *InlinedCallSite = nullptr)
       : Loc(Loc), InlinedCallSite(InlinedCallSite) {
     if (ParentScope)
       Parent = ParentScope;
-    else {
-      assert(SILFn && "no parent provided");
-      Parent = SILFn;
-    }
+    else
+      Parent = &SILFn;
   }
 
   /// Create a scope for an artificial function.
@@ -71,6 +68,8 @@ public:
     : Loc(CalleeScope->Loc), Parent(CalleeScope),
         InlinedCallSite(CallSiteScope) {
     assert(CallSiteScope && CalleeScope);
+    assert(CalleeScope->getParentFunction()->isInlined() &&
+           "function of inlined debug scope is not inlined");
     if (InlinedCallSite)
       assert(!InlinedCallSite->InlinedCallSite &&
              "a call site scope cannot have an inlined call site");
@@ -134,7 +133,18 @@ public:
   /// ScopeCloner expects NewFn to be a clone of the original
   /// function, with all debug scopes and locations still pointing to
   /// the original function.
-  ScopeCloner(SILFunction &NewFn);
+  ScopeCloner(SILFunction &NewFn) : NewFn(NewFn) {
+    // Some clients of SILCloner copy over the original function's
+    // debug scope. Create a new one here.
+    // FIXME: Audit all call sites and make them create the function
+    // debug scope.
+    auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
+    if (SILFn != &NewFn) {
+      SILFn->setInlined();
+      NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));
+    }
+  }
+
   /// Return a (cached) deep copy of a scope.
   const SILDebugScope *getOrCreateClonedScope(const SILDebugScope *OrigScope);
 };

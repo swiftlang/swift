@@ -835,7 +835,6 @@ public:
   bool parseSILWitnessTable();
   bool parseSILDefaultWitnessTable();
   bool parseSILCoverageMap();
-  bool parseSILScope();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

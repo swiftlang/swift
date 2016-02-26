@@ -29,7 +29,7 @@
                     "import" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "let" "where"  "sil_vtable"
                     "sil_global" "private" "public" "internal" "override"
-                    "sil_witness_table" "sil_scope")
+                    "sil_witness_table")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
@@ -152,9 +152,6 @@
    ;; Blocks
    `(,(regexp-opt '("project_block_storage" "init_block_storage_header"
                     "copy_block")
-                  'words) . font-lock-keyword-face)
-   ;; Debug Info
-   `(,(regexp-opt '("loc" "scope" "parent" "inlined_at")
                   'words) . font-lock-keyword-face)
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)

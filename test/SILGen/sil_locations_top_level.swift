@@ -16,7 +16,7 @@ class TopLevelObjectTyWithoutDestructor {
 var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // CHECK-LABEL: sil @main
-// CHECK: integer_literal ${{.*}}, 0, {{.*}} top_level
+// CHECK: integer_literal ${{.*}}, 0  {{.*}} top_level
 // CHECK: return    {{.*}} top_level
 
 // Check default constructor

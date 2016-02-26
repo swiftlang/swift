@@ -18,7 +18,7 @@ func testDoStmt() throws -> Void {
     _blackHole(obj)
     try foo(100)
     // CHECK-SIL: bb{{.*}}(%{{[0-9]+}} : $()):
-    // CHECK-SIL-NEXT: strong_release {{.*}}: $Obj{{.*}} line:[[@LINE+1]]:3:cleanup
+    // CHECK-SIL-NEXT: strong_release {{.*}}: $Obj //{{.*}} line:[[@LINE+1]]:3:cleanup
   }
   // CHECK-SIL-NEXT:     = tuple ()
   // CHECK-SIL-NEXT:   return                        {{.*}} line:[[@LINE+1]]
@@ -32,7 +32,7 @@ func testDoWhileStmt() -> Void {
   do {
     try foo(100)
     // CHECK-SIL: bb{{.*}}(%{{[0-9]+}} : $()):
-    // CHECK-SIL-NEXT:  br [[RETURN_BB:bb[0-9]+]]{{.*}} line:[[@LINE+1]]:3:cleanup
+    // CHECK-SIL-NEXT:  br [[RETURN_BB:bb[0-9]+]] // {{.*}} line:[[@LINE+1]]:3:cleanup
   }
   // CHECK-SIL: [[RETURN_BB]]:
   // CHECK-SIL-NEXT:     = tuple ()
