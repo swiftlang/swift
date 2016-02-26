@@ -62,7 +62,7 @@ public protocol UnicodeCodecType {
   /// - parameter next: A generator of code units to be decoded.
   mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
-  >(next: inout G) -> UnicodeDecodingResult
+  >(inout next: G) -> UnicodeDecodingResult
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
@@ -335,7 +335,7 @@ public struct UTF8 : UnicodeCodecType {
   /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
-  >(next: inout G) -> UnicodeDecodingResult {
+  >(inout next: G) -> UnicodeDecodingResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
     // generator.
     if _lookaheadFlags & 0b1111_0000 == 0 {
@@ -521,7 +521,7 @@ public struct UTF16 : UnicodeCodecType {
   /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
-  >(input: inout G) -> UnicodeDecodingResult {
+  >(inout input: G) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
       return .EmptyInput
     }
@@ -599,7 +599,7 @@ public struct UTF16 : UnicodeCodecType {
   /// units than required for this scalar.
   mutating func _decodeOne<
     G : GeneratorType where G.Element == CodeUnit
-  >(input: inout G) -> (UnicodeDecodingResult, Int) {
+  >(inout input: G) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
     case .Result(let us):
@@ -656,13 +656,13 @@ public struct UTF32 : UnicodeCodecType {
   /// - parameter next: A generator of code units to be decoded.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
-  >(input: inout G) -> UnicodeDecodingResult {
+  >(inout input: G) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
   }
 
   static func _decode<
     G : GeneratorType where G.Element == CodeUnit
-  >(input: inout G) -> UnicodeDecodingResult {
+  >(inout input: G) -> UnicodeDecodingResult {
     guard let x = input.next() else { return .EmptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
       return .Result(UnicodeScalar(x))

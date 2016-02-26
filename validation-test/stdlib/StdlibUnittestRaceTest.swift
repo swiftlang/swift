@@ -34,7 +34,7 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
   }
 
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
   ) -> Observation {
     switch RaceTest1.iterationCountdown.fetchAndAdd(-1) {
     case 0:

@@ -4,7 +4,7 @@
 // Generate all possible permutes.
 func _permuteInternal(
   elem: Int, _ size: Int,
-  _ perm: inout [Int], _ visited: inout [Bool],
+  inout _ perm: [Int], inout _ visited: [Bool],
   _ verify: ([Int]) -> Void
 ) {
   if (elem == size) {

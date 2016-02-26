@@ -141,7 +141,7 @@ func structs() {
 }
 
 
-func inoutcallee(x: inout Int) {}
+func inoutcallee(inout x: Int) {}
 func address_of_expr() {
   var x: Int = 4
   inoutcallee(&x)

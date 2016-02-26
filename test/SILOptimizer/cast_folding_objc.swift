@@ -25,9 +25,9 @@ struct CX: _ObjectiveCBridgeable {
     return ObjCX()
   }
 
-  static func _forceBridgeFromObjectiveC(source: ObjCX, result: inout CX?) {}
+  static func _forceBridgeFromObjectiveC(source: ObjCX, inout result: CX?) {}
 
-  static func _conditionallyBridgeFromObjectiveC(source: ObjCX, result: inout CX?) -> Bool {
+  static func _conditionallyBridgeFromObjectiveC(source: ObjCX, inout result: CX?) -> Bool {
     return false
   }
 }

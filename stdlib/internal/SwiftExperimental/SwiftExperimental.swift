@@ -72,7 +72,7 @@ public func ∖ <
 /// Assigns the relative complement between `lhs` and `rhs` to `lhs`.
 public func ∖= <
   T, S: SequenceType where S.Generator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+  >(inout lhs: Set<T>, rhs: S) {
   lhs.subtractInPlace(rhs)
 }
 
@@ -86,7 +86,7 @@ public func ∪ <
 /// Assigns the union of `lhs` and `rhs` to `lhs`.
 public func ∪= <
   T, S: SequenceType where S.Generator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+  >(inout lhs: Set<T>, rhs: S) {
   lhs.unionInPlace(rhs)
 }
 
@@ -100,7 +100,7 @@ public func ∩ <
 /// Assigns the intersection of `lhs` and `rhs` to `lhs`.
 public func ∩= <
   T, S: SequenceType where S.Generator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+  >(inout lhs: Set<T>, rhs: S) {
   lhs.intersectInPlace(rhs)
 }
 
@@ -114,7 +114,7 @@ public func ⨁ <
 /// Assigns to `lhs` the set with elements in `lhs` or `rhs` but not in both.
 public func ⨁= <
   T, S: SequenceType where S.Generator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+  >(inout lhs: Set<T>, rhs: S) {
   lhs.exclusiveOrInPlace(rhs)
 }
 

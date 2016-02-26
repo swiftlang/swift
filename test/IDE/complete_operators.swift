@@ -41,7 +41,7 @@
 
 struct S {}
 postfix operator ++ {}
-postfix func ++(x: inout S) -> S { return x }
+postfix func ++(inout x: S) -> S { return x }
 
 func testPostfix1(x: S) {
   x#^POSTFIX_1^#
@@ -131,7 +131,7 @@ infix operator **= {
 }
 func +(x: S2, y: S2) -> S2 { return x }
 func **(x: S2, y: Int) -> S2 { return x }
-func **=(x: inout S2, y: Int) -> Void { return x }
+func **=(inout x: S2, y: Int) -> Void { return x }
 
 func testInfix1(x: S2) {
   x#^INFIX_1^#
@@ -163,7 +163,7 @@ func testInfix2(var x: S2) {
 // S2_INFIX_LVALUE-DAG-NOT: ~>
 // S2_INFIX_LVALUE: End completions
 
-func testInfix3(x: inout S2) {
+func testInfix3(inout x: S2) {
   x#^INFIX_3^#
 }
 

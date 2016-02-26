@@ -252,8 +252,8 @@ extension Magic {
   }
 }
 struct Wizard : Magic {}
-func improve(x: inout Int) {}
-func improveWizard(wizard: inout Wizard) {
+func improve(inout x: Int) {}
+func improveWizard(inout wizard: Wizard) {
   improve(&wizard.hocus)
 }
 // CHECK-LABEL: sil hidden @_TF17materializeForSet13improveWizardFRVS_6WizardT_

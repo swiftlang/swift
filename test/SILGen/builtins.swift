@@ -554,7 +554,7 @@ func pinUnpin(object : Builtin.NativeObject) {
 // CHECK: copy_addr [[PB]] to %0 : $*Optional<Builtin.NativeObject>
 // CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Builtin.NativeObject>
 // CHECK-NEXT: return
-func isUnique(ref: inout Builtin.NativeObject?) -> Bool {
+func isUnique(inout ref: Builtin.NativeObject?) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
@@ -568,7 +568,7 @@ func isUnique(ref: inout Builtin.NativeObject?) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.NativeObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.NativeObject
 // CHECK-NEXT: return
-func isUnique(ref: inout Builtin.NativeObject) -> Bool {
+func isUnique(inout ref: Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
@@ -582,7 +582,7 @@ func isUnique(ref: inout Builtin.NativeObject) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Optional<Builtin.NativeObject>
 // CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Builtin.NativeObject>
 // CHECK-NEXT: return
-func isUniqueOrPinned(ref: inout Builtin.NativeObject?) -> Bool {
+func isUniqueOrPinned(inout ref: Builtin.NativeObject?) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
 
@@ -596,7 +596,7 @@ func isUniqueOrPinned(ref: inout Builtin.NativeObject?) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.NativeObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.NativeObject
 // CHECK-NEXT: return
-func isUniqueOrPinned(ref: inout Builtin.NativeObject) -> Bool {
+func isUniqueOrPinned(inout ref: Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
 
@@ -610,7 +610,7 @@ func isUniqueOrPinned(ref: inout Builtin.NativeObject) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Optional<Builtin.UnknownObject>
 // CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Builtin.UnknownObject>
 // CHECK-NEXT: return
-func isUnique(ref: inout Builtin.UnknownObject?) -> Bool {
+func isUnique(inout ref: Builtin.UnknownObject?) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
@@ -624,7 +624,7 @@ func isUnique(ref: inout Builtin.UnknownObject?) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.UnknownObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.UnknownObject
 // CHECK-NEXT: return
-func isUnique(ref: inout Builtin.UnknownObject) -> Bool {
+func isUnique(inout ref: Builtin.UnknownObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
@@ -638,7 +638,7 @@ func isUnique(ref: inout Builtin.UnknownObject) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.UnknownObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.UnknownObject
 // CHECK-NEXT: return
-func isUniqueOrPinned(ref: inout Builtin.UnknownObject) -> Bool {
+func isUniqueOrPinned(inout ref: Builtin.UnknownObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
 
@@ -652,7 +652,7 @@ func isUniqueOrPinned(ref: inout Builtin.UnknownObject) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
 // CHECK-NEXT: return
-func isUnique(ref: inout Builtin.BridgeObject) -> Bool {
+func isUnique(inout ref: Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
@@ -666,7 +666,7 @@ func isUnique(ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
 // CHECK-NEXT: return
-func isUniqueOrPinned(ref: inout Builtin.BridgeObject) -> Bool {
+func isUniqueOrPinned(inout ref: Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
 
@@ -681,7 +681,7 @@ func isUniqueOrPinned(ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
 // CHECK-NEXT: return
-func isUnique_native(ref: inout Builtin.BridgeObject) -> Bool {
+func isUnique_native(inout ref: Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique_native(&ref))
 }
 
@@ -696,7 +696,7 @@ func isUnique_native(ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
 // CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
 // CHECK-NEXT: return
-func isUniqueOrPinned_native(ref: inout Builtin.BridgeObject) -> Bool {
+func isUniqueOrPinned_native(inout ref: Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned_native(&ref))
 }
 

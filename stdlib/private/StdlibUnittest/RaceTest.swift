@@ -88,7 +88,7 @@ public protocol RaceTestWithPerTrialDataType {
 
   /// Performs the operation under test and makes an observation.
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData) -> Observation
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData) -> Observation
 
   /// Evaluates the observations made by all threads for a particular instance
   /// of `RaceData`.

@@ -146,7 +146,7 @@ public func _reflect<T>(x: T) -> _MirrorType
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStreamType>(
-    x: T, _ targetStream: inout TargetStream,
+    x: T, inout _ targetStream: TargetStream,
     name: String? = nil, indent: Int = 0,
     maxDepth: Int = .max, maxItems: Int = .max
 ) -> T {
@@ -172,9 +172,9 @@ public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
 /// Dump an object's contents. User code should use dump().
 internal func _dumpObject_unlocked<TargetStream : OutputStreamType>(
     object: Any, _ name: String?, _ indent: Int, _ maxDepth: Int,
-    _ maxItemCounter: inout Int,
-    _ visitedItems: inout [ObjectIdentifier : Int],
-    _ targetStream: inout TargetStream
+    inout _ maxItemCounter: Int,
+    inout _ visitedItems: [ObjectIdentifier : Int],
+    inout _ targetStream: TargetStream
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
@@ -255,9 +255,9 @@ internal func _dumpObject_unlocked<TargetStream : OutputStreamType>(
 /// that superclass.
 internal func _dumpSuperclass_unlocked<TargetStream : OutputStreamType>(
     mirror: Mirror, _ indent: Int, _ maxDepth: Int,
-    _ maxItemCounter: inout Int,
-    _ visitedItems: inout [ObjectIdentifier : Int],
-    _ targetStream: inout TargetStream
+    inout _ maxItemCounter: Int,
+    inout _ visitedItems: [ObjectIdentifier : Int],
+    inout _ targetStream: TargetStream
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1

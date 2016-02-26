@@ -308,7 +308,7 @@ public final class _stdlib_AtomicInt {
 
   @warn_unused_result
   public func compareExchange(
-    expected expected: inout Int, desired: Int
+    inout expected expected: Int, desired: Int
   ) -> Bool {
     var expectedVar = expected
     let result = _stdlib_atomicCompareExchangeStrongInt(

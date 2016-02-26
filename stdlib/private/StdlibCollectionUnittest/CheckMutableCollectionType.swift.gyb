@@ -61,7 +61,7 @@ public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
 }
 
 internal func _mapInPlace<C : MutableCollectionType>(
-  elements: inout C,
+  inout elements: C,
   @noescape transform: (C.Generator.Element) -> C.Generator.Element
 ) {
   for i in elements.indices {

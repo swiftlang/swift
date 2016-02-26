@@ -22,7 +22,7 @@ func init_var_from_lvalue(x: Int) {
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
 // CHECK:   copy_addr [[PBY]] to [[PBX]]
-func assign_var_from_lvalue(x: inout Int, y: Int) {
+func assign_var_from_lvalue(inout x: Int, y: Int) {
   var y = y
   x = y
 }
@@ -59,6 +59,6 @@ func assign_computed_from_lvalue(y: Int) {
 // CHECK:   [[X:%.*]] = alloc_box
 // CHECK:   [[PBX:%.*]] = project_box [[X]]
 // CHECK:   assign {{%.*}} to [[PBX]]
-func assign_var_from_computed(x: inout Int) {
+func assign_var_from_computed(inout x: Int) {
   x = computed
 }

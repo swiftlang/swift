@@ -3,7 +3,7 @@
 class CFArray {}
 struct U<T> {}
 
-func yyy<T, Result>(arg: inout T, @noescape _ body: U<T> -> Result) -> Result {
+func yyy<T, Result>(inout arg: T, @noescape _ body: U<T> -> Result) -> Result {
   return body(U<T>())
 }
 

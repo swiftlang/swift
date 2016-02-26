@@ -6,7 +6,7 @@
 //CHECK-NOT: strong_retain
 //CHECK-NOT: strong_release
 //CHECK: return
-public func swapByIndex(A: inout [Int8], x : Int, y : Int) {
+public func swapByIndex(inout A : [Int8], x : Int, y : Int) {
   swap(&A[x],&A[y])
 }
 

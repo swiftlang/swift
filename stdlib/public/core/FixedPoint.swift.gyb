@@ -605,7 +605,7 @@ extension ${Self} : BitwiseOperationsType {
 // Compound assignments
 % for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
 @_transparent
-public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
+public func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 % end
@@ -616,14 +616,14 @@ public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
 //        to remove these.
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func ++ (x: inout ${Self}) -> ${Self} {
+public prefix func ++ (inout x: ${Self}) -> ${Self} {
   x = x + 1
   return x
 }
 
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func ++ (x: inout ${Self}) -> ${Self} {
+public postfix func ++ (inout x: ${Self}) -> ${Self} {
   let ret = x
   x = x + 1
   return ret
@@ -631,14 +631,14 @@ public postfix func ++ (x: inout ${Self}) -> ${Self} {
 
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func -- (x: inout ${Self}) -> ${Self} {
+public prefix func -- (inout x: ${Self}) -> ${Self} {
   x = x - 1
   return x
 }
 
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func -- (x: inout ${Self}) -> ${Self} {
+public postfix func -- (inout x: ${Self}) -> ${Self} {
   let ret = x
   x = x - 1
   return ret

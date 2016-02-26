@@ -110,7 +110,7 @@ func tuple_argument(x: (Int, Float, ())) {
 // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
 // CHECK: [[PBY:%[0-9]+]] = project_box [[YADDR]]
 // CHECK: copy_addr [[PBY]] to [[PBX]]
-func inout_argument(x: inout Int, y: Int) {
+func inout_argument(inout x: Int, y: Int) {
   var y = y
   x = y
 }

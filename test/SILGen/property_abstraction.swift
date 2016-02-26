@@ -26,11 +26,11 @@ func getF(x: Foo<Int, Int>) -> Int -> Int {
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func setF(x: inout Foo<Int, Int>, f: Int -> Int) {
+func setF(inout x: Foo<Int, Int>, f: Int -> Int) {
   x.f = f
 }
 
-func inOutFunc(f: inout (Int -> Int)) { }
+func inOutFunc(inout f: (Int -> Int)) { }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF
 // CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
@@ -117,7 +117,7 @@ protocol Factory {
   typealias Product
   var builder : () -> Product { get set }
 }
-func setBuilder<F: Factory where F.Product == MyClass>(factory: inout F) {
+func setBuilder<F: Factory where F.Product == MyClass>(inout factory: F) {
   factory.builder = { return MyClass() }
 }
 // CHECK: sil hidden @_TF20property_abstraction10setBuilder{{.*}} : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()

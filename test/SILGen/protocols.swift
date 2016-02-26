@@ -77,7 +77,7 @@ func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(generic : T, idx :
 // CHECK-NEXT: destroy_addr %0
 
 
-func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(generic: inout T, idx : Int) -> Int {
+func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic : T, idx : Int) -> Int {
   return generic[idx]
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
@@ -95,7 +95,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(generic: inout 
 // CHECK: return [[APPLYRESULT]]
 
 
-func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(generic: inout T, idx : Int) {
+func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(inout generic : T, idx : Int) {
   generic[idx] = idx
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
@@ -190,7 +190,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(generic : T
 // CHECK-NEXT: destroy_addr %0
 
 
-func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(generic: inout T, v : Int) {
+func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(inout generic : T, v : Int) {
   generic.b = v
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
@@ -379,7 +379,7 @@ protocol ExistentialProperty {
   var p: PropertyWithGetterSetter { get set }
 }
 
-func testExistentialPropertyRead<T: ExistentialProperty>(t: inout T) {
+func testExistentialPropertyRead<T: ExistentialProperty>(inout t: T) {
     let b = t.p.b
 }
 // CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyRead

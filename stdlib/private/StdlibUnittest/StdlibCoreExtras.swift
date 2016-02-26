@@ -136,7 +136,7 @@ extension TypeIdentifier
 
 func _forAllPermutationsImpl(
   index: Int, _ size: Int,
-  _ perm: inout [Int], _ visited: inout [Bool],
+  inout _ perm: [Int], inout _ visited: [Bool],
   _ body: ([Int]) -> Void
 ) {
   if index == size {
