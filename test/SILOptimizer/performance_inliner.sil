@@ -30,7 +30,7 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @test1
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64)
-// CHECK: integer_literal $Builtin.Int1, 0 {{.*}}
+// CHECK: integer_literal $Builtin.Int1, 0
 // CHECK: [[MUL_TUPLE_RESULT:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]]
 // CHECK: [[MUL_RESULT:%[0-9]+]] = tuple_extract [[MUL_TUPLE_RESULT]]
 // CHECK: return [[MUL_RESULT]]

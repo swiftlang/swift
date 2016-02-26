@@ -420,6 +420,19 @@ ERROR(sil_use_of_undefined_value,none,
 NOTE(sil_prior_reference,none,
      "prior reference was here", ())
 
+// SIL Locations
+ERROR(expected_colon_in_sil_location,none,
+      "expected ':' in SIL location", ())
+ERROR(sil_invalid_line_in_sil_location,none,
+      "line number must be a positive integer", ())
+ERROR(sil_invalid_column_in_sil_location,none,
+      "column number must be a positive integer", ())
+ERROR(sil_invalid_scope_slot,none,
+      "scope number must be a positive integer ", ())
+ERROR(sil_scope_undeclared,none,
+      "scope number %0 needs to be declared before first use", (unsigned))
+ERROR(sil_scope_redefined,none,
+      "scope number %0 is already defined", (unsigned))
 
 // SIL Instructions
 ERROR(expected_sil_instr_start_of_line,none,

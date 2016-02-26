@@ -255,6 +255,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::pound_else) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) &&
+         Tok.isNot(tok::kw_sil_scope) &&
          Tok.isNot(tok::kw_sil_stage) &&
          Tok.isNot(tok::kw_sil_vtable) &&
          Tok.isNot(tok::kw_sil_global) &&
