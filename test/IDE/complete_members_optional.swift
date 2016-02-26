@@ -14,7 +14,7 @@ protocol HasOptionalMembers1 {
 }
 
 func sanityCheck1(a: HasOptionalMembers1) {
-  func isOptionalInt(inout a: Int?) {}
+  func isOptionalInt(a: inout Int?) {}
 
   var result1 = a.optionalInstanceFunc?()
   isOptionalInt(&result1)

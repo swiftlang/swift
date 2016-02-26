@@ -28,7 +28,7 @@ class C : B { }
 class D : C { }
 
 
-func prefer_coercion(inout c: C) {
+func prefer_coercion(c: inout C) {
   let d = c as! D
   c = d
 }

@@ -21,6 +21,6 @@ protocol StoriedType {
   var protocolRequirement: [Block] { get set }
 }
 
-func testProtocol<T: StoriedType>(inout x: T) {
+func testProtocol<T: StoriedType>(x: inout T) {
   swap(&x.protocolRequirement[0], &x.protocolRequirement[1])
 }

@@ -186,9 +186,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status |= makeParserCodeCompletionStatus();
       }
     }
-
+    //SourceLoc deprecatedInoutLoc;
     // ('inout' | 'let' | 'var')?
     if (Tok.is(tok::kw_inout)) {
+      //deprecatedInoutLoc = Tok.getLoc();
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::InOut;
     } else if (Tok.is(tok::kw_let)) {
@@ -242,8 +243,28 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = SourceLoc();
       }
 
-      // (':' type)?
+      // (':' ('inout')? type)?
       if (consumeIf(tok::colon)) {
+
+        SourceLoc postColonLoc = Tok.getLoc();
+
+        bool hasDeprecatedInOut =
+          param.SpecifierKind == ParsedParameter::InOut;
+
+        if (Tok.is(tok::kw_inout)) {
+          SourceLoc deprecatedInOutLoc = param.LetVarInOutLoc;
+          param.LetVarInOutLoc = consumeToken();
+          param.SpecifierKind = ParsedParameter::InOut;
+          if (hasDeprecatedInOut) {
+            diagnose(deprecatedInOutLoc, diag::inout_as_attr_deprecated)
+              .fixItRemove(deprecatedInOutLoc);
+          }
+        } else if (hasDeprecatedInOut) {
+          diagnose(param.LetVarInOutLoc, diag::inout_as_attr_deprecated)
+            .fixItRemove(param.LetVarInOutLoc)
+            .fixItInsert(postColonLoc, "inout ");
+        }
+
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
@@ -252,16 +273,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // was invalid.  Remember that.
         if (type.isParseError() && !type.hasCodeCompletion())
           param.isInvalid = true;
-       
-        // Only allow 'inout' before the parameter name.
-        if (auto InOutTy = dyn_cast_or_null<InOutTypeRepr>(param.Type)) {
-          SourceLoc InOutLoc = InOutTy->getInOutLoc();
-          SourceLoc NameLoc = param.FirstNameLoc;
-          diagnose(InOutLoc, diag::inout_must_appear_before_param)
-              .fixItRemove(InOutLoc)
-              .fixItInsert(NameLoc, "inout ");
-          param.Type = InOutTy->getBase();
-        }
       }
     } else {
       // Otherwise, we have invalid code.  Check to see if this looks like a

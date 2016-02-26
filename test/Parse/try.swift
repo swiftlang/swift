@@ -32,7 +32,7 @@ var b = true ? try! foo() : try! bar() + 0
 var c = true ? try! foo() : try! bar() %%% 0 // expected-error {{'try!' following conditional operator does not cover everything to its right}}
 
 infix operator ?+= { associativity right precedence 90 assignment }
-func ?+=(inout lhs: Int?, rhs: Int?) {
+func ?+=(lhs: inout Int?, rhs: Int?) {
   lhs = lhs! + rhs!
 }
 

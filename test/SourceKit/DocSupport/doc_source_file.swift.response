@@ -2619,3 +2619,24 @@
     ]
   }
 ]
+[
+  {
+    key.line: 137,
+    key.column: 12,
+    key.filepath: "/Users/drchrono/swift/swift/test/SourceKit/DocSupport/Inputs/main.swift",
+    key.severity: source.diagnostic.severity.warning,
+    key.description: "'inout' before a parameter name is deprecated, place it before the parameter type instead",
+    key.fixits: [
+      {
+        key.offset: 1687,
+        key.length: 5,
+        key.sourcetext: ""
+      },
+      {
+        key.offset: 1696,
+        key.length: 0,
+        key.sourcetext: "inout "
+      }
+    ]
+  }
+]

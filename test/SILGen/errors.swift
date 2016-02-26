@@ -485,7 +485,7 @@ protocol Buildable {
   var firstStructure: Structure { get set }
   subscript(name: String) -> Structure { get set }
 }
-func supportFirstStructure<B: Buildable>(inout b: B) throws {
+func supportFirstStructure<B: Buildable>(b: inout B) throws {
   try b.firstStructure.support()
 }
 // CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructure{{.*}} : $@convention(thin) <B where B : Buildable, B.Structure : Supportable> (@inout B) -> @error ErrorType {
@@ -515,7 +515,7 @@ func supportFirstStructure<B: Buildable>(inout b: B) throws {
 // CHECK: dealloc_stack [[MATBUFFER]]
 // CHECK: throw [[ERROR]]
 
-func supportStructure<B: Buildable>(inout b: B, name: String) throws {
+func supportStructure<B: Buildable>(b: inout B, name: String) throws {
   try b[name].support()
 }
 // CHECK-LABEL: sil hidden @_TF6errors16supportStructure
@@ -561,7 +561,7 @@ struct Bridge {
     set {}
   }
 }
-func supportStructure(inout b: Bridge, name: String) throws {
+func supportStructure(b: inout Bridge, name: String) throws {
   try b[name].support()
 }
 // CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ :
@@ -614,7 +614,7 @@ struct OwnedBridge {
     mutableAddressWithOwner { return (nil, owner) }
   }
 }
-func supportStructure(inout b: OwnedBridge, name: String) throws {
+func supportStructure(b: inout OwnedBridge, name: String) throws {
   try b[name].support()
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
@@ -650,7 +650,7 @@ struct PinnedBridge {
     mutableAddressWithPinnedNativeOwner { return (nil, owner) }
   }
 }
-func supportStructure(inout b: PinnedBridge, name: String) throws {
+func supportStructure(b: inout PinnedBridge, name: String) throws {
   try b[name].support()
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :

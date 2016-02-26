@@ -488,7 +488,7 @@ enum Color {
   static func overload(a a : Int) -> Color {}
   static func overload(b b : Int) -> Color {}
   
-  static func frob(a : Int, inout b : Int) -> Color {}
+  static func frob(a : Int, b : inout Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}} {{51-51=description: }}
@@ -643,7 +643,7 @@ extension Array {
 }
 
 // <rdar://problem/22519983> QoI: Weird error when failing to infer archetype
-func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}
+func safeAssign<T: RawRepresentable>(lhs: inout T) -> Bool {}
 // expected-note @-1 {{in call to function 'safeAssign'}}
 let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
 
