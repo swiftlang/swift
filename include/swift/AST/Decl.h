@@ -4036,7 +4036,6 @@ public:
           Type Ty, DeclContext *DC)
     : VarDecl(DeclKind::Var, IsStatic, IsLet, NameLoc, Name, Ty, DC) { }
 
-  SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
 
   void setUserAccessible(bool Accessible) {
