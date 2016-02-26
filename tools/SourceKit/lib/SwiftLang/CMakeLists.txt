@@ -3,6 +3,7 @@ add_sourcekit_library(SourceKitSwiftLang
   SwiftASTManager.cpp
   SwiftCompletion.cpp
   SwiftDocSupport.cpp
+  FormatContext.cpp
   SwiftEditor.cpp
   SwiftEditorInterfaceGen.cpp
   SwiftIndexing.cpp

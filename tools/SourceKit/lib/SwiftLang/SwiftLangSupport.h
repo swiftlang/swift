@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTLANGSUPPORT_H
 
 #include "CodeCompletion.h"
+#include "FormatContext.h"
 #include "SwiftInterfaceGenContext.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/Concurrency.h"
@@ -57,17 +58,13 @@ namespace SourceKit {
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
 
-
   struct Implementation;
   Implementation &Impl;
 
-  size_t getLineOffset(unsigned LineIndex);
-  size_t getTrimmedLineOffset(unsigned LineIndex);
-
 public:
-  struct CodeFormatOptions;
 
-  SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport);
+  SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport,
+       swift::ide::CodeFormatOptions Options = swift::ide::CodeFormatOptions());
   ~SwiftEditorDocument();
 
   ImmutableTextSnapshotRef initializeText(llvm::MemoryBuffer *Buf,
@@ -94,7 +91,7 @@ public:
   StringRef getTrimmedTextForLine(unsigned Line);
   size_t getExpandedIndentForLine(unsigned LineIndex);
 
-  const CodeFormatOptions &getFormatOptions();
+  const swift::ide::CodeFormatOptions &getFormatOptions();
 
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
