@@ -673,8 +673,6 @@ ERROR(var_parameter_not_allowed,none,
 
 ERROR(expected_behavior_name,none,
       "expected behavior name after '[' in property declaration", ())
-ERROR(expected_rsquare_after_behavior_name,none,
-      "expected ']' after behavior name in property declaration", ())
 
 
 WARNING(parameter_extraneous_double_up,none,
