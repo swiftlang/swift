@@ -722,11 +722,6 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
 
     printPattern(TP->getSubPattern());
     Printer << ": ";
-
-    if (dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
-      Printer << "inout ";
-    }
-
     printTypeLoc(TheTypeLoc);
     return;
   }
@@ -734,8 +729,7 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
 
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  Type T = TP->getType();
-  T.print(Printer, Options);
+  TP->getType().print(Printer, Options);
 }
 
 void PrintAST::printPattern(const Pattern *pattern) {
@@ -1881,29 +1875,8 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
 
   printArgName();
 
-  if (TheTypeLoc.getTypeRepr()) {
-
-    if (auto *IOTR = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
-      TheTypeLoc = TypeLoc(IOTR->getBase());
-      if (Type T = TheTypeLoc.getType()) {
-        if (auto *IOT = T->getAs<InOutType>()) {
-          TheTypeLoc.setType(IOT->getObjectType());
-        }
-      }
-
-      Printer << "inout ";
-    }
-  } else {
-    if (param->hasType())
-      TheTypeLoc = TypeLoc::withoutLoc(param->getType());
-
-    if (Type T = TheTypeLoc.getType()) {
-      if (auto *IOT = T->getAs<InOutType>()) {
-        Printer << "inout ";
-        TheTypeLoc.setType(IOT->getObjectType());
-      }
-    }
-  }
+  if (!TheTypeLoc.getTypeRepr() && param->hasType())
+    TheTypeLoc = TypeLoc::withoutLoc(param->getType());
 
   auto ContainsFunc = [&] (DeclAttrKind Kind) {
     return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.

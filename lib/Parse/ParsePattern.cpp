@@ -186,10 +186,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status |= makeParserCodeCompletionStatus();
       }
     }
-    //SourceLoc deprecatedInoutLoc;
     // ('inout' | 'let' | 'var')?
     if (Tok.is(tok::kw_inout)) {
-      //deprecatedInoutLoc = Tok.getLoc();
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::InOut;
     } else if (Tok.is(tok::kw_let)) {
@@ -252,12 +250,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           param.SpecifierKind == ParsedParameter::InOut;
 
         if (Tok.is(tok::kw_inout)) {
-          SourceLoc deprecatedInOutLoc = param.LetVarInOutLoc;
           param.LetVarInOutLoc = consumeToken();
           param.SpecifierKind = ParsedParameter::InOut;
           if (hasDeprecatedInOut) {
-            diagnose(deprecatedInOutLoc, diag::inout_as_attr_deprecated)
-              .fixItRemove(deprecatedInOutLoc);
+            diagnose(param.LetVarInOutLoc, diag::inout_as_attr_deprecated)
+              .fixItRemove(param.LetVarInOutLoc);
           }
         } else if (hasDeprecatedInOut) {
           diagnose(param.LetVarInOutLoc, diag::inout_as_attr_deprecated)
