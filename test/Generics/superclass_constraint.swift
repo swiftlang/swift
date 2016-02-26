@@ -65,8 +65,8 @@ extension P2 where Self.T : C {
 // CHECK: superclassConformance1
 // CHECK: Requirements:
 // CHECK-NEXT: T witness marker
-// CHECK-NEXT: T : C [explicit @ /Users/dgregor/Projects/swift/swift/test/Generics/superclass_constraint.swift
-// CHECK-NEXT: T : P3 [redundant @ /Users/dgregor/Projects/swift/swift/test/Generics/superclass_constraint.swift
+// CHECK-NEXT: T : C [explicit @
+// CHECK-NEXT: T : P3 [redundant @
 // CHECK-NEXT: T[.P3].T == T [protocol]
 // CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T where T : C, T : P3>(t: T) { }
@@ -74,8 +74,8 @@ func superclassConformance1<T where T : C, T : P3>(t: T) { }
 // CHECK: superclassConformance2
 // CHECK: Requirements:
 // CHECK-NEXT: T witness marker
-// CHECK-NEXT: T : C [explicit @ /Users/dgregor/Projects/swift/swift/test/Generics/superclass_constraint.swift
-// CHECK-NEXT: T : P3 [redundant @ /Users/dgregor/Projects/swift/swift/test/Generics/superclass_constraint.swift
+// CHECK-NEXT: T : C [explicit @
+// CHECK-NEXT: T : P3 [redundant @
 // CHECK-NEXT: T[.P3].T == T [protocol]
 // CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T where T : C, T : P3>(t: T) { }
@@ -87,7 +87,7 @@ class C2 : C, P4 { }
 // CHECK: superclassConformance3
 // CHECK: Requirements:
 // CHECK-NEXT: T witness marker
-// CHECK-NEXT: T : C2 [explicit @ /Users/dgregor/Projects/swift/swift/test/Generics/superclass_constraint.swift
-// CHECK-NEXT: T : P4 [redundant @ /Users/dgregor/Projects/swift/swift/test/Generics/superclass_constraint.swift
+// CHECK-NEXT: T : C2 [explicit @
+// CHECK-NEXT: T : P4 [redundant @
 // CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C2>
 func superclassConformance3<T where T : C, T : P4, T : C2>(t: T) { }
