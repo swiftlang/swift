@@ -95,8 +95,12 @@ class NonContiguousNSString : NSString {
     var encoded: [UInt16] = []
     var iter = scalars.makeIterator()
     let output: (UInt16) -> Void = { encoded.append($0) }
-    let hadError =
-      transcode(UTF32.self, UTF16.self, iter, output, stoppingOnError: true)
+    let hadError = transcode(
+      iter,
+      from: UTF32.self,
+      to: UTF16.self,
+      stoppingOnError: true,
+      sendingOutputTo: output)
     expectFalse(hadError)
     self.init(encoded)
   }

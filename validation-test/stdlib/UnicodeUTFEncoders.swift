@@ -136,7 +136,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     )
 
     encodeIndex = encodeBuffer.startIndex
-    Codec.encode(scalar, output: encodeOutput)
+    Codec.encode(scalar, sendingOutputTo: encodeOutput)
     expectEqual(
       nsEncoded, encodeBuffer[0..<encodeIndex],
       "Decoding failed: \(asHex(nsEncoded)) => " +
