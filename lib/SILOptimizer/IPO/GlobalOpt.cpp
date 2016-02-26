@@ -282,12 +282,15 @@ void SILGlobalOpt::collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG) {
 /// Return the callee of a once call.
 static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
   assert(BI->getNumOperands() == 2 && "once call should have 2 operands.");
-  if (auto *TTTF = dyn_cast<ThinToThickFunctionInst>(BI->getOperand(1))) {
-    if (auto *FR = dyn_cast<FunctionRefInst>(TTTF->getOperand()))
-       return FR->getReferencedFunction();
-  } else if (auto *FR = dyn_cast<FunctionRefInst>(BI->getOperand(1))) {
+
+  auto Callee = BI->getOperand(1);
+  assert(cast<SILFunctionType>(Callee->getType().getSwiftRValueType())
+                 ->getRepresentation() == SILFunctionTypeRepresentation::Thin &&
+         "Expected thin function representation!");
+
+  if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
     return FR->getReferencedFunction();
-  }
+
   return nullptr;
 }
 
