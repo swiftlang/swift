@@ -264,6 +264,9 @@ extension String : CustomDebugStringConvertible {
   }
 }
 
+// Make it possible to `throw` strings as errors
+extension String: ErrorType {}
+
 extension String {
   /// Returns the number of code units occupied by this string
   /// in the given encoding.
