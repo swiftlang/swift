@@ -281,7 +281,7 @@ void SILGlobalOpt::collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG) {
 
 /// Return the callee of a once call.
 static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
-  assert(BI->getNumOperands() == 2 && "once call should have 3 operands.");
+  assert(BI->getNumOperands() == 2 && "once call should have 2 operands.");
   if (auto *TTTF = dyn_cast<ThinToThickFunctionInst>(BI->getOperand(1))) {
     if (auto *FR = dyn_cast<FunctionRefInst>(TTTF->getOperand()))
        return FR->getReferencedFunction();
