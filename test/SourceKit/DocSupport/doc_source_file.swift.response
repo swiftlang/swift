@@ -1526,19 +1526,19 @@
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1687,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1693,
+    key.offset: 1687,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1693,
+    key.offset: 1687,
     key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1690,
+    key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
@@ -2448,7 +2448,7 @@
     key.usr: "s:F8__main__5test4FRSiT_",
     key.offset: 1676,
     key.length: 26,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>test4</decl.name>(<decl.var.parameter>inout <decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>test4</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type>inout <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -2615,27 +2615,6 @@
             key.length: 4
           }
         ]
-      }
-    ]
-  }
-]
-[
-  {
-    key.line: 137,
-    key.column: 12,
-    key.filepath: "/Users/drchrono/swift/swift/test/SourceKit/DocSupport/Inputs/main.swift",
-    key.severity: source.diagnostic.severity.warning,
-    key.description: "'inout' before a parameter name is deprecated, place it before the parameter type instead",
-    key.fixits: [
-      {
-        key.offset: 1687,
-        key.length: 5,
-        key.sourcetext: ""
-      },
-      {
-        key.offset: 1696,
-        key.length: 0,
-        key.sourcetext: "inout "
       }
     ]
   }
