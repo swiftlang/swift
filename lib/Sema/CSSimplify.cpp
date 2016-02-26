@@ -2488,61 +2488,6 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 }
 
-/// Determine whether the given type is the Self type of the protocol.
-static bool isProtocolSelf(Type type) {
-  if (auto genericParam = type->getAs<GenericTypeParamType>())
-    return genericParam->getDepth() == 0;
-  
-  return false;
-}
-
-/// Determine whether the given type contains a reference to the 'Self' type
-/// of a protocol.
-static bool containsProtocolSelf(Type type) {
-  // If the type is not dependent, it doesn't refer to 'Self'.
-  if (!type->hasTypeParameter())
-    return false;
-
-  return type.findIf([](Type type) -> bool {
-    return isProtocolSelf(type);
-  });
-}
-
-/// Determine whether the given protocol member's signature prevents
-/// it from being used in an existential reference.
-static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
-  Type type = decl->getInterfaceType();
-  if (!type) // FIXME: deal with broken recursion
-    return true;
-  
-  // For a function or constructor, skip the implicit 'this'.
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-    type = type->castTo<AnyFunctionType>()->getResult();
-
-    // Allow functions to return Self, but not have Self anywhere in
-    // their argument types.
-    for (unsigned i = 1, n = afd->getNumParameterLists(); i != n; ++i) {
-      // Check whether the input type contains Self anywhere.
-      auto fnType = type->castTo<AnyFunctionType>();
-      if (containsProtocolSelf(fnType->getInput()))
-        return true;
-      
-      type = fnType->getResult();
-    }
-
-    // Look through one level of optional on the result type.
-    if (auto valueType = type->getAnyOptionalObjectType())
-      type = valueType;
-    
-    if (isProtocolSelf(type) || type->is<DynamicSelfType>())
-      return false;
-
-    return containsProtocolSelf(type);
-  }
-
-  return containsProtocolSelf(type);
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
 {
@@ -2791,27 +2736,35 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // Introduce a new overload set.
   retry_ctors_after_fail:
     bool labelMismatch = false;
-    for (auto constructor : ctors) {
+    for (auto ctor : ctors) {
       // If the constructor is invalid, we fail entirely to avoid error cascade.
-      TC.validateDecl(constructor, true);
-      if (constructor->isInvalid())
+      TC.validateDecl(ctor, true);
+      if (ctor->isInvalid())
         return result.markErrorAlreadyDiagnosed();
+
+      // FIXME: Deal with broken recursion
+      if (!ctor->getInterfaceType())
+        continue;
 
       // If the argument labels for this result are incompatible with
       // the call site, skip it.
-      if (!hasCompatibleArgumentLabels(constructor)) {
+      if (!hasCompatibleArgumentLabels(ctor)) {
         labelMismatch = true;
-        result.addUnviable(constructor, MemberLookupResult::UR_LabelMismatch);
+        result.addUnviable(ctor, MemberLookupResult::UR_LabelMismatch);
         continue;
       }
 
       // If our base is an existential type, we can't make use of any
       // constructor whose signature involves associated types.
-      if (isExistential &&
-          isUnavailableInExistential(getTypeChecker(), constructor)) {
-        result.addUnviable(constructor,
-                           MemberLookupResult::UR_UnavailableInExistential);
-        continue;
+      if (isExistential) {
+        if (auto *proto = ctor->getDeclContext()
+                ->getAsProtocolOrProtocolExtensionContext()) {
+          if (!proto->isAvailableInExistential(ctor)) {
+            result.addUnviable(ctor,
+                               MemberLookupResult::UR_UnavailableInExistential);
+            continue;
+          }
+        }
       }
       
       // If the invocation's argument expression has a favored constraint,
@@ -2820,7 +2773,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (favoredType && result.FavoredChoice == ~0U) {
         // Only try and favor monomorphic initializers.
         if (auto fnTypeWithSelf =
-            constructor->getType()->getAs<FunctionType>()) {
+            ctor->getType()->getAs<FunctionType>()) {
           
           if (auto fnType =
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
@@ -2838,7 +2791,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, constructor,
+      result.addViable(OverloadChoice(baseTy, ctor,
                                       /*isSpecialized=*/false, *this));
     }
 
@@ -2919,6 +2872,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return;
     }
 
+    // FIXME: Deal with broken recursion
+    if (!cand->getInterfaceType())
+      return;
+
     // If the argument labels for this result are incompatible with
     // the call site, skip it.
     if (!hasCompatibleArgumentLabels(cand)) {
@@ -2927,12 +2884,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return;
     }
 
-    
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
-    if (isExistential && isUnavailableInExistential(getTypeChecker(), cand)) {
-      result.addUnviable(cand, MemberLookupResult::UR_UnavailableInExistential);
-      return;
+    if (isExistential) {
+      if (auto *proto = cand->getDeclContext()
+              ->getAsProtocolOrProtocolExtensionContext()) {
+        if (!proto->isAvailableInExistential(cand)) {
+          result.addUnviable(cand,
+                             MemberLookupResult::UR_UnavailableInExistential);
+          return;
+        }
+      }
     }
 
     // See if we have an instance method, instance member or static method,

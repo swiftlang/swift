@@ -3292,6 +3292,53 @@ public:
 };
 
 
+/// Describes whether a requirement refers to 'Self', for use in the
+/// is-inheritable and is-available-existential checks.
+struct SelfReferenceKind {
+  bool result;
+  bool parameter;
+  bool other;
+
+  /// The type does not refer to 'Self' at all.
+  static SelfReferenceKind None() {
+    return SelfReferenceKind(false, false, false);
+  }
+
+  /// The type refers to 'Self', but only as the result type of a method.
+  static SelfReferenceKind Result() {
+    return SelfReferenceKind(true, false, false);
+  }
+
+  /// The type refers to 'Self', but only as the parameter type of a method.
+  static SelfReferenceKind Parameter() {
+    return SelfReferenceKind(false, true, false);
+  }
+
+  /// The type refers to 'Self' in a position that is invariant.
+  static SelfReferenceKind Other() {
+    return SelfReferenceKind(false, false, true);
+  }
+
+  SelfReferenceKind flip() const {
+    return SelfReferenceKind(parameter, result, other);
+  }
+
+  SelfReferenceKind operator|=(SelfReferenceKind kind) {
+    result |= kind.result;
+    parameter |= kind.parameter;
+    other |= kind.other;
+    return *this;
+  }
+
+  operator bool() const {
+    return result || parameter || other;
+  }
+
+private:
+  SelfReferenceKind(bool result, bool parameter, bool other)
+    : result(result), parameter(parameter), other(other) { }
+};
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -3365,10 +3412,28 @@ public:
              ->existentialConformsToSelfSlow();
   }
 
+  /// Find direct Self references within the given requirement.
+  ///
+  /// \param allowCovariantParameters If true, 'Self' is assumed to be
+  /// covariant anywhere; otherwise, only in the return type of the top-level
+  /// function type.
+  ///
+  /// \param skipAssocTypes If true, associated types of 'Self' are ignored;
+  /// otherwise, they count as an 'other' usage of 'Self'.
+  SelfReferenceKind findProtocolSelfReferences(const ValueDecl *decl,
+                                               bool allowCovariantParameters,
+                                               bool skipAssocTypes) const;
+
+  /// Determine whether we are allowed to refer to an existential type
+  /// conforming to this protocol. This is only permitted if the type of
+  /// the member does not contain any associated types, and does not
+  /// contain 'Self' in 'parameter' or 'other' position.
+  bool isAvailableInExistential(const ValueDecl *decl) const;
+
   /// Determine whether we are allowed to refer to an existential type
   /// conforming to this protocol. This is only permitted if the types of
-  /// all the members are rank-1, that is, do not have Self or associated
-  /// type requirements that may depend on the existential's opened type.
+  /// all the members do not contain any associated types, and do not
+  /// contain 'Self' in 'parameter' or 'other' position.
   bool existentialTypeSupported(LazyResolver *resolver) const {
     if (ProtocolDeclBits.ExistentialTypeSupportedValid)
       return ProtocolDeclBits.ExistentialTypeSupported;

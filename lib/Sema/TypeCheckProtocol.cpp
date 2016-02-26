@@ -1775,162 +1775,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     Conformance->addDefaultDefinition(assocType);
 }
 
-namespace {
-  /// Describes whether a requirement refers to 'Self', for use in the
-  /// is-inheritable check.
-  enum class SelfReferenceKind {
-    /// The type does not refer to 'Self' at all.
-    None,
-    /// The type refers to 'Self', but only as the result type of a method.
-    Result,
-    /// The type refers to 'Self', but only as the parameter type of a method.
-    Parameter,
-    /// The type refers to 'Self', and none of the above conditions hold.
-    Other
-  };
-}
-
-/// Determine whether the given type is the 'Self' generic parameter
-/// of a protocol.
-static bool isSelf(Type type) {
-  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    return genericParam->getDepth() == 0 && genericParam->getIndex() == 0;
-  }
-
-  return false;
-}
-
-/// Determine whether the given type is the 'Self' generic parameter of a
-/// protocol or a (possibly implicitly unwrapped) optional thereof.
-static bool isSelfOrOptionalSelf(Type type) {
-  if (auto optType = type->getAnyOptionalObjectType())
-    type = optType;
-  if (auto selfType = type->getAs<DynamicSelfType>())
-    type = selfType->getSelfType();
-  return isSelf(type);
-}
-
-/// Determine whether the given type contains a reference to the
-/// 'Self' generic parameter of a protocol that is not the base of a
-/// dependent member expression.
-static bool containsSelf(Type type) {
-  struct SelfWalker : public TypeWalker {
-    bool FoundSelf = false;
-
-    virtual Action walkToTypePre(Type ty) { 
-      // If we found a reference to 'Self', note it and stop.
-      if (isSelf(ty)) {
-        FoundSelf = true;
-        return Action::Stop;
-      }
-
-      // Don't recurse into the base of a dependent member type: it
-      // doesn't contain a bare 'Self'.
-      if (ty->is<DependentMemberType>())
-        return Action::SkipChildren;
-
-      return Action::Continue; 
-    }
-  } selfWalker;
-
-  type.walk(selfWalker);
-  return selfWalker.FoundSelf;
-}
-
-/// Classify usages of Self in the given type.
-static SelfReferenceKind
-findSelfReferences(Type type, SelfReferenceKind selfKind) {
-  if (isSelfOrOptionalSelf(type))
-    return selfKind;
-
-  // Decompose tuples.
-  if (auto tuple = type->getAs<TupleType>()) {
-    auto kind = SelfReferenceKind::None;
-    for (auto &elt: tuple->getElements()) {
-      auto eltKind = findSelfReferences(elt.getType(), selfKind);
-      // If all non-'No' kinds are equal, return one,
-      // otherwise we have a problematic usage.
-      if (kind == SelfReferenceKind::None)
-        kind = eltKind;
-      else if (eltKind == SelfReferenceKind::None)
-        continue;
-      else if (eltKind != kind)
-        return SelfReferenceKind::Other;
-    }
-
-    return kind;
-  } 
-
-  // Decompose functions.
-  if (auto funcTy = type->getAs<AnyFunctionType>()) {
-    // Flip the input type around.
-    auto inputKind = findSelfReferences(funcTy->getInput(),
-                                        (selfKind == SelfReferenceKind::Parameter
-                                         ? SelfReferenceKind::Result
-                                         : SelfReferenceKind::Parameter));
-    auto resultKind = findSelfReferences(funcTy->getResult(), selfKind);
-
-    // Return a non-'No' value if one of them is 'No' or they're
-    // both equal.
-    if (inputKind == SelfReferenceKind::None)
-      return resultKind;
-    else if (resultKind == SelfReferenceKind::None)
-      return inputKind;
-    else if (inputKind == resultKind)
-      return inputKind;
-
-    // We have a problematic usage.
-    return SelfReferenceKind::Other;
-  }
-
-  // Any other usage is problematic.
-  return (containsSelf(type)
-          ? SelfReferenceKind::Other
-          : SelfReferenceKind::None);
-}
-
-/// Find references to Self within the given function type.
-static SelfReferenceKind findSelfReferences(const AnyFunctionType *fnType) {
-  // Contravariant 'Self' in the parameter list is always allowed,
-  // because a witness in a non-final class then has a more general
-  // function type than the requirement.
-  auto inputKind = findSelfReferences(fnType->getInput(),
-                                      SelfReferenceKind::Parameter);
-  if (inputKind == SelfReferenceKind::Result ||
-      inputKind == SelfReferenceKind::Other) {
-    return SelfReferenceKind::Other;
-  }
-
-  // Consider the result type.
-  return findSelfReferences(fnType->getResult(),
-                            SelfReferenceKind::Result);
-}
-
-/// Find the bare Self references within the given requirement.
-static SelfReferenceKind findSelfReferences(ValueDecl *value) {
-  // Types never refer to 'Self'.
-  if (isa<TypeDecl>(value))
-    return SelfReferenceKind::None;
-
-  auto type = value->getInterfaceType();
-
-  // If the function requirement returns Self and has no other
-  // reference to Self, note that.
-  if (isa<AbstractFunctionDecl>(value)) {
-    // Skip the 'self' parameter.
-    type = type->castTo<AnyFunctionType>()->getResult();
-    return findSelfReferences(type->castTo<AnyFunctionType>());
-  }
-
-  if (isa<SubscriptDecl>(value)) {
-    auto fnType = type->castTo<AnyFunctionType>();
-    return findSelfReferences(fnType);
-  }
-
-  return containsSelf(type) ? SelfReferenceKind::Other
-                            : SelfReferenceKind::None;
-}
-
 SmallVector<ValueDecl *, 4> 
 ConformanceChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
@@ -2230,20 +2074,19 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         }
       }
 
-      // Check whether this requirement uses Self in a way that might
-      // prevent conformance from succeeding.
-      switch (findSelfReferences(requirement)) {
-      case SelfReferenceKind::None:
-        // No references to Self: nothing more to do.
-        break;
+      ClassDecl *classDecl = Adoptee->getClassOrBoundGenericClass();
 
-      case SelfReferenceKind::Other: {
-        // References to Self in a position where subclasses cannot do
-        // the right thing. Complain if the adoptee is a non-final
-        // class.
-        ClassDecl *classDecl = nullptr;
-        if ((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
-            !classDecl->isFinal()) {
+      if (classDecl && !classDecl->isFinal()) {
+        // Check whether this requirement uses Self in a way that might
+        // prevent conformance from succeeding.
+        auto selfKind = Proto->findProtocolSelfReferences(requirement,
+                                             /*allowCovariantParameters=*/false,
+                                             /*skipAssocTypes=*/true);
+
+        if (selfKind.other) {
+          // References to Self in a position where subclasses cannot do
+          // the right thing. Complain if the adoptee is a non-final
+          // class.
           diagnoseOrDefer(requirement, false,
             [witness, requirement](TypeChecker &tc,
                                    NormalProtocolConformance *conformance) {
@@ -2252,55 +2095,43 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                           proto->getDeclaredType(), requirement->getFullName(),
                           conformance->getType());
             });
-        }
-        break;
-      }
+        } else if (selfKind.result) {
+          // The reference to Self occurs in the result type. A non-final class 
+          // can satisfy this requirement with a method that returns Self.
 
-      case SelfReferenceKind::Result: {
-        // The reference to Self occurs in the result type. A non-final class 
-        // can satisfy this requirement with a method that returns Self.
-        ClassDecl *classDecl = nullptr;
-        if ((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
-            !classDecl->isFinal()) {
+          // If the function has a dynamic Self, it's okay.
           if (auto func = dyn_cast<FuncDecl>(best.Witness)) {
-            // If the function has a dynamic Self, it's okay.
-            if (func->hasDynamicSelf())
-              break;
+            if (!func->hasDynamicSelf()) {
+              diagnoseOrDefer(requirement, false,
+                [witness, requirement](TypeChecker &tc,
+                                       NormalProtocolConformance *conformance) {
+                  auto proto = conformance->getProtocol();
+                  tc.diagnose(witness->getLoc(),
+                              diag::witness_requires_dynamic_self,
+                              requirement->getFullName(),
+                              conformance->getType(),
+                              proto->getDeclaredType());
+                });
+            }
 
+          // Constructors conceptually also have a dynamic Self
+          // return type, so they're okay.
+          } else if (!isa<ConstructorDecl>(best.Witness)) {
             diagnoseOrDefer(requirement, false,
               [witness, requirement](TypeChecker &tc,
                                      NormalProtocolConformance *conformance) {
                 auto proto = conformance->getProtocol();
-                tc.diagnose(witness->getLoc(),
-                            diag::witness_requires_dynamic_self,
-                            requirement->getFullName(), conformance->getType(),
-                            proto->getDeclaredType());
+
+                tc.diagnose(witness->getLoc(), diag::witness_self_non_subtype,
+                            proto->getDeclaredType(), requirement->getFullName(),
+                            conformance->getType());
               });
-            break;
           }
-
-          if (isa<ConstructorDecl>(best.Witness)) {
-            // Constructors conceptually also have a dynamic Self
-            // return type, so they're okay.
-            break;
-          }
-
-          diagnoseOrDefer(requirement, false,
-            [witness, requirement](TypeChecker &tc,
-                                   NormalProtocolConformance *conformance) {
-              auto proto = conformance->getProtocol();
-
-              tc.diagnose(witness->getLoc(), diag::witness_self_non_subtype,
-                          proto->getDeclaredType(), requirement->getFullName(),
-                          conformance->getType());
-            });
-          break;
         }
-        break;
-      }
-      case SelfReferenceKind::Parameter:
-        llvm_unreachable("Should not see this here");
-        
+
+        // A non-final class can model a protocol requirement with a
+        // contravariant Self, because here the witness will always have
+        // a more general type than the requirement.
       }
 
       // Record the match.
