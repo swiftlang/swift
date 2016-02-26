@@ -4571,7 +4571,6 @@ bool Parser::parseSILScope() {
     GenericParamList *Ignored;
     Scope S(this, ScopeKind::TopLevel);
     Scope Body(this, ScopeKind::FunctionBody);
-    llvm::errs()<<Slot<<"\n";
     if ((ScopeState.parseGlobalName(FnName)) ||
         parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
         ScopeState.parseSILType(Ty, Ignored, true))
