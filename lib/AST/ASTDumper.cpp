@@ -67,7 +67,7 @@ namespace {
     
     ~PrintWithColorRAII() {
       if (ShowColors) {
-        OS << llvm::sys::Process::ResetColor();
+        OS.resetColor();
       }
     }
     
@@ -249,7 +249,7 @@ namespace {
       OS << Name;
 
       if (ShowColors)
-        OS << llvm::sys::Process::ResetColor();
+        OS.resetColor();
 
       if (P->isImplicit())
         OS << " implicit";
@@ -404,7 +404,7 @@ namespace {
       OS << Name;
 
       if (ShowColors)
-        OS << llvm::sys::Process::ResetColor();
+        OS.resetColor();
 
       if (D->isImplicit())
         OS << " implicit";
@@ -2262,7 +2262,7 @@ public:
     OS << Name;
 
     if (ShowColors)
-      OS << llvm::sys::Process::ResetColor();
+      OS.resetColor();
     return OS;
   }
 
