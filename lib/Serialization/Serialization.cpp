@@ -3483,7 +3483,7 @@ typedef std::unique_ptr<FileNameToGroupNameMap> pFileNameToGroupNameMap;
 
 class YamlGroupInputParser {
   StringRef RecordPath;
-  std::string Separator = ".";
+  std::string Separator = "/";
   static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
 
   bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
