@@ -983,7 +983,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
     if (T->Superclass->isSuperclassOf(Superclass, nullptr)) {
       T->Superclass = Superclass;
 
-      // We've strenthened the bound, so update superclass conformances.
+      // We've strengthened the bound, so update superclass conformances.
       updateSuperclassConformances();
     } else if (!Superclass->isSuperclassOf(T->Superclass, nullptr)) {
       Diags.diagnose(Source.getLoc(),
