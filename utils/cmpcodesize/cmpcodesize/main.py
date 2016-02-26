@@ -177,7 +177,7 @@ How to specify files:
             sizes = collections.defaultdict(int)
             for file in oldFiles:
                 readSizes(sizes, file, True, False)
-            print(listFunctionSizes(sizes.items()))
+            print(os.linesep.join(listFunctionSizes(sizes.items())))
         else:
             compareFunctionSizes(oldFiles, newFiles)
     else:
