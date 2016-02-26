@@ -974,10 +974,8 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     return false;
 
   if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
-    // FIXME: this is synched with shouldPrintInContext() since otherwise we
-    // may setup a printDeclPre callback but never print anything. We should
-    // unify these methods or rename one to reflect the difference between
-    // them.
+    // Enum elements are printed as part of the EnumCaseDecl, unless they were
+    // imported without source info.
     return !EED->getSourceRange().isValid();
   }
 
@@ -2131,8 +2129,6 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
 }
 
 void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
-  if (!decl->shouldPrintInContext(Options))
-    return;
   printDocumentationComment(decl);
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
@@ -2517,12 +2513,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     }
   }
 
-  if (auto EED = dyn_cast<EnumElementDecl>(this)) {
-    // Enum elements are printed as part of the EnumCaseDecl, unless they were
-    // imported without source info.
-    return !EED->getSourceRange().isValid();
-
-  } else if (isa<IfConfigDecl>(this)) {
+  if (isa<IfConfigDecl>(this)) {
     return PO.PrintIfConfig;
   }
 
