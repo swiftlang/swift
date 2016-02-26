@@ -2444,7 +2444,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 }
 
 ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
-    unsigned int Offset, unsigned int Length, llvm::MemoryBuffer *Buf,
+    unsigned Offset, unsigned Length, llvm::MemoryBuffer *Buf,
     bool ProvideSemanticInfo) {
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);

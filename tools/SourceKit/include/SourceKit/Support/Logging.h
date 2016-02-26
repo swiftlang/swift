@@ -87,7 +87,7 @@ public:
   Logger &operator<<(const char *Str) { if (Str) LogOS << Str; return *this; }
   Logger &operator<<(unsigned long N) { LogOS << N; return *this; }
   Logger &operator<<(long N) { LogOS << N ; return *this; }
-  Logger &operator<<(unsigned int N) { LogOS << N; return *this; }
+  Logger &operator<<(unsigned N) { LogOS << N; return *this; }
   Logger &operator<<(int N) { LogOS << N; return *this; }
   Logger &operator<<(char C) { LogOS << C; return *this; }
   Logger &operator<<(unsigned char C) { LogOS << C; return *this; }

@@ -4192,12 +4192,12 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   return new (ctx) ErasureExpr(expr, toType, conformances);
 }
 
-static unsigned int getOptionalBindDepth(const BoundGenericType *bgt) {
+static unsigned getOptionalBindDepth(const BoundGenericType *bgt) {
   
   if (bgt->getDecl()->classifyAsOptionalType()) {
     auto tyarg = bgt->getGenericArgs()[0];
     
-    unsigned int innerDepth = 0;
+    unsigned innerDepth = 0;
     
     if (auto wrappedBGT = dyn_cast<BoundGenericType>(tyarg->
                                                      getCanonicalType())) {

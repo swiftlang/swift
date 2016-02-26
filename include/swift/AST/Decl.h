@@ -834,7 +834,7 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
   return mem;
 }
 
-enum class RequirementReprKind : unsigned int {
+enum class RequirementReprKind : unsigned {
   /// A type bound T : P, where T is a type that depends on a generic
   /// parameter and P is some type that should bound T, either as a concrete
   /// supertype or a protocol to which T must conform.
