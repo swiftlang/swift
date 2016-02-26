@@ -88,8 +88,6 @@ function(_add_variant_c_compile_link_flags)
       "-arch" "${CFLAGS_ARCH}"
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
-    
-    message("SDK=${CFLAGS_SDK} + ARCH=${CFLAGS_ARCH} + DEPLOYMENT_VERSION=${DEPLOYMENT_VERSION} + INPUT_DEPLOYMENT_VERS_IOS=${CFLAGS_DEPLOYMENT_VERSION_IOS}")
       
     if(analyze_code_coverage)
       list(APPEND result "-fprofile-instr-generate"
