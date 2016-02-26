@@ -53,7 +53,7 @@ function (_swift_benchmark_compile_file)
 endfunction(_swift_benchmark_compile_file)
 
 function (swift_benchmark_compile_file)
-  make_parse_arguments(BENCH_COMPILE_FILE "IS_SINGLE_FRONTEND_INVOCATION;IS_LIBRARY" "OBJDIR;MODULE_NAME;OBJ_OUT_VAR;SIB_OUT_VAR" "SOURCES;EXTRA_DEPENDS;FLAGS" ${ARGN})
+  cmake_parse_arguments(BENCH_COMPILE_FILE "IS_SINGLE_FRONTEND_INVOCATION;IS_LIBRARY" "OBJDIR;MODULE_NAME;OBJ_OUT_VAR;SIB_OUT_VAR" "SOURCES;EXTRA_DEPENDS;FLAGS" ${ARGN})
   set(swiftmodule "${BENCH_COMPILE_FILE_OBJDIR}/${BENCH_COMPILE_FILE_MODULE_NAME}.swiftmodule")
   set(extra_boolean_args)
   if (BENCH_COMPILE_FILE_IS_LIBRARY)
@@ -216,76 +216,77 @@ function (swift_benchmark_compile_archopts)
     endif()
   endforeach()
 
-  foreach(module_name_path ${SWIFT_MULTISOURCE_BENCHES})
-    get_filename_component(module_name "${module_name_path}" NAME)
+  # foreach(module_name_path ${SWIFT_MULTISOURCE_BENCHES})
+  #   get_filename_component(module_name "${module_name_path}" NAME)
 
-    if ("${bench_flags}" MATCHES "-whole-module.*" AND
-        NOT "${bench_flags}" MATCHES "-num-threads.*")
-      # Regular whole-module-compilation: only a single object file is
-      # generated.
-      set(sources)
-      foreach(source ${${module_name}_sources})
-        list(APPEND sources "${srcdir}/${source}")
-      endforeach()
+  #   if ("${bench_flags}" MATCHES "-whole-module.*" AND
+  #       NOT "${bench_flags}" MATCHES "-num-threads.*")
+  #     # Regular whole-module-compilation: only a single object file is
+  #     # generated.
+  #     set(sources)
+  #     foreach(source ${${module_name}_sources})
+  #       list(APPEND sources "${srcdir}/${source}")
+  #     endforeach()
 
-      set(new_obj_file)
-      set(new_sib_file)
-      swift_benchmark_compile_file(
-        IS_LIBRARY
-        OBJDIR "${objdir}"
-        MODULE_NAME "${module_name}"
-        SOURCES "${sources}"
-        FLAGS ${common_options} ${bench_flags}
-        EXTRA_DEPENDS ${stdlib_dependencies} ${bench_library_objects}
-        OBJ_OUT_VAR new_obj_file
-        SIB_OUT_VAR new_sib_file)
-      if (new_obj_file)
-        list(APPEND SWIFT_BENCH_OBJFILES "${new_obj_file}")
-      endif()
-      if (new_sib_file)
-        list(APPEND SWIFT_BENCH_SIBFILES "${new_sib_file}")
-      endif()
+  #     set(new_obj_file)
+  #     set(new_sib_file)
+  #     swift_benchmark_compile_file(
+  #       IS_LIBRARY
+  #       OBJDIR "${objdir}"
+  #       MODULE_NAME "${module_name}"
+  #       SOURCES "${sources}"
+  #       FLAGS ${common_options} ${bench_flags}
+  #       EXTRA_DEPENDS ${stdlib_dependencies} ${bench_library_objects}
+  #       OBJ_OUT_VAR new_obj_file
+  #       SIB_OUT_VAR new_sib_file)
+  #     if (new_obj_file)
+  #       list(APPEND SWIFT_BENCH_OBJFILES "${new_obj_file}")
+  #     endif()
+  #     if (new_sib_file)
+  #       list(APPEND SWIFT_BENCH_SIBFILES "${new_sib_file}")
+  #     endif()
 
-    else()
+  #   else()
 
-      # No whole-module-compilation or multi-threaded compilation.
-      # There is an output object file for each input file. We have to write
-      # an output-map-file to specify the output object file names.
-      set(sources)
-      set(objfiles)
-      set(json "{\n")
-      foreach(source ${${module_name}_sources})
-          list(APPEND sources "${srcdir}/${source}")
+  #     # No whole-module-compilation or multi-threaded compilation.
+  #     # There is an output object file for each input file. We have to write
+  #     # an output-map-file to specify the output object file names.
+  #     set(sources)
+  #     set(objfiles)
+  #     set(json "{\n")
+  #     foreach(source ${${module_name}_sources})
+  #         list(APPEND sources "${srcdir}/${source}")
 
-          get_filename_component(basename "${source}" NAME_WE)
-          set(objfile "${objdir}/${module_name}/${basename}.o")
+  #         get_filename_component(basename "${source}" NAME_WE)
+  #         set(objfile "${objdir}/${module_name}/${basename}.o")
 
-              string(CONCAT json "${json}"
-    "  \"${srcdir}/${source}\": { \"object\": \"${objfile}\" },\n")
+  #             string(CONCAT json "${json}"
+  #   "  \"${srcdir}/${source}\": { \"object\": \"${objfile}\" },\n")
 
-          list(APPEND objfiles "${objfile}")
-          list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
-      endforeach()
-      string(CONCAT json "${json}" "}")
-      file(WRITE "${objdir}/${module_name}/outputmap.json" ${json})
+  #         list(APPEND objfiles "${objfile}")
+  #         list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
+  #     endforeach()
+  #     string(CONCAT json "${json}" "}")
+  #     file(WRITE "${objdir}/${module_name}/outputmap.json" ${json})
 
-      add_custom_command(
-          OUTPUT ${objfiles}
-          DEPENDS
-            ${stdlib_dependencies} ${bench_library_objects} ${sources}
-          COMMAND "${SWIFT_EXEC}"
-          ${common_options}
-          ${bench_flags}
-          "-parse-as-library"
-          "-module-name" "${module_name}"
-          "-I" "${objdir}"
-          "-output-file-map" "${objdir}/${module_name}/outputmap.json"
-          ${sources})
-    endif()
-  endforeach()
+  #     add_custom_command(
+  #         OUTPUT ${objfiles}
+  #         DEPENDS
+  #           ${stdlib_dependencies} ${bench_library_objects} ${sources}
+  #         COMMAND "${SWIFT_EXEC}"
+  #         ${common_options}
+  #         ${bench_flags}
+  #         "-parse-as-library"
+  #         "-module-name" "${module_name}"
+  #         "-I" "${objdir}"
+  #         "-output-file-map" "${objdir}/${module_name}/outputmap.json"
+  #         ${sources})
+  #   endif()
+  # endforeach()
 
   set(module_name "main")
   set(source "${srcdir}/utils/${module_name}.swift")
+  message(STATUS "${objdir}/${module_name}.o")
   add_custom_command(
       OUTPUT "${objdir}/${module_name}.o"
       DEPENDS
@@ -299,7 +300,7 @@ function (swift_benchmark_compile_archopts)
       "-I" "${objdir}"
       "-o" "${objdir}/${module_name}.o"
       "${source}")
-  list(APPEND SWIFT_BENCH_OBJFILES "${objdir}/${module_name}.o")
+  #list(APPEND SWIFT_BENCH_OBJFILES "${objdir}/${module_name}.o")
 
   if("${BENCH_COMPILE_ARCHOPTS_PLATFORM}" STREQUAL "macosx")
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
@@ -307,35 +308,35 @@ function (swift_benchmark_compile_archopts)
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   endif()
 
-  add_custom_command(
-      OUTPUT "${OUTPUT_EXEC}"
-      DEPENDS
-        ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
-        "adhoc-sign-swift-stdlib-${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
-      COMMAND
-        "${CLANG_EXEC}"
-        "-fno-stack-protector"
-        "-fPIC"
-        "-Werror=date-time"
-        "-fcolor-diagnostics"
-        "-O3"
-        "-Wl,-search_paths_first"
-        "-Wl,-headerpad_max_install_names"
-        "-target" "${target}"
-        "-isysroot" "${sdk}"
-        "-arch" "${BENCH_COMPILE_ARCHOPTS_ARCH}"
-        "-F" "${sdk}/../../../Developer/Library/Frameworks"
-        "-m${triple_platform}-version-min=${ver}"
-        "-lobjc"
-        "-L${SWIFT_LIBRARY_PATH}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
-        "-Xlinker" "-rpath"
-        "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
-        ${bench_library_objects}
-        ${SWIFT_BENCH_OBJFILES}
-        "-o" "${OUTPUT_EXEC}"
-      COMMAND
-        "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")
-  set(new_output_exec "${OUTPUT_EXEC}" PARENT_SCOPE)
+  # add_custom_command(
+  #     OUTPUT "${OUTPUT_EXEC}"
+  #     DEPENDS
+  #       ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
+  #       "adhoc-sign-swift-stdlib-${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+  #     COMMAND
+  #       "${CLANG_EXEC}"
+  #       "-fno-stack-protector"
+  #       "-fPIC"
+  #       "-Werror=date-time"
+  #       "-fcolor-diagnostics"
+  #       "-O3"
+  #       "-Wl,-search_paths_first"
+  #       "-Wl,-headerpad_max_install_names"
+  #       "-target" "${target}"
+  #       "-isysroot" "${sdk}"
+  #       "-arch" "${BENCH_COMPILE_ARCHOPTS_ARCH}"
+  #       "-F" "${sdk}/../../../Developer/Library/Frameworks"
+  #       "-m${triple_platform}-version-min=${ver}"
+  #       "-lobjc"
+  #       "-L${SWIFT_LIBRARY_PATH}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+  #       "-Xlinker" "-rpath"
+  #       "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+  #       ${bench_library_objects}
+  #       ${SWIFT_BENCH_OBJFILES}
+  #       "-o" "${OUTPUT_EXEC}"
+  #     COMMAND
+  #       "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")
+  # set(new_output_exec "${OUTPUT_EXEC}" PARENT_SCOPE)
 endfunction()
 
 function(swift_benchmark_compile)
