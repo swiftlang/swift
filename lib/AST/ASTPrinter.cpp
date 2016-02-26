@@ -992,6 +992,14 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
+  if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+    // FIXME: this is synched with shouldPrintInContext() since otherwise we
+    // may setup a printDeclPre callback but never print anything. We should
+    // unify these methods or rename one to reflect the difference between
+    // them.
+    return !EED->getSourceRange().isValid();
+  }
+
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessibilityFilter > Accessibility::Private &&

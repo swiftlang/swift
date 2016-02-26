@@ -87,6 +87,10 @@ func nonDefaultArgNames(external1 local1: Int, _ local2: Int, external3 local3: 
 
 func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) -> Int) -> Int) { return closure }
 
+enum E2 {
+  case C1
+}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -329,3 +333,11 @@ func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) ->
 // RUN: %sourcekitd-test -req=cursor -pos=88:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK38
 // CHECK38: <decl.function.free>func <decl.name>nestedFunctionType</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>closure</decl.var.parameter.name.local>: <decl.var.parameter.type>(y: (z: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>(<decl.var.parameter.name.external>y</decl.var.parameter.name.external>: (<decl.var.parameter.name.external>z</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct>) -&gt; <ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
 // FIXME: inconsistent use of parameter inside type
+
+// RUN: %sourcekitd-test -req=cursor -pos=91:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK39
+// CHECK39: source.lang.swift.decl.enumelement (91:8-91:10)
+// CHECK39-NEXT: C1
+// CHECK39-NEXT: s:FO11cursor_info2E22C1FMS0_S0_
+// CHECK39-NEXT: E2.Type -> E2
+// CHECK39-NEXT: <Declaration></Declaration>
+// FIXME: missing annotation for enum element decl.

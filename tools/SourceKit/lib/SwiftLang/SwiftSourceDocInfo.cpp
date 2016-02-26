@@ -122,10 +122,6 @@ private:
     DeclStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
   }
-  void avoidPrintDeclPost(const Decl *D) override {
-    assert(DeclStack.back() == D && "unmatched printDeclPre");
-    DeclStack.pop_back();
-  }
 
   void printDeclLoc(const Decl *D) override {
     openTag(getDeclNameTagForDecl(D));
