@@ -820,7 +820,7 @@ StringTests.test("toInt") {
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
     initialValue: Int,
-    modification: (inout chars: [UTF8.CodeUnit]) -> Void
+    modification: (chars: inout [UTF8.CodeUnit]) -> Void
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)

@@ -479,7 +479,7 @@ extension String {
   //     enumerateLinesUsingBlock:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(body: (line: String, inout stop: Bool) -> ()) {
+  public func enumerateLines(body: (line: String, stop: inout Bool) -> ()) {
     _ns.enumerateLinesUsingBlock {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
@@ -620,7 +620,7 @@ extension String {
   ///
   /// - Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
   public func getBytes(
-    inout buffer: [UInt8],
+    buffer: inout [UInt8],
     maxLength maxBufferCount: Int,
     usedLength usedBufferCount: UnsafeMutablePointer<Int>,
     encoding: NSStringEncoding,
@@ -649,7 +649,7 @@ extension String {
   /// stores them in a buffer.
   /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
   public func getCString(
-    inout buffer: [CChar], maxLength: Int, encoding: NSStringEncoding
+    buffer: inout [CChar], maxLength: Int, encoding: NSStringEncoding
   ) -> Bool {
     return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength),
                           encoding: encoding)
@@ -665,7 +665,7 @@ extension String {
   /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
   @available(*, unavailable, message="Use getFileSystemRepresentation on NSURL instead.")
   public func getFileSystemRepresentation(
-    inout buffer: [CChar], maxLength: Int) -> Bool {
+    buffer: inout [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
       &buffer, maxLength: min(buffer.count, maxLength))
   }

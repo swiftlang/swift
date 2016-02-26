@@ -96,7 +96,7 @@ class NestedGeneric<U> {
   }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures16local_properties
-func local_properties<T>(inout t: T) {
+func local_properties<T>(t: inout T) {
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   var prop: T {
     get {

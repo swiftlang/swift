@@ -14,7 +14,7 @@
 // CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}
 // CHECK: return
 @inline(never)
-public func test(inout a: [Int], size: Int) {
+public func test(a: inout [Int], size: Int) {
   for i in 0..<size {
     for j in 0..<size {
       a[i] = a[j]

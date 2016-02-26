@@ -23,13 +23,13 @@ struct Struct {
   init() { ivar = 4567 }
 }
 
-func foo(inout x: Class) {
+func foo(x: inout Class) {
 // CHECK: !DILocalVariable(name: "x", arg: 1{{.*}} line: [[@LINE-1]]
   markUsed(x.ivar)
   x.ivar += 1 // Set breakpoint here
 }
 
-func foo(inout x: Struct) {
+func foo(x: inout Struct) {
 // CHECK: !DILocalVariable(name: "x", arg: 1{{.*}} line: [[@LINE-1]]
   markUsed(x.ivar)
   x.ivar += 1 // Set breakpoint here

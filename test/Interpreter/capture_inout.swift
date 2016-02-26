@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-func foo(inout x: Int) -> () -> Int {
+func foo(x: inout Int) -> () -> Int {
   func bar() -> Int {
     x += 1
     return x
