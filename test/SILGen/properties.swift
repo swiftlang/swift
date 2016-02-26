@@ -538,7 +538,7 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
-  // CHECK-NEXT:   return %2 : $Int                      // id: %3
+  // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
   
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
   // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1a
@@ -729,7 +729,7 @@ class DerivedProperty : BaseProperty {
 // CHECK: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
 // CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1xSi : $@convention(method) (@guaranteed BaseProperty) -> Int 
-// CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int // user: %7
+// CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int{{.*}} // user: %7
 
 
 // <rdar://problem/16411449> ownership qualifiers don't work with non-mutating struct property

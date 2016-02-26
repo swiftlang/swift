@@ -251,6 +251,9 @@ bool Parser::parseTopLevel() {
   } else if (Tok.is(tok::kw_sil_coverage_map)) {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseSILCoverageMap();
+  } else if (Tok.is(tok::kw_sil_scope)) {
+    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
+    parseSILScope();
   } else {
     parseBraceItems(Items,
                     allowTopLevelCode() ? BraceItemListKind::TopLevelCode

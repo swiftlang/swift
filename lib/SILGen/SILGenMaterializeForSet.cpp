@@ -556,7 +556,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
                               F.isFragile());
 
   callback->setContextGenericParams(GenericParams);
-  callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, *callback));
+  callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
 
   PrettyStackTraceSILFunction X("silgen materializeForSet callback", callback);
   {

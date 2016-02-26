@@ -512,11 +512,11 @@ public final class C {
 
 // CHECK-LABEL: @ref_element_addr_and_object_itself
 // CHECK: PAIR #0.
-// CHECK-NEXT:   %0 = alloc_ref $C                               // user: %1
-// CHECK-NEXT:   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT:   %0 = alloc_ref $C{{.*}}                          // user: %1
+// CHECK-NEXT:   %0 = alloc_ref $C{{.*}}                          // user: %1
 // CHECK-NEXT: MustAlias
 // CHECK: PAIR #1.
-// CHECK-NEXT:   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT:   %0 = alloc_ref $C{{.*}}                         // user: %1
 // CHECK-NEXT:   %1 = ref_element_addr %0 : $C, #C.a
 // CHECK-NEXT: PartialAlias
 sil @ref_element_addr_and_object_itself : $@convention(thin) () -> () {
@@ -541,7 +541,7 @@ bb0(%0 : $C, %1 : $C, %2 : $Int):
 
 // CHECK-LABEL: @non_escaping_local_object_does_not_alias_with_unknown
 // CHECK: PAIR #7.
-// CHECK-NEXT:   %1 = alloc_ref $X                               // user: %3
+// CHECK-NEXT:   %1 = alloc_ref $X{{.*}}                               // user: %3
 // CHECK-NEXT:   %3 = apply %2(%1) : $@convention(thin) (X) -> X
 // CHECK-NEXT: NoAlias
 sil @non_escaping_local_object_does_not_alias_with_unknown : $@convention(thin) (X) -> () {
@@ -563,7 +563,7 @@ bb0(%0 : $X):
 
 // CHECK-LABEL: @alloc_stack_and_addr_cast
 // CHECK: PAIR #1.
-// CHECK-NEXT:   %0 = alloc_stack $C                             // users: %1, %2
+// CHECK-NEXT:   %0 = alloc_stack $C{{.*}}                             // users: %1, %2
 // CHECK-NEXT:   %1 = unchecked_addr_cast %0 : $*C to $*Optional<C>
 // CHECK-NEXT: MayAlias
 sil @alloc_stack_and_addr_cast : $@convention(thin) () -> () {

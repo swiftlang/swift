@@ -54,8 +54,8 @@ bb2(%13 : $Builtin.Int32):
   %27 = struct $Int32 (%24 : $Builtin.Int32)
   // CHECK-NEXT: store
   store %27 to %1 : $*Int32
-  // CHECK-NEXT: cond_fail
-  // CHECK-NEXT: cond_fail
+  // CHECK-NEXT: {{ cond_fail}}
+  // CHECK-NEXT: {{ cond_fail}}
   %29 = builtin "cmp_eq_Word"(%18 : $Builtin.Int32, %8 : $Builtin.Int32) : $Builtin.Int1
   cond_br %29, bb1, bb2(%18 : $Builtin.Int32)
 }

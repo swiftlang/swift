@@ -91,7 +91,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
       M.getOrCreateFunction(SILLinkage::Private, name, overrideInfo.SILFnType,
                             derivedDecl->getGenericParams(), loc, IsBare,
                             IsNotTransparent, IsNotFragile);
-  thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
+  thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, basePattern,
