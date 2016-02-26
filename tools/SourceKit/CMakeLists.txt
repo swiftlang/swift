@@ -66,19 +66,19 @@ function(add_sourcekit_default_compiler_flags target)
   set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
   set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   _add_variant_c_compile_flags(
-      "${sdk}"
-      "${arch}"
-      "${build_type}"
-      "${enable_assertions}"
-      "${analyze_code_coverage}"
-      c_compile_flags)
+    SDK "${sdk}"
+    ARCH "${arch}"
+    BUILD_TYPE "${build_type}"
+    ENABLE_ASSERTIONS "${enable_assertions}"
+    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    RESULT_VAR_NAME c_compile_flags)
   _add_variant_link_flags(
-      "${sdk}"
-      "${arch}"
-      "${build_type}"
-      "${enable_assertions}"
-      "${analyze_code_coverage}"
-      link_flags)
+    SDK "${sdk}"
+    ARCH "${arch}"
+    BUILD_TYPE "${build_type}"
+    ENABLE_ASSERTIONS "${enable_assertions}"
+    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    RESULT_VAR_NAME link_flags)
 
   # Convert variables to space-separated strings.
   _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
