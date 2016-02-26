@@ -1784,7 +1784,8 @@
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "globV",
-    key.usr: "s:v8__main__5globVSi"
+    key.usr: "s:v8__main__5globVSi",
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globV</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -1792,11 +1793,13 @@
     key.usr: "s:C8__main__3CC0",
     key.offset: 16,
     key.length: 29,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>CC0</decl.name></decl.class>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "x",
-        key.usr: "s:vC8__main__3CC01xSi"
+        key.usr: "s:vC8__main__3CC01xSi",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.instance>"
       }
     ]
   },
@@ -1806,18 +1809,21 @@
     key.usr: "s:C8__main__2CC",
     key.offset: 47,
     key.length: 236,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>CC</decl.name></decl.class>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "instV",
-        key.usr: "s:vC8__main__2CC5instVCS_3CC0"
+        key.usr: "s:vC8__main__2CC5instVCS_3CC0",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>instV</decl.name>: <ref.class usr=\"s:C8__main__3CC0\">CC0</ref.class></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "meth()",
         key.usr: "s:FC8__main__2CC4methFT_T_",
         key.offset: 77,
-        key.length: 13
+        key.length: 13,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>meth</decl.name>()</decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -1825,6 +1831,7 @@
         key.usr: "s:FC8__main__2CC13instanceFunc0FTSi1bSf_Si",
         key.offset: 94,
         key.length: 61,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>instanceFunc0</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>b</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -1848,6 +1855,7 @@
         key.usr: "s:FC8__main__2CC13instanceFunc1FT1aSi1bSf_Si",
         key.offset: 159,
         key.length: 65,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>instanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>a</decl.var.parameter.name.external> <decl.var.parameter.name.local>x</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>b</decl.var.parameter.name.external> <decl.var.parameter.name.local>y</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -1870,14 +1878,16 @@
         key.name: "smeth()",
         key.usr: "s:ZFC8__main__2CC5smethFT_T_",
         key.offset: 228,
-        key.length: 20
+        key.length: 20,
+        key.fully_annotated_decl: "<decl.function.method.class>class func <decl.name>smeth</decl.name>()</decl.function.method.class>"
       },
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init()",
         key.usr: "s:FC8__main__2CCcFT_S0_",
         key.offset: 252,
-        key.length: 29
+        key.length: 29,
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>()</decl.function.constructor>"
       }
     ]
   },
@@ -1887,6 +1897,7 @@
     key.usr: "s:ZF8__main__oi1pFTCS_2CCCS_3CC0_S0_",
     key.offset: 286,
     key.length: 42,
+    key.fully_annotated_decl: "<decl.function.operator.infix>func <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.local>b</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__3CC0\">CC0</ref.class></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.function.returntype></decl.function.operator.infix>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -1910,20 +1921,23 @@
     key.usr: "s:V8__main__1S",
     key.offset: 331,
     key.length: 53,
+    key.fully_annotated_decl: "<decl.struct>struct <decl.name>S</decl.name></decl.struct>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "meth()",
         key.usr: "s:FV8__main__1S4methFT_T_",
         key.offset: 344,
-        key.length: 13
+        key.length: 13,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>meth</decl.name>()</decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.static,
         key.name: "smeth()",
         key.usr: "s:ZFV8__main__1S5smethFT_T_",
         key.offset: 361,
-        key.length: 21
+        key.length: 21,
+        key.fully_annotated_decl: "<decl.function.method.static>static func <decl.name>smeth</decl.name>()</decl.function.method.static>"
       }
     ]
   },
@@ -1933,6 +1947,7 @@
     key.usr: "s:O8__main__1E",
     key.offset: 387,
     key.length: 22,
+    key.fully_annotated_decl: "<decl.enum>enum <decl.name>E</decl.name></decl.enum>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.enumelement,
@@ -1947,6 +1962,7 @@
     key.usr: "s:P8__main__4Prot",
     key.offset: 412,
     key.length: 41,
+    key.fully_annotated_decl: "<decl.protocol>protocol <decl.name>Prot</decl.name></decl.protocol>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -1954,6 +1970,7 @@
         key.usr: "s:FP8__main__4Prot8protMethFPS0__T_",
         key.offset: 430,
         key.length: 21,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -1972,6 +1989,7 @@
     key.usr: "s:F8__main__3fooFTCS_2CC1bOS_1E_T_",
     key.offset: 456,
     key.length: 156,
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>foo</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>b</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.enum usr=\"s:O8__main__1E\">E</ref.enum></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -1994,7 +2012,8 @@
     key.name: "CCAlias",
     key.usr: "s:8__main__7CCAlias",
     key.offset: 615,
-    key.length: 20
+    key.length: 20,
+    key.fully_annotated_decl: "<decl.typealias>typealias <decl.name>CCAlias</decl.name> = <ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.typealias>"
   },
   {
     key.kind: source.lang.swift.decl.extension.class,
@@ -2019,6 +2038,7 @@
         key.usr: "s:FC8__main__2CC5meth2FS0_T_",
         key.offset: 663,
         key.length: 24,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>meth2</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>x</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.typealias usr=\"s:8__main__7CCAlias\">CCAlias</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -2035,6 +2055,7 @@
         key.usr: "s:FC8__main__2CC8protMethFPS_4Prot_T_",
         key.offset: 691,
         key.length: 24,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
@@ -2055,13 +2076,15 @@
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "extV",
-        key.usr: "s:vC8__main__2CC4extVSi"
+        key.usr: "s:vC8__main__2CC4extVSi",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>extV</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
         key.usr: "s:FC8__main__2CCg4extVSi",
         key.offset: 734,
-        key.length: 11
+        key.length: 11,
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
       }
     ]
   },
@@ -2071,6 +2094,7 @@
     key.usr: "s:C8__main__5SubCC",
     key.offset: 750,
     key.length: 18,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>SubCC</decl.name> : <ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.class>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.class,
@@ -2082,7 +2106,8 @@
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "globV2",
-    key.usr: "s:v8__main__6globV2CS_5SubCC"
+    key.usr: "s:v8__main__6globV2CS_5SubCC",
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globV2</decl.name>: <ref.class usr=\"s:C8__main__5SubCC\">SubCC</ref.class></decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -2090,23 +2115,27 @@
     key.usr: "s:C8__main__16ComputedProperty",
     key.offset: 790,
     key.length: 196,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>ComputedProperty</decl.name></decl.class>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "value",
-        key.usr: "s:vC8__main__16ComputedProperty5valueSi"
+        key.usr: "s:vC8__main__16ComputedProperty5valueSi",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>value</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
         key.usr: "s:FC8__main__16ComputedPropertyg5valueSi",
         key.offset: 839,
-        key.length: 51
+        key.length: 51,
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.setter,
         key.usr: "s:FC8__main__16ComputedPropertys5valueSi",
         key.offset: 896,
         key.length: 49,
+        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(newVal)</decl.name> {}</decl.function.accessor.setter>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -2119,13 +2148,15 @@
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "readOnly",
-        key.usr: "s:vC8__main__16ComputedProperty8readOnlySi"
+        key.usr: "s:vC8__main__16ComputedProperty8readOnlySi",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>readOnly</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
         key.usr: "s:FC8__main__16ComputedPropertyg8readOnlySi",
         key.offset: 973,
-        key.length: 11
+        key.length: 11,
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
       }
     ]
   },
@@ -2135,6 +2166,7 @@
     key.usr: "s:C8__main__3BC2",
     key.offset: 989,
     key.length: 40,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>BC2</decl.name></decl.class>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -2142,6 +2174,7 @@
         key.usr: "s:FC8__main__3BC28protMethFPS_4Prot_T_",
         key.offset: 1003,
         key.length: 24,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -2160,6 +2193,7 @@
     key.usr: "s:C8__main__5SubC2",
     key.offset: 1031,
     key.length: 63,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>SubC2</decl.name> : <ref.class usr=\"s:C8__main__3BC2\">BC2</ref.class>, <ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.class>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.class,
@@ -2181,6 +2215,7 @@
         key.usr: "s:FC8__main__5SubC28protMethFPS_4Prot_T_",
         key.offset: 1068,
         key.length: 24,
+        key.fully_annotated_decl: "<decl.function.method.instance>override func <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.inherits: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
@@ -2213,6 +2248,7 @@
     key.usr: "s:C8__main__3CC2",
     key.offset: 1097,
     key.length: 111,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>CC2</decl.name></decl.class>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.subscript,
@@ -2220,6 +2256,7 @@
         key.usr: "s:iC8__main__3CC29subscriptFSiSi",
         key.offset: 1111,
         key.length: 95,
+        key.fully_annotated_decl: "<decl.function.subscript><decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { get set }</decl.function.subscript>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -2235,6 +2272,7 @@
         key.usr: "s:FC8__main__3CC2g9subscriptFSiSi",
         key.offset: 1144,
         key.length: 25,
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -2249,6 +2287,7 @@
         key.usr: "s:FC8__main__3CC2s9subscriptFSiSi",
         key.offset: 1175,
         key.length: 27,
+        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(vvv)</decl.name> {}</decl.function.accessor.setter>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -2272,6 +2311,7 @@
     key.usr: "s:F8__main__5test1FTCS_16ComputedProperty3subCS_3CC2_T_",
     key.offset: 1211,
     key.length: 153,
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>test1</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>cp</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__16ComputedProperty\">ComputedProperty</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>sub</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__3CC2\">CC2</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -2295,33 +2335,38 @@
     key.usr: "s:V8__main__2S2",
     key.offset: 1367,
     key.length: 29,
+    key.fully_annotated_decl: "<decl.struct>struct <decl.name>S2</decl.name></decl.struct>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "sfoo()",
         key.usr: "s:FV8__main__2S24sfooFT_T_",
         key.offset: 1381,
-        key.length: 13
+        key.length: 13,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>sfoo</decl.name>()</decl.function.method.instance>"
       }
     ]
   },
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "globReadOnly",
-    key.usr: "s:v8__main__12globReadOnlyVS_2S2"
+    key.usr: "s:v8__main__12globReadOnlyVS_2S2",
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globReadOnly</decl.name>: <ref.struct usr=\"s:V8__main__2S2\">S2</ref.struct> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.function.accessor.getter,
     key.usr: "s:F8__main__g12globReadOnlyVS_2S2",
     key.offset: 1425,
-    key.length: 25
+    key.length: 25,
+    key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
     key.name: "test2()",
     key.usr: "s:F8__main__5test2FT_T_",
     key.offset: 1455,
-    key.length: 37
+    key.length: 37,
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>test2</decl.name>()</decl.function.free>"
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -2329,13 +2374,15 @@
     key.usr: "s:C8__main__2B1",
     key.offset: 1495,
     key.length: 27,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>B1</decl.name></decl.class>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
         key.usr: "s:FC8__main__2B13fooFT_T_",
         key.offset: 1508,
-        key.length: 12
+        key.length: 12,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>foo</decl.name>()</decl.function.method.instance>"
       }
     ]
   },
@@ -2345,6 +2392,7 @@
     key.usr: "s:C8__main__3SB1",
     key.offset: 1525,
     key.length: 86,
+    key.fully_annotated_decl: "<decl.class>class <decl.name>SB1</decl.name> : <ref.class usr=\"s:C8__main__2B1\">B1</ref.class></decl.class>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.class,
@@ -2359,6 +2407,7 @@
         key.usr: "s:FC8__main__3SB13fooFT_T_",
         key.offset: 1553,
         key.length: 56,
+        key.fully_annotated_decl: "<decl.function.method.instance>override func <decl.name>foo</decl.name>()</decl.function.method.instance>",
         key.inherits: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
@@ -2375,6 +2424,7 @@
     key.usr: "s:F8__main__5test3FTCS_3SB11sVS_2S2_T_",
     key.offset: 1614,
     key.length: 59,
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>test3</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>c</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__3SB1\">SB1</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>s</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:V8__main__2S2\">S2</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -2398,6 +2448,7 @@
     key.usr: "s:F8__main__5test4FRSiT_",
     key.offset: 1676,
     key.length: 26,
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>test4</decl.name>(<decl.var.parameter>inout <decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -2414,29 +2465,34 @@
     key.usr: "s:P8__main__5Prot2",
     key.offset: 1705,
     key.length: 77,
+    key.fully_annotated_decl: "<decl.protocol>protocol <decl.name>Prot2</decl.name></decl.protocol>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.associatedtype,
         key.name: "Element",
         key.usr: "s:P8__main__5Prot27Element",
         key.offset: 1724,
-        key.length: 15
+        key.length: 15,
+        key.fully_annotated_decl: "<decl.associatedtype>associatedtype <decl.name>Element</decl.name></decl.associatedtype>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
-        key.usr: "s:vP8__main__5Prot21pSi"
+        key.usr: "s:vP8__main__5Prot21pSi",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
-        key.usr: "s:FP8__main__5Prot2g1pSi"
+        key.usr: "s:FP8__main__5Prot2g1pSi",
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
         key.usr: "s:FP8__main__5Prot23fooFT_T_",
         key.offset: 1771,
-        key.length: 9
+        key.length: 9,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>foo</decl.name>()</decl.function.method.instance>"
       }
     ]
   },
@@ -2446,6 +2502,7 @@
     key.usr: "s:V8__main__2S1",
     key.offset: 1785,
     key.length: 80,
+    key.fully_annotated_decl: "<decl.struct>struct <decl.name>S1</decl.name> : <ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -2460,6 +2517,7 @@
         key.usr: "s:V8__main__2S17Element",
         key.offset: 1807,
         key.length: 20,
+        key.fully_annotated_decl: "<decl.typealias>typealias <decl.name>Element</decl.name> = <ref.struct usr=\"s:Si\">Int</ref.struct></decl.typealias>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.associatedtype,
@@ -2472,6 +2530,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
         key.usr: "s:vV8__main__2S11pSi",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
@@ -2486,6 +2545,7 @@
         key.usr: "s:FV8__main__2S13fooFT_T_",
         key.offset: 1851,
         key.length: 12,
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>foo</decl.name>()</decl.function.method.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
@@ -2513,6 +2573,7 @@
     ],
     key.offset: 1868,
     key.length: 53,
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>genfoo</decl.name>&lt;T : <decl.function.returntype><ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.function.returntype> where <decl.function.returntype><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param>.<ref.associatedtype usr=\"s:P8__main__5Prot27Element\">Element</ref.associatedtype></decl.function.returntype> == <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype>&gt;(<decl.var.parameter><decl.var.parameter.name.local>x</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -2529,6 +2590,7 @@
     key.usr: "s:P8__main__5Prot3",
     key.offset: 1924,
     key.length: 44,
+    key.fully_annotated_decl: "<decl.protocol>protocol <decl.name>Prot3</decl.name></decl.protocol>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
@@ -2536,6 +2598,7 @@
         key.usr: "s:ZFP8__main__5Prot3oi1pFTxx_T_",
         key.offset: 1943,
         key.length: 23,
+        key.fully_annotated_decl: "<decl.function.operator.infix>func <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>x</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tP8__main__5Prot34SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.local>y</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tP8__main__5Prot34SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,

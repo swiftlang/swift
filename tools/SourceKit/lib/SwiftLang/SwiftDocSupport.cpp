@@ -205,6 +205,11 @@ static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
     ide::getDocumentationCommentAsXML(D, OS);
 
     initDocGenericParams(D, Info);
+
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
+      SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
+    }
   }
 
   return false;

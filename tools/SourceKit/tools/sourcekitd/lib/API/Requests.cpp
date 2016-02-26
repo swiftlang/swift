@@ -1098,6 +1098,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyIsDeprecated, Info.IsDeprecated);
   if (!Info.DocComment.empty())
     Elem.set(KeyDocFullAsXML, Info.DocComment);
+  if (!Info.FullyAnnotatedDecl.empty())
+    Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDecl);
 
   if (!Info.GenericParams.empty()) {
     auto GPArray = Elem.setArray(KeyGenericParams);

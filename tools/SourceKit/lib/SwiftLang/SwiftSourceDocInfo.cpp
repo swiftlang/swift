@@ -236,8 +236,9 @@ static void printAnnotatedDeclaration(const ValueDecl *VD, const Type Ty,
   OS<<"</Declaration>";
 }
 
-static void printFullyAnnotatedDeclaration(const ValueDecl *VD, const Type Ty,
-                                           const Type BaseTy, raw_ostream &OS) {
+void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
+                                                      Type BaseTy,
+                                                      raw_ostream &OS) {
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   if (BaseTy)
@@ -462,7 +463,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned FullDeclBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    printFullyAnnotatedDeclaration(VD, Ty, BaseType, OS);
+    SwiftLangSupport::printFullyAnnotatedDeclaration(VD, BaseType, OS);
   }
   unsigned FullDeclEnd = SS.size();
 
