@@ -299,7 +299,6 @@ static ProtocolConformance *getSuperConformance(
 /// If there is a same-type requirement to be added for the given nested type
 /// due to a superclass constraint on the parent type, add it now.
 static void maybeAddSameTypeRequirementForNestedType(
-              ArchetypeBuilder::PotentialArchetype *parentPA,
               ArchetypeBuilder::PotentialArchetype *nestedPA,
               RequirementSource fromSource,
               ProtocolConformance *superConformance,
@@ -369,7 +368,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
 
       // If there's a superclass constraint that conforms to the protocol,
       // add the appropriate same-type relationship.
-      maybeAddSameTypeRequirementForNestedType(this, known->second.front(),
+      maybeAddSameTypeRequirementForNestedType(known->second.front(),
                                                source, superConformance,
                                                builder);
       continue;
@@ -387,7 +386,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
 
     // If there's a superclass constraint that conforms to the protocol,
     // add the appropriate same-type relationship.
-    maybeAddSameTypeRequirementForNestedType(this, otherPA, source,
+    maybeAddSameTypeRequirementForNestedType(otherPA, source,
                                              superConformance, builder);
   }
 
@@ -491,7 +490,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
       // add the appropriate same-type relationship.
       ProtocolConformance *superConformance =
         getSuperConformance(this, conforms.first, conforms.second, builder);
-      maybeAddSameTypeRequirementForNestedType(this, pa, source,
+      maybeAddSameTypeRequirementForNestedType(pa, source,
                                                superConformance, builder);
     }
   }
@@ -969,7 +968,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
 
           for (auto nestedPA : nested->second) {
             if (nestedPA->getResolvedAssociatedType() == assocType)
-              maybeAddSameTypeRequirementForNestedType(T, nestedPA,
+              maybeAddSameTypeRequirementForNestedType(nestedPA,
                                                        Source,
                                                        superConformance, *this);
           }
