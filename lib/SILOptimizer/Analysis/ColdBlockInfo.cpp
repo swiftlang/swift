@@ -54,20 +54,21 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
 
     // Check all predecessor values which come from non-cold blocks.
     for (auto Pair : InValues) {
-      if (!isCold(Pair.first, recursionDepth + 1)) {
-        auto *IL = dyn_cast<IntegerLiteralInst>(Pair.second);
-        if (!IL)
+      if (isCold(Pair.first, recursionDepth + 1))
+        continue;
+
+      auto *IL = dyn_cast<IntegerLiteralInst>(Pair.second);
+      if (!IL)
+        return BranchHint::None;
+      // Check if we have a consistent value for all non-cold predecessors.
+      if (IL->getValue().getBoolValue()) {
+        if (Hint == BranchHint::LikelyFalse)
           return BranchHint::None;
-        // Check if we have a consistent value for all non-cold predecessors.
-        if (IL->getValue().getBoolValue()) {
-          if (Hint == BranchHint::LikelyFalse)
-            return BranchHint::None;
-          Hint = BranchHint::LikelyTrue;
-        } else {
-          if (Hint == BranchHint::LikelyTrue)
-            return BranchHint::None;
-          Hint = BranchHint::LikelyFalse;
-        }
+        Hint = BranchHint::LikelyTrue;
+      } else {
+        if (Hint == BranchHint::LikelyTrue)
+          return BranchHint::None;
+        Hint = BranchHint::LikelyFalse;
       }
     }
     return Hint;
