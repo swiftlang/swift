@@ -111,7 +111,7 @@ extension A {
     _ = y2
   }
 
-  func test_method_overload_coerce(x x:inout  X, y: inout Y, z: Z) {
+  func test_method_overload_coerce(x x: inout X, y: inout Y, z: Z) {
     var fail = g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
     x = g(z: z)
     y = g(z: z)
