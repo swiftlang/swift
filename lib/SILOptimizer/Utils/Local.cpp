@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -1067,71 +1068,40 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 //                             Value Lifetime
 //===----------------------------------------------------------------------===//
 
-// Record a use by marking it's block and adding it to the initial LiveIn set.
-void ValueLifetimeAnalysis::visitUser(SILInstruction *User) {
-  auto *BB = User->getParent();
-  UseBlocks.insert(BB);
-  if (BB != DefValue->getParentBB())
-    LiveIn.insert(BB);
-}
-
-// Generate ValueLifetimeAnalysis::liveIn.
-//
-// Propagate liveness backwards from an initial set of blocks in our
-// liveIn set.
 void ValueLifetimeAnalysis::propagateLiveness() {
-  // First populate a worklist of predecessors.
-  llvm::SmallVector<SILBasicBlock *, 64> Worklist;
-  for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
-      Worklist.push_back(Pred);
+  assert(LiveBlocks.empty() && "frontier computed twice");
 
-  // Now propagate liveness backwards until we hit the block that
-  // defines the value.
   auto DefBB = DefValue->getParentBB();
+  llvm::SmallVector<SILBasicBlock *, 64> Worklist;
+
+  // Find the initial set of blocks where the value is live, because
+  // it is used in those blocks.
+  for (SILInstruction *User : UserSet) {
+    SILBasicBlock *UserBlock = User->getParent();
+    if (LiveBlocks.insert(UserBlock))
+      Worklist.push_back(UserBlock);
+  }
+
+  // Now propagate liveness backwards until we hit the block that defines the
+  // value.
   while (!Worklist.empty()) {
     auto *BB = Worklist.pop_back_val();
 
-    // If it's already in the set, then we've already queued and/or
-    // processed the predecessors.
-    if (BB == DefBB || !LiveIn.insert(BB).second)
+    // Don't go beyond the definition.
+    if (BB == DefBB)
       continue;
 
-    for (auto Pred : BB->getPreds())
-      Worklist.push_back(Pred);
-  }
-}
-
-// Is any successor of BB in the LiveIn set?
-bool ValueLifetimeAnalysis::successorHasLiveIn(SILBasicBlock *BB) {
-
-  for (auto &Succ : BB->getSuccessors())
-    if (LiveIn.count(Succ))
-      return true;
-
-  return false;
-}
-
-// Walk backwards in BB looking for last use of value DefValue.
-SILInstruction *ValueLifetimeAnalysis::
-findLastDirectUseInBlock(SILBasicBlock *BB) {
-  for (auto II = BB->rbegin(); II != BB->rend(); ++II) {
-    assert(DefValue != &*II && "Found def before finding use!");
-
-    for (auto &Oper : II->getAllOperands()) {
-      if (Oper.get() != DefValue)
-        continue;
-
-      return &*II;
+    for (SILBasicBlock *Pred : BB->getPreds()) {
+      // If it's already in the set, then we've already queued and/or
+      // processed the predecessors.
+      if (LiveBlocks.insert(Pred))
+        Worklist.push_back(Pred);
     }
   }
-  llvm_unreachable("Expected to find use of value in block!");
 }
 
-// Walk backwards in BB looking for last use specified in the provided use
-// list. This likely includes transitive uses of defValue.
-SILInstruction *ValueLifetimeAnalysis::
-findLastSpecifiedUseInBlock(SILBasicBlock *BB) {
+SILInstruction *ValueLifetimeAnalysis:: findLastUserInBlock(SILBasicBlock *BB) {
+  // Walk backwards in BB looking for last use of the value.
   for (auto II = BB->rbegin(); II != BB->rend(); ++II) {
     assert(DefValue != &*II && "Found def before finding use!");
 
@@ -1141,18 +1111,98 @@ findLastSpecifiedUseInBlock(SILBasicBlock *BB) {
   llvm_unreachable("Expected to find use of value in block!");
 }
 
-/// Generate ValueLifetime::lastUsers from ValueLifetimeAnalysis.
-ValueLifetime ValueLifetimeAnalysis::computeLastUsers() {
-  ValueLifetime Lifetime;
-  for (auto *BB : UseBlocks) {
-    if (successorHasLiveIn(BB))
-      continue;
-    Lifetime.LastUsers.insert(UserSet.empty()
-                              ? findLastDirectUseInBlock(BB)
-                              : findLastSpecifiedUseInBlock(BB));
+ValueLifetimeAnalysis::ComputeResult ValueLifetimeAnalysis::
+computeFrontierImpl(Frontier &Fr, bool AllowedToModifyCFG) {
+  ComputeResult Result = ComputeResult::Success;
+
+  // Exit-blocks from the lifetime region. The value if live at the end of
+  // a predecessor block but not in the frontier block itself.
+  llvm::SmallSetVector<SILBasicBlock *, 16> FrontierBlocks;
+
+  // Blocks where the value is live somewhere inside the block but not at the
+  // end of the block.
+  llvm::SmallPtrSet<SILBasicBlock *, 16> NotLiveOutBlocks;
+
+  /// The lifetime ends if we have a live block and a not-live successor.
+  for (SILBasicBlock *BB : LiveBlocks) {
+    bool LiveInSucc = false;
+    for (const SILSuccessor &Succ : BB->getSuccessors()) {
+      if (LiveBlocks.count(Succ)) {
+        LiveInSucc = true;
+      } else {
+        // It's an "exit" edge from the lifetime region.
+        FrontierBlocks.insert(Succ);
+      }
+    }
+    if (!LiveInSucc) {
+      // The value is not live in any of the successor blocks. This means the
+      // block contains a last use of the value. The next instruction after
+      // the last use is part of the frontier.
+      NotLiveOutBlocks.insert(BB);
+      SILBasicBlock::iterator Iter(findLastUserInBlock(BB));
+      Fr.push_back(&*next(Iter));
+    }
   }
-  return Lifetime;
+  // Handle "exit" edges from the lifetime region.
+  for (SILBasicBlock *FrontierBB: FrontierBlocks) {
+    bool needSplit = false;
+    // If the value is live only in part of the precessor blocks we have to
+    // split those predecessor edges.
+    for (SILBasicBlock *Pred : FrontierBB->getPreds()) {
+      if (!LiveBlocks.count(Pred) || NotLiveOutBlocks.count(Pred)) {
+        needSplit = true;
+        break;
+      }
+    }
+    if (needSplit) {
+      if (!AllowedToModifyCFG)
+        return ComputeResult::Fail;
+
+      // Split the predecessor edges which come from the lifetime region.
+      for (SILBasicBlock *Pred : FrontierBB->getPreds()) {
+        if (LiveBlocks.count(Pred) && !NotLiveOutBlocks.count(Pred)) {
+          SILBasicBlock *NewBlock = splitIfCriticalEdge(Pred, FrontierBB);
+          assert(NewBlock && "actually not a critical edge?");
+
+          // The single terminator instruction is part of the frontier.
+          Fr.push_back(&*NewBlock->begin());
+          Result = ComputeResult::SuccessWithSplitEdges;
+        }
+      }
+    } else {
+      // The first instruction of the exit-block is part of the frontier.
+      Fr.push_back(&*FrontierBB->begin());
+    }
+  }
+  return Result;
 }
+
+bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
+  SILBasicBlock *BB = Inst->getParent();
+  // Check if the value is not live anywhere in Inst's block.
+  if (!LiveBlocks.count(BB))
+    return false;
+  for (const SILSuccessor &Succ : BB->getSuccessors()) {
+    // If the value is live at the beginning of any successor block it is also
+    // live at the end of BB and therefore Inst is definitely in the lifetime
+    // region (Note that we don't check in upward direction agains the value's
+    // definition).
+    if (LiveBlocks.count(Succ))
+      return true;
+  }
+  // The value is live in the block but not at the end of the block. Check if
+  // Inst is located before (or at) the last use.
+  bool InLifeRange = false;
+  for (auto II = BB->rbegin(); II != BB->rend(); ++II) {
+    if (UserSet.count(&*II)) {
+      InLifeRange = true;
+    }
+    if (InLifeRange && Inst == &*II)
+      return true;
+  }
+  llvm_unreachable("Expected to find use of value in block!");
+}
+
 
 //===----------------------------------------------------------------------===//
 //                    Casts Optimization and Simplification

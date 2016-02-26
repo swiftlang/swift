@@ -573,7 +573,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
 // TODO: This relies on the lowest level array.uninitialized not being
 // inlined. To do better we could either run this pass before semantic inlining,
 // or we could also handle calls to array.init.
-static bool removeAndReleaseArray(SILValue NewArrayValue) {
+static bool removeAndReleaseArray(SILValue NewArrayValue, bool &CFGChanged) {
   TupleExtractInst *ArrayDef = nullptr;
   TupleExtractInst *StorageAddress = nullptr;
   for (auto *Op : NewArrayValue->getUses()) {
@@ -623,24 +623,23 @@ static bool removeAndReleaseArray(SILValue NewArrayValue) {
     return false;
 
   // Find array object lifetime.
-  ValueLifetimeAnalysis VLA(ArrayDef);
-  ValueLifetime Lifetime = VLA.computeFromUserList(DeadArray.getAllUsers());
+  ValueLifetimeAnalysis VLA(ArrayDef, DeadArray.getAllUsers());
 
-  // Check that all storage users are in the Array's live blocks and never the
-  // last user.
+  // Check that all storage users are in the Array's live blocks.
   for (auto *User : DeadStorage.getAllUsers()) {
-    auto *BB = User->getParent();
-    if (!VLA.successorHasLiveIn(BB)
-        && VLA.findLastSpecifiedUseInBlock(BB) == User) {
-        return false;
-    }
+    if (!VLA.isWithinLifetime(User))
+      return false;
   }
   // For each store location, insert releases.
   // This makes a strong assumption that the allocated object is released on all
   // paths in which some object initialization occurs.
   SILSSAUpdater SSAUp;
+  ValueLifetimeAnalysis::Frontier ArrayFrontier;
+  if (VLA.computeFrontierAllowingCFGChanges(ArrayFrontier))
+    CFGChanged = true;
+
   DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
-      insertReleases(Stores, Lifetime.getLastUsers(), SSAUp);
+      insertReleases(Stores, ArrayFrontier, SSAUp);
     });
 
   // Delete all uses of the dead array and its storage address.
@@ -665,6 +664,7 @@ namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
   llvm::SmallVector<SILInstruction*, 16> Allocations;
+  bool CFGChanged = false;
 
   void collectAllocations(SILFunction &Fn) {
     for (auto &BB : Fn)
@@ -700,8 +700,11 @@ class DeadObjectElimination : public SILFunctionTransform {
   }
 
   void run() override {
+    CFGChanged = false;
     if (processFunction(*getFunction())) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+      invalidateAnalysis(CFGChanged ?
+                         SILAnalysis::InvalidationKind::FunctionBody :
+                         SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 
@@ -789,7 +792,7 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
       return false;
   }
 
-  if (!removeAndReleaseArray(AI))
+  if (!removeAndReleaseArray(AI, CFGChanged))
     return false;
 
   DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");

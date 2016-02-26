@@ -2732,25 +2732,25 @@ sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @
 // Retain the owned argument
 // CHECK: strong_retain %{{[0-9]+}} : $CC3
 // CHECK: apply [[CLOSURE]]({{.*}}, [[TMP]])
+// Check that the peephole inserted a release the guaranteed argument
+// CHECK: strong_release %{{[0-9]+}} : $CC1
 // Release the @owned CC4 argument of the function
 // CHECK: load {{%[0-9]+}} : $*CC4
 // CHECK: strong_release {{%[0-9]+}} : $CC4
-// Check that the peephole inserted a release the guaranteed argument
-// CHECK: strong_release %{{[0-9]+}} : $CC1
 // CHECK: br bb3
 
-// CHECK: bb2
+// CHECK: bb2:
 // CHECK-NOT: partial_apply
 // Check that the peephole inserted a retain of the closure's guaranteed argument
 // CHECK: strong_retain %{{[0-9]+}} : $CC1
 // Check that the peephole inserted a retain of the closure's owned argument
 // CHECK: strong_retain %{{[0-9]+}} : $CC3
 // CHECK: apply [[CLOSURE]]({{.*}}, [[TMP]])
+// Check that the peephole inserted a release the closure's guaranteed argument
+// CHECK: strong_release %{{[0-9]+}} : $CC1
 // Release the @owned CC4 argument of the function
 // CHECK: load {{%[0-9]+}} : $*CC4
 // CHECK: strong_release {{%[0-9]+}} : $CC4
-// Check that the peephole inserted a release the closure's guaranteed argument
-// CHECK: strong_release %{{[0-9]+}} : $CC1
 // CHECK: br bb3
 
 // bb3:
