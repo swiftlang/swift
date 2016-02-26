@@ -220,7 +220,7 @@ class C : P {
   func getValue() -> Bool { return theValue }
 }
 
-func toggle(value: inout Bool) {
+func toggle(inout value: Bool) {
   value = !value
 }
 

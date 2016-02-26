@@ -265,7 +265,7 @@ public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
   }
 }
 
-public func expectType<T>(_: T.Type, _ x: inout T) {}
+public func expectType<T>(_: T.Type, inout _ x: T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
 public func expectSequenceType<
@@ -317,7 +317,7 @@ public func expectCollectionAssociatedTypes<
 ) {}
 
 public func expectForwardIndexType<X : ForwardIndexType>(x: X) -> X { return x }
-public func expectIsBooleanType<X : BooleanType>(x: inout X) -> X { return x }
+public func expectIsBooleanType<X : BooleanType>(inout x: X) -> X { return x }
 
 public struct AssertionResult : CustomStringConvertible, BooleanType {
   init(isPass: Bool) {
@@ -2310,7 +2310,7 @@ where
       for newCount in 0..<(2 * oldCount) {
         let newValues = makeNewValues(newCount)
 
-        func reportFailure(a: inout A, _ message: String) {
+        func reportFailure(inout a: A, _ message: String) {
           print("\(message) when replacing indices \(ix)...\(jx)")
           print("  in \(Array(source)) with \(Array(newValues))")
           print("  yielding \(Array(a))")

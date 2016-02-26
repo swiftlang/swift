@@ -74,7 +74,7 @@ public struct _DisabledRangeIndex_ {
 /// `i`.
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
+public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
   i._successorInPlace()
   return i
 }
@@ -83,7 +83,7 @@ public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
 /// value of `i`.
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func ++ <T : _Incrementable> (i: inout T) -> T {
+public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
   let ret = i
   i._successorInPlace()
   return ret
@@ -322,7 +322,7 @@ extension BidirectionalIndexType {
 /// of `i`.
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func -- <T : BidirectionalIndexType> (i: inout T) -> T {
+public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
 }
@@ -332,7 +332,7 @@ public prefix func -- <T : BidirectionalIndexType> (i: inout T) -> T {
 /// value of `i`.
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func -- <T : BidirectionalIndexType> (i: inout T) -> T {
+public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   let ret = i
   i._predecessorInPlace()
   return ret

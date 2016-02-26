@@ -43,9 +43,9 @@ func _insertionSort<
   C: MutableCollectionType where C.Index: BidirectionalIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: inout (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   if !range.isEmpty {
     let start = range.startIndex
@@ -100,7 +100,7 @@ public func partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> C.Index {
@@ -111,9 +111,9 @@ func _partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: inout (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> C.Index {
   var lo = range.startIndex
   var hi = range.endIndex
@@ -166,7 +166,7 @@ func _introSort<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
@@ -187,9 +187,9 @@ func _introSortImpl<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: inout (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""},
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""},
   _ depthLimit: Int
 ) {
 
@@ -218,10 +218,10 @@ func _siftDown<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ index: C.Index,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: inout (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   let countToIndex = (range.startIndex..<index).count
   let countFromIndex = (index..<range.endIndex).count
@@ -253,9 +253,9 @@ func _heapify<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: inout (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
@@ -274,9 +274,9 @@ func _heapSort<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  elements: inout C,
+  inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: inout (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   var hi = range.endIndex
   let lo = range.startIndex
@@ -311,7 +311,7 @@ public func sort<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
-  collection: inout C ${"," if p else ""}
+  inout collection: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   fatalError("unavailable function can't be called")
@@ -324,10 +324,10 @@ ${sortIsUnstable}
 ${orderingRequirement}
 % if p:
 @available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<T>(array: inout [T], _ isOrderedBefore: (T, T) -> Bool) {
+public func sort<T>(inout array: [T], _ isOrderedBefore: (T, T) -> Bool) {
 % else:
 @available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<T : Comparable>(array: inout [T]) {
+public func sort<T : Comparable>(inout array: [T]) {
 % end
   fatalError("unavailable function can't be called")
 }
@@ -340,12 +340,12 @@ ${orderingRequirement}
 % if p:
 @available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
 public func sort<T>(
-  array: inout ContiguousArray<T>,
+  inout array: ContiguousArray<T>,
   _ isOrderedBefore: (T, T) -> Bool
 ) {
 % else:
 @available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<T : Comparable>(array: inout ContiguousArray<T>) {
+public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
 % end
   fatalError("unavailable function can't be called")
 }
@@ -370,7 +370,7 @@ public func sorted<
 /// Exchange the values of `a` and `b`.
 ///
 /// - Requires: `a` and `b` do not alias each other.
-public func swap<T>(a: inout T, _ b: inout T) {
+public func swap<T>(inout a : T, inout _ b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
   let p1 = Builtin.addressof(&a)

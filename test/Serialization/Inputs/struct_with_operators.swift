@@ -6,10 +6,10 @@ public struct SpecialInt {
 prefix operator +++ {}
 postfix operator +++ {}
 
-prefix public func +++(base: inout SpecialInt) {
+prefix public func +++(inout base: SpecialInt) {
   base.value += 2
 }
 
-postfix public func +++(base: inout SpecialInt) {
+postfix public func +++(inout base: SpecialInt) {
 }
 

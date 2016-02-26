@@ -9,7 +9,7 @@ typealias Int = Builtin.Int64
 // CHECK:   partial_apply [[FUNC]]([[X_LOCAL]])
 // CHECK: }
 // CHECK: sil shared [[CLOSURE]] : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-func foo(x: inout Int) -> () -> Int {
+func foo(inout x: Int) -> () -> Int {
   func bar() -> Int {
     return x
   }

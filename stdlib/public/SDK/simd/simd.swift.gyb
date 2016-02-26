@@ -213,26 +213,26 @@ public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 /// Add `rhs` to `lhs`.
 % if is_floating:
 @inline(__always)
-public func +=(lhs: inout ${vectype}, rhs: ${vectype}) -> Void {
+public func +=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
   lhs = lhs + rhs
 }
 
 /// Subtract `rhs` from `lhs`.
 @inline(__always)
-public func -=(lhs: inout ${vectype}, rhs: ${vectype}) -> Void {
+public func -=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
   lhs = lhs - rhs
 }
 
 /// Multiply `lhs` by `rhs` (elementwise).
 @inline(__always)
-public func *=(lhs: inout ${vectype}, rhs: ${vectype}) -> Void {
+public func *=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
   lhs = lhs * rhs
 }
 % end
 
 /// Divide `lhs` by `rhs` (elementwise).
 @inline(__always)
-public func /=(lhs: inout ${vectype}, rhs: ${vectype}) -> Void {
+public func /=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
   lhs = lhs / rhs
 }
 
@@ -253,7 +253,7 @@ public func ${wrap}*(lhs: ${vectype}, rhs: ${type}) -> ${vectype} {
 % if is_floating:
 /// Scales `lhs` by `rhs`.
 @inline(__always)
-public func *=(lhs: inout ${vectype}, rhs: ${type}) -> Void {
+public func *=(inout lhs: ${vectype}, rhs: ${type}) -> Void {
   lhs = lhs * rhs
 }
 % end
@@ -654,25 +654,25 @@ public func *(x: ${type}, y: ${vectype}) -> ${vectype} {
 
 @available(*, unavailable,
            message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &+ y' instead")
-public func +=(x: inout ${vectype}, y: ${vectype}) {
+public func +=(inout x: ${vectype}, y: ${vectype}) {
   fatalError("unavailable function cannot be called")
 }
 
 @available(*, unavailable,
            message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &- y' instead")
-public func -=(x: inout ${vectype}, y: ${vectype}) {
+public func -=(inout x: ${vectype}, y: ${vectype}) {
   fatalError("unavailable function cannot be called")
 }
 
 @available(*, unavailable,
            message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
-public func *=(x: inout ${vectype}, y: ${vectype}) {
+public func *=(inout x: ${vectype}, y: ${vectype}) {
   fatalError("unavailable function cannot be called")
 }
 
 @available(*, unavailable,
            message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
-public func *=(x: inout ${vectype}, y: ${type}) {
+public func *=(inout x: ${vectype}, y: ${type}) {
   fatalError("unavailable function cannot be called")
 }
 
@@ -836,11 +836,11 @@ public func -(lhs: ${mattype}, rhs: ${mattype}) -> ${mattype} {
                     range(cols)))})
 }
 
-public func +=(lhs: inout ${mattype}, rhs: ${mattype}) -> Void {
+public func +=(inout lhs: ${mattype}, rhs: ${mattype}) -> Void {
   lhs = lhs + rhs
 }
 
-public func -=(lhs: inout ${mattype}, rhs: ${mattype}) -> Void {
+public func -=(inout lhs: ${mattype}, rhs: ${mattype}) -> Void {
   lhs = lhs - rhs;
 }
 
@@ -858,7 +858,7 @@ public func *(lhs: ${mattype}, rhs: ${type}) -> ${mattype} {
   return rhs*lhs
 }
 
-public func *=(lhs: inout ${mattype}, rhs: ${type}) -> Void {
+public func *=(inout lhs: ${mattype}, rhs: ${type}) -> Void {
   lhs = lhs*rhs
 }
 
@@ -898,7 +898,7 @@ public func *(lhs: ${lhstype}, rhs: ${rhstype}) -> ${mattype} {
 %   rhstype = ctype[type] + str(cols) + 'x' + str(cols)
 /// Matrix multiplication (the "usual" matrix product, not the elementwise
 /// product).
-public func *=(lhs: inout ${mattype}, rhs: ${rhstype}) -> Void {
+public func *=(inout lhs: ${mattype}, rhs: ${rhstype}) -> Void {
   lhs = lhs*rhs
 }
 

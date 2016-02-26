@@ -43,7 +43,7 @@ struct Box<T> {
   let t: T
 }
 
-func notFun(c: inout C, i: Int) {}
+func notFun(inout c: C, i: Int) {}
 
 func testInoutOpaque(c: C, i: Int) {
   var c = c

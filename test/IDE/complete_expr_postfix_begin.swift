@@ -156,7 +156,7 @@ func testExprPostfixBeginIgnored3(fooParam: FooStruct) {
 
 //===--- Test that we include function parameters in completion results.
 
-func testFindFuncParam1(fooParam: FooStruct, a: Int, b: Float, c: inout Double)(d: inout Double) {
+func testFindFuncParam1(fooParam: FooStruct, a: Int, b: Float, inout c: Double)(inout d: Double) {
   #^FIND_FUNC_PARAM_1^#
 // FIND_FUNC_PARAM_1: Begin completions
 // FIND_FUNC_PARAM_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
@@ -232,7 +232,7 @@ class TestFindFuncParam7 {
   }
 }
 
-func testFindFuncParamSelector1(a: Int, b x: Float, foo fooParam: FooStruct, bar barParam: inout FooStruct) {
+func testFindFuncParamSelector1(a: Int, b x: Float, foo fooParam: FooStruct, inout bar barParam: FooStruct) {
   #^FIND_FUNC_PARAM_SELECTOR_1^#
 // FIND_FUNC_PARAM_SELECTOR_1: Begin completions
 // FIND_FUNC_PARAM_SELECTOR_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}

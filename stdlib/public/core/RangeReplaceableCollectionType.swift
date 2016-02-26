@@ -95,7 +95,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   func +=<
     S : SequenceType
     where S.Generator.Element == Generator.Element
-  >(_: inout Self, _: S)
+  >(inout _: Self, _: S)
   */
 
   /// Append the elements of `newElements` to `self`.
@@ -345,7 +345,7 @@ extension RangeReplaceableCollectionType where Index : BidirectionalIndexType {
 @available(*, unavailable, message="call the 'insert()' method on the collection")
 public func insert<
     C: RangeReplaceableCollectionType
->(x: inout C, _ newElement: C.Generator.Element, atIndex i: C.Index) {
+>(inout x: C, _ newElement: C.Generator.Element, atIndex i: C.Index) {
   fatalError("unavailable function can't be called")
 }
 
@@ -358,7 +358,7 @@ public func insert<
 public func splice<
     C: RangeReplaceableCollectionType,
     S : CollectionType where S.Generator.Element == C.Generator.Element
->(x: inout C, _ newElements: S, atIndex i: C.Index) {
+>(inout x: C, _ newElements: S, atIndex i: C.Index) {
   fatalError("unavailable function can't be called")
 }
 
@@ -370,7 +370,7 @@ public func splice<
 @available(*, unavailable, message="call the 'removeAtIndex()' method on the collection")
 public func removeAtIndex<
     C: RangeReplaceableCollectionType
->(x: inout C, _ index: C.Index) -> C.Generator.Element {
+>(inout x: C, _ index: C.Index) -> C.Generator.Element {
   fatalError("unavailable function can't be called")
 }
 
@@ -382,7 +382,7 @@ public func removeAtIndex<
 @available(*, unavailable, message="call the 'removeRange()' method on the collection")
 public func removeRange<
     C: RangeReplaceableCollectionType
->(x: inout C, _ subRange: Range<C.Index>) {
+>(inout x: C, _ subRange: Range<C.Index>) {
   fatalError("unavailable function can't be called")
 }
 
@@ -398,7 +398,7 @@ public func removeRange<
 @available(*, unavailable, message="call the 'removeAll()' method on the collection")
 public func removeAll<
     C: RangeReplaceableCollectionType
->(x: inout C, keepCapacity: Bool = false) {
+>(inout x: C, keepCapacity: Bool = false) {
   fatalError("unavailable function can't be called")
 }
 
@@ -409,7 +409,7 @@ public func removeAll<
 public func extend<
     C: RangeReplaceableCollectionType,
     S : SequenceType where S.Generator.Element == C.Generator.Element
->(x: inout C, _ newElements: S) {
+>(inout x: C, _ newElements: S) {
   fatalError("unavailable function can't be called")
 }
 
@@ -436,7 +436,7 @@ extension RangeReplaceableCollectionType {
 @available(*, unavailable, message="call the 'removeLast()' method on the collection")
 public func removeLast<
     C: RangeReplaceableCollectionType where C.Index : BidirectionalIndexType
->(x: inout C) -> C.Generator.Element {
+>(inout x: C) -> C.Generator.Element {
   fatalError("unavailable function can't be called")
 }
 

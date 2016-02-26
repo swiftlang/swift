@@ -77,8 +77,8 @@ func nthUnicodeScalar(n: UInt32) -> UnicodeScalar {
 func nsEncode<CodeUnit>(
   c: UInt32,
   _ encoding: NSStringEncoding,
-  _ buffer: inout [CodeUnit],
-  _ used: inout Int
+  inout _ buffer: [CodeUnit],
+  inout _ used: Int
 ) {
   var c = c
   _precondition(buffer.count >= 4, "buffer is not large enough")

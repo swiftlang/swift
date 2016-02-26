@@ -302,15 +302,15 @@ public protocol BitwiseOperationsType {
   static var allZeros: Self { get }
 }
 
-public func |= <T : BitwiseOperationsType>(lhs: inout T, rhs: T) {
+public func |= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs | rhs
 }
 
-public func &= <T : BitwiseOperationsType>(lhs: inout T, rhs: T) {
+public func &= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs & rhs
 }
 
-public func ^= <T : BitwiseOperationsType>(lhs: inout T, rhs: T) {
+public func ^= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs ^ rhs
 }
 

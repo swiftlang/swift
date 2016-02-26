@@ -25,7 +25,7 @@ extension String: XOutputStream {
 
 /// \brief A thing that can be written to an XOutputStream
 protocol XStreamable {
-  func writeTo<Target: XOutputStream>(target: inout Target)
+  func writeTo<Target: XOutputStream>(inout target: Target)
 }
 
 /// \brief A thing that can be printed in the REPL and the Debugger
@@ -57,7 +57,7 @@ protocol XDebugPrintable {
 
 /// \brief Strings are XStreamable
 extension String : XStreamable {
-  func writeTo<Target: XOutputStream>(target: inout Target) {
+  func writeTo<Target: XOutputStream>(inout target: Target) {
     target.append(self)
   }
 }
@@ -129,7 +129,7 @@ struct EscapedStringFormat : XStreamable {
     self._value = s
   }
 
-  func writeTo<Target: XOutputStream>(target: inout Target) {
+  func writeTo<Target: XOutputStream>(inout target: Target) {
     target.append("\"")
     for c in _value.unicodeScalars {
       target.append(c.escape(asASCII: true))
@@ -189,7 +189,7 @@ func format(radix radix: Int = 10, fill: String = " ", width: Int = 0) -> _forma
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writePositive<T:XPrintableInteger, S: XOutputStream>(
-  value: T, _ stream: inout S, _ args: _formatArgs) -> Int
+  value: T, inout _ stream: S, _ args: _formatArgs) -> Int
 {
 
   if value == 0 {
@@ -210,7 +210,7 @@ func _writePositive<T:XPrintableInteger, S: XOutputStream>(
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writeSigned<T:XPrintableInteger, S: XOutputStream>(
-  value: T, _ target: inout S, _ args: _formatArgs
+  value: T, inout _ target: S, _ args: _formatArgs
 ) {
   var width = 0
   var result = ""
@@ -241,7 +241,7 @@ struct RadixFormat<T: XPrintableInteger> : XStreamable {
     self.args = args
   }
 
-  func writeTo<S: XOutputStream>(target: inout S) {
+  func writeTo<S: XOutputStream>(inout target: S) {
     _writeSigned(value, &target, args)
   }
 
@@ -276,11 +276,11 @@ struct StdoutStream : XOutputStream {
   }
 }
 
-func xprint<Target: XOutputStream, T: XStreamable>(target: inout Target, _ x: T) {
+func xprint<Target: XOutputStream, T: XStreamable>(inout target: Target, _ x: T) {
   x.writeTo(&target)
 }
 
-func xprint<Target: XOutputStream, T: XPrintable>(target: inout Target, _ x: T) {
+func xprint<Target: XOutputStream, T: XPrintable>(inout target: Target, _ x: T) {
   xprint(&target, x~>format())
 }
 
@@ -294,12 +294,12 @@ func xprint<T: XStreamable>(x: T) {
   xprint(&target, x)
 }
 
-func xprintln<Target: XOutputStream, T: XPrintable>(target: inout Target, _ x: T) {
+func xprintln<Target: XOutputStream, T: XPrintable>(inout target: Target, _ x: T) {
   xprint(&target, x)
   target.append("\n")
 }
 
-func xprintln<Target: XOutputStream, T: XStreamable>(target: inout Target, _ x: T) {
+func xprintln<Target: XOutputStream, T: XStreamable>(inout target: Target, _ x: T) {
   xprint(&target, x)
   target.append("\n")
 }

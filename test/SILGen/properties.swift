@@ -30,7 +30,7 @@ func physical_tuple_rvalue() -> Int {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties16tuple_assignment
-func tuple_assignment(a: inout Int, b: inout Int) {
+func tuple_assignment(inout a: Int, inout b: Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
   // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
@@ -44,7 +44,7 @@ func tuple_assignment(a: inout Int, b: inout Int) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties18tuple_assignment_2
-func tuple_assignment_2(a: inout Int, b: inout Int, xy: (Int, Int)) {
+func tuple_assignment_2(inout a: Int, inout b: Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
   // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
   // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
@@ -164,7 +164,7 @@ func logical_struct_get() -> Int {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties18logical_struct_set
-func logical_struct_set(value: inout Val, z: Int) {
+func logical_struct_set(inout value: Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
@@ -175,7 +175,7 @@ func logical_struct_set(value: inout Val, z: Int) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties27logical_struct_in_tuple_set
-func logical_struct_in_tuple_set(value: inout (Int, Val), z: Int) {
+func logical_struct_in_tuple_set(inout value: (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $(Int, Val)
@@ -187,7 +187,7 @@ func logical_struct_in_tuple_set(value: inout (Int, Val), z: Int) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties29logical_struct_in_reftype_set
-func logical_struct_in_reftype_set(value: inout Val, z1: Int) {
+func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
@@ -249,7 +249,7 @@ func reftype_rvalue_set(value: Val) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF10properties27tuple_in_logical_struct_set
-func tuple_in_logical_struct_set(value: inout Val, z1: Int) {
+func tuple_in_logical_struct_set(inout value: Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
   // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
@@ -332,7 +332,7 @@ func logical_local_captured_get(x: Int) -> Int {
 // CHECK: sil shared @_TFF10properties26logical_local_captured_get
 // CHECK: bb0(%{{[0-9]+}} : $Int):
 
-func inout_arg(x: inout Int) {}
+func inout_arg(inout x: Int) {}
 
 // CHECK-LABEL: sil hidden  @_TF10properties14physical_inout
 func physical_inout(x: Int) {
@@ -413,14 +413,14 @@ func generic_mono_subscript_get<T>(g: Generic<T>, i: Int) -> Float {
 }
 
 // CHECK-LABEL: sil hidden  @{{.*}}generic_mono_subscript_set
-func generic_mono_subscript_set<T>(g: inout Generic<T>, i: Int, x: Float) {
+func generic_mono_subscript_set<T>(inout g: Generic<T>, i: Int, x: Float) {
   g[i] = x
   // CHECK: [[GENERIC_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties7Generics9subscript
   // CHECK: apply [[GENERIC_SET_METHOD]]<
 }
 
 // CHECK-LABEL: sil hidden  @{{.*}}bound_generic_mono_phys_get
-func bound_generic_mono_phys_get(g: inout Generic<UnicodeScalar>, x: Int) -> Int {
+func bound_generic_mono_phys_get(inout g: Generic<UnicodeScalar>, x: Int) -> Int {
   return g.mono_phys
   // CHECK: struct_element_addr %{{.*}}, #Generic.mono_phys
 }

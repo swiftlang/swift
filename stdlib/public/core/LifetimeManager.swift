@@ -53,7 +53,7 @@ public func _fixLifetime<T>(x: T) {
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
-  arg: inout T,
+  inout arg: T,
   @noescape _ body: UnsafeMutablePointer<T> throws -> Result
 ) rethrows -> Result
 {
@@ -62,8 +62,8 @@ public func withUnsafeMutablePointer<T, Result>(
 
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafeMutablePointers<A0, A1, Result>(
-  arg0: inout A0,
-  _ arg1: inout A1,
+  inout arg0: A0,
+  inout _ arg1: A1,
   @noescape _ body: (
     UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
 ) rethrows -> Result {
@@ -75,9 +75,9 @@ public func withUnsafeMutablePointers<A0, A1, Result>(
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
 public func withUnsafeMutablePointers<A0, A1, A2, Result>(
-  arg0: inout A0,
-  _ arg1: inout A1,
-  _ arg2: inout A2,
+  inout arg0: A0,
+  inout _ arg1: A1,
+  inout _ arg2: A2,
   @noescape _ body: (
     UnsafeMutablePointer<A0>,
     UnsafeMutablePointer<A1>,
@@ -94,7 +94,7 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
-  arg: inout T,
+  inout arg: T,
   @noescape _ body: UnsafePointer<T> throws -> Result
 ) rethrows -> Result
 {
@@ -103,8 +103,8 @@ public func withUnsafePointer<T, Result>(
 
 /// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafePointers<A0, A1, Result>(
-  arg0: inout A0,
-  _ arg1: inout A1,
+  inout arg0: A0,
+  inout _ arg1: A1,
   @noescape _ body: (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
 ) rethrows -> Result {
   return try body(
@@ -115,9 +115,9 @@ public func withUnsafePointers<A0, A1, Result>(
 /// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
 public func withUnsafePointers<A0, A1, A2, Result>(
-  arg0: inout A0,
-  _ arg1: inout A1,
-  _ arg2: inout A2,
+  inout arg0: A0,
+  inout _ arg1: A1,
+  inout _ arg2: A2,
   @noescape _ body: (
     UnsafePointer<A0>,
     UnsafePointer<A1>,

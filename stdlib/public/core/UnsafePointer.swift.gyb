@@ -357,7 +357,7 @@ ${comment}
   /// of a `Memory` which is written into buffer before this method returns.
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
-    buffer: inout U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
+    inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -368,7 +368,7 @@ ${comment}
   /// of buffer.
   @_transparent public
   func _withBridgeValue<U, R>(
-    buffer: inout U, @noescape body: UnsafeMutablePointer<U> -> R
+    inout buffer: U, @noescape body: UnsafeMutablePointer<U> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -480,12 +480,12 @@ public func - <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Int {
 }
 
 @_transparent
-public func += <Memory>(lhs: inout ${Self}<Memory>, rhs: Int) {
+public func += <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @_transparent
-public func -= <Memory>(lhs: inout ${Self}<Memory>, rhs: Int) {
+public func -= <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
   lhs = lhs - rhs
 }
 % end # for mutable

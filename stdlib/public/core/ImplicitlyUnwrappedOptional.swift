@@ -125,14 +125,14 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: AnyObject,
-    result: inout Wrapped!?
+    inout result: Wrapped!?
   ) {
     result = Swift._forceBridgeFromObjectiveC(x, Wrapped.self)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: AnyObject,
-    result: inout Wrapped!?
+    inout result: Wrapped!?
   ) -> Bool {
     let bridged: Wrapped? =
       Swift._conditionallyBridgeFromObjectiveC(x, Wrapped.self)

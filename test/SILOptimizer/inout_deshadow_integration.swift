@@ -9,14 +9,14 @@
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_trivial_type_dead(a: inout Int) {
+func exploded_trivial_type_dead(inout a: Int) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}exploded_trivial_type_returned
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_trivial_type_returned(a: inout Int) -> Int {
+func exploded_trivial_type_returned(inout a: Int) -> Int {
   return a
 }
 
@@ -24,7 +24,7 @@ func exploded_trivial_type_returned(a: inout Int) -> Int {
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_trivial_type_stored(a: inout Int) {
+func exploded_trivial_type_stored(inout a: Int) {
   a = 12
 }
 
@@ -32,7 +32,7 @@ func exploded_trivial_type_stored(a: inout Int) {
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_trivial_type_stored_returned(a: inout Int) -> Int {
+func exploded_trivial_type_stored_returned(inout a: Int) -> Int {
   a = 12
   return a
 }
@@ -42,14 +42,14 @@ func exploded_trivial_type_stored_returned(a: inout Int) -> Int {
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_nontrivial_type_dead(a: inout String) {
+func exploded_nontrivial_type_dead(inout a: String) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}exploded_nontrivial_type_returned
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_nontrivial_type_returned(a: inout String) -> String {
+func exploded_nontrivial_type_returned(inout a: String) -> String {
   return a
 }
 
@@ -58,7 +58,7 @@ func exploded_nontrivial_type_returned(a: inout String) -> String {
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_nontrivial_type_stored(a: inout String) {
+func exploded_nontrivial_type_stored(inout a: String) {
   a = "x"
 }
 
@@ -66,7 +66,7 @@ func exploded_nontrivial_type_stored(a: inout String) {
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
-func exploded_nontrivial_type_stored_returned(a: inout String) -> String {
+func exploded_nontrivial_type_stored_returned(inout a: String) -> String {
   a = "x"
   return a
 }
