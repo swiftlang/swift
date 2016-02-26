@@ -350,6 +350,12 @@ namespace {
     /// \brief Associated type substitutions needed to match the witness.
     SmallVector<Substitution, 2> WitnessSubstitutions;
 
+    ConcreteDeclRef getWitness(ASTContext &ctx) const {
+      if (WitnessSubstitutions.empty())
+        return Witness;
+      return ConcreteDeclRef(ctx, Witness, WitnessSubstitutions);
+    }
+
     /// Classify the provided optionality issues for use in diagnostics.
     /// FIXME: Enumify this
     unsigned classifyOptionalityIssues(ValueDecl *requirement) const {
@@ -1849,12 +1855,7 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
   }
 
   // Record this witness in the conformance.
-  ConcreteDeclRef witness;
-  if (match.WitnessSubstitutions.empty())
-    witness = match.Witness;
-  else
-    witness = ConcreteDeclRef(TC.Context, match.Witness,
-                              match.WitnessSubstitutions);
+  ConcreteDeclRef witness = match.getWitness(TC.Context);
   Conformance->setWitness(requirement, witness);
 
   // Synthesize accessors for the protocol witness table to use.
