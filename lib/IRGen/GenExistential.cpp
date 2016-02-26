@@ -1671,6 +1671,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   // Should only be one conformance, for the ErrorType protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
+  (void) entry;
   assert(entry.getProtocol() == conformances[0].getRequirement());
   auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
                                      conformances[0]);
