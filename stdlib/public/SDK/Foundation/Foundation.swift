@@ -671,6 +671,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 // to the enumeration state, so the state cannot be moved in memory. We will
 // probably need to implement fast enumeration in the compiler as a primitive
 // to implement it both correctly and efficiently.
+@swift3_migration(renamed="NSFastEnumerationIterator")
 final public class NSFastGenerator : GeneratorType {
   var enumerable: NSFastEnumeration
   var state: [NSFastEnumerationState]
