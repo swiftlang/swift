@@ -215,6 +215,13 @@ function to_varname() {
     toupper "${1//-/_}"
 }
 
+function join_array_with_delimiter() {
+    # $1 is the delimiter
+    local IFS="$1"
+    shift
+    echo "$*"
+}
+
 function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
 }
@@ -1034,7 +1041,7 @@ COMMON_CMAKE_OPTIONS=(
 )
 
 COMMON_C_FLAGS=""
-SANITIZERS=""
+SANITIZERS=()
 if [[ "${ENABLE_ASAN}" ]] ; then
     SANITIZERS=(
         "${SANITIZERS[@]}"
@@ -1052,7 +1059,7 @@ fi
 if [[ -n "${SANITIZERS[@]}" ]] ; then
     COMMON_CMAKE_OPTIONS=(
         "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_USE_SANITIZER="${SANITIZERS[@]}"
+        -DLLVM_USE_SANITIZER=$(join_array_with_delimiter ";" "${SANITIZERS[@]}")
     )
 fi
 
