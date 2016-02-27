@@ -282,14 +282,14 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     return result
   }
 
-  /// Returns `true` iff `self` holds the only strong reference to its buffer.
+  /// Returns `true` if `self` holds the only strong reference to its buffer.
   ///
   /// See `isUniquelyReferenced` for details.
   public mutating func holdsUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
   }
 
-  /// Returns `true` iff either `self` holds the only strong reference
+  /// Returns `true` if either `self` holds the only strong reference
   /// to its buffer or the pinned has been 'pinned'.
   ///
   /// See `isUniquelyReferenced` for details.
@@ -442,7 +442,7 @@ public func == <Value, Element>(
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
+/// Returns `true` if `object` is a non-`@objc` class instance with
 /// a single strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -474,7 +474,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T
   return _isUniqueOrPinned(&object)
 }
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with a single
+/// Returns `true` if `object` is a non-`@objc` class instance with a single
 /// strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -502,7 +502,7 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
   return _isUnique(&object)
 }
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
+/// Returns `true` if `object` is a non-`@objc` class instance with
 /// a single strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an

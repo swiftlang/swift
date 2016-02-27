@@ -133,7 +133,7 @@ extension LazyCollection : CollectionType {
     return Slice(base: _base, bounds: bounds).lazy
   }
   
-  /// Returns `true` iff `self` is empty.
+  /// Returns `true` if `self` is empty.
   public var isEmpty: Bool {
     return _base.isEmpty
   }

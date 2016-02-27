@@ -91,7 +91,7 @@ public struct StaticString
     return Int(_byteSize)
   }
 
-  /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
+  /// `true` if `self` stores a pointer to ASCII or UTF-8 code units.
   @_transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0

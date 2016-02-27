@@ -19,7 +19,7 @@
 public protocol _ObjectiveCBridgeable {
   associatedtype _ObjectiveCType : AnyObject
 
-  /// Returns `true` iff instances of `Self` can be converted to
+  /// Returns `true` if instances of `Self` can be converted to
   /// Objective-C.  Even if this method returns `true`, a given
   /// instance of `Self._ObjectiveCType` may, or may not, convert
   /// successfully to `Self`; for example, an `NSArray` will only

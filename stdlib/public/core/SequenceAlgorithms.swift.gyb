@@ -124,7 +124,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Equatable"}
 %{
 if preds:
   comment = """
-  /// Returns `true` iff `self` begins with elements equivalent to those of
+  /// Returns `true` if `self` begins with elements equivalent to those of
   /// `other`, using `isEquivalent` as the equivalence test.  Returns `true` if
   /// `other` is empty.
   ///
@@ -134,7 +134,7 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns `true` iff the initial elements of `self` are equal to `prefix`.
+  /// Returns `true` if the initial elements of `self` are equal to `prefix`.
   /// Returns `true` if `other` is empty."""
   rethrows_ = ""
 }%
@@ -178,7 +178,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Equatable"}
 %{
 if preds:
   comment = """
-  /// Returns `true` iff `self` and `other` contain equivalent elements, using
+  /// Returns `true` if `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
   /// - Requires: `isEquivalent` is an
@@ -186,7 +186,7 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns `true` iff `self` and `other` contain the same elements in the
+  /// Returns `true` if `self` and `other` contain the same elements in the
   /// same order."""
   rethrows_ = ""
 }%
@@ -234,7 +234,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 %{
 if preds:
   comment = """
-  /// Returns `true` iff `self` precedes `other` in a lexicographical 
+  /// Returns `true` if `self` precedes `other` in a lexicographical 
   /// ("dictionary") ordering, using `isOrderedBefore` as the comparison 
   /// between elements.
   ///
@@ -249,7 +249,7 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Returns `true` iff `self` precedes `other` in a lexicographical
+  /// Returns `true` if `self` precedes `other` in a lexicographical
   /// ("dictionary") ordering, using "<" as the comparison between elements.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
@@ -297,7 +297,7 @@ else:
 //===----------------------------------------------------------------------===//
 
 extension SequenceType where Generator.Element : Equatable {
-  /// Returns `true` iff `element` is in `self`.
+  /// Returns `true` if `element` is in `self`.
   @warn_unused_result
   public func contains(element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
@@ -314,7 +314,7 @@ extension SequenceType where Generator.Element : Equatable {
 }
 
 extension SequenceType {
-  /// Returns `true` iff an element in `self` satisfies `predicate`.
+  /// Returns `true` if an element in `self` satisfies `predicate`.
   @warn_unused_result
   public func contains(
     @noescape predicate: (${GElement}) throws -> Bool

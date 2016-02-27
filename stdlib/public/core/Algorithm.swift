@@ -109,7 +109,7 @@ public func split<S : CollectionType, R : BooleanType>(
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff the initial elements of `s` are equal to `prefix`.
+/// Returns `true` if the initial elements of `s` are equal to `prefix`.
 @available(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
@@ -121,7 +121,7 @@ public func startsWith<
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff `s` begins with elements equivalent to those of
+/// Returns `true` if `s` begins with elements equivalent to those of
 /// `prefix`, using `isEquivalent` as the equivalence test.
 ///
 /// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
@@ -218,7 +218,7 @@ public func enumerate<Seq : SequenceType>(
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff `a1` and `a2` contain the same elements in the
+/// Returns `true` if `a1` and `a2` contain the same elements in the
 /// same order.
 @available(*, unavailable, message="call the 'equalElements()' method on the sequence")
 public func equal<
@@ -230,7 +230,7 @@ public func equal<
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff `a1` and `a2` contain equivalent elements, using
+/// Returns `true` if `a1` and `a2` contain equivalent elements, using
 /// `isEquivalent` as the equivalence test.
 ///
 /// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
@@ -245,7 +245,7 @@ public func equal<
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff `a1` precedes `a2` in a lexicographical ("dictionary")
+/// Returns `true` if `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using "<" as the comparison between elements.
 @available(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
 public func lexicographicalCompare<
@@ -257,7 +257,7 @@ public func lexicographicalCompare<
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff `a1` precedes `a2` in a lexicographical ("dictionary")
+/// Returns `true` if `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using `isOrderedBefore` as the comparison between elements.
 ///
 /// - Requires: `isOrderedBefore` is a
@@ -276,7 +276,7 @@ public func lexicographicalCompare<
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff an element in `seq` satisfies `predicate`.
+/// Returns `true` if an element in `seq` satisfies `predicate`.
 @available(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType, L : BooleanType
@@ -284,7 +284,7 @@ public func contains<
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff `x` is in `seq`.
+/// Returns `true` if `x` is in `seq`.
 @available(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType where S.Generator.Element : Equatable

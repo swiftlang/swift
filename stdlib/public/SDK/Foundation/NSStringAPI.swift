@@ -613,7 +613,7 @@ extension String {
   /// - Parameter leftover: The remaining range. Pass `nil` If you do
   ///   not need this value.
   ///
-  /// - Returns: `true` iff some characters were converted.
+  /// - Returns: `true` if some characters were converted.
   ///
   /// - Note: Conversion stops when the buffer fills or when the
   ///   conversion isn't possible due to the chosen encoding.
@@ -1639,7 +1639,7 @@ extension String {
   // No need to make these unavailable on earlier OSes, since they can
   // forward trivially to rangeOfString.
 
-  /// Returns `true` iff `other` is non-empty and contained within
+  /// Returns `true` if `other` is non-empty and contained within
   /// `self` by case-sensitive, non-literal search.
   ///
   /// Equivalent to `self.rangeOfString(other) != nil`
@@ -1652,7 +1652,7 @@ extension String {
     return r
   }
   
-  /// Returns `true` iff `other` is non-empty and contained within
+  /// Returns `true` if `other` is non-empty and contained within
   /// `self` by case-insensitive, non-literal search, taking into
   /// account the current locale.
   ///

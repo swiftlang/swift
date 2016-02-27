@@ -401,7 +401,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     }
   }
 
-  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  /// Returns `true` if this buffer's storage is uniquely-referenced.
   ///
   /// - Note: This does not mean the buffer is mutable.  Other factors
   ///   may need to be considered, such as whether the buffer could be
@@ -411,7 +411,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     return __bufferPointer.holdsUniqueReference()
   }
 
-  /// Returns `true` iff this buffer's storage is either
+  /// Returns `true` if this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
   @warn_unused_result
@@ -456,7 +456,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     return withUnsafeBufferPointer { UnsafePointer($0.baseAddress) }
   }
   
-  /// Returns `true` iff we have storage for elements of the given
+  /// Returns `true` if we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
     return _storage.canStoreElementsOfDynamicType(proposedElementType)

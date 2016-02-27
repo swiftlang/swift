@@ -136,7 +136,7 @@ public struct LazyFilterIndex<
   public typealias Base = BaseElements
 }
 
-/// Returns `true` iff `lhs` is identical to `rhs`.
+/// Returns `true` if `lhs` is identical to `rhs`.
 @warn_unused_result
 public func == <Base : CollectionType>(
   lhs: LazyFilterIndex<Base>,
