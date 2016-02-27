@@ -89,6 +89,18 @@ func nestedFunctionType(closure: (y: (z: Int) -> Int) -> Int) -> (y: (z: Int) ->
 
 enum E2 {
   case C1
+  case C2(x: Int, y: String), C3(Int)
+}
+
+enum E3: String {
+  case C = "a"
+}
+
+func refEnumElements() {
+  let w = E2.C1
+  let x = E2.C2(x: 1, y: "")
+  let y: E2 = .C2(x: 2, y: "")
+  let z: E3 = .C
 }
 
 // RUN: rm -rf %t.tmp
@@ -339,5 +351,56 @@ enum E2 {
 // CHECK39-NEXT: C1
 // CHECK39-NEXT: s:FO11cursor_info2E22C1FMS0_S0_
 // CHECK39-NEXT: E2.Type -> E2
-// CHECK39-NEXT: <Declaration></Declaration>
-// FIXME: missing annotation for enum element decl.
+// CHECK39-NEXT: <Declaration>case C1</Declaration>
+// CHECK39-NEXT: <decl.enumelement>case <decl.name>C1</decl.name></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=92:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK40
+// CHECK40: source.lang.swift.decl.enumelement (92:8-92:10)
+// CHECK40-NEXT: C2
+// CHECK40-NEXT: s:FO11cursor_info2E22C2FMS0_FT1xSi1ySS_S0_
+// CHECK40-NEXT: E2.Type -> (x: Int, y: String) -> E2
+// CHECK40-NEXT: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
+// CHECK40-NEXT: <decl.enumelement>case <decl.name>C2</decl.name>(<decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <ref.struct usr="s:Si">Int</ref.struct>, <decl.var.parameter.name.external>y</decl.var.parameter.name.external>: <ref.struct usr="s:SS">String</ref.struct>)</decl.enumelement>
+// FIXME: Wrap parameters in <decl.var.parameter>
+
+// RUN: %sourcekitd-test -req=cursor -pos=92:31 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK41
+// CHECK41: source.lang.swift.decl.enumelement (92:31-92:33)
+// CHECK41-NEXT: C3
+// CHECK41-NEXT: s:FO11cursor_info2E22C3FMS0_FSiS0_
+// CHECK41-NEXT: E2.Type -> (Int) -> E2
+// CHECK41-NEXT: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK41-NEXT: <decl.enumelement>case <decl.name>C3</decl.name>(<ref.struct usr="s:Si">Int</ref.struct>)</decl.enumelement>
+// FIXME: Wrap parameters in <decl.var.parameter>
+
+// RUN: %sourcekitd-test -req=cursor -pos=96:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK42
+// CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
+// CHECK42-NEXT: C
+// CHECK42-NEXT: s:FO11cursor_info2E31CFMS0_S0_
+// CHECK42-NEXT: E3.Type -> E3
+// CHECK42-NEXT: <Declaration>case C</Declaration>
+// CHECK42-NEXT: <decl.enumelement>case <decl.name>C</decl.name></decl.enumelement>
+// FIXME: Annotate raw value.
+
+// RUN: %sourcekitd-test -req=cursor -pos=100:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK43
+// CHECK43: source.lang.swift.ref.enumelement (91:8-91:10)
+// CHECK43-NEXT: C1
+// CHECK43: <Declaration>case C1</Declaration>
+// CHECK43-NEXT: <decl.enumelement>case <decl.name>C1</decl.name></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=101:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK44
+// CHECK44: source.lang.swift.ref.enumelement (92:8-92:10)
+// CHECK44-NEXT: C2
+// CHECK44: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
+// CHECK44-NEXT: <decl.enumelement>case <decl.name>C2</decl.name>(<decl.var.parameter.name.external>x
+
+// RUN: %sourcekitd-test -req=cursor -pos=102:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK45
+// CHECK45: source.lang.swift.ref.enumelement (92:8-92:10)
+// CHECK45-NEXT: C2
+// CHECK45: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
+// CHECK45-NEXT: <decl.enumelement>case <decl.name>C2</decl.name>(<decl.var.parameter.name.external>x
+
+// RUN: %sourcekitd-test -req=cursor -pos=103:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK46
+// CHECK46: source.lang.swift.ref.enumelement (96:8-96:9)
+// CHECK46-NEXT: C
+// CHECK46: <Declaration>case C</Declaration>
+// CHECK46-NEXT: <decl.enumelement>case <decl.name>C</decl.name></decl.enumelement>

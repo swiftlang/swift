@@ -1952,7 +1952,8 @@
       {
         key.kind: source.lang.swift.decl.enumelement,
         key.name: "EElem",
-        key.usr: "s:FO8__main__1E5EElemFMS0_S0_"
+        key.usr: "s:FO8__main__1E5EElemFMS0_S0_",
+        key.fully_annotated_decl: "<decl.enumelement>case <decl.name>EElem</decl.name></decl.enumelement>"
       }
     ]
   },

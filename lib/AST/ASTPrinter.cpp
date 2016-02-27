@@ -973,7 +973,12 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
-  if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+  if (Options.ExplodeEnumCaseDecls) {
+    if (isa<EnumElementDecl>(D))
+      return true;
+    if (isa<EnumCaseDecl>(D))
+      return false;
+  } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
     // Enum elements are printed as part of the EnumCaseDecl, unless they were
     // imported without source info.
     return !EED->getSourceRange().isValid();

@@ -111,6 +111,13 @@ struct PrintOptions {
   /// \c false.
   bool ExplodePatternBindingDecls = false;
 
+  /// If true, the printer will explode an enum case like this:
+  /// \code
+  ///   case A, B
+  /// \endcode
+  /// into multiple case declarations.
+  bool ExplodeEnumCaseDecls = false;
+
   /// \brief Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
@@ -349,6 +356,7 @@ struct PrintOptions {
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.ExcludeAttrList.push_back(DAK_Swift3Migration);
     PO.SkipPrivateStdlibDecls = true;
+    PO.ExplodeEnumCaseDecls = true;
     return PO;
   }
 };
