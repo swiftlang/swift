@@ -140,14 +140,14 @@ func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
-/// Returns `true` iff `t0` is identical to `t1`; i.e. if they are both
+/// Returns `true` if `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
 @warn_unused_result
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return unsafeBitCast(t0, Int.self) == unsafeBitCast(t1, Int.self)
 }
 
-/// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both
+/// Returns `false` if `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
 @warn_unused_result
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
@@ -178,7 +178,7 @@ func _conditionallyUnreachable() {
 @_silgen_name("swift_isClassOrObjCExistentialType")
 func _swift_isClassOrObjCExistentialType<T>(x: T.Type) -> Bool
 
-/// Returns `true` iff `T` is a class type or an `@objc` existential such as
+/// Returns `true` if `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
 @inline(__always)
 @warn_unused_result
@@ -312,7 +312,7 @@ public func _slowPath<C : BooleanType>(x: C) -> Bool {
 
 //===--- Runtime shim wrappers --------------------------------------------===//
 
-/// Returns `true` iff the class indicated by `theClass` uses native
+/// Returns `true` if the class indicated by `theClass` uses native
 /// Swift reference-counting.
 @inline(__always)
 @warn_unused_result

@@ -142,7 +142,7 @@ public protocol AnyObject : class {}
 /// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
-/// Returns `true` iff `lhs` and `rhs` are references to the same object
+/// Returns `true` if `lhs` and `rhs` are references to the same object
 /// instance (in other words, are identical pointers).
 ///
 /// - SeeAlso: `Equatable`, `==`

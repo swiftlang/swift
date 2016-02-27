@@ -66,30 +66,30 @@ public protocol FloatingPointType : Strideable {
   /// The IEEE 754 "class" of this type.
   var floatingPointClass: FloatingPointClassification { get }
 
-  /// `true` iff `self` is negative.
+  /// `true` if `self` is negative.
   var isSignMinus: Bool { get }
 
-  /// `true` iff `self` is normal (not zero, subnormal, infinity, or
+  /// `true` if `self` is normal (not zero, subnormal, infinity, or
   /// NaN).
   var isNormal: Bool { get }
 
-  /// `true` iff `self` is zero, subnormal, or normal (not infinity
+  /// `true` if `self` is zero, subnormal, or normal (not infinity
   /// or NaN).
   var isFinite: Bool { get }
 
-  /// `true` iff `self` is +0.0 or -0.0.
+  /// `true` if `self` is +0.0 or -0.0.
   var isZero: Bool { get }
 
-  /// `true` iff `self` is subnormal.
+  /// `true` if `self` is subnormal.
   var isSubnormal: Bool { get }
 
-  /// `true` iff `self` is infinity.
+  /// `true` if `self` is infinity.
   var isInfinite: Bool { get }
 
-  /// `true` iff `self` is NaN.
+  /// `true` if `self` is NaN.
   var isNaN: Bool { get }
 
-  /// `true` iff `self` is a signaling NaN.
+  /// `true` if `self` is a signaling NaN.
   var isSignaling: Bool { get }
 
   // Not implemented, because it only makes sense for decimal floating point.

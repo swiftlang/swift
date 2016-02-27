@@ -42,7 +42,7 @@ extension String {
     return scalarSlices.map { String($0) }
   }
 
-  /// `true` iff `self` contains no characters.
+  /// `true` if `self` contains no characters.
   public var isEmpty : Bool {
     return _core.count == 0
   }
@@ -82,13 +82,13 @@ func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, _ prefix: AnyObject) -> 
 func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, _ suffix: AnyObject) -> Bool
 
 extension String {
-  /// Returns `true` iff `self` begins with `prefix`.
+  /// Returns `true` if `self` begins with `prefix`.
   public func hasPrefix(prefix: String) -> Bool {
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
-  /// Returns `true` iff `self` ends with `suffix`.
+  /// Returns `true` if `self` ends with `suffix`.
   public func hasSuffix(suffix: String) -> Bool {
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())

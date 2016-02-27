@@ -46,7 +46,7 @@ public protocol RawRepresentable {
   var rawValue: RawValue { get }
 }
 
-/// Returns `true` iff `lhs.rawValue == rhs.rawValue`.
+/// Returns `true` if `lhs.rawValue == rhs.rawValue`.
 @warn_unused_result
 public func == <
   T : RawRepresentable where T.RawValue : Equatable
@@ -54,7 +54,7 @@ public func == <
   return lhs.rawValue == rhs.rawValue
 }
 
-/// Returns `true` iff `lhs.rawValue != rhs.rawValue`.
+/// Returns `true` if `lhs.rawValue != rhs.rawValue`.
 @warn_unused_result
 public func != <
   T : RawRepresentable where T.RawValue : Equatable
@@ -64,7 +64,7 @@ public func != <
 
 // This overload is needed for ambiguity resolution against the
 // implementation of != for T : Equatable
-/// Returns `true` iff `lhs.rawValue != rhs.rawValue`.
+/// Returns `true` if `lhs.rawValue != rhs.rawValue`.
 @warn_unused_result
 public func != <
   T : Equatable where T : RawRepresentable, T.RawValue : Equatable

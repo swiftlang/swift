@@ -1173,7 +1173,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // CollectionType conformance
   //
 
-  /// `true` iff `count == 0`.
+  /// `true` if `count == 0`.
   public var isEmpty: Bool {
     return count == 0
   }

@@ -96,7 +96,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
     return _transform(_base[position])
   }
 
-  /// Returns `true` iff `self` is empty.
+  /// Returns `true` if `self` is empty.
   public var isEmpty: Bool { return _base.isEmpty }
 
   public var first: Element? { return _base.first.map(_transform) }

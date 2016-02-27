@@ -15,7 +15,7 @@ public protocol IntervalType {
   /// The type of the `Interval`'s endpoints.
   associatedtype Bound : Comparable
 
-  /// Returns `true` iff the interval contains `value`.
+  /// Returns `true` if the interval contains `value`.
   @warn_unused_result
   func contains(value: Bound) -> Bool
 
@@ -24,7 +24,7 @@ public protocol IntervalType {
   @warn_unused_result
   func clamp(intervalToClamp: Self) -> Self
 
-  /// `true` iff `self` is empty.
+  /// `true` if `self` is empty.
   var isEmpty: Bool { get }
 
 
@@ -104,7 +104,7 @@ public struct ${Self}<Bound : Comparable>
     return "${Self}(\(String(reflecting: start))${rangeOperator}\(String(reflecting: end)))"
   }
 
-  /// Returns `true` iff the `Interval` contains `x`.
+  /// Returns `true` if the `Interval` contains `x`.
   @warn_unused_result
   public func contains(x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
@@ -152,14 +152,14 @@ public func == <Bound : Comparable> (
 %end
 
 extension HalfOpenInterval {
-  /// `true` iff the `Interval` is empty.
+  /// `true` if the `Interval` is empty.
   public var isEmpty: Bool {
     return end <= start
   }
 }
 
 extension ClosedInterval {
-  /// `true` iff the `Interval` is empty.  In the case of
+  /// `true` if the `Interval` is empty.  In the case of
   /// `ClosedInterval`, always returns `false`.
   public var isEmpty: Bool {
     return false
@@ -167,7 +167,7 @@ extension ClosedInterval {
 }
 
 extension IntervalType {
-  /// Returns `true` iff `lhs` and `rhs` have a non-empty intersection.
+  /// Returns `true` if `lhs` and `rhs` have a non-empty intersection.
   @warn_unused_result
   public func overlaps<
     I: IntervalType where I.Bound == Bound
@@ -200,7 +200,7 @@ public func ... <Bound : Comparable>(
   return ClosedInterval(start, end)
 }
 
-/// Returns `true` iff `pattern` contains `value`.
+/// Returns `true` if `pattern` contains `value`.
 @warn_unused_result
 public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)

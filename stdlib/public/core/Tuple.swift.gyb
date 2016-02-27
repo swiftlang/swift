@@ -18,7 +18,7 @@
 
 %   equatableTypeParams = ", ".join(["{} : Equatable".format(c) for c in typeParams])
 
-/// Returns `true` iff each component of `lhs` is equal to the corresponding
+/// Returns `true` if each component of `lhs` is equal to the corresponding
 /// component of `rhs`.
 @warn_unused_result
 public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
@@ -30,7 +30,7 @@ public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
   )
 }
 
-/// Returns `true` iff any component of `lhs` is not equal to the corresponding
+/// Returns `true` if any component of `lhs` is not equal to the corresponding
 /// component of `rhs`.
 @warn_unused_result
 public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
