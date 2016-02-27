@@ -2,17 +2,17 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/AADumper.cpp
   UtilityPasses/BasicCalleePrinter.cpp
   UtilityPasses/BasicInstructionPropertyDumper.cpp
+  UtilityPasses/CFGPrinter.cpp
   UtilityPasses/ComputeDominanceInfo.cpp
   UtilityPasses/ComputeLoopInfo.cpp
-  UtilityPasses/CFGPrinter.cpp
   UtilityPasses/EpilogueRetainReleaseMatcherDumper.cpp
   UtilityPasses/EscapeAnalysisDumper.cpp
   UtilityPasses/FunctionOrderPrinter.cpp
-  UtilityPasses/IVInfoPrinter.cpp
   UtilityPasses/InstCount.cpp
+  UtilityPasses/IVInfoPrinter.cpp
   UtilityPasses/Link.cpp
-  UtilityPasses/LoopInfoPrinter.cpp
   UtilityPasses/LoopCanonicalizer.cpp
+  UtilityPasses/LoopInfoPrinter.cpp
   UtilityPasses/LoopRegionPrinter.cpp
   UtilityPasses/LSLocationPrinter.cpp
   UtilityPasses/MemBehaviorDumper.cpp
