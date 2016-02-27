@@ -246,7 +246,7 @@ public:
 
   /// Computes the lifetime frontier for the value.
   /// Returns true on success. It can fail if the lifetime frontier is located
-  /// on a critical edge. Which means that getting the corrseponding frontier
+  /// on a critical edge. Which means that getting the corresponding frontier
   /// instruction would require splitting that critical edge.
   bool computeFrontier(Frontier &Fr) {
     switch (computeFrontierImpl(Fr, true)) {
