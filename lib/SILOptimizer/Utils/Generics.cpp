@@ -408,7 +408,7 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
                               IsBare, IsTransparent, OrigF->isFragile(),
                               IsThunk);
 
-  // Re-ues an existing thunk.
+  // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
 
