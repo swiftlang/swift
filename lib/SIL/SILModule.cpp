@@ -468,6 +468,15 @@ bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
+SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
+  assert(!lookUpFunction(Name) && "hasFunction should be only called for "
+                                  "functions that are not contained in the "
+                                  "SILModule yet");
+  return SILLinkerVisitor(*this, getSILLoader(),
+                          SILModule::LinkingMode::LinkNormal)
+      .lookupFunction(Name, Linkage);
+}
+
 void SILModule::linkAllWitnessTables() {
   getSILLoader()->getAllWitnessTables();
 }
@@ -514,6 +523,10 @@ void SILModule::eraseFunction(SILFunction *F) {
     FunctionTable.erase(F->getName());
     getFunctionList().erase(F);
   }
+}
+
+void SILModule::invalidateFunctionInSILCache(SILFunction *F) {
+  getSILLoader()->invalidateFunction(F);
 }
 
 /// Erase a global SIL variable from the module.

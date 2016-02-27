@@ -109,12 +109,16 @@ public:
       return MF->getFile();
     }
     SILFunction *lookupSILFunction(SILFunction *InFunc);
-    SILFunction *lookupSILFunction(StringRef Name);
+    SILFunction *lookupSILFunction(StringRef Name,
+                                   bool declarationOnly = false);
     SILVTable *lookupVTable(Identifier Name);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
 
     /// Invalidate all cached SILFunctions.
     void invalidateFunctionCache();
+
+    /// Invalidate a specific cached SILFunction.
+    bool invalidateFunction(SILFunction *F);
 
     /// Deserialize all SILFunctions, VTables, and WitnessTables inside the
     /// module and add them to SILMod.
