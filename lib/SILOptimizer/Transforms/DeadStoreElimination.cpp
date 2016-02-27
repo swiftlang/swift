@@ -517,6 +517,10 @@ unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
 }
 
 DSEContext::ProcessKind DSEContext::getProcessFunctionKind() {
+  // Don't optimize function that are marked as 'no.optimize'.
+  if (!F->shouldOptimize())
+    return ProcessKind::ProcessNone;
+
   bool RunOneIteration = true;
   unsigned BBCount = 0;
   unsigned LocationCount = LocationVault.size();
