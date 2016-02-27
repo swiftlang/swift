@@ -1146,7 +1146,7 @@ computeFrontierImpl(Frontier &Fr, bool AllowedToModifyCFG) {
   // Handle "exit" edges from the lifetime region.
   for (SILBasicBlock *FrontierBB: FrontierBlocks) {
     bool needSplit = false;
-    // If the value is live only in part of the precessor blocks we have to
+    // If the value is live only in part of the predecessor blocks we have to
     // split those predecessor edges.
     for (SILBasicBlock *Pred : FrontierBB->getPreds()) {
       if (!LiveBlocks.count(Pred) || NotLiveOutBlocks.count(Pred)) {
@@ -1185,7 +1185,7 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
   for (const SILSuccessor &Succ : BB->getSuccessors()) {
     // If the value is live at the beginning of any successor block it is also
     // live at the end of BB and therefore Inst is definitely in the lifetime
-    // region (Note that we don't check in upward direction agains the value's
+    // region (Note that we don't check in upward direction against the value's
     // definition).
     if (LiveBlocks.count(Succ))
       return true;
