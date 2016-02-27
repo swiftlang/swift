@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: rdar24874073
 //
 // XFAIL: interpret
 
