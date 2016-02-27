@@ -1752,14 +1752,15 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   return Func;
 }
 
-SILFunction *SILDeserializer::lookupSILFunction(StringRef name) {
+SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
+                                                bool declarationOnly) {
   if (!FuncTable)
     return nullptr;
   auto iter = FuncTable->find(name);
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ false);
+  auto Func = readSILFunction(*iter, nullptr, name, declarationOnly);
   if (Func)
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
@@ -2136,4 +2137,15 @@ void SILDeserializer::invalidateFunctionCache() {
       fnEntry.get()->decrementRefCount();
       fnEntry.reset();
     }
+}
+
+bool SILDeserializer::invalidateFunction(SILFunction *F) {
+  for (auto &fnEntry : Funcs) {
+    if (fnEntry.isDeserialized() && fnEntry.get() == F) {
+      fnEntry.get()->decrementRefCount();
+      fnEntry.reset();
+      return true;
+    }
+  }
+  return false;
 }

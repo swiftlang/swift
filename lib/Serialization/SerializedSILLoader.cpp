@@ -75,15 +75,28 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILDeclRef Decl) {
   return retVal;
 }
 
-SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name) {
+SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
+                                                    bool declarationOnly,
+                                                    SILLinkage Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Name)) {
+    if (auto Func = Des->lookupSILFunction(Name, declarationOnly)) {
       DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
             << Des->getModuleIdentifier().str() << "\n");
-      if (!Func->empty())
+      if (Linkage != SILLinkage::Private) {
+        // This is not the linkage we are looking for.
+        if (Func->getLinkage() != Linkage) {
+          DEBUG(llvm::dbgs()
+                << "Wrong linkage for Function: " << Func->getName() << " : "
+                << (int)Func->getLinkage() << "\n");
+          Des->invalidateFunction(Func);
+          Func->getModule().eraseFunction(Func);
+          continue;
+        }
+      }
+      if (!Func->empty() || declarationOnly)
         return Func;
       retVal = Func;
     }
@@ -109,6 +122,13 @@ SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
 void SerializedSILLoader::invalidateCaches() {
   for (auto &Des : LoadedSILSections)
     Des->invalidateFunctionCache();
+}
+
+bool SerializedSILLoader::invalidateFunction(SILFunction *F) {
+  for (auto &Des : LoadedSILSections)
+    if (Des->invalidateFunction(F))
+      return true;
+  return false;
 }
 
 void SerializedSILLoader::getAll() {

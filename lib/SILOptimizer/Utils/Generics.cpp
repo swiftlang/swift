@@ -344,49 +344,39 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   // Try to link existing specialization only in -Onone mode.
   // All other compilation modes perform specialization themselves.
   // TODO: Cache optimized specializations and perform lookup here?
-  // TODO: Only check that this function exists, but don't read
+  // Only check that this function exists, but don't read
   // its body. It can save some compile-time.
-  if (isWhitelistedSpecialization(FunctionName) &&
-      M.linkFunction(FunctionName, SILOptions::LinkingMode::LinkNormal))
-    return M.lookUpFunction(FunctionName);
+  if (isWhitelistedSpecialization(FunctionName))
+    return M.hasFunction(FunctionName, SILLinkage::PublicExternal);
 
   return nullptr;
 }
 
 SILFunction *swift::getExistingSpecialization(SILModule &M,
                                               StringRef FunctionName) {
-  auto *Specialization = lookupExistingSpecialization(M, FunctionName);
+  // First check if the module contains a required specialization already.
+  auto *Specialization = M.lookUpFunction(FunctionName);
+  if (Specialization)
+    return Specialization;
+
+  // Then check if the required specialization can be found elsewhere.
+  Specialization = lookupExistingSpecialization(M, FunctionName);
   if (!Specialization)
     return nullptr;
-  if (hasPublicVisibility(Specialization->getLinkage())) {
-    // The bodies of existing specializations cannot be used,
-    // as they may refer to non-public symbols.
-    if (Specialization->isDefinition())
-      Specialization->convertToDeclaration();
-    Specialization->setLinkage(SILLinkage::PublicExternal);
-    // Ignore body for -Onone and -Odebug.
-    assert((Specialization->isExternalDeclaration() ||
-            convertExternalDefinitionIntoDeclaration(Specialization)) &&
-           "Could not remove body of the found specialization");
-    if (!Specialization->isExternalDeclaration() &&
-        !convertExternalDefinitionIntoDeclaration(Specialization)) {
-      DEBUG(
-          llvm::dbgs() << "Could not remove body of specialization: "
-                       << FunctionName << '\n');
-    }
 
-    DEBUG(
-        llvm::dbgs() << "Found existing specialization for: "
-                     << FunctionName << '\n';
+  assert(hasPublicVisibility(Specialization->getLinkage()) &&
+         "Pre-specializations should have public visibility");
+
+  Specialization->setLinkage(SILLinkage::PublicExternal);
+
+  assert(Specialization->isExternalDeclaration()  &&
+         "Specialization should be a public external declaration");
+
+  DEBUG(llvm::dbgs() << "Found existing specialization for: " << FunctionName
+                     << '\n';
         llvm::dbgs() << swift::Demangle::demangleSymbolAsString(
-                            Specialization->getName()) << "\n\n");
-  } else {
-    // Forget about this function.
-    DEBUG(llvm::dbgs() << "Cannot reuse the specialization: "
-           << swift::Demangle::demangleSymbolAsString(Specialization->getName())
-           <<"\n");
-    return nullptr;
-  }
+                            Specialization->getName())
+                     << "\n\n");
 
   return Specialization;
 }
