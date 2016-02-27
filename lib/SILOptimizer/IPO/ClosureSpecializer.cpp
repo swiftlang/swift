@@ -249,7 +249,7 @@ public:
 namespace {
 struct ClosureInfo {
   SILInstruction *Closure;
-  ValueLifetime Lifetime;
+  ValueLifetimeAnalysis::Frontier LifetimeFrontier;
   llvm::SmallVector<CallSiteDescriptor, 8> CallSites;
 
   ClosureInfo(SILInstruction *Closure): Closure(Closure) {}
@@ -404,15 +404,14 @@ std::string CallSiteDescriptor::createName() const {
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
-  assert(!CInfo->Lifetime.getLastUsers().empty() &&
+  assert(!CInfo->LifetimeFrontier.empty() &&
          "Need a post-dominating release(s)");
 
   // Extend the lifetime of a captured argument to cover the callee.
   SILBuilderWithScope Builder(getClosure());
   Builder.createRetainValue(getClosure()->getLoc(), Arg);
-  for (auto *I : CInfo->Lifetime.getLastUsers()) {
-    auto It = SILBasicBlock::iterator(*I);
-    Builder.setInsertionPoint(++It);
+  for (auto *I : CInfo->LifetimeFrontier) {
+    Builder.setInsertionPoint(I);
     Builder.createReleaseValue(getClosure()->getLoc(), Arg);
   }
 }
@@ -800,7 +799,7 @@ void ClosureSpecializer::gatherCallSites(
         if (!CInfo) {
           CInfo = new ClosureInfo(&II);
           ValueLifetimeAnalysis VLA(CInfo->Closure);
-          CInfo->Lifetime = VLA.computeFromDirectUses();
+          VLA.computeFrontierAllowingCFGChanges(CInfo->LifetimeFrontier);
         }
 
         // Now we know that CSDesc is profitable to specialize. Add it to our
