@@ -107,7 +107,7 @@ function (swift_benchmark_compile_archopts)
           "-module-name" "${module_name}"
           "-emit-sib"
           "-o" "${sibfile}"
-          "${srcdir}/${module_name_path}.swift" ${extra_sources})
+          "${source}" ${extra_sources})
     endif()
   endforeach()
 
@@ -116,6 +116,7 @@ function (swift_benchmark_compile_archopts)
 
     set(objfile "${objdir}/${module_name}.o")
     set(swiftmodule "${objdir}/${module_name}.swiftmodule")
+    set(source "${srcdir}/${module_name_path}.swift")
     list(APPEND bench_library_objects "${objfile}")
     add_custom_command(
         OUTPUT "${objfile}"
@@ -129,7 +130,7 @@ function (swift_benchmark_compile_archopts)
         "-module-name" "${module_name}"
         "-emit-module" "-emit-module-path" "${swiftmodule}"
         "-o" "${objfile}"
-        "${srcdir}/${module_name_path}.swift" ${extra_sources})
+        "${source}" ${extra_sources})
     if (SWIFT_BENCHMARK_EMIT_SIB)
       set(sibfile "${objdir}/${module_name}.sib")
       list(APPEND bench_library_sibfiles "${sibfile}")
@@ -145,7 +146,7 @@ function (swift_benchmark_compile_archopts)
           "-module-name" "${module_name}"
           "-emit-sib"
           "-o" "${sibfile}"
-          "${srcdir}/${module_name_path}.swift" ${extra_sources})
+          "${source}" ${extra_sources})
     endif()
   endforeach()
 
@@ -157,6 +158,7 @@ function (swift_benchmark_compile_archopts)
     if(module_name)
       set(objfile "${objdir}/${module_name}.o")
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
+      set(source "${srcdir}/${module_name_path}.swift")
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
       add_custom_command(
           OUTPUT "${objfile}"
@@ -171,7 +173,7 @@ function (swift_benchmark_compile_archopts)
           "-emit-module" "-emit-module-path" "${swiftmodule}"
           "-I" "${objdir}"
           "-o" "${objfile}"
-          "${srcdir}/${module_name_path}.swift")
+          "${source}")
       if (SWIFT_BENCHMARK_EMIT_SIB)
         set(sibfile "${objdir}/${module_name}.sib")
         list(APPEND SWIFT_BENCH_SIBFILES "${sibfile}")
@@ -188,7 +190,7 @@ function (swift_benchmark_compile_archopts)
             "-I" "${objdir}"
             "-emit-sib"
             "-o" "${sibfile}"
-            "${srcdir}/${module_name_path}.swift")
+            "${source}")
       endif()
     endif()
   endforeach()
