@@ -15,23 +15,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/SanitizerOptions.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-
-namespace swift {
+using namespace swift;
 
 static StringRef toStringRef(const SanitizerKind kind) {
-  switch(kind) {
-    case SanitizerKind::Address:
-      return "address";
-    case SanitizerKind::None:
-      assert("Getting a name for SanitizerKind::None");
+  switch (kind) {
+  case SanitizerKind::Address:
+    return "address";
+  case SanitizerKind::None:
+    llvm_unreachable("Getting a name for SanitizerKind::None");
   }
   llvm_unreachable("Unsupported sanitizer");
 }
 
-SanitizerKind parseSanitizerArgValues(const llvm::opt::Arg *A,
+SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
                                       const llvm::Triple &Triple,
                                       DiagnosticEngine &Diags) {
   SanitizerKind kind = SanitizerKind::None;
@@ -44,7 +43,7 @@ SanitizerKind parseSanitizerArgValues(const llvm::opt::Arg *A,
       kind = SanitizerKind::Address;
     } else {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
-                      A->getOption().getName(), A->getValue(i));
+        A->getOption().getName(), A->getValue(i));
       return kind;
     }
   }
@@ -58,5 +57,4 @@ SanitizerKind parseSanitizerArgValues(const llvm::opt::Arg *A,
   }
 
   return kind;
-}
 }

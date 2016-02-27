@@ -1352,10 +1352,6 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   if (!updatedAttrs.isEmpty())
     fn->setAttributes(updatedAttrs);
 
-  // Apply sanitizer attributes to the function.
-  //if (IGM.Opts.Sanitize == SanitizerKind::Address)
-  //  fn->addFnAttr(llvm::Attribute::SanitizeAddress);
-
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
   //

@@ -19,7 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
-#include "swift/Basic/SanitizerOptions.h"
+#include "swift/Basic/Sanitizers.h"
 #include <string>
 #include <vector>
 
@@ -173,7 +173,6 @@ public:
     Hash = (Hash << 1) | Optimize;
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableLLVMARCOpts;
-    Hash = (Hash << 2) | (unsigned)Sanitize;
     return Hash;
   }
 };

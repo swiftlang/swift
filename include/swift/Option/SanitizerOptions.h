@@ -10,19 +10,15 @@
 //
 //===---------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_SANITIZER_OPTIONS_H
-#define SWIFT_BASIC_SANITIZER_OPTIONS_H
+#ifndef SWIFT_OPTIONS_SANITIZER_OPTIONS_H
+#define SWIFT_OPTIONS_SANITIZER_OPTIONS_H
 
+#include "swift/Basic/Sanitizers.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
 
 namespace swift {
 class DiagnosticEngine;
-
-enum class SanitizerKind : unsigned {
-  None = 0,
-  Address,
-};
 
 /// \brief Parses a -sanitize= argument's values.
 ///
@@ -32,4 +28,4 @@ SanitizerKind parseSanitizerArgValues(const llvm::opt::Arg *A,
                                       const llvm::Triple &Triple,
                                       DiagnosticEngine &Diag);
 }
-#endif // SWIFT_BASIC_SANITIZER_OPTIONS_H
+#endif // SWIFT_OPTIONS_SANITIZER_OPTIONS_H

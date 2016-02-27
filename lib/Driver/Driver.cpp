@@ -32,6 +32,7 @@
 #include "swift/Driver/OutputFileMap.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Option/Options.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1100,11 +1101,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     }
   }
 
+  OI.SelectedSanitizer = SanitizerKind::None;
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
     OI.SelectedSanitizer = parseSanitizerArgValues(A, TC.getTriple(), Diags);
-  else
-    OI.SelectedSanitizer = SanitizerKind::None;
-
 }
 
 void Driver::buildActions(const ToolChain &TC,

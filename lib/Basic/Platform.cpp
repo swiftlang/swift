@@ -65,21 +65,21 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
 }
 
 static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
-  switch(platform) {
-    case DarwinPlatformKind::MacOS:
-      return "macosx";
-    case DarwinPlatformKind::IPhoneOS:
-      return "iphoneos";
-    case DarwinPlatformKind::IPhoneOSSimulator:
-      return "iphonesimulator";
-    case DarwinPlatformKind::TvOS:
-      return "appletvos";
-    case DarwinPlatformKind::TvOSSimulator:
-      return "appletvsimulator";
-    case DarwinPlatformKind::WatchOS:
-      return "watchos";
-    case DarwinPlatformKind::WatchOSSimulator:
-      return "watchsimulator";
+  switch (platform) {
+  case DarwinPlatformKind::MacOS:
+    return "macosx";
+  case DarwinPlatformKind::IPhoneOS:
+    return "iphoneos";
+  case DarwinPlatformKind::IPhoneOSSimulator:
+    return "iphonesimulator";
+  case DarwinPlatformKind::TvOS:
+    return "appletvos";
+  case DarwinPlatformKind::TvOSSimulator:
+    return "appletvsimulator";
+  case DarwinPlatformKind::WatchOS:
+    return "watchos";
+  case DarwinPlatformKind::WatchOSSimulator:
+    return "watchsimulator";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }

@@ -850,28 +850,29 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 
 static StringRef
 getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
-  switch(getDarwinPlatformKind(triple)) {
-    case DarwinPlatformKind::MacOS:
-      return "osx";
-    case DarwinPlatformKind::IPhoneOS:
-      return "ios";
-    case DarwinPlatformKind::IPhoneOSSimulator:
-      return "iossim";
-    case DarwinPlatformKind::TvOS:
-      return "tvos";
-    case DarwinPlatformKind::TvOSSimulator:
-      return "tvossim";
-    case DarwinPlatformKind::WatchOS:
-      return "watchos";
-    case DarwinPlatformKind::WatchOSSimulator:
-      return "watchossim";
+  switch (getDarwinPlatformKind(triple)) {
+  case DarwinPlatformKind::MacOS:
+    return "osx";
+  case DarwinPlatformKind::IPhoneOS:
+    return "ios";
+  case DarwinPlatformKind::IPhoneOSSimulator:
+    return "iossim";
+  case DarwinPlatformKind::TvOS:
+    return "tvos";
+  case DarwinPlatformKind::TvOSSimulator:
+    return "tvossim";
+  case DarwinPlatformKind::WatchOS:
+    return "watchos";
+  case DarwinPlatformKind::WatchOSSimulator:
+    return "watchossim";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
 
-static void AddLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
-                              StringRef DarwinLibName, bool AddRPath,
-                              const ToolChain &TC) {
+static void
+addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
+                           StringRef DarwinLibName, bool AddRPath,
+                           const ToolChain &TC) {
   SmallString<128> Dir;
   getRuntimeLibraryPath(Dir, Args, TC);
   // Remove platform name.
@@ -900,16 +901,17 @@ static void AddLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
   }
 }
 
-static void AddLinkSanitizerLibArgs(const ArgList &Args,
-                                    ArgStringList &Arguments,
-                                    StringRef Sanitizer, const ToolChain &TC) {
+static void
+addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
+                                 ArgStringList &Arguments,
+                                 StringRef Sanitizer, const ToolChain &TC) {
   // Sanitizer runtime libraries requires C++.
   Arguments.push_back("-lc++");
   // Add explicit dependcy on -lc++abi, as -lc++ doesn't re-export
   // all RTTI-related symbols that are used.
   Arguments.push_back("-lc++abi");
 
-  AddLinkRuntimeLib(Args, Arguments,
+  addLinkRuntimeLibForDarwin(Args, Arguments,
                     (Twine("libclang_rt.") + Sanitizer + "_" +
                      getDarwinLibraryNameSuffixForTriple(TC.getTriple()) +
                      "_dynamic.dylib").str(),
@@ -1023,8 +1025,11 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     Arguments.push_back("-application_extension");
   }
 
+  // Liking in sanitizers will add rpaths, which might negatively interact when
+  // other rpaths are involved, so we should make sure we add the rpaths after
+  // all user-specified rpaths.
   if (context.OI.SelectedSanitizer == SanitizerKind::Address)
-    AddLinkSanitizerLibArgs(context.Args, Arguments, "asan", *this);
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {

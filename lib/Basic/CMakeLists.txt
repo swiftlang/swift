@@ -78,7 +78,6 @@ add_swift_library(swiftBasic
   PunycodeUTF8.cpp
   QuotedString.cpp
   Remangle.cpp
-  SanitizerOptions.cpp
   SourceLoc.cpp
   StringExtras.cpp
   TaskQueue.cpp

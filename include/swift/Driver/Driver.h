@@ -19,6 +19,7 @@
 
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/DenseMap.h"
