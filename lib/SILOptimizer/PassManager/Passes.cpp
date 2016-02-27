@@ -270,7 +270,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.run();
   PM.resetAndRemoveTransformations();
 
-  // Run two iterations of the high-level SSA passes.
+  // Run an iteration of the high-level SSA passes.
   PM.setStageName("HighLevel");
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   PM.runOneIteration();
@@ -289,7 +289,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
-  // Run two iterations of the mid-level SSA passes.
+  // Run an iteration of the mid-level SSA passes.
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
   PM.runOneIteration();
