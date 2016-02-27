@@ -1146,7 +1146,7 @@ computeFrontierImpl(Frontier &Fr, bool AllowedToModifyCFG) {
   // Handle "exit" edges from the lifetime region.
   for (SILBasicBlock *FrontierBB: FrontierBlocks) {
     bool needSplit = false;
-    // If the value is live only in part of the precessor blocks we have to
+    // If the value is live only in part of the predecessor blocks we have to
     // split those predecessor edges.
     for (SILBasicBlock *Pred : FrontierBB->getPreds()) {
       if (!LiveBlocks.count(Pred) || NotLiveOutBlocks.count(Pred)) {
