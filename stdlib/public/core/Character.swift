@@ -323,7 +323,7 @@ public func <(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
   case let (.Small(lbits), .Small(rbits)) where
     // Note: This is consistent with Foundation but unicode incorrect.
-    // See String._lessThanASCII.
+    // See String._compareASCII.
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
     && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
     return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
