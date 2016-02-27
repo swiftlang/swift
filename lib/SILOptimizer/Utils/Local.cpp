@@ -1185,7 +1185,7 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
   for (const SILSuccessor &Succ : BB->getSuccessors()) {
     // If the value is live at the beginning of any successor block it is also
     // live at the end of BB and therefore Inst is definitely in the lifetime
-    // region (Note that we don't check in upward direction agains the value's
+    // region (Note that we don't check in upward direction against the value's
     // definition).
     if (LiveBlocks.count(Succ))
       return true;
