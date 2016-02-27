@@ -80,7 +80,8 @@ KNOWN_SETTINGS=(
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
-    enable-asan                 ""               "enable AddressSanitizer"
+    enable-asan                 ""               "enable Address Sanitizer"
+    enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     user-config-args            ""               "User-supplied arguments to cmake when used to do configuration"
@@ -1033,11 +1034,25 @@ COMMON_CMAKE_OPTIONS=(
 )
 
 COMMON_C_FLAGS=""
-
+SANITIZERS=""
 if [[ "${ENABLE_ASAN}" ]] ; then
+    SANITIZERS=(
+        "${SANITIZERS[@]}"
+        "Address"
+    )
+fi
+
+if [[ "${ENABLE_UBSAN}" ]] ; then
+    SANITIZERS=(
+        "${SANITIZERS[@]}"
+        "Undefined"
+    )
+fi
+
+if [[ -n "${SANITIZERS[@]}" ]] ; then
     COMMON_CMAKE_OPTIONS=(
         "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_USE_SANITIZER="Address"
+        -DLLVM_USE_SANITIZER="${SANITIZERS[@]}"
     )
 fi
 
