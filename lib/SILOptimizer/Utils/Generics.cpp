@@ -211,28 +211,6 @@ replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
   return replaceWithSpecializedCallee(AI, FRI, Builder, ReInfo);
 }
 
-/// Try to convert definition into declaration.
-static bool convertExternalDefinitionIntoDeclaration(SILFunction *F) {
-  // Bail if it is a declaration already.
-  if (!F->isDefinition())
-    return false;
-  // Bail if there is no external implementation of this function.
-  if (!F->isAvailableExternally())
-    return false;
-  // Bail if has a shared visibility, as there are no guarantees
-  // that an implementation is available elsewhere.
-  if (hasSharedVisibility(F->getLinkage()))
-    return false;
-  // Make this definition a declaration by removing the body of a function.
-  F->convertToDeclaration();
-  assert(F->isExternalDeclaration() &&
-         "Function should be an external declaration");
-
-  DEBUG(llvm::dbgs() << "  removed external function " << F->getName() << "\n");
-
-  return true;
-}
-
 /// Check of a given name could be a name of a white-listed
 /// specialization.
 bool swift::isWhitelistedSpecialization(StringRef SpecName) {
