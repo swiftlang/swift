@@ -82,11 +82,13 @@ public struct AnyGenerator<Element> : GeneratorType {
 /// traversing the sequence consumes the generator.
 extension AnyGenerator : SequenceType {}
 
+@swift3_migration(message="Please use AnyIterator(_:) instead")
 @available(*, deprecated, renamed="AnyGenerator")
 public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
   return AnyGenerator(base)
 }
 
+@swift3_migration(message="Please use AnyIterator(:_) instead")
 @available(*, deprecated, renamed="AnyGenerator")
 public func anyGenerator<Element>(body: () -> Element?) -> AnyGenerator<Element> {
   return AnyGenerator(body: body)
