@@ -133,8 +133,14 @@ static void diagnoseStaticReports(const SILInstruction *I,
       if (!V || V->getValue() != 1)
         return;
 
-      diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
-               diag::static_report_error);
+      auto message = dyn_cast<StringLiteralInst>(Args[2]);
+      if (!message || message->getValue().empty()) {
+        diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+                 diag::static_report_error);
+      } else {
+        diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+                 diag::static_report_error_message, message->getValue());
+      }
     }
   }
 }

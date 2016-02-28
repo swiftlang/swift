@@ -243,11 +243,10 @@ ERROR(wrong_non_negative_assumption,none,
 ERROR(shifting_all_significant_bits,none,
       "shift amount is greater than or equal to type size in bits", ())
 
-// FIXME: We won't need this as it will be replaced with user-generated strings.
-// staticReport diagnostics.
 ERROR(static_report_error, none,
-      "static report error", ())
-
+      "unknown static error", ())
+ERROR(static_report_error_message, none,
+      "static error: %0", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
