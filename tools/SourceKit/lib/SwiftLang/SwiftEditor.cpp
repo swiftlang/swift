@@ -363,52 +363,6 @@ struct EditorConsumerSyntaxMapEntry {
     :Offset(Offset), Length(Length), Kind(Kind) { }
 };
 
-
-class SwiftEditorLineRange {
-  unsigned StartLine;
-  unsigned Length;
-
-public:
-  SwiftEditorLineRange()
-    :StartLine(0), Length(0) { }
-  SwiftEditorLineRange(unsigned StartLine, unsigned Length)
-    :StartLine(StartLine), Length(Length) { }
-  SwiftEditorLineRange(const SwiftEditorLineRange &Other)
-    :StartLine(Other.StartLine), Length(Other.Length) { }
-
-  bool isValid() const {
-    return Length != 0;
-  }
-
-  unsigned startLine() const {
-    return StartLine;
-  }
-  
-  unsigned endLine() const {
-    return isValid() ? StartLine + Length - 1 : 0;
-  }
-
-  unsigned lineCount() const {
-    return Length;
-  }
-  
-  void setRange(unsigned NewStartLine, unsigned NewLength) {
-    StartLine = NewStartLine;
-    Length = NewLength;
-  }
-
-  void extendToIncludeLine(unsigned Line) {
-    if (!isValid()) {
-      StartLine = Line;
-      Length = 1;
-    }
-    else if (Line >= StartLine + Length) {
-      Length = Line - StartLine + 1;
-    }
-  }
-
-};
-
 typedef std::pair<unsigned, unsigned> SwiftEditorCharRange;
 
 struct SwiftSemanticToken {
@@ -1462,70 +1416,6 @@ public:
 
   bool walkToSubStructurePost(SyntaxStructureNode Node) override {
     return DocStructureWalker.walkToSubStructurePost(Node);
-  }
-
-};
-
-class CodeFormatter {
-  CodeFormatOptions &FmtOptions;
-public:
-  CodeFormatter(CodeFormatOptions &Options)
-    :FmtOptions(Options) { }
-
-  std::pair<SwiftEditorLineRange, std::string> indent(unsigned LineIndex, FormatContext &FC, StringRef Text) {
-
-    // If having sibling locs to align with, respect siblings.
-    if (FC.HasSibling()) {
-      StringRef Line = getTrimmedTextForLine(LineIndex, Text);
-      StringBuilder Builder;
-      FC.padToSiblingColumn(Builder);
-      if (FC.needExtraIndentationForSibling()) {
-        if (FmtOptions.UseTabs)
-          Builder.append(1, '\t');
-        else
-          Builder.append(FmtOptions.IndentWidth, ' ');
-      }
-      Builder.append(Line);
-      return std::make_pair(SwiftEditorLineRange(LineIndex, 1),
-                            Builder.str().str());
-    }
-
-    // Take the current indent position of the outer context, then add another
-    // indent level if expected.
-    auto LineAndColumn = FC.indentLineAndColumn();
-    size_t ExpandedIndent = getExpandedIndentForLine(LineAndColumn.first, FmtOptions, Text);
-    auto AddIndentFunc = [&] () {
-      auto Width = FmtOptions.UseTabs ? FmtOptions.TabWidth
-                                      : FmtOptions.IndentWidth;
-      // Increment indent.
-      ExpandedIndent += Width;
-      // Normalize indent to align on proper column indent width.
-      ExpandedIndent -= ExpandedIndent % Width;
-    };
-
-    if (LineAndColumn.second > 0 && FC.shouldAddIndentForLine(LineIndex))
-      AddIndentFunc();
-    if (FC.IsInDocCommentBlock()) {
-
-      // Inside doc comment block, the indent is one space, e.g.
-      // /**
-      //  * <---Indent to align with the first star.
-      //  */
-      ExpandedIndent += 1;
-    }
-
-    // Reformat the specified line with the calculated indent.
-    StringRef Line = getTrimmedTextForLine(LineIndex, Text);
-    std::string IndentedLine;
-    if (FmtOptions.UseTabs)
-      IndentedLine.assign(ExpandedIndent / FmtOptions.TabWidth, '\t');
-    else
-      IndentedLine.assign(ExpandedIndent, ' ');
-    IndentedLine.append(Line);
-
-    // Return affected line range, which can later be more than one line.
-    SwiftEditorLineRange range = SwiftEditorLineRange(LineIndex, 1);
-    return std::make_pair(range, IndentedLine);
   }
 
 };
