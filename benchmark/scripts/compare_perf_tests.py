@@ -126,10 +126,10 @@ def compareScores(key, score1, score2, runs, num):
     # if the interval endpoints have inverse relationship, then they overlap
     if minbest:
         if bestscore1 < worstscore2:
-            print "(!)",
+            print "(?)",
     else:
         if bestscore1 > worstscore2:
-            print "(!)",
+            print "(?)",
     print
 
 def printBestScores(key, scores):
