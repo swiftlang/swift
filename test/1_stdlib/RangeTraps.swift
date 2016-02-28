@@ -37,9 +37,9 @@ RangeTraps.test("HalfOpen")
   .code {
   var range = 1..<1
   expectType(Range<Int>.self, &range)
-  
+
   expectCrashLater()
-  1..<0
+  1..<getInt(0)
 }
 
 RangeTraps.test("Closed")
@@ -51,7 +51,7 @@ RangeTraps.test("Closed")
   expectType(Range<Int>.self, &range)
 
   expectCrashLater()
-  1...0
+  1...getInt(0)
 }
 
 RangeTraps.test("OutOfRange")
@@ -68,9 +68,9 @@ RangeTraps.test("OutOfRange")
   expectCrashLater()
 #if arch(i386)  ||  arch(arm)
   // FIXME <rdar://17670791> Range<Int> bounds checking not enforced in optimized 32-bit
-  1...0  // crash some other way
+  1...getInt(0)  // crash some other way
 #else
-  0...Int.max
+  0...getInt(Int.max)
 #endif
 }
 

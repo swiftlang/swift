@@ -159,6 +159,18 @@ public func _precondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
+  // This allows _precondition's inside @_transparent functions to be checked at
+  // compile time if the compiler is able to fold the condition into true/false.
+  Builtin.staticReport(
+    (!condition())._value, true._value, message._startPtrOrData)
+  _preconditionImpl(condition(), message, file, line)
+}
+
+@_transparent
+private func _preconditionImpl(
+  @autoclosure condition: () -> Bool, _ message: StaticString,
+  _ file: StaticString, _ line: UInt
+) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
@@ -176,7 +188,7 @@ public func _preconditionFailure(
   message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line) {
 
-  _precondition(false, message, file:file, line: line)
+  _preconditionImpl(false, message, file, line)
 
   _conditionallyUnreachable()
 }
@@ -228,7 +240,7 @@ public func _debugPreconditionFailure(
   message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line) {
   if _isDebugAssertConfiguration() {
-    _precondition(false, message, file: file, line: line)
+    _preconditionImpl(false, message, file, line)
   }
   _conditionallyUnreachable()
 }
