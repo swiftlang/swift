@@ -1470,15 +1470,15 @@ class CodeFormatter {
   SwiftEditorDocument &Doc;
   EditorConsumer &Consumer;
 public:
-  CodeFormatter(SwiftEditorDocument &Doc, EditorConsumer& Consumer)
+  CodeFormatter(SwiftEditorDocument &Doc, EditorConsumer &Consumer)
     :Doc(Doc), Consumer(Consumer) { }
 
-  SwiftEditorLineRange indent(unsigned LineIndex, FormatContext &FC) {
+  std::pair<SwiftEditorLineRange,StringRef> indent(unsigned LineIndex, FormatContext &FC, StringRef Text) {
     auto &FmtOptions = Doc.getFormatOptions();
 
     // If having sibling locs to align with, respect siblings.
     if (FC.HasSibling()) {
-      StringRef Line = Doc.getTrimmedTextForLine(LineIndex);
+      StringRef Line = Doc.getTrimmedTextForLine(LineIndex, Text);
       StringBuilder Builder;
       FC.padToSiblingColumn(Builder);
       if (FC.needExtraIndentationForSibling()) {
@@ -1489,7 +1489,7 @@ public:
       }
       Builder.append(Line);
       Consumer.recordFormattedText(Builder.str().str());
-      return SwiftEditorLineRange(LineIndex, 1);
+      return std::make_pair(SwiftEditorLineRange(LineIndex, 1), Text);
     }
 
     // Take the current indent position of the outer context, then add another
@@ -1517,7 +1517,7 @@ public:
     }
 
     // Reformat the specified line with the calculated indent.
-    StringRef Line = Doc.getTrimmedTextForLine(LineIndex);
+    StringRef Line = Doc.getTrimmedTextForLine(LineIndex, Text);
     std::string IndentedLine;
     if (FmtOptions.UseTabs)
       IndentedLine.assign(ExpandedIndent / FmtOptions.TabWidth, '\t');
@@ -1528,7 +1528,8 @@ public:
     Consumer.recordFormattedText(IndentedLine);
 
     // Return affected line range, which can later be more than one line.
-    return SwiftEditorLineRange(LineIndex, 1);
+    SwiftEditorLineRange range = SwiftEditorLineRange(LineIndex, 1);
+    return std::make_pair(range, Text);
   }
 
 };
@@ -1986,8 +1987,7 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   SourceLoc Loc = SM.getLocForBufferStart(BufID).getAdvancedLoc(Offset);
   FormatContext FC = walker.walkToLocation(Loc);
   CodeFormatter CF(*this, Consumer);
-  SwiftEditorLineRange LineRange = CF.indent(Line, FC);
-
+  SwiftEditorLineRange LineRange = CF.indent(Line, FC, Text).first;
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
 
@@ -2151,8 +2151,7 @@ size_t SwiftEditorDocument::getExpandedIndentForLine(unsigned LineIndex) {
   return Indent;
 }
 
-StringRef SwiftEditorDocument::getTrimmedTextForLine(unsigned LineIndex) {
-  StringRef Text = Impl.EditableBuffer->getBuffer()->getText();
+StringRef SwiftEditorDocument::getTrimmedTextForLine(unsigned LineIndex, StringRef Text) {
   size_t LineOffset = getOffsetOfTrimmedLine(LineIndex, Text);
   size_t LineEnd = Text.find_first_of("\r\n", LineOffset);
   return Text.slice(LineOffset, LineEnd);

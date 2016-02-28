@@ -88,7 +88,7 @@ public:
   void formatText(unsigned Line, unsigned Length, EditorConsumer &Consumer);
   void expandPlaceholder(unsigned Offset, unsigned Length,
                          EditorConsumer &Consumer);
-  StringRef getTrimmedTextForLine(unsigned Line);
+  StringRef getTrimmedTextForLine(unsigned Line, StringRef Text);
   size_t getExpandedIndentForLine(unsigned LineIndex);
 
   const swift::ide::CodeFormatOptions &getFormatOptions();
