@@ -78,48 +78,6 @@ public struct UTF8 : UnicodeCodecType {
 
   public init() {}
 
-  /// Returns the number of expected trailing bytes for a given first byte: 0,
-  /// 1, 2 or 3.  If the first byte cannot start a valid UTF-8 code unit
-  /// sequence, returns 4.
-  @warn_unused_result
-  public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
-    if _fastPath(cu0 & 0x80 == 0) {
-      // 0x00 -- 0x7f: 1-byte sequences.
-      return 0
-    }
-
-    // 0xc0 -- 0xc1: invalid first byte.
-    // 0xc2 -- 0xdf: 2-byte sequences.
-    // 0xe0 -- 0xef: 3-byte sequences.
-    // 0xf0 -- 0xf4: 4-byte sequences.
-    // 0xf5 -- 0xff: invalid first byte.
-
-    // The rules above are represented as a lookup table.  The lookup table
-    // consists of two words, where `high` contains the high bit of the result,
-    // `low` contains the low bit.
-    //
-    // Bit patterns:
-    // high | low | meaning
-    // -----+-----+----------------
-    //   0  |  0  | 2-byte sequence
-    //   0  |  1  | 3-byte sequence
-    //   1  |  0  | 4-byte sequence
-    //   1  |  1  | invalid
-    //
-    // This implementation allows us to handle these cases without branches.
-
-    //    ---------0xf?-------  ---------0xe?-------  ---------0xd?-------  ---------0xc?-------
-    let low: UInt64 =
-        0b1111_1111__1110_0000__1111_1111__1111_1111__0000_0000__0000_0000__0000_0000__0000_0011
-    let high: UInt64 =
-        0b1111_1111__1111_1111__0000_0000__0000_0000__0000_0000__0000_0000__0000_0000__0000_0011
-
-    let index = UInt64(max(0, Int(cu0) - 0xc0))
-    let highBit = ((high >> index) & 1) << 1
-    let lowBit = (low >> index) & 1
-    return UInt8(1 + (highBit | lowBit))
-  }
-
   /// Lookahead buffer used for UTF-8 decoding.  New bytes are inserted at LSB,
   /// and bytes are read at MSB.
   var _decodeLookahead: UInt32 = 0
@@ -141,83 +99,64 @@ public struct UTF8 : UnicodeCodecType {
   /// buffer with a shift, and update flags with a single-bit right shift.
   var _lookaheadFlags: UInt8 = 0
 
-  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
-  /// unit sequence.
-  @warn_unused_result
-  static func _isValidUTF8Impl(buffer: UInt32, length: UInt8) -> Bool {
-    switch length {
-    case 4:
-      let cu3 = UInt8((buffer >> 24) & 0xff)
-      if cu3 < 0x80 || cu3 > 0xbf {
-        return false
-      }
-      fallthrough
-    case 3:
-      let cu2 = UInt8((buffer >> 16) & 0xff)
-      if cu2 < 0x80 || cu2 > 0xbf {
-        return false
-      }
-      fallthrough
-    case 2:
-      let cu0 = UInt8(buffer & 0xff)
-      let cu1 = UInt8((buffer >> 8) & 0xff)
-      switch cu0 {
-      case 0xe0:
-        if cu1 < 0xa0 || cu1 > 0xbf {
-          return false
-        }
-      case 0xed:
-        if cu1 < 0x80 || cu1 > 0x9f {
-          return false
-        }
-      case 0xf0:
-        if cu1 < 0x90 || cu1 > 0xbf {
-          return false
-        }
-      case 0xf4:
-        if cu1 < 0x80 || cu1 > 0x8f {
-          return false
-        }
-      default:
-        _sanityCheck(cu0 >= 0xc2 && cu0 <= 0xf4,
-            "invalid first bytes should be handled in the caller")
-        if cu1 < 0x80 || cu1 > 0xbf {
-          return false
-        }
-      }
-      return true
 
-    default:
-      _sanityCheckFailure("one-byte sequences should be handled in the caller")
-    }
-  }
-
-  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
+  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code		
   /// unit sequence.
   @warn_unused_result
   static func _isValidUTF8(buffer: UInt32, validBytes: UInt8) -> Bool {
     _sanityCheck(validBytes & 0b0000_1111 != 0,
         "input buffer should not be empty")
 
-    let cu0 = UInt8(buffer & 0xff)
-    let trailingBytes = _numTrailingBytes(cu0)
-    switch trailingBytes {
-    case 0:
+    if _fastPath(buffer & 0x80 == 0) {
+      return true // 0x00 -- 0x7f: 1-byte sequences (ASCII).
+    }
+
+    // Determine sequence length using high 5 bits of 1st byte. We use a
+    // look-up table to branch less. 1-byte sequence are handled above.
+    //
+    //  case | pattern | description
+    // ----------------------------
+    //   00  |  110xx  | 2-byte sequence
+    //   01  |  1110x  | 3-byte sequence
+    //   10  |  11110  | 4-byte sequence
+    //   11  |  other  | invalid
+    //
+    //                     11xxx      10xxx      01xxx      00xxx
+    let lut0: UInt32 = 0b1011_0000__1111_1111__1111_1111__1111_1111
+    let lut1: UInt32 = 0b1100_0000__1111_1111__1111_1111__1111_1111
+
+    let index = (buffer >> 3) & 0x1f
+    let bit0 = (lut0 >> index) & 1
+    let bit1 = (lut1 >> index) & 1
+
+    // Note that all past-EOF bytes are 0 and thus never a valid continuation.
+    switch (bit1, bit0) {
+    case (0, 0): // 2-byte sequence.
+      // Require 10xx xxxx  110x xxxx.
+      if buffer & 0xc0e0 != 0x80c0 { return false }
+      // Disallow xxxx xxxx  xxx0 000x (<= 7 bits case).
+      if buffer & 0x001e == 0x0000 { return false }
       return true
-
-    case 1, 2, 3:
-      // We *don't* need to check the if the buffer actually contains at least
-      // `trailingBytes` bytes.  Here's why.
-      //
-      // If the buffer is not full -- contains fewer than 4 bytes, we are at
-      // EOF, and the buffer will be padded with 0x00.  Thus, an incomplete
-      // code unit sequence just before EOF would be seen by code below as
-      // padded with nuls.  This sequence will be rejected by the logic in
-      // `_isValidUTF8Impl`, because the nul byte is not a valid continuation
-      // byte for UTF-8.
-      return _isValidUTF8Impl(buffer, length: trailingBytes + 1)
-
-    default:
+    case (0, 1): // 3-byte sequence.
+      // Require 10xx xxxx  10xx xxxx  1110 xxxx.
+      if buffer & 0xc0c0f0 != 0x8080e0 { return false }
+      // Disallow xxxx xxxx  xx0x xxxx  xxxx 0000 (<= 11 bits case).
+      if buffer & 0x00200f == 0x000000 { return false }
+      // Disallow xxxx xxxx  xx1x xxxx  xxxx 1101 (surrogate code points).
+      if buffer & 0x00200f == 0x00200d { return false }
+      return true
+    case (1, 0): // 4-byte sequence.
+      // Require 10xx xxxx  10xx xxxx  10xx xxxx  1111 0xxx.
+      if buffer & 0xc0c0c0f8 != 0x808080f0 { return false }
+      // Disallow xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx x000 (<= 16 bits case).
+      if buffer & 0x00003007 == 0x00000000 { return false }
+      // Case xxxx xxxx  xxxx xxxx  xxxx xxxx  xxxx x1xx.
+      if buffer & 0x00000004 == 0x00000004 {
+        // Require xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx xx00 (<= 0x10FFFF).
+        if buffer & 0x00003003 != 0x00000000 { return false }
+      }
+      return true
+    default: // Invalid sequence
       return false
     }
   }
