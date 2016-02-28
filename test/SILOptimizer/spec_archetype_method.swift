@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass="Function Signature Optimization" -disable-arc-opts -emit-sil -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -O -disable-arc-opts -emit-sil -primary-file %s | FileCheck %s
 
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.
@@ -32,7 +32,7 @@ func useFoo<T>(x x: T) {
 //CHECK: function_ref @_TTSg5C21spec_archetype_method3ABCS0_S_8pingableS____TF21spec_archetype_method12generic_call
 //CHECK-NEXT: retain
 //CHECK-NEXT: apply
-//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC___TF21spec_archetype_method6useFoo{{.*}} : $@convention(thin) (@owned ABC) -> ()
+//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC___TF21spec_archetype_method6useFoo{{.*}} : $@convention(thin) (@in ABC) -> ()
 //CHECK-NEXT: apply
 //CHECK: return
 public

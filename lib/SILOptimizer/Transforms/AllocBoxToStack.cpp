@@ -660,13 +660,47 @@ PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
   SILCloner<PromotedParamCloner>::visitProjectBoxInst(Inst);
 }
 
+static void emitStrongReleaseAfter(SILValue V, SILInstruction *I) {
+  SILBuilderWithScope Builder(std::next(SILBasicBlock::iterator(I)));
+  Builder.emitStrongReleaseAndFold(I->getLoc(), V);
+}
+
+namespace {
+class LifetimeTracker {
+  SILValue TheValue;
+  Optional<ValueLifetime> Lifetime;
+
+  public:
+    LifetimeTracker(SILValue Value): TheValue(Value) {}
+
+  using EndpointRange =
+    iterator_range<llvm::SmallVectorImpl<SILInstruction *>::const_iterator>;
+
+  SILValue getStart() { return TheValue; }
+
+  EndpointRange getEndpoints();
+};
+}
+
+LifetimeTracker::EndpointRange LifetimeTracker::getEndpoints() {
+  if (!Lifetime) {
+    if (TheValue->hasOneUse()) {
+      Lifetime = ValueLifetime();
+      Lifetime->LastUsers.insert(TheValue->use_begin().getUser());
+    } else {
+      ValueLifetimeAnalysis VLA(TheValue);
+      Lifetime = VLA.computeFromDirectUses();
+    }
+  }
+  return EndpointRange(Lifetime->LastUsers.begin(), Lifetime->LastUsers.end());
+}
+
 /// Specialize a partial_apply by promoting the parameters indicated by
 /// indices. We expect these parameters to be replaced by stack address
 /// references.
 static PartialApplyInst *
 specializePartialApply(PartialApplyInst *PartialApply,
-                       ParamIndexList &PromotedParamIndices,
-                       bool &CFGChanged) {
+                       ParamIndexList &PromotedParamIndices) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
   assert(FRI && "Expected a direct partial_apply!");
   auto *F = FRI->getReferencedFunction();
@@ -689,7 +723,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   // Now create the new partial_apply using the cloned function.
   llvm::SmallVector<SILValue, 16> Args;
 
-  ValueLifetimeAnalysis::Frontier PAFrontier;
+  LifetimeTracker Lifetime(PartialApply);
 
   // Promote the arguments that need promotion.
   for (auto &O : PartialApply->getArgumentOperands()) {
@@ -699,6 +733,8 @@ specializePartialApply(PartialApplyInst *PartialApply,
       Args.push_back(O.get());
       continue;
     }
+
+    auto Endpoints = Lifetime.getEndpoints();
 
     // If this argument is promoted, it is a box that we're
     // turning into an address because we've proven we can
@@ -731,18 +767,18 @@ specializePartialApply(PartialApplyInst *PartialApply,
 
     Args.push_back(promoted);
 
-    if (PAFrontier.empty()) {
-      ValueLifetimeAnalysis VLA(PartialApply);
-      if (VLA.computeFrontierAllowingCFGChanges(PAFrontier))
-        CFGChanged = true;
-      assert(!PAFrontier.empty() && "partial_apply must have at least one use "
-                                    "to release the returned function");
+    // If the partial_apply is dead, insert a release after it.
+    if (Endpoints.begin() == Endpoints.end()) {
+      emitStrongReleaseAfter(O.get(), PartialApply);
+      continue;
     }
 
-    // Insert releases after each point where the partial_apply becomes dead.
-    for (SILInstruction *FrontierInst : PAFrontier) {
-      SILBuilderWithScope Builder(FrontierInst);
-      Builder.emitStrongReleaseAndFold(PartialApply->getLoc(), O.get());
+    // Otherwise insert releases after each point where the
+    // partial_apply becomes dead.
+    for (auto *User : Endpoints) {
+      assert((isa<StrongReleaseInst>(User) || isa<ApplyInst>(User)) &&
+             "Unexpected end of lifetime for partial_apply!");
+      emitStrongReleaseAfter(O.get(), User);
     }
   }
 
@@ -763,8 +799,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
 }
 
 static void
-rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands,
-                      bool &CFGChanged) {
+rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
   llvm::DenseMap<PartialApplyInst *, ParamIndexList> IndexMap;
   ParamIndexList Indices;
 
@@ -796,8 +831,7 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands,
     std::sort(Indices.begin(), Indices.end());
     Indices.erase(std::unique(Indices.begin(), Indices.end()), Indices.end());
 
-    auto *Replacement = specializePartialApply(PartialApply, Indices,
-                                               CFGChanged);
+    auto *Replacement = specializePartialApply(PartialApply, Indices);
     PartialApply->replaceAllUsesWith(Replacement);
 
     auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
@@ -812,11 +846,10 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands,
 static unsigned
 rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
                      llvm::SmallVectorImpl<Operand *> &PromotedOperands,
-                     llvm::SmallVectorImpl<TermInst *> &Returns,
-                     bool &CFGChanged) {
+                     llvm::SmallVectorImpl<TermInst *> &Returns) {
   // First we'll rewrite any partial applies that we can to remove the
   // box container pointer from the operands.
-  rewritePartialApplies(PromotedOperands, CFGChanged);
+  rewritePartialApplies(PromotedOperands);
 
   unsigned Count = 0;
   auto rend = Promoted.rend();
@@ -850,14 +883,14 @@ class AllocBoxToStack : public SILFunctionTransform {
     }
 
     if (!Promotable.empty()) {
-      bool CFGChanged = false;
-      auto Count = rewritePromotedBoxes(Promotable, PromotedOperands, Returns,
-                                        CFGChanged);
+      auto Count = rewritePromotedBoxes(Promotable, PromotedOperands, Returns);
       NumStackPromoted += Count;
       
-      invalidateAnalysis(CFGChanged ?
-                         SILAnalysis::InvalidationKind::FunctionBody :
-                         SILAnalysis::InvalidationKind::CallsAndInstructions);
+      // TODO: Update the call graph instead of invalidating it.
+      // Currently we need it invalidate it because we clone functions and
+      // replace partial_apply instructions which may be used by apply
+      // instructions.
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 

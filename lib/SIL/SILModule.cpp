@@ -220,8 +220,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             SILFunction::ClassVisibility_t CV) {
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
-    assert(fn->getLinkage() == linkage ||
-           stripExternalFromLinkage(fn->getLinkage()) == linkage);
+    assert(fn->getLinkage() == linkage);
     return fn;
   }
 
