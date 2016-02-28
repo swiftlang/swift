@@ -107,7 +107,8 @@ public struct UTF8 : UnicodeCodecType {
   /// space in `buffer` is filled with some value not matching the UTF-8
   /// continuation byte form (`0b10xxxxxx`).
   @warn_unused_result
-  public static func _isValidUTF8(buffer: UInt32) -> Bool {
+  public // @testable
+  static func _isValidUTF8(buffer: UInt32) -> Bool {
 
     if _fastPath(buffer & 0x80 == 0) {
       return true // 0x00 -- 0x7f: 1-byte sequences (ASCII).
