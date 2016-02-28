@@ -1467,13 +1467,12 @@ public:
 };
 
 class CodeFormatter {
-  EditorConsumer &Consumer;
   CodeFormatOptions &FmtOptions;
 public:
-  CodeFormatter(EditorConsumer &Consumer, CodeFormatOptions &Options)
-    :Consumer(Consumer), FmtOptions(Options) { }
+  CodeFormatter(CodeFormatOptions &Options)
+    :FmtOptions(Options) { }
 
-  std::pair<SwiftEditorLineRange,StringRef> indent(unsigned LineIndex, FormatContext &FC, StringRef Text) {
+  std::pair<SwiftEditorLineRange, std::string> indent(unsigned LineIndex, FormatContext &FC, StringRef Text) {
 
     // If having sibling locs to align with, respect siblings.
     if (FC.HasSibling()) {
@@ -1487,8 +1486,8 @@ public:
           Builder.append(FmtOptions.IndentWidth, ' ');
       }
       Builder.append(Line);
-      Consumer.recordFormattedText(Builder.str().str());
-      return std::make_pair(SwiftEditorLineRange(LineIndex, 1), Text);
+      return std::make_pair(SwiftEditorLineRange(LineIndex, 1),
+                            Builder.str().str());
     }
 
     // Take the current indent position of the outer context, then add another
@@ -1524,11 +1523,9 @@ public:
       IndentedLine.assign(ExpandedIndent, ' ');
     IndentedLine.append(Line);
 
-    Consumer.recordFormattedText(IndentedLine);
-
     // Return affected line range, which can later be more than one line.
     SwiftEditorLineRange range = SwiftEditorLineRange(LineIndex, 1);
-    return std::make_pair(range, Text);
+    return std::make_pair(range, IndentedLine);
   }
 
 };
@@ -1986,8 +1983,12 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   SourceLoc Loc = SM.getLocForBufferStart(BufID).getAdvancedLoc(Offset);
   FormatContext FC = walker.walkToLocation(Loc);
   CodeFormatOptions Options = getFormatOptions();
-  CodeFormatter CF(Consumer, Options);
-  SwiftEditorLineRange LineRange = CF.indent(Line, FC, Text).first;
+  CodeFormatter CF(Options);
+  std::pair<SwiftEditorLineRange, std::string> indented = CF.indent(Line, FC, Text);
+
+  SwiftEditorLineRange LineRange = indented.first;
+  StringRef ModifiedText = indented.second;
+  Consumer.recordFormattedText(ModifiedText);
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
 
