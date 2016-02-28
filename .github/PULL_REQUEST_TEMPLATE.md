@@ -12,10 +12,9 @@ Before merging this pull request to apple/swift repository:
 - [ ] Test pull request on Swift continuous integration.
 
 <details>
-  <summary>Triggering Swift CI </summary>
+  <summary>Triggering Swift CI</summary>
 
-The swift-ci is triggered by writing a comment on this PR addressed to the github user @swift-ci. Different tests will run depending on the specific comment that you use. The currently available comments are:
-
+The swift-ci is triggered by writing a comment on this PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment that you use. The currently available comments are:
 
 **Smoke Testing**
 
