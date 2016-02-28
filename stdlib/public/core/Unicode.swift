@@ -112,7 +112,7 @@ public struct UTF8 : UnicodeCodecType {
     }
 
     // Determine sequence length using high 5 bits of 1st byte. We use a
-    // look-up table to branch less. 1-byte sequence are handled above.
+    // look-up table to branch less. 1-byte sequences are handled above.
     //
     //  case | pattern | description
     // ----------------------------
@@ -156,7 +156,7 @@ public struct UTF8 : UnicodeCodecType {
         if buffer & 0x00003003 != 0x00000000 { return false }
       }
       return true
-    default: // Invalid sequence
+    default: // Invalid sequence.
       return false
     }
   }
