@@ -100,12 +100,14 @@ public struct UTF8 : UnicodeCodecType {
   var _lookaheadFlags: UInt8 = 0
 
 
-  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code		
-  /// unit sequence.
+  /// Returns `true` if the LSB bytes in `buffer` are a well-formed UTF-8 code
+  /// unit sequence. The lowest byte is considered the first code unit.
+  ///
+  /// - Requires: There is at least one used byte in `buffer`, and the unused
+  /// space in `buffer` is filled with some value not matching the UTF-8
+  /// continuation byte form (`0b10xxxxxx`).
   @warn_unused_result
-  static func _isValidUTF8(buffer: UInt32, validBytes: UInt8) -> Bool {
-    _sanityCheck(validBytes & 0b0000_1111 != 0,
-        "input buffer should not be empty")
+  public static func _isValidUTF8(buffer: UInt32) -> Bool {
 
     if _fastPath(buffer & 0x80 == 0) {
       return true // 0x00 -- 0x7f: 1-byte sequences (ASCII).
@@ -129,7 +131,6 @@ public struct UTF8 : UnicodeCodecType {
     let bit0 = (lut0 >> index) & 1
     let bit1 = (lut1 >> index) & 1
 
-    // Note that all past-EOF bytes are 0 and thus never a valid continuation.
     switch (bit1, bit0) {
     case (0, 0): // 2-byte sequence.
       // Require 10xx xxxx  110x xxxx.
@@ -176,7 +177,7 @@ public struct UTF8 : UnicodeCodecType {
 
     _sanityCheck(validBytes != 0,
         "input buffer should not be empty")
-    _sanityCheck(!UTF8._isValidUTF8(buffer, validBytes: validBytes),
+    _sanityCheck(!UTF8._isValidUTF8(buffer),
         "input sequence should be ill-formed UTF-8")
 
     // Unicode 6.3.0, D93b:
@@ -330,7 +331,7 @@ public struct UTF8 : UnicodeCodecType {
     // The first byte to read is located at MSB of `_decodeLookahead`.  Get a
     // representation of the buffer where we can read bytes starting from LSB.
     var buffer = _decodeLookahead.byteSwapped
-    if _slowPath(!UTF8._isValidUTF8(buffer, validBytes: _lookaheadFlags)) {
+    if _slowPath(!UTF8._isValidUTF8(buffer)) {
       // The code unit sequence is ill-formed.  According to Unicode
       // recommendation, replace the maximal subpart of ill-formed sequence
       // with one replacement character.
