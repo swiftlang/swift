@@ -709,6 +709,9 @@ public:
 
 size_t getOffsetOfLine(unsigned LineIndex, StringRef Text);
 size_t getOffsetOfTrimmedLine(unsigned LineIndex, StringRef Text);
+StringRef getTrimmedTextForLine(unsigned LineIndex, StringRef Text);
+size_t getExpandedIndentForLine(unsigned LineIndex, CodeFormatOptions Options,
+                                StringRef Text);
 
 } // namespace ide
 } // namespace swift

@@ -252,10 +252,10 @@ void mergeSplitRanges(unsigned Off1, unsigned Len1, unsigned Off2, unsigned Len2
 struct SwiftSyntaxToken {
   unsigned Column;
   unsigned Length:24;
-  swift::ide::SyntaxNodeKind Kind:8;
+  SyntaxNodeKind Kind:8;
 
   SwiftSyntaxToken(unsigned Column, unsigned Length,
-                   swift::ide::SyntaxNodeKind Kind)
+                   SyntaxNodeKind Kind)
     :Column(Column), Length(Length), Kind(Kind) { }
 };
 
@@ -1478,7 +1478,7 @@ public:
 
     // If having sibling locs to align with, respect siblings.
     if (FC.HasSibling()) {
-      StringRef Line = Doc.getTrimmedTextForLine(LineIndex, Text);
+      StringRef Line = getTrimmedTextForLine(LineIndex, Text);
       StringBuilder Builder;
       FC.padToSiblingColumn(Builder);
       if (FC.needExtraIndentationForSibling()) {
@@ -1495,7 +1495,7 @@ public:
     // Take the current indent position of the outer context, then add another
     // indent level if expected.
     auto LineAndColumn = FC.indentLineAndColumn();
-    size_t ExpandedIndent = Doc.getExpandedIndentForLine(LineAndColumn.first);
+    size_t ExpandedIndent = getExpandedIndentForLine(LineAndColumn.first, FmtOptions, Text);
     auto AddIndentFunc = [&] () {
       auto Width = FmtOptions.UseTabs ? FmtOptions.TabWidth
                                       : FmtOptions.IndentWidth;
@@ -1517,7 +1517,7 @@ public:
     }
 
     // Reformat the specified line with the calculated indent.
-    StringRef Line = Doc.getTrimmedTextForLine(LineIndex, Text);
+    StringRef Line = getTrimmedTextForLine(LineIndex, Text);
     std::string IndentedLine;
     if (FmtOptions.UseTabs)
       IndentedLine.assign(ExpandedIndent / FmtOptions.TabWidth, '\t');
@@ -2135,33 +2135,11 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
     });
 }
 
-size_t SwiftEditorDocument::getExpandedIndentForLine(unsigned LineIndex) {
-  StringRef Text = Impl.EditableBuffer->getBuffer()->getText();
-  size_t LineOffset = getOffsetOfLine(LineIndex, Text);
-
-  // Tab-expand all leading whitespace
-  size_t FirstNonWSOnLine = Text.find_first_not_of(" \t\v\f", LineOffset);
-  size_t Indent = 0;
-  while (LineOffset < Text.size() && LineOffset < FirstNonWSOnLine) {
-    if (Text[LineOffset++] == '\t')
-      Indent += Impl.FormatOptions.TabWidth;
-    else
-      Indent += 1;
-  }
-  return Indent;
-}
-
-StringRef SwiftEditorDocument::getTrimmedTextForLine(unsigned LineIndex, StringRef Text) {
-  size_t LineOffset = getOffsetOfTrimmedLine(LineIndex, Text);
-  size_t LineEnd = Text.find_first_of("\r\n", LineOffset);
-  return Text.slice(LineOffset, LineEnd);
-}
-
 ImmutableTextSnapshotRef SwiftEditorDocument::getLatestSnapshot() const {
   return Impl.EditableBuffer->getSnapshot();
 }
 
-void SwiftEditorDocument::reportDocumentStructure(swift::SourceFile &SrcFile,
+void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
                                                   EditorConsumer &Consumer) {
   ide::SyntaxModelContext ModelContext(SrcFile);
   SwiftDocumentStructureWalker Walker(SrcFile.getASTContext().SourceMgr,

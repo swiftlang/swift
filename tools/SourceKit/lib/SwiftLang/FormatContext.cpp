@@ -43,3 +43,27 @@ size_t swift::ide::getOffsetOfTrimmedLine(unsigned LineIndex, StringRef Text) {
 
   return LineOffset;
 }
+
+llvm::StringRef swift::ide::getTrimmedTextForLine(unsigned LineIndex,
+                                                  StringRef Text) {
+  size_t LineOffset = getOffsetOfTrimmedLine(LineIndex, Text);
+  size_t LineEnd = Text.find_first_of("\r\n", LineOffset);
+  return Text.slice(LineOffset, LineEnd);
+}
+
+size_t swift::ide::getExpandedIndentForLine(unsigned LineIndex,
+                                            CodeFormatOptions Options,
+                                            StringRef Text) {
+  size_t LineOffset = getOffsetOfLine(LineIndex, Text);
+
+  // Tab-expand all leading whitespace
+  size_t FirstNonWSOnLine = Text.find_first_not_of(" \t\v\f", LineOffset);
+  size_t Indent = 0;
+  while (LineOffset < Text.size() && LineOffset < FirstNonWSOnLine) {
+    if (Text[LineOffset++] == '\t')
+      Indent += Options.TabWidth;
+    else
+      Indent += 1;
+  }
+  return Indent;
+}
