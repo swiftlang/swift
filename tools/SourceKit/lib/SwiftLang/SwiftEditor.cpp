@@ -1467,14 +1467,13 @@ public:
 };
 
 class CodeFormatter {
-  SwiftEditorDocument &Doc;
   EditorConsumer &Consumer;
+  CodeFormatOptions &FmtOptions;
 public:
-  CodeFormatter(SwiftEditorDocument &Doc, EditorConsumer &Consumer)
-    :Doc(Doc), Consumer(Consumer) { }
+  CodeFormatter(EditorConsumer &Consumer, CodeFormatOptions &Options)
+    :Consumer(Consumer), FmtOptions(Options) { }
 
   std::pair<SwiftEditorLineRange,StringRef> indent(unsigned LineIndex, FormatContext &FC, StringRef Text) {
-    auto &FmtOptions = Doc.getFormatOptions();
 
     // If having sibling locs to align with, respect siblings.
     if (FC.HasSibling()) {
@@ -1986,7 +1985,8 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   size_t Offset = getOffsetOfTrimmedLine(Line, Text);
   SourceLoc Loc = SM.getLocForBufferStart(BufID).getAdvancedLoc(Offset);
   FormatContext FC = walker.walkToLocation(Loc);
-  CodeFormatter CF(*this, Consumer);
+  CodeFormatOptions Options = getFormatOptions();
+  CodeFormatter CF(Consumer, Options);
   SwiftEditorLineRange LineRange = CF.indent(Line, FC, Text).first;
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
