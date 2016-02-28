@@ -797,7 +797,7 @@ UTF8Decoder.test("Internal/_isValidUTF8") {
       data |= UInt32(cp) << (i*8)
       i += 1
     }
-    expectEqual(FastUTF8._isValidUTF8(data), true, "data=\(asHex(data))")
+    expectEqual(UTF8._isValidUTF8(data), true, "data=\(asHex(data))")
   }
 
   for i in 0..<0xd800 { ensureValid(UnicodeScalar(i)) }
@@ -809,7 +809,7 @@ UTF8Decoder.test("Internal/_isValidUTF8") {
     for cu0 in head {
       for rest in tail {
         let data = rest << 8 | cu0
-        if FastUTF8._isValidUTF8(data) { n += 1 }
+        if UTF8._isValidUTF8(data) { n += 1 }
       }
     }
   }
