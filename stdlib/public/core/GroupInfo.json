@@ -43,6 +43,9 @@
     "Index.swift",
     "Existential.swift",
     {
+      "Type-erased": [
+        "ExistentialCollection.swift"
+      ],
       "Lazy Views": [
         "Algorithm.swift",
         "Flatten.swift",
@@ -55,8 +58,7 @@
         "Slice.swift",
         "SequenceWrapper.swift",
         "LazyCollection.swift",
-        "LazySequence.swift",
-        "ExistentialCollection.swift"],
+        "LazySequence.swift"],
       "Array": [
         "ArrayBody.swift",
         "ArrayBuffer.swift",
