@@ -17,7 +17,6 @@
 
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"

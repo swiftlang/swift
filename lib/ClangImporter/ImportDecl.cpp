@@ -33,7 +33,6 @@
 #include "swift/Config.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
-#include "clang/AST/DeclVisitor.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"

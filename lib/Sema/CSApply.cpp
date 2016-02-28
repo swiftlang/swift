@@ -20,7 +20,6 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"

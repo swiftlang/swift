@@ -17,7 +17,6 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Sema/IDETypeChecking.h"

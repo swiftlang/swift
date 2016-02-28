@@ -13,7 +13,7 @@
 #ifndef SWIFT_SEMA_MISC_DIAGNOSTICS_H
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
-#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 
 namespace swift {
   class AbstractFunctionDecl;

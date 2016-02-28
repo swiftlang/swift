@@ -22,6 +22,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Range.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
@@ -37,55 +38,6 @@ class ASTContext;
 struct PrintOptions;
 class Decl;
 class ClassDecl;
-
-/// The associativity of a binary operator.
-enum class Associativity {
-  /// Non-associative operators cannot be written next to other
-  /// operators with the same precedence.  Relational operators are
-  /// typically non-associative.
-  None,
-
-  /// Left-associative operators associate to the left if written next
-  /// to other left-associative operators of the same precedence.
-  Left,
-
-  /// Right-associative operators associate to the right if written
-  /// next to other right-associative operators of the same precedence.
-  Right
-};
-
-/// The kind of unary operator, if any.
-enum class UnaryOperatorKind : uint8_t {
-  None,
-  Prefix,
-  Postfix
-};
-
-/// Access control levels.
-// These are used in diagnostics, so please do not reorder existing values.
-enum class Accessibility : uint8_t {
-  /// Private access is limited to the current file.
-  Private = 0,
-  /// Internal access is limited to the current module.
-  Internal,
-  /// Public access is not limited.
-  Public
-};
-
-enum class InlineKind : uint8_t {
-  Never = 0,
-  Always = 1
-};
-
-/// This enum represents the possible values of the @effects attribute.
-/// These values are ordered from the strongest guarantee to the weakest,
-/// so please do not reorder existing values.
-enum class EffectsKind : uint8_t {
-  ReadNone,
-  ReadOnly,
-  ReadWrite,
-  Unspecified
-};
 
 class InfixData {
   unsigned Precedence : 8;
@@ -148,20 +100,6 @@ namespace IntrinsicPrecedences {
     MaxPrecedence = 255
   };
 }
-
-  
-enum DeclAttrKind : unsigned {
-#define DECL_ATTR(_, NAME, ...) DAK_##NAME,
-#include "swift/AST/Attr.def"
-  DAK_Count
-};
-
-// Define enumerators for each type attribute, e.g. TAK_weak.
-enum TypeAttrKind {
-#define TYPE_ATTR(X) TAK_##X,
-#include "swift/AST/Attr.def"
-  TAK_Count
-};
 
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {

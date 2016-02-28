@@ -24,7 +24,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"

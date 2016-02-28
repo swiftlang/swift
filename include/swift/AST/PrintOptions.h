@@ -13,7 +13,9 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
-#include "swift/AST/Attr.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/AST/AttrKind.h"
+#include "swift/AST/Identifier.h"
 #include <vector>
 
 namespace swift {

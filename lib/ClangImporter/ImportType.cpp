@@ -32,8 +32,6 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
