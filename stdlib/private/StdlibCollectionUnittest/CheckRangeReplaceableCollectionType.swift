@@ -147,7 +147,7 @@ internal struct InsertContentsOfTest {
     self.newElements = newElements.map(OpaqueValue.init)
     self.indexSelection = indexSelection
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "insertContents(of:at:) test data")
+    self.loc = SourceLoc(file, line, comment: "insert(contentsOf:at:) test data")
   }
 }
 
@@ -501,15 +501,15 @@ self.test("\(testNamePrefix).append()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// appendContents(of:)
+// append(contentsOf:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).appendContents(of:)/semantics") {
+self.test("\(testNamePrefix).append(contentsOf:)/semantics") {
   for test in appendContentsOfTests {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))
-    c.appendContents(of: newElements)
+    c.append(contentsOf: newElements)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },
@@ -572,10 +572,10 @@ self.test("\(testNamePrefix).insert()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// insertContents(of:at:)
+// insert(contentsOf:at:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).insertContents(of:at:)/semantics") {
+self.test("\(testNamePrefix).insert(contentsOf:at:)/semantics") {
   let tests: [InsertContentsOfTest] = [
     InsertContentsOfTest(
       collection: [],
@@ -648,7 +648,7 @@ self.test("\(testNamePrefix).insertContents(of:at:)/semantics") {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))
-    c.insertContents(of: newElements, at: test.indexSelection.indexIn(c))
+    c.insert(contentsOf: newElements, at: test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

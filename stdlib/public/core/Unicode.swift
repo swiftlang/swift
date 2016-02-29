@@ -70,7 +70,10 @@ public protocol UnicodeCodec {
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
-  static func encode(input: UnicodeScalar, output: (CodeUnit) -> Void)
+  static func encode(
+    input: UnicodeScalar,
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+  )
 }
 
 /// A codec for [UTF-8](http://www.unicode.org/glossary/#UTF_8).
@@ -452,7 +455,7 @@ public struct UTF8 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -474,13 +477,13 @@ public struct UTF8 : UnicodeCodec {
         else {
           c >>= 6
           buf1 = (buf1 & 0x3F) | 0x80 // 10xxxxxx
-          put(UInt8(c | 0xF0)) // 11110xxx
+          processCodeUnit(UInt8(c | 0xF0)) // 11110xxx
         }
-        put(buf1)
+        processCodeUnit(buf1)
       }
-      put(buf2)
+      processCodeUnit(buf2)
     }
-    put(buf3)
+    processCodeUnit(buf3)
   }
 
   /// Returns `true` if `byte` is a continuation byte of the form
@@ -619,17 +622,17 @@ public struct UTF16 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
     if scalarValue <= UInt32(UInt16.max) {
-      put(UInt16(scalarValue))
+      processCodeUnit(UInt16(scalarValue))
     }
     else {
       let lead_offset = UInt32(0xd800) - UInt32(0x10000 >> 10)
-      put(UInt16(lead_offset + (scalarValue >> 10)))
-      put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
+      processCodeUnit(UInt16(lead_offset + (scalarValue >> 10)))
+      processCodeUnit(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
   }
 }
@@ -675,9 +678,9 @@ public struct UTF32 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
-    put(UInt32(input))
+    processCodeUnit(UInt32(input))
   }
 }
 
@@ -691,10 +694,13 @@ public func transcode<
   Input : IteratorProtocol,
   InputEncoding : UnicodeCodec,
   OutputEncoding : UnicodeCodec
-  where InputEncoding.CodeUnit == Input.Element>(
-  inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
-  _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
-  stoppingOnError stopOnError: Bool
+  where InputEncoding.CodeUnit == Input.Element
+>(
+  input: Input,
+  from inputEncoding: InputEncoding.Type,
+  to outputEncoding: OutputEncoding.Type,
+  stoppingOnError stopOnError: Bool,
+  sendingOutputTo processCodeUnit: (OutputEncoding.CodeUnit) -> Void
 ) -> Bool {
   var input = input
 
@@ -708,14 +714,14 @@ public func transcode<
   while scalar != .emptyInput {
     switch scalar {
     case .scalarValue(let us):
-      OutputEncoding.encode(us, output: output)
+      OutputEncoding.encode(us, sendingOutputTo: processCodeUnit)
     case .emptyInput:
       _sanityCheckFailure("should not enter the loop when input becomes empty")
     case .error:
       if stopOnError {
         return (hadError: true)
       } else {
-        OutputEncoding.encode("\u{fffd}", output: output)
+        OutputEncoding.encode("\u{fffd}", sendingOutputTo: processCodeUnit)
         hadError = true
       }
     }
@@ -925,12 +931,14 @@ extension UTF16 {
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
   @warn_unused_result
-  public static func measure<
-      Encoding : UnicodeCodec, Input : IteratorProtocol
-      where Encoding.CodeUnit == Input.Element
+  public static func transcodedLength<
+    Encoding : UnicodeCodec, Input : IteratorProtocol
+    where Encoding.CodeUnit == Input.Element
   >(
-    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-  ) -> (Int, Bool)? {
+    of input: Input,
+    decodedAs sourceEncoding: Encoding.Type,
+    repairingIllFormedSequences: Bool
+  ) -> (count: Int, isASCII: Bool)? {
     var input = input
     var count = 0
     var isAscii = true
@@ -947,7 +955,7 @@ extension UTF16 {
       case .emptyInput:
         break loop
       case .error:
-        if !repairIllFormedSequences {
+        if !repairingIllFormedSequences {
           return nil
         }
         isAscii = false
@@ -960,4 +968,30 @@ extension UTF16 {
 
 @available(*, unavailable, renamed="UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
+
+@available(*, unavailable, message="use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'")
+public func transcode<
+  Input : IteratorProtocol,
+  InputEncoding : UnicodeCodec,
+  OutputEncoding : UnicodeCodec
+  where InputEncoding.CodeUnit == Input.Element
+>(
+  inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
+  _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
+  stoppingOnError stopOnError: Bool
+) -> Bool {
+  fatalError("unavailable function can't be called")
+}
+
+extension UTF16 {
+  @available(*, unavailable, message="use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
+  public static func measure<
+    Encoding : UnicodeCodec, Input : IteratorProtocol
+    where Encoding.CodeUnit == Input.Element
+  >(
+    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
+  ) -> (Int, Bool)? {
+    fatalError("unavailable function can't be called")
+  }
+}
 

@@ -106,11 +106,11 @@ public protocol RangeReplaceableCollection : Collection {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  mutating func appendContents<
+  mutating func append<
     S : Sequence
     where
     S.Iterator.Element == Iterator.Element
-  >(of newElements: S)
+  >(contentsOf newElements: S)
 
   /// Insert `newElement` at index `i`.
   ///
@@ -124,9 +124,9 @@ public protocol RangeReplaceableCollection : Collection {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  mutating func insertContents<
+  mutating func insert<
     S : Collection where S.Iterator.Element == Iterator.Element
-  >(of newElements: S, at i: Index)
+  >(contentsOf newElements: S, at i: Index)
 
   /// Remove the element at index `i`.
   ///
@@ -191,7 +191,7 @@ extension RangeReplaceableCollection {
     self.init()
     if count != 0 {
       let elements = Repeated(_repeating: repeatedValue, count: count)
-      appendContents(of: elements)
+      append(contentsOf: elements)
     }
   }
 
@@ -199,16 +199,16 @@ extension RangeReplaceableCollection {
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
     self.init()
-    appendContents(of: elements)
+    append(contentsOf: elements)
   }
 
   public mutating func append(newElement: Iterator.Element) {
     insert(newElement, at: endIndex)
   }
 
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == Iterator.Element
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     let approximateCapacity = self.count +
       numericCast(newElements.underestimatedCount)
     self.reserveCapacity(approximateCapacity)
@@ -223,9 +223,9 @@ extension RangeReplaceableCollection {
     replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
 
-  public mutating func insertContents<
+  public mutating func insert<
     C : Collection where C.Iterator.Element == Iterator.Element
-  >(of newElements: C, at i: Index) {
+  >(contentsOf newElements: C, at i: Index) {
     replaceSubrange(i..<i, with: newElements)
   }
 
@@ -364,7 +364,7 @@ public func +<
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.underestimatedCount))
-  lhs.appendContents(of: rhs)
+  lhs.append(contentsOf: rhs)
   return lhs
 }
 
@@ -376,8 +376,8 @@ public func +<
 >(lhs: S, rhs: C) -> C {
   var result = C()
   result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
-  result.appendContents(of: lhs)
-  result.appendContents(of: rhs)
+  result.append(contentsOf: lhs)
+  result.append(contentsOf: rhs)
   return result
 }
 
@@ -390,7 +390,7 @@ public func +<
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContents(of: rhs)
+  lhs.append(contentsOf: rhs)
   return lhs
 }
 
@@ -416,7 +416,7 @@ extension RangeReplaceableCollection {
   public mutating func removeRange(subRange: Range<Index>) {
   }
 
-  @available(*, unavailable, renamed="appendContents(of:)")
+  @available(*, unavailable, renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence
     where
@@ -425,7 +425,7 @@ extension RangeReplaceableCollection {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="insertContents(of:at:)")
+  @available(*, unavailable, renamed="insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(newElements: C, at i: Index) {

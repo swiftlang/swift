@@ -126,7 +126,12 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
     var decoded = [UInt32]()
     let output: (UInt32) -> Void = { decoded.append($0) }
     let iterator = EOFCountingIterator(utfStr)
-    transcode(codec, UTF32.self, iterator, output, stoppingOnError: true)
+    transcode(
+      iterator,
+      from: codec,
+      to: UTF32.self,
+      stoppingOnError: true,
+      sendingOutputTo: output)
     expectGE(1, iterator.numTimesReturnedEOF)
     if expectedHead != decoded {
       return assertionFailure()
@@ -143,7 +148,12 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
     var decoded = [UInt32]()
     let output: (UInt32) -> Void = { decoded.append($0) }
     let iterator = EOFCountingIterator(utfStr)
-    transcode(codec, UTF32.self, iterator, output, stoppingOnError: false)
+    transcode(
+      iterator,
+      from: codec,
+      to: UTF32.self,
+      stoppingOnError: false,
+      sendingOutputTo: output)
     expectEqual(1, iterator.numTimesReturnedEOF)
     if expected != decoded {
       return assertionFailure()
@@ -184,8 +194,12 @@ func checkEncodeUTF8(expected: [UInt8],
   var encoded = [UInt8]()
   let output: (UInt8) -> Void = { encoded.append($0) }
   let iterator = EOFCountingIterator(scalars)
-  let hadError =
-    transcode(UTF32.self, UTF8.self, iterator, output, stoppingOnError: true)
+  let hadError = transcode(
+    iterator,
+    from: UTF32.self,
+    to: UTF8.self,
+    stoppingOnError: true,
+    sendingOutputTo: output)
   expectFalse(hadError)
   expectGE(1, iterator.numTimesReturnedEOF)
   if expected != encoded {
@@ -1904,11 +1918,13 @@ UTF8Decoder.test("Noncharacters") {
 
 var UTF16Decoder = TestSuite("UTF16Decoder")
 
-UTF16Decoder.test("measure") {
+UTF16Decoder.test("UTF16.transcodedLength") {
   do {
     var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
-    let (count, isASCII) = UTF16.measure(
-      UTF8.self, input: u8.makeIterator(), repairIllFormedSequences: false)!
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u8.makeIterator(),
+      decodedAs: UTF8.self,
+      repairingIllFormedSequences: false)!
     expectEqual(6, count)
     expectTrue(isASCII)
   }
@@ -1916,16 +1932,20 @@ UTF16Decoder.test("measure") {
   do {
     // "€" == U+20AC.
     var u8: [UTF8.CodeUnit] = [ 0xF0, 0xA4, 0xAD, 0xA2 ]
-    let (count, isASCII) = UTF16.measure(
-      UTF8.self, input: u8.makeIterator(), repairIllFormedSequences: false)!
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u8.makeIterator(),
+      decodedAs: UTF8.self,
+      repairingIllFormedSequences: false)!
     expectEqual(2, count)
     expectFalse(isASCII)
   }
 
   do {
     let u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
-    let (count, isASCII) = UTF16.measure(
-      UTF16.self, input: u16.makeIterator(), repairIllFormedSequences: false)!
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u16.makeIterator(),
+      decodedAs: UTF16.self,
+      repairingIllFormedSequences: false)!
     expectEqual(6, count)
     expectTrue(isASCII)
   }
@@ -2095,7 +2115,12 @@ UnicodeAPIs.test("transcode/MutableArray") {
   var input: [UInt16] = [ 0x0041, 0x0042 ]
   var transcoded = [UInt16]()
   let output: (UInt16) -> Void = { transcoded.append($0) }
-  transcode(UTF16.self, UTF16.self, input.makeIterator(), output, stoppingOnError: true)
+  transcode(
+    input.makeIterator(),
+    from: UTF16.self,
+    to: UTF16.self,
+    stoppingOnError: true,
+    sendingOutputTo: output)
   expectEqual(input, transcoded)
 }
 
@@ -2103,7 +2128,12 @@ UnicodeAPIs.test("transcode/ReferenceTypedArray") {
   var input: [UInt16] = [ 0x0041, 0x0042 ]
   var transcoded = [UInt16]()
   let output: (UInt16) -> Void = { transcoded.append($0) }
-  transcode(UTF16.self, UTF16.self, input.makeIterator(), output, stoppingOnError: true)
+  transcode(
+    input.makeIterator(),
+    from: UTF16.self,
+    to: UTF16.self,
+    stoppingOnError: true,
+    sendingOutputTo: output)
   expectEqual(input, transcoded)
 }
 
@@ -2123,8 +2153,12 @@ class NonContiguousNSString : NSString {
     var encoded = [UInt16]()
     let output: (UInt16) -> Void = { encoded.append($0) }
     let iterator = utf8.makeIterator()
-    let hadError =
-      transcode(UTF8.self, UTF16.self, iterator, output, stoppingOnError: true)
+    let hadError = transcode(
+      iterator,
+      from: UTF8.self,
+      to: UTF16.self,
+      stoppingOnError: true,
+      sendingOutputTo: output)
     expectFalse(hadError)
     self.init(encoded)
   }
@@ -2138,8 +2172,12 @@ class NonContiguousNSString : NSString {
     var encoded = [UInt16]()
     let output: (UInt16) -> Void = { encoded.append($0) }
     let iterator = scalars.makeIterator()
-    let hadError =
-      transcode(UTF32.self, UTF16.self, iterator, output, stoppingOnError: true)
+    let hadError = transcode(
+      iterator,
+      from: UTF32.self,
+      to: UTF16.self,
+      stoppingOnError: true,
+      sendingOutputTo: output)
     expectFalse(hadError)
     self.init(encoded)
   }
@@ -2195,7 +2233,12 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     let output: (UInt16) -> Void = { backingStorage.append($0) }
 
     var iterator = test.scalars.makeIterator()
-    transcode(UTF32.self, UTF16.self, iterator, output, stoppingOnError: false)
+    transcode(
+      iterator,
+      from: UTF32.self,
+      to: UTF16.self,
+      stoppingOnError: false,
+      sendingOutputTo: output)
 
     backingStorage.withUnsafeBufferPointer {
       (ptr) -> Void in
@@ -2216,7 +2259,12 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     let output: (UInt8) -> Void = { expected.append($0) }
     var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
     var iterator = expectedScalars.makeIterator()
-    transcode(UTF32.self, UTF8.self, iterator, output, stoppingOnError: false)
+    transcode(
+      iterator,
+      from: UTF32.self,
+      to: UTF8.self,
+      stoppingOnError: false,
+      sendingOutputTo: output)
 
     checkUTF8View(expected, subject, test.loc.withCurrentLoc())
   }
@@ -2262,7 +2310,12 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
       let output: (UInt8) -> Void = { expected.append($0) }
       var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
       var iterator = expectedScalars.makeIterator()
-      transcode(UTF32.self, UTF8.self, iterator, output, stoppingOnError: false)
+      transcode(
+        iterator,
+        from: UTF32.self,
+        to: UTF8.self,
+        stoppingOnError: false,
+        sendingOutputTo: output)
 
       var nss = NonContiguousNSString(test.encoded)
       verifyThatStringIsOpaqueForCoreFoundation(nss)
@@ -2330,7 +2383,12 @@ StringCookedViews.test("UTF16") {
     let output: (UInt16) -> Void = { expected.append($0) }
     var expectedScalars = test.scalars
     var iterator = expectedScalars.makeIterator()
-    transcode(UTF32.self, UTF16.self, iterator, output, stoppingOnError: false)
+    transcode(
+      iterator,
+      from: UTF32.self,
+      to: UTF16.self,
+      stoppingOnError: false,
+      sendingOutputTo: output)
 
     var nss = NonContiguousNSString(test.scalars)
     checkUTF16View(expected, nss as String, test.loc.withCurrentLoc())
@@ -2342,7 +2400,12 @@ StringCookedViews.test("UTF16") {
     let output: (UInt16) -> Void = { expected.append($0) }
     var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
     var iterator = expectedScalars.makeIterator()
-    transcode(UTF32.self, UTF16.self, iterator, output, stoppingOnError: false)
+    transcode(
+      iterator,
+      from: UTF32.self,
+      to: UTF16.self,
+      stoppingOnError: false,
+      sendingOutputTo: output)
 
     checkUTF16View(expected, subject, test.loc.withCurrentLoc())
   }

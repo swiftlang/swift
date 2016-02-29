@@ -52,7 +52,7 @@ public func run_PopFrontArrayGeneric(N: Int) {
   for _ in 1...20*N {
     for _ in 1...reps {
       var result = 0
-      a.appendContents(of: orig)
+      a.append(contentsOf: orig)
       while a.count != 0 {
         result += a[0]
         _arrayReplace(&a._buffer, 0..<1, EmptyCollection())

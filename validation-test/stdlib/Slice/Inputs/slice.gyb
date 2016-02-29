@@ -12,8 +12,8 @@ do {
   func makeCollection(elements: [OpaqueValue<Int>])
     -> ${Wrapper}<${Base}<OpaqueValue<Int>>> {
     var baseElements = prefix.map(OpaqueValue.init)
-    baseElements.appendContents(of: elements)
-    baseElements.appendContents(of: suffix.map(OpaqueValue.init))
+    baseElements.append(contentsOf: elements)
+    baseElements.append(contentsOf: suffix.map(OpaqueValue.init))
     let base = ${Base}(elements: baseElements)
     let startIndex = base.startIndex.advanced(by: numericCast(prefix.count))
     let endIndex = base.startIndex.advanced(
@@ -26,8 +26,8 @@ do {
   func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
     -> ${Wrapper}<${Base}<MinimalEquatableValue>> {
     var baseElements = prefix.map(MinimalEquatableValue.init)
-    baseElements.appendContents(of: elements)
-    baseElements.appendContents(of: suffix.map(MinimalEquatableValue.init))
+    baseElements.append(contentsOf: elements)
+    baseElements.append(contentsOf: suffix.map(MinimalEquatableValue.init))
     let base = ${Base}(elements: baseElements)
     let startIndex = base.startIndex.advanced(by: numericCast(prefix.count))
     let endIndex = base.startIndex.advanced(
@@ -40,8 +40,8 @@ do {
   func makeCollectionOfComparable(elements: [MinimalComparableValue])
     -> ${Wrapper}<${Base}<MinimalComparableValue>> {
     var baseElements = prefix.map(MinimalComparableValue.init)
-    baseElements.appendContents(of: elements)
-    baseElements.appendContents(of: suffix.map(MinimalComparableValue.init))
+    baseElements.append(contentsOf: elements)
+    baseElements.append(contentsOf: suffix.map(MinimalComparableValue.init))
     let base = ${Base}(elements: baseElements)
     let startIndex = base.startIndex.advanced(by: numericCast(prefix.count))
     let endIndex = base.startIndex.advanced(

@@ -396,7 +396,7 @@ extension Sequence {
   ) rethrows -> [S.${GElement}] {
     var result: [S.${GElement}] = []
     for element in self {
-      result.appendContents(of: try transform(element))
+      result.append(contentsOf: try transform(element))
     }
     return result
   }

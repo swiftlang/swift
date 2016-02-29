@@ -277,16 +277,16 @@ extension String.CharacterView : RangeReplaceableCollection {
     switch c._representation {
     case .small(let _63bits):
       let bytes = Character._smallValue(_63bits)
-      _core.appendContents(of: Character._SmallUTF16(bytes))
+      _core.append(contentsOf: Character._SmallUTF16(bytes))
     case .large(_):
       _core.append(String(c)._core)
     }
   }
 
   /// Append the elements of `newElements` to `self`.
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == Character
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     reserveCapacity(_core.count + newElements.underestimatedCount)
     for c in newElements {
       self.append(c)
@@ -298,7 +298,7 @@ extension String.CharacterView : RangeReplaceableCollection {
     S : Sequence where S.Iterator.Element == Character
   >(_ characters: S) {
     self = String.CharacterView()
-    self.appendContents(of: characters)
+    self.append(contentsOf: characters)
   }
 }
 
@@ -326,7 +326,7 @@ extension String.CharacterView {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="appendContents(of:)")
+  @available(*, unavailable, renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {

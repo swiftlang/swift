@@ -33,11 +33,6 @@ public struct UnicodeScalar :
     self = value
   }
 
-  /// Creates an instance of the NUL scalar value.
-  public init() {
-    self._value = 0
-  }
-
   /// Create an instance with numeric value `v`.
   ///
   /// - Precondition: `v` is a valid Unicode scalar value.
@@ -83,7 +78,7 @@ public struct UnicodeScalar :
   /// - parameter forceASCII: If `true`, forces most values into a numeric
   ///   representation.
   @warn_unused_result
-  public func escape(asASCII forceASCII: Bool) -> String {
+  public func escaped(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
       let nibble = v & 15
       if nibble < 10 {
@@ -203,11 +198,11 @@ public struct UnicodeScalar :
 extension UnicodeScalar : CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
-    return "\"\(escape(asASCII: false))\""
+    return "\"\(escaped(asASCII: false))\""
   }
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "\"\(escape(asASCII: true))\""
+    return "\"\(escaped(asASCII: true))\""
   }
 }
 
@@ -323,5 +318,18 @@ public // SPI(SwiftExperimental)
 func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
+}
+
+extension UnicodeScalar {
+  /// Creates an instance of the NUL scalar value.
+  @available(*, unavailable, message="use the 'UnicodeScalar(\"\\0\")'")
+  public init() {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="escaped")
+  public func escape(asASCII forceASCII: Bool) -> String {
+    fatalError("unavailable function can't be called")
+  }
 }
 

@@ -336,17 +336,19 @@ public struct _StringCore {
           start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
           count: count
         ) {
-          Encoding.encode(UnicodeScalar(UInt32(x)), output: output)
+          Encoding.encode(UnicodeScalar(UInt32(x)), sendingOutputTo: output)
         }
       }
       else {
-        let hadError = transcode(UTF16.self, encoding,
+        let hadError = transcode(
           UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
             count: count
           ).makeIterator(),
-          output,
-          stoppingOnError: true
+          from: UTF16.self,
+          to: encoding,
+          stoppingOnError: true,
+          sendingOutputTo: output
         )
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
       }
@@ -652,9 +654,9 @@ extension _StringCore : RangeReplaceableCollection {
             : isRepresentableAsASCII() && !newElements.contains { $0 > 0x7f } ? 1
             : 2
         ))
-      r.appendContents(of: self[0..<bounds.startIndex])
-      r.appendContents(of: newElements)
-      r.appendContents(of: self[bounds.endIndex..<count])
+      r.append(contentsOf: self[0..<bounds.startIndex])
+      r.append(contentsOf: newElements)
+      r.append(contentsOf: self[bounds.endIndex..<count])
       self = r
     }
   }
@@ -677,9 +679,9 @@ extension _StringCore : RangeReplaceableCollection {
       minElementWidth: 1)
   }
 
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == UTF16.CodeUnit
-  >(of s: S) {
+  >(contentsOf s: S) {
     var width = elementWidth
     if width == 1 {
       if let hasNonAscii = s._preprocessingPass({
