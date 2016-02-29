@@ -71,10 +71,7 @@ def main():
         description="""
 repositories.
 
-By default, updates your checkouts of Swift, and LLDB.""")
-    parser.add_argument("-a", "--all",
-        help="also update checkouts of LLVM, and Clang",
-        action="store_true")
+By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument("--clone",
         help="Obtain Sources for Swift and Related Projects",
         action="store_true")
@@ -93,9 +90,8 @@ By default, updates your checkouts of Swift, and LLDB.""")
         obtain_additional_swift_sources(clone_with_ssh, branch)
         return 0
 
-    if args.all:
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"), branch)
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"), branch)
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"), branch)
 
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"), branch)
     update_working_copy(
