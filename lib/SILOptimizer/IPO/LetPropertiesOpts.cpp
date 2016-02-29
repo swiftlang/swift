@@ -246,8 +246,9 @@ static bool compareInsnSequences(SmallVectorImpl<SILInstruction *> &LHS,
 /// initializing a given property.
 SILValue findStoredValue(SILFunction *Init, VarDecl *Property,
                          SmallVectorImpl<SILInstruction *> &Insns) {
-  for (auto &BB: *Init) {
-    for (auto &I: BB) {
+  SILValue ResultValue;
+  for (auto &BB : *Init) {
+    for (auto &I : BB) {
       if (auto *RI = dyn_cast<ReturnInst>(&I)) {
         if (auto *SI = dyn_cast<StructInst>(RI->getOperand())) {
           auto Value = SI->getFieldValue(Property);
@@ -268,22 +269,24 @@ SILValue findStoredValue(SILFunction *Init, VarDecl *Property,
         auto REAI = dyn_cast<RefElementAddrInst>(Dest);
         if (!REAI || REAI->getField() != Property)
             continue;
-
+        // Bail, if it is not the only assignment to the
+        // required property.
+        if (ResultValue)
+          return SILValue();
         auto Value = SI->getSrc();
         SmallVector<SILInstruction *, 8> ReverseInsns;
-        // ReverseInsns.push_back(SI);
         if (!analyzeStaticInitializer(Value, ReverseInsns))
           return SILValue();
         // Produce a correct order of instructions.
         while (!ReverseInsns.empty()) {
           Insns.push_back(ReverseInsns.pop_back_val());
         }
-        return Value;
+        ResultValue = Value;
       }
     }
   }
 
-  return SILValue();
+  return ResultValue;
 }
 
 /// Try to find a sequence of instructions which initializes
