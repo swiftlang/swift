@@ -787,31 +787,40 @@ UnicodeScalarTests.test("init") {
 
 var UTF8Decoder = TestSuite("UTF8Decoder")
 
-UTF8Decoder.test("Internal/_numTrailingBytes") {
-  for i in UInt8(0x00)...UInt8(0x7f) {
-    expectEqual(0, UTF8._numTrailingBytes(i), "i=\(i)")
+UTF8Decoder.test("Internal/_isValidUTF8") {
+
+  // Ensure we accept all valid scalars
+  func ensureValid(scalar: UnicodeScalar) {
+    var data: UInt32 = 0
+    var i: UInt32 = 0
+    Swift.UTF8.encode(scalar) { cp in
+      data |= UInt32(cp) << (i*8)
+      i += 1
+    }
+    expectEqual(UTF8._isValidUTF8(data), true, "data=\(asHex(data))")
   }
-  for i in UInt8(0x80)...UInt8(0xc1) {
-    expectEqual(4, UTF8._numTrailingBytes(i), "i=\(i)")
+
+  for i in 0..<0xd800 { ensureValid(UnicodeScalar(i)) }
+  for i in 0xe000...0x10ffff { ensureValid(UnicodeScalar(i)) }
+
+  // Ensure we have no false positives
+  var n = 0
+  func countValidSequences(head head: Range<UInt32>, tail: Range<UInt32>) {
+    for cu0 in head {
+      for rest in tail {
+        let data = rest << 8 | cu0
+        if UTF8._isValidUTF8(data) { n += 1 }
+      }
+    }
   }
-  for i in UInt8(0xc2)...UInt8(0xdf) {
-    expectEqual(1, UTF8._numTrailingBytes(i), "i=\(i)")
-  }
-  for i in UInt8(0xe0)...UInt8(0xef) {
-    expectEqual(2, UTF8._numTrailingBytes(i), "i=\(i)")
-  }
-  for i in UInt8(0xf0)...UInt8(0xf4) {
-    expectEqual(3, UTF8._numTrailingBytes(i), "i=\(i)")
-  }
-  for i in UInt8(0xf5)...UInt8(0xfe) {
-    expectEqual(4, UTF8._numTrailingBytes(i), "i=\(i)")
-  }
-  // Separate test for 0xff because of:
-  // <rdar://problem/17376512> Range UInt8(0x00)...UInt8(0xff) invokes a
-  // runtime trap
-  var i = UInt8(0xff)
-  expectEqual(4, UTF8._numTrailingBytes(i), "i=\(i)")
+
+  countValidSequences(head: 0x00...0x7f, tail: 0...0)
+  countValidSequences(head: 0xc0...0xdf, tail: 0...0xff)
+  countValidSequences(head: 0xe0...0xef, tail: 0...0xffff)
+  countValidSequences(head: 0xf0...0xf7, tail: 0...0xffffff)
+  expectEqual(n, 0x10f800, "n=\(asHex(n))") // 0x10ffff minus surrogates
 }
+
 
 UTF8Decoder.test("Empty") {
   expectTrue(checkDecodeUTF8([], [], []))
