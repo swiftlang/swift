@@ -2024,6 +2024,13 @@ auto ClangImporter::Implementation::importFullName(
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
     bool skipCustomName = false;
 
+    // Parse the name.
+    SmallVector<StringRef, 4> argumentNames;
+    bool isFunctionName;
+    StringRef baseName = parseDeclName(nameAttr->getName(), argumentNames,
+                                       isFunctionName);
+    if (baseName.empty()) return result;
+
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be
@@ -2032,7 +2039,7 @@ auto ClangImporter::Implementation::importFullName(
     auto method = dyn_cast<clang::ObjCMethodDecl>(D);
     if (method) {
       unsigned initPrefixLength;
-      if (nameAttr->getName().startswith("init(")) {
+      if (baseName == "init") {
         if (!shouldImportAsInitializer(method, initPrefixLength,
                                        result.InitKind)) {
           // We cannot import this as an initializer anyway.
@@ -2054,12 +2061,6 @@ auto ClangImporter::Implementation::importFullName(
     }
 
     if (!skipCustomName) {
-      SmallVector<StringRef, 4> argumentNames;
-      bool isFunctionName;
-      StringRef baseName = parseDeclName(nameAttr->getName(), argumentNames,
-                                         isFunctionName);
-      if (baseName.empty()) return result;
-      
       result.HasCustomName = true;
       result.Imported = formDeclName(SwiftContext, baseName, argumentNames,
                                      isFunctionName);
