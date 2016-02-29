@@ -89,14 +89,14 @@ function(_add_variant_c_compile_link_flags)
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
       
-    if(analyze_code_coverage)
+    if(CFLAGS_ANALYZE_CODE_COVERAGE)
       list(APPEND result "-fprofile-instr-generate"
                          "-fcoverage-mapping")
     endif()
+  endif()
 
-    if(enable_lto)
-      list(APPEND result "-flto")
-    endif()
+  if(CFLAGS_ENABLE_LTO)
+    list(APPEND result "-flto")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -117,7 +117,7 @@ function(_add_variant_c_compile_flags)
     ARCH "${CFLAGS_ARCH}"
     BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${CFLAGS_ENABLE_ASSERTIONS}"
-    SWIFT_ENABLE_LTO "${SWIFT_ENABLE_LTO}"
+    ENABLE_LTO "${SWIFT_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE FALSE
     DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME result)
