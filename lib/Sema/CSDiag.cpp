@@ -986,7 +986,8 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 /// argument type, decide whether the param and actual arg have the same shape
 /// and equal fixed type portions, and return by reference each archetype and
 /// the matching portion of the actual arg type where that archetype appears.
-static bool findGenericSubstitutions(DeclContext *dc, Type paramType, Type actualArgType,
+static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
+                                     Type actualArgType,
                                      TypeSubstitutionMap &archetypesMap) {
   class GenericVisitor : public TypeMatcher<GenericVisitor> {
     DeclContext *dc;
@@ -1133,8 +1134,15 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
       bool matched;
       if (paramType->is<UnresolvedType>() || rArgType->hasTypeVariable())
         matched = false;
-      else
-        matched = findGenericSubstitutions(dc, paramType, rArgType, archetypesMap);
+      else {
+        auto matchType = paramType;
+        // If the parameter is an inout type, and we have a proper lvalue, match
+        // against the type contained therein.
+        if (paramType->is<InOutType>() && argType->is<LValueType>())
+          matchType = matchType->getInOutObjectType();
+        matched = findGenericSubstitutions(dc, matchType , rArgType,
+                                           archetypesMap);
+      }
       
       if (matched) {
         for (auto pair : archetypesMap) {

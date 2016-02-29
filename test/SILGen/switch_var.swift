@@ -596,7 +596,7 @@ func test_multiple_patterns4() {
   }
 }
 
-func aaa(inout x x: Int) {}
+func aaa(x x: inout Int) {}
 
 // CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns5FT_T_ : $@convention(thin) () -> () {
 func test_multiple_patterns5() {

@@ -732,3 +732,15 @@ enum AssocTest {
 
 if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '==' cannot be applied to two 'AssocTest' operands}}
 // expected-note @-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
+
+
+// <rdar://problem/24251022> Swift 2: Bad Diagnostic Message When Adding Different Integer Types
+func r24251022() {
+  var a = 1
+  var b: UInt32 = 2
+  a += a +
+    b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
+}
+
+
+
