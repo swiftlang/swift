@@ -15,6 +15,10 @@
 #include <atomic>
 #include <stdint.h>
 
+#if defined(__FreeBSD__)
+#include <stdio.h>
+#endif
+
 /// This is a node in a concurrent linked list.
 template <class ElemTy> struct ConcurrentListNode {
   ConcurrentListNode(ElemTy Elem) : Payload(Elem), Next(nullptr) {}
