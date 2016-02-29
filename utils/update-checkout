@@ -24,6 +24,15 @@ from SwiftBuildSupport import (
     check_output,
 )
 
+REPOSITORIES = {
+    'llvm': 'apple/swift-llvm',
+    'clang': 'apple/swift-clang',
+    'swift': 'apple/swift-swift',
+    'lldb': 'apple/swift-lldb',
+    'cmark': 'apple/swift-cmark',
+    'swift-integration-tests': 'apple/swift-integration-tests',
+}
+
 def update_working_copy(repo_path, branch):
     if not os.path.isdir(repo_path):
         return
@@ -44,15 +53,12 @@ def update_working_copy(repo_path, branch):
         check_call(["git", "fetch"])
         check_call(["git", "rebase", "FETCH_HEAD"])
 
-def obtain_additional_swift_sources(with_ssh, branch, skip_history):
-    additional_repos = {
-        'llvm': 'apple/swift-llvm',
-        'clang': 'apple/swift-clang',
-        'lldb': 'apple/swift-lldb',
-        'cmark': 'apple/swift-cmark',
-        'swift-integration-tests': 'apple/swift-integration-tests',
-    }
-    for dir_name, repo in additional_repos.items():
+def obtain_additional_swift_sources(
+    with_ssh, branch, skip_history, skip_repositories):
+    for dir_name, repo in REPOSITORIES.items():
+        if dir_name in skip_repositories:
+            print("--- Skipping '" + dir_name + "' ---")
+            continue
         with WorkingDirectory(SWIFT_SOURCE_ROOT):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
@@ -84,6 +90,11 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument("--skip-history",
         help="Skip histories when obtain sources",
         action="store_true")
+    parser.add_argument("--skip-repository",
+        metavar="DIRECTORY",
+        default=[],
+        help="Skip the specified repository",
+        action="append")
     parser.add_argument("--branch",
         help="Obtain Sources for specific branch")
     args = parser.parse_args()
@@ -94,17 +105,14 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     branch = args.branch
 
     if clone or clone_with_ssh:
-        obtain_additional_swift_sources(clone_with_ssh, branch, skip_history)
+        obtain_additional_swift_sources(
+            clone_with_ssh, branch, skip_history, args.skip_repository)
 
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"), branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"), branch)
-
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"), branch)
-    update_working_copy(
-        os.path.join(SWIFT_SOURCE_ROOT, "swift", "benchmark", "PerfTestSuite"), branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "cmark"), branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"), branch)
-    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-integration-tests"), branch)
+    for dir_name, _ in REPOSITORIES.items():
+        if dir_name in args.skip_repository:
+            print("--- Skipping '" + dir_name + "' ---")
+            continue
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name), branch)
 
     return 0
 
