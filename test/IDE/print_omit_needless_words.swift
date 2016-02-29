@@ -306,6 +306,9 @@
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
 
+// Property-name sensitivity in the base name "Self" stripping.
+// CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
+
 // Protocols as contexts
 // CHECK-OMIT-NEEDLESS-WORDS: protocol OMWLanding {
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func flip()
