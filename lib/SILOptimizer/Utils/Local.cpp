@@ -1176,8 +1176,14 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
   // blocks.
   for (SILBasicBlock *FrontierPred : LiveOutBlocks) {
     auto *T = FrontierPred->getTerminator();
-    for (unsigned i = 0, e = T->getSuccessors().size(); i != e; ++i) {
-      if (UnhandledFrontierBlocks.count(T->getSuccessors()[i])) {
+    // Cache the successor blocks because splitting critical edges invalidates
+    // the successor list iterator of T.
+    llvm::SmallVector<SILBasicBlock *, 4> SuccBlocks;
+    for (const SILSuccessor &Succ : T->getSuccessors())
+      SuccBlocks.push_back(Succ);
+
+    for (unsigned i = 0, e = SuccBlocks.size(); i != e; ++i) {
+      if (UnhandledFrontierBlocks.count(SuccBlocks[i])) {
         assert(isCriticalEdge(T, i) && "actually not a critical edge?");
         SILBasicBlock *NewBlock = splitEdge(T, i);
         // The single terminator instruction is part of the frontier.
