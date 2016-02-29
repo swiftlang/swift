@@ -862,7 +862,6 @@ namespace {
       }
 
       auto dataPtr = emitROData(ForMetaClass);
-      dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
 
       llvm::Constant *fields[] = {
         rootPtr,
@@ -1042,12 +1041,15 @@ namespace {
 
       return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
     }
-    
+
     llvm::Constant *emitROData(ForMetaClass_t forMeta) {
       auto fields = emitRODataFields(forMeta);
-      
+
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
-      return buildGlobalVariable(fields, dataSuffix);
+      llvm::Constant *DataVar = buildGlobalVariable(fields, dataSuffix);
+      return llvm::ConstantExpr::getBitCast(
+          DataVar,
+          IGM.getModule()->getTypeByName("struct._class_ro_t")->getPointerTo());
     }
 
   private:
