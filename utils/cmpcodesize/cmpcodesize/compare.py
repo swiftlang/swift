@@ -51,7 +51,7 @@ SortedPrefixes = sorted(Prefixes)
 SortedInfixes = sorted(Infixes)
 
 
-def addFunction(sizes, function, start_addr, end_addr, group_by_prefix):
+def add_function(sizes, function, start_addr, end_addr, group_by_prefix):
     if not function or start_addr is None or end_addr is None:
         return
 
@@ -85,7 +85,7 @@ def flatten(*args):
             yield x
 
 
-def readSizes(sizes, file_name, function_details, group_by_prefix):
+def read_sizes(sizes, file_name, function_details, group_by_prefix):
     # Check if multiple architectures are supported by the object file.
     # Prefer arm64 if available.
     architectures = subprocess.check_output(["otool", "-V", "-f", file_name]).split("\n")
@@ -134,7 +134,7 @@ def readSizes(sizes, file_name, function_details, group_by_prefix):
             sectionMatch = sectionPattern.match(line)
             if labelMatch:
                 funcName = labelMatch.group(1)
-                addFunction(sizes, currFunc, start_addr, end_addr, group_by_prefix)
+                add_function(sizes, currFunc, start_addr, end_addr, group_by_prefix)
                 currFunc = funcName
                 start_addr = None
                 end_addr = None
@@ -146,10 +146,10 @@ def readSizes(sizes, file_name, function_details, group_by_prefix):
                 if sectName == "__textcoal_nt":
                     sectName = "__text"
 
-    addFunction(sizes, currFunc, start_addr, end_addr, group_by_prefix)
+    add_function(sizes, currFunc, start_addr, end_addr, group_by_prefix)
 
 
-def compareSizes(old_sizes, new_sizes, name_key, title):
+def compare_sizes(old_sizes, new_sizes, name_key, title):
     oldSize = old_sizes[name_key]
     newSize = new_sizes[name_key]
     if oldSize is not None and newSize is not None:
@@ -160,13 +160,13 @@ def compareSizes(old_sizes, new_sizes, name_key, title):
         print("%-26s%16s: %8d  %8d  %6s" % (title, name_key, oldSize, newSize, perc))
 
 
-def compareSizesOfFile(old_files, new_files, all_sections, list_categories):
+def compare_sizes_of_file(old_files, new_files, all_sections, list_categories):
     old_sizes = collections.defaultdict(int)
     new_sizes = collections.defaultdict(int)
     for oldFile in old_files:
-        readSizes(old_sizes, oldFile, list_categories, True)
+        read_sizes(old_sizes, oldFile, list_categories, True)
     for newFile in new_files:
-        readSizes(new_sizes, newFile, list_categories, True)
+        read_sizes(new_sizes, newFile, list_categories, True)
 
     if len(old_files) == 1 and len(new_files) == 1:
         oldBase = os.path.basename(old_files[0])
@@ -177,43 +177,43 @@ def compareSizesOfFile(old_files, new_files, all_sections, list_categories):
     else:
         title = "old-new"
 
-    compareSizes(old_sizes, new_sizes, "__text", title)
+    compare_sizes(old_sizes, new_sizes, "__text", title)
     if list_categories:
         prev = None
         for categoryName in sorted(Prefixes.values()) + sorted(Infixes.values()) + ["Unknown"]:
             if categoryName != prev:
-                compareSizes(old_sizes, new_sizes, categoryName, "")
+                compare_sizes(old_sizes, new_sizes, categoryName, "")
             prev = categoryName
 
     if all_sections:
         sectionTitle = "    section"
-        compareSizes(old_sizes, new_sizes, "__textcoal_nt", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__stubs", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__const", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__cstring", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__objc_methname", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__const", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__objc_const", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__data", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__swift1_proto", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__common", sectionTitle)
-        compareSizes(old_sizes, new_sizes, "__bss", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__textcoal_nt", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__stubs", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__const", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__cstring", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__objc_methname", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__const", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__objc_const", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__data", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__swift1_proto", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__common", sectionTitle)
+        compare_sizes(old_sizes, new_sizes, "__bss", sectionTitle)
 
 
-def listFunctionSizes(size_array):
+def list_function_sizes(size_array):
     for pair in sorted(size_array, key=itemgetter(1)):
         name = pair[0]
         size = pair[1]
         yield "%8d %s" % (size, name)
 
 
-def compareFunctionSizes(old_files, new_files):
+def compare_function_sizes(old_files, new_files):
     old_sizes = collections.defaultdict(int)
     new_sizes = collections.defaultdict(int)
     for name in old_files:
-        readSizes(old_sizes, name, True, False)
+        read_sizes(old_sizes, name, True, False)
     for name in new_files:
-        readSizes(new_sizes, name, True, False)
+        read_sizes(new_sizes, name, True, False)
 
     onlyInFile1 = []
     onlyInFile2 = []
@@ -239,13 +239,13 @@ def compareFunctionSizes(old_files, new_files):
 
     if onlyInFile1:
         print("Only in old file(s)")
-        print(os.linesep.join(listFunctionSizes(onlyInFile1)))
+        print(os.linesep.join(list_function_sizes(onlyInFile1)))
         print("Total size of functions only in old file: {}".format(onlyInFile1Size))
         print()
 
     if onlyInFile2:
         print("Only in new files(s)")
-        print(os.linesep.join(listFunctionSizes(onlyInFile2)))
+        print(os.linesep.join(list_function_sizes(onlyInFile2)))
         print("Total size of functions only in new file: {}".format(onlyInFile2Size))
         print()
 

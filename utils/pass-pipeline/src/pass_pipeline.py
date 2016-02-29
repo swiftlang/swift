@@ -21,7 +21,7 @@ class PassList(object):
     def __iter__(self):
         return self.transforms.__iter__()
 
-    def addPass(self, p):
+    def add_pass(self, p):
         if isinstance(p, list):
             p = PassList(p)
         self.transforms.append(p)
@@ -45,8 +45,8 @@ class PassPipeline(object):
         self.action = action
         self.pass_list = PassList([])
 
-    def addPass(self, p):
-        self.pass_list.addPass(p)
+    def add_pass(self, p):
+        self.pass_list.add_pass(p)
 
     def __repr__(self):
         return "<passpipeline values=%s>" % self.pass_list

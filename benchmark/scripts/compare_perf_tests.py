@@ -35,13 +35,13 @@ IsTime = 1
 ShowSpeedup = 1
 PrintAllScores = 0
 
-def parseInt(word):
+def parse_int(word):
     try:
         return int(word)
     except:
         raise Exception("Expected integer value, not " + word)
 
-def getScores(fname):
+def get_scores(fname):
     scores = {}
     worstscores = {}
     nums = {}
@@ -65,8 +65,8 @@ def getScores(fname):
             if not m.group(KEYGROUP) in scores:
                 scores[m.group(KEYGROUP)] = []
                 worstscores[m.group(KEYGROUP)] = []
-            scores[m.group(KEYGROUP)].append(parseInt(m.group(BESTGROUP)))
-            worstscores[m.group(KEYGROUP)].append(parseInt(m.group(WORSTGROUP)))
+            scores[m.group(KEYGROUP)].append(parse_int(m.group(BESTGROUP)))
+            worstscores[m.group(KEYGROUP)].append(parse_int(m.group(WORSTGROUP)))
             if is_total:
                 nums[m.group(KEYGROUP)] = ""
             else:
@@ -77,10 +77,10 @@ def getScores(fname):
         f.close()
     return scores, worstscores, runs, nums
 
-def isMaxScore(newscore, maxscore, invert):
+def is_max_score(newscore, maxscore, invert):
     return not maxscore or (newscore > maxscore if not invert else newscore < maxscore)
 
-def compareScores(key, score1, worstsample1, score2, worstsample2, runs, num):
+def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
     print num.rjust(3),
     print key.ljust(25),
     bestscore1 = None
@@ -91,25 +91,25 @@ def compareScores(key, score1, worstsample1, score2, worstsample2, runs, num):
     minworst = not minbest
     r = 0
     for score in score1:
-        if isMaxScore(newscore=score, maxscore=bestscore1, invert=minbest):
+        if is_max_score(newscore=score, maxscore=bestscore1, invert=minbest):
             bestscore1 = score
-        if isMaxScore(newscore=score, maxscore=worstscore1, invert=minworst):
+        if is_max_score(newscore=score, maxscore=worstscore1, invert=minworst):
             worstscore1 = score
         if PrintAllScores:
             print ("%d" % score).rjust(16),
     for score in worstsample1:
-        if isMaxScore(newscore=score, maxscore=worstscore1, invert=minworst):
+        if is_max_score(newscore=score, maxscore=worstscore1, invert=minworst):
             worstscore1 = score
     for score in score2:
-        if isMaxScore(newscore=score, maxscore=bestscore2, invert=minbest):
+        if is_max_score(newscore=score, maxscore=bestscore2, invert=minbest):
             bestscore2 = score
-        if isMaxScore(newscore=score, maxscore=worstscore2, invert=minworst):
+        if is_max_score(newscore=score, maxscore=worstscore2, invert=minworst):
             worstscore2 = score
         if PrintAllScores:
             print ("%d" % score).rjust(16),
         r += 1
     for score in worstsample2:
-        if isMaxScore(newscore=score, maxscore=worstscore2, invert=minworst):
+        if is_max_score(newscore=score, maxscore=worstscore2, invert=minworst):
             worstscore2 = score
     while r < runs:
         if PrintAllScores:
@@ -136,20 +136,20 @@ def compareScores(key, score1, worstsample1, score2, worstsample2, runs, num):
     # check if the worst->best interval for each configuration overlap.
     if minbest:
         if (bestscore1 < bestscore2 and bestscore2 < worstscore1) \
-        or (bestscore2 < bestscore1 and bestscore1 < worstscore2):
+           or (bestscore2 < bestscore1 and bestscore1 < worstscore2):
             print "(?)",
     else:
         if (worstscore1 < worstscore2 and worstscore2 < bestscore1) \
-        or (worstscore2 < worstscore1 and worstscore1 < bestscore2):
+           or (worstscore2 < worstscore1 and worstscore1 < bestscore2):
             print "(?)",
     print
 
-def printBestScores(key, scores):
+def print_best_scores(key, scores):
     print key,
     bestscore = None
     minbest = IsTime
     for score in scores:
-        if isMaxScore(newscore=score, maxscore=bestscore, invert=minbest):
+        if is_max_score(newscore=score, maxscore=bestscore, invert=minbest):
             bestscore = score
     print ", %d" % bestscore
 
@@ -163,19 +163,19 @@ if __name__ == '__main__':
         sys.exit(1)
     file1 = sys.argv[1]
     if len(sys.argv) < 3:
-        scores, worstscores, runs, nums = getScores(file1)
+        scores, worstscores, runs, nums = get_scores(file1)
         keys = list(set(scores.keys()))
         keys.sort()
         for key in keys:
-            printBestScores(key, scores[key])
+            print_best_scores(key, scores[key])
         sys.exit(0)
 
     file2 = sys.argv[2]
     if len(sys.argv) > 3:
         SCORERE = re.compile(sys.argv[3])
 
-    scores1, worstscores1, runs1, nums = getScores(file1)
-    scores2, worstscores2, runs2, nums = getScores(file2)
+    scores1, worstscores1, runs1, nums = get_scores(file1)
+    scores2, worstscores2, runs2, nums = get_scores(file2)
 
     runs = runs1
     if runs2 > runs:
@@ -213,4 +213,4 @@ if __name__ == '__main__':
         if key not in scores2:
             print key, "not in", file2
             continue
-        compareScores(key, scores1[key], worstscores1[key], scores2[key], worstscores2[key], runs, nums[key])
+        compare_scores(key, scores1[key], worstscores1[key], scores2[key], worstscores2[key], runs, nums[key])
