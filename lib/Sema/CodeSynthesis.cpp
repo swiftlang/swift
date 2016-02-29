@@ -1293,75 +1293,159 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                     ConcreteDeclRef(Context, Storage->getSetter(), MemberSubs));
 }
 
-void TypeChecker::completePropertyBehaviorInitialValue(VarDecl *VD,
-                               VarDecl *BehaviorInitialValue,
+void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
+                               FuncDecl *BehaviorParameter,
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs) {
-  // Create a property to witness the requirement.
+  // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
-  NameBuf += ".initialValue";
-  auto InitialValueName = Context.getIdentifier(NameBuf);
-  // TODO: non-static initialValue
-  assert(BehaviorInitialValue->isStatic());
-  auto *InitialValue = new (Context) VarDecl(/*static*/ true,
-                                             /*let*/ false,
-                                             VD->getLoc(),
-                                             InitialValueName,
-                                            SelfContextSubs[1].getReplacement(),
-                                             DC);
-  InitialValue->setInterfaceType(SelfInterfaceSubs[1].getReplacement());
-  InitialValue->setUserAccessible(false);
-  // Mark the vardecl to be final, implicit, and private.  In a class, this
-  // prevents it from being dynamically dispatched.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
-    makeFinal(Context, InitialValue);
-  InitialValue->setImplicit();
-  InitialValue->setAccessibility(Accessibility::Private);
-  InitialValue->setIsBeingTypeChecked();
+  NameBuf += ".parameter";
+  auto ParameterBaseName = Context.getIdentifier(NameBuf);
 
-  addMemberToContextIfNeeded(InitialValue, DC);
+  // Substitute the requirement type into the conforming context.
+  auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
+  auto ParameterTy = BehaviorParameter->getInterfaceType()
+    ->castTo<AnyFunctionType>()
+    ->getResult();
   
-  Pattern *InitialPBDPattern = new (Context) NamedPattern(InitialValue,
-                                                          /*implicit*/true);
-  InitialPBDPattern = new (Context) TypedPattern(InitialPBDPattern,
-                      TypeLoc::withoutLoc(SelfContextSubs[1].getReplacement()),
-                      /*implicit*/ true);
-  auto *InitialPBD = PatternBindingDecl::create(Context,
-                                              /*staticloc*/SourceLoc(),
-                                              StaticSpellingKind::KeywordStatic,
-                                              VD->getLoc(),
-                                              InitialPBDPattern, nullptr,
-                                              VD->getDeclContext());
-  InitialPBD->setImplicit();
-  InitialPBD->setInitializerChecked(0);
-  addMemberToContextIfNeeded(InitialPBD, VD->getDeclContext(), VD);
+  TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
+  auto SubstInterfaceTy = ParameterTy.subst(VD->getModuleContext(),
+                                            interfaceMap, SubstOptions());
+  assert(SubstInterfaceTy && "storage type substitution failed?!");
   
-  // Create a getter.
-  auto Get = createGetterPrototype(InitialValue, *this);
-  addMemberToContextIfNeeded(Get, DC);
+  TypeSubstitutionMap contextMap = sig->getSubstitutionMap(SelfContextSubs);
+  auto SubstContextTy = ParameterTy.subst(VD->getModuleContext(),
+                                                 contextMap, SubstOptions());
+  assert(SubstContextTy && "storage type substitution failed?!");
+
+  auto SubstBodyResultTy = SubstContextTy->castTo<AnyFunctionType>()
+    ->getResult();
   
-  // Take the initializer from the PatternBindingDecl for VD.
-  auto *InitValue = VD->getParentInitializer();
-  auto PBD = VD->getParentPatternBinding();
-  unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
-  PBD->setInit(entryIndex, nullptr);
-  PBD->setInitializerChecked(entryIndex);
+  // Add the Self type back to the interface and context types.
+  if (DC->isTypeContext()) {
+    if (DC->isGenericContext()) {
+      auto genericSig = DC->getGenericSignatureOfContext();
+      SubstInterfaceTy = GenericFunctionType::get(genericSig,
+                                                  DC->getSelfInterfaceType(),
+                                                  SubstInterfaceTy,
+                                                  AnyFunctionType::ExtInfo());
+      auto genericParams = DC->getGenericParamsOfContext();
+      SubstContextTy = PolymorphicFunctionType::get(DC->getSelfTypeInContext(),
+                                                    SubstContextTy,
+                                                    genericParams);
+    } else {
+      SubstInterfaceTy = FunctionType::get(DC->getSelfInterfaceType(),
+                                           SubstInterfaceTy);
+      SubstContextTy = FunctionType::get(DC->getSelfTypeInContext(),
+                                         SubstContextTy);
+    }
+  }
+  
+  // Borrow the parameters from the requirement declaration.
+  SmallVector<ParameterList *, 2> ParamLists;
+  if (DC->isTypeContext()) {
+    auto self = new (Context) ParamDecl(/*let*/ true, SourceLoc(), SourceLoc(),
+                                        Identifier(), SourceLoc(),
+                                        Context.Id_self,
+                                        DC->getSelfTypeInContext(), DC);
+    self->setInterfaceType(DC->getSelfInterfaceType());
+    self->setImplicit();
+    
+    ParamLists.push_back(ParameterList::create(Context, SourceLoc(),
+                                               self, SourceLoc()));
+    ParamLists.back()->get(0)->setImplicit();
+  }
+  
+  assert(BehaviorParameter->getParameterLists().size() == 2);
+  SmallVector<ParamDecl *, 4> Params;
+  SmallVector<Identifier, 4> NameComponents;
+  
+  auto *DeclaredParams = BehaviorParameter->getParameterList(1);
+  for (unsigned i : indices(*DeclaredParams)) {
+    auto declaredParam = DeclaredParams->get(i);
+    auto declaredParamTy = declaredParam->getInterfaceType();
+    auto interfaceTy = declaredParamTy.subst(DC->getParentModule(),
+                                             interfaceMap,
+                                             SubstOptions());
+    assert(interfaceTy);
+    auto contextTy = declaredParamTy.subst(DC->getParentModule(),
+                                           contextMap, SubstOptions());
+    assert(contextTy);
+
+    SmallString<64> ParamNameBuf;
+    {
+      llvm::raw_svector_ostream names(ParamNameBuf);
+      names << "%arg." << i;
+    }
+    auto param = new (Context) ParamDecl(/*let*/ true, SourceLoc(), SourceLoc(),
+                                         Identifier(),
+                                         SourceLoc(),
+                                         Context.getIdentifier(ParamNameBuf),
+                                         contextTy, DC);
+    param->setInterfaceType(interfaceTy);
+    param->setImplicit();
+    Params.push_back(param);
+    NameComponents.push_back(Identifier());
+  }
+  ParamLists.push_back(ParameterList::create(Context, Params));
+
+  auto *Parameter = FuncDecl::create(Context, SourceLoc(),
+                                     StaticSpellingKind::None,
+                                     SourceLoc(),
+                                     DeclName(Context, ParameterBaseName,
+                                              NameComponents),
+                                     SourceLoc(), SourceLoc(),
+                                     SourceLoc(), nullptr, SubstContextTy,
+                                     ParamLists,
+                                     TypeLoc::withoutLoc(SubstBodyResultTy),
+                                     DC);
+
+  Parameter->setInterfaceType(SubstInterfaceTy);
+  // Mark the method to be final, implicit, and private.  In a class, this
+  // prevents it from being dynamically dispatched.
+  if (DC->getAsClassOrClassExtensionContext())
+    makeFinal(Context, Parameter);
+  Parameter->setImplicit();
+  Parameter->setAccessibility(Accessibility::Private);
+  Parameter->setIsBeingTypeChecked();
+  Parameter->setBodyResultType(SubstBodyResultTy);
 
   // Recontextualize any closure declcontexts nested in the initializer to
-  // realize that they are in the getter function.
-  InitValue->walk(RecontextualizeClosures(Get));
+  // realize that they are in the parameter function.
+  assert(VD->getBehavior()->Param);
+  VD->getBehavior()->Param->walk(RecontextualizeClosures(Parameter));
+  
+  // Apply and return the closure in the function context.
+  SmallVector<Expr *, 4> argRefs;
+  SmallVector<Identifier, 4> argNames;
+  for (unsigned i : indices(Params)) {
+    auto param = Params[i];
+    auto expr = new (Context) DeclRefExpr(param, DeclNameLoc(),
+                                          /*implicit*/ true);
+    argRefs.push_back(expr);
+    argNames.push_back(DeclaredParams->get(i)->getName());
+  }
+  auto argTuple = TupleExpr::create(Context, SourceLoc(), argRefs,
+                                    argNames,
+                                    {}, SourceLoc(),
+                                    /*trailing closure*/ false,
+                                    /*implicit*/ true);
+  auto apply = new (Context) CallExpr(VD->getBehavior()->Param, argTuple,
+                                      /*implicit*/ true);
   
   // Return the expression value.
-  auto Ret = new (Context) ReturnStmt(SourceLoc(), InitValue,
-                                             /*implicit*/ true);
+  auto Ret = new (Context) ReturnStmt(SourceLoc(), apply,
+                                      /*implicit*/ true);
   auto Body = BraceStmt::create(Context, SourceLoc(), ASTNode(Ret),
                                 SourceLoc(), /*implicit*/ true);
-  Get->setBody(Body);
+  Parameter->setBody(Body);
   
-  InitialValue->makeComputed(SourceLoc(), Get, nullptr, nullptr, SourceLoc());
-  InitialValue->setIsBeingTypeChecked(false);
+  Parameter->setIsBeingTypeChecked(false);
+  typeCheckDecl(Parameter, true);
+  typeCheckDecl(Parameter, false);
+  addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.
   ArrayRef<Substitution> MemberSubs;
@@ -1370,10 +1454,8 @@ void TypeChecker::completePropertyBehaviorInitialValue(VarDecl *VD,
     ->getForwardingSubstitutions(Context);
   }
 
-  BehaviorConformance->setWitness(BehaviorInitialValue,
-                            ConcreteDeclRef(Context, InitialValue, MemberSubs));
-  BehaviorConformance->setWitness(BehaviorInitialValue->getGetter(),
-                            ConcreteDeclRef(Context, Get, MemberSubs));
+  BehaviorConformance->setWitness(BehaviorParameter,
+                               ConcreteDeclRef(Context, Parameter, MemberSubs));
 }
 
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,

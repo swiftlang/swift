@@ -120,7 +120,7 @@ func exerciseStorage<T>(inout _ sx: S2<T>, inout _ sy: S2<Int>,
 protocol withInit {
   associatedtype Value
   var storage: Value? { get set }
-  static var initialValue: Value { get }
+  func parameter() -> Value
 }
 extension withInit {
   var value: Value {
@@ -131,14 +131,14 @@ extension withInit {
   static func initStorage() -> Value? { }
 }
 
-// TODO: initialValue behaviors in non-instance context
+// TODO: parameterized behaviors in non-instance context
 func any<T>() -> T { }
 
 struct S3<T> {
-  var instance: T = any() __behavior withInit
+  var instance: T __behavior withInit { any() }
 }
 class C3<T> {
-  var instance: T = any() __behavior withInit
+  var instance: T __behavior withInit { any() }
 }
 
 func exerciseStorage<T>(inout _ sx: S3<T>, inout _ sy: S3<Int>,

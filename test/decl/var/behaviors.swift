@@ -184,44 +184,37 @@ struct S<T> {
   static var testGetset: T __behavior getset
 }
 
-protocol initialValue {
+protocol parameterized {
   associatedtype Value
-  static var initialValue: Value { get }
+  func parameter() -> Value
 }
-extension initialValue {
+extension parameterized {
   var value: Value {
     get { }
     set { }
   }
 }
 
-let compoundInitialValue = (0,0)
-
-struct TestInitialValues {
-  var hasInitialValue: Int = 0 __behavior initialValue
-  var (sharedInitialValue1, sharedInitialValue2): (Int,Int) 
-    = compoundInitialValue __behavior initialValue // expected-error * {{cannot destructure}}
-  var missingInitialValue: Int __behavior initialValue // expected-error{{requires an initializer}}
-  // TODO: "return expression" message is wrong
-  var invalidInitialValue: Int = 5.5 __behavior initialValue // expected-error{{cannot convert return expression of type 'Double' to return type 'Int'}}
+struct TestParameters {
+  var hasParameter: Int __behavior parameterized { 0 }
+  var (sharedParameter1, sharedParameter2): (Int,Int) 
+    __behavior parameterized { 0 }  // expected-error {{multiple variables is not supported}} expected-error{{sharedParameter2}}
+  var missingParameter: Int __behavior parameterized // expected-error{{requires a parameter}}
+  var invalidParameter: Int __behavior parameterized { 5.5 } // expected-error{{cannot convert return expression of type 'Double' to return type 'Int'}}
 }
 
 // TODO
-var globalInitialValue: Int = 0 __behavior initialValue // expected-error{{not supported}}
+var globalParameter: Int __behavior parameterized { 0 } // expected-error{{not supported}}
 
-protocol noInitialValue {
+protocol noParameter {
   associatedtype Value
 }
-extension noInitialValue {
+extension noParameter {
   var value: Value {
     get { }
     set { }
   }
 }
 
-var hasNoInitialValue: Int __behavior noInitialValue
-var hasUnwantedInitialValue: Int = 0 __behavior noInitialValue // expected-error{{initializer expression provided, but property behavior 'noInitialValue' does not use it}}
-var (hasUnwantedSharedInitialValue1,
-     hasUnwantedSharedInitialValue2): (Int, Int)
-  = compoundInitialValue // expected-error * {{initializer expression provided, but property behavior 'noInitialValue' does not use it}}
-  __behavior noInitialValue
+var hasNoParameter: Int __behavior noParameter
+var hasUnwantedParameter: Int __behavior noParameter { 0 } // expected-error{{parameter expression provided, but property behavior 'noParameter' does not use it}}

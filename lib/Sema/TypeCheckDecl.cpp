@@ -2641,6 +2641,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   //
   // It'd probably be cleaner to model as `where Self: ...` constraints when
   // we have those.
+  //
+  // TODO: Handle non-protocol requirements ('class', base class, etc.)
   for (auto refinedProto : behaviorProto->getInheritedProtocols(&TC)) {
     ProtocolConformance *inherited = nullptr;
     
@@ -2772,7 +2774,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // Now that type witnesses are done, satisfy property and method requirements.
   conformance->setState(ProtocolConformanceState::Checking);
 
-  bool requiresInitialValue = false;
+  bool requiresParameter = false;
   for (auto requirementDecl : behaviorProto->getMembers()) {
     auto requirement = dyn_cast<ValueDecl>(requirementDecl);
     if (!requirement)
@@ -2783,6 +2785,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     if (auto varReqt = dyn_cast<VarDecl>(requirement)) {
       // Match a storage requirement.
       if (varReqt->getName() == TC.Context.Id_storage) {
+        TC.validateDecl(varReqt);
+
         auto storageTy = varReqt->getInterfaceType();
         auto expectedInitStorageTy =
           FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
@@ -2814,6 +2818,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
               TC.diagnose(foundFunc->getLoc(),
                           diag::property_behavior_protocol_reqt_here,
                           TC.Context.Id_initStorage);
+              conformance->setInvalid();
               break;
             }
             
@@ -2828,6 +2833,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
           for (auto found : lookup)
             TC.diagnose(found.Decl->getLoc(),
                         diag::found_candidate);
+          conformance->setInvalid();
           continue;
         }
         
@@ -2849,67 +2855,56 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                                            interfaceSubs,
                                            contextSubs);
         continue;
-      // Handle an initialValue requirement.
-      } else if (varReqt->getName() == TC.Context.Id_initialValue) {
-        requiresInitialValue = true;
-        
-        // The requirement should be static, get-only, and have the type of the
-        // Value.
-        // TODO: A "deferred" initialization would be an instance requirement.
-        Type valueTy = GenericTypeParamType::get(0, 0, TC.Context);
-        assert(valueReqt && "no Value associated type?!");
-        valueTy = DependentMemberType::get(valueTy, valueReqt, TC.Context);
-  
-        if (!varReqt->isStatic()
-            || varReqt->isSettable(dc)
-            || !varReqt->getInterfaceType()->isEqual(valueTy)) {
-          TC.diagnose(behavior->getLoc(),
-                      diag::property_behavior_invalid_initialValue_reqt,
-                      behaviorProto->getName());
-          TC.diagnose(varReqt->getLoc(),
-                      diag::property_behavior_protocol_reqt_here,
-                      TC.Context.Id_initialValue);
-          continue;
-        }
-        
-        // The declaration must have an initializer expression.
-        // FIXME: It should have the initializer to itself too, no 'var (a,b)=x'
-        if (!decl->getParentInitializer()) {
-          TC.diagnose(behavior->getLoc(),
-                      diag::property_behavior_requires_initialValue,
-                      behaviorProto->getName(),
-                      decl->getName());
-          continue;
-        }
-        
-        if (!isa<NamedPattern>(
-                    decl->getParentPattern()->getSemanticsProvidingPattern())) {
-          TC.diagnose(decl->getParentInitializer()->getLoc(),
-                      diag::property_behavior_requires_unique_initialValue,
-                      behaviorProto->getName());
-          continue;
-        }
-        
-        // TODO: Support initialValue requirements in non-type contexts.
-        if (!dc->isTypeContext()) {
-          TC.diagnose(behavior->getLoc(),
-                      diag::property_behavior_with_feature_not_supported,
-                      behaviorProto->getName(), "initial value requirement");
-          conformance->setInvalid();
-          continue;
-        }
-        
-        // Wrap the initializer expression in a get-only property to
-        TC.completePropertyBehaviorInitialValue(decl, varReqt,
-                                                conformance,
-                                                interfaceSubs,
-                                                contextSubs);
-        continue;
       }
     } else if (auto func = dyn_cast<FuncDecl>(requirement)) {
       // Handle accessors as part of their property.
       if (func->isAccessor())
         continue;
+      
+      // Handle a parameter block requirement.
+      if (func->getName() == TC.Context.Id_parameter) {
+        requiresParameter = true;
+        
+        TC.validateDecl(func);
+        
+        // The requirement should be for a nongeneric instance method.
+        if (func->isStatic() || func->isGeneric()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_invalid_parameter_reqt,
+                      behaviorProto->getName());
+          TC.diagnose(varReqt->getLoc(),
+                      diag::property_behavior_protocol_reqt_here,
+                      TC.Context.Id_parameter);
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // The declaration must have a parameter.
+        if (!decl->getBehavior()->Param) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_requires_parameter,
+                      behaviorProto->getName(),
+                      decl->getName());
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // TODO: Support parameter requirements in non-type contexts.
+        if (!dc->isTypeContext()) {
+          TC.diagnose(behavior->getLoc(),
+                      diag::property_behavior_with_feature_not_supported,
+                      behaviorProto->getName(), "parameter requirement");
+          conformance->setInvalid();
+          continue;
+        }
+        
+        // Wrap the initializer expression in a get-only property to
+        TC.completePropertyBehaviorParameter(decl, func,
+                                             conformance,
+                                             interfaceSubs,
+                                             contextSubs);
+        continue;
+      }
     }
 
     unknownRequirement(requirement);
@@ -2919,9 +2914,9 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // use it, complain.
   // TODO: The initializer could eventually be consumed by DI-style
   // initialization.
-  if (!requiresInitialValue && decl->getParentInitializer()) {
-    TC.diagnose(decl->getParentInitializer()->getLoc(),
-                diag::property_behavior_invalid_initializer,
+  if (!requiresParameter && decl->getBehavior()->Param) {
+    TC.diagnose(decl->getBehavior()->Param->getLoc(),
+                diag::property_behavior_invalid_parameter,
                 behaviorProto->getName());
   }
   

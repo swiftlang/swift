@@ -1564,18 +1564,14 @@ ERROR(property_behavior_value_type_doesnt_match,none,
       (Identifier, Type, Identifier, Type))
 NOTE(property_behavior_value_decl_here,none,
      "'value' property declared here", ())
-ERROR(property_behavior_invalid_initialValue_reqt,none,
-      "property behavior %0 'initialValue' requirement must be static, "
-      "get-only, and of type 'Self.Value'", (Identifier))
-ERROR(property_behavior_requires_initialValue,none,
-      "property behavior %0 requires an initializer in the declaration of %1",
+ERROR(property_behavior_invalid_parameter_reqt,none,
+      "property behavior %0 has a 'parameter' requirement that is "
+      "static or generic", (Identifier))
+ERROR(property_behavior_requires_parameter,none,
+      "property behavior %0 requires a parameter in the declaration of %1",
       (Identifier, Identifier))
-ERROR(property_behavior_requires_unique_initialValue,none,
-      "property behavior %0 cannot destructure an initializer expression in a "
-      "compound pattern",
-      (Identifier))
-ERROR(property_behavior_invalid_initializer,none,
-      "initializer expression provided, but property behavior %0 does not "
+ERROR(property_behavior_invalid_parameter,none,
+      "parameter expression provided, but property behavior %0 does not "
       "use it",
       (Identifier))
 
