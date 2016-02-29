@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -emit-sil -O -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | FileCheck -check-prefix=OPT %s
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar24894993
 
 import Foundation
 import gizmo
