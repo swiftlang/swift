@@ -950,37 +950,18 @@ static bool isVacuousPreposition(StringRef beforePreposition,
       !camel_case::sameWordIgnoreFirstCase(preposition, "using"))
     return false;
 
-  // If the preposition is "with", check for special cases.
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "with")) {
-    // Some words following the preposition indicate that "with" is
-    // not vacuous.
-    auto following = camel_case::getFirstWord(afterPreposition);
-    if (camel_case::sameWordIgnoreFirstCase(following, "coder") ||
-        camel_case::sameWordIgnoreFirstCase(following, "zone"))
-      return false;
-
-    // If the last word of the argument label looks like a past
-    // participle (ends in "-ed"), the preposition is not vacuous.
-    auto lastWord = camel_case::getLastWord(afterPreposition);
-    if (lastWord.endswith("ed"))
-      return false;
-
-    if (camel_case::sameWordIgnoreFirstCase(following, "delegate") ||
-        camel_case::sameWordIgnoreFirstCase(following, "frame"))
-      return true;
-  }
+  // If the preposition is "with" followed by "zone", never consider
+  // it vacuous.
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "with") &&
+      camel_case::sameWordIgnoreFirstCase(
+        camel_case::getFirstWord(afterPreposition), "zone"))
+    return false;
 
   // If the parameter has a default argument, it's vacuous.
   if (paramType.hasDefaultArgument()) return true;
 
   // If the parameter is of function type, it's vacuous.
   if (paramType.isFunction()) return true;
-
-  // If the first word of the name is a verb, the preposition is
-  // likely vacuous.
-  if (getPartOfSpeech(camel_case::getFirstWord(beforePreposition))
-        == PartOfSpeech::Verb)
-    return true;
 
   return false;
 }
