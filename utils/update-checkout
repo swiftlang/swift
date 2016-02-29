@@ -88,7 +88,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="Obtain Sources for Swift and Related Projects via SSH",
         action="store_true")
     parser.add_argument("--skip-history",
-        help="Skip histories when obtain sources",
+        help="Skip histories when obtaining sources",
         action="store_true")
     parser.add_argument("--skip-repository",
         metavar="DIRECTORY",
