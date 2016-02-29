@@ -64,7 +64,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 /// stderr.
 public func spawnChild(args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
-  var fileActions: posix_spawn_file_actions_t = nil
+  var fileActions: posix_spawn_file_actions_t = _make_posix_spawn_file_actions_t()
   if swift_posix_spawn_file_actions_init(&fileActions) != 0 {
     preconditionFailure("swift_posix_spawn_file_actions_init() failed")
   }
@@ -138,6 +138,14 @@ public func spawnChild(args: [String])
   }
 
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
+}
+
+internal func _make_posix_spawn_file_actions_t() -> posix_spawn_file_actions_t {
+#if os(Linux) || os(FreeBSD)
+  return posix_spawn_file_actions_t()
+#else
+  return nil
+#endif
 }
 
 internal func _readAll(fd: CInt) -> String {

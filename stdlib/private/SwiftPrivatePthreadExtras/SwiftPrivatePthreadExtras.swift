@@ -71,7 +71,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   let contextAsOpaque = OpaquePointer(bitPattern: Unmanaged.passRetained(context))
   let contextAsVoidPointer = UnsafeMutablePointer<Void>(contextAsOpaque)
 
-  var threadID: pthread_t = nil
+  var threadID: pthread_t = _make_pthread_t()
   let result = pthread_create(&threadID, attr,
     invokeBlockContext, contextAsVoidPointer)
   if result == 0 {
@@ -79,6 +79,14 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   } else {
     return (result, nil)
   }
+}
+
+internal func _make_pthread_t() -> pthread_t {
+#if os(Linux) || os(FreeBSD)
+  return pthread_t()
+#else
+  return nil
+#endif
 }
 
 /// Block-based wrapper for `pthread_join`.
