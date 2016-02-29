@@ -296,6 +296,10 @@ def print_inst_counts : Flag<["-"], "print-inst-counts">,
 def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
   HelpText<"Print the LLVM inline tree.">;
 
+def disable_incremental_llvm_codegeneration :
+  Flag<["-"], "disable-incremental-llvm-codegen">,
+       HelpText<"Disable incremental llvm code generation.">;
+
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;
