@@ -60,6 +60,9 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t _swift_stdlib_write(int fd, const void *buf,
                                     __swift_size_t nbyte);
 SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_ssize_t _swift_stdlib_write_stdout(const void *buf,
+                                    __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions

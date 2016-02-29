@@ -45,6 +45,11 @@ __swift_ssize_t _swift_stdlib_write(int fd, const void *buf,
   return write(fd, buf, nbyte);
 }
 
+__swift_ssize_t _swift_stdlib_write_stdout(const void *buf,
+                                    __swift_size_t nbyte) {
+  return write(STDOUT_FILENO, buf, nbyte);
+}
+
 int _swift_stdlib_close(int fd) { return close(fd); }
 
 #if defined(__APPLE__)
