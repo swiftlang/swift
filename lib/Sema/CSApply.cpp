@@ -624,50 +624,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto resultTy = result->getType();
       if (resultTy->hasOpenedExistential(record.Archetype)) {
-        // Erase the opened existential.
-
-        // Remove the optional, if present.
-        OptionalTypeKind optKind;
-        if (auto optValueTy = resultTy->getAnyOptionalObjectType(optKind)) {
-          resultTy = optValueTy;
-        }
-
-        //   - Drill down to the optional value (if necessary).
-        if (optKind) {
-          result = new (tc.Context) BindOptionalExpr(result,
-                                                     result->getEndLoc(),
-                                                     0,
-                                                     resultTy);
-          result->setImplicit(true);
-        }
-
-        Type erasedTy;
-        if (resultTy->isEqual(record.Archetype)) {
-          //   - Coerce to an existential value.
-          erasedTy = record.Archetype->getOpenedExistentialType();
-
-          result = coerceToType(result, erasedTy, nullptr);
-          // FIXME: can this really ever fail? We'll leave behind rogue
-          // OpaqueValueExprs if that is the case.
-          assert(result);
-        } else {
-          //   - Perform a covariant function coercion.
-          erasedTy = resultTy->eraseOpenedExistential(
-                       cs.DC->getParentModule(),
-                       record.Archetype);
-          result = new (tc.Context) CovariantFunctionConversionExpr(
-                                      result,
-                                      erasedTy);
-        }
-
-        //   - Bind up the result back up as an optional (if necessary).
-        if (optKind) {
-          Type optErasedTy = OptionalType::get(optKind, erasedTy);
-          result = new (tc.Context) InjectIntoOptionalExpr(result,
-                                                           optErasedTy);
-          result = new (tc.Context) OptionalEvaluationExpr(result,
-                                                           optErasedTy);
-        }
+        Type erasedTy = resultTy->eraseOpenedExistential(
+                          cs.DC->getParentModule(),
+                          record.Archetype);
+        result = coerceToType(result, erasedTy, nullptr);
       }
 
       // If the opaque value has an l-value access kind, then
@@ -5154,6 +5114,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Coercions from a type to an existential type.
   if (toType->isAnyExistentialType()) {
     return coerceExistential(expr, toType, locator);
+  }
+
+  if (toType->getAnyOptionalObjectType() &&
+      expr->getType()->getAnyOptionalObjectType()) {
+    return coerceOptionalToOptional(expr, toType, locator);
   }
 
   // Coercion to Optional<T>.

@@ -98,11 +98,21 @@ let _: () -> Int = {
 //===----------------------------------------------------------------------===//
 protocol Clonable {
   func maybeClone() -> Self?
-  func badMaybeClone() -> Self??
+  func doubleMaybeClone() -> Self??
+  func subdivideClone() -> (Self, Self)
+  func metatypeOfClone() -> Self.Type
+  func badClonerFn() -> (Self -> Self)
+  func veryBadClonerFn() -> ((inout Self) -> ())
+  func goodClonerFn() -> (() -> Self)
 }
 
-func testClonable(v : Clonable) {
+func testClonable(v : Clonable) { // expected-error {{protocol 'Clonable' can only be used as a generic constraint because it has Self or associated type requirements}}
   let v2 = v.maybeClone()
+  let v3 = v.doubleMaybeClone()
+  let v4 = v.subdivideClone()
+  let v5 = v.metatypeOfClone()
+  let v6 = v.goodClonerFn()
 
-  let v3 = v.badMaybeClone() // expected-error {{member 'badMaybeClone' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+  let v7 = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+  let v8 = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
 }
