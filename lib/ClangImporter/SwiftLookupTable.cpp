@@ -56,29 +56,33 @@ bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
 }
 
 Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>>
-SwiftLookupTable::translateContext(clang::DeclContext *context) {
-  // Translation unit context.
-  if (context->isTranslationUnit())
-    return std::make_pair(ContextKind::TranslationUnit, StringRef());
+SwiftLookupTable::translateContext(EffectiveClangContext context) {
+  if (auto dc = context.dyn_cast<clang::DeclContext *>()) {
+    // Translation unit context.
+    if (dc->isTranslationUnit())
+      return std::make_pair(ContextKind::TranslationUnit, StringRef());
 
-  // Tag declaration context.
-  if (auto tag = dyn_cast<clang::TagDecl>(context)) {
-    if (tag->getIdentifier())
-      return std::make_pair(ContextKind::Tag, tag->getName());
-    if (auto typedefDecl = tag->getTypedefNameForAnonDecl())
-      return std::make_pair(ContextKind::Tag, typedefDecl->getName());
+    // Tag declaration context.
+    if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
+      if (tag->getIdentifier())
+        return std::make_pair(ContextKind::Tag, tag->getName());
+      if (auto typedefDecl = tag->getTypedefNameForAnonDecl())
+        return std::make_pair(ContextKind::Tag, typedefDecl->getName());
+      return None;
+    }
+
+    // Objective-C class context.
+    if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
+      return std::make_pair(ContextKind::ObjCClass, objcClass->getName());
+
+    // Objective-C protocol context.
+    if (auto objcProtocol = dyn_cast<clang::ObjCProtocolDecl>(dc))
+      return std::make_pair(ContextKind::ObjCProtocol, objcProtocol->getName());
+
     return None;
   }
 
-  // Objective-C class context.
-  if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(context))
-    return std::make_pair(ContextKind::ObjCClass, objcClass->getName());
-
-  // Objective-C protocol context.
-  if (auto objcProtocol = dyn_cast<clang::ObjCProtocolDecl>(context))
-    return std::make_pair(ContextKind::ObjCProtocol, objcProtocol->getName());
-
-  return None;
+  llvm_unreachable("Non-Clang-DeclContexts are not yet handled");
 }
 
 void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
@@ -89,7 +93,7 @@ void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
 }
 
 void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
-                                clang::DeclContext *effectiveContext) {
+                                EffectiveClangContext effectiveContext) {
   assert(!Reader && "Cannot modify a lookup table stored on disk");
 
   // Translate the context.
