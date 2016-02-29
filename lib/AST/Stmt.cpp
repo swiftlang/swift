@@ -284,7 +284,7 @@ SourceLoc PoundAvailableInfo::getEndLoc() const {
 
 void PoundAvailableInfo::
 getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange> &PlatformRanges) {
-  for (unsigned int i = 0; i < NumQueries; i ++) {
+  for (unsigned i = 0; i < NumQueries; i++) {
     auto *VersionSpec =
       dyn_cast<VersionConstraintAvailabilitySpec>(getQueries()[i]);
     if (!VersionSpec)

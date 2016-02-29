@@ -18,7 +18,7 @@ func empty_dic_test() {
   let unused : [Int:Int] = [:]
 }
 
-//CHECK-LABEL: @_TF17unused_containers18unused_string_testFT_T_
+//CHECK-LABEL: sil hidden @_TF17unused_containers18unused_string_testFT_T_
 //CHECK-NEXT: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return

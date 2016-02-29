@@ -521,7 +521,7 @@ NSStringAPIs.test("decomposedStringWithCompatibilityMapping") {
 NSStringAPIs.test("enumerateLines(_:)") {
   var lines: [String] = []
   "abc\n\ndefghi\njklm".enumerateLines {
-    (line: String, inout stop: Bool)
+    (line: String, stop: inout Bool)
   in
     lines.append(line)
     if lines.count == 3 {
@@ -542,7 +542,7 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
       scheme: NSLinguisticTagSchemeTokenType,
       options: [],
       orthography: nil) {
-    (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, inout stop: Bool)
+    (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, stop: inout Bool)
   in
     tags.append(tag)
     tokens.append(s[tokenRange])
@@ -569,7 +569,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
     s.enumerateSubstrings(in: startIndex..<endIndex,
       options: NSStringEnumerationOptions.byComposedCharacterSequences) {
       (substring: String?, substringRange: Range<String.Index>,
-       enclosingRange: Range<String.Index>, inout stop: Bool)
+       enclosingRange: Range<String.Index>, stop: inout Bool)
     in
       substrings.append(substring!)
       expectEqual(substring, s[substringRange])
@@ -582,7 +582,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
     s.enumerateSubstrings(in: startIndex..<endIndex,
       options: [.byComposedCharacterSequences, .substringNotRequired]) {
       (substring_: String?, substringRange: Range<String.Index>,
-       enclosingRange: Range<String.Index>, inout stop: Bool)
+       enclosingRange: Range<String.Index>, stop: inout Bool)
     in
       expectEmpty(substring_)
       let substring = s[substringRange]

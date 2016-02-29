@@ -304,7 +304,7 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
                         StringRef OutputFilename) {
-  if (HashGlobal) {
+  if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
     MD5::MD5Result Result;

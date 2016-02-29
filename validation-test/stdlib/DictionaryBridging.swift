@@ -46,7 +46,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
   let key = TestObjCKeyTy(10)
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsd = raceData.nsd
     let v: AnyObject? = nsd.object(forKey: key)
@@ -84,7 +84,7 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsd = raceData.nsd
     let objcPairs = NSMutableArray()

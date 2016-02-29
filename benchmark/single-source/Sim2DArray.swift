@@ -23,7 +23,7 @@ struct Array2D {
 }
 
 @inline(never)
-func workload_2DArrayTest(inout A: Array2D) {
+func workload_2DArrayTest(A: inout Array2D) {
   for _ in 0 ..< 10 {
     for r in 0 ..< A.rows {
       for c in 0 ..< A.cols {

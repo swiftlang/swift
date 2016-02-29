@@ -41,8 +41,8 @@ func useTwoIdentical(xi: Int, yi: Float) {
   twoIdentical(x, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
-func mySwap<T>(inout x: T,
-               inout _ y: T) {
+func mySwap<T>(x: inout T,
+               _ y: inout T) {
   let tmp = x
   x = y
   y = tmp
@@ -99,8 +99,8 @@ func confusingArgAndParam<T, U>(f: (T) -> U, _ g: (U) -> T) {
 func acceptUnaryFn<T, U>(f: (T) -> U) { }
 func acceptUnaryFnSame<T>(f: (T) -> T) { }
 
-func acceptUnaryFnRef<T, U>(inout f: (T) -> U) { }
-func acceptUnaryFnSameRef<T>(inout f: (T) -> T) { }
+func acceptUnaryFnRef<T, U>(f: inout (T) -> U) { }
+func acceptUnaryFnSameRef<T>(f: inout (T) -> T) { }
 
 func unaryFnIntInt(_: Int) -> Int {}
 

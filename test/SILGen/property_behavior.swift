@@ -10,10 +10,10 @@ extension behavior {
 }
 
 // TODO: global accessor doesn't get walked because it's in DerivedFileUnit
-var [behavior] global: Int
+var global: Int __behavior behavior
 
 struct S1<T> {
-  var [behavior] instance: T
+  var instance: T __behavior behavior
   // CHECK-LABEL: sil hidden @_TFV17property_behavior2S1g8instancex
   // CHECK:         [[BEHAVIOR_IMP:%.*]] = function_ref @_TFE17property_behaviorPS_8behaviorg5valuewx5Value
   // CHECK:         apply [[BEHAVIOR_IMP]]<S1<T>, T>
@@ -21,7 +21,7 @@ struct S1<T> {
   // CHECK:         [[BEHAVIOR_IMP:%.*]] = function_ref @_TFE17property_behaviorPS_8behaviors5valuewx5Value
   // CHECK:         apply [[BEHAVIOR_IMP]]<S1<T>, T>
 
-  static var [behavior] typeLevel: T
+  static var typeLevel: T __behavior behavior
   // CHECK-LABEL: sil hidden @_TZFV17property_behavior2S1g9typeLevelx
   // CHECK:         [[BEHAVIOR_IMP:%.*]] = function_ref @_TFE17property_behaviorPS_8behaviorg5valuewx5Value
   // CHECK:         apply [[BEHAVIOR_IMP]]<S1<T>.Type, T>
@@ -31,8 +31,8 @@ struct S1<T> {
 }
 
 class C1<T> {
-  var [behavior] instance: T
-  static var [behavior] typeLevel: T
+  var instance: T __behavior behavior
+  static var typeLevel: T __behavior behavior
 }
 
 var zero: Int { get { } }
@@ -41,12 +41,12 @@ func exerciseBehavior<T>(inout _ sx: S1<T>, inout _ sy: S1<Int>,
                          _ cx: C1<T>, _ cy: C1<Int>,
                          _ z: T) {
   /* FIXME
-  var [behavior] local: T
+  var local: T __behavior behavior
 
   _ = local
   local = z
 
-  var [behavior] localInt: Int
+  var localInt: Int __behavior behavior
 
   _ = localInt
   localInt = zero
@@ -95,10 +95,10 @@ extension withStorage {
 
 // TODO: storage behaviors in non-instance context
 struct S2<T> {
-  var [withStorage] instance: T
+  var instance: T __behavior withStorage
 }
 class C2<T> {
-  var [withStorage] instance: T
+  var instance: T __behavior withStorage
 }
 
 func exerciseStorage<T>(inout _ sx: S2<T>, inout _ sy: S2<Int>,
@@ -135,10 +135,10 @@ extension withInit {
 func any<T>() -> T { }
 
 struct S3<T> {
-  var [withInit] instance: T = any()
+  var instance: T = any() __behavior withInit
 }
 class C3<T> {
-  var [withInit] instance: T = any()
+  var instance: T = any() __behavior withInit
 }
 
 func exerciseStorage<T>(inout _ sx: S3<T>, inout _ sy: S3<Int>,

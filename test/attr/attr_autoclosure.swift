@@ -18,7 +18,7 @@ func func6(@autoclosure _: () -> Int) {func6(0)}
 func func7(@autoclosure _: @noreturn () -> Int) {func7(0)}
 
 // autoclosure + inout don't make sense.
-func func8(@autoclosure inout x: () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be applied to values of function type}}
+func func8(@autoclosure x: inout () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be applied to values of function type}}
 }
 
 

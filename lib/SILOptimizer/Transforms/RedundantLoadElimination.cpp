@@ -1001,6 +1001,10 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
 }
 
 RLEContext::ProcessKind RLEContext::getProcessFunctionKind() {
+  // Don't optimize function that are marked as 'no.optimize'.
+  if (!Fn->shouldOptimize())
+    return ProcessKind::ProcessNone;
+
   bool RunOneIteration = true;
   unsigned BBCount = 0;
   unsigned LocationCount = LocationVault.size();

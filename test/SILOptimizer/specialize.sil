@@ -402,8 +402,8 @@ bb0(%0 : $Int32, %1 : $@box T):
 }
 
 // check that there is a generic specialization of boo
-// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ : $@convention(thin) (@in C) -> @owned @callee_owned (Int32, @in Float) -> Int32
-// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSr5V4main1CS0_S_1PS__Sf___TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_
 // CHECK: partial_apply [[CLOSURE_SPECIALIZATION:%[0-9]+]]
 // CHECK: return
 
@@ -412,7 +412,7 @@ bb0(%0 : $Int32, %1 : $@box T):
 // CHECK: return
 
 // Check that there is a generic specialization of foo
-// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_ : $@convention(thin) (@in C, @in C) -> @owned @callee_owned (Int32, Float) -> Int32
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_ : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
 // CHECK: function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ 
 // check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
 // CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__XFo_dS1_dSf_dS1__
@@ -423,7 +423,7 @@ bb0(%0 : $Int32, %1 : $@box T):
 
 
 // Check that there is a generic specialization of gen1
-// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS____TF5test44gen1US_1P__FQ_FVs5Int32S1_ : $@convention(thin) (@in C) -> @owned @callee_owned (Int32) -> Int32
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS____TF5test44gen1US_1P__FQ_FVs5Int32S1_ : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
 // check that it invokes a generic specialization of the closure by mean of partial_apply
 // CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS____TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_
 // CHECK-NOT: apply
@@ -488,7 +488,7 @@ bb0:
 // CHECK: apply
 // Reference to the generic specialization of gen1
 // CHECK-NOT: function_ref @_TF5test44gen1US_1P__FQ_FVs5Int32S1_
-// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS____TF5test44gen1US_1P__FQ_FVs5Int32S1_ : $@convention(thin) (@in C) -> @owned @callee_owned (Int32) -> Int32
+// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS____TF5test44gen1US_1P__FQ_FVs5Int32S1_ : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
 sil @_TF5test48testGen1FT_Vs5Int32 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $@callee_owned (Int32) -> Int32, var, name "f" // users: %9, %16

@@ -24,8 +24,8 @@ let _: No = no
 
 import ObjectiveC
 
-func expectIsHashable<T : Hashable>(inout value: T) {}
-func expectIsCVarArg<T : CVarArg>(inout value: T) {}
+func expectIsHashable<T : Hashable>(value: inout T) {}
+func expectIsCVarArg<T : CVarArg>(value: inout T) {}
 
 var anNSObject = NSObject()
 expectIsHashable(&anNSObject)

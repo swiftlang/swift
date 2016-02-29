@@ -503,14 +503,14 @@ func _getSuperclass(t: Any.Type) -> AnyClass? {
 /// Returns `true` if `object` is uniquely referenced.
 @_transparent
 @warn_unused_result
-internal func _isUnique<T>(inout object: T) -> Bool {
+internal func _isUnique<T>(object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
 /// Returns `true` if `object` is uniquely referenced or pinned.
 @_transparent
 @warn_unused_result
-internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
+internal func _isUniqueOrPinned<T>(object: inout T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned(&object))
 }
 
@@ -519,7 +519,7 @@ internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isUnique_native<T>(inout object: T) -> Bool {
+func _isUnique_native<T>(object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
@@ -536,7 +536,7 @@ func _isUnique_native<T>(inout object: T) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
+func _isUniqueOrPinned_native<T>(object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero.
   _sanityCheck(

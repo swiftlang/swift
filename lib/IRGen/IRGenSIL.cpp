@@ -3167,17 +3167,20 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   StringRef Name = getVarName(i);
   DebugTypeInfo DbgTy;
   SILType SILTy = SILVal->getType();
-  if (VarDecl *Decl = i->getDecl())
-    DbgTy = DebugTypeInfo(Decl, Decl->getType(), getTypeInfo(SILTy));
-  else if (i->getFunction()->isBare() &&
-           !SILTy.getSwiftType()->hasArchetype() && !Name.empty())
-    // Preliminary support for .sil debug information.
-    DbgTy = DebugTypeInfo(SILTy.getSwiftType(), getTypeInfo(SILTy), nullptr);
-  else
-    return;
   // An inout/lvalue type that is described by a debug value has been
   // promoted by an optimization pass. Unwrap the type.
-  DbgTy.unwrapLValueOrInOutType();
+  bool Unwrap = true;
+  auto RealTy = SILVal->getType().getSwiftType();
+  if (VarDecl *Decl = i->getDecl()) {
+    DbgTy = DebugTypeInfo(Decl, RealTy, getTypeInfo(SILVal->getType()), Unwrap);
+  } else if (i->getFunction()->isBare() &&
+             !SILTy.getSwiftType()->hasArchetype() && !Name.empty()) {
+    // Preliminary support for .sil debug information.
+    DbgTy = DebugTypeInfo(RealTy, getTypeInfo(SILTy), nullptr);
+    if (Unwrap)
+      DbgTy.unwrapLValueOrInOutType();
+  } else
+    return;
 
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy; 
@@ -3200,12 +3203,13 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
 
   StringRef Name = getVarName(i);
   auto Addr = getLoweredAddress(SILVal).getAddress();
-  DebugTypeInfo DbgTy(Decl, SILVal->getType().getSwiftType(),
-                      getTypeInfo(SILVal->getType()));
+  auto RealType = SILVal->getType().getSwiftType();
   // Unwrap implicitly indirect types and types that are passed by
   // reference only at the SIL level and below.
-  if (DbgTy.isArchetype() || i->getVarInfo().Constant)
-    DbgTy.unwrapLValueOrInOutType();
+  bool Unwrap =
+      i->getVarInfo().Constant ||
+      RealType->getLValueOrInOutObjectType()->getKind() == TypeKind::Archetype;
+  DebugTypeInfo DbgTy(Decl, RealType, getTypeInfo(SILVal->getType()), Unwrap);
   // Put the value's address into a stack slot at -Onone and emit a debug
   // intrinsic.
   unsigned ArgNo = i->getVarInfo().ArgNo;
@@ -3468,11 +3472,12 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
           Pattern->getKind() != PatternKind::OptionalSome)
         return;
 
-    auto DbgTy = DebugTypeInfo(Decl, type);
     // Discard any inout or lvalue qualifiers. Since the object itself
     // is stored in the alloca, emitting it as a reference type would
     // be wrong.
-    DbgTy.unwrapLValueOrInOutType();
+    bool Unwrap = true;
+    auto RealType = i->getType().getSwiftType().getLValueOrInOutObjectType();
+    auto DbgTy = DebugTypeInfo(Decl, RealType, type, Unwrap);
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope())
       emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
@@ -3628,7 +3633,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     if (Name == IGM.Context.Id_self.str())
       return;
 
-    DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type);
+    DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type, false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
           emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),

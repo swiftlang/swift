@@ -37,10 +37,10 @@ func test_conv() {
 var xy : X // expected-note {{previously declared here}}
 var xy : Y // expected-error {{invalid redeclaration of 'xy'}}
 
-func accept_X(inout x: X) { }
-func accept_XY(inout x: X) -> X { }
-func accept_XY(inout y: Y) -> Y { }
-func accept_Z(inout z: Z) -> Z { }
+func accept_X(x: inout X) { }
+func accept_XY(x: inout X) -> X { }
+func accept_XY(y: inout Y) -> Y { }
+func accept_Z(z: inout Z) -> Z { }
 
 func test_inout() {
   var x : X
@@ -56,7 +56,7 @@ func test_inout() {
   accept_Z(&xy); // expected-error{{cannot convert value of type 'X' to expected argument type 'Z'}}
 }
 
-func lvalue_or_rvalue(inout x: X) -> X { }
+func lvalue_or_rvalue(x: inout X) -> X { }
 func lvalue_or_rvalue(x: X) -> Y { }
 
 func test_lvalue_or_rvalue() {

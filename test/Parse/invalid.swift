@@ -9,7 +9,9 @@ func foo(a: Int) {
 
 // rdar://15946844
 func test1(inout var x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
+// expected-warning @-1 {{'inout' before a parameter name is deprecated, place it before the parameter type instead}}
 func test2(inout let x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
+// expected-warning @-1 {{'inout' before a parameter name is deprecated, place it before the parameter type instead}}
 
 func test3() {
   undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}} expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{19-19=,}}
@@ -26,8 +28,6 @@ func foo() {
     skview!
     // expected-error @-1 {{use of unresolved identifier 'skview'}}
 } // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
-
-func test3(a: inout Int) {} // expected-error {{'inout' must appear before the parameter name}}{{12-12=inout }}{{15-21=}}
 
 super.init() // expected-error {{'super' cannot be used outside of class members}}
 

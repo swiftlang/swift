@@ -1202,6 +1202,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
+  // This is set to true by default.
+  Opts.UseIncrementalLLVMCodeGen &=
+    !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
+
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.EmbedMode = IRGenEmbedMode::EmbedBitcode;
   else if (Args.hasArg(OPT_embed_bitcode_marker))

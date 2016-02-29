@@ -19,7 +19,6 @@
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"

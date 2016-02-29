@@ -205,9 +205,9 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     case OptimizationLevelKind::MidLevel:
       // Does inline semantics-functions (except "availability"), but not
       // global-init functions.
-      PM.addPerfInliner();
       PM.addGlobalOpt();
       PM.addLetPropertiesOpt();
+      PM.addPerfInliner();
       break;
     case OptimizationLevelKind::LowLevel:
       // Inlines everything
@@ -270,10 +270,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.run();
   PM.resetAndRemoveTransformations();
 
-  // Run two iterations of the high-level SSA passes.
+  // Run an iteration of the high-level SSA passes.
   PM.setStageName("HighLevel");
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
-  PM.runOneIteration();
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
@@ -290,10 +289,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
-  // Run two iterations of the mid-level SSA passes.
+  // Run an iteration of the mid-level SSA passes.
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
-  PM.runOneIteration();
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 

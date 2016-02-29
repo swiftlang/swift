@@ -28,6 +28,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   StdlibUnittest.swift.gyb
 
   InterceptTraps.cpp
+  LifetimeTracked.swift
   OpaqueIdentityFunctions.cpp
   OpaqueIdentityFunctions.swift
   RaceTest.swift
@@ -35,7 +36,6 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   StdlibCoreExtras.swift
   TestHelpers.swift
   TypeIndexed.swift
-  LifetimeTracked.swift
   ${swift_stdlib_unittest_platform_sources}
 
   PRIVATE_LINK_LIBRARIES ${swift_stdlib_unittest_private_link_libraries}

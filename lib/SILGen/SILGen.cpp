@@ -380,7 +380,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
                          Types.getConstantInfo(constant).ContextGenericParams);
 
   // Create a debug scope for the function using astNode as source location.
-  F->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), *F));
+  F->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), F));
 
   F->setLocation(Loc);
 
@@ -699,7 +699,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     preEmitFunction(destroyer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestroyingDestructor", f);
     SILGenFunction(*this, *f).emitDestroyingDestructor(dd);
-    f->setDebugScope(new (M) SILDebugScope(dd, *f));
+    f->setDebugScope(new (M) SILDebugScope(dd, f));
     postEmitFunction(destroyer, f);
   }
 
@@ -710,7 +710,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     preEmitFunction(deallocator, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
     SILGenFunction(*this, *f).emitDeallocatingDestructor(dd);
-    f->setDebugScope(new (M) SILDebugScope(dd, *f));
+    f->setDebugScope(new (M) SILDebugScope(dd, f));
     postEmitFunction(deallocator, f);
   }
 }
@@ -738,9 +738,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
       M.getOrCreateFunction(SILLinkage::Private, funcName, initSILType, nullptr,
                             SILLocation(binding), IsNotBare, IsNotTransparent,
                             makeModuleFragile ? IsFragile : IsNotFragile);
-  f->setDebugScope(new (M)
-                   SILDebugScope(RegularLocation(binding->getInit(pbdEntry)),
-                                 *f));
+  f->setDebugScope(
+      new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);
 
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
@@ -1041,7 +1040,7 @@ public:
       SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
 
       // Assign a debug scope pointing into the void to the top level function.
-      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
+      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc, toplevel));
 
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
@@ -1150,7 +1149,7 @@ public:
       SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
 
       // Assign a debug scope pointing into the void to the top level function.
-      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
+      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc, toplevel));
 
       SILGenFunction gen(sgm, *toplevel);
       emitTopLevelProlog(gen, mainClass);

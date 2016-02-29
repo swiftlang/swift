@@ -119,7 +119,7 @@ class ViolateInoutSafetySwitchToObjcBuffer {
   }
 
   @inline(never)
-  func runLoop(inout A: [ElementClass]) {
+  func runLoop(A: inout [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
@@ -162,7 +162,7 @@ class ViolateInoutSafetyNeedElementTypeCheck {
   }
 
   @inline(never)
-  func runLoop(inout A : [ElementClass]) {
+  func runLoop(A: inout [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()

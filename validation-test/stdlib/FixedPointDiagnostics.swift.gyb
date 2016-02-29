@@ -108,8 +108,8 @@ func testMixedSignArithmetic() {
 
     // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{}}
-    y -= ${T}(1)        // expected-error {{}}
+    y += ${T}(1)        // expected-error {{}} expected-note {{}}
+    y -= ${T}(1)        // expected-error {{}} expected-note {{}}
   }
 % end
 }

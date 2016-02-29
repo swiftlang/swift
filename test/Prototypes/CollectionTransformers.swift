@@ -105,7 +105,7 @@ public protocol CollectionBuilder {
   /// but is more efficient.
   ///
   /// Complexity: O(1).
-  mutating func moveContentsOf(inout otherBuilder: Self)
+  mutating func moveContentsOf(otherBuilder: inout Self)
 
   /// Build the collection from the elements that were added to this builder.
   ///
@@ -154,7 +154,7 @@ public struct ArrayBuilder<T> : CollectionBuilder {
     _resultTail.appendContents(of: elements)
   }
 
-  public mutating func moveContentsOf(inout otherBuilder: ArrayBuilder<T>) {
+  public mutating func moveContentsOf(otherBuilder: inout ArrayBuilder<T>) {
     // FIXME: do something smart with the capacity set in this builder and the
     // other builder.
     _resultParts.append(_resultTail)
@@ -839,7 +839,7 @@ internal protocol _CollectionTransformerStepProtocol /*: class*/ {
   >(
     c: InputCollection,
     _ range: Range<InputCollection.Index>,
-    inout _ collector: Collector
+    _ collector: inout Collector
   )
 }
 
@@ -887,7 +887,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
   >(
     c: InputCollection,
     _ range: Range<InputCollection.Index>,
-    inout _ collector: Collector
+    _ collector: inout Collector
   ) {
     fatalError("abstract method")
   }
@@ -941,7 +941,7 @@ final internal class _CollectionTransformerStepCollectionSource<
   >(
     c: InputCollection,
     _ range: Range<InputCollection.Index>,
-    inout _ collector: Collector
+    _ collector: inout Collector
   ) {
     for i in range {
       let e = c[i]
@@ -1024,7 +1024,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
   >(
     c: InputCollection,
     _ range: Range<InputCollection.Index>,
-    inout _ collector: Collector
+    _ collector: inout Collector
   ) {
     var collectorWrapper =
       _ElementCollectorOneToMaybeOne(collector, _transform)

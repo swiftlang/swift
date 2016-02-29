@@ -9,31 +9,26 @@ extension behavior {
 
 struct NotABehavior {}
 
-var [behavior] test1: Int
-var [Main.behavior] test2: String
-
-// expected-error@+1{{expected behavior name}}
-var [] test3: String
-// expected-error@+1{{expected ']' after behavior name}}
-var [behavior oops] test4: String
+var test1: Int __behavior behavior
+var test2: String __behavior Main.behavior
 
 // expected-error@+1{{property behavior name must refer to a protocol}}
-var [NotABehavior] test5: String
+var test5: String __behavior NotABehavior
 
 struct Concrete {
-  var [behavior] test: String
-  static var [behavior] test: String
+  var test: String __behavior behavior
+  static var test: String __behavior behavior
 }
 
 protocol Proto { }
 extension Proto {
-  var [behavior] test: String
-  static var [behavior] test: String
+  var test: String __behavior behavior
+  static var test: String __behavior behavior
 }
 
 struct Generic<T> {
-  var [behavior] test: String
-  static var [behavior] test: String
+  var test: String __behavior behavior
+  static var test: String __behavior behavior
 }
 
 protocol SelfRequirement {}
@@ -53,23 +48,23 @@ struct NVR {}
 // expected-error@+3{{property behavior 'constraints' can only be used on instance properties because it has 'Self' requirements}}
 // expected-error@+2{{type 'NVR' does not conform to protocol 'ValueRequirement'}}
 // expected-note@+1{{behavior 'constraints' requires property type to conform to protocol 'ValueRequirement'}}
-var [constraints] a: NVR
+var a: NVR __behavior constraints
 
 // expected-error@+1{{property behavior 'constraints' can only be used on instance properties because it has 'Self' requirements}}
-var [constraints] b: VR
+var b: VR __behavior constraints
 
 struct SR: SelfRequirement {
   // expected-error@+2{{type 'NVR' does not conform to protocol 'ValueRequirement'}}
   // expected-note@+1{{behavior 'constraints' requires property type to conform to protocol 'ValueRequirement'}}
-  var [constraints] a: NVR
-  var [constraints] b: VR
+  var a: NVR __behavior constraints
+  var b: VR __behavior constraints
 
   // expected-error@+3{{property behavior 'constraints' can only be used on instance properties because it has 'Self' requirements}}
   // expected-error@+2{{type 'NVR' does not conform to protocol 'ValueRequirement'}}
   // expected-note@+1{{behavior 'constraints' requires property type to conform to protocol 'ValueRequirement'}}
-  static var [constraints] a: NVR
+  static var a: NVR __behavior constraints
   // expected-error@+1{{property behavior 'constraints' can only be used on instance properties because it has 'Self' requirements}}
-  static var [constraints] b: VR
+  static var b: VR __behavior constraints
 }
 
 // expected-error@+1 * {{type 'NSR' does not conform to protocol 'SelfRequirement'}}
@@ -77,18 +72,18 @@ struct NSR {
   // expected-note@+3{{conformance to 'SelfRequirement' required to contain an instance property with behavior 'constraints'}}
   // expected-error@+2{{type 'NVR' does not conform to protocol 'ValueRequirement'}}
   // expected-note@+1{{behavior 'constraints' requires property type to conform to protocol 'ValueRequirement'}}
-  var [constraints] a: NVR
+  var a: NVR __behavior constraints
   // expected-note@+1{{conformance to 'SelfRequirement' required to contain an instance property with behavior 'constraints'}}
-  var [constraints] b: VR
+  var b: VR __behavior constraints
 }
 
 struct GSR<T>: SelfRequirement {
-  var [constraints] a: VR
-  var [constraints] b: GVR<T>
+  var a: VR __behavior constraints
+  var b: GVR<T> __behavior constraints
 }
 
 extension GSR where T: ValueRequirement {
-  var [constraints] c: T
+  var c: T __behavior constraints
 }
 
 protocol nonBehaviorReqt {
@@ -101,7 +96,7 @@ extension nonBehaviorReqt {
 }
 
 // expected-error@+1{{behavior protocol 'nonBehaviorReqt' has non-behavior requirement 'notBehaviorRelated'}}
-var [nonBehaviorReqt] x: Int
+var x: Int __behavior nonBehaviorReqt
 
 protocol hasStorage {
   associatedtype Value
@@ -127,22 +122,22 @@ extension hasStorage {
   var value: Value { fatalError("") }
 }
 
-var [hasStorage] storage1: Int // expected-error {{not supported}}
+var storage1: Int __behavior hasStorage // expected-error {{not supported}}
 struct Foo<T> {
-  static var [hasStorage] staticStorage1: T // expected-error{{static stored properties not supported in generic types}}
-  var [hasStorage] storage2: T
+  static var staticStorage1: T __behavior hasStorage // expected-error{{static stored properties not supported in generic types}}
+  var storage2: T __behavior hasStorage
 
   func foo<U>(_: U) {
-    var [hasStorage] storage1: T // expected-error {{not supported}}
-    var [hasStorage] storage2: U // expected-error {{not supported}}
+    var storage1: T __behavior hasStorage // expected-error {{not supported}}
+    var storage2: U __behavior hasStorage // expected-error {{not supported}}
 
     _ = storage1
     _ = storage2
   }
 }
 extension Foo {
-  static var [hasStorage] y: T // expected-error{{static stored properties not supported in generic types}}
-  var [hasStorage] y: T // expected-error {{extensions may not contain stored properties}}
+  static var y: T __behavior hasStorage // expected-error{{static stored properties not supported in generic types}}
+  var y: T __behavior hasStorage // expected-error {{extensions may not contain stored properties}}
 }
 
 protocol storageWithoutInit {
@@ -157,10 +152,10 @@ extension storageWithoutInit {
 }
 
 struct Bar {
-  var [storageWithoutInit] x: Int // expected-error {{property behavior protocol has a 'storage' requirement but does not have a static 'initStorage' method with the expected type '() -> Self.Value'}}
+  var x: Int __behavior storageWithoutInit // expected-error {{property behavior protocol has a 'storage' requirement but does not have a static 'initStorage' method with the expected type '() -> Self.Value'}}
 }
 class Bas {
-  var [storageWithoutInit] x: Int // expected-error {{property behavior protocol has a 'storage' requirement but does not have a static 'initStorage' method with the expected type '() -> Self.Value'}}
+  var x: Int __behavior storageWithoutInit // expected-error {{property behavior protocol has a 'storage' requirement but does not have a static 'initStorage' method with the expected type '() -> Self.Value'}}
 }
 
 protocol valueTypeMismatch {
@@ -170,7 +165,7 @@ extension valueTypeMismatch {
   var value: Value? { fatalError("") } // expected-note {{'value' property declared here}}
 }
 
-var [valueTypeMismatch] x: Int // expected-error {{property behavior 'valueTypeMismatch' provides 'value' property implementation with type 'Int?' that doesn't match type 'x' of declared property 'Int'}}
+var x: Int __behavior valueTypeMismatch // expected-error {{property behavior 'valueTypeMismatch' provides 'value' property implementation with type 'Int?' that doesn't match type 'x' of declared property 'Int'}}
 
 protocol getset {
   associatedtype Value
@@ -179,14 +174,14 @@ extension getset {
   var value: Value { get { } set { } }
 }
 
-var [getset] testGetset: Int
+var testGetset: Int __behavior getset
 class C<T> {
-  var [getset] testGetset: T
-  static var [getset] testGetset: T
+  var testGetset: T __behavior getset
+  static var testGetset: T __behavior getset
 }
 struct S<T> {
-  var [getset] testGetset: T
-  static var [getset] testGetset: T
+  var testGetset: T __behavior getset
+  static var testGetset: T __behavior getset
 }
 
 protocol initialValue {
@@ -203,16 +198,16 @@ extension initialValue {
 let compoundInitialValue = (0,0)
 
 struct TestInitialValues {
-  var [initialValue] hasInitialValue: Int = 0
-  var [initialValue] (sharedInitialValue1, sharedInitialValue2): (Int,Int) 
-    = compoundInitialValue // expected-error * {{cannot destructure}}
-  var [initialValue] missingInitialValue: Int // expected-error{{requires an initializer}}
+  var hasInitialValue: Int = 0 __behavior initialValue
+  var (sharedInitialValue1, sharedInitialValue2): (Int,Int) 
+    = compoundInitialValue __behavior initialValue // expected-error * {{cannot destructure}}
+  var missingInitialValue: Int __behavior initialValue // expected-error{{requires an initializer}}
   // TODO: "return expression" message is wrong
-  var [initialValue] invalidInitialValue: Int = 5.5 // expected-error{{cannot convert return expression of type 'Double' to return type 'Int'}}
+  var invalidInitialValue: Int = 5.5 __behavior initialValue // expected-error{{cannot convert return expression of type 'Double' to return type 'Int'}}
 }
 
 // TODO
-var [initialValue] globalInitialValue: Int = 0 // expected-error{{not supported}}
+var globalInitialValue: Int = 0 __behavior initialValue // expected-error{{not supported}}
 
 protocol noInitialValue {
   associatedtype Value
@@ -224,9 +219,9 @@ extension noInitialValue {
   }
 }
 
-var [noInitialValue] hasNoInitialValue: Int
-var [noInitialValue] hasUnwantedInitialValue: Int = 0 // expected-error{{initializer expression provided, but property behavior 'noInitialValue' does not use it}}
-var [noInitialValue] (hasUnwantedSharedInitialValue1,
-                      hasUnwantedSharedInitialValue2): (Int, Int)
+var hasNoInitialValue: Int __behavior noInitialValue
+var hasUnwantedInitialValue: Int = 0 __behavior noInitialValue // expected-error{{initializer expression provided, but property behavior 'noInitialValue' does not use it}}
+var (hasUnwantedSharedInitialValue1,
+     hasUnwantedSharedInitialValue2): (Int, Int)
   = compoundInitialValue // expected-error * {{initializer expression provided, but property behavior 'noInitialValue' does not use it}}
-
+  __behavior noInitialValue

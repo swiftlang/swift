@@ -61,3 +61,33 @@ extension P2 where Self.T : C {
   // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P2, τ_0_0.T : C, τ_0_0.T : P3, τ_0_0.T.T == Int>
   func concreteTypeWitnessViaSuperclass1(x: Self.T.T) {}
 }
+
+// CHECK: superclassConformance1
+// CHECK: Requirements:
+// CHECK-NEXT: T witness marker
+// CHECK-NEXT: T : C [explicit @
+// CHECK-NEXT: T : P3 [redundant @
+// CHECK-NEXT: T[.P3].T == T [protocol]
+// CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C>
+func superclassConformance1<T where T : C, T : P3>(t: T) { }
+
+// CHECK: superclassConformance2
+// CHECK: Requirements:
+// CHECK-NEXT: T witness marker
+// CHECK-NEXT: T : C [explicit @
+// CHECK-NEXT: T : P3 [redundant @
+// CHECK-NEXT: T[.P3].T == T [protocol]
+// CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C>
+func superclassConformance2<T where T : C, T : P3>(t: T) { }
+
+protocol P4 { }
+
+class C2 : C, P4 { }
+
+// CHECK: superclassConformance3
+// CHECK: Requirements:
+// CHECK-NEXT: T witness marker
+// CHECK-NEXT: T : C2 [explicit @
+// CHECK-NEXT: T : P4 [redundant @
+// CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C2>
+func superclassConformance3<T where T : C, T : P4, T : C2>(t: T) { }

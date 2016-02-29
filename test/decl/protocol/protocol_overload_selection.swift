@@ -30,7 +30,7 @@ protocol MutableCollection : Collection {
 func insertionSort<
 C: MutableCollection 
 >(
-  inout elements: C,
+  elements: inout C,
   i: C.Index
 ) {
   var _: C.Iterator.Element = elements[i] // should not error

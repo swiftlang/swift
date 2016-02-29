@@ -26,16 +26,8 @@ using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
 SILFunction *GenericCloner::initCloned(SILFunction *Orig,
-                                       TypeSubstitutionMap &InterfaceSubs,
+                                       const ReabstractionInfo &ReInfo,
                                        StringRef NewName) {
-  SILModule &M = Orig->getModule();
-  Module *SM = M.getSwiftModule();
-
-  CanSILFunctionType FTy =
-    SILType::substFuncType(M, SM, InterfaceSubs,
-                           Orig->getLoweredFunctionType(),
-                           /*dropGenerics = */ true);
-
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
@@ -43,8 +35,9 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   // Create a new empty function.
-  SILFunction *NewF = M.getOrCreateFunction(
-      getSpecializedLinkage(Orig, Orig->getLinkage()), NewName, FTy, nullptr,
+  SILFunction *NewF = Orig->getModule().getOrCreateFunction(
+      getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
+      ReInfo.getSpecializedType(), nullptr,
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
       Orig->isFragile(), Orig->isThunk(), Orig->getClassVisibility(),
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
@@ -63,18 +56,55 @@ void GenericCloner::populateCloned() {
   // Create arguments for the entry block.
   SILBasicBlock *OrigEntryBB = &*Original.begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  getBuilder().setInsertionPoint(ClonedEntryBB);
+
+  llvm::SmallVector<AllocStackInst *, 8> AllocStacks;
+  AllocStackInst *ReturnValueAddr = nullptr;
 
   // Create the entry basic block with the function arguments.
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  int ArgIdx = 0;
   while (I != E) {
-    SILValue MappedValue =
-      new (M) SILArgument(ClonedEntryBB, remapType((*I)->getType()),
-                          (*I)->getDecl());
-    ValueMap.insert(std::make_pair(*I, MappedValue));
+    SILArgument *OrigArg = *I;
+    RegularLocation Loc((Decl *)OrigArg->getDecl());
+    AllocStackInst *ASI = nullptr;
+    SILType mappedType = remapType(OrigArg->getType());
+    if (ReInfo.isArgConverted(ArgIdx)) {
+      // We need an alloc_stack as a replacement for the indirect parameter.
+      assert(mappedType.isAddress());
+      mappedType = mappedType.getObjectType();
+      ASI = getBuilder().createAllocStack(Loc, mappedType);
+      ValueMap[OrigArg] = ASI;
+      AllocStacks.push_back(ASI);
+      if (ReInfo.isResultIndex(ArgIdx)) {
+        // This result is converted from indirect to direct. The return inst
+        // needs to load the value from the alloc_stack. See below.
+        assert(!ReturnValueAddr);
+        ReturnValueAddr = ASI;
+      } else {
+        // Store the new direct parameter to the alloc_stack.
+        auto *NewArg =
+          new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
+        getBuilder().createStore(Loc, NewArg, ASI);
+
+        // Try to create a new debug_value from an existing debug_value_addr.
+        for (Operand *ArgUse : OrigArg->getUses()) {
+          if (auto *DVAI = dyn_cast<DebugValueAddrInst>(ArgUse->getUser())) {
+            getBuilder().createDebugValue(DVAI->getLoc(), NewArg,
+                                          DVAI->getVarInfo());
+            break;
+          }
+        }
+      }
+    } else {
+      auto *NewArg =
+        new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
+      ValueMap[OrigArg] = NewArg;
+    }
     ++I;
+    ++ArgIdx;
   }
 
-  getBuilder().setInsertionPoint(ClonedEntryBB);
   BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
   // Recursively visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
@@ -83,6 +113,27 @@ void GenericCloner::populateCloned() {
   // Now iterate over the BBs and fix up the terminators.
   for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
     getBuilder().setInsertionPoint(BI->second);
+    TermInst *OrigTermInst = BI->first->getTerminator();
+    if (auto *RI = dyn_cast<ReturnInst>(OrigTermInst)) {
+      SILValue ReturnValue;
+      if (ReturnValueAddr) {
+        // The result is converted from indirect to direct. We have to load the
+        // returned value from the alloc_stack.
+        ReturnValue = getBuilder().createLoad(ReturnValueAddr->getLoc(),
+                                              ReturnValueAddr);
+      }
+      for (AllocStackInst *ASI : reverse(AllocStacks)) {
+        getBuilder().createDeallocStack(ASI->getLoc(), ASI);
+      }
+      if (ReturnValue) {
+        getBuilder().createReturn(RI->getLoc(), ReturnValue);
+        continue;
+      }
+    } else if (isa<ThrowInst>(OrigTermInst)) {
+      for (AllocStackInst *ASI : reverse(AllocStacks)) {
+        getBuilder().createDeallocStack(ASI->getLoc(), ASI);
+      }
+    }
     visit(BI->first->getTerminator());
   }
 }

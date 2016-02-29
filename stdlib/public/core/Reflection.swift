@@ -152,7 +152,7 @@ public func _reflect<T>(x: T) -> _Mirror
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(
   value: T,
-  inout to target: TargetStream,
+  to target: inout TargetStream,
   name: String? = nil,
   indent: Int = 0,
   maxDepth: Int = .max,
@@ -194,12 +194,12 @@ public func dump<T>(
 /// Dump an object's contents. User code should use dump().
 internal func _dump_unlocked<TargetStream : OutputStream>(
   value: Any,
-  inout to target: TargetStream,
+  to target: inout TargetStream,
   name: String?,
   indent: Int,
   maxDepth: Int,
-  inout maxItemCounter: Int,
-  inout visitedItems: [ObjectIdentifier : Int]
+  maxItemCounter: inout Int,
+  visitedItems: inout [ObjectIdentifier : Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
@@ -292,11 +292,11 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 /// that superclass.
 internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
   mirror mirror: Mirror,
-  inout to target: TargetStream,
+  to target: inout TargetStream,
   indent: Int,
   maxDepth: Int,
-  inout maxItemCounter: Int,
-  inout visitedItems: [ObjectIdentifier : Int]
+  maxItemCounter: inout Int,
+  visitedItems: inout [ObjectIdentifier : Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1

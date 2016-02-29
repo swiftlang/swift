@@ -83,14 +83,14 @@ struct X : _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: Tracked,
-    inout result: X?
+    result: inout X?
   ) {
     result = X(x.value)
   }
 
   static func _conditionallyBridgeFromObjectiveC(
     x: Tracked,
-    inout result: X?
+    result: inout X?
   ) -> Bool {
     result = X(x.value)
     return true
@@ -126,7 +126,7 @@ func testScope() {
 
   objects.withUnsafeMutableBufferPointer {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
-    (inout buf: UnsafeMutableBufferPointer<Int>) -> () in
+    (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
     nsx.getObjects(
       UnsafeMutablePointer<AnyObject>(buf.baseAddress),
       range: _SwiftNSRange(location: 1, length: 2))

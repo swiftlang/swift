@@ -6,7 +6,7 @@ class A {
   func foo(a: [(x: Int, y: Double)]) {}
 }
 
-func accept<T>(t: T.Type, inout _ value: T) {}
+func accept<T>(t: T.Type, _ value: inout T) {}
 
 typealias TheType = (A) -> ([(x: Int, y: Double)]) -> ()
 var curried = A.foo

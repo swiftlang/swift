@@ -86,7 +86,7 @@ protocol Comparable {
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
-func sort<T : Comparable>(inout array: [T]) {
+func sort<T : Comparable>(array: inout [T]) {
   for i in 0..<array.count {
     for j in i+1..<array.count {
       if array[j] < array[i] {

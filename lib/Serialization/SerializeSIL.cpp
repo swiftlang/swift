@@ -13,10 +13,12 @@
 #define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
+#include "swift/Strings.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -1679,11 +1681,25 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
       writeSILWitnessTable(wt);
   }
 
+  // Emit only declarations if it is a module with pre-specializations.
+  bool emitDeclarationsForOnoneSupport =
+      SILMod->getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT;
+
   // Go through all the SILFunctions in SILMod and write out any
   // mandatory function bodies.
   for (const SILFunction &F : *SILMod) {
-    if (shouldEmitFunctionBody(F) || ShouldSerializeAll)
-      writeSILFunction(F);
+    if (shouldEmitFunctionBody(F) || ShouldSerializeAll) {
+      if (emitDeclarationsForOnoneSupport) {
+        // Only declarations of whitelisted pre-specializations from with
+        // public linkage need to be serialized as they will be used
+        // by UsePrespecializations pass during -Onone compilation to
+        // check for availability of concrete pre-specializations.
+        if (!hasPublicVisibility(F.getLinkage()) ||
+            !isWhitelistedSpecialization(F.getName()))
+            continue;
+      }
+      writeSILFunction(F, emitDeclarationsForOnoneSupport);
+    }
   }
 
   if (ShouldSerializeAll)

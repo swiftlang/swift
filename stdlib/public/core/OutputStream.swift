@@ -36,7 +36,7 @@ extension OutputStream {
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
   /// Write a textual representation of `self` into `target`.
-  func write<Target : OutputStream>(inout to target: Target)
+  func write<Target : OutputStream>(to target: inout Target)
 }
 
 /// A type with a customized textual representation.
@@ -90,7 +90,7 @@ func _opaqueSummary(metadata: Any.Type) -> UnsafePointer<CChar>
 
 /// Do our best to print a value that cannot be printed directly.
 internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
-    value: T, _ mirror: Mirror, inout _ target: TargetStream,
+    value: T, _ mirror: Mirror, _ target: inout TargetStream,
     isDebugPrint: Bool
 ) {
   func printTypeName(type: Any.Type) {
@@ -177,7 +177,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _print_unlocked<T, TargetStream : OutputStream>(
-  value: T, inout _ target: TargetStream
+  value: T, _ target: inout TargetStream
 ) {
   // Optional has no representation suitable for display; therefore,
   // values of optional type should be printed as a debug
@@ -233,7 +233,7 @@ func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
 
 @inline(never)
 public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
-    value: T, inout _ target: TargetStream
+    value: T, _ target: inout TargetStream
 ) {
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
     debugPrintableObject.debugDescription.write(to: &target)
@@ -255,7 +255,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
 }
 
 internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
-    value: T, _ mirror: Mirror, inout _ target: TargetStream
+    value: T, _ mirror: Mirror, _ target: inout TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
     // Containers and tuples are always displayed in terms of their element count
@@ -355,21 +355,21 @@ extension String : OutputStream {
 
 extension String : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func write<Target : OutputStream>(inout to target: Target) {
+  public func write<Target : OutputStream>(to target: inout Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func write<Target : OutputStream>(inout to target: Target) {
+  public func write<Target : OutputStream>(to target: inout Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func write<Target : OutputStream>(inout to target: Target) {
+  public func write<Target : OutputStream>(to target: inout Target) {
     target.write(String(Character(self)))
   }
 }

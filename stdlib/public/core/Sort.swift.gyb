@@ -43,9 +43,9 @@ func _insertionSort<
   C: MutableCollection where C.Index: BidirectionalIndex
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
-  inout elements: C,
+  elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   if !range.isEmpty {
     let start = range.startIndex
@@ -90,9 +90,9 @@ func _partition<
   C: MutableCollection where C.Index: RandomAccessIndex
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
-  inout elements: C,
+  elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) -> C.Index {
   var lo = range.startIndex
   var hi = range.endIndex
@@ -145,7 +145,7 @@ func _introSort<
   C : MutableCollection where C.Index : RandomAccessIndex
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
-  inout elements: C,
+  elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
@@ -170,9 +170,9 @@ func _introSortImpl<
   C : MutableCollection where C.Index : RandomAccessIndex
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
-  inout elements: C,
+  elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
+  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
   depthLimit: Int
 ) {
 
@@ -215,10 +215,10 @@ func _siftDown<
   C : MutableCollection where C.Index : RandomAccessIndex
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
-  inout elements: C,
+  elements: inout C,
   index: C.Index,
   subRange range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   let countToIndex = (range.startIndex..<index).count
   let countFromIndex = (index..<range.endIndex).count
@@ -254,9 +254,9 @@ func _heapify<
   C : MutableCollection where C.Index : RandomAccessIndex
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
-  inout elements: C,
+  elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
@@ -279,9 +279,9 @@ func _heapSort<
   C : MutableCollection where C.Index : RandomAccessIndex
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
-  inout elements: C,
+  elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   var hi = range.endIndex
   let lo = range.startIndex
@@ -307,7 +307,7 @@ func _heapSort<
 /// Exchange the values of `a` and `b`.
 ///
 /// - Precondition: `a` and `b` do not alias each other.
-public func swap<T>(inout a: T, inout _ b: T) {
+public func swap<T>(a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
   let p1 = Builtin.addressof(&a)

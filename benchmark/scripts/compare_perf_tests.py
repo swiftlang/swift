@@ -24,11 +24,12 @@ import re
 VERBOSE = 0
 
 # #,TEST,SAMPLES,MIN(ms),MAX(ms),MEAN(ms),SD(ms),MEDIAN(ms)
-SCORERE = re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+)")
-TOTALRE = re.compile(r"()(Totals),[ \t]*([\d.]+),[ \t]*([\d.]+)")
-KEYGROUP = 2
-VALGROUP = 4
+SCORERE = re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+),[ \t]*([\d.]+)")
+TOTALRE = re.compile(r"()(Totals),[ \t]*([\d.]+),[ \t]*([\d.]+),[ \t]*([\d.]+)")
 NUMGROUP = 1
+KEYGROUP = 2
+BESTGROUP = 4
+WORSTGROUP = 5
 
 IsTime = 1
 ShowSpeedup = 1
@@ -42,6 +43,7 @@ def parseInt(word):
 
 def getScores(fname):
     scores = {}
+    worstscores = {}
     nums = {}
     runs = 0
     f = open(fname)
@@ -58,11 +60,13 @@ def getScores(fname):
                 continue
 
             if VERBOSE:
-                print "  match", m.group(KEYGROUP), m.group(VALGROUP)
+                print "  match", m.group(KEYGROUP), m.group(BESTGROUP)
 
             if not m.group(KEYGROUP) in scores:
                 scores[m.group(KEYGROUP)] = []
-            scores[m.group(KEYGROUP)].append(parseInt(m.group(VALGROUP)))
+                worstscores[m.group(KEYGROUP)] = []
+            scores[m.group(KEYGROUP)].append(parseInt(m.group(BESTGROUP)))
+            worstscores[m.group(KEYGROUP)].append(parseInt(m.group(WORSTGROUP)))
             if is_total:
                 nums[m.group(KEYGROUP)] = ""
             else:
@@ -71,12 +75,12 @@ def getScores(fname):
                 runs = len(scores[m.group(KEYGROUP)])
     finally:
         f.close()
-    return scores, runs, nums
+    return scores, worstscores, runs, nums
 
 def isMaxScore(newscore, maxscore, invert):
     return not maxscore or (newscore > maxscore if not invert else newscore < maxscore)
 
-def compareScores(key, score1, score2, runs, num):
+def compareScores(key, score1, worstsample1, score2, worstsample2, runs, num):
     print num.rjust(3),
     print key.ljust(25),
     bestscore1 = None
@@ -93,6 +97,9 @@ def compareScores(key, score1, score2, runs, num):
             worstscore1 = score
         if PrintAllScores:
             print ("%d" % score).rjust(16),
+    for score in worstsample1:
+        if isMaxScore(newscore=score, maxscore=worstscore1, invert=minworst):
+            worstscore1 = score
     for score in score2:
         if isMaxScore(newscore=score, maxscore=bestscore2, invert=minbest):
             bestscore2 = score
@@ -101,6 +108,9 @@ def compareScores(key, score1, score2, runs, num):
         if PrintAllScores:
             print ("%d" % score).rjust(16),
         r += 1
+    for score in worstsample2:
+        if isMaxScore(newscore=score, maxscore=worstscore2, invert=minworst):
+            worstscore2 = score
     while r < runs:
         if PrintAllScores:
             print ("0").rjust(9),
@@ -123,13 +133,15 @@ def compareScores(key, score1, score2, runs, num):
         print "*".rjust(9),
         if ShowSpeedup:
             print "*".rjust(9),
-    # if the interval endpoints have inverse relationship, then they overlap
+    # check if the worst->best interval for each configuration overlap.
     if minbest:
-        if bestscore1 < worstscore2:
-            print "(!)",
+        if (bestscore1 < bestscore2 and bestscore2 < worstscore1) \
+        or (bestscore2 < bestscore1 and bestscore1 < worstscore2):
+            print "(?)",
     else:
-        if bestscore1 > worstscore2:
-            print "(!)",
+        if (worstscore1 < worstscore2 and worstscore2 < bestscore1) \
+        or (worstscore2 < worstscore1 and worstscore1 < bestscore2):
+            print "(?)",
     print
 
 def printBestScores(key, scores):
@@ -151,7 +163,7 @@ if __name__ == '__main__':
         sys.exit(1)
     file1 = sys.argv[1]
     if len(sys.argv) < 3:
-        scores, runs, nums = getScores(file1)
+        scores, worstscores, runs, nums = getScores(file1)
         keys = list(set(scores.keys()))
         keys.sort()
         for key in keys:
@@ -162,8 +174,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 3:
         SCORERE = re.compile(sys.argv[3])
 
-    scores1, runs1, nums = getScores(file1)
-    scores2, runs2, nums = getScores(file2)
+    scores1, worstscores1, runs1, nums = getScores(file1)
+    scores2, worstscores2, runs2, nums = getScores(file2)
 
     runs = runs1
     if runs2 > runs:
@@ -201,4 +213,4 @@ if __name__ == '__main__':
         if key not in scores2:
             print key, "not in", file2
             continue
-        compareScores(key, scores1[key], scores2[key], runs, nums[key])
+        compareScores(key, scores1[key], worstscores1[key], scores2[key], worstscores2[key], runs, nums[key])

@@ -408,7 +408,7 @@ public struct ${Self}<Pointee>
   /// of a `Pointee` which is written into buffer before this method returns.
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
-    inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
+    buffer: inout U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -419,7 +419,7 @@ public struct ${Self}<Pointee>
   /// of buffer.
   @_transparent public
   func _withBridgeValue<U, R>(
-    inout buffer: U, @noescape body: UnsafeMutablePointer<U> -> R
+    buffer: inout U, @noescape body: UnsafeMutablePointer<U> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -531,12 +531,12 @@ public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
 }
 
 @_transparent
-public func += <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
+public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @_transparent
-public func -= <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
+public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs - rhs
 }
 

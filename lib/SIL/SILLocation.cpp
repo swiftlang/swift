@@ -54,6 +54,8 @@ SourceLoc SILLocation::getSourceLoc(ASTNodeTy N) const {
 }
 
 SourceLoc SILLocation::getDebugSourceLoc() const {
+  assert(!isDebugInfoLoc());
+
   if (isSILFile())
     return Loc.SILFileLoc;
 
@@ -124,7 +126,7 @@ SILLocation::DebugLoc SILLocation::decode(SourceLoc Loc,
   DebugLoc DL;
   if (Loc.isValid()) {
     DL.Filename = SM.getBufferIdentifierForLoc(Loc);
-    std::tie(DL.Line, DL.Col) = SM.getLineAndColumn(Loc);
+    std::tie(DL.Line, DL.Column) = SM.getLineAndColumn(Loc);
   }
   return DL;
 }

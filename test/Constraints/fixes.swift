@@ -73,7 +73,7 @@ func forgotAnyObjectBang(obj: AnyObject) {
   _ = a
 }
 
-func increment(inout x: Int) { }
+func increment(x: inout Int) { }
 
 func forgotAmpersand() {
   var i = 5

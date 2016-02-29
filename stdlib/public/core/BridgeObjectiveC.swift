@@ -52,7 +52,7 @@ public protocol _ObjectiveCBridgeable {
   ///   will always contain a value.
   static func _forceBridgeFromObjectiveC(
     source: _ObjectiveCType,
-    inout result: Self?
+    result: inout Self?
   )
 
   /// Try to bridge from an Objective-C object of the bridged class
@@ -71,7 +71,7 @@ public protocol _ObjectiveCBridgeable {
   ///   to determine success.
   static func _conditionallyBridgeFromObjectiveC(
     source: _ObjectiveCType,
-    inout result: Self?
+    result: inout Self?
   ) -> Bool
 }
 
@@ -103,14 +103,14 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     source: AnyObject,
-    inout result: _BridgeableMetatype?
+    result: inout _BridgeableMetatype?
   ) {
     result = _BridgeableMetatype(value: source as! AnyObject.Type)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     source: AnyObject,
-    inout result: _BridgeableMetatype?
+    result: inout _BridgeableMetatype?
   ) -> Bool {
     if let type = source as? AnyObject.Type {
       result = _BridgeableMetatype(value: type)
@@ -254,7 +254,7 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 func _bridgeNonVerbatimFromObjectiveC<T>(
   x: AnyObject,
   _ nativeType: T.Type,
-  inout _ result: T?
+  _ result: inout T?
 )
 
 /// Runtime optional to conditionally perform a bridge from an object to a value
@@ -268,7 +268,7 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
   x: AnyObject,
   _ nativeType: T.Type,
-  inout _ result: T?
+  _ result: inout T?
 ) -> Bool
 
 /// Determines if values of a given type can be converted to an Objective-C

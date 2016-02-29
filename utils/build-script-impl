@@ -80,7 +80,8 @@ KNOWN_SETTINGS=(
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
-    enable-asan                 ""               "enable AddressSanitizer"
+    enable-asan                 ""               "enable Address Sanitizer"
+    enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     user-config-args            ""               "User-supplied arguments to cmake when used to do configuration"
@@ -192,7 +193,6 @@ KNOWN_SETTINGS=(
     extra-swift-args            ""               "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     sil-verify-all              "0"              "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
-    swift-runtime-enable-dtrace "0"              "Enable runtime dtrace support"
     swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
     use-gold-linker             ""               "Enable using the gold linker"
     darwin-toolchain-bundle-identifier ""        "CFBundleIdentifier for xctoolchain info plist"
@@ -213,6 +213,13 @@ function toupper() {
 
 function to_varname() {
     toupper "${1//-/_}"
+}
+
+function join_array_with_delimiter() {
+    # $1 is the delimiter
+    local IFS="$1"
+    shift
+    echo "$*"
 }
 
 function set_lldb_build_mode() {
@@ -1034,11 +1041,25 @@ COMMON_CMAKE_OPTIONS=(
 )
 
 COMMON_C_FLAGS=""
-
+SANITIZERS=()
 if [[ "${ENABLE_ASAN}" ]] ; then
+    SANITIZERS=(
+        "${SANITIZERS[@]}"
+        "Address"
+    )
+fi
+
+if [[ "${ENABLE_UBSAN}" ]] ; then
+    SANITIZERS=(
+        "${SANITIZERS[@]}"
+        "Undefined"
+    )
+fi
+
+if [[ -n "${SANITIZERS[@]}" ]] ; then
     COMMON_CMAKE_OPTIONS=(
         "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_USE_SANITIZER="Address"
+        -DLLVM_USE_SANITIZER=$(join_array_with_delimiter ";" "${SANITIZERS[@]}")
     )
 fi
 
@@ -1420,7 +1441,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
         "${swift_cmake_options[@]}"
         -DSWIFT_AST_VERIFIER:BOOL=$(true_false "${SWIFT_ENABLE_AST_VERIFIER}")
         -DSWIFT_SIL_VERIFY_ALL:BOOL=$(true_false "${SIL_VERIFY_ALL}")
-        -DSWIFT_RUNTIME_ENABLE_DTRACE:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_DTRACE}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 

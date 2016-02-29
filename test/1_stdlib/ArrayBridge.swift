@@ -113,7 +113,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: BridgedObjC,
-    inout result: BridgedSwift?
+    result: inout BridgedSwift?
   ) {
     assert(x.value >= 0, "not bridged")
     bridgeFromOperationCount += 1
@@ -122,7 +122,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: BridgedObjC,
-    inout result: BridgedSwift?
+    result: inout BridgedSwift?
   ) -> Bool {
     if x.value >= 0 {
       result = BridgedSwift(x.value)

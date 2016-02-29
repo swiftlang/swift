@@ -17,7 +17,6 @@
 #include "swift/SIL/Mangle.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"

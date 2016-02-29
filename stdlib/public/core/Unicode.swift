@@ -66,7 +66,7 @@ public protocol UnicodeCodec {
   /// - parameter next: An iterator over the code units to be decoded.
   mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout next: I) -> UnicodeDecodingResult
+  >(next: inout I) -> UnicodeDecodingResult
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
@@ -339,7 +339,7 @@ public struct UTF8 : UnicodeCodec {
   /// - parameter next: An iterator over the code units to be decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout next: I) -> UnicodeDecodingResult {
+  >(next: inout I) -> UnicodeDecodingResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
     // iterator.
     if _lookaheadFlags & 0b1111_0000 == 0 {
@@ -523,7 +523,7 @@ public struct UTF16 : UnicodeCodec {
   /// - parameter next: An *iterator* over the code units to be decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> UnicodeDecodingResult {
+  >(input: inout I) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
       return .emptyInput
     }
@@ -601,7 +601,7 @@ public struct UTF16 : UnicodeCodec {
   /// units than required for this scalar.
   mutating func _decodeOne<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> (UnicodeDecodingResult, Int) {
+  >(input: inout I) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
     case .scalarValue(let us):
@@ -656,13 +656,13 @@ public struct UTF32 : UnicodeCodec {
   /// - parameter next: An iterator over the code units to be decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> UnicodeDecodingResult {
+  >(input: inout I) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
   }
 
   static func _decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> UnicodeDecodingResult {
+  >(input: inout I) -> UnicodeDecodingResult {
     guard let x = input.next() else { return .emptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
       return .scalarValue(UnicodeScalar(x))

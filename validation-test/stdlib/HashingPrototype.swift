@@ -29,14 +29,14 @@ below.
 */
 
 protocol NewHashable /*: Equatable*/ {
-  func combineIntoHash<H : Hasher>(inout hasher: H)
+  func combineIntoHash<H : Hasher>(hasher: inout H)
 }
 
 struct UserTypeA : NewHashable {
   var a1: Int
   var a2: Float
 
-  func combineIntoHash<H : Hasher>(inout hasher: H) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(a1)
     hasher.combine(a2)
   }
@@ -47,7 +47,7 @@ struct UserTypeB : NewHashable {
   var b2: UserTypeA // User-defined hashable type
   var b3: [Int]
 
-  func combineIntoHash<H : Hasher>(inout hasher: H) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(b1)
     hasher.combine(b2)
     hasher.combineSequence(b3)
@@ -58,7 +58,7 @@ class UserClassA : NSObject {
   var a1: Int = 0
 
   // error: declarations from extensions cannot be overridden yet
-  //func combineIntoHash<H : Hasher>(inout hasher: H) {
+  //func combineIntoHash<H : Hasher>(hasher: inout H) {
   //  hasher.combine(a1)
   //}
 
@@ -157,7 +157,7 @@ struct InProcessHashtableHasher : Hasher {
 // struct StableFingerprint128Hasher : Hasher {}
 
 extension Int : NewHashable {
-  func combineIntoHash<H : Hasher>(inout hasher: H) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(self)
   }
 }
@@ -169,7 +169,7 @@ extension Int : NewHashable {
 import Foundation
 
 extension NSObject : NewHashable {
-  func combineIntoHash<H : Hasher>(inout hasher: H) {
+  func combineIntoHash<H : Hasher>(hasher: inout H) {
     hasher.combine(self.hash)
   }
 }

@@ -281,6 +281,15 @@ func brokenSwitch(x: Int) -> Int {
   }
 }
 
+func switchWithVarsNotMatchingTypes(x: Int, y: Int, z: String) -> Int {
+  switch (x,y,z) {
+  case (let a, 0, _), (0, let a, _): // OK
+    return a
+  case (let a, _, _), (_, _, let a): // expected-error {{pattern variable bound to type 'String', expected type 'Int'}}
+    return a
+  }
+}
+
 func breakContinue(x : Int) -> Int {
 
 Outer:

@@ -304,10 +304,10 @@ func testForceTryMultiple() {
 // CHECK-LABEL: sil hidden @_TF6errors20testForceTryMultipleFT_T_
 // CHECK-NEXT: bb0:
 // CHECK: [[FN_1:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
-// CHECK-NEXT: try_apply [[FN_1]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_1:[^ ]+]], error [[CLEANUPS_1:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN_1]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_1:[^ ]+]], error [[CLEANUPS_1:[^ ]+]],
 // CHECK: [[SUCCESS_1]]([[VALUE_1:%.+]] : $Cat)
 // CHECK: [[FN_2:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
-// CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]],
 // CHECK: [[SUCCESS_2]]([[VALUE_2:%.+]] : $Cat)
 // CHECK-NEXT: strong_release [[VALUE_2]] : $Cat
 // CHECK-NEXT: strong_release [[VALUE_1]] : $Cat
@@ -485,7 +485,7 @@ protocol Buildable {
   var firstStructure: Structure { get set }
   subscript(name: String) -> Structure { get set }
 }
-func supportFirstStructure<B: Buildable>(inout b: B) throws {
+func supportFirstStructure<B: Buildable>(b: inout B) throws {
   try b.firstStructure.support()
 }
 // CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructure{{.*}} : $@convention(thin) <B where B : Buildable, B.Structure : Supportable> (@inout B) -> @error ErrorProtocol {
@@ -515,7 +515,7 @@ func supportFirstStructure<B: Buildable>(inout b: B) throws {
 // CHECK: dealloc_stack [[MATBUFFER]]
 // CHECK: throw [[ERROR]]
 
-func supportStructure<B: Buildable>(inout b: B, name: String) throws {
+func supportStructure<B: Buildable>(b: inout B, name: String) throws {
   try b[name].support()
 }
 // CHECK-LABEL: sil hidden @_TF6errors16supportStructure
@@ -561,7 +561,7 @@ struct Bridge {
     set {}
   }
 }
-func supportStructure(inout b: Bridge, name: String) throws {
+func supportStructure(b: inout Bridge, name: String) throws {
   try b[name].support()
 }
 // CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ :
@@ -614,7 +614,7 @@ struct OwnedBridge {
     mutableAddressWithOwner { return (nil, owner) }
   }
 }
-func supportStructure(inout b: OwnedBridge, name: String) throws {
+func supportStructure(b: inout OwnedBridge, name: String) throws {
   try b[name].support()
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
@@ -650,7 +650,7 @@ struct PinnedBridge {
     mutableAddressWithPinnedNativeOwner { return (nil, owner) }
   }
 }
-func supportStructure(inout b: PinnedBridge, name: String) throws {
+func supportStructure(b: inout PinnedBridge, name: String) throws {
   try b[name].support()
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :
@@ -692,7 +692,7 @@ func testForcePeephole(f: () throws -> Int?) -> Int {
 // CHECK-LABEL: sil hidden @_TF6errors15testOptionalTryFT_T_
 // CHECK-NEXT: bb0:
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
-// CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Cat)
 // CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[VALUE]]
 // CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<Cat>)
@@ -716,11 +716,11 @@ func testOptionalTry() {
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
-// CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Cat)
 // CHECK-NEXT: store [[VALUE]] to [[BOX_DATA]] : $*Cat
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
-// CHECK-NEXT: br [[DONE:[^ ]+]]
+// CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
 // CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
@@ -742,11 +742,11 @@ func testOptionalTryVar() {
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
 // CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
-// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
-// CHECK-NEXT: br [[DONE:[^ ]+]]
+// CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
 // CHECK-NEXT: destroy_addr [[BOX]] : $*Optional<T>
 // CHECK-NEXT: dealloc_stack [[BOX]] : $*Optional<T>
@@ -772,11 +772,11 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
 // CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
-// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
-// CHECK-NEXT: br [[DONE:[^ ]+]]
+// CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
 // CHECK-NEXT: strong_release [[BOX]] : $@box Optional<T>
 // CHECK-NEXT: destroy_addr %0 : $*T
@@ -796,10 +796,10 @@ func testOptionalTryAddressOnlyVar<T>(obj: T) {
 // CHECK-LABEL: sil hidden @_TF6errors23testOptionalTryMultipleFT_T_
 // CHECK: bb0:
 // CHECK: [[FN_1:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
-// CHECK-NEXT: try_apply [[FN_1]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_1:[^ ]+]], error [[CLEANUPS_1:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN_1]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_1:[^ ]+]], error [[CLEANUPS_1:[^ ]+]],
 // CHECK: [[SUCCESS_1]]([[VALUE_1:%.+]] : $Cat)
 // CHECK: [[FN_2:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
-// CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]]
+// CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error ErrorProtocol), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]],
 // CHECK: [[SUCCESS_2]]([[VALUE_2:%.+]] : $Cat)
 // CHECK-NEXT: [[TUPLE:%.+]] = tuple ([[VALUE_1]] : $Cat, [[VALUE_2]] : $Cat)
 // CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.some!enumelt.1, [[TUPLE]]

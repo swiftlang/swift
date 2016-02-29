@@ -2,7 +2,7 @@
 
 func markUsed<T>(t: T) {}
 
-func foo(inout x : Int64) {
+func foo(x: inout Int64) {
   // Make sure the shadow copy is being made in the prologue or (at
   // line 0), but the code to load the value from the inout storage is
   // not.
