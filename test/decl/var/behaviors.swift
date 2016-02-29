@@ -112,20 +112,24 @@ extension hasStorage {
   static func initStorage() -> Value {
     fatalError("")
   }
-  static func initStorage(_: Int) -> Value? {
-    fatalError("")
-  }
-  static func initStorage(_: Value) -> Value? {
+  static func initStorage(_: String) -> Value? {
     fatalError("")
   }
 
   var value: Value { fatalError("") }
 }
 
+var tuple = (0,0)
+
 var storage1: Int __behavior hasStorage // expected-error {{not supported}}
 struct Foo<T> {
   static var staticStorage1: T __behavior hasStorage // expected-error{{static stored properties not supported in generic types}}
   var storage2: T __behavior hasStorage
+
+  var storage3: Int = 0 // expected-error {{initializer expression provided, but property behavior 'hasStorage' does not use it}}
+    __behavior hasStorage
+  var (storage4, storage5) = tuple // expected-error* {{initializer expression provided, but property behavior 'hasStorage' does not use it}}
+    __behavior hasStorage
 
   func foo<U>(_: U) {
     var storage1: T __behavior hasStorage // expected-error {{not supported}}
@@ -218,3 +222,22 @@ extension noParameter {
 
 var hasNoParameter: Int __behavior noParameter
 var hasUnwantedParameter: Int __behavior noParameter { 0 } // expected-error{{parameter expression provided, but property behavior 'noParameter' does not use it}}
+
+protocol storageWithInitialValue {
+  associatedtype Value
+  var storage: Value? { get set }
+}
+extension storageWithInitialValue {
+  var value: Value { get { } }
+
+  static func initStorage(x: Value) -> Value? {
+    return nil
+  }
+}
+
+struct TestStorageWithInitialValue {
+  var x: Int __behavior storageWithInitialValue // Would require DI
+  var y = 0 __behavior storageWithInitialValue
+  var z: Int = 5.5 __behavior storageWithInitialValue // expected-error {{cannot convert value of type 'Double' to type 'Int' in coercion}}
+  var (a, b) = tuple __behavior storageWithInitialValue // expected-error* {{do not support destructuring}}
+}

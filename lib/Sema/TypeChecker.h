@@ -1024,7 +1024,8 @@ public:
   /// Instantiate the storage implementation for a behavior-backed property.
   void completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
-                               FuncDecl *BehaviorInitStorage,
+                               FuncDecl *DefaultInitStorage,
+                               FuncDecl *ParamInitStorage,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
