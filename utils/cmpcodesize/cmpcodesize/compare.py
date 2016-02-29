@@ -59,12 +59,12 @@ def addFunction(sizes, function, start_addr, end_addr, group_by_prefix):
 
     if group_by_prefix:
         for infix in SortedInfixes:
-	    if infix in function:
+            if infix in function:
                if GenericFunctionPrefix not in function:
-	           sizes[Infixes[infix]] += size
+                   sizes[Infixes[infix]] += size
                    return
         for prefix in SortedPrefixes:
-	    if function.startswith(prefix):
+            if function.startswith(prefix):
                 # Special handling for function signature specializations
                 # of generic specializations.
                 if prefix == "__TTSf" and GenericFunctionPrefix in function:
