@@ -985,6 +985,9 @@ public:
 
   SourceLoc getStartLoc() const { return getLoc(); }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
+  SourceRange getLabelItemsRange() const {
+    return ColonLoc.isValid() ? SourceRange(getLoc(), ColonLoc) : getSourceRange();
+  }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
 
