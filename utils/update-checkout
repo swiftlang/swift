@@ -44,7 +44,7 @@ def update_working_copy(repo_path, branch):
         check_call(["git", "fetch"])
         check_call(["git", "rebase", "FETCH_HEAD"])
 
-def obtain_additional_swift_sources(with_ssh, branch):
+def obtain_additional_swift_sources(with_ssh, branch, fast):
     additional_repos = {
         'llvm': 'apple/swift-llvm',
         'clang': 'apple/swift-clang',
@@ -60,7 +60,10 @@ def obtain_additional_swift_sources(with_ssh, branch):
                     remote = "git@github.com:" + repo + '.git'
                 else:
                     remote = "https://github.com/" + repo + '.git'
-                check_call(['git', 'clone', remote, dir_name])
+                if fast:
+                    check_call(['git', 'clone', '--depth', '1', remote, dir_name])
+                else:
+                    check_call(['git', 'clone', remote, dir_name])
                 if branch:
                     src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + ".git"
                     check_call(['git', '--git-dir', src_path, '--work-tree', os.path.join(SWIFT_SOURCE_ROOT, dir_name), 'checkout', branch])
@@ -78,16 +81,20 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument("--clone-with-ssh",
         help="Obtain Sources for Swift and Related Projects via SSH",
         action="store_true")
+    parser.add_argument("--fast",
+        help="Obtain Sources Fast",
+        action="store_true")
     parser.add_argument("--branch",
         help="Obtain Sources for specific branch")
     args = parser.parse_args()
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh
+    clone_fast = args.fast
     branch = args.branch
 
     if clone or clone_with_ssh:
-        obtain_additional_swift_sources(clone_with_ssh, branch)
+        obtain_additional_swift_sources(clone_with_ssh, branch, clone_fast)
         return 0
 
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"), branch)
