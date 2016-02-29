@@ -239,13 +239,13 @@ def compareFunctionSizes(old_files, new_files):
 
     if onlyInFile1:
         print("Only in old file(s)")
-        print(listFunctionSizes(onlyInFile1))
+        print(os.linesep.join(listFunctionSizes(onlyInFile1)))
         print("Total size of functions only in old file: {}".format(onlyInFile1Size))
         print()
 
     if onlyInFile2:
         print("Only in new files(s)")
-        print(listFunctionSizes(onlyInFile2))
+        print(os.linesep.join(listFunctionSizes(onlyInFile2)))
         print("Total size of functions only in new file: {}".format(onlyInFile2Size))
         print()
 
