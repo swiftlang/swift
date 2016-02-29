@@ -1537,7 +1537,8 @@ ERROR(property_behavior_protocol_no_value,none,
       "property behavior protocol does not have a 'value' property", ())
 ERROR(property_behavior_protocol_no_initStorage,none,
       "property behavior protocol has a 'storage' requirement but does not "
-      "have a static 'initStorage' method with the expected type %0", (Type))
+      "have a static 'initStorage' method with the expected type %0 or %1",
+      (Type, Type))
 ERROR(property_behavior_unknown_requirement,none,
       "property behavior protocol %0 has non-behavior requirement %1",
       (Identifier, Identifier))
@@ -1570,6 +1571,13 @@ ERROR(property_behavior_invalid_parameter_reqt,none,
 ERROR(property_behavior_requires_parameter,none,
       "property behavior %0 requires a parameter in the declaration of %1",
       (Identifier, Identifier))
+ERROR(property_behavior_invalid_initializer,none,
+      "initializer expression provided, but property behavior %0 does not "
+      "use it",
+      (Identifier))
+ERROR(property_behavior_unsupported_initializer,none,
+      "property behaviors do not support destructuring initialization of "
+      "multiple properties", ())
 ERROR(property_behavior_invalid_parameter,none,
       "parameter expression provided, but property behavior %0 does not "
       "use it",

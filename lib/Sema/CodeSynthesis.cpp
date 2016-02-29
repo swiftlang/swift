@@ -1185,14 +1185,15 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 
 void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
-                               FuncDecl *BehaviorInitStorage,
+                               FuncDecl *DefaultInitStorage,
+                               FuncDecl *ParamInitStorage,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs) {
   assert(BehaviorStorage);
-  assert(BehaviorInitStorage);
+  assert((bool)DefaultInitStorage != (bool)ParamInitStorage);
 
   // Substitute the storage type into the conforming context.
   auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
@@ -1229,34 +1230,76 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   
   addMemberToContextIfNeeded(Storage, DC);
   
-  // Build the initializer expression, 'Self.initStorage()', using the
-  // conformance.
-  auto SelfTypeRef = TypeExpr::createImplicit(SelfTy, Context);
-  auto SpecializeInitStorage = ConcreteDeclRef(Context, BehaviorInitStorage,
+  // Initialize the storage immediately, if we can.
+  Expr *InitStorageExpr = nullptr;
+  auto Method = DefaultInitStorage ? DefaultInitStorage : ParamInitStorage;
+  auto SpecializeInitStorage = ConcreteDeclRef(Context, Method,
                                                SelfContextSubs);
-  
-  auto InitStorageRef = new (Context) DeclRefExpr(SpecializeInitStorage,
-                                                  DeclNameLoc(),
-                                                  /*implicit*/ true);
-  auto InitStorageMethodTy = FunctionType::get(Context.TheEmptyTupleType,
-                                               SubstStorageContextTy);
-  auto InitStorageRefTy = FunctionType::get(SelfTypeRef->getType(),
-                                            InitStorageMethodTy);
-  InitStorageRef->setType(InitStorageRefTy);
 
-  auto SelfApply = new (Context) DotSyntaxCallExpr(InitStorageRef,
-                                                   SourceLoc(),
-                                                   SelfTypeRef);
-  SelfApply->setImplicit();
-  SelfApply->setType(InitStorageMethodTy);
-  SelfApply->setThrows(false);
-  auto EmptyTuple = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
-                                           /*implicit*/ true);
-  auto InitStorageExpr = new (Context) CallExpr(SelfApply, EmptyTuple,
+  if (DefaultInitStorage ||
+      (ParamInitStorage && VD->getParentInitializer())) {
+    
+    // Build the initializer expression, 'Self.initStorage()', using the
+    // conformance.
+    auto SelfTypeRef = TypeExpr::createImplicit(SelfTy, Context);
+    
+    auto InitStorageRef = new (Context) DeclRefExpr(SpecializeInitStorage,
+                                                    DeclNameLoc(),
+                                                    /*implicit*/ true);
+    auto InitStorageMethodTy = FunctionType::get(Context.TheEmptyTupleType,
+                                                 SubstStorageContextTy);
+    auto InitStorageRefTy = FunctionType::get(SelfTypeRef->getType(),
+                                              InitStorageMethodTy);
+    InitStorageRef->setType(InitStorageRefTy);
+
+    auto SelfApply = new (Context) DotSyntaxCallExpr(InitStorageRef,
+                                                     SourceLoc(),
+                                                     SelfTypeRef);
+    SelfApply->setImplicit();
+    SelfApply->setType(InitStorageMethodTy);
+    SelfApply->setThrows(false);
+    
+    Expr *InitStorageParam;
+    if (ParamInitStorage) {
+      // Claim the var initializer as the parameter to the `initStorage`
+      // method.
+      auto InitValue = VD->getParentInitializer();
+      auto PBD = VD->getParentPatternBinding();
+      unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
+      PBD->setInit(entryIndex, nullptr);
+      PBD->setInitializerChecked(entryIndex);
+
+      // Recontextualize any closure declcontexts nested in the initializer to
+      // realize that they are in the initialization context.
+      InitValue->walk(RecontextualizeClosures(DC));
+      
+      // Coerce to the property type.
+      InitValue = new (Context) CoerceExpr(InitValue, SourceLoc(),
+                      TypeLoc::withoutLoc(SelfContextSubs[1].getReplacement()));
+      // Type-check the expression.
+      typeCheckExpression(InitValue, DC);
+
+      InitStorageParam = InitValue;
+    } else {
+      InitStorageParam = TupleExpr::createEmpty(Context,
+                                                SourceLoc(), SourceLoc(),
                                                 /*implicit*/ true);
-  InitStorageExpr->setImplicit();
-  InitStorageExpr->setType(SubstStorageContextTy);
-  InitStorageExpr->setThrows(false);
+    }
+    
+    auto InitStorageExpr = new (Context) CallExpr(SelfApply, InitStorageParam,
+                                                  /*implicit*/ true);
+    InitStorageExpr->setImplicit();
+    InitStorageExpr->setType(SubstStorageContextTy);
+    InitStorageExpr->setThrows(false);
+    
+  } else {
+    // Save the storage property and the initStorage reference for later.
+    // We'll leave it to DI analysis to insert the initializer call at the
+    // right place.
+    auto *Behavior = VD->getMutableBehavior();
+    Behavior->StorageDecl = Storage;
+    Behavior->InitStorageDecl = SpecializeInitStorage;
+  }
   
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized using the protocol's initStorage() method.
@@ -1294,10 +1337,10 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
 }
 
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
-                               FuncDecl *BehaviorParameter,
-                               NormalProtocolConformance *BehaviorConformance,
-                               ArrayRef<Substitution> SelfInterfaceSubs,
-                               ArrayRef<Substitution> SelfContextSubs) {
+                                 FuncDecl *BehaviorParameter,
+                                 NormalProtocolConformance *BehaviorConformance,
+                                 ArrayRef<Substitution> SelfInterfaceSubs,
+                                 ArrayRef<Substitution> SelfContextSubs) {
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();

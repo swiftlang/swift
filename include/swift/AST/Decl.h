@@ -19,6 +19,7 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/GenericSignature.h"
@@ -3616,6 +3617,10 @@ struct BehaviorRecord {
   // The 'value' property from the behavior protocol that provides the property
   // implementation.
   VarDecl *ValueDecl = nullptr;
+  
+  // Storage declaration and initializer for use by definite initialization.
+  VarDecl *StorageDecl = nullptr;
+  ConcreteDeclRef InitStorageDecl = nullptr;
   
   BehaviorRecord(TypeRepr *ProtocolName,
                  Expr *Param)
