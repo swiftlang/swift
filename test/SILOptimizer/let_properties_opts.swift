@@ -86,6 +86,18 @@ public struct Boo {
   public init(i:Int64) {}
 }
 
+public class Foo2 {
+  internal let x: Int32
+  @inline(never)
+  init(count: Int32) {
+    if count < 2 {
+      x = 5
+    } else {
+      x = 10
+    }
+  }
+}
+
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
@@ -169,4 +181,16 @@ public func testStructLet(inout b: Boo) -> Int32 {
 // CHECK-NEXT: return
 public func testStructPublicLet(b: Boo) -> Int32 {
   return b.Prop0
+}
+
+// Check that f.x is not constant folded, because the initializer of Foo2 has multiple
+// assignments to the property x with different values.
+// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
+// bb0
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK: return
+public func testClassLet2(f: Foo2) -> Int32 {
+  return f.x + f.x
 }
