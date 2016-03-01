@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -472,6 +473,9 @@ void swift::ide::printSubmoduleInterface(
           AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
           for (auto ET : ExtensionsFromConformances) {
             if (!shouldPrint(ET, AdjustedOptions))
+              continue;
+            SynthesizedExtensionAnalyzer Analyzer(ET, NTD);
+            if (!Analyzer.isApplicable())
               continue;
             Printer << "\n";
             ET->print(Printer, AdjustedOptions);

@@ -51,6 +51,15 @@ private:
   llvm::PointerUnion<TypeBase*, NominalTypeDecl*> TypeBaseOrNominal;
 };
 
+class SynthesizedExtensionAnalyzer {
+  struct Implementation;
+  Implementation &Impl;
+public:
+  SynthesizedExtensionAnalyzer(ExtensionDecl *Ext, NominalTypeDecl *Target);
+  ~SynthesizedExtensionAnalyzer();
+  bool isApplicable();
+};
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;

@@ -50,6 +50,30 @@
 using namespace swift;
 namespace swift {
 
+std::unique_ptr<llvm::DenseMap<StringRef, Type>>
+collectNameTypeMap(Type Ty, const DeclContext *DC) {
+  std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap(
+    new llvm::DenseMap<StringRef, Type>());
+  Type BaseTy = Ty->getRValueType();
+
+  do {
+    auto D = BaseTy->getNominalOrBoundGenericNominal();
+    if (!D || !D->getGenericParams())
+      continue;
+    SmallVector<Type, 3> Scrach;
+    auto Args = BaseTy->getAllGenericArgs(Scrach);
+    const auto ParamDecls = D->getGenericParams()->getParams();
+    assert(ParamDecls.size() == Args.size());
+
+    // Map type parameter names with their instantiating arguments.
+    for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+      (*IdMap)[ParamDecls[I]->getName().str()] = Args[I];
+    }
+  } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
+  return IdMap;
+}
+
+
 class PrinterArchetypeTransformer {
 public:
   virtual Type transform(Type Ty) = 0;
@@ -59,32 +83,12 @@ public:
 
 class PrinterArchetypeNameTransformer : public PrinterArchetypeTransformer{
   Type BaseTy;
-  const DeclContext *DC;
   llvm::DenseMap<TypeBase *, Type> Cache;
-  llvm::DenseMap<StringRef, Type> IdMap;
+  std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap;
 
 public:
   PrinterArchetypeNameTransformer(Type Ty, const DeclContext *DC) :
-    BaseTy(Ty->getRValueType()), DC(DC){
-    (void) this->DC;
-      
-      Type BaseTy = Ty->getRValueType();
-      
-      do {
-        auto D = BaseTy->getNominalOrBoundGenericNominal();
-        if (!D || !D->getGenericParams())
-          continue;
-        SmallVector<Type, 3> Scrach;
-        auto Args = BaseTy->getAllGenericArgs(Scrach);
-        const auto ParamDecls = D->getGenericParams()->getParams();
-        assert(ParamDecls.size() == Args.size());
-        
-        // Map type parameter names with their instantiating arguments.
-        for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
-          IdMap[ParamDecls[I]->getName().str()] = Args[I];
-        }
-      } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
-    }
+    BaseTy(Ty->getRValueType()), IdMap(collectNameTypeMap(Ty, DC)){}
 
   StringRef transform(StringRef TypeName) override {
     return TypeName;
@@ -103,7 +107,7 @@ public:
       auto Result = Ty;
       
       // Iterate the IdMap to find the argument type of the given param name.
-      for (auto It = IdMap.begin(); It != IdMap.end(); ++ It) {
+      for (auto It = IdMap->begin(); It != IdMap->end(); ++ It) {
         if (Id == It->getFirst()) {
           Result = It->getSecond();
           break;
@@ -174,7 +178,8 @@ public:
     return Ty.transform(F);
   }
 
-  StringRef transform(StringRef TypeName) override {
+  Type checkMemberTypeInternal(StringRef TypeName) {
+    ASTContext &Ctx = DC.getASTContext();
     llvm::SmallVector<StringRef, 4> Parts;
     TypeName.split(Parts, '.');
     std::vector<Identifier> Names;
@@ -183,8 +188,11 @@ public:
         continue;
       Names.push_back(Ctx.getIdentifier(Parts[I]));
     }
-    Type Result = checkMemberType(DC, BaseTy, Names);
-    if (Result) {
+    return checkMemberType(DC, BaseTy, Names);
+  }
+
+  StringRef transform(StringRef TypeName) override {
+    if (auto Result = checkMemberTypeInternal(TypeName)) {
       Result = Result->getDesugaredType();
       std::unique_ptr<std::string> pBuffer(new std::string);
       llvm::raw_string_ostream OS(*pBuffer);
@@ -196,6 +204,66 @@ public:
     return tryNamedArchetypeTransform(TypeName);
   }
 };
+
+struct SynthesizedExtensionAnalyzer::Implementation {
+
+  struct UnapplicableCondition {
+    std::function<bool(Type)> FirstCondition;
+    std::function<bool(Type)> SecondCondition;
+    bool isHit(Type First, Type Second) {
+      return FirstCondition(First->getDesugaredType()) &&
+             SecondCondition(Second->getDesugaredType());
+    }
+  };
+
+  ExtensionDecl *Ext;
+  Type BaseType;
+  DeclContext *DC;
+  std::unique_ptr<ArchetypeSelfTransformer> pTransform;
+  std::vector<UnapplicableCondition> KnownConditions;
+
+  bool isHitAnyKnowConditions(Type First, Type Second) {
+    return KnownConditions.end() !=
+      std::find_if(KnownConditions.begin(), KnownConditions.end(),
+                   [&](UnapplicableCondition &Condition) {
+                     return Condition.isHit(First, Second);
+                   });
+  }
+
+  Implementation(ExtensionDecl *Ext, NominalTypeDecl *Target):
+    Ext(Ext), BaseType(Target->getDeclaredTypeInContext()),
+    DC(Target), pTransform(new ArchetypeSelfTransformer(Target)) {
+
+      // Condition: Tuple never conforms to nominals.
+      KnownConditions.push_back({
+        [](Type T){ return T->getKind() == TypeKind::Tuple;},
+        [](Type T){ return T->getAnyNominal();}});
+  }
+};
+
+SynthesizedExtensionAnalyzer::
+SynthesizedExtensionAnalyzer(ExtensionDecl *Proto, NominalTypeDecl *Target):
+  Impl(*(new Implementation(Proto, Target))) {}
+
+bool SynthesizedExtensionAnalyzer::isApplicable() {
+  if (!Impl.Ext->getGenericParams())
+    return true;
+  for (auto Req : Impl.Ext->getGenericParams()->getRequirements()){
+    auto TupleOp = Req.getAsAnalyzedWrittenString();
+    if (!TupleOp)
+      continue;
+    StringRef FirstType = std::get<0>(TupleOp.getValue());
+    StringRef SecondType = std::get<1>(TupleOp.getValue());
+    Type First = Impl.pTransform->checkMemberTypeInternal(FirstType);
+    Type Second = lookUpTypeInContext(Impl.DC, SecondType);
+    if (First && Second) {
+      if (Impl.isHitAnyKnowConditions(First, Second))
+        return false;
+    }
+  }
+  return true;
+}
+SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 }
 
 PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {

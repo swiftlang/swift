@@ -47,6 +47,17 @@ public struct S1<T> : P1, P2 {
   }
 }
 
+public struct S3<T> : P1 {
+  public typealias T1 = (T, T)
+  public typealias T2 = (T, T)
+  public func f1(t : T1) -> T1 {
+    return t
+  }
+  public func f2(t : T2) -> T2 {
+    return t
+  }
+}
+
 // CHECK: <synthesized>/// Synthesized extension from P2
 // CHECK: extension S1 where T : P2 {
 // CHECK:     <decl:Func>public func <loc>p2member()</loc></decl>
@@ -68,3 +79,6 @@ public struct S1<T> : P1, P2 {
 // CHECK: extension S1 where S2 : P3 {
 // CHECK:     <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK: }</synthesized>
+
+// No applicable extensions for S3
+// CHECK-NOT: extension S3 where
