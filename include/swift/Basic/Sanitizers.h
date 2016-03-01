@@ -1,4 +1,4 @@
-//===----- Sanitizers.h - Helpers related to sanitizers --------*- C++ -*-===//
+//===--- Sanitizers.h - Helpers related to sanitizers -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -8,7 +8,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_BASIC_SANITIZERS_H
 #define SWIFT_BASIC_SANITIZERS_H

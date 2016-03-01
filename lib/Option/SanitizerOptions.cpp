@@ -1,4 +1,4 @@
-//===--- SanitizerOptions.cpp - Swift Sanitizer options ------------------===//
+//===--- SanitizerOptions.cpp - Swift Sanitizer options -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
