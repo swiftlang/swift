@@ -7,10 +7,12 @@ func playgroundCommentLine(f : () throws -> ()) rethrows {}
 
 /*:
   playground doc comment multi-line
+  - returns: sdf
 */
 func playgroundCommentMultiLine(f : () throws -> ()) rethrows {}
 // CHECK: <doc-comment-block>/*:
 // CHECK: playground doc comment multi-line
+// CHECK:  - <doc-comment-field>returns</doc-comment-field>: sdf
 // CHECK: */</doc-comment-block>
 
 // Keep this as the last test
