@@ -148,6 +148,9 @@ NOTE(note_in_decl_extension,none,
 WARNING(inout_as_attr_deprecated,none,
         "'inout' before a parameter name is deprecated, place it before the parameter type instead",
         ())
+WARNING(line_directive_style_deprecated,none,
+        "#line directive is deprecated, please use #setline instead",
+        ())
 
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())

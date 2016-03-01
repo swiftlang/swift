@@ -25,3 +25,5 @@ public struct S { // expected-note{{in declaration of 'S'}}
 // expected-error@+1{{expected declaration}}
 / ###line 25 "line-directive.swift"
 }
+// expected-warning@+1{{#line directive is deprecated, please use #setline instead}}
+#line 32000 "troops_on_the_water"
