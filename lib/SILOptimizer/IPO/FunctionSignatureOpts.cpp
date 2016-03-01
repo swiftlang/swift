@@ -41,7 +41,7 @@ using namespace swift;
 STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
 STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
-STATISTIC(NumOwnedConvertedToNotOwnedResult, "Total owned result -> not owned result");
+STATISTIC(NumOwnedConvertedToGuaranteedReturnValue, "Total owned args -> guaranteed return value");
 STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
 STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
@@ -74,7 +74,6 @@ static bool hasIdenticalReleases(ReleaseList LHS, ReleaseList RHS) {
       return false;
   return true;
 }
-
 
 /// Returns .Some(I) if I is a release that is the only non-debug instruction
 /// with side-effects in the use-def graph originating from Arg. Returns
@@ -655,7 +654,7 @@ bool SignatureAnalyzer::analyze() {
     if (!Retains.empty()) {
       RI.CalleeRetain = Retains;
       ShouldOptimize = true;
-      ++NumOwnedConvertedToNotOwnedResult;
+      ++NumOwnedConvertedToGuaranteedReturnValue;
     }
   }
 
@@ -782,20 +781,10 @@ SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
 static void addRetainsForConvertedDirectResults(SILBuilder &Builder,
                                                 SILLocation Loc,
                                                 SILValue ReturnValue,
-                                                SILInstruction *AI,
                                      ArrayRef<ResultDescriptor> DirectResults) {
   for (auto I : indices(DirectResults)) {
     auto &RV = DirectResults[I];
     if (RV.CalleeRetain.empty()) continue;
-
-    bool IsSelfRecursionEpilogueRetain = false;
-    for (auto &X : RV.CalleeRetain) {
-      IsSelfRecursionEpilogueRetain |= (AI == X);
-    }
-
-    // We do not create an retain if this ApplyInst is a self-recursion.
-    if (IsSelfRecursionEpilogueRetain)
-      continue;
 
     // Extract the return value if necessary.
     SILValue SpecificResultValue = ReturnValue;
@@ -815,7 +804,6 @@ static void addRetainsForConvertedDirectResults(SILBuilder &Builder,
 static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
                                               SILFunction *NewF,
                                               const ApplyList &CallSites) {
-  llvm::DenseSet<SILInstruction *> ApplysToRemove;
   for (auto FAS : CallSites) {
     auto *AI = FAS.getInstruction();
 
@@ -877,19 +865,14 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
 
     // If we have converted the return value from @owned to @guaranteed,
     // insert a retain_value at the callsite.
-    addRetainsForConvertedDirectResults(Builder, Loc, ReturnValue, AI,
+    addRetainsForConvertedDirectResults(Builder, Loc, ReturnValue,
                                         Optimizer.getResultDescList());
-
-    // Make sure we remove this apply in the end.
-    ApplysToRemove.insert(AI);
-    ++NumCallSitesOptimized;
-  }
-
-  // Lastly, we have rewritten all the callsites, erase the old applys and
-  // its callee.
-  for (auto *AI : ApplysToRemove) {
+      
+    // Erase the old apply and its callee.
     recursivelyDeleteTriviallyDeadInstructions(AI, true,
                                                [](SILInstruction *) {});
+
+    ++NumCallSitesOptimized;
   }
 }
 
@@ -954,7 +937,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   }
 
   // Handle @owned to @unowned return value conversion.
-  addRetainsForConvertedDirectResults(Builder, Loc, ReturnValue, nullptr,
+  addRetainsForConvertedDirectResults(Builder, Loc, ReturnValue,
                                       Optimizer.getResultDescList());
 
   // Function that are marked as @NoReturn must be followed by an 'unreachable'
@@ -1073,8 +1056,6 @@ static bool optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   // to unowned conversion.
   for (ResultDescriptor &RD : Optimizer.getResultDescList()) {
     for (auto &X : RD.CalleeRetain) {
-      if (!isa<StrongRetainInst>(X) && !isa<RetainValueInst>(X))
-        continue;
       X->eraseFromParent();
     }
   }

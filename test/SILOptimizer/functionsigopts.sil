@@ -112,25 +112,6 @@ bb0(%0 : $boo):
   return %0 : $boo
 }
 
-
-// CHECK-LABEL: sil [thunk] @single_owned_return_value_with_self_recursion
-// CHECK: function_ref @_TTSf4n_g_single_owned_return_value
-// CHECK: [[RET:%.*]] = apply
-// CHECK: retain_value [[RET]]
-sil @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo {
-bb0(%0 : $boo):
-  cond_br undef, bb1, bb2
-bb1:
-  retain_value %0 : $boo
-  br bb3(%0 : $boo)
-bb2:
-  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo
-  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo
-  br bb3 (%3 : $boo)
-bb3(%4 : $boo):
-  return %4 : $boo
-}
-
 // CHECK-LABEL: sil [thunk] @single_owned_return_value_with_interfering_release
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
 // CHECK: [[IN1:%.*]] = function_ref @_TTSf4s__single_owned_return_value_with_interfering_release
@@ -264,22 +245,6 @@ bb0(%0 : $boo):
   return %5 : $()
 }
 
-// Make sure we pull out the retain_value from the callee.
-//
-// The retain and release can be got rid of easily by arc this way.
-//
-// CHECK-LABEL: sil @single_owned_return_value_with_self_recursion_callsite
-// CHECK: [[RET:%.*]] = apply
-// CHECK: retain_value [[RET]]
-// CHECK: release_value [[RET]]
-sil @single_owned_return_value_with_self_recursion_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
-  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo 
-  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo 
-  release_value %4 : $boo
-  %5 = tuple()
-  return %5 : $()
-}
 
 sil [fragile] @exploded_release_to_dead_param_callsite : $@convention(thin) (@owned boo) -> () {
 bb0(%0 : $boo):
@@ -680,13 +645,6 @@ bb0(%0 : $Builtin.Int32):
 
 // CHECK-LABEL: sil @_TTSf4n_g_single_owned_return_value : $@convention(thin) (@owned boo) -> boo
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK-NOT: retain_value
-// CHECK: return
-
-// There should not be a single retain in this function.
-//
-// CHECK-LABEL: sil @_TTSf4n_g_single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> boo
-// CHECK: bb0
 // CHECK-NOT: retain_value
 // CHECK: return
 
