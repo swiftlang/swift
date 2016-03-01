@@ -3207,3 +3207,17 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   // Having a solution implies the extension's requirements have been fulfilled.
   return CS.solveSingle().hasValue();
 }
+
+bool swift::isEqual(Type T1, Type T2, DeclContext *DC) {
+  auto &Ctx = DC->getASTContext();
+  TypeChecker *TC;
+  // We try to reuse the type checker associated with the ast context first.
+  if (Ctx.getLazyResolver()) {
+    TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
+  } else {
+    DiagnosticEngine Diags(Ctx.SourceMgr);
+    TC = new TypeChecker(Ctx, Diags);
+  }
+  return TC->typesSatisfyConstraint(T1, T2,
+                                    constraints::ConstraintKind::Equal, DC);
+}
