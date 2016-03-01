@@ -48,7 +48,7 @@ SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
     }
   }
 
-  // Check if the traget is supported for this sanitizer.
+  // Check if the target is supported for this sanitizer.
   if (!Triple.isOSDarwin() && kind != SanitizerKind::None) {
     SmallVector<char, 128> buffer;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,

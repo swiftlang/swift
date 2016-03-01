@@ -821,7 +821,7 @@ public:
     ///
     /// When the context into which the declaration will be imported
     /// matches a Clang declaration context (the common case), the
-    /// result will be expressed as a declaration contet. Otherwise,
+    /// result will be expressed as a declaration context. Otherwise,
     /// if the Clang type is not itself a declaration context (for
     /// example, a typedef that comes into Swift as a strong type),
     /// the type declaration will be provided.
