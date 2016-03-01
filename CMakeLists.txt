@@ -626,6 +626,7 @@ endforeach()
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
+message(STATUS "  LTO:        ${SWIFT_ENABLE_LTO}")
 message(STATUS "")
 
 message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")
