@@ -201,34 +201,36 @@ internal func _writeBackMutableSlice<
   C.Index == Slice_.Index
 >(inout self_: C, bounds: Range<C.Index>, slice: Slice_) {
   fatalError("FIXME: swift-3-indexing-model")
-//  C._failEarlyRangeCheck(
-//    rangeStart: bounds.startIndex,
-//    rangeEnd: bounds.endIndex,
-//    boundsStart: self_.startIndex,
-//    boundsEnd: self_.endIndex)
-//  // FIXME(performance): can we use
-//  // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
-//  // aliasing violations if the newValue points to the same buffer?
-//
-//  var selfElementIndex = bounds.startIndex
-//  let selfElementsEndIndex = bounds.endIndex
-//  var newElementIndex = slice.startIndex
-//  let newElementsEndIndex = slice.endIndex
-//
-//  while selfElementIndex != selfElementsEndIndex &&
-//    newElementIndex != newElementsEndIndex {
-//
-//    self_[selfElementIndex] = slice[newElementIndex]
-//    selfElementIndex._successorInPlace()
-//    newElementIndex._successorInPlace()
-//  }
-//
-//  _precondition(
-//    selfElementIndex == selfElementsEndIndex,
-//    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
-//  _precondition(
-//    newElementIndex == newElementsEndIndex,
-//    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+  /*
+  C._failEarlyRangeCheck(
+    rangeStart: bounds.startIndex,
+    rangeEnd: bounds.endIndex,
+    boundsStart: self_.startIndex,
+    boundsEnd: self_.endIndex)
+  // FIXME(performance): can we use
+  // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
+  // aliasing violations if the newValue points to the same buffer?
+
+  var selfElementIndex = bounds.startIndex
+  let selfElementsEndIndex = bounds.endIndex
+  var newElementIndex = slice.startIndex
+  let newElementsEndIndex = slice.endIndex
+
+  while selfElementIndex != selfElementsEndIndex &&
+    newElementIndex != newElementsEndIndex {
+
+    self_[selfElementIndex] = slice[newElementIndex]
+    selfElementIndex._successorInPlace()
+    newElementIndex._successorInPlace()
+  }
+
+  _precondition(
+    selfElementIndex == selfElementsEndIndex,
+    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
+  _precondition(
+    newElementIndex == newElementsEndIndex,
+    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+  */
 }
 
 @available(*, unavailable, renamed="MutableCollection")
