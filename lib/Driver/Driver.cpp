@@ -1045,6 +1045,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   }
 
   {
+    // Default to / for SDKROOT on FreeBSD.
+    // This is needed to run the testsuite correctly.
+    if (TC.getTriple().isOSFreeBSD()) {
+      OI.SDKPath = "/";
+    }
     if (const Arg *A = Args.getLastArg(options::OPT_sdk)) {
       OI.SDKPath = A->getValue();
     } else if (const char *SDKROOT = getenv("SDKROOT")) {
