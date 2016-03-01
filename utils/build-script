@@ -888,11 +888,55 @@ the number of parallel build jobs to use""",
             "--skip-build-benchmarks",
         ]
 
-    if platform.system() == 'Darwin':
+    system = platform.system()
+    machine = platform.machine()
+
+    if system == 'Darwin':
         build_script_impl_inferred_args += [
             "--toolchain-prefix",
             swift_build_support.targets.darwin_toolchain_prefix(args.install_prefix),
         ]
+        stdlib_deployment_targets = [
+            "macosx-x86_64",
+            "iphonesimulator-i386",
+            "iphonesimulator-x86_64",
+            "appletvsimulator-x86_64",
+            "watchsimulator-i386",
+
+            # Put iOS native targets last so that we test them last (it takes a
+            # long time).
+            "iphoneos-arm64",
+            "iphoneos-armv7",
+            "appletvos-arm64",
+            "watchos-armv7k"
+        ]
+        stdlib_cross_targets = [
+            "linux-armv7"
+        ]
+    elif system == 'Linux':
+        arch_mapping = [
+            ('x86_64' , 'x86_64'),
+            ('armv6' , 'armv6'),
+            ('armv7' , 'armv7'),
+            ('aarch64' , 'aarch64'),
+            ('ppc64' , 'powerpc64'),
+            ('ppc64le' , 'powerpc64le')
+        ]
+        arch_mapping = [(x, 'linux-'+y) for (x,y) in arch_mapping]
+
+        host_target = next(t for (s,t) in arch_mapping if machine.startswith(s))
+        stdlib_deployment_targets = [host_target]
+
+        # All other linux-* targets
+        stdlib_cross_targets = [t for (_,t) in arch_mapping]
+        stdlib_cross_targets.remove(host_target)
+    elif system == 'FreeBSD' and machine == 'amd64':
+        stdlib_deployment_targets = ["freebsd-x86_64"]
+    elif system == 'CYGWIN_NT-10' and machine == 'x86_64':
+        stdlib_deployment_targets = ["cygwin-x86_64"]
+    else:
+        print_with_argv0("Unknown operating system")
+        return 1
 
     if args.build_subdir is None:
         # Create a name for the build directory.
@@ -1043,16 +1087,15 @@ the number of parallel build jobs to use""",
             'watchsimulator',
         ])
 
-    host_build_script_impl_args = []
-
-    if platform.system() != 'Linux':
-        host_build_script_impl_args += [
-            "--skip-build-linux"
+    host_build_script_impl_args = [
+        "--stdlib-deployment-targets=" + " ".join(stdlib_deployment_targets)
         ]
 
     check_call(build_script_impl_args + host_build_script_impl_args)
 
     if args.cross_compile_stdlib_targets:
+        # Filter cross_compile_stdlib_targets by those supported for this host
+        stdlib_cross_targets = set(stdlib_cross_targets).intersection(args.cross_compile_stdlib_targets)
         # Currently only cross-compiling the swift libraries is supported.
         # Building the swift compiler would require building llvm too.
         llvm_path = os.path.join(build_dir, "llvm-"+args.host_target, 'bin')
@@ -1067,9 +1110,10 @@ the number of parallel build jobs to use""",
             "--build-swift-tools=0"
             ]
 
-        for target in args.cross_compile_stdlib_targets:
+        for target in stdlib_cross_targets:
             check_call(build_script_impl_args +
-                    ["--cross-compile-deployment-targets=" + target])
+                    ["--cross-compile-deployment-targets=" + target,
+                     "--stdlib-deployment-targets=" + target])
 
     if args.symbols_package:
         print('--- Creating symbols package ---')
