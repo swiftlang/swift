@@ -174,3 +174,9 @@ func typeCheckMultiStmtClosureCrash() {
     return 1
   }
 }
+
+// SR-832 - both these should be ok
+func someFunc(foo: (String -> String)?, bar: String -> String) {
+    let _: String -> String = foo != nil ? foo! : bar
+    let _: String -> String = foo ?? bar
+}
