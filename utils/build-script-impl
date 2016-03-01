@@ -424,6 +424,14 @@ function set_deployment_target_based_options() {
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
 	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
+                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
+                    llvm_cmake_options=(
+                        "${llvm_cmake_options[@]}"
+                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                    )
+                fi
+
 		llvm_cmake_options=(
 		    "${llvm_cmake_options[@]}"
 		    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
@@ -433,6 +441,17 @@ function set_deployment_target_based_options() {
 		    "-DLLVM_PARALLEL_LINK_JOBS=5"
 		)
 	    fi
+
+            if [[ $(true_false "${SWIFT_ENABLE_LTO}") = "TRUE" ]]; then
+                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
+                    swift_cmake_options=(
+                        "${swift_cmake_options[@]}"
+                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                    )
+                fi
+            fi
+
             swift_cmake_options=(
                 "${swift_cmake_options[@]}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX="${DARWIN_DEPLOYMENT_VERSION_OSX}"
@@ -738,6 +757,18 @@ function true_false() {
             exit 1
             ;;
     esac
+}
+
+function cmake_version() {
+    echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
+}
+
+function cmake_needs_to_specify_standard_computed_defaults() {
+    if [[ $(cmake_version) = "3.4.0" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
 }
 
 # A list of deployment targets to cross-compile the Swift host tools for.
