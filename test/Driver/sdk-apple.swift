@@ -1,4 +1,4 @@
-// XFAIL: linux
+// XFAIL: freebsd, linux
 
 // Test SDK detection for immediate mode.
 // RUN: rm -rf %t && mkdir -p %t/usr/bin/
