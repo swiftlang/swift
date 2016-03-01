@@ -2990,7 +2990,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC8FooEnum1cFVs6UInt32S_",
         key.offset: 88,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>rawValue</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3007,7 +3007,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC8FooEnum1cFT8rawValueVs6UInt32_S_",
         key.offset: 117,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>rawValue</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
@@ -3077,7 +3077,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC8FooEnum2cFVs6UInt32S_",
         key.offset: 260,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>rawValue</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3094,7 +3094,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC8FooEnum2cFT8rawValueVs6UInt32_S_",
         key.offset: 289,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>rawValue</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
@@ -3171,7 +3171,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC8FooEnum3cFVs6UInt32S_",
         key.offset: 464,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>rawValue</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3188,7 +3188,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC8FooEnum3cFT8rawValueVs6UInt32_S_",
         key.offset: 493,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>rawValue</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
@@ -3303,7 +3303,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC17FooRuncingOptionscFT8rawValueSi_S_",
         key.offset: 772,
         key.length: 28,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>rawValue</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
@@ -3382,7 +3382,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC10FooStruct1cFT1xVs5Int321ySd_S_",
         key.offset: 982,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>y</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3440,7 +3440,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC10FooStruct2cFT1xVs5Int321ySd_S_",
         key.offset: 1084,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>y</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3506,7 +3506,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC17FooStructTypedef2cFT1xVs5Int321ySd_S_",
         key.offset: 1234,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>y</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3551,7 +3551,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Function file=Foo.h line=\"65\" column=\"5\"><Name>fooFunc1</Name><USR>c:@F@fooFunc1</USR><Declaration>func fooFunc1(a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  fooFunc1.  Bbb.</Para></Abstract></Function>",
     key.offset: 1317,
     key.length: 34,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -3568,7 +3568,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFunc1AnonymousParam",
     key.offset: 1352,
     key.length: 48,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFunc1AnonymousParam</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>_</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFunc1AnonymousParam</decl.name>(<decl.var.parameter><decl.var.parameter.name>_</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -3584,7 +3584,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFunc3",
     key.offset: 1401,
     key.length: 93,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFunc3</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>b</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>c</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>d</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Sp\">UnsafeMutablePointer</ref.struct>&lt;<ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>&gt;</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFunc3</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>c</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>d</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sp\">UnsafeMutablePointer</ref.struct>&lt;<ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>&gt;</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -3622,7 +3622,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncWithBlock",
     key.offset: 1495,
     key.length: 49,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFuncWithBlock</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>blk</decl.var.parameter.name.local>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFuncWithBlock</decl.name>(<decl.var.parameter><decl.var.parameter.name>blk</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -3639,7 +3639,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncWithFunctionPointer",
     key.offset: 1545,
     key.length: 60,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFuncWithFunctionPointer</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>fptr</decl.var.parameter.name.local>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooFuncWithFunctionPointer</decl.name>(<decl.var.parameter><decl.var.parameter.name>fptr</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -3718,7 +3718,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Function file=Foo.h line=\"117\" column=\"5\"><Name>redeclaredInMultipleModulesFunc1</Name><USR>c:@F@redeclaredInMultipleModulesFunc1</USR><Declaration>func redeclaredInMultipleModulesFunc1(a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.</Para></Abstract></Function>",
     key.offset: 1809,
     key.length: 58,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>redeclaredInMultipleModulesFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>redeclaredInMultipleModulesFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -3836,7 +3836,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassBase(im)fooBaseInstanceFunc1:",
         key.offset: 2270,
         key.length: 66,
-        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>fooBaseInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>anObject</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class>!</decl.function.returntype></decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>fooBaseInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>anObject</decl.var.parameter.name>: <decl.var.parameter.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class>!</decl.function.returntype></decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3861,7 +3861,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassBase(im)initWithFloat:",
         key.offset: 2353,
         key.length: 33,
-        key.fully_annotated_decl: "<decl.function.constructor>convenience <decl.name>init</decl.name>!(<decl.var.parameter><decl.var.parameter.name.external>float</decl.var.parameter.name.external> <decl.var.parameter.name.local>f</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor>convenience <decl.name>init</decl.name>!(<decl.var.parameter><decl.var.parameter.argument_label>float</decl.var.parameter.argument_label> <decl.var.parameter.name>f</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3951,7 +3951,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(im)fooInstanceFunc1:",
         key.offset: 2648,
         key.length: 33,
-        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>fooInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>fooInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -3968,7 +3968,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(im)fooInstanceFunc2:withB:",
         key.offset: 2686,
         key.length: 49,
-        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>fooInstanceFunc2</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name.external>withB</decl.var.parameter.name.external> <decl.var.parameter.name.local>b</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance>func <decl.name>fooInstanceFunc2</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>withB</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4113,7 +4113,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC15_InternalStructcFT1xVs5Int32_S_",
         key.offset: 3151,
         key.length: 16,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>x</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4311,7 +4311,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooUnavailableMembers(cm)unavailableMembersWithInt:",
         key.offset: 3843,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor>convenience <decl.name>init</decl.name>!(<decl.var.parameter><decl.var.parameter.name.external>int</decl.var.parameter.name.external> <decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor>convenience <decl.name>init</decl.name>!(<decl.var.parameter><decl.var.parameter.argument_label>int</decl.var.parameter.argument_label> <decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4328,7 +4328,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooUnavailableMembers(cm)unavailableMembersWithInt:",
         key.offset: 3879,
         key.length: 57,
-        key.fully_annotated_decl: "<decl.function.method.class>class func <decl.name>unavailableMembersWithInt</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>i</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>Self!</decl.function.returntype></decl.function.method.class>",
+        key.fully_annotated_decl: "<decl.function.method.class>class func <decl.name>unavailableMembersWithInt</decl.name>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>Self!</decl.function.returntype></decl.function.method.class>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4545,7 +4545,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@FooCFTypeRelease",
     key.offset: 4336,
     key.length: 40,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>FooCFTypeRelease</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>_</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.typealias usr=\"c:Foo.h@T@FooCFTypeRef\">FooCFTypeRef</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>FooCFTypeRelease</decl.name>(<decl.var.parameter><decl.var.parameter.name>_</decl.var.parameter.name>: <decl.var.parameter.type><ref.typealias usr=\"c:Foo.h@T@FooCFTypeRef\">FooCFTypeRef</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -4561,7 +4561,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooSubFunc1",
     key.offset: 4377,
     key.length: 37,
-    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name.local>a</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free>func <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -4598,7 +4598,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC11FooSubEnum1cFVs6UInt32S_",
         key.offset: 4470,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>_</decl.var.parameter.name.external> <decl.var.parameter.name.local>rawValue</decl.var.parameter.name.local>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4615,7 +4615,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:FVSC11FooSubEnum1cFT8rawValueVs6UInt32_S_",
         key.offset: 4499,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.name.external>rawValue</decl.var.parameter.name.external>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,

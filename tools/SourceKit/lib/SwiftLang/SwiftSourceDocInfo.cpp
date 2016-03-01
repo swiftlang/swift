@@ -62,8 +62,8 @@ static StringRef getTagForDecl(const Decl *D, bool isRef) {
   return UID.getName().drop_front(strlen(prefix));
 }
 
-static StringRef ExternalParamNameTag = "decl.var.parameter.name.external";
-static StringRef LocalParamNameTag = "decl.var.parameter.name.local";
+static StringRef ExternalParamNameTag = "decl.var.parameter.argument_label";
+static StringRef LocalParamNameTag = "decl.var.parameter.name";
 
 static StringRef getTagForPrintNameContext(PrintNameContext context) {
   switch (context) {
