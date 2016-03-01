@@ -423,7 +423,7 @@ function set_deployment_target_based_options() {
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
-	    if [[ -n "${LLVM_ENABLE_LTO}" ]]; then
+	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
 		llvm_cmake_options=(
 		    "${llvm_cmake_options[@]}"
 		    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
