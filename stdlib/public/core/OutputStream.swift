@@ -330,11 +330,14 @@ internal struct _Stdout : OutputStreamType {
   }
 
   mutating func write(string: String) {
-    // FIXME: buffering?
-    // It is important that we use stdio routines in order to correctly
-    // interoperate with stdio buffering.
-    for c in string.utf8 {
-      _swift_stdlib_putchar_unlocked(Int32(c))
+    let utf8 = string.nulTerminatedUTF8
+    utf8.withUnsafeBufferPointer {
+        (utf8) -> Void in
+        let result = _swift_stdlib_fwrite_stdout(UnsafePointer(utf8.baseAddress),
+            utf8.count - 1, 1)
+        if result < 0 {
+            fatalError("fwrite() returned an error")
+        }
     }
   }
 }

@@ -30,6 +30,11 @@ void _swift_stdlib_free(void *ptr) { free(ptr); }
 
 int _swift_stdlib_putchar_unlocked(int c) { return putchar_unlocked(c); }
 
+__swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
+		__swift_size_t nitems) {
+  return fwrite(ptr, size, nitems, stdout);
+}
+
 __swift_size_t _swift_stdlib_strlen(const char *s) { return strlen(s); }
 
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n) {
