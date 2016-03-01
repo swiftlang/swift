@@ -20,7 +20,7 @@ final class DerivedClass : BaseClass {
 
 func something(x: Int) {}
 
-func something(inout x: Int) {}
+func something(x: inout Int) {}
 
 func something(x: AnyObject) {}
 

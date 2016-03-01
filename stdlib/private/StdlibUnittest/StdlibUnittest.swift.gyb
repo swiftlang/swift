@@ -12,7 +12,7 @@
 
 import SwiftPrivate
 import SwiftPrivatePthreadExtras
-import SwiftPrivateDarwinExtras
+import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
@@ -265,7 +265,7 @@ public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
   }
 }
 
-public func expectType<T>(_: T.Type, inout _ x: T) {}
+public func expectType<T>(_: T.Type, _ x: inout T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
 public func expectSequenceType<
@@ -317,7 +317,7 @@ public func expectCollectionAssociatedTypes<
 ) {}
 
 public func expectForwardIndexType<X : ForwardIndex>(x: X) -> X { return x }
-public func expectIsBooleanType<X : Boolean>(inout x: X) -> X { return x }
+public func expectIsBooleanType<X : Boolean>(x: inout X) -> X { return x }
 
 public struct AssertionResult : CustomStringConvertible, Boolean {
   init(isPass: Bool) {
@@ -408,9 +408,9 @@ public func _setTestSuiteFailedCallback(callback: () -> Void) {
 extension ProcessTerminationStatus {
   var isSwiftTrap: Bool {
     switch self {
-    case .Exit(_):
+    case .exit(_):
       return false
-    case .Signal(let signal):
+    case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
     }
   }
@@ -450,7 +450,7 @@ func _stdlib_installTrapInterceptor()
 func _childProcess() {
   _stdlib_installTrapInterceptor()
   while let line = _stdlib_getline() {
-    let parts = line._split(";")
+    let parts = line._split(separator: ";")
     let testSuiteName = parts[0]
     let testName = parts[1]
 
@@ -559,7 +559,8 @@ struct _ParentProcess {
         _childStdout.read()
         while var line = _childStdout.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            let controlMessage = line[index..<line.endIndex]._split(";")
+            let controlMessage =
+                line[index..<line.endIndex]._split(separator: ";")
             switch controlMessage[1] {
             case "expectCrash":
               stdoutSeenCrashDelimiter = true
@@ -586,7 +587,8 @@ struct _ParentProcess {
         _childStderr.read()
         while var line = _childStderr.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            let controlMessage = line[index..<line.endIndex]._split(";")
+            let controlMessage =
+                line[index..<line.endIndex]._split(separator: ";")
             switch controlMessage[1] {
             case "expectCrash":
               stderrSeenCrashDelimiter = true
@@ -616,7 +618,7 @@ struct _ParentProcess {
       if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
         status = _waitForChild()
         switch status! {
-        case .Exit(0):
+        case .exit(0):
           status = nil
         default:
           ()
@@ -1025,42 +1027,42 @@ func _stdlib_getSystemVersionPlistProperty(propertyName: String) -> String? {
 #endif
 
 public enum OSVersion : CustomStringConvertible {
-  case OSX(major: Int, minor: Int, bugFix: Int)
+  case osx(major: Int, minor: Int, bugFix: Int)
   case iOS(major: Int, minor: Int, bugFix: Int)
-  case TVOS(major: Int, minor: Int, bugFix: Int)
+  case tvOS(major: Int, minor: Int, bugFix: Int)
   case watchOS(major: Int, minor: Int, bugFix: Int)
   case iOSSimulator
-  case TVOSSimulator
+  case tvOSSimulator
   case watchOSSimulator
-  case Linux
-  case FreeBSD
+  case linux
+  case freeBSD
 
   public var description: String {
     switch self {
-    case OSX(let major, let minor, let bugFix):
+    case osx(let major, let minor, let bugFix):
       return "OS X \(major).\(minor).\(bugFix)"
     case iOS(let major, let minor, let bugFix):
       return "iOS \(major).\(minor).\(bugFix)"
-    case TVOS(let major, let minor, let bugFix):
+    case tvOS(let major, let minor, let bugFix):
       return "TVOS \(major).\(minor).\(bugFix)"
     case watchOS(let major, let minor, let bugFix):
       return "watchOS \(major).\(minor).\(bugFix)"
     case iOSSimulator:
       return "iOSSimulator"
-    case TVOSSimulator:
+    case tvOSSimulator:
       return "TVOSSimulator"
     case watchOSSimulator:
       return "watchOSSimulator"
-    case Linux:
+    case linux:
       return "Linux"
-    case FreeBSD:
+    case freeBSD:
       return "FreeBSD"
     }
   }
 }
 
 func _parseDottedVersion(s: String) -> [Int] {
-  return Array(s._split(".").lazy.map { Int($0)! })
+  return Array(s._split(separator: ".").lazy.map { Int($0)! })
 }
 
 public func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
@@ -1082,22 +1084,22 @@ func _getOSVersion() -> OSVersion {
   // FIXME: how to get the simulator version *without* UIKit?
   return .iOSSimulator
 #elseif os(tvOS) && (arch(i386) || arch(x86_64))
-  return .TVOSSimulator
+  return .tvOSSimulator
 #elseif os(watchOS) && (arch(i386) || arch(x86_64))
   return .watchOSSimulator
 #elseif os(Linux)
-  return .Linux
+  return .linux
 #elseif os(FreeBSD)
-  return .FreeBSD
+  return .freeBSD
 #else
   let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
   #if os(OSX)
-  return .OSX(major: major, minor: minor, bugFix: bugFix)
+  return .osx(major: major, minor: minor, bugFix: bugFix)
   #elseif os(iOS)
   return .iOS(major: major, minor: minor, bugFix: bugFix)
   #elseif os(tvOS)
-  return .TVOS(major: major, minor: minor, bugFix: bugFix)
+  return .tvOS(major: major, minor: minor, bugFix: bugFix)
   #elseif os(watchOS)
   return .watchOS(major: major, minor: minor, bugFix: bugFix)
   #else
@@ -1120,17 +1122,17 @@ func _getRunningOSVersion() -> OSVersion {
 }
 
 public enum TestRunPredicate : CustomStringConvertible {
-  case Custom(() -> Bool, reason: String)
+  case custom(() -> Bool, reason: String)
 
-  case Always(/*reason:*/ String)
-  case Never
+  case always(/*reason:*/ String)
+  case never
 
-  case OSXAny(/*reason:*/ String)
-  case OSXMajor(Int, reason: String)
-  case OSXMinor(Int, Int, reason: String)
-  case OSXMinorRange(Int, Range<Int>, reason: String)
-  case OSXBugFix(Int, Int, Int, reason: String)
-  case OSXBugFixRange(Int, Int, Range<Int>, reason: String)
+  case osxAny(/*reason:*/ String)
+  case osxMajor(Int, reason: String)
+  case osxMinor(Int, Int, reason: String)
+  case osxMinorRange(Int, Range<Int>, reason: String)
+  case osxBugFix(Int, Int, Int, reason: String)
+  case osxBugFixRange(Int, Int, Range<Int>, reason: String)
 
   case iOSAny(/*reason:*/ String)
   case iOSMajor(Int, reason: String)
@@ -1141,14 +1143,14 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case iOSSimulatorAny(/*reason:*/ String)
 
-  case TVOSAny(/*reason:*/ String)
-  case TVOSMajor(Int, reason: String)
-  case TVOSMinor(Int, Int, reason: String)
-  case TVOSMinorRange(Int, Range<Int>, reason: String)
-  case TVOSBugFix(Int, Int, Int, reason: String)
-  case TVOSBugFixRange(Int, Int, Range<Int>, reason: String)
+  case tvOSAny(/*reason:*/ String)
+  case tvOSMajor(Int, reason: String)
+  case tvOSMinor(Int, Int, reason: String)
+  case tvOSMinorRange(Int, Range<Int>, reason: String)
+  case tvOSBugFix(Int, Int, Int, reason: String)
+  case tvOSBugFixRange(Int, Int, Range<Int>, reason: String)
 
-  case TVOSSimulatorAny(/*reason:*/ String)
+  case tvOSSimulatorAny(/*reason:*/ String)
 
   case watchOSAny(/*reason:*/ String)
   case watchOSMajor(Int, reason: String)
@@ -1159,35 +1161,35 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case watchOSSimulatorAny(/*reason:*/ String)
 
-  case LinuxAny(reason: String)
+  case linuxAny(reason: String)
 
-  case FreeBSDAny(reason: String)
+  case freeBSDAny(reason: String)
 
-  case ObjCRuntime(/*reason:*/ String)
-  case NativeRuntime(/*reason:*/ String)
+  case objCRuntime(/*reason:*/ String)
+  case nativeRuntime(/*reason:*/ String)
 
   public var description: String {
     switch self {
-    case Custom(_, let reason):
+    case custom(_, let reason):
       return "Custom(reason: \(reason))"
 
-    case Always(let reason):
+    case always(let reason):
       return "Always(reason: \(reason))"
-    case Never:
+    case never:
       return ""
 
-    case OSXAny(let reason):
-      return "OSX(*, reason: \(reason))"
-    case OSXMajor(let major, let reason):
-      return "OSX(\(major).*, reason: \(reason))"
-    case OSXMinor(let major, let minor, let reason):
-      return "OSX(\(major).\(minor), reason: \(reason))"
-    case OSXMinorRange(let major, let minorRange, let reason):
-      return "OSX(\(major).[\(minorRange)], reason: \(reason))"
-    case OSXBugFix(let major, let minor, let bugFix, let reason):
-      return "OSX(\(major).\(minor).\(bugFix), reason: \(reason))"
-    case OSXBugFixRange(let major, let minor, let bugFixRange, let reason):
-      return "OSX(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
+    case osxAny(let reason):
+      return "osx(*, reason: \(reason))"
+    case osxMajor(let major, let reason):
+      return "osx(\(major).*, reason: \(reason))"
+    case osxMinor(let major, let minor, let reason):
+      return "osx(\(major).\(minor), reason: \(reason))"
+    case osxMinorRange(let major, let minorRange, let reason):
+      return "osx(\(major).[\(minorRange)], reason: \(reason))"
+    case osxBugFix(let major, let minor, let bugFix, let reason):
+      return "osx(\(major).\(minor).\(bugFix), reason: \(reason))"
+    case osxBugFixRange(let major, let minor, let bugFixRange, let reason):
+      return "osx(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
 
     case iOSAny(let reason):
       return "iOS(*, reason: \(reason))"
@@ -1205,21 +1207,21 @@ public enum TestRunPredicate : CustomStringConvertible {
     case iOSSimulatorAny(let reason):
       return "iOSSimulatorAny(*, reason: \(reason))"
 
-    case TVOSAny(let reason):
-      return "TVOS(*, reason: \(reason))"
-    case TVOSMajor(let major, let reason):
-      return "TVOS(\(major).*, reason: \(reason))"
-    case TVOSMinor(let major, let minor, let reason):
-      return "TVOS(\(major).\(minor), reason: \(reason))"
-    case TVOSMinorRange(let major, let minorRange, let reason):
-      return "TVOS(\(major).[\(minorRange)], reason: \(reason))"
-    case TVOSBugFix(let major, let minor, let bugFix, let reason):
-      return "TVOS(\(major).\(minor).\(bugFix), reason: \(reason))"
-    case TVOSBugFixRange(let major, let minor, let bugFixRange, let reason):
-      return "TVOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
+    case tvOSAny(let reason):
+      return "tvOS(*, reason: \(reason))"
+    case tvOSMajor(let major, let reason):
+      return "tvOS(\(major).*, reason: \(reason))"
+    case tvOSMinor(let major, let minor, let reason):
+      return "tvOS(\(major).\(minor), reason: \(reason))"
+    case tvOSMinorRange(let major, let minorRange, let reason):
+      return "tvOS(\(major).[\(minorRange)], reason: \(reason))"
+    case tvOSBugFix(let major, let minor, let bugFix, let reason):
+      return "tvOS(\(major).\(minor).\(bugFix), reason: \(reason))"
+    case tvOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+      return "tvOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
 
-    case TVOSSimulatorAny(let reason):
-      return "TVOSSimulatorAny(*, reason: \(reason))"
+    case tvOSSimulatorAny(let reason):
+      return "tvOSSimulatorAny(*, reason: \(reason))"
 
     case watchOSAny(let reason):
       return "watchOS(*, reason: \(reason))"
@@ -1237,72 +1239,72 @@ public enum TestRunPredicate : CustomStringConvertible {
     case watchOSSimulatorAny(let reason):
       return "watchOSSimulatorAny(*, reason: \(reason))"
 
-    case LinuxAny(reason: let reason):
-      return "LinuxAny(*, reason: \(reason))"
+    case linuxAny(reason: let reason):
+      return "linuxAny(*, reason: \(reason))"
 
-    case FreeBSDAny(reason: let reason):
-      return "FreeBSDAny(*, reason: \(reason))"
+    case freeBSDAny(reason: let reason):
+      return "freeBSDAny(*, reason: \(reason))"
 
-    case ObjCRuntime(let reason):
+    case objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
-    case NativeRuntime(let reason):
+    case nativeRuntime(let reason):
       return "Native runtime (no ObjC), reason: \(reason))"
     }
   }
 
   public func evaluate() -> Bool {
     switch self {
-    case Custom(let predicate, _):
+    case custom(let predicate, _):
       return predicate()
 
-    case Always:
+    case always:
       return true
-    case Never:
+    case never:
       return false
 
-    case OSXAny:
+    case osxAny:
       switch _getRunningOSVersion() {
-      case .OSX:
+      case .osx:
         return true
       default:
         return false
       }
 
-    case OSXMajor(let major, _):
+    case osxMajor(let major, _):
       switch _getRunningOSVersion() {
-      case .OSX(major, _, _):
+      case .osx(major, _, _):
         return true
       default:
         return false
       }
 
-    case OSXMinor(let major, let minor, _):
+    case osxMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
-      case .OSX(major, minor, _):
+      case .osx(major, minor, _):
         return true
       default:
         return false
       }
 
-    case OSXMinorRange(let major, let minorRange, _):
+    case osxMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
-      case .OSX(major, let runningMinor, _):
+      case .osx(major, let runningMinor, _):
         return minorRange.contains(runningMinor)
       default:
         return false
       }
 
-    case OSXBugFix(let major, let minor, let bugFix, _):
+    case osxBugFix(let major, let minor, let bugFix, _):
       switch _getRunningOSVersion() {
-      case .OSX(major, minor, bugFix):
+      case .osx(major, minor, bugFix):
         return true
       default:
         return false
       }
 
-    case OSXBugFixRange(let major, let minor, let bugFixRange, _):
+    case osxBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
-      case .OSX(major, minor, let runningBugFix):
+      case .osx(major, minor, let runningBugFix):
         return bugFixRange.contains(runningBugFix)
       default:
         return false
@@ -1364,57 +1366,57 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case TVOSAny:
+    case tvOSAny:
       switch _getRunningOSVersion() {
-      case .TVOS:
+      case .tvOS:
         return true
       default:
         return false
       }
 
-    case TVOSMajor(let major, _):
+    case tvOSMajor(let major, _):
       switch _getRunningOSVersion() {
-      case .TVOS(major, _, _):
+      case .tvOS(major, _, _):
         return true
       default:
         return false
       }
 
-    case TVOSMinor(let major, let minor, _):
+    case tvOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
-      case .TVOS(major, minor, _):
+      case .tvOS(major, minor, _):
         return true
       default:
         return false
       }
 
-    case TVOSMinorRange(let major, let minorRange, _):
+    case tvOSMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
-      case .TVOS(major, let runningMinor, _):
+      case .tvOS(major, let runningMinor, _):
         return minorRange.contains(runningMinor)
       default:
         return false
       }
 
-    case TVOSBugFix(let major, let minor, let bugFix, _):
+    case tvOSBugFix(let major, let minor, let bugFix, _):
       switch _getRunningOSVersion() {
-      case .TVOS(major, minor, bugFix):
+      case .tvOS(major, minor, bugFix):
         return true
       default:
         return false
       }
 
-    case TVOSBugFixRange(let major, let minor, let bugFixRange, _):
+    case tvOSBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
-      case .TVOS(major, minor, let runningBugFix):
+      case .tvOS(major, minor, let runningBugFix):
         return bugFixRange.contains(runningBugFix)
       default:
         return false
       }
 
-    case TVOSSimulatorAny:
+    case tvOSSimulatorAny:
       switch _getRunningOSVersion() {
-      case .TVOSSimulator:
+      case .tvOSSimulator:
         return true
       default:
         return false
@@ -1476,30 +1478,30 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
-    case LinuxAny:
+    case linuxAny:
       switch _getRunningOSVersion() {
-      case .Linux:
+      case .linux:
         return true
       default:
         return false
       }
 
-    case FreeBSDAny:
+    case freeBSDAny:
       switch _getRunningOSVersion() {
-      case .FreeBSD:
+      case .freeBSD:
         return true
       default:
         return false
       }
 
-    case ObjCRuntime:
+    case objCRuntime:
 #if _runtime(_ObjC)
       return true
 #else
       return false
 #endif
 
-    case NativeRuntime:
+    case nativeRuntime:
 #if _runtime(_ObjC)
       return false
 #else
@@ -1636,18 +1638,18 @@ public func check${inc.capitalize()}rementable<
 %end
 
 public enum ExpectedComparisonResult {
-  case LT, EQ, GT
+  case lt, eq, gt
 
   public func isLT() -> Bool {
-    return self == .LT
+    return self == .lt
   }
 
   public func isEQ() -> Bool {
-    return self == .EQ
+    return self == .eq
   }
 
   public func isGT() -> Bool {
-    return self == .GT
+    return self == .gt
   }
 
   public func isLE() -> Bool {
@@ -1664,12 +1666,12 @@ public enum ExpectedComparisonResult {
 
   public func flip() -> ExpectedComparisonResult {
     switch self {
-    case .LT:
-      return .GT
-    case .EQ:
-      return .EQ
-    case .GT:
-      return .LT
+    case .lt:
+      return .gt
+    case .eq:
+      return .eq
+    case .gt:
+      return .lt
     }
   }
 }
@@ -1677,11 +1679,11 @@ public enum ExpectedComparisonResult {
 extension ExpectedComparisonResult : CustomStringConvertible {
   public var description: String {
     switch self {
-    case .LT:
+    case .lt:
       return "<"
-    case .EQ:
+    case .eq:
       return "=="
-    case .GT:
+    case .gt:
       return ">"
     }
   }
@@ -1747,7 +1749,7 @@ public func checkComparable<T : Comparable>(
 ) {
   checkComparable(
     [lhs, rhs],
-    oracle: { [[ .EQ,  expected], [ expected.flip(), .EQ]][$0][$1] },
+    oracle: { [[ .eq,  expected], [ expected.flip(), .eq]][$0][$1] },
     ${trace})
 }
 
@@ -1777,7 +1779,7 @@ public func checkStrideable<
     instances,
     oracle: {
       let d = distanceOracle($1, $0);
-      return d < 0 ? .LT : d == 0 ? .EQ : .GT
+      return d < 0 ? .lt : d == 0 ? .eq : .gt
     },
     ${trace})
   
@@ -1799,15 +1801,15 @@ public func checkStrideable<
 
 public struct CollectionMisuseResiliencyChecks {
   public enum FailureKind {
-    case None
-    case Trap
-    case ExpectationFailure
+    case none
+    case trap
+    case expectationFailure
   }
 
   public var callNextOnExhaustedGenerator: Bool = true
-  public var creatingOutOfBoundsIndicesBehavior: FailureKind = .Trap
-  public var subscriptOnOutOfBoundsIndicesBehavior: FailureKind = .Trap
-  public var subscriptRangeOnOutOfBoundsRangesBehavior: FailureKind = .Trap
+  public var creatingOutOfBoundsIndicesBehavior: FailureKind = .trap
+  public var subscriptOnOutOfBoundsIndicesBehavior: FailureKind = .trap
+  public var subscriptRangeOnOutOfBoundsRangesBehavior: FailureKind = .trap
 
   public static var all: CollectionMisuseResiliencyChecks {
     return CollectionMisuseResiliencyChecks()
@@ -1816,9 +1818,9 @@ public struct CollectionMisuseResiliencyChecks {
   public static var none: CollectionMisuseResiliencyChecks {
     return CollectionMisuseResiliencyChecks(
       callNextOnExhaustedGenerator: false,
-      creatingOutOfBoundsIndicesBehavior: .None,
-      subscriptOnOutOfBoundsIndicesBehavior: .None,
-      subscriptRangeOnOutOfBoundsRangesBehavior: .None)
+      creatingOutOfBoundsIndicesBehavior: .none,
+      subscriptOnOutOfBoundsIndicesBehavior: .none,
+      subscriptRangeOnOutOfBoundsRangesBehavior: .none)
   }
 }
 
@@ -2015,20 +2017,20 @@ public func checkSequence<
   expectGE(
     expectedCount, sequence.underestimatedCount, ${trace})
 
-  // Check that _initializeTo does the right thing if we can do so
+  // Check that _copyContents does the right thing if we can do so
   // without destroying the sequence.
   sequence._preprocessingPass { () -> Void in 
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
-    let end = sequence._initializeTo(buf)
-    expectTrue(end == buf + count, "_initializeTo returned the wrong value")
+    let end = sequence._copyContents(initializing: buf)
+    expectTrue(end == buf + count, "_copyContents returned the wrong value")
     var j = expected.startIndex
     for i in 0..<(end - buf) {
       expectTrue(sameValue(expected[j], buf[i]))
       j = j.successor()
     }
-    buf.deinitializePointee(count: end - buf)
+    buf.deinitialize(count: end - buf)
     buf.deallocateCapacity(count)
   }
 }
@@ -2321,7 +2323,7 @@ public func checkRangeReplaceable<
       for newCount in 0..<(2 * oldCount) {
         let newValues = makeNewValues(newCount)
 
-        func reportFailure(inout a: A, _ message: String) {
+        func reportFailure(a: inout A, _ message: String) {
           print("\(message) when replacing indices \(ix)...\(jx)")
           print("  in \(Array(source)) with \(Array(newValues))")
           print("  yielding \(Array(a))")
@@ -2428,7 +2430,7 @@ public func expectEqualsUnordered<
   expected: Expected, _ actual: Actual, ${TRACE}
 ) {
   expectEqualsUnordered(expected, actual, ${trace}) {
-    $0 < $1 ? .LT : $0 == $1 ? .EQ : .GT
+    $0 < $1 ? .lt : $0 == $1 ? .eq : .gt
   }
 }
 
@@ -2459,7 +2461,7 @@ func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return [ lhs.first, lhs.second ].lexicographicalCompare(
+  return [ lhs.first, lhs.second ].lexicographicallyPrecedes(
     [ rhs.first, rhs.second ])
 }
 
@@ -2474,7 +2476,7 @@ public func expectEqualsUnordered<
     expected: Expected, _ actual: Actual, ${TRACE}
 ) {
   func comparePairLess(lhs: (T, T), rhs: (T, T)) -> Bool {
-    return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
+    return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
   }
 
   let x: [(T, T)] =

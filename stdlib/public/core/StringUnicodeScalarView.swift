@@ -120,11 +120,11 @@ extension String {
       var scratch = _ScratchIterator(_core, position._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
-      case .ScalarValue(let us):
+      case .scalarValue(let us):
         return us
-      case .EmptyInput:
+      case .emptyInput:
         _sanityCheckFailure("cannot subscript using an endIndex")
-      case .Error:
+      case .error:
         return UnicodeScalar(0xfffd)
       }
     }
@@ -173,9 +173,9 @@ extension String {
           if _ascii {
             switch self._asciiBase.next() {
             case let x?:
-              result = .ScalarValue(UnicodeScalar(x))
+              result = .scalarValue(UnicodeScalar(x))
             case nil:
-              result = .EmptyInput
+              result = .emptyInput
             }
           } else {
             result = _decoder.decode(&(self._base!))
@@ -184,11 +184,11 @@ extension String {
           result = _decoder.decode(&(self._iterator!))
         }
         switch result {
-        case .ScalarValue(let us):
+        case .scalarValue(let us):
           return us
-        case .EmptyInput:
+        case .emptyInput:
           return nil
-        case .Error:
+        case .error:
           return UnicodeScalar(0xfffd)
         }
       }
@@ -263,10 +263,10 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == UnicodeScalar
-  >(of newElements: S) {
-    _core.appendContents(of: newElements.lazy.flatMap { $0.utf16 })
+  >(contentsOf newElements: S) {
+    _core.append(contentsOf: newElements.lazy.flatMap { $0.utf16 })
   }
   /// Replace the elements within `bounds` with `newElements`.
   ///
@@ -357,7 +357,7 @@ extension String.UnicodeScalarIndex {
   ///
   /// - Precondition: `self` is an element of `String(utf8)!.indices`.
   @warn_unused_result
-  public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
+  public func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
 
@@ -366,8 +366,8 @@ extension String.UnicodeScalarIndex {
   ///
   /// - Precondition: `self` is an element of `String(utf16)!.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -378,7 +378,7 @@ extension String.UnicodeScalarIndex {
   /// - Precondition: `self` is an element of
   ///   `characters.unicodeScalars.indices`.
   @warn_unused_result
-  public func samePositionIn(characters: String) -> String.Index? {
+  public func samePosition(in characters: String) -> String.Index? {
     return String.Index(self, within: characters)
   }
 

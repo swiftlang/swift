@@ -296,6 +296,10 @@ def print_inst_counts : Flag<["-"], "print-inst-counts">,
 def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
   HelpText<"Print the LLVM inline tree.">;
 
+def disable_incremental_llvm_codegeneration :
+  Flag<["-"], "disable-incremental-llvm-codegen">,
+       HelpText<"Disable incremental llvm code generation.">;
+
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;
@@ -324,5 +328,8 @@ def dump_api_path : Separate<["-"], "dump-api-path">,
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Compile the module to export resilient interfaces for all "
             "public declarations by default">;
+
+def group_info_path : Separate<["-"], "group-info-path">,
+  HelpText<"The path to collect the group information of the compiled module">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

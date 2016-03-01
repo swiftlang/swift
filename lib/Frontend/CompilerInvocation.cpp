@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
@@ -162,6 +163,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
     Opts.DumpAPIPath = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_group_info_path)) {
+    Opts.GroupInfoPath = A->getValue();
   }
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
@@ -835,7 +840,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (UnsupportedOS) {
-    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents.back() : "";
+    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents[2] : "";
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
@@ -1103,7 +1108,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
                            StringRef SDKPath,
-                           StringRef ResourceDir) {
+                           StringRef ResourceDir,
+                           const llvm::Triple &Triple) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
@@ -1198,6 +1204,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
+  // This is set to true by default.
+  Opts.UseIncrementalLLVMCodeGen &=
+    !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
+
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.EmbedMode = IRGenEmbedMode::EmbedBitcode;
   else if (Args.hasArg(OPT_embed_bitcode_marker))
@@ -1225,6 +1235,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         Opts.CmdArgs.push_back('\0');
       }
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
+    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
   }
 
   if (Args.hasArg(OPT_enable_reflection_metadata)) {
@@ -1297,7 +1311,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts,
-                     getSDKPath(), SearchPathOpts.RuntimeResourcePath)) {
+                     getSDKPath(), SearchPathOpts.RuntimeResourcePath,
+                     LangOpts.Target)) {
     return true;
   }
 

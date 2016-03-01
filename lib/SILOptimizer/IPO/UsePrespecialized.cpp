@@ -71,7 +71,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
   collectApplyInst(F, NewApplies);
 
   for (auto &AI : NewApplies) {
-    auto *ReferencedF = AI.getCalleeFunction();
+    auto *ReferencedF = AI.getReferencedFunction();
     if (!ReferencedF)
       continue;
 
@@ -84,13 +84,15 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (Subs.empty())
       continue;
 
-    auto SubsFunctionType =
-        ReferencedF->getLoweredFunctionType()->substGenericArgs(M,
-            M.getSwiftModule(), Subs);
+    ReabstractionInfo ReInfo(ReferencedF, AI);
+
+    auto SpecType = ReInfo.getSpecializedType();
+    if (!SpecType)
+      continue;
 
     // Bail if any generic types parameters of the concrete type
     // are unbound.
-    if (SubsFunctionType->hasArchetype())
+    if (SpecType->hasArchetype())
       continue;
 
     // Bail if any generic types parameters of the concrete type
@@ -128,7 +130,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
         llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
         << " : " << NewF->getName() << "\n");
 
-    auto NewAI = replaceWithSpecializedFunction(AI, NewF);
+    auto NewAI = replaceWithSpecializedFunction(AI, NewF, ReInfo);
     AI.getInstruction()->replaceAllUsesWith(NewAI.getInstruction());
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
     Changed = true;

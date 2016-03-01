@@ -68,7 +68,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
     return DataflowResult(Op);
 
   BottomUpRefCountState &State = DataflowState.getBottomUpRefCountState(Op);
-  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I));
+  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I), RCFI);
 
   // If we are running with 'frozen' owned arg releases, check if we have a
   // frozen use in the side table. If so, this release must be known safe.
@@ -203,7 +203,7 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
   // count state and continue...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
   auto &State = DataflowState.getTopDownRefCountState(Op);
-  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I));
+  bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I), RCFI);
 
   DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
                      << (State.isKnownSafe() ? "yes" : "no") << "\n");

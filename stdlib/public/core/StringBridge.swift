@@ -68,7 +68,7 @@ func _cocoaStringToSwiftString_NonASCII(
 /// `_CocoaString`, having the given minimum capacity.
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringToContiguous(
-  source: _CocoaString, _ range: Range<Int>, minimumCapacity: Int
+  source source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
     "Known contiguously-stored strings should already be converted to Swift")
@@ -230,13 +230,13 @@ public final class _NSContiguousString : _SwiftNativeNSString {
 
     if _core.elementWidth == 2 {
       UTF16._copy(
-        _core.startUTF16 + aRange.location,
+        source: _core.startUTF16 + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
         count: aRange.length)
     }
     else {
       UTF16._copy(
-        _core.startASCII + aRange.location,
+        source: _core.startASCII + aRange.location,
         destination: UnsafeMutablePointer<UInt16>(buffer),
         count: aRange.length)
     }

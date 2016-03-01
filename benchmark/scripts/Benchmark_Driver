@@ -62,7 +62,7 @@ def parse_results(res, optset):
             tests.append(mem_test)
     return tests
 
-def submit_to_LNT(data, url):
+def submit_to_lnt(data, url):
     print "\nSubmitting results to LNT server..."
     json_report = {'input_data': json.dumps(data), 'commit': '1'}
     data = urllib.urlencode(json_report)
@@ -224,7 +224,7 @@ def submit(args):
                    'Start Time': starttime}
     print "End time:\t", endtime
 
-    submit_to_LNT(data, args.lnt_host)
+    submit_to_lnt(data, args.lnt_host)
     return 0
 
 def run(args):

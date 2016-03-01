@@ -344,7 +344,7 @@ mirrors.test("class/CustomizedSuper/Synthesized") {
     var b: UInt = 42
     // This is an unusual case: when writing override on a
     // customMirror implementation you would typically want to pass
-    // ancestorRepresentation: .Customized(super.customMirror) or, in
+    // ancestorRepresentation: .customized(super.customMirror) or, in
     // rare cases, ancestorRepresentation: .Suppressed.  However, it
     // has an expected behavior, which we test here.
     override var customMirror: Mirror {
@@ -443,7 +443,7 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     var b: UInt = 42
     // This is an unusual case: when writing override on a
     // customMirror implementation you would typically want to pass
-    // ancestorRepresentation: .Customized(super.customMirror) or, in
+    // ancestorRepresentation: .customized(super.customMirror) or, in
     // rare cases, ancestorRepresentation: .Suppressed.  However, it
     // has an expected behavior, which we test here.
     override var customMirror: Mirror {
@@ -690,7 +690,7 @@ mirrors.test("Addressing") {
 }
 
 mirrors.test("Invalid Path Type")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

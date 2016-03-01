@@ -23,7 +23,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangImporter.h"

@@ -22,8 +22,8 @@ set(SWIFTLIB_ESSENTIAL
   ArrayBuffer.swift
   ArrayBufferProtocol.swift
   ArrayCast.swift
-  ArrayType.swift
   Arrays.swift.gyb
+  ArrayType.swift
   Assert.swift
   AssertCommon.swift
   BidirectionalCollection.swift
@@ -33,21 +33,21 @@ set(SWIFTLIB_ESSENTIAL
   BridgeStorage.swift
   Builtin.swift
   BuiltinMath.swift.gyb
-  CString.swift
-  CTypes.swift
   Character.swift
   CocoaArray.swift
   Collection.swift
   CollectionAlgorithms.swift.gyb
   CompilerProtocols.swift
   ContiguousArrayBuffer.swift
+  CString.swift
+  CTypes.swift
   EmptyCollection.swift
   ErrorType.swift
   Existential.swift
   Filter.swift
   FixedPoint.swift.gyb
-  Flatten.swift.gyb
   FlatMap.swift
+  Flatten.swift.gyb
   FloatingPoint.swift.gyb
   FloatingPointOperations.swift.gyb
   FloatingPointParsing.swift.gyb
@@ -75,17 +75,17 @@ set(SWIFTLIB_ESSENTIAL
   Pointer.swift
   Policy.swift
   Print.swift
-  REPL.swift
   RandomAccessCollection.swift
   Range.swift
   RangeReplaceableCollection.swift
   Reflection.swift
   Repeat.swift
+  REPL.swift
   Reverse.swift
   Runtime.swift.gyb
   Sequence.swift
-  SequenceWrapper.swift
   SequenceAlgorithms.swift.gyb
+  SequenceWrapper.swift
   SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift
@@ -104,10 +104,10 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16.swift
   StringUTF8.swift
   SwiftNativeNSArray.swift
+  UnavailableStringAPIs.swift.gyb
   Unicode.swift
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
-  UnavailableStringAPIs.swift.gyb
   Unmanaged.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
@@ -127,9 +127,8 @@ set(SWIFTLIB_SOURCES
   Tuple.swift.gyb
   VarArgs.swift
   Zip.swift
-  Prespecialized.swift
   )
-
+set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags)
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
@@ -162,6 +161,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       ${BSD_LIBRARIES})
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
+      OUTPUT_VARIABLE ENV_SYSTEMROOT)
+
+  list(APPEND swift_core_link_flags "${ENV_SYSTEMROOT}/system32/psapi.dll")
+endif()
+
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)
@@ -182,6 +188,7 @@ add_swift_library(swiftCore SHARED IS_STDLIB IS_STDLIB_CORE
   FILE_DEPENDS
     copy_shim_headers "${SWIFTLIB_DIR}/shims"
     section_magic
+    ${GROUP_INFO_JSON_FILE}
   LINK_FLAGS ${swift_core_link_flags}
   PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
   FRAMEWORK_DEPENDS ${swift_core_framework_depends}

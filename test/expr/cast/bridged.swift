@@ -26,12 +26,12 @@ struct BridgedStruct : _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: BridgedClass,
-    inout result: BridgedStruct?
+    result: inout BridgedStruct?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: BridgedClass,
-    inout result: BridgedStruct?
+    result: inout BridgedStruct?
   ) -> Bool {
     return true
   }

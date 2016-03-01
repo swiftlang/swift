@@ -60,6 +60,15 @@
     key.filepath: rdar_18677108-2-a.swift,
     key.severity: source.diagnostic.severity.error,
     key.description: "expected declaration",
-    key.diagnostic_stage: source.diagnostic.stage.swift.parse
+    key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+    key.diagnostics: [
+      {
+        key.line: 1,
+        key.column: 7,
+        key.filepath: rdar_18677108-2-a.swift,
+        key.severity: source.diagnostic.severity.note,
+        key.description: "in declaration of 'CameraController'"
+      }
+    ]
   }
 ]

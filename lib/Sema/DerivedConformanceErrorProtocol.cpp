@@ -184,11 +184,11 @@ ValueDecl *DerivedConformance::deriveErrorProtocol(TypeChecker &tc,
   return nullptr;
 }
 
-static void deriveBodyBridgedNSError_enum_NSErrorDomain(
+static void deriveBodyBridgedNSError_enum_nsErrorDomain(
               AbstractFunctionDecl *domainDecl) {
   // enum SomeEnum {
   //   @derived
-  //   static var _NSErrorDomain: String {
+  //   static var _nsErrorDomain: String {
   //     return "\(self)"
   //   }
   // }
@@ -208,12 +208,12 @@ static void deriveBodyBridgedNSError_enum_NSErrorDomain(
   domainDecl->setBody(body);
 }
 
-static ValueDecl *deriveBridgedNSError_enum_NSErrorDomain(TypeChecker &tc,
+static ValueDecl *deriveBridgedNSError_enum_nsErrorDomain(TypeChecker &tc,
                                                           Decl *parentDecl,
                                                           EnumDecl *enumDecl) {
   // enum SomeEnum {
   //   @derived
-  //   static var _NSErrorDomain: String {
+  //   static var _nsErrorDomain: String {
   //     return "\(self)"
   //   }
   // }
@@ -229,14 +229,14 @@ static ValueDecl *deriveBridgedNSError_enum_NSErrorDomain(TypeChecker &tc,
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
                                                  stringTy, stringTy,
                                                  /*isStatic=*/true);
-  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_NSErrorDomain);
+  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
   
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
     = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
-                                     C.Id_NSErrorDomain,
+                                     C.Id_nsErrorDomain,
                                      stringTy, stringTy,
                                      getterDecl, /*isStatic=*/true);
   
@@ -257,8 +257,8 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(TypeChecker &tc,
 
   auto enumType = cast<EnumDecl>(type);
 
-  if (requirement->getName() == tc.Context.Id_NSErrorDomain)
-    return deriveBridgedNSError_enum_NSErrorDomain(tc, parentDecl, enumType);
+  if (requirement->getName() == tc.Context.Id_nsErrorDomain)
+    return deriveBridgedNSError_enum_nsErrorDomain(tc, parentDecl, enumType);
 
   tc.diagnose(requirement->getLoc(),
               diag::broken_errortype_requirement);

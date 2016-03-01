@@ -57,8 +57,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_code_))
       return getRequirement(KnownProtocolKind::ErrorProtocol);
 
-    // _BridgedNSError._NSErrorDomain
-    if (name.isSimpleName(ctx.Id_NSErrorDomain))
+    // _BridgedNSError._nsErrorDomain
+    if (name.isSimpleName(ctx.Id_nsErrorDomain))
       return getRequirement(KnownProtocolKind::BridgedNSError);
 
     return nullptr;

@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
 #include "llvm/ADT/StringMap.h"
 
@@ -630,12 +631,25 @@ public:
   /// cannot be opened.
   void dump(const char *FileName) const;
 
+  // Helper for SILFunction::print().
+  struct ScopeSlotTracker {
+    llvm::DenseMap<const SILDebugScope *, unsigned> ScopeToIDMap;
+    unsigned ScopeIndex = 0;
+  };
+
   /// Pretty-print the SILFunction with the designated stream as a 'sil'
   /// definition.
   ///
   /// \param Verbose In verbose mode, print the SIL locations.
   void print(raw_ostream &OS, bool Verbose = false,
-             bool SortedSIL = false) const;
+             bool SortedSIL = false) const {
+    SILFunction::ScopeSlotTracker Tracker;
+    print(OS, Tracker, Verbose, SortedSIL);
+  }
+
+  /// Version of print that accepts a ScopeSlotTracker.
+  void print(raw_ostream &OS, ScopeSlotTracker &ScopeTracker, bool Verbose,
+             bool SortedSIL) const;
 
   /// Pretty-print the SILFunction's name using SIL syntax,
   /// '@function_mangled_name'.

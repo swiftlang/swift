@@ -8,15 +8,15 @@ import Swift
 // CHECK-LABEL: sil @merge_cond_fail
 // CHECK: bb0([[ARG1:%.*]] : $Builtin.Int1, [[ARG2:%.*]] : $Builtin.Int1, [[ARG3:%.*]] : $Builtin.Int1, [[ARG4:%.*]] : $Builtin.Int1, [[ARG5:%.*]] : $*Builtin.Int64):
 // CHECK: [[COND1:%.*]] = builtin "or_Int1"([[ARG1]]{{.*}}, [[ARG2]]
-// CHECK: cond_fail [[COND1]]
-// CHECK-NOT: cond_fail
+// CHECK: {{ cond_fail}} [[COND1]]
+// CHECK-NOT: {{ cond_fail}}
 // CHECK: [[LD:%.*]] = load [[ARG5]]
 // CHECK: [[COND2:%.*]] = builtin "or_Int1"([[ARG3]]{{.*}}, [[ARG4]]
-// CHECK: cond_fail [[COND2]]
+// CHECK: {{ cond_fail}} [[COND2]]
 // CHECK:  [[TUPLE:%.*]] = builtin "sadd_with_overflow_Int64"
 // CHECK:  [[RES:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 0
 // CHECK:  [[OVERFLOW:%.*]] = tuple_extract [[TUPLE]]{{.*}}, 1
-// CHECK: cond_fail [[OVERFLOW]]
+// CHECK: {{ cond_fail}} [[OVERFLOW]]
 // CHECK: return [[RES]]
 
 sil @merge_cond_fail : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1, @inout Builtin.Int64) -> Builtin.Int64 {

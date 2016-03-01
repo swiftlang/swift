@@ -69,11 +69,11 @@ public func - <T : Strideable>(lhs: T, rhs: T) -> T.Stride {
   return rhs.distance(to: lhs)
 }
 
-public func += <T : Strideable>(inout lhs: T, rhs: T.Stride) {
+public func += <T : Strideable>(lhs: inout T, rhs: T.Stride) {
   lhs = lhs.advanced(by: rhs)
 }
 
-public func -= <T : Strideable>(inout lhs: T, rhs: T.Stride) {
+public func -= <T : Strideable>(lhs: inout T, rhs: T.Stride) {
   lhs = lhs.advanced(by: -rhs)
 }
 
@@ -107,20 +107,20 @@ public func - <T : _DisallowMixedSignArithmetic>(
 }
 
 public func += <T : UnsignedInteger>(
-  inout lhs: T, rhs: T._DisallowMixedSignArithmetic
+  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
 ) {
   _sanityCheckFailure("Should not be callable.")
 }
 
 public func -= <T : UnsignedInteger>(
-  inout lhs: T, rhs: T._DisallowMixedSignArithmetic
+  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
 ) {
   _sanityCheckFailure("Should not be callable.")
 }
 
 //===----------------------------------------------------------------------===//
 
-/// An iterator for the result of `strideTo(...)`.
+/// An iterator for the result of `stride(to:...)`.
 public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   internal var _current: Element
   internal let _end: Element
@@ -167,14 +167,14 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   }
 }
 
-extension Strideable {
-  /// Returns the sequence of values (`self`, `self + stride`, `self +
-  /// stride + stride`, ... *last*) where *last* is the last value in
-  /// the progression that is less than `end`.
-  @warn_unused_result
-  public func strideTo(end: Self, by stride: Stride) -> StrideTo<Self> {
-    return StrideTo(_start: self, end: end, stride: stride)
-  }
+/// Returns the sequence of values (`self`, `self + stride`, `self +
+/// stride + stride`, ... *last*) where *last* is the last value in
+/// the progression that is less than `end`.
+@warn_unused_result
+public func stride<T : Strideable>(
+  from start: T, to end: T, by stride: T.Stride
+) -> StrideTo<T> {
+  return StrideTo(_start: start, end: end, stride: stride)
 }
 
 /// An `IteratorProtocol` for `StrideThrough<Element>`.
@@ -204,7 +204,9 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a closed interval.
-public struct StrideThrough<Element : Strideable> : Sequence, CustomReflectable {
+public struct StrideThrough<
+  Element : Strideable
+> : Sequence, CustomReflectable {
   // FIXME: should really be a CollectionType, as it is multipass
 
   /// Returns an iterator over the elements of this sequence.
@@ -227,22 +229,21 @@ public struct StrideThrough<Element : Strideable> : Sequence, CustomReflectable 
   internal let _stride: Element.Stride
 
   public var customMirror: Mirror {
-    return Mirror(self, children: ["from": _start, "through": _end, "by": _stride])
+    return Mirror(self,
+      children: ["from": _start, "through": _end, "by": _stride])
   }
 }
 
-extension Strideable {
-  /// Returns the sequence of values (`self`, `self + stride`, `self +
-  /// stride + stride`, ... *last*) where *last* is the last value in
-  /// the progression less than or equal to `end`.
-  ///
-  /// - Note: There is no guarantee that `end` is an element of the sequence.
-  @warn_unused_result
-  public func strideThrough(
-    end: Self, by stride: Stride
-  ) -> StrideThrough<Self> {
-    return StrideThrough(_start: self, end: end, stride: stride)
-  }
+/// Returns the sequence of values (`self`, `self + stride`, `self +
+/// stride + stride`, ... *last*) where *last* is the last value in
+/// the progression less than or equal to `end`.
+///
+/// - Note: There is no guarantee that `end` is an element of the sequence.
+@warn_unused_result
+public func stride<T : Strideable>(
+  from start: T, through end: T, by stride: T.Stride
+) -> StrideThrough<T> {
+  return StrideThrough(_start: start, end: end, stride: stride)
 }
 
 @available(*, unavailable, renamed="StrideToIterator")
@@ -252,12 +253,12 @@ public struct StrideToGenerator<Element : Strideable> {}
 public struct StrideThroughGenerator<Element : Strideable> {}
 
 extension Strideable {
-  @available(*, unavailable, renamed="strideTo")
+  @available(*, unavailable, message="Use stride(from:to:by:) free function instead")
   public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="strideThrough")
+  @available(*, unavailable, message="Use stride(from:through:by:) free function instead")
   public func stride(
     through end: Self, by stride: Stride
   ) -> StrideThrough<Self> {

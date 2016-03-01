@@ -72,7 +72,7 @@ FixedPointArithmeticTraps.test("PreDecrement/${IntTy}") {
 
   x = get${IntTy}(${IntTy}.min)
   expectCrashLater()
-  // --IntTy.min
+  // IntTy.min -= 1
   x -= 1
   _blackHole(x)
 }
@@ -83,7 +83,7 @@ FixedPointArithmeticTraps.test("PreIncrement/${IntTy}") {
 
   x = get${IntTy}(${IntTy}.max)
   expectCrashLater()
-  // ++IntTy.max
+  // IntTy.max += 1
   x += 1
   _blackHole(x)
 }
@@ -94,7 +94,7 @@ FixedPointArithmeticTraps.test("PostDecrement/${IntTy}") {
 
   x = get${IntTy}(${IntTy}.min)
   expectCrashLater()
-  // IntTy.min--
+  // IntTy.min -= 1
   x -= 1
   _blackHole(x)
 }
@@ -105,7 +105,7 @@ FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
 
   x = get${IntTy}(${IntTy}.max)
   expectCrashLater()
-  // IntTy.max++
+  // IntTy.max += 1
   x += 1
   _blackHole(x)
 }

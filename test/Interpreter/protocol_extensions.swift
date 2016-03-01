@@ -124,10 +124,10 @@ extension RangeReplaceableCollection {
     var result = Self()
     var iter = elements.makeIterator()
     if let first = iter.next() {
-      result.appendContents(of: first)
+      result.append(contentsOf: first)
       while let next = iter.next() {
-        result.appendContents(of: self)
-        result.appendContents(of: next)
+        result.append(contentsOf: self)
+        result.append(contentsOf: next)
       }
     }
     return result
@@ -220,7 +220,7 @@ class C : P {
   func getValue() -> Bool { return theValue }
 }
 
-func toggle(inout value: Bool) {
+func toggle(value: inout Bool) {
   value = !value
 }
 

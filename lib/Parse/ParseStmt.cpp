@@ -255,6 +255,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::pound_else) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) &&
+         Tok.isNot(tok::kw_sil_scope) &&
          Tok.isNot(tok::kw_sil_stage) &&
          Tok.isNot(tok::kw_sil_vtable) &&
          Tok.isNot(tok::kw_sil_global) &&
@@ -858,7 +859,8 @@ namespace {
 static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                 ParserStatus &status,
                                 SmallVectorImpl<VarDecl *> &boundDecls,
-                                GuardedPatternContext parsingContext) {
+                                GuardedPatternContext parsingContext,
+                                bool isFirstPattern) {
   ParserResult<Pattern> patternResult;
   auto setErrorResult = [&] () {
     patternResult = makeParserErrorResult(new (P.Context)
@@ -945,14 +947,64 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   status |= patternResult;
   result.ThePattern = patternResult.get();
 
-  // Add variable bindings from the pattern to the case scope.  We have
-  // to do this with a full AST walk, because the freshly parsed pattern
-  // represents tuples and var patterns as tupleexprs and
-  // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
-  patternResult.get()->forEachVariable([&](VarDecl *VD) {
-    if (VD->hasName()) P.addToScope(VD);
-    boundDecls.push_back(VD);
-  });
+  if (isFirstPattern) {
+    // Add variable bindings from the pattern to the case scope.  We have
+    // to do this with a full AST walk, because the freshly parsed pattern
+    // represents tuples and var patterns as tupleexprs and
+    // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
+    patternResult.get()->forEachVariable([&](VarDecl *VD) {
+      if (VD->hasName()) P.addToScope(VD);
+      boundDecls.push_back(VD);
+    });
+  } else {
+    // If boundDecls already contains variables, then we must match the
+    // same number and same names in this pattern as were declared in a
+    // previous pattern (and later we will make sure they have the same
+    // types).
+    SmallVector<VarDecl*, 4> repeatedDecls;
+    patternResult.get()->forEachVariable([&](VarDecl *VD) {
+      if (!VD->hasName())
+        return;
+      
+      for (auto repeat : repeatedDecls)
+        if (repeat->getName() == VD->getName())
+          P.addToScope(VD); // will diagnose a duplicate declaration
+
+      bool found = false;
+      for (auto previous : boundDecls) {
+        if (previous->hasName() && previous->getName() == VD->getName()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        // Diagnose a declaration that doesn't match a previous pattern.
+        P.diagnose(VD->getLoc(), diag::extra_var_in_multiple_pattern_list, VD->getName());
+        status.setIsParseError();
+      }
+      repeatedDecls.push_back(VD);
+    });
+    
+    for (auto previous : boundDecls) {
+      bool found = false;
+      for (auto repeat : repeatedDecls) {
+        if (previous->hasName() && previous->getName() == repeat->getName()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        // Diagnose a previous declaration that is missing in this pattern.
+        P.diagnose(previous->getLoc(), diag::extra_var_in_multiple_pattern_list, previous->getName());
+        status.setIsParseError();
+      }
+    }
+    
+    for (auto VD : repeatedDecls) {
+      VD->setHasNonPatternBindingInit();
+      VD->setImplicit();
+    }
+  }
   
   // Now that we have them, mark them as being initialized without a PBD.
   for (auto VD : boundDecls)
@@ -2004,7 +2056,7 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
   ParserStatus status;
   GuardedPattern pattern;
   parseGuardedPattern(*this, pattern, status, boundDecls,
-                      GuardedPatternContext::Catch);
+                      GuardedPatternContext::Catch, /* isFirst */ true);
   if (status.hasCodeCompletion()) {
     return makeParserCodeCompletionResult<CatchStmt>();
   }
@@ -2509,17 +2561,19 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
                                   SmallVectorImpl<VarDecl *> &BoundDecls,
                                   SourceLoc &ColonLoc) {
   ParserStatus Status;
-
+  bool isFirst = true;
+  
   CaseLoc = P.consumeToken(tok::kw_case);
 
   do {
     GuardedPattern PatternResult;
     parseGuardedPattern(P, PatternResult, Status, BoundDecls,
-                        GuardedPatternContext::Case);
+                        GuardedPatternContext::Case, isFirst);
     LabelItems.push_back(CaseLabelItem(/*IsDefault=*/false,
                                        PatternResult.ThePattern,
                                        PatternResult.WhereLoc,
                                        PatternResult.Guard));
+    isFirst = false;
   } while (P.consumeIf(tok::comma));
 
   ColonLoc = P.Tok.getLoc();
@@ -2585,11 +2639,6 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   }
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
-
-  // Case blocks with multiple patterns cannot bind variables.
-  if (!BoundDecls.empty() && CaseLabelItems.size() > 1)
-    diagnose(BoundDecls[0]->getLoc(),
-             diag::var_binding_with_multiple_case_patterns);
 
   SmallVector<ASTNode, 8> BodyItems;
 

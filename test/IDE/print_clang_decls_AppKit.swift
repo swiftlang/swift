@@ -19,7 +19,7 @@
 
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
-// APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
+// APPKIT-NEXT: func isDescendant(of aView: NSView) -> Bool
 // APPKIT-NEXT: func ancestorShared(with aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)

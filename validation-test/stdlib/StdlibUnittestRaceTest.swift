@@ -34,7 +34,7 @@ struct RaceTest1 : RaceTestWithPerTrialData {
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     switch RaceTest1.iterationCountdown.fetchAndAdd(-1) {
     case 0:
@@ -61,13 +61,13 @@ struct RaceTest1 : RaceTestWithPerTrialData {
     for observation in observations {
       switch observation {
       case Observation(0x1):
-        sink(.Pass)
+        sink(.pass)
       case Observation(0x2):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(observation)))
       case Observation(0xffff):
-        sink(.Failure)
+        sink(.failure)
       case Observation(0xfffe):
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(observation)))
       default:
         fatalError("should not happen")
       }

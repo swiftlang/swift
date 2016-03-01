@@ -1542,10 +1542,7 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
 Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
   if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
     return None;
-  auto Group = (*GroupNamesMap)[Id];
-  if (Group.empty())
-    return None;
-  return Group;
+  return (*GroupNamesMap)[Id];
 }
 
 Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {

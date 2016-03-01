@@ -258,8 +258,7 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // Look for anything at all that's fulfilled by this.  If we don't find
   // anything, stop.
   FulfillmentMap fulfillments;
-  if (!fulfillments.searchTypeMetadata(*IGF.IGM.SILMod->getSwiftModule(),
-                                       type, isExact,
+  if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
                                        /*source*/ 0, MetadataPath(),
                                        FulfillmentMap::Everything())) {
     return;

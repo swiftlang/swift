@@ -29,6 +29,7 @@ class AbstractClosureExpr;
 
 enum class SpecializationKind : uint8_t {
   Generic,
+  NotReAbstractedGeneric,
   FunctionSignature,
 };
 
@@ -66,6 +67,9 @@ protected:
     switch (Kind) {
     case SpecializationKind::Generic:
       M.append("g");
+      break;
+    case SpecializationKind::NotReAbstractedGeneric:
+      M.append("r");
       break;
     case SpecializationKind::FunctionSignature:
       M.append("f");
@@ -124,9 +128,18 @@ class GenericSpecializationMangler :
   ArrayRef<Substitution> Subs;
 
 public:
+
+  enum ReAbstractionMode {
+    ReAbstracted,
+    NotReabstracted
+  };
+
   GenericSpecializationMangler(Mangle::Mangler &M, SILFunction *F,
-                               ArrayRef<Substitution> Subs)
-    : SpecializationMangler(SpecializationKind::Generic,
+                               ArrayRef<Substitution> Subs,
+                               ReAbstractionMode isReAbstracted = ReAbstracted)
+    : SpecializationMangler(isReAbstracted == ReAbstracted ?
+                              SpecializationKind::Generic :
+                              SpecializationKind::NotReAbstractedGeneric,
                             SpecializationPass::GenericSpecializer,
                             M, F), Subs(Subs) {}
 

@@ -16,7 +16,7 @@ import ObjectiveC
 
 var ClassChangeSizeTest = TestSuite("ClassChangeSize")
 
-func increment(inout c: ChangeSize) {
+func increment(c: inout ChangeSize) {
   c.version += 1
 }
 

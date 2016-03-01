@@ -760,6 +760,7 @@ Basic Blocks
   sil-argument ::= sil-value-name ':' sil-type
 
   sil-instruction-def ::= (sil-value-name '=')? sil-instruction
+                          (',' sil-loc)? (',' sil-scope-ref)?
 
 A function body consists of one or more basic blocks that correspond
 to the nodes of the function's control flow graph. Each basic block
@@ -798,6 +799,30 @@ are bound by the function's caller::
     %3 = tuple ()
     return %3 : $()
   }
+
+
+Debug Information
+~~~~~~~~~~~~~~~~~
+::
+
+  sil-scope-ref ::= 'scope' [0-9]+
+  sil-scope ::= 'sil_scope' [0-9]+ '{'
+                   sil-loc
+                   'parent' scope-parent
+                   ('inlined_at' sil-scope-ref )?
+                '}'
+  scope-parent ::= sil-function-name ':' sil-type
+  scope-parent ::= sil-scope-ref
+  sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
+
+Each instruction may have a debug location and a SIL scope reference
+at the end.  Debug locations consist of a filename, a line number, and
+a column number.  If the debug location is omitted, it defaults to the
+location in the SIL source file.  SIL scopes describe the position
+inside the lexical scope structure that the Swift expression a SIL
+instruction was generated from had originally. SIL scopes also hold
+inlining information.
+
 
 Declaration References
 ~~~~~~~~~~~~~~~~~~~~~~

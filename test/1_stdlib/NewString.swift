@@ -17,10 +17,10 @@ func hexAddrVal<T>(x: T) -> String {
 func hexAddr(x: AnyObject?) -> String {
   if let owner = x {
     if let y = owner as? _StringBuffer._Storage.Storage {
-      return ".Native\(hexAddrVal(y))"
+      return ".native\(hexAddrVal(y))"
     }
     if let y = owner as? NSString {
-      return ".Cocoa\(hexAddrVal(y))"
+      return ".cocoa\(hexAddrVal(y))"
     }
     else {
       return "?Uknown?\(hexAddrVal(owner))"
@@ -91,7 +91,7 @@ func nonASCII() {
   // CHECK-NEXT: __NSCFString@[[utf16address:[x0-9a-f]+]] = "🏂☃❅❆❄︎⛄️❄️"
   print("  \(repr(nsUTF16))")
 
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 11))
+  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 11))
   var newNSUTF16 = nsUTF16 as String
   print("  \(repr(newNSUTF16))")
 
@@ -103,7 +103,7 @@ func nonASCII() {
   print("--- UTF-16 slicing ---")
 
   // Slicing the String does not allocate
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
+  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
   let i2 = newNSUTF16.startIndex.advanced(by: 2)
   let i8 = newNSUTF16.startIndex.advanced(by: 6)
   print("  \(repr(newNSUTF16[i2..<i8]))")
@@ -115,7 +115,7 @@ func nonASCII() {
   print("  \(repr(nsSliceUTF16))")
 
   // Check that we can recover the original buffer
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
+  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
   print("  \(repr(nsSliceUTF16 as String))")
 }
 nonASCII()

@@ -90,7 +90,7 @@ func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
 func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 
-func insertA<T>(inout array : [T], elt : T) {
+func insertA<T>(array : inout [T], elt : T) {
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}} expected-note {{expected an argument list of type '(T)'}}
 }
 

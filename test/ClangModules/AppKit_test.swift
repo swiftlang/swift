@@ -18,7 +18,7 @@ func test(URL: NSURL, controller: NSDocumentController) {
   try! NSDocument(contentsOf: URL, ofType: "") // expected-warning{{unused}}
   try! MyDocument(contentsOf: URL, ofType: "")
 
-  try! controller.makeDocument(contentsOf: URL, ofType: "")
+  try! controller.makeDocument(withContentsOf: URL, ofType: "")
 }
 
 extension NSBox {

@@ -19,7 +19,6 @@
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/IRGenOptions.h"
@@ -262,6 +261,27 @@ void ClangImporter::clearTypeResolver() {
 #define SHIMS_INCLUDE_FLAG "-I"
 #endif
 
+static StringRef
+getMinVersionOptNameForDarwinTriple(const llvm::Triple &triple) {
+  switch(getDarwinPlatformKind(triple)) {
+    case DarwinPlatformKind::MacOS:
+      return "-mmacosx-version-min=";
+    case DarwinPlatformKind::IPhoneOS:
+      return "-mios-version-min=";
+    case DarwinPlatformKind::IPhoneOSSimulator:
+      return "-mios-simulator-version-min=";
+    case DarwinPlatformKind::TvOS:
+      return "-mtvos-version-min=";
+    case DarwinPlatformKind::TvOSSimulator:
+      return "-mtvos-simulator-version-min=";
+    case DarwinPlatformKind::WatchOS:
+      return "-mwatchos-version-min=";
+    case DarwinPlatformKind::WatchOSSimulator:
+      return "-mwatchos-simulator-version-min=";
+  }
+  llvm_unreachable("Unsupported Darwin platform");
+}
+
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -343,31 +363,15 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   if (triple.isOSDarwin()) {
     std::string minVersionBuf;
     llvm::raw_string_ostream minVersionOpt{minVersionBuf};
+    minVersionOpt << getMinVersionOptNameForDarwinTriple(triple);
+
     unsigned major, minor, micro;
     if (triple.isiOS()) {
-      bool isiOSSimulator = swift::tripleIsiOSSimulator(triple);
-      if (triple.isTvOS()) {
-        if (isiOSSimulator)
-          minVersionOpt << "-mtvos-simulator-version-min=";
-        else
-          minVersionOpt << "-mtvos-version-min=";
-      } else {
-        if (isiOSSimulator)
-          minVersionOpt << "-mios-simulator-version-min=";
-        else
-          minVersionOpt << "-mios-version-min=";
-      }
-
       triple.getiOSVersion(major, minor, micro);
     } else if(triple.isWatchOS()) {
-      if (tripleIsWatchSimulator(triple))
-          minVersionOpt << "-mwatchos-simulator-version-min=";
-      else
-          minVersionOpt << "-mwatchos-version-min=";
-      triple.getOSVersion(major, minor, micro);
+      triple.getWatchOSVersion(major, minor, micro);
     } else {
       assert(triple.isMacOSX());
-      minVersionOpt << "-mmacosx-version-min=";
       triple.getMacOSXVersion(major, minor, micro);
     }
     minVersionOpt << clang::VersionTuple(major, minor, micro);
@@ -716,20 +720,18 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   if (shouldSuppressDeclImport(named)) return;
 
   // If we have a name to import as, add this entry to the table.
-  clang::DeclContext *effectiveContext;
-  if (auto importedName = importFullName(named, None, &effectiveContext,
-                                         &clangSema)) {
-    table.addEntry(importedName.Imported, named, effectiveContext);
+  if (auto importedName = importFullName(named, None, &clangSema)) {
+    table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
     // Also add the alias, if needed.
     if (importedName.Alias)
-      table.addEntry(importedName.Alias, named, effectiveContext);
+      table.addEntry(importedName.Alias, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
     if (importedName.IsSubscriptAccessor)
       table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
                               ArrayRef<Identifier>()),
-                     named, effectiveContext);
+                     named, importedName.EffectiveContext);
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
     table.addCategory(category);
   }
@@ -1915,7 +1917,6 @@ namespace {
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
-       clang::DeclContext **effectiveContext,
        clang::Sema *clangSemaOverride) -> ImportedName {
   clang::Sema &clangSema = clangSemaOverride ? *clangSemaOverride
                                              : getClangSema();
@@ -1926,38 +1927,38 @@ auto ClangImporter::Implementation::importFullName(
   if (isa<clang::ObjCCategoryDecl>(D))
     return result;
 
-  // Compute the effective context, if requested.
-  if (effectiveContext) {
-    auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
+  // Compute the effective context.
+  auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
 
-    // Enumerators can end up within their enclosing enum or in the global
-    // scope, depending how their enclosing enumeration is imported.
-    if (isa<clang::EnumConstantDecl>(D)) {
-      auto enumDecl = cast<clang::EnumDecl>(dc);
-      switch (getEnumKind(enumDecl, &clangSema.getPreprocessor())) {
-      case EnumKind::Enum:
-      case EnumKind::Options:
-        // Enums are mapped to Swift enums, Options to Swift option sets.
-        *effectiveContext = enumDecl;
-        break;
+  // Enumerators can end up within their enclosing enum or in the global
+  // scope, depending how their enclosing enumeration is imported.
+  if (isa<clang::EnumConstantDecl>(D)) {
+    auto enumDecl = cast<clang::EnumDecl>(dc);
+    switch (getEnumKind(enumDecl, &clangSema.getPreprocessor())) {
+    case EnumKind::Enum:
+    case EnumKind::Options:
+      // Enums are mapped to Swift enums, Options to Swift option sets.
+      result.EffectiveContext = cast<clang::DeclContext>(enumDecl);
+      break;
 
-      case EnumKind::Constants:
-      case EnumKind::Unknown:
-        // The enum constant goes into the redeclaration context of the
-        // enum.
-        *effectiveContext = enumDecl->getRedeclContext();
-        break;
-      }
-    } else {
-      // Everything else goes into its redeclaration context.
-      *effectiveContext = dc->getRedeclContext();
+    case EnumKind::Constants:
+    case EnumKind::Unknown:
+      // The enum constant goes into the redeclaration context of the
+      // enum.
+      result.EffectiveContext = enumDecl->getRedeclContext();
+      break;
     }
+  } else {
+    // Everything else goes into its redeclaration context.
+    result.EffectiveContext = dc->getRedeclContext();
+  }
 
-    // Anything in an Objective-C category or extension is adjusted to the
-    // class context.
-    if (auto category = dyn_cast<clang::ObjCCategoryDecl>(*effectiveContext)) {
-      *effectiveContext = category->getClassInterface();
-    }
+  // Anything in an Objective-C category or extension is adjusted to the
+  // class context.
+  if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
+                         result.EffectiveContext
+                           .dyn_cast<clang::DeclContext *>())) {
+    result.EffectiveContext = category->getClassInterface();
   }
 
   // When omitting needless words, find the original method/property
@@ -1972,7 +1973,7 @@ auto ClangImporter::Implementation::importFullName(
       method->getOverriddenMethods(overriddenMethods);
       for (auto overridden : overriddenMethods) {
         const auto overriddenName = importFullName(overridden, options,
-                                                   nullptr,clangSemaOverride);
+                                                   clangSemaOverride);
         if (overriddenName.Imported)
           overriddenNames.push_back({overridden, overriddenName});
       }
@@ -1981,6 +1982,7 @@ auto ClangImporter::Implementation::importFullName(
       if (!overriddenNames.empty()) {
         if (overriddenNames.size() > 1)
           mergeOverriddenNames(SwiftContext, method, overriddenNames);
+        overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
         return overriddenNames[0].second;
       }
     } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
@@ -2002,7 +2004,6 @@ auto ClangImporter::Implementation::importFullName(
 
           const auto overriddenName = importFullName(overriddenProperty,
                                                      options,
-                                                     nullptr,
                                                      clangSemaOverride);
           if (overriddenName.Imported)
             overriddenNames.push_back({overriddenProperty, overriddenName});
@@ -2012,6 +2013,7 @@ auto ClangImporter::Implementation::importFullName(
         if (!overriddenNames.empty()) {
           if (overriddenNames.size() > 1)
             mergeOverriddenNames(SwiftContext, property, overriddenNames);
+          overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
           return overriddenNames[0].second;
         }
       }

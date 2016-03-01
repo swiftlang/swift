@@ -238,7 +238,7 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK-NEXT:  exit
 // CHECK-NEXT:  function_ref
 // CHECK-NEXT:  apply
-// CHECK-NEXT:  unreachable
+// CHECK-NEXT: {{ unreachable}}
 // CHECK: }
 
 sil @dead_use_of_alloc_stack : $@convention(thin) () -> () {
@@ -374,7 +374,7 @@ sil @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
 
 // CHECK-LABEL:sil @try_apply_1
 // CHECK:    bb1(
-// CHECK-NEXT: unreachable
+// CHECK-NEXT: {{ unreachable}}
 // CHECK:    bb2(
 // CHECK-NEXT: throw
 sil @try_apply_1 : $@convention(thin) () -> @error ErrorProtocol {
@@ -390,7 +390,7 @@ bb2(%3 : $ErrorProtocol):
 
 // CHECK-LABEL:sil @try_apply_2
 // CHECK:    bb3(
-// CHECK-NEXT: unreachable
+// CHECK-NEXT: {{ unreachable}}
 // CHECK:    bb4(
 // CHECK-NEXT: throw
 sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error ErrorProtocol {
@@ -412,7 +412,7 @@ bb4(%4 : $ErrorProtocol):
 // CHECK-LABEL:sil @try_apply_3
 // CHECK:      br bb1
 // CHECK:    bb1(
-// CHECK-NOT:  unreachable
+// CHECK-NOT:  {{ unreachable}}
 // CHECK:      try_apply
 // CHECK:    bb2(
 // CHECK-NEXT: throw

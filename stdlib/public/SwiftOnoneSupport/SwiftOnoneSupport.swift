@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 // Pre-specialization of some popular generic classes and functions.
 //===----------------------------------------------------------------------===//
+import Swift
 
 struct _Prespecialize {
+  class C {}
+
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
   static internal func _specializeArrays() {
@@ -25,8 +28,9 @@ struct _Prespecialize {
       let _ =  a[0]
 
       // Set array elements
-      for j in 0..<a.count {
+      for j in 1..<a.count {
         a[0] = a[j]
+        a[j-1] = a[j]
       }
 
       for i1 in 0..<a.count {
@@ -56,12 +60,61 @@ struct _Prespecialize {
       let _ = a.sorted { (a: Element, b: Element) in a < b }
       a.sort { (a: Element, b: Element) in a < b }
 
+      // force specialization of append.
+      a.append(a[0])
 
       // force specialization of print<Element>
       print(sampleValue)
       print("Element:\(sampleValue)")
     }
 
+    func _createArrayUserWithoutSorting<Element>(sampleValue: Element) {
+      // Initializers.
+      let _: [Element] = [ sampleValue ]
+      var a = [Element](repeating: sampleValue, count: 1)
+
+      // Read array element
+      let _ =  a[0]
+
+      // Set array elements
+      for j in 0..<a.count {
+        a[0] = a[j]
+      }
+
+      for i1 in 0..<a.count {
+        for i2 in 0..<a.count {
+          a[i1] = a[i2]
+        }
+      }
+
+      a[0] = sampleValue
+
+      // Get length and capacity
+      let _ = a.count + a.capacity
+
+      // Iterate over array
+      for e in a {
+        print(e)
+        print("Value: \(e)")
+      }
+
+      print(a)
+
+      // Reserve capacity
+      a.removeAll()
+      a.reserveCapacity(100)
+
+
+      // force specialization of append.
+      a.append(a[0])
+
+      // force specialization of print<Element>
+      print(sampleValue)
+      print("Element:\(sampleValue)")
+    }
+
+    // Force pre-specialization of arrays with elements of different
+    // integer types.
     _createArrayUser(1 as Int)
     _createArrayUser(1 as Int8)
     _createArrayUser(1 as Int16)
@@ -72,9 +125,23 @@ struct _Prespecialize {
     _createArrayUser(1 as UInt16)
     _createArrayUser(1 as UInt32)
     _createArrayUser(1 as UInt64)
-    _createArrayUser("a" as String)
+
+    // Force pre-specialization of arrays with elements of different
+    // floating point types.
     _createArrayUser(1.5 as Float)
     _createArrayUser(1.5 as Double)
+
+    // Force pre-specialization of string arrays
+    _createArrayUser("a" as String)
+
+    // Force pre-specialization of arrays with elements of different
+    // character and unicode scalar types.
+    _createArrayUser("a" as Character)
+    _createArrayUser("a" as UnicodeScalar)
+    _createArrayUserWithoutSorting("a".utf8)
+    _createArrayUserWithoutSorting("a".utf16)
+    _createArrayUserWithoutSorting("a".unicodeScalars)
+    _createArrayUserWithoutSorting("a".characters)
   }
 
   // Force pre-specialization of Range<Int>

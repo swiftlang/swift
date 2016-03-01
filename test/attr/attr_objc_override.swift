@@ -2,7 +2,7 @@
 //
 // REQUIRES: objc_interop
 
-class MixedKeywordsAndAttributes {
+class MixedKeywordsAndAttributes { // expected-note{{in declaration of 'MixedKeywordsAndAttributes'}}
   // expected-error@+1 {{expected declaration}} expected-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}}
   override @objc func f1() {}
 }

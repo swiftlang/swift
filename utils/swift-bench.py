@@ -63,11 +63,11 @@ class SwiftBenchHarness:
         sys.stdout.write('  ')
       print(str)
 
-  def runCommand(self, cmd):
+  def run_command(self, cmd):
     self.log('    Executing: ' + ' '.join(cmd), 1)
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
-  def parseArguments(self):
+  def parse_arguments(self):
     self.log("Parsing arguments.", 2)
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbosity", help="increase output verbosity", type=int)
@@ -97,7 +97,7 @@ class SwiftBenchHarness:
     self.log("Time limit: %s." % self.timeLimit, 3)
     self.log("Min sample time: %s." % self.minSampleTime, 3)
 
-  def processSource(self, name):
+  def process_source(self, name):
     self.log("Processing source file: %s." % name, 2)
 
     header = """
@@ -193,12 +193,12 @@ main()
     for n in testNames:
       self.tests[name + ":" + n].processedSource = processedName
 
-  def processSources(self):
+  def process_sources(self):
     self.log("Processing sources: %s." % self.sources, 2)
     for s in self.sources:
-      self.processSource(s)
+      self.process_source(s)
 
-  def compileOpaqueCFile(self):
+  def compile_opaque_cfile(self):
     self.log("Generating and compiling C file with opaque functions.", 3)
     fileBody = """
 #include <stdint.h>
@@ -208,16 +208,16 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     with open('opaque.cpp', 'w') as f:
       f.write(fileBody)
     # TODO: Handle subprocess.CalledProcessError for this call:
-    self.runCommand(['clang++', 'opaque.cpp', '-o', 'opaque.o', '-c', '-O2'])
+    self.run_command(['clang++', 'opaque.cpp', '-o', 'opaque.o', '-c', '-O2'])
 
   compiledFiles = {}
 
-  def compileSource(self, name):
+  def compile_source(self, name):
     self.tests[name].binary = "./" + self.tests[name].processedSource.split(os.extsep)[0]
     if not self.tests[name].processedSource in self.compiledFiles:
       try:
-        self.runCommand([self.compiler, self.tests[name].processedSource, "-o", self.tests[name].binary + '.o', '-c'] + self.optFlags)
-        self.runCommand([self.compiler, '-o', self.tests[name].binary, self.tests[name].binary + '.o', 'opaque.o'])
+        self.run_command([self.compiler, self.tests[name].processedSource, "-o", self.tests[name].binary + '.o', '-c'] + self.optFlags)
+        self.run_command([self.compiler, '-o', self.tests[name].binary, self.tests[name].binary + '.o', 'opaque.o'])
         self.compiledFiles[self.tests[name].processedSource] = ('', '')
       except subprocess.CalledProcessError as e:
         self.compiledFiles[self.tests[name].processedSource] = ('COMPFAIL', e.output)
@@ -226,18 +226,18 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     self.tests[name].status = status
     self.tests[name].output = output
 
-  def compileSources(self):
+  def compile_sources(self):
     self.log("Compiling processed sources.", 2)
-    self.compileOpaqueCFile()
+    self.compile_opaque_cfile()
     for t in self.tests:
-      self.compileSource(t)
+      self.compile_source(t)
 
-  def runBenchmarks(self):
+  def run_benchmarks(self):
     self.log("Running benchmarks.", 2)
     for t in self.tests:
-      self.runBench(t)
+      self.run_bench(t)
 
-  def parseBenchmarkOutput(self, res):
+  def parse_benchmark_output(self, res):
     # Parse lines like
     # TestName,NNN,MMM
     # where NNN - performed iterations number, MMM - execution time (in ns)
@@ -247,16 +247,16 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       return ("", 0, 0)
     return (m.group(1), m.group(2), m.group(3))
 
-  def computeItersNumber(self, name):
+  def compute_iters_number(self, name):
     scale = 1
     spent = 0
     # Measure time for one iteration
     # If it's too small, increase number of iteration until it's measurable
     while (spent <= self.minIterTime):
       try:
-        r = self.runCommand([self.tests[name].binary, str(scale),
+        r = self.run_command([self.tests[name].binary, str(scale),
                              self.tests[name].name])
-        (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
+        (testName, itersComputed, execTime) = self.parse_benchmark_output(r)
         # Convert ns to ms
         spent = int(execTime) / 1000000
         if spent <= self.minIterTime:
@@ -279,10 +279,10 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       samples = 1
     return (samples, scale)
 
-  def runBench(self, name):
+  def run_bench(self, name):
     if not self.tests[name].status == "":
       return
-    (numSamples, iterScale) = self.computeItersNumber(name)
+    (numSamples, iterScale) = self.compute_iters_number(name)
     if (numSamples, iterScale) == (0, 0):
       self.tests[name].status = "CAN'T MEASURE"
       self.tests[name].output = "Can't find number of iterations for the test to last longer than %d ms." % self.minIterTime
@@ -291,9 +291,9 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     self.log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
     for _ in range(0, numSamples):
       try:
-        r = self.runCommand([self.tests[name].binary, str(iterScale),
+        r = self.run_command([self.tests[name].binary, str(iterScale),
                              self.tests[name].name])
-        (testName, itersComputed, execTime) = self.parseBenchmarkOutput(r)
+        (testName, itersComputed, execTime) = self.parse_benchmark_output(r)
         # TODO: Verify testName and itersComputed
         samples.append(int(execTime) / iterScale)
         self.tests[name].output = r
@@ -304,11 +304,11 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
     res = TestResults(name, samples)
     self.tests[name].results = res
 
-  def reportResults(self):
+  def report_results(self):
     self.log("\nReporting results.", 2)
     print("==================================================")
     for t in self.tests:
-      self.tests[t].Print()
+      self.tests[t].do_print()
 
 
 class Test:
@@ -319,11 +319,11 @@ class Test:
     self.binary = binary
     self.status = ""
 
-  def Print(self):
+  def do_print(self):
     print("NAME: %s" % self.name)
     print("SOURCE: %s" % self.source)
     if self.status == "":
-      self.results.Print()
+      self.results.do_print()
     else:
       print("STATUS: %s" % self.status)
       print("OUTPUT:")
@@ -337,9 +337,9 @@ class TestResults:
     self.name = name
     self.samples = samples
     if len(samples) > 0:
-      self.Process()
+      self.process()
 
-  def Process(self):
+  def process(self):
     self.minimum = min(self.samples)
     self.maximum = max(self.samples)
     self.avg = sum(self.samples) / len(self.samples)
@@ -348,7 +348,7 @@ class TestResults:
     self.int_min = self.avg - self.err * 1.96
     self.int_max = self.avg + self.err * 1.96
 
-  def Print(self):
+  def do_print(self):
     print("SAMPLES: %d" % len(self.samples))
     print("MIN: %3.2e" % self.minimum)
     print("MAX: %3.2e" % self.maximum)
@@ -361,11 +361,11 @@ class TestResults:
 
 def main():
   harness = SwiftBenchHarness()
-  harness.parseArguments()
-  harness.processSources()
-  harness.compileSources()
-  harness.runBenchmarks()
-  harness.reportResults()
+  harness.parse_arguments()
+  harness.process_sources()
+  harness.compile_sources()
+  harness.run_benchmarks()
+  harness.report_results()
 
 
 main()

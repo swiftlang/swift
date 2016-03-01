@@ -26,7 +26,7 @@ func returnNil() -> AnyObject? {
 var OptionalTraps = TestSuite("OptionalTraps")
 
 OptionalTraps.test("UnwrapNone")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -37,7 +37,7 @@ OptionalTraps.test("UnwrapNone")
 }
 
 OptionalTraps.test("UnwrapNone/Ounchecked")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isFastAssertConfiguration() },
     reason: "unwrapping nil should trap unless we are in -Ounchecked mode"))
   .code {

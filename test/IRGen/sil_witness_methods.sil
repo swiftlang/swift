@@ -57,13 +57,13 @@ entry(%x : $@thick Foo.Type):
 
 //   The use of %0 or %Self here is irrelevant.
 // CHECK-LABEL: define{{( protected)?}} %swift.type* @generic_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self, i8** %SelfWitnessTable)
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type**
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
 // CHECK:         %T = load %swift.type*, %swift.type** [[T1]], align 8
-// CHECK:         [[U0:%.*]] = bitcast %swift.type* %0 to %swift.type**
+// CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[U0]], i64 11
 // CHECK:         %U = load %swift.type*, %swift.type** [[U1]], align 8
-// CHECK:         [[V0:%.*]] = bitcast %swift.type* %0 to %swift.type**
+// CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 12
 // CHECK:         %V = load %swift.type*, %swift.type** [[V1]], align 8
 sil @generic_type_concrete_static_method_witness : $@convention(witness_method) <T, U, V> (@thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {

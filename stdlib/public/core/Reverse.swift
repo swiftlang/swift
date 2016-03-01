@@ -17,7 +17,7 @@ public protocol ReverseIndexProtocol : BidirectionalIndex {
 
   /// A type that can represent the number of steps between pairs of
   /// `ReverseIndex` values where one value is reachable from the other.
-  associatedtype Distance: _SignedInteger = Base.Distance
+  associatedtype Distance : _SignedInteger = Base.Distance
 
   /// The successor position in the underlying (un-reversed)
   /// collection.
@@ -49,7 +49,7 @@ extension BidirectionalIndex where Self : ReverseIndexProtocol {
 
 /// A wrapper for a `BidirectionalIndex` that reverses its
 /// direction of traversal.
-public struct ReverseIndex<Base: BidirectionalIndex>
+public struct ReverseIndex<Base : BidirectionalIndex>
 : BidirectionalIndex, ReverseIndexProtocol {
   public typealias Distance = Base.Distance
   

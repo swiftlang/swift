@@ -117,7 +117,7 @@ def collect_submodules(common_args, module):
     return sorted(list(submodules))
 
 # Print out the command we're about to execute
-def printCommand(cmd, outfile=""):
+def print_command(cmd, outfile=""):
     str = " ".join(cmd)
     if outfile != "":
         str += " > " + outfile
@@ -138,7 +138,7 @@ def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
 
     top_level_cmd = cmd + extra_dump_args + ['-module-to-print=%s' % (module)]
     if verbose:
-        printCommand(top_level_cmd, output_file)
+        print_command(top_level_cmd, output_file)
 
     output_command_result_to_file(top_level_cmd, output_file)
 
@@ -152,7 +152,7 @@ def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet, verbose)):
         submodule_cmd = cmd + extra_dump_args
         submodule_cmd = submodule_cmd + ['-module-to-print=%s' % (full_submodule)]
         if verbose:
-            printCommand(submodule_cmd, output_file)
+            print_command(submodule_cmd, output_file)
 
         output_command_result_to_file(submodule_cmd, output_file)
 
@@ -229,7 +229,7 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments']
+    cmd_common = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-module-print-skip-overlay', '-skip-unavailable', '-skip-print-doc-comments', '-always-argument-labels', '-skip-overrides']
 
     # Add -F / -I arguments.
     if args.framework_dir:
@@ -242,7 +242,7 @@ def main():
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
     if args.swift_3:
-        extra_args = extra_args + ['-enable-omit-needless-words', '-enable-infer-default-arguments', '-enable-strip-ns-prefix']
+        extra_args = extra_args + ['-enable-omit-needless-words', '-enable-infer-default-arguments']
 
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])

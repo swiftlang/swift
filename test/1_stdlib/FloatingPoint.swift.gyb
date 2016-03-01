@@ -276,7 +276,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
       if lhs.isZero && rhs.isZero {
         // Special case: 0.0 and -0.0 compare equal.
         checkFloatingPointComparison_${FloatSelf}(
-          ExpectedComparisonResult.EQ, lhs, rhs)
+          ExpectedComparisonResult.eq, lhs, rhs)
       } else if lhs.isNaN || rhs.isNaN {
         // Special case: NaN is unordered wrt other values.
         // - equality comparison with NaN returns false,
@@ -292,10 +292,10 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
         // The sane case.
         checkFloatingPointComparison_${FloatSelf}(
           lhsIdx < rhsIdx ?
-            ExpectedComparisonResult.LT :
+            ExpectedComparisonResult.lt :
             (lhsIdx == rhsIdx ?
-              ExpectedComparisonResult.EQ :
-              ExpectedComparisonResult.GT),
+              ExpectedComparisonResult.eq :
+              ExpectedComparisonResult.gt),
           lhs, rhs)
       }
     }

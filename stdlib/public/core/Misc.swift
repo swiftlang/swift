@@ -65,7 +65,7 @@ func _withUninitializedString<R>(
 ) -> (R, String) {
   let stringPtr = UnsafeMutablePointer<String>(allocatingCapacity: 1)
   let bodyResult = body(stringPtr)
-  let stringResult = stringPtr.take()
+  let stringResult = stringPtr.move()
   stringPtr.deallocateCapacity(1)
   return (bodyResult, stringResult)
 }
@@ -104,7 +104,7 @@ func _typeByName(name: String) -> Any.Type? {
   // actually a class.
   var name = "C"
   if components[0] == "Swift" {
-    name += "Ss"
+    name += "s"
   } else {
     name += String(components[0].characters.count) + components[0]
   }

@@ -61,7 +61,7 @@ public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
 }
 
 internal func _mapInPlace<C : MutableCollection>(
-  inout elements: C,
+  elements: inout C,
   @noescape transform: (C.Iterator.Element) -> C.Iterator.Element
 ) {
   for i in elements.indices {
@@ -98,7 +98,8 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1,
-    withUnsafeMutableBufferPointerIsSupported: Bool
+    withUnsafeMutableBufferPointerIsSupported: Bool,
+    isFixedLengthCollection: Bool
   ) {
     var testNamePrefix = testNamePrefix
 
@@ -136,11 +137,11 @@ extension TestSuite {
 // subscript(_: Index)
 //===----------------------------------------------------------------------===//
 
-if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
+if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Set") {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
@@ -155,7 +156,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/Empty/Set") {
     var c = makeWrappedCollection([])
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
@@ -211,6 +212,39 @@ self.test("\(testNamePrefix).subscript(_: Range)/Set/semantics") {
         resiliencyChecks: .none) {
         extractValue($0).value == extractValue($1).value
       }
+    }
+  }
+}
+
+if isFixedLengthCollection {
+  self.test("\(testNamePrefix).subscript(_: Range)/Set/LargerRange") {
+    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+    let newElements = makeWrappedCollection([ 91010, 92020, 93030, 94040 ].map(OpaqueValue.init))
+  
+    expectCrashLater()
+    c[c.indices] = newElements[newElements.indices]
+  }
+
+  self.test("\(testNamePrefix).subscript(_: Range)/Set/SmallerRange") {
+    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+    let newElements = makeWrappedCollection([ 91010, 92020 ].map(OpaqueValue.init))
+  
+    expectCrashLater()
+    c[c.indices] = newElements[newElements.indices]
+  }
+} else {
+  self.test("\(testNamePrefix).subscript(_: Range)/Set/DifferentlySizedRange") {
+    for test in replaceRangeTests {
+      var c = makeWrappedCollection(test.collection)
+      let newElements = makeWrappedCollection(test.newElements)
+      let rangeToReplace = test.rangeSelection.rangeOf(c)
+
+      c[rangeToReplace] = newElements[newElements.indices]
+            
+      expectEqualSequence(
+        test.expected,
+        c.map(extractValue).map { $0.value },
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -403,7 +437,8 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1,
-    withUnsafeMutableBufferPointerIsSupported: Bool
+    withUnsafeMutableBufferPointerIsSupported: Bool,
+    isFixedLengthCollection: Bool
   ) {
     var testNamePrefix = testNamePrefix
 
@@ -428,7 +463,8 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
       withUnsafeMutableBufferPointerIsSupported:
-        withUnsafeMutableBufferPointerIsSupported)
+        withUnsafeMutableBufferPointerIsSupported,
+      isFixedLengthCollection: isFixedLengthCollection)
 
     addBidirectionalCollectionTests(
       testNamePrefix,
@@ -453,11 +489,11 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
 // subscript(_: Index)
 //===----------------------------------------------------------------------===//
 
-if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
+if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/NonEmpty/Set") {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
@@ -472,7 +508,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/Empty/Set") {
     var c = makeWrappedCollection([])
     var index = c.startIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .trap {
       expectCrashLater()
       index = index.advanced(by: numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
@@ -521,7 +557,8 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1,
-    withUnsafeMutableBufferPointerIsSupported: Bool
+    withUnsafeMutableBufferPointerIsSupported: Bool,
+    isFixedLengthCollection: Bool
   ) {
     var testNamePrefix = testNamePrefix
 
@@ -546,7 +583,8 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
       withUnsafeMutableBufferPointerIsSupported:
-        withUnsafeMutableBufferPointerIsSupported)
+        withUnsafeMutableBufferPointerIsSupported,
+      isFixedLengthCollection: isFixedLengthCollection)
 
     addRandomAccessCollectionTests(
       testNamePrefix,

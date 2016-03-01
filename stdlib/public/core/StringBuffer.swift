@@ -11,20 +11,20 @@
 //===----------------------------------------------------------------------===//
 
 struct _StringBufferIVars {
-  init(_ elementWidth: Int) {
-    _sanityCheck(elementWidth == 1 || elementWidth == 2)
+  internal init(_elementWidth: Int) {
+    _sanityCheck(_elementWidth == 1 || _elementWidth == 2)
     usedEnd = nil
-    capacityAndElementShift = elementWidth - 1
+    capacityAndElementShift = _elementWidth - 1
   }
 
-  init(
-    usedEnd: UnsafeMutablePointer<_RawByte>,
+  internal init(
+    _usedEnd: UnsafeMutablePointer<_RawByte>,
     byteCapacity: Int,
     elementWidth: Int
   ) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     _sanityCheck((byteCapacity & 0x1) == 0)
-    self.usedEnd = usedEnd
+    self.usedEnd = _usedEnd
     self.capacityAndElementShift = byteCapacity + (elementWidth - 1)
   }
 
@@ -74,7 +74,7 @@ public struct _StringBuffer {
     let divRound = 1 &- elementShift
     _storage = _Storage(
       HeapBufferStorage.self,
-      _StringBufferIVars(elementWidth),
+      _StringBufferIVars(_elementWidth: elementWidth),
       (capacity + capacityBump + divRound) >> divRound
     )
     self.usedEnd = start + (initialSize << elementShift)
@@ -84,16 +84,19 @@ public struct _StringBuffer {
 
   @warn_unused_result
   static func fromCodeUnits<
-    Encoding : UnicodeCodec, Input : Collection // Sequence?
+    Input : Collection, // Sequence?
+    Encoding : UnicodeCodec
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
-    encoding: Encoding.Type, input: Input, repairIllFormedSequences: Bool,
+    input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
-    guard let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
-        repairIllFormedSequences: repairIllFormedSequences) else {
+    guard let (utf16Count, isAscii) = UTF16.transcodedLength(
+        of: inputStream,
+        decodedAs: encoding,
+        repairingIllFormedSequences: repairIllFormedSequences) else {
       return (nil, true)
     }
 
@@ -110,8 +113,10 @@ public struct _StringBuffer {
         p += 1
       }
       let hadError = transcode(
-        encoding, UTF32.self, input.makeIterator(), sink,
-        stoppingOnError: true)
+        input.makeIterator(),
+        from: encoding, to: UTF32.self,
+        stoppingOnError: true,
+        sendingOutputTo: sink)
       _sanityCheck(!hadError, "string cannot be ASCII if there were decoding errors")
       return (result, hadError)
     }
@@ -122,8 +127,10 @@ public struct _StringBuffer {
         p += 1
       }
       let hadError = transcode(
-        encoding, UTF16.self, input.makeIterator(), sink,
-        stoppingOnError: !repairIllFormedSequences)
+        input.makeIterator(),
+        from: encoding, to: UTF16.self,
+        stoppingOnError: !repairIllFormedSequences,
+        sendingOutputTo: sink)
       return (result, hadError)
     }
   }
@@ -194,7 +201,7 @@ public struct _StringBuffer {
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
   mutating func grow(
-    bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
+    oldBounds bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
   ) -> Bool {
     var newUsedCount = newUsedCount
     // The substring to be grown could be pointing in the middle of this

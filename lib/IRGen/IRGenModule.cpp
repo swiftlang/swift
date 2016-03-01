@@ -97,7 +97,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   }
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
-    CGO.DwarfVersion = swift::DWARFVersion;
+    CGO.DwarfVersion = Opts.DWARFVersion;
     CGO.DwarfDebugFlags = Opts.DWARFDebugFlags;
   }
 
@@ -377,6 +377,7 @@ IRGenModule::~IRGenModule() {
     delete DebugInfo;
   delete ABITypes;
 }
+
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 
 // Explicitly listing these constants is an unfortunate compromise for
@@ -751,6 +752,7 @@ void IRGenModule::emitAutolinkInfo() {
     }
     break;
   }
+  case llvm::Triple::COFF:
   case llvm::Triple::ELF: {
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
@@ -840,6 +842,7 @@ void IRGenModule::finalize() {
       ModuleHash->setSection("__LLVM,__swift_modhash");
       break;
     case llvm::Triple::ELF:
+    case llvm::Triple::COFF:
       ModuleHash->setSection(".swift_modhash");
       break;
     default:

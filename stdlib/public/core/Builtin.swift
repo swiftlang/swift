@@ -202,8 +202,13 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
 /// object.
 @_transparent
 @warn_unused_result
-public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
+}
+
+@available(*, unavailable, renamed="unsafeAddress(of:)")
+public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
+  fatalError("unavailable function can't be called")
 }
 
 /// Converts a reference of type `T` to a reference of type `U` after
@@ -287,7 +292,7 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
   return swift_objc_class_usesNativeSwiftReferenceCounting(
-    unsafeAddressOf(theClass)
+    unsafeAddress(of: theClass)
   )
 #else
   return true
@@ -498,14 +503,14 @@ func _getSuperclass(t: Any.Type) -> AnyClass? {
 /// Returns `true` if `object` is uniquely referenced.
 @_transparent
 @warn_unused_result
-internal func _isUnique<T>(inout object: T) -> Bool {
+internal func _isUnique<T>(object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
 /// Returns `true` if `object` is uniquely referenced or pinned.
 @_transparent
 @warn_unused_result
-internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
+internal func _isUniqueOrPinned<T>(object: inout T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned(&object))
 }
 
@@ -514,7 +519,7 @@ internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isUnique_native<T>(inout object: T) -> Bool {
+func _isUnique_native<T>(object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
@@ -531,7 +536,7 @@ func _isUnique_native<T>(inout object: T) -> Bool {
 @_transparent
 @warn_unused_result
 public // @testable
-func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
+func _isUniqueOrPinned_native<T>(object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero.
   _sanityCheck(

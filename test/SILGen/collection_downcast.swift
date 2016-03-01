@@ -25,12 +25,12 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: BridgedObjC,
-    inout result: BridgedSwift?
+    result: inout BridgedSwift?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: BridgedObjC,
-    inout result: BridgedSwift?
+    result: inout BridgedSwift?
   ) -> Bool {
     return true
   }
@@ -131,7 +131,7 @@ func testDictionaryDowncastConditional(dict: Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedVConditional(dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedSwift>? {
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs42_dictionaryBridgeFromObjectiveCConditional
-  // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedObjC, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>> // user: %6
+  // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedObjC, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>{{.*}} // user: %6
   return dict as? Dictionary<BridgedObjC, BridgedSwift>
 }
 

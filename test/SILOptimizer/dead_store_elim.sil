@@ -142,8 +142,8 @@ sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil hidden @dead_store_across_fixlifetime_inst
 // CHECK: bb0 
-// CHECK-NOT: store 
-// CHECK: store 
+// CHECK-NOT: {{ store}}
+// CHECK: {{ store}} 
 sil hidden @dead_store_across_fixlifetime_inst : $@convention(thin) (@owned AB, Int) -> () {
 bb0(%0 : $AB, %1 : $Int):
   %2 = ref_element_addr %0 : $AB, #AB.value       // user: %3
@@ -159,7 +159,7 @@ bb0(%0 : $AB, %1 : $Int):
 //
 // CHECK-LABEL: trivial_local_dead_store
 // CHECK: bb0
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: return
 sil hidden @trivial_local_dead_store : $@convention(thin) () -> () {
 bb0:
@@ -176,7 +176,7 @@ bb0:
 //
 // CHECK-LABEL: blocking_read_on_local_store
 // CHECK: bb0
-// CHECK: store 
+// CHECK: {{ store}} 
 // CHECK: return
 sil hidden @blocking_read_on_local_store : $@convention(thin) () -> () {
 bb0:
@@ -192,8 +192,8 @@ bb0:
 
 // CHECK-LABEL: sil @store_after_store
 // CHECK: bb0 
-// CHECK: store
-// CHECK-NOT: store
+// CHECK: {{ store}}
+// CHECK-NOT: {{ store}}
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
@@ -211,7 +211,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
-// CHECK-NEXT: store
+// CHECK-NEXT: {{ store}}
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @dead_store_elimination_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
@@ -229,8 +229,8 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
 }
 
 // CHECK-LABEL: sil @post_dominating_dead_store : $@convention(thin) (@inout Builtin.Int32) -> () {
-// CHECK: store
-// CHECK-NOT: store
+// CHECK: {{ store}}
+// CHECK-NOT: {{ store}}
 // CHECK: return
 sil @post_dominating_dead_store : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
@@ -252,12 +252,12 @@ bb3:
 
 // CHECK-LABEL: sil @post_dominating_dead_store_partial : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0(
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: bb1:
 // CHECK_NOT: store
 // CHECK: bb2:
 // CHECK: bb3:
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: return
 sil @post_dominating_dead_store_partial : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
@@ -282,9 +282,9 @@ bb3:
 
 // We can't eliminate any stores here.
 // CHECK-LABEL: sil @post_dominating_dead_store_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
-// CHECK: store
-// CHECK: store
-// CHECK-NOT: store
+// CHECK: {{ store}}
+// CHECK: {{ store}}
+// CHECK-NOT: {{ store}}
 // CHECK: return
 sil @post_dominating_dead_store_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
@@ -308,7 +308,7 @@ bb2:
 //
 // CHECK-LABEL: blocking_debug_value_addr_on_dead_store 
 // CHECK: bb0
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: debug_value_addr
 sil hidden @blocking_debug_value_addr_on_dead_store : $@convention(thin) () -> () {
 bb0:
@@ -324,11 +324,11 @@ bb0:
 
 // CHECK-LABEL: sil @test_read_dependence_allows_forwarding : $@convention(thin) (@inout A, A) -> A {
 // CHECK: bb0
-// CHECK-NEXT: store
+// CHECK-NEXT: {{ store}}
 // CHECK-NEXT: unchecked_addr_cast
 // CHECK-NEXT: unchecked_addr_cast
 // CHECK-NEXT: load
-// CHECK-NEXT: store
+// CHECK-NEXT: {{ store}}
 // CHECK-NEXT: return
 sil @test_read_dependence_allows_forwarding : $@convention(thin) (@inout A, A) -> A {
 bb0(%0 : $*A, %1 : $A):
@@ -345,8 +345,8 @@ bb0(%0 : $*A, %1 : $A):
 // was a full dead store.
 //
 // CHECK-LABEL: sil @partially_dead_store1 : $@convention(thin) (@inout AA, AA, A) -> () {
-// CHECK: store
-// CHECK: store
+// CHECK: {{ store}}
+// CHECK: {{ store}}
 sil @partially_dead_store1 : $@convention(thin) (@inout AA, AA, A) -> () {
 bb0(%0 : $*AA, %1 : $AA, %2 : $A):
   store %1 to %0 : $*AA
@@ -360,8 +360,8 @@ bb0(%0 : $*AA, %1 : $AA, %2 : $A):
 // was a full dead store.
 //
 // CHECK-LABEL: sil @partially_dead_store2 : $@convention(thin) (@inout AA, AA, A) -> () {
-// CHECK: store
-// CHECK: store
+// CHECK: {{ store}}
+// CHECK: {{ store}}
 sil @partially_dead_store2 : $@convention(thin) (@inout AA, AA, A) -> () {
 bb0(%0 : $*AA, %1 : $AA, %2 : $A):
   store %1 to %0 : $*AA
@@ -375,11 +375,11 @@ bb0(%0 : $*AA, %1 : $AA, %2 : $A):
 //
 // CHECK-LABEL: sil @store_map_failed_dead_object_elim_invalidation : $@convention(thin) () -> () {
 // CHECK: bb1:
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: bb2:
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: bb3:
-// CHECK: store
+// CHECK: {{ store}}
 sil @store_map_failed_dead_object_elim_invalidation : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int32, 32
@@ -410,8 +410,8 @@ bb3:
 //
 // CHECK-LABEL: DeadStoreWithAliasingBasesSimpleClass
 // CHECK: bb0([[RET0:%.+]] : $Bool):
-// CHECK: store
-// CHECK: store
+// CHECK: {{ store}}
+// CHECK: {{ store}}
 sil hidden @DeadStoreWithAliasingBasesSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_ref $foo                             // users: %3, %6
@@ -434,9 +434,9 @@ bb0(%0 : $Bool):
 //
 // CHECK-LABEL: diamond_control_flow_dead_store
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: bb2:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 sil hidden @diamond_control_flow_dead_store : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -478,7 +478,7 @@ bb3:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreInSplitSimpleStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: cond_br
 sil hidden @DeadStoreInSplitSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -522,7 +522,7 @@ bb4:                                              // Preds: bb2 bb3
 //
 // CHECK-LABEL: DeadStoreInSplitElseBlockSimpleStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: cond_br
 sil hidden @DeadStoreInSplitElseBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -567,7 +567,7 @@ bb4:                                              // Preds: bb2 bb3
 //
 // CHECK-LABEL: DeadStoreInElsePartialDeadStoreInSplitSimpleStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: cond_br
 sil hidden @DeadStoreInElsePartialDeadStoreInSplitSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -616,10 +616,10 @@ bb4:                                              // Preds: bb2 bb3
 //
 // CHECK-LABEL: DeadStoreInUnreachablePredecessorSimpleStruct
 // CHECK: bb0
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 // CHECK: bb1
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 sil hidden @DeadStoreInUnreachablePredecessorSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -661,10 +661,10 @@ bb4:                                              // Preds: bb3
 
 // CHECK-LABEL: DeadStoreInIfElseBlockComplexStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 // CHECK: bb2:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 sil hidden @DeadStoreInIfElseBlockComplexStruct : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
@@ -708,10 +708,10 @@ bb3:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreInSplitElseBlockComplexStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 // CHECK: bb3:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 sil hidden @DeadStoreInSplitElseBlockComplexStruct : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
@@ -758,7 +758,7 @@ bb4:                                              // Preds: bb2 bb3
 //
 // CHECK-LABEL: DeadStoreSingleLoopBlockSimpleStruct
 // CHECK: bb2:
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: br
 sil hidden @DeadStoreSingleLoopBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -798,10 +798,10 @@ bb3:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreInMultiLoopBlocksSimpleStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 // CHECK: bb2:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 sil hidden @DeadStoreInMultiLoopBlocksSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -841,9 +841,9 @@ bb3:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreInSimpleTuple
 // CHECK: bb0:
-// CHECK: store
-// CHECK: store
-// CHECK-NOT: store
+// CHECK: {{ store}}
+// CHECK: {{ store}}
+// CHECK-NOT: {{ store}}
 // CHECK: load 
 sil hidden @DeadStoreInSimpleTuple : $@convention(thin) () -> Int {
 bb0:
@@ -879,10 +879,10 @@ bb0:
 //
 // CHECK-LABEL: DeadStoreInIfElseSimpleClass
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 // CHECK: bb2:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 sil hidden @DeadStoreInIfElseSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
@@ -930,7 +930,7 @@ bb3:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreInSplitSimpleClass
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: cond_br
 sil hidden @DeadStoreInSplitSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
@@ -974,7 +974,7 @@ bb4:                                              // Preds: bb2 bb3
 //
 // CHECK-LABEL: partial_dead_store_simple_class
 // CHECK: bb1:
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: cond_br
 sil hidden @partial_dead_store_simple_class : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
@@ -1013,7 +1013,7 @@ bb4:                                              // Preds: bb2 bb3
 //
 // CHECK-LABEL: partial_dead_store_with_function_call
 // CHECK: bb1:
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: cond_br
 sil hidden @partial_dead_store_with_function_call : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
@@ -1059,7 +1059,7 @@ bb4:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreSameBlockAcrossFunctionCallSimpleStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: function_ref
 sil hidden @DeadStoreSameBlockAcrossFunctionCallSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -1094,7 +1094,7 @@ bb2:                                              // Preds: bb1
 // CHECK-LABEL: DeadStoreInoutAndStackAlias
 // CHECK: bb0
 // CHECK : struct_element_addr
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: load
 sil hidden @DeadStoreInoutAndStackAlias : $@convention(thin) (@inout A) -> () {
 bb0(%0 : $*A):
@@ -1113,8 +1113,8 @@ bb0(%0 : $*A):
 // test dead store for enums. there should be only 1 store left.
 //
 // CHECK-LABEL: DeadStoreEnumSameCase
-// CHECK: store
-// CHECK-NOT: store
+// CHECK: {{ store}}
+// CHECK-NOT: {{ store}}
 // CHECK: return
 sil hidden @DeadStoreEnumSameCase : $@convention(thin) (@inout Example) -> Int64 {
 bb0(%0 : $*Example):
@@ -1185,7 +1185,7 @@ bb3:                                              // Preds: bb1 bb2
 /// CHECK-LABEL : PartialDeadStoreStructInStruct
 /// CHECK: [[RET0:%.+]] = struct_extract
 /// CHECK: [[RET1:%.+]] = struct_element_addr
-/// CHECK: store [[RET0:%.+]] to [[RET1:%.+]] : $*S4
+/// CHECK: {{ store}} [[RET0:%.+]] to [[RET1:%.+]] : $*S4
 sil hidden @PartialDeadStoreStructInStruct : $@convention(thin) (@inout S5) -> () {
 bb0(%0 : $*S5):
   %1 = function_ref @S5_init : $@convention(thin) (@thin S5.Type) -> S5 // user: %3
@@ -1203,9 +1203,9 @@ bb0(%0 : $*S5):
 /// Make sure we do not coalesce the 2 live stores to the 2 fields in S6.
 ///
 /// CHECK-LABEL : DiscontiguousPartialDeadStoreInSimpleStruct
-/// CHECK: store
-/// CHECK: store
-/// CHECK: store
+/// CHECK: {{ store}}
+/// CHECK: {{ store}}
+/// CHECK: {{ store}}
 sil hidden @DiscontiguousPartialDeadStoreInSimpleStruct : $@convention(thin) (@inout S6) -> () {
 bb0(%0 : $*S6):
   %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6 // user: %3
@@ -1224,9 +1224,9 @@ bb0(%0 : $*S6):
 /// is partially dead.
 ///
 /// CHECK-LABEL : DiscontiguousPartialDeadStoreInSimpleLargeStruct
-/// CHECK: store
-/// CHECK-NOT: store
-/// CHECK: store
+/// CHECK: {{ store}}
+/// CHECK-NOT: {{ store}}
+/// CHECK: {{ store}}
 sil hidden @DiscontiguousPartialDeadStoreInSimpleLargeStruct : $@convention(thin) (@inout S7) -> () {
 bb0(%0 : $*S7):
   %1 = function_ref @S7_init : $@convention(thin) (@thin S7.Type) -> S7 // user: %3
@@ -1247,7 +1247,7 @@ bb0(%0 : $*S7):
 ///
 /// CHECK-LABEL : PartialDeadStoreBailOutProperPropagation
 /// CHECK: bb0 
-/// CHECK-NOT: store
+/// CHECK-NOT: {{ store}}
 /// CHECK: function_ref
 sil hidden @PartialDeadStoreBailOutProperPropagation : $@convention(thin) () -> () {
 bb0:
@@ -1321,9 +1321,9 @@ bb0(%0 : $*S8):
 /// %0 and %1 cannot alias here.
 ///
 /// CHECK-LABEL: NoDeadStoreWithInterferingLoad
-/// CHECK: store
+/// CHECK: {{ store}}
 /// CHECK: load
-/// CHECK: store
+/// CHECK: {{ store}}
 sil hidden @NoDeadStoreWithInterferingLoad : $@convention(thin) (@owned foo, @owned foo) -> () {
 bb0(%0 : $foo, %1 : $foo):
   debug_value %0 : $foo, let, name "x" // id: %2
@@ -1354,7 +1354,7 @@ bb0(%0 : $foo, %1 : $foo):
 //
 // CHECK-LABEL: DeadStoreAcrossLoopSimpleStruct
 // CHECK: bb0
-// CHECK-NOT: store
+// CHECK-NOT: {{ store}}
 // CHECK: br
 sil hidden @DeadStoreAcrossLoopSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
@@ -1390,7 +1390,7 @@ bb2:                                              // Preds: bb1
 //
 // CHECK-LABEL: conservative_kill_set_class
 // CHECK: bb0
-// CHECK: store
+// CHECK: {{ store}}
 // CHECK: br bb1
 sil hidden @conservative_kill_set_class : $@convention(thin) (@owned foo, @owned foo) -> () {
 bb0(%0 : $foo, %1 : $foo):
@@ -1417,7 +1417,7 @@ bb2:
 /// Make sure we DO NOT get rid of the first store as a dead store.
 ///
 /// CHECK-LABEL: tbaa_no_alias_no_dead_store
-/// CHECK: store
+/// CHECK: {{ store}}
 /// CHECK: load
 sil @tbaa_no_alias_no_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
 bb0(%0 : $Optional<protocol<>.Type>):
@@ -1434,7 +1434,7 @@ bb0(%0 : $Optional<protocol<>.Type>):
 /// 
 /// CHECK-LABEL: local_dead_store
 /// CHECK: load
-/// CHECK-NOT: store 
+/// CHECK-NOT: {{ store}}
 /// CHECK: return 
 sil @local_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
 bb0(%0 : $Optional<protocol<>.Type>):

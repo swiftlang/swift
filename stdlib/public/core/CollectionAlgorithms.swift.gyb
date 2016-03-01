@@ -167,9 +167,10 @@ ${orderingRequirementForComparable}
       (${IElement}, ${IElement}) -> Bool
     var escapableIsOrderedBefore =
       unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
-    return _partition(&self, indices, &escapableIsOrderedBefore)
+    return _partition(
+      &self, subRange: indices, isOrderedBefore: &escapableIsOrderedBefore)
 %   else:
-    return _partition(&self, indices)
+    return _partition(&self, subRange: indices)
 %   end
   }
 }
@@ -260,7 +261,7 @@ ${orderingRequirementForComparable}
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, self.indices)
+      _introSort(&self, subRange: self.indices)
     }
   }
 }
@@ -289,7 +290,10 @@ ${orderingRequirementForPredicate}
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, self.indices, escapableIsOrderedBefore)
+      _introSort(
+        &self,
+        subRange: self.indices,
+        isOrderedBefore: escapableIsOrderedBefore)
     }
   }
 }
@@ -297,7 +301,7 @@ ${orderingRequirementForPredicate}
 extension MutableCollection
   where Index : RandomAccessIndex {
 
-  @swift3_migration(message="slice the collection using the range, and call partition(isOrderedBefore:)")
+  @available(*, unavailable, message="slice the collection using the range, and call partition(isOrderedBefore:)")
   public mutating func partition(
     range: Range<Index>,
     isOrderedBefore: (${IElement}, ${IElement}) -> Bool
@@ -309,7 +313,7 @@ extension MutableCollection
 extension MutableCollection
   where Index : RandomAccessIndex, ${IElement} : Comparable {
 
-  @swift3_migration(message="slice the collection using the range, and call partition()")
+  @available(*, unavailable, message="slice the collection using the range, and call partition()")
   public mutating func partition(range: Range<Index>) -> Index {
     fatalError("unavailable function can't be called")
   }
@@ -347,6 +351,24 @@ extension MutableCollection where Self.Index : RandomAccessIndex {
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Collection where ${IElement} : Equatable {
+  @available(*, unavailable, renamed="index(of:)")
+  @warn_unused_result
+  public func indexOf(element: ${IElement}) -> Index? {
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension Collection {
+  @available(*, unavailable, renamed="index(where:)")
+  @warn_unused_result
+  public func indexOf(
+    @noescape predicate: (${IElement}) throws -> Bool
+  ) rethrows -> Index? {
     fatalError("unavailable function can't be called")
   }
 }

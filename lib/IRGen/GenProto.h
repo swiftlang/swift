@@ -145,8 +145,10 @@ namespace irgen {
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
                                    CanType srcType,
                                    llvm::Value **srcMetadataCache,
-                                   ProtocolDecl *proto,
-                                   const ProtocolInfo &protoI,
+                                   ProtocolConformanceRef conformance);
+
+  llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
+                                   CanType srcType,
                                    ProtocolConformanceRef conformance);
 
   /// An entry in a list of known protocols.

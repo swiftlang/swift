@@ -461,3 +461,177 @@ func test_mixed_let_var() {
     d()
   }
 }
+
+// CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns1FT_T_ : $@convention(thin) () -> () {
+func test_multiple_patterns1() {
+  // CHECK:   function_ref @_TF10switch_var6foobarFT_TSiSi_
+  switch foobar() {
+  // CHECK-NOT: br
+  case (0, let x), (let x, 0):
+    // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
+    // CHECK:   [[FIRST_MATCH_CASE]]:
+    // CHECK:     debug_value [[FIRST_X:%.*]] :
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
+    // CHECK:   [[FIRST_FAIL]]:
+    // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
+    // CHECK:   [[SECOND_MATCH_CASE]]:
+    // CHECK:     debug_value [[SECOND_X:%.*]] :
+    // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
+    // CHECK:     [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
+    // CHECK:     apply [[A]]([[BODY_VAR]])
+    a(x: x)
+  default:
+    // CHECK:   [[SECOND_FAIL]]:
+    // CHECK:     function_ref @_TF10switch_var1bFT_T_
+    b()
+  }
+}
+
+// CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns2FT_T_ : $@convention(thin) () -> () {
+func test_multiple_patterns2() {
+  let t1 = 2
+  let t2 = 4
+  // CHECK:   debug_value [[T1:%.*]] :
+  // CHECK:   debug_value [[T2:%.*]] :
+  switch (0,0) {
+    // CHECK-NOT: br
+  case (_, let x) where x > t1, (let x, _) where x > t2:
+    // CHECK:   [[FIRST_X:%.*]] = tuple_extract {{%.*}} : $(Int, Int), 1
+    // CHECK:   debug_value [[FIRST_X]] :
+    // CHECK:   apply {{%.*}}([[FIRST_X]], [[T1]])
+    // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
+    // CHECK:   [[FIRST_MATCH_CASE]]:
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
+    // CHECK:   [[FIRST_FAIL]]:
+    // CHECK:     debug_value [[SECOND_X:%.*]] :
+    // CHECK:     apply {{%.*}}([[SECOND_X]], [[T2]])
+    // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
+    // CHECK:   [[SECOND_MATCH_CASE]]:
+    // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
+    // CHECK:     [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
+    // CHECK:     apply [[A]]([[BODY_VAR]])
+    a(x: x)
+  default:
+    // CHECK:   [[SECOND_FAIL]]:
+    // CHECK:     function_ref @_TF10switch_var1bFT_T_
+    b()
+  }
+}
+
+enum Foo {
+  case A(Int, Double)
+  case B(Double, Int)
+  case C(Int, Int, Double)
+}
+
+// CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns3FT_T_ : $@convention(thin) () -> () {
+func test_multiple_patterns3() {
+  let f = Foo.C(0, 1, 2.0)
+  switch f {
+    // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+  case .A(let x, let n), .B(let n, let x), .C(_, let x, let n):
+    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:     [[A_X:%.*]] = tuple_extract
+    // CHECK:     [[A_N:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int, [[A_N]] : $Double)
+    
+    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:     [[B_N:%.*]] = tuple_extract
+    // CHECK:     [[B_X:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int, [[B_N]] : $Double)
+
+    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:     [[C__:%.*]] = tuple_extract
+    // CHECK:     [[C_X:%.*]] = tuple_extract
+    // CHECK:     [[C_N:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY]]([[C_X]] : $Int, [[C_N]] : $Double)
+
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int, [[BODY_N:%.*]] : $Double):
+    // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
+    // CHECK:     apply [[FUNC_A]]([[BODY_X]])
+    a(x: x)
+  }
+}
+
+enum Bar {
+  case Y(Foo, Int)
+  case Z(Int, Foo)
+}
+
+// CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns4FT_T_ : $@convention(thin) () -> () {
+func test_multiple_patterns4() {
+  let b = Bar.Y(.C(0, 1, 2.0), 3)
+  switch b {
+    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
+  case .Y(.A(let x, _), _), .Y(.B(_, let x), _), .Y(.C, let x), .Z(let x, _):
+    // CHECK:   [[Y]]({{%.*}} : $(Foo, Int)):
+    // CHECK:     [[Y_F:%.*]] = tuple_extract
+    // CHECK:     [[Y_X:%.*]] = tuple_extract
+    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    
+    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:     [[A_X:%.*]] = tuple_extract
+    // CHECK:     [[A_N:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
+    
+    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:     [[B_N:%.*]] = tuple_extract
+    // CHECK:     [[B_X:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
+    
+    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
+
+    // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
+    // CHECK:     [[Z_X:%.*]] = tuple_extract
+    // CHECK:     [[Z_F:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
+
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
+    // CHECK:     apply [[FUNC_A]]([[BODY_X]])
+    a(x: x)
+  }
+}
+
+func aaa(x x: inout Int) {}
+
+// CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns5FT_T_ : $@convention(thin) () -> () {
+func test_multiple_patterns5() {
+  let b = Bar.Y(.C(0, 1, 2.0), 3)
+  switch b {
+    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
+  case .Y(.A(var x, _), _), .Y(.B(_, var x), _), .Y(.C, var x), .Z(var x, _):
+    // CHECK:   [[Y]]({{%.*}} : $(Foo, Int)):
+    // CHECK:     [[Y_F:%.*]] = tuple_extract
+    // CHECK:     [[Y_X:%.*]] = tuple_extract
+    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    
+    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:     [[A_X:%.*]] = tuple_extract
+    // CHECK:     [[A_N:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
+    
+    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:     [[B_N:%.*]] = tuple_extract
+    // CHECK:     [[B_X:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
+    
+    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
+    
+    // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
+    // CHECK:     [[Z_X:%.*]] = tuple_extract
+    // CHECK:     [[Z_F:%.*]] = tuple_extract
+    // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
+    
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:     store [[BODY_X]] to [[BOX_X:%.*]] : $*Int
+    // CHECK:     [[FUNC_AAA:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
+    // CHECK:     apply [[FUNC_AAA]]([[BOX_X]])
+    aaa(x: &x)
+  }
+}
+

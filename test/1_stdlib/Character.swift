@@ -272,7 +272,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

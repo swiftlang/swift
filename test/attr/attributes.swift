@@ -8,7 +8,7 @@ enum binary {
   init() { self = .Zero }
 }
 
-func f5(inout x: binary) {}
+func f5(x: inout binary) {}
 
 //===---
 //===--- IB attributes

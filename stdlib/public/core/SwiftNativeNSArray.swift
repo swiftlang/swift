@@ -24,20 +24,20 @@ import SwiftShims
 /// Returns `true` iff the given `index` is valid as a position, i.e. `0
 /// ≤ index ≤ count`.
 @_transparent
-internal func _isValidArrayIndex(index: Int, _ count: Int) -> Bool {
+internal func _isValidArrayIndex(index: Int, count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
 /// Returns `true` iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`.
 @_transparent
-internal func _isValidArraySubscript(index: Int, _ count: Int) -> Bool {
+internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
   return (index >= 0) && (index < count)
 }
 
 /// An `NSArray` with Swift-native reference counting and contiguous
 /// storage.
-class _SwiftNativeNSArrayWithContiguousStorage
+internal class _SwiftNativeNSArrayWithContiguousStorage
   : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
   // Operate on our contiguous storage
@@ -50,16 +50,17 @@ class _SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
+extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
 
-  @objc(objectAtIndex:) internal func objectAt(index: Int) -> AnyObject {
+  @objc(objectAtIndex:)
+  internal func objectAt(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArraySubscript(index, objects.count),
+        _isValidArraySubscript(index, count: objects.count),
         "Array index out of range")
       return objects[index]
     }
@@ -71,12 +72,12 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArrayIndex(range.location, objects.count),
+        _isValidArrayIndex(range.location, count: objects.count),
         "Array index out of range")
 
       _precondition(
         _isValidArrayIndex(
-          range.location + range.length, objects.count),
+          range.location + range.length, count: objects.count),
         "Array index out of range")
 
       // These objects are "returned" at +0, so treat them as values to
@@ -156,7 +157,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     if let bridgedStorage = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
-      heapBuffer.baseAddress.deinitializePointee(count: count)
+      heapBuffer.baseAddress.deinitialize(count: count)
     }
   }
 

@@ -24,7 +24,7 @@ namespace swift {
 
 /// Describes the kind of a requirement that occurs within a requirements
 /// clause.
-enum class RequirementKind : unsigned int {
+enum class RequirementKind : unsigned {
   /// A conformance requirement T : P, where T is a type that depends
   /// on a generic parameter and P is a protocol to which T must conform.
   Conformance,

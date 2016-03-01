@@ -96,17 +96,17 @@ extension MinimalIterator : _MinimalIterator {}
 
 public enum UnderestimatedCountBehavior {
   /// Return the actual number of elements.
-  case Precise
+  case precise
 
   /// Return the actual number of elements divided by 2.
-  case Half
+  case half
 
   /// Return an overestimated count.  Useful to test how algorithms reserve
   /// memory.
-  case Overestimate
+  case overestimate
 
   /// Return the provided value.
-  case Value(Int)
+  case value(Int)
 }
 
 public protocol StrictSequence : Sequence {
@@ -118,7 +118,7 @@ public protocol StrictSequence : Sequence {
 extension StrictSequence {
   public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
-    underestimatedCount: UnderestimatedCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self.init(base: MinimalSequence(
       elements: elements, underestimatedCount: underestimatedCount))
@@ -142,22 +142,22 @@ extension StrictSequence where Iterator : _MinimalIterator {
 public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
   public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedCount: UnderestimatedCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     let data = Array(elements)
     self._sharedState = _MinimalIteratorSharedState(data)
 
     switch underestimatedCount {
-    case .Precise:
+    case .precise:
       self._sharedState.underestimatedCount = data.count
 
-    case .Half:
+    case .half:
       self._sharedState.underestimatedCount = data.count / 2
 
-    case .Overestimate:
+    case .overestimate:
       self._sharedState.underestimatedCount = data.count * 3 + 5
 
-    case .Value(let count):
+    case .value(let count):
       self._sharedState.underestimatedCount = count
     }
   }
@@ -182,35 +182,35 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
 //===----------------------------------------------------------------------===//
 
 internal enum _CollectionOperation : Equatable {
-  case ReserveCapacity(capacity: Int)
-  case Append
-  case AppendContentsOf(count: Int)
-  case ReplaceRange(subRange: Range<Int>, replacementCount: Int)
-  case Insert(atIndex: Int)
-  case InsertContentsOf(atIndex: Int, count: Int)
-  case RemoveAtIndex(index: Int)
-  case RemoveLast
-  case RemoveRange(subRange: Range<Int>)
-  case RemoveAll(keepCapacity: Bool)
+  case reserveCapacity(capacity: Int)
+  case append
+  case appendContentsOf(count: Int)
+  case replaceRange(subRange: Range<Int>, replacementCount: Int)
+  case insert(atIndex: Int)
+  case insertContentsOf(atIndex: Int, count: Int)
+  case removeAtIndex(index: Int)
+  case removeLast
+  case removeRange(subRange: Range<Int>)
+  case removeAll(keepCapacity: Bool)
 
   internal func _applyTo(
     elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
     var result = elementsLastMutatedStateIds
     switch self {
-    case ReserveCapacity:
+    case reserveCapacity:
       let invalidIndices = result.indices
       result.replaceSubrange(
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case Append:
+    case append:
       result.append(nextStateId)
 
-    case AppendContentsOf(let count):
-      result.appendContents(of:
+    case appendContentsOf(let count):
+      result.append(contentsOf:
         repeatElement(nextStateId, count: count))
 
-    case ReplaceRange(let subRange, let replacementCount):
+    case replaceRange(let subRange, let replacementCount):
       result.replaceSubrange(
         subRange,
         with: repeatElement(nextStateId, count: replacementCount))
@@ -220,7 +220,7 @@ internal enum _CollectionOperation : Equatable {
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case Insert(let atIndex):
+    case insert(let atIndex):
       result.insert(nextStateId, at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
@@ -228,9 +228,9 @@ internal enum _CollectionOperation : Equatable {
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case InsertContentsOf(let atIndex, let count):
-      result.insertContentsOf(
-        repeatElement(nextStateId, count: count),
+    case insertContentsOf(let atIndex, let count):
+      result.insert(
+        contentsOf: repeatElement(nextStateId, count: count),
         at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
@@ -238,7 +238,7 @@ internal enum _CollectionOperation : Equatable {
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case RemoveAtIndex(let index):
+    case removeAtIndex(let index):
       result.remove(at: index)
 
       let invalidIndices = index..<result.endIndex
@@ -246,10 +246,10 @@ internal enum _CollectionOperation : Equatable {
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case RemoveLast:
+    case removeLast:
       result.removeLast()
 
-    case RemoveRange(let subRange):
+    case removeRange(let subRange):
       result.removeSubrange(subRange)
 
       let invalidIndices = subRange.startIndex..<result.endIndex
@@ -257,7 +257,7 @@ internal enum _CollectionOperation : Equatable {
         invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
 
-    case RemoveAll(let keepCapacity):
+    case removeAll(let keepCapacity):
       result.removeAll(keepingCapacity: keepCapacity)
     }
     return result
@@ -269,41 +269,41 @@ internal func == (
   rhs: _CollectionOperation
 ) -> Bool {
   switch (lhs, rhs) {
-  case (.ReserveCapacity(let lhsCapacity), .ReserveCapacity(let rhsCapacity)):
+  case (.reserveCapacity(let lhsCapacity), .reserveCapacity(let rhsCapacity)):
     return lhsCapacity == rhsCapacity
 
-  case (.Append, .Append):
+  case (.append, .append):
     return true
 
-  case (.AppendContentsOf(let lhsCount), .AppendContentsOf(let rhsCount)):
+  case (.appendContentsOf(let lhsCount), .appendContentsOf(let rhsCount)):
     return lhsCount == rhsCount
 
   case (
-    .ReplaceRange(let lhsSubRange, let lhsReplacementCount),
-    .ReplaceRange(let rhsSubRange, let rhsReplacementCount)):
+    .replaceRange(let lhsSubRange, let lhsReplacementCount),
+    .replaceRange(let rhsSubRange, let rhsReplacementCount)):
 
     return lhsSubRange == rhsSubRange &&
       lhsReplacementCount == rhsReplacementCount
 
-  case (.Insert(let lhsAtIndex), .Insert(let rhsAtIndex)):
+  case (.insert(let lhsAtIndex), .insert(let rhsAtIndex)):
     return lhsAtIndex == rhsAtIndex
 
   case (
-    .InsertContentsOf(let lhsAtIndex, let lhsCount),
-    .InsertContentsOf(let rhsAtIndex, let rhsCount)):
+    .insertContentsOf(let lhsAtIndex, let lhsCount),
+    .insertContentsOf(let rhsAtIndex, let rhsCount)):
 
     return lhsAtIndex == rhsAtIndex && lhsCount == rhsCount
 
-  case (.RemoveAtIndex(let lhsIndex), .RemoveAtIndex(let rhsIndex)):
+  case (.removeAtIndex(let lhsIndex), .removeAtIndex(let rhsIndex)):
     return lhsIndex == rhsIndex
 
-  case (.RemoveLast, .RemoveLast):
+  case (.removeLast, .removeLast):
     return true
 
-  case (.RemoveRange(let lhsSubRange), .RemoveRange(let rhsSubRange)):
+  case (.removeRange(let lhsSubRange), .removeRange(let rhsSubRange)):
     return lhsSubRange == rhsSubRange
 
-  case (.RemoveAll(let lhsKeepCapacity), .RemoveAll(let rhsKeepCapacity)):
+  case (.removeAll(let lhsKeepCapacity), .removeAll(let rhsKeepCapacity)):
     return lhsKeepCapacity == rhsKeepCapacity
 
   default:
@@ -873,7 +873,7 @@ public protocol ${Protocol} : ${'MutableCollection' if mutable else 'Collection'
 extension ${Protocol} {
   public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
-    underestimatedCount: UnderestimatedCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self.init(base:
       ${Self}(elements: elements, underestimatedCount: underestimatedCount))
@@ -917,7 +917,7 @@ extension ${Protocol} where Index : _MinimalIndex {
 public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
   public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedCount: UnderestimatedCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self._elements = Array(elements)
 
@@ -925,16 +925,16 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
       newRootStateForElementCount: self._elements.count)
 
     switch underestimatedCount {
-    case .Precise:
+    case .precise:
       self.underestimatedCount = _elements.count
 
-    case .Half:
+    case .half:
       self.underestimatedCount = _elements.count / 2
 
-    case .Overestimate:
+    case .overestimate:
       self.underestimatedCount = _elements.count * 3 + 5
 
-    case .Value(let count):
+    case .value(let count):
       self.underestimatedCount = count
     }
   }
@@ -1043,7 +1043,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   /// history.  No other instance has the same modification history.
   public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedCount: UnderestimatedCountBehavior = .Value(0)
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
   ) {
     self.elements = Array(elements)
 
@@ -1051,16 +1051,16 @@ public struct ${Self}<T> : RangeReplaceableCollection {
       newRootStateForElementCount: self.elements.count)
 
     switch underestimatedCount {
-    case .Precise:
+    case .precise:
       self.underestimatedCount = self.elements.count
 
-    case .Half:
+    case .half:
       self.underestimatedCount = self.elements.count / 2
 
-    case .Overestimate:
+    case .overestimate:
       self.underestimatedCount = self.elements.count * 3 + 5
 
-    case .Value(let count):
+    case .value(let count):
       self.underestimatedCount = count
     }
   }
@@ -1112,23 +1112,23 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   }
 
   public mutating func reserveCapacity(n: Int) {
-    _willMutate(.ReserveCapacity(capacity: n))
+    _willMutate(.reserveCapacity(capacity: n))
     elements.reserveCapacity(n)
     reservedCapacity = Swift.max(reservedCapacity, n)
   }
 
   public mutating func append(x: T) {
-    _willMutate(.Append)
+    _willMutate(.append)
     elements.append(x)
   }
 
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == T
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     let oldCount = count
-    elements.appendContents(of: newElements)
+    elements.append(contentsOf: newElements)
     let newCount = count
-    _willMutate(.AppendContentsOf(count: newCount - oldCount))
+    _willMutate(.appendContentsOf(count: newCount - oldCount))
   }
 
   public mutating func replaceSubrange<
@@ -1141,43 +1141,43 @@ public struct ${Self}<T> : RangeReplaceableCollection {
       subRange.startIndex.position..<subRange.endIndex.position,
       with: newElements)
     let newCount = count
-    _willMutate(.ReplaceRange(
+    _willMutate(.replaceRange(
       subRange: subRange.startIndex._offset..<subRange.endIndex._offset,
       replacementCount: subRange.count + newCount - oldCount))
   }
 
   public mutating func insert(newElement: T, at i: ${Index}) {
-    _willMutate(.Insert(atIndex: i._offset))
+    _willMutate(.insert(atIndex: i._offset))
     elements.insert(newElement, at: i.position)
   }
 
-  public mutating func insertContentsOf<
+  public mutating func insert<
     S : Collection where S.Iterator.Element == T
-  >(newElements: S, at i: ${Index}) {
+  >(contentsOf newElements: S, at i: ${Index}) {
     let oldCount = count
-    elements.insertContentsOf(newElements, at: i.position)
+    elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
 
     if newCount - oldCount != 0 {
-      _willMutate(.InsertContentsOf(
+      _willMutate(.insertContentsOf(
         atIndex: i._offset,
         count: newCount - oldCount))
     }
   }
 
   public mutating func remove(at i: ${Index}) -> T {
-    _willMutate(.RemoveAtIndex(index: i._offset))
+    _willMutate(.removeAtIndex(index: i._offset))
     return elements.remove(at: i.position)
   }
 
   public mutating func removeLast() -> T {
-    _willMutate(.RemoveLast)
+    _willMutate(.removeLast)
     return elements.removeLast()
   }
 
   public mutating func removeSubrange(subRange: Range<${Index}>) {
     if !subRange.isEmpty {
-      _willMutate(.RemoveRange(
+      _willMutate(.removeRange(
         subRange: subRange.startIndex._offset..<subRange.endIndex._offset))
     }
     elements.removeSubrange(
@@ -1186,7 +1186,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   }
 
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
-    _willMutate(.RemoveAll(keepCapacity: keepCapacity))
+    _willMutate(.removeAll(keepCapacity: keepCapacity))
     // Ignore the value of `keepCapacity`.
     elements.removeAll(keepingCapacity: false)
   }

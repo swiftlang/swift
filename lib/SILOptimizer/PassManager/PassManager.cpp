@@ -299,7 +299,7 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   // Used to track how many times a given function has been
   // (partially) optimized by the function pass pipeline in this
   // invocation.
-  llvm::DenseMap<SILFunction *, unsigned int> CountOptimized;
+  llvm::DenseMap<SILFunction *, unsigned> CountOptimized;
 
   // Pop functions off the worklist, and run all function transforms
   // on each of them.

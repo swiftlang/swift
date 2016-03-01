@@ -29,7 +29,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#if defined(__CYGWIN__)
+#include <sstream>
+#include <cmath>
+#define fmodl(lhs, rhs) std::fmod(lhs, rhs)
+#else
 #include <xlocale.h>
+#endif
 #include <limits>
 #include "llvm/ADT/StringExtras.h"
 #include "swift/Runtime/Debug.h"
@@ -106,6 +112,8 @@ static inline locale_t getCLocale() {
   // as C locale.
   return nullptr;
 }
+#elif defined(__CYGWIN__)
+// In Cygwin, getCLocale() is not used.
 #else
 static locale_t makeCLocale() {
   locale_t CLocale = newlocale(LC_ALL_MASK, "C", nullptr);
@@ -122,6 +130,8 @@ static locale_t getCLocale() {
 
 #if defined(__APPLE__)
 #define swift_snprintf_l snprintf_l
+#elif defined(__CYGWIN__)
+// In Cygwin, swift_snprintf_l() is not used.
 #else
 static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
                             const char *Format, ...) {
@@ -153,6 +163,24 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
     Precision = std::numeric_limits<T>::max_digits10;
   }
   
+#if defined(__CYGWIN__)
+  // Cygwin does not support uselocale(), but we can use the locale feature 
+  // in stringstream object.
+  std::ostringstream ValueStream;
+  ValueStream.width(0);
+  ValueStream.precision(Precision);
+  ValueStream.imbue(std::locale::classic());
+  ValueStream << Value;
+  std::string ValueString(ValueStream.str());
+  size_t i = ValueString.length();
+
+  if (i < BufferLength) {
+    std::copy(ValueString.begin(), ValueString.end(), Buffer);
+    Buffer[i] = '\0';
+  } else {
+    swift::crash("swift_floatingPointToString: insufficient buffer size");
+  }
+#else
   // Pass a null locale to use the C locale.
   int i = swift_snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
                            Precision, Value);
@@ -162,6 +190,7 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
         "swift_floatingPointToString: unexpected return value from sprintf");
   if (size_t(i) >= BufferLength)
     swift::crash("swift_floatingPointToString: insufficient buffer size");
+#endif
 
   // Add ".0" to a float that (a) is not in scientific notation, (b) does not
   // already have a fractional part, (c) is not infinite, and (d) is not a NaN
@@ -327,6 +356,42 @@ __mulodi4(di_int a, di_int b, int* overflow)
 }
 #endif
 
+#if defined(__CYGWIN__)
+// Cygwin does not support uselocale(), but we can use the locale feature 
+// in stringstream object.
+template <typename T>
+static const char *_swift_stdlib_strtoX_clocale_impl(
+    const char *nptr, T *outResult) {
+  std::istringstream ValueStream(nptr);
+  ValueStream.imbue(std::locale::classic());
+  T ParsedValue;
+  ValueStream >> ParsedValue;
+  *outResult = ParsedValue;
+
+  int pos = ValueStream.tellg();
+  if (pos <= 0)
+    return nullptr;
+
+  return nptr + pos;
+}
+
+extern "C" const char *_swift_stdlib_strtold_clocale(
+    const char *nptr, void *outResult) {
+  return _swift_stdlib_strtoX_clocale_impl(
+    nptr, static_cast<long double*>(outResult));
+}
+
+extern "C" const char *_swift_stdlib_strtod_clocale(
+    const char * nptr, double *outResult) {
+  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
+}
+
+extern "C" const char *_swift_stdlib_strtof_clocale(
+    const char * nptr, float *outResult) {
+  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
+}
+#else
+
 // We can't return Float80, but we can receive a pointer to one, so
 // switch the return type and the out parameter on strtold.
 template <typename T>
@@ -365,6 +430,7 @@ extern "C" const char *_swift_stdlib_strtof_clocale(
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VALF, strtof_l);
 }
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void _swift_stdlib_flockfile_stdout() {

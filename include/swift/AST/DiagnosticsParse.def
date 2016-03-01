@@ -143,6 +143,12 @@ WARNING(lex_editor_placeholder_in_playground,none,
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
+NOTE(note_in_decl_extension,none,
+     "in %select{declaration|extension}0 of %1", (bool, Identifier))
+WARNING(inout_as_attr_deprecated,none,
+        "'inout' before a parameter name is deprecated, place it before the parameter type instead",
+        ())
+
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
 
@@ -250,6 +256,9 @@ ERROR(addressor_with_getter,none,
 ERROR(addressor_with_setter,none,
       "%select{variable|subscript}0 cannot provide both 'address' and "
       "a setter; use an ordinary getter instead", (unsigned))
+ERROR(behavior_multiple_vars,none,
+      "applying property behavior with parameter to multiple variables is "
+      "not supported", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -414,6 +423,19 @@ ERROR(sil_use_of_undefined_value,none,
 NOTE(sil_prior_reference,none,
      "prior reference was here", ())
 
+// SIL Locations
+ERROR(expected_colon_in_sil_location,none,
+      "expected ':' in SIL location", ())
+ERROR(sil_invalid_line_in_sil_location,none,
+      "line number must be a positive integer", ())
+ERROR(sil_invalid_column_in_sil_location,none,
+      "column number must be a positive integer", ())
+ERROR(sil_invalid_scope_slot,none,
+      "scope number must be a positive integer ", ())
+ERROR(sil_scope_undeclared,none,
+      "scope number %0 needs to be declared before first use", (unsigned))
+ERROR(sil_scope_redefined,none,
+      "scope number %0 is already defined", (unsigned))
 
 // SIL Instructions
 ERROR(expected_sil_instr_start_of_line,none,
@@ -641,12 +663,12 @@ WARNING(let_on_param_is_redundant, none,
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
+ERROR(extra_var_in_multiple_pattern_list,none,
+      "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern cannot appear nested in an already immutable context", ())
 ERROR(inout_must_have_type,none,
       "'inout' arguments must have a type specified", ())
-ERROR(inout_must_appear_before_param,none,
-      "'inout' must appear before the parameter name", ())
 ERROR(expected_rparen_parameter,PointsToFirstBadToken,
       "expected ')' in parameter", ())
 ERROR(expected_parameter_type,PointsToFirstBadToken,
@@ -668,8 +690,6 @@ ERROR(var_parameter_not_allowed,none,
 
 ERROR(expected_behavior_name,none,
       "expected behavior name after '[' in property declaration", ())
-ERROR(expected_rsquare_after_behavior_name,none,
-      "expected ']' after behavior name in property declaration", ())
 
 
 WARNING(parameter_extraneous_double_up,none,
@@ -884,9 +904,6 @@ ERROR(expected_case_colon,PointsToFirstBadToken,
       "expected ':' after '%0'", (StringRef))
 ERROR(default_with_where,none,
       "'default' cannot be used with a 'where' guard expression",
-      ())
-ERROR(var_binding_with_multiple_case_patterns,none,
-      "'case' labels with multiple patterns cannot declare variables",
       ())
 ERROR(case_stmt_without_body,none,
       "%select{'case'|'default'}0 label in a 'switch' should have at least one "

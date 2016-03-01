@@ -463,7 +463,7 @@ struct Callee_match<SILFunction &> {
     if (!AI)
       return false;
 
-    return AI->getCalleeFunction() == &Fun;
+    return AI->getReferencedFunction() == &Fun;
   }
 };
 

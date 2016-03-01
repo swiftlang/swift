@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <functional>
 #include <vector>
+#include <cstdio>
 #include <cstdlib>
 
 using namespace swift;
@@ -839,8 +840,11 @@ private:
 #undef FUNCSIGSPEC_CREATE_PARAM_PAYLOAD
 
   NodePointer demangleSpecializedAttribute() {
-    if (Mangled.nextIf("g")) {
-      auto spec = NodeFactory::create(Node::Kind::GenericSpecialization);
+    bool isNotReAbstracted = false;
+    if (Mangled.nextIf("g") || (isNotReAbstracted = Mangled.nextIf("r"))) {
+      auto spec = NodeFactory::create(isNotReAbstracted ?
+                              Node::Kind::GenericSpecializationNotReAbstracted :
+                              Node::Kind::GenericSpecialization);
       // Create a node for the pass id.
       spec->addChild(NodeFactory::create(Node::Kind::SpecializationPassID,
                                          unsigned(Mangled.next() - 48)));
@@ -2389,6 +2393,7 @@ private:
     case Node::Kind::GenericProtocolWitnessTable:
     case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
     case Node::Kind::GenericSpecialization:
+    case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecializationParam:
     case Node::Kind::GenericType:
     case Node::Kind::GenericTypeMetadataPattern:
@@ -3038,15 +3043,18 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "override ";
     return;
   case Node::Kind::FunctionSignatureSpecialization:
-  case Node::Kind::GenericSpecialization: {
+  case Node::Kind::GenericSpecialization:
+  case Node::Kind::GenericSpecializationNotReAbstracted: {
     if (!Options.DisplayGenericSpecializations) {
       Printer << "specialized ";
       return;
     }
     if (pointer->getKind() == Node::Kind::FunctionSignatureSpecialization) {
       Printer << "function signature specialization <";
-    } else {
+    } else if (pointer->getKind() == Node::Kind::GenericSpecialization) {
       Printer << "generic specialization <";
+    } else {
+      Printer << "generic not re-abstracted specialization <";
     }
     bool hasPrevious = false;
     // We skip the 0 index since the SpecializationPassID does not contain any

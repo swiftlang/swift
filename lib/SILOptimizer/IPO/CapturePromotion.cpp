@@ -749,7 +749,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // index so is not stored separately);
       unsigned Index = OpNo - 1 + closureType->getNumSILArguments();
 
-      auto *Fn = PAI->getCalleeFunction();
+      auto *Fn = PAI->getReferencedFunction();
       if (!Fn || !Fn->isDefinition())
         return false;
 

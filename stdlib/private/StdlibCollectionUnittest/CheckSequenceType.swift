@@ -183,7 +183,7 @@ internal struct ForEachTest {
   }
 }
 
-public struct LexicographicalCompareTest {
+public struct LexicographicallyPrecedesTest {
   public let expected: ExpectedComparisonResult
   public let sequence: [Int]
   public let other: [Int]
@@ -206,8 +206,8 @@ public struct LexicographicalCompareTest {
     self.loc = SourceLoc(file, line, comment: "test data" + comment)
   }
 
-  func flip() -> LexicographicalCompareTest {
-    return LexicographicalCompareTest(
+  func flip() -> LexicographicallyPrecedesTest {
+    return LexicographicallyPrecedesTest(
       expected.flip(), other, sequence,
       expectedLeftoverOther, expectedLeftoverSequence,
       file: loc.file, line: loc.line, comment: " (flipped)")
@@ -669,37 +669,37 @@ public let dropLastTests = [
   ),
 ]
 
-public let lexicographicalCompareTests = [
-  LexicographicalCompareTest(.EQ, [], [], [], []),
-  LexicographicalCompareTest(.EQ, [ 1 ], [ 1 ], [], []),
+public let lexicographicallyPrecedesTests = [
+  LexicographicallyPrecedesTest(.eq, [], [], [], []),
+  LexicographicallyPrecedesTest(.eq, [ 1 ], [ 1 ], [], []),
 
-  LexicographicalCompareTest(.GT, [ 1 ], [], [], []),
+  LexicographicallyPrecedesTest(.gt, [ 1 ], [], [], []),
 
-  LexicographicalCompareTest(.GT, [ 1 ], [ 0 ], [], []),
-  LexicographicalCompareTest(.EQ, [ 1 ], [ 1 ], [], []),
-  LexicographicalCompareTest(.LT, [ 1 ], [ 2 ], [], []),
+  LexicographicallyPrecedesTest(.gt, [ 1 ], [ 0 ], [], []),
+  LexicographicallyPrecedesTest(.eq, [ 1 ], [ 1 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1 ], [ 2 ], [], []),
 
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [], [ 2 ], []),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [], [ 2 ], []),
 
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0 ], [ 2 ], []),
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 1 ], [], []),
-  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2 ], [ 2 ], []),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0 ], [ 2 ], []),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 1 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2 ], [ 2 ], []),
 
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 0 ], [ 2 ], [ 0 ]),
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 1, 0 ], [], []),
-  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 0 ], [ 2 ], [ 0 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 0 ], [ 2 ], [ 0 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 1, 0 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 0 ], [ 2 ], [ 0 ]),
 
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 1 ], [ 2 ], [ 1 ]),
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 1, 1 ], [], []),
-  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 1 ], [ 2 ], [ 1 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 1 ], [ 2 ], [ 1 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 1, 1 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 1 ], [ 2 ], [ 1 ]),
 
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 2 ], [ 2 ], [ 2 ]),
-  LexicographicalCompareTest(.EQ, [ 1, 2 ], [ 1, 2 ], [], []),
-  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 2 ], [ 2 ], [ 2 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 2 ], [ 2 ], [ 2 ]),
+  LexicographicallyPrecedesTest(.eq, [ 1, 2 ], [ 1, 2 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 2 ], [ 2 ], [ 2 ]),
 
-  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 3 ], [ 2 ], [ 3 ]),
-  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 1, 3 ], [], []),
-  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 3 ], [ 2 ], [ 3 ]),
+  LexicographicallyPrecedesTest(.gt, [ 1, 2 ], [ 0, 3 ], [ 2 ], [ 3 ]),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 1, 3 ], [], []),
+  LexicographicallyPrecedesTest(.lt, [ 1, 2 ], [ 2, 3 ], [ 2 ], [ 3 ]),
 ].flatMap { [ $0, $0.flip() ] }
 
 public let mapTests = [

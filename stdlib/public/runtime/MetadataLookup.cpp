@@ -49,6 +49,8 @@ using namespace Demangle;
 #define SWIFT_TYPE_METADATA_SECTION "__swift2_types"
 #elif defined(__ELF__)
 #define SWIFT_TYPE_METADATA_SECTION ".swift2_type_metadata_start"
+#elif defined(__CYGWIN__)
+#define SWIFT_TYPE_METADATA_SECTION ".sw2tymd"
 #endif
 
 // Type Metadata Cache.
@@ -71,17 +73,20 @@ namespace {
 
   public:
     TypeMetadataCacheEntry(const llvm::StringRef name,
-                           const struct Metadata *metadata) {
-      Name = name.str();
-      Metadata = metadata;
-    }
-
-    bool matches(llvm::StringRef aName) {
-      return aName.equals(Name);
-    }
+                           const struct Metadata *metadata)
+      : Name(name.str()), Metadata(metadata) {}
 
     const struct Metadata *getMetadata(void) {
       return Metadata;
+    }
+
+    int compareWithKey(llvm::StringRef aName) const {
+      return aName.compare(Name);
+    }
+
+    template <class... T>
+    static size_t getExtraAllocationSize(T &&... ignored) {
+      return 0;
     }
   };
 }
@@ -89,7 +94,7 @@ namespace {
 static void _initializeCallbacksToInspectDylib();
 
 struct TypeMetadataState {
-  ConcurrentMap<size_t, TypeMetadataCacheEntry> Cache;
+  ConcurrentMap<TypeMetadataCacheEntry> Cache;
   std::vector<TypeMetadataSection> SectionsToScan;
   pthread_mutex_t SectionsToScanLock;
 
@@ -176,6 +181,26 @@ static int _addImageTypeMetadataRecords(struct dl_phdr_info *info,
   dlclose(handle);
   return 0;
 }
+#elif defined(__CYGWIN__)
+static int _addImageTypeMetadataRecords(struct dl_phdr_info *info,
+                                        size_t size, void * /*data*/) {
+  void *handle;
+  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
+    handle = dlopen(nullptr, RTLD_LAZY);
+  } else
+    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+
+  unsigned long recordsSize;
+  const uint8_t *records =
+    _swift_getSectionDataPE(handle, SWIFT_TYPE_METADATA_SECTION,
+                           &recordsSize);
+
+  if (records) {
+    _addImageTypeMetadataRecordsBlock(records, recordsSize);
+  }
+  dlclose(handle);
+  return 0;
+}
 #endif
 
 static void _initializeCallbacksToInspectDylib() {
@@ -190,6 +215,8 @@ static void _initializeCallbacksToInspectDylib() {
   // FIXME: Find a way to have this continue to happen after.
   // rdar://problem/19045112
   dl_iterate_phdr(_addImageTypeMetadataRecords, nullptr);
+#elif defined(__CYGWIN__)
+  _swift_dl_iterate_phdr(_addImageTypeMetadataRecords, nullptr);
 #else
 # error No known mechanism to inspect dynamic libraries on this platform.
 #endif
@@ -236,7 +263,7 @@ swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
   // Instantiate resilient types.
   if (metadata == nullptr &&
       ntd->getGenericMetadataPattern() &&
-      !ntd->GenericParams.hasGenericParams()) {
+      !ntd->GenericParams.isGeneric()) {
     return swift_getResilientMetadata(ntd->getGenericMetadataPattern());
   }
 
@@ -271,19 +298,11 @@ static const Metadata *
 _typeByMangledName(const llvm::StringRef typeName) {
   const Metadata *foundMetadata = nullptr;
   auto &T = TypeMetadataRecords.get();
-  size_t hash = llvm::HashString(typeName);
-
-
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
-  while (TypeMetadataCacheEntry *Value = T.Cache.findValueByKey(hash)) {
-    if (Value->matches(typeName))
-      return Value->getMetadata();
-    // Implement a closed hash table. If we have a hash collision increase
-    // the hash value by one and try again.
-    hash++;
-  }
+  if (auto Value = T.Cache.find(typeName))
+    return Value->getMetadata();
 
   // Check type metadata records
   pthread_mutex_lock(&T.SectionsToScanLock);
@@ -295,18 +314,9 @@ _typeByMangledName(const llvm::StringRef typeName) {
   if (!foundMetadata)
     foundMetadata = _searchConformancesByMangledTypeName(typeName);
 
-
   if (foundMetadata) {
-    auto E = TypeMetadataCacheEntry(typeName, foundMetadata);
-
-    // Some other thread may have setup the value we are about to construct
-    // while we were asleep so do a search before constructing a new value.
-    while (!T.Cache.tryToAllocateNewNode(hash, E)) {
-      // Implement a closed hash table. If we have a hash collision increase
-      // the hash value by one and try again.
-      hash++;
-    }
- }
+    T.Cache.getOrInsert(typeName, foundMetadata);
+  }
 
 #if SWIFT_OBJC_INTEROP
   // Check for ObjC class

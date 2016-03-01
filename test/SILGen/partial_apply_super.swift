@@ -110,7 +110,7 @@ class ChildToFixedOutsideParent : OutsideParent {
   // CHECK-LABEL: sil hidden @_TZFC19partial_apply_super25ChildToFixedOutsideParent11classMethodfT_T_
   // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF19partial_apply_super5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick ChildToFixedOutsideParent.Type to $@thick OutsideParent.Type
-  // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick ChildToFixedOutsideParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> () , $@convention(thin) (@thick OutsideParent.Type) -> () // user: %5
+  // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick ChildToFixedOutsideParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> () , $@convention(thin) (@thick OutsideParent.Type) -> (){{.*}} // user: %5
   // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick OutsideParent.Type) -> ()
   // CHECK: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   override class func classMethod() {

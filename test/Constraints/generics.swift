@@ -165,7 +165,7 @@ class r22409190ManagedBuffer<Value, Element> {
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
     self.withUnsafeMutablePointerToElements { elems -> Void in
-      elems.deinitializePointee(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
 }

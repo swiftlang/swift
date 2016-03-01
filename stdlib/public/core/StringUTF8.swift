@@ -28,7 +28,7 @@ extension _StringCore {
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
   @warn_unused_result
-  func _encodeSomeUTF8(i: Int) -> (Int, _UTF8Chunk) {
+  func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 
     if _fastPath(elementWidth == 1) {
@@ -45,10 +45,10 @@ extension _StringCore {
 
       return (i + utf16Count, result)
     } else if _fastPath(!_baseAddress._isNull) {
-      return _encodeSomeContiguousUTF16AsUTF8(i)
+      return _encodeSomeContiguousUTF16AsUTF8(from: i)
     } else {
 #if _runtime(_ObjC)
-      return _encodeSomeNonContiguousUTF16AsUTF8(i)
+      return _encodeSomeNonContiguousUTF16AsUTF8(from: i)
 #else
       _sanityCheckFailure("_encodeSomeUTF8: Unexpected cocoa string")
 #endif
@@ -58,7 +58,7 @@ extension _StringCore {
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is contiguous UTF-16.
   @warn_unused_result
-  func _encodeSomeContiguousUTF16AsUTF8(i: Int) -> (Int, _UTF8Chunk) {
+  func _encodeSomeContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(!_baseAddress._isNull)
 
@@ -70,7 +70,7 @@ extension _StringCore {
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is non-contiguous UTF-16.
   @warn_unused_result
-  func _encodeSomeNonContiguousUTF16AsUTF8(i: Int) -> (Int, _UTF8Chunk) {
+  func _encodeSomeNonContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(_baseAddress._isNull)
 
@@ -95,7 +95,7 @@ extension String {
       self._core = _core
       self._endIndex = Index(_core, _core.endIndex, Index._emptyBuffer)
       if _fastPath(_core.count != 0) {
-        let (_, buffer) = _core._encodeSomeUTF8(0)
+        let (_, buffer) = _core._encodeSomeUTF8(from: 0)
         self._startIndex = Index(_core, 0, buffer)
       } else {
         self._startIndex = self._endIndex
@@ -136,7 +136,7 @@ extension String {
            0b10___01___01___01___00___00___00___00___01___01___01___01___01___01___01___01)
         let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
         let nextCoreIndex = _coreIndex &+ increment
-        let nextBuffer = Index._nextBuffer(_buffer)
+        let nextBuffer = Index._nextBuffer(after: _buffer)
 
         // if the nextBuffer is non-empty, we have all we need
         if _fastPath(nextBuffer != Index._emptyBuffer) {
@@ -144,7 +144,7 @@ extension String {
         }
         // If the underlying UTF16 isn't exhausted, fill a new buffer
         else if _fastPath(nextCoreIndex < _core.endIndex) {
-          let (_, freshBuffer) = _core._encodeSomeUTF8(nextCoreIndex)
+          let (_, freshBuffer) = _core._encodeSomeUTF8(from: nextCoreIndex)
           return Index(_core, nextCoreIndex, freshBuffer)
         }
         else {
@@ -159,8 +159,7 @@ extension String {
       /// True iff the index is at the end of its view or if the next
       /// byte begins a new UnicodeScalar.
       internal var _isOnUnicodeScalarBoundary : Bool {
-        let next = UTF8.CodeUnit(truncatingBitPattern: _buffer)
-        return UTF8._numTrailingBytes(next) != 4 || _isAtEnd
+        return UTF8._isValidUTF8(UInt32(truncatingBitPattern: _buffer)) || _isAtEnd
       }
 
       /// True iff the index is at the end of its view
@@ -181,7 +180,7 @@ extension String {
 
       /// Consume a byte of the given buffer: shift out the low byte
       /// and put FF in the high byte
-      internal static func _nextBuffer(thisBuffer: Buffer) -> Buffer {
+      internal static func _nextBuffer(after thisBuffer: Buffer) -> Buffer {
         return (thisBuffer >> 8) | _bufferHiByte
       }
 
@@ -270,8 +269,8 @@ extension String {
   public init?(_ utf8: UTF8View) {
     let wholeString = String(utf8._core)
 
-    if let start = utf8.startIndex.samePositionIn(wholeString),
-       let end = utf8.endIndex.samePositionIn(wholeString) {
+    if let start = utf8.startIndex.samePosition(in: wholeString),
+       let end = utf8.endIndex.samePosition(in: wholeString) {
       self = wholeString[start..<end]
       return
     }
@@ -313,8 +312,8 @@ public func == (
 
     // Move the buffers along.
     buffer = (
-      String.UTF8Index._nextBuffer(buffer.0),
-      String.UTF8Index._nextBuffer(buffer.1))
+      String.UTF8Index._nextBuffer(after: buffer.0),
+      String.UTF8Index._nextBuffer(after: buffer.1))
   }
   while true
 }
@@ -322,7 +321,7 @@ public func == (
 // Index conversions
 extension String.UTF8View.Index {
   internal init(_ core: _StringCore, _utf16Offset: Int) {
-      let (_, buffer) = core._encodeSomeUTF8(_utf16Offset)
+      let (_, buffer) = core._encodeSomeUTF8(from: _utf16Offset)
       self.init(core, _utf16Offset, buffer)
   }
 
@@ -379,8 +378,8 @@ extension String.UTF8View.Index {
   ///
   /// - Precondition: `self` is an element of `String(utf16)!.utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -391,8 +390,8 @@ extension String.UTF8View.Index {
   /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
@@ -402,8 +401,8 @@ extension String.UTF8View.Index {
   ///
   /// - Precondition: `self` is an element of `characters.utf8.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    characters: String
+  public func samePosition(
+    in characters: String
   ) -> String.Index? {
     return String.Index(self, within: characters)
   }

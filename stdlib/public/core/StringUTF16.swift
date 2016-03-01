@@ -41,7 +41,7 @@ extension String {
     }
 
     @warn_unused_result
-    func _toInternalIndex(i: Int) -> Int {
+    func _internalIndex(at i: Int) -> Int {
       return _core.startIndex + _offset + i
     }
 
@@ -54,7 +54,7 @@ extension String {
       _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
-      let index = _toInternalIndex(position)
+      let index = _internalIndex(at: position)
       let u = _core[index]
       if _fastPath((u >> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
@@ -106,7 +106,7 @@ extension String {
     public subscript(bounds: Range<Index>) -> UTF16View {
       return UTF16View(
         _core,
-        offset: _toInternalIndex(bounds.startIndex._offset),
+        offset: _internalIndex(at: bounds.startIndex._offset),
         length: bounds.endIndex._offset - bounds.startIndex._offset)
     }
 
@@ -123,8 +123,8 @@ extension String {
     }
 
     public var description: String {
-      let start = _toInternalIndex(0)
-      let end = _toInternalIndex(_length)
+      let start = _internalIndex(at: 0)
+      let end = _internalIndex(at: _length)
       return String(_core[start..<end])
     }
 
@@ -155,10 +155,10 @@ extension String {
 
     if let start = UTF16Index(
       _offset: utf16._offset
-    ).samePositionIn(wholeString) {
+    ).samePosition(in: wholeString) {
       if let end = UTF16Index(
         _offset: utf16._offset + utf16._length
-      ).samePositionIn(wholeString) {
+      ).samePosition(in: wholeString) {
         self = wholeString[start..<end]
         return
       }
@@ -274,8 +274,8 @@ extension String.UTF16View.Index {
   /// - Precondition: `self` is an element of
   ///   `String(utf8)!.utf16.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf8: String.UTF8View
+  public func samePosition(
+    in utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -286,8 +286,8 @@ extension String.UTF16View.Index {
   /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf16.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
@@ -297,8 +297,8 @@ extension String.UTF16View.Index {
   ///
   /// - Precondition: `self` is an element of `characters.utf16.indices`.
   @warn_unused_result
-  public func samePositionIn(
-    characters: String
+  public func samePosition(
+    in characters: String
   ) -> String.Index? {
     return String.Index(self, within: characters)
   }

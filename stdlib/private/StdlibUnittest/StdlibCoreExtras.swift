@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
-import SwiftPrivateDarwinExtras
+import SwiftPrivateLibcExtras
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD)
@@ -32,7 +32,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     return string.startIndex
   }
 #if _runtime(_ObjC)
-  return string.rangeOf(substring)?.startIndex
+  return string.range(of: substring)?.startIndex
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
@@ -48,7 +48,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     while true {
       if needleIndex == needle.endIndex {
         // if we hit the end of the search string, we found the needle
-        return matchStartIndex.samePositionIn(string)
+        return matchStartIndex.samePosition(in: string)
       }
       if matchIndex == haystack.endIndex {
         // if we hit the end of the string before finding the end of the needle,
@@ -101,8 +101,8 @@ infix operator <=> {}
 
 public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
   return lhs < rhs
-    ? .LT
-    : lhs > rhs ? .GT : .EQ
+    ? .lt
+    : lhs > rhs ? .gt : .eq
 }
 
 public struct TypeIdentifier : Hashable, Comparable {
@@ -136,7 +136,7 @@ extension TypeIdentifier
 
 func _forAllPermutationsImpl(
   index: Int, _ size: Int,
-  inout _ perm: [Int], inout _ visited: [Bool],
+  _ perm: inout [Int], _ visited: inout [Bool],
   _ body: ([Int]) -> Void
 ) {
   if index == size {

@@ -23,7 +23,7 @@ sil @use_foo : $@convention(thin) (@owned foo) -> ()
 // Tests //
 ///////////
 
-// CHECK-LABEL: @test_dead_block
+// CHECK-LABEL: sil @test_dead_block
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   unreachable
 // CHECK-NEXT: }
@@ -1176,7 +1176,7 @@ bb7:
 }
 
 
-// CHECK-LABEL: @jumpthread_switch_enum
+// CHECK-LABEL: sil @jumpthread_switch_enum
 // CHECK-NOT: switch_enum
 // CHECK: return
 
@@ -1233,7 +1233,7 @@ bb8(%40 : $Builtin.Int32):
   return %41 : $Int32
 }
 
-// CHECK-LABEL: @jumpthread_switch_enum2
+// CHECK-LABEL: sil @jumpthread_switch_enum2
 // CHECK-NOT: switch_enum
 // CHECK: return
 

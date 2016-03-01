@@ -8,9 +8,9 @@ typealias MyInt = Int
 // CHECK: TypeAliasDecl '''MyInt''' MyInt.Type{{$}}
 // FULL:  TypeAliasDecl '''MyInt''' swift_ide_test.MyInt.Type{{$}}
 
-func testVariableTypes(param: Int, inout param2: Double) {
-// CHECK: FuncDecl '''testVariableTypes''' (Int, inout param2: Double) -> (){{$}}
-// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, inout param2: Swift.Double) -> (){{$}}
+func testVariableTypes(param: Int, param2: inout Double) {
+// CHECK: FuncDecl '''testVariableTypes''' (Int, param2: inout Double) -> (){{$}}
+// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, param2: inout Swift.Double) -> (){{$}}
 
   var a1 = 42
 // CHECK: VarDecl '''a1''' Int{{$}}

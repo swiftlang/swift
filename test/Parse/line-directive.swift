@@ -21,7 +21,7 @@ x
 x x // expected-error{{consecutive statements}} {{2-2=;}}
 
 // rdar://19582475
-public struct S {
+public struct S { // expected-note{{in declaration of 'S'}}
 // expected-error@+1{{expected declaration}}
 / ###line 25 "line-directive.swift"
 }

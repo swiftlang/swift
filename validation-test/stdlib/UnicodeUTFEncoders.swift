@@ -77,8 +77,8 @@ func nthUnicodeScalar(n: UInt32) -> UnicodeScalar {
 func nsEncode<CodeUnit>(
   c: UInt32,
   _ encoding: NSStringEncoding,
-  inout _ buffer: [CodeUnit],
-  inout _ used: Int
+  _ buffer: inout [CodeUnit],
+  _ used: inout Int
 ) {
   var c = c
   _precondition(buffer.count >= 4, "buffer is not large enough")
@@ -116,14 +116,15 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     let nsEncoded = nsEncodeBuffer[0..<(used/sizeof(CodeUnit.self))]
     var encodeIndex = encodeBuffer.startIndex
     let encodeOutput: (CodeUnit) -> Void = {
-      self.encodeBuffer[encodeIndex++] = $0
+      self.encodeBuffer[encodeIndex] = $0
+      encodeIndex += 1
     }
 
     var iter = nsEncoded.makeIterator()
     var decoded: UnicodeScalar
     var decoder = Codec()
     switch decoder.decode(&iter) {
-    case .ScalarValue(let us):
+    case .scalarValue(let us):
       decoded = us
     default:
       fatalError("decoding failed")
@@ -135,7 +136,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     )
 
     encodeIndex = encodeBuffer.startIndex
-    Codec.encode(scalar, output: encodeOutput)
+    Codec.encode(scalar, sendingOutputTo: encodeOutput)
     expectEqual(
       nsEncoded, encodeBuffer[0..<encodeIndex],
       "Decoding failed: \(asHex(nsEncoded)) => " +

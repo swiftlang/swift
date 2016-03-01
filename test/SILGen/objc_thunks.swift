@@ -14,8 +14,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7typical{{.*}} : $@convention(method) (Int, @owned Gizmo, @guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[X]], [[Y]], [[THIS]]) {{.*}} line:[[@LINE-7]]:8:auto_gen
-  // CHECK-NEXT:   strong_release [[THIS]] : $Hoozit // {{.*}}
-  // CHECK-NEXT:   return [[RES]] : $Gizmo // {{.*}} line:[[@LINE-9]]:8:auto_gen
+  // CHECK-NEXT:   strong_release [[THIS]] : $Hoozit
+  // CHECK-NEXT:   return [[RES]] : $Gizmo{{.*}} line:[[@LINE-9]]:8:auto_gen
   // CHECK-NEXT: }
 
   // NS_CONSUMES_SELF by inheritance
@@ -66,7 +66,7 @@ class Hoozit : Gizmo {
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
-  // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty {{.*}}
+  // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]] {{.*}}
   // CHECK-NEXT:   strong_retain [[RES]] : $Gizmo
   // CHECK-NEXT:   return [[RES]]

@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-class C {
+class C { // expected-note 3 {{in declaration of 'C'}}
 
 #if os(iOS)
 	func foo() {}

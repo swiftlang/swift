@@ -82,7 +82,7 @@ def all_real_number_type_names():
 def all_numeric_type_names():
     return all_integer_type_names() + all_real_number_type_names()
 
-def numeric_type_names_Macintosh_only():
+def numeric_type_names_macintosh_only():
     return ['Float80']
 
 # Swift_Programming_Language/Expressions.html

@@ -143,15 +143,15 @@ class UserClass : UnannotatedFrameworkProtocol {
 
   @available(OSX 10.51, *)
   @objc(doSomethingWithClass:)
-  func doSomething(k: AnnotatedFrameworkClass?) { }
+  func doSomething(with k: AnnotatedFrameworkClass?) { }
 
   @available(OSX 10.51, *)
   @objc
-  func doSomething(nonNullableClass k: AnnotatedFrameworkClass) { }
+  func doSomething(withNonNullableClass k: AnnotatedFrameworkClass) { }
 
   @available(OSX 10.51, *)
   @objc(doSomethingWithIUOClass:)
-  func doSomething(iuoClass k: AnnotatedFrameworkClass!) { }
+  func doSomething(withIUOClass k: AnnotatedFrameworkClass!) { }
 
   @objc
   @available(OSX 10.51, *)
@@ -163,7 +163,7 @@ class UserClass : UnannotatedFrameworkProtocol {
   func noUnavailableTypesInSignature() { }
 
   @objc(doSomethingWithClass:andLaterClass:) @available(OSX 10.52, *)
-  func doSomething(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
+  func doSomething(with k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
 
   @objc
   @available(OSX 10.53, *)
@@ -190,7 +190,7 @@ func callViaAnnotatedFrameworkProtocol(p: AnnotatedFrameworkProtocol) {
 
 class SubclassOfFrameworkClassConformingToUnannotatedFrameworkProtocol : FrameworkClassConformingToUnannotatedFrameworkProtocol {
   @available(OSX 10.51, *)
-  override func doSomething(nonNullableClass k: AnnotatedFrameworkClass) {
+  override func doSomething(withNonNullableClass k: AnnotatedFrameworkClass) {
   }
 
   @available(OSX 10.51, *)
@@ -200,13 +200,13 @@ class SubclassOfFrameworkClassConformingToUnannotatedFrameworkProtocol : Framewo
   }
 
   @available(OSX 10.52, *)
-  override func doSomething(iuoClass k: AnnotatedFrameworkClass!) { } // expected-error {{'doSomething' must be as available as declaration it overrides}}
+  override func doSomething(withIUOClass k: AnnotatedFrameworkClass!) { } // expected-error {{'doSomething' must be as available as declaration it overrides}}
 }
 
 @available(OSX 10.52, *)
 class SubclassOfLaterFrameworkClassConformingToUnannotatedFrameworkProtocol : LaterFrameworkClassConformingToUnannotatedFrameworkProtocol {
   @available(OSX 10.52, *)
-  override func doSomething(nonNullableClass k: AnnotatedFrameworkClass) {
+  override func doSomething(withNonNullableClass k: AnnotatedFrameworkClass) {
   }
 
   @available(OSX 10.53, *)

@@ -862,8 +862,9 @@ extension Collection
 extension Sequence
   where Self : _ArrayProtocol, Self.Element == Self.Iterator.Element {
   // A fast implementation for when you are backed by a contiguous array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
-    -> UnsafeMutablePointer<Iterator.Element> {
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Iterator.Element>
+  ) -> UnsafeMutablePointer<Iterator.Element> {
     let s = self._baseAddressIfContiguous
     if s != nil {
       let count = self.count
@@ -873,7 +874,7 @@ extension Sequence
     } else {
       var p = ptr
       for x in self {
-        p.initializePointee(x)
+        p.initialize(with: x)
         p += 1
       }
       return p
@@ -974,7 +975,7 @@ internal func _writeBackMutableSlice<
   where
   C._Element == Slice_.Iterator.Element,
   C.Index == Slice_.Index
->(inout self_: C, bounds: Range<C.Index>, slice: Slice_) {
+>(self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
   C.Index._failEarlyRangeCheck2(
     rangeStart: bounds.startIndex,
     rangeEnd: bounds.endIndex,
@@ -999,10 +1000,10 @@ internal func _writeBackMutableSlice<
 
   _precondition(
     selfElementIndex == selfElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
+    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
   _precondition(
     newElementIndex == newElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
 }
 
 @available(*, unavailable, message="Bit enum has been deprecated. Please use Int instead.")

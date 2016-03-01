@@ -3483,8 +3483,46 @@ typedef std::unique_ptr<FileNameToGroupNameMap> pFileNameToGroupNameMap;
 
 class YamlGroupInputParser {
   StringRef RecordPath;
-
+  std::string Separator = "/";
   static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
+
+  bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
+                 const llvm::Twine &ParentName) {
+    llvm::yaml::MappingNode *MapNode = dyn_cast<llvm::yaml::MappingNode>(Root);
+    if (!MapNode) {
+      return true;
+    }
+    for (auto Pair : *MapNode) {
+      auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
+      auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
+
+      if (!Key || !Value) {
+        return true;
+      }
+      llvm::SmallString<16> GroupNameStorage;
+      StringRef GroupName = Key->getValue(GroupNameStorage);
+      std::unique_ptr<llvm::Twine> pCombined;
+      if (!ParentName.isTriviallyEmpty()) {
+        pCombined.reset(new llvm::Twine(ParentName.concat(Separator).
+                                        concat(GroupName)));
+      } else {
+        pCombined.reset(new llvm::Twine(GroupName));
+      }
+      std::string CombinedName = pCombined->str();
+      for (llvm::yaml::Node &Entry : *Value) {
+        if (auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry)) {
+          llvm::SmallString<16> FileNameStorage;
+          StringRef FileName = FileEntry->getValue(FileNameStorage);
+          Map[FileName] = CombinedName;
+        } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
+          if(parseRoot(Map, &Entry, *pCombined))
+            return true;
+        } else
+          return true;
+      }
+    }
+    return false;
+  }
 
 public:
   YamlGroupInputParser(StringRef RecordPath): RecordPath(RecordPath) {}
@@ -3526,22 +3564,8 @@ public:
       return true;
     }
     pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
-    for (auto Pair : *Map) {
-      auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
-      auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
-
-      if (!Key || !Value) {
-        return true;
-      }
-      llvm::SmallString<16> GroupNameStorage;
-      StringRef GroupName = Key->getValue(GroupNameStorage);
-      for (llvm::yaml::Node &Entry : *Value) {
-        auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry);
-        llvm::SmallString<16> FileNameStorage;
-        StringRef FileName = FileEntry->getValue(FileNameStorage);
-        (*pMap)[FileName] = GroupName;
-      }
-    }
+    if(parseRoot(*pMap, Root, llvm::Twine()))
+      return true;
 
     // Save the parsed map to the owner.
     AllMaps[RecordPath] = std::move(pMap);
@@ -3576,24 +3600,23 @@ class DeclGroupNameContext {
   };
 
   class GroupNameCollectorFromJson : public GroupNameCollector {
-    const std::string GroupInfoFileName = "GroupInfo.json";
+    StringRef RecordPath;
     FileNameToGroupNameMap* pMap = nullptr;
 
   public:
-    GroupNameCollectorFromJson(bool Enable) : GroupNameCollector(Enable) {}
+    GroupNameCollectorFromJson(StringRef RecordPath) :
+      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath) {}
     StringRef getGroupNameInternal(const ValueDecl *VD) override {
+      // We need the file path, so there has to be a location.
+      if (VD->getLoc().isInvalid())
+        return NullGroupName;
       auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
       if (!PathOp.hasValue())
         return NullGroupName;
       StringRef FullPath = StringRef(VD->getASTContext().SourceMgr.
                                      getIdentifierForBuffer(PathOp.getValue()));
       if (!pMap) {
-        llvm::SmallString<64> Path;
-
-        // The group info should be in the same directory with the source file.
-        llvm::sys::path::append(Path, llvm::sys::path::parent_path(FullPath),
-                                GroupInfoFileName);
-        YamlGroupInputParser Parser(Path.str());
+        YamlGroupInputParser Parser(RecordPath);
         if (!Parser.parse()) {
 
           // Get the file-name to group map if parsing correctly.
@@ -3613,8 +3636,8 @@ class DeclGroupNameContext {
   std::unique_ptr<GroupNameCollector> pNameCollector;
 
 public:
-  DeclGroupNameContext(bool Enable) :
-    pNameCollector(new GroupNameCollectorFromJson(Enable)) {}
+  DeclGroupNameContext(StringRef RecordPath) :
+    pNameCollector(new GroupNameCollectorFromJson(RecordPath)) {}
   uint32_t getGroupSequence(const ValueDecl *VD) {
     return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
                                      Map.size())).first->second;
@@ -3626,6 +3649,10 @@ public:
       ViewBuffer.push_back(It->first);
     }
     return llvm::makeArrayRef(ViewBuffer);
+  }
+
+  bool isEnable() {
+    return pNameCollector->Enable;
   }
 };
 
@@ -3671,7 +3698,7 @@ static void writeDeclCommentTable(
 
       // Skip the decl if it does not have a comment.
       RawComment Raw = VD->getRawComment();
-      if (Raw.Comments.empty())
+      if (Raw.Comments.empty() && !GroupContext.isEnable())
         return true;
 
       // Compute USR.
@@ -3995,16 +4022,9 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 
-static bool isStdlibModule(ModuleOrSourceFile DC) {
-  if (auto M = DC.dyn_cast<ModuleDecl*>()) {
-    return M->isStdlibModule();
-  }
-  return false;
-}
-
-void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
+void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                                  StringRef GroupInfoPath) {
   Serializer S{MODULE_DOC_SIGNATURE, DC};
-  bool isStdlib = isStdlibModule(DC);
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
 
@@ -4013,7 +4033,7 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
     S.writeDocHeader();
     {
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
-      DeclGroupNameContext GroupContext(isStdlib);
+      DeclGroupNameContext GroupContext(GroupInfoPath);
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
       writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
       comment_block::GroupNamesLayout GroupNames(S.Out);
@@ -4093,7 +4113,7 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization (swiftdoc)");
-      Serializer::writeDocToStream(out, DC);
+      Serializer::writeDocToStream(out, DC, options.GroupInfoPath);
     });
   }
 }

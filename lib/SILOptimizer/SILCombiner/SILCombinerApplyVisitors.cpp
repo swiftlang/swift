@@ -29,36 +29,6 @@
 using namespace swift;
 using namespace swift::PatternMatch;
 
-/// Check that this is a partial apply of a reabstraction thunk and return the
-/// argument of the partial apply if it is.
-static SILValue
-isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI, bool requireSingleUse) {
-  if (requireSingleUse) {
-    SILValue PAIVal(PAI);
-    if (!hasOneNonDebugUse(PAIVal))
-      return SILValue();
-  }
-
-  if (PAI->getNumArguments() != 1)
-    return SILValue();
-
-  auto *Fun = PAI->getCalleeFunction();
-  if (!Fun)
-    return SILValue();
-
-  // Make sure we have a reabstraction thunk.
-  if (Fun->isThunk() != IsReabstractionThunk)
-    return SILValue();
-
-  // The argument should be a closure.
-  auto Arg = PAI->getArgument(0);
-  if (!Arg->getType().is<SILFunctionType>() ||
-      !Arg->getType().isReferenceCounted(PAI->getFunction()->getModule()))
-    return SILValue();
-
-  return PAI->getArgument(0);
-}
-
 /// Remove pointless reabstraction thunk closures.
 ///   partial_apply %reabstraction_thunk_typeAtoB(
 ///      partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
@@ -66,7 +36,7 @@ isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI, bool requireSingleUse)
 ///   %closure_typeB
 static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
                                            SILCombiner *Combiner) {
-  auto PAIArg = isPartialApplyOfReabstractionThunk(PAI, false);
+  auto PAIArg = isPartialApplyOfReabstractionThunk(PAI);
   if (!PAIArg)
     return false;
 
@@ -74,7 +44,10 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   if (!PAI2)
     return false;
 
-  auto PAI2Arg = isPartialApplyOfReabstractionThunk(PAI2, true);
+  if (!hasOneNonDebugUse(PAI2))
+    return false;
+
+  auto PAI2Arg = isPartialApplyOfReabstractionThunk(PAI2);
   if (!PAI2Arg)
     return false;
 
@@ -154,9 +127,8 @@ class PartialApplyCombiner {
   // Set of lifetime endpoints for this partial_apply.
   //
   // Used to find the last uses of partial_apply, which is need to insert
-  // releases/destroys of temporaries as early as possible.  If no releases are
-  // needed, Lifetime remains empty.
-  ValueLifetime Lifetime;
+  // releases/destroys of temporaries as early as possible.
+  ValueLifetimeAnalysis::Frontier PAFrontier;
 
   SILBuilder &Builder;
 
@@ -165,8 +137,8 @@ class PartialApplyCombiner {
 
   SILCombiner *SilCombiner;
 
-  void processSingleApply(FullApplySite AI);
-  void allocateTemporaries();
+  bool processSingleApply(FullApplySite AI);
+  bool allocateTemporaries();
   void deallocateTemporaries();
   void releaseTemporaries();
 
@@ -178,7 +150,8 @@ public:
   SILInstruction *combine();
 };
 
-void PartialApplyCombiner::allocateTemporaries() {
+/// Returns true on success.
+bool PartialApplyCombiner::allocateTemporaries() {
   // Copy the original arguments of the partial_apply into
   // newly created temporaries and use these temporaries instead of
   // the original arguments afterwards.
@@ -198,6 +171,7 @@ void PartialApplyCombiner::allocateTemporaries() {
   auto Args = PAI->getArguments();
   unsigned Delta = Params.size() - Args.size();
 
+  llvm::SmallVector<std::pair<SILValue, unsigned>, 8> ArgsToHandle;
   for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
     SILValue Arg = Args[AI];
     SILParameterInfo Param = Params[AI + Delta];
@@ -209,30 +183,38 @@ void PartialApplyCombiner::allocateTemporaries() {
     //   (e.g. it is an @in argument)
     if (isa<AllocStackInst>(Arg) ||
         (Param.isConsumed() && Param.isIndirect())) {
-      Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
-      // Create a new temporary at the beginning of a function.
-      auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(),
-                                           {/*Constant*/ true, AI});
-      Builder.setInsertionPoint(PAI);
-      // Copy argument into this temporary.
-      Builder.createCopyAddr(PAI->getLoc(), Arg, Tmp,
-                              IsTake_t::IsNotTake,
-                              IsInitialization_t::IsInitialization);
-
-      Tmps.push_back(Tmp);
       // If the temporary is non-trivial, we need to release it later.
       if (!Arg->getType().isTrivial(PAI->getModule()))
         needsReleases = true;
-      ArgToTmp.insert(std::make_pair(Arg, Tmp));
+      ArgsToHandle.push_back(std::make_pair(Arg, AI));
     }
   }
 
   if (needsReleases) {
-    // Compute the set of endpoints, which will be used
-    // to insert releases of temporaries.
+    // Compute the set of endpoints, which will be used to insert releases of
+    // temporaries. This may fail if the frontier is located on a critical edge
+    // which we may not split (no CFG changes in SILCombine).
     ValueLifetimeAnalysis VLA(PAI);
-    Lifetime = VLA.computeFromDirectUses();
+    if (!VLA.computeFrontier(PAFrontier, ValueLifetimeAnalysis::DontModifyCFG))
+      return false;
   }
+
+  for (auto ArgWithIdx : ArgsToHandle) {
+    SILValue Arg = ArgWithIdx.first;
+    Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
+    // Create a new temporary at the beginning of a function.
+    auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(),
+                                        {/*Constant*/ true, ArgWithIdx.second});
+    Builder.setInsertionPoint(PAI);
+    // Copy argument into this temporary.
+    Builder.createCopyAddr(PAI->getLoc(), Arg, Tmp,
+                           IsTake_t::IsNotTake,
+                           IsInitialization_t::IsInitialization);
+
+    Tmps.push_back(Tmp);
+    ArgToTmp.insert(std::make_pair(Arg, Tmp));
+  }
+  return true;
 }
 
 /// Emit dealloc_stack for all temporaries.
@@ -259,8 +241,8 @@ void PartialApplyCombiner::releaseTemporaries() {
     auto TmpType = Op->getType().getObjectType();
     if (TmpType.isTrivial(PAI->getModule()))
       continue;
-    for (auto *EndPoint : Lifetime.LastUsers) {
-      Builder.setInsertionPoint(next(SILBasicBlock::iterator(EndPoint)));
+    for (auto *EndPoint : PAFrontier) {
+      Builder.setInsertionPoint(EndPoint);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
         auto *Load = Builder.createLoad(PAI->getLoc(), Op);
         Builder.createReleaseValue(PAI->getLoc(), Load);
@@ -273,7 +255,8 @@ void PartialApplyCombiner::releaseTemporaries() {
 
 /// Process an apply instruction which uses a partial_apply
 /// as its callee.
-void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
+/// Returns true on success.
+bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   Builder.setInsertionPoint(AI.getInstruction());
   Builder.setCurrentDebugScope(AI.getDebugScope());
 
@@ -289,7 +272,8 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   // Pre-process partial_apply arguments only once, lazily.
   if (isFirstTime) {
     isFirstTime = false;
-    allocateTemporaries();
+    if (!allocateTemporaries())
+      return false;
   }
 
   // Now, copy over the partial apply args.
@@ -371,14 +355,10 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     }
     Builder.createStrongRelease(AI.getLoc(), PAI);
   }
-  // Update the set endpoints.
-  if (Lifetime.LastUsers.count(AI.getInstruction())) {
-    Lifetime.LastUsers.remove(AI.getInstruction());
-    Lifetime.LastUsers.insert(NAI.getInstruction());
-  }
 
   SilCombiner->replaceInstUsesWith(*AI.getInstruction(), NAI.getInstruction());
   SilCombiner->eraseInstFromFunction(*AI.getInstruction());
+  return true;
 }
 
 /// Perform the apply{partial_apply(x,y)}(z) -> apply(z,x,y) peephole
@@ -410,7 +390,8 @@ SILInstruction *PartialApplyCombiner::combine() {
     if (AI.hasSubstitutions())
       continue;
 
-    processSingleApply(AI);
+    if (!processSingleApply(AI))
+      return nullptr;
   }
 
   // release/destroy and deallocate introduced temporaries.
@@ -697,7 +678,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   SmallVector<Substitution, 8> Substitutions;
   for (auto Subst : AI.getSubstitutions()) {
     if (Subst.getReplacement().getCanonicalTypeOrNull() ==
-        Self->getType().getSwiftRValueType()) {
+        OpenedArchetype) {
       auto Conformances = AI.getModule().getASTContext()
                             .AllocateUninitialized<ProtocolConformanceRef>(1);
       Conformances[0] = Conformance;
@@ -900,7 +881,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   // Check if it is legal to perform the propagation.
   if (!AI.hasSubstitutions())
     return nullptr;
-  auto *Callee = AI.getCalleeFunction();
+  auto *Callee = AI.getReferencedFunction();
   if (!Callee || !Callee->getDeclContext())
     return nullptr;
 
@@ -1214,7 +1195,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         }
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *SF = AI->getCalleeFunction();
+  SILFunction *SF = AI->getReferencedFunction();
   if (SF && SF->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
@@ -1348,7 +1329,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   }
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *Fn = AI->getCalleeFunction();
+  SILFunction *Fn = AI->getReferencedFunction();
   if (Fn && Fn->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {
