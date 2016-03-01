@@ -817,6 +817,16 @@ public:
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind InitKind = CtorInitializerKind::Designated;
 
+    /// The context into which this declaration will be imported.
+    ///
+    /// When the context into which the declaration will be imported
+    /// matches a Clang declaration context (the common case), the
+    /// result will be expressed as a declaration context. Otherwise,
+    /// if the Clang type is not itself a declaration context (for
+    /// example, a typedef that comes into Swift as a strong type),
+    /// the type declaration will be provided.
+    EffectiveClangContext EffectiveContext;
+
     /// For names that map Objective-C error handling conventions into
     /// throwing Swift methods, describes how the mapping is performed.
     Optional<ImportedErrorInfo> ErrorInfo;
@@ -844,14 +854,8 @@ public:
   /// so it should not be used when referencing Clang symbols.
   ///
   /// \param D The Clang declaration whose name should be imported.
-  ///
-  /// \param effectiveContext If non-null, will be set to the effective
-  /// Clang declaration context in which the declaration will be imported.
-  /// This can differ from D's redeclaration context when the Clang importer
-  /// introduces nesting, e.g., for enumerators within an NS_ENUM.
   ImportedName importFullName(const clang::NamedDecl *D,
                               ImportNameOptions options = None,
-                              clang::DeclContext **effectiveContext = nullptr,
                               clang::Sema *clangSemaOverride = nullptr);
 
   /// Imports the name of the given Clang macro into Swift.
@@ -956,9 +960,19 @@ public:
   /// \brief Import the declaration context of a given Clang declaration into
   /// Swift.
   ///
+  /// \param context The effective context as determined by importFullName.
+  ///
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
-  DeclContext *importDeclContextOf(const clang::Decl *D);
+  DeclContext *importDeclContextOf(const clang::Decl *D,
+                                   EffectiveClangContext context);
+
+  /// \brief Import the declaration context of a given Clang
+  /// declaration into Swift.
+  DeclContext *importDeclContextOf(const clang::Decl *D) {
+    return importDeclContextOf(
+             D, const_cast<clang::DeclContext *>(D->getDeclContext()));
+  }
 
   /// \brief Create a new named constant with the given value.
   ///

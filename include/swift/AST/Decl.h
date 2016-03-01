@@ -19,6 +19,7 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/GenericSignature.h"
@@ -3609,17 +3610,20 @@ enum class AccessStrategy : unsigned char {
 struct BehaviorRecord {
   // The behavior name.
   TypeRepr *ProtocolName;
-  // The parameter function, if any.
-  FuncDecl *Param;
+  // The parameter expression, if any.
+  Expr *Param;
   
   Optional<NormalProtocolConformance *> Conformance = None;
   // The 'value' property from the behavior protocol that provides the property
   // implementation.
   VarDecl *ValueDecl = nullptr;
   
+  // Storage declaration and initializer for use by definite initialization.
+  VarDecl *StorageDecl = nullptr;
+  ConcreteDeclRef InitStorageDecl = nullptr;
   
   BehaviorRecord(TypeRepr *ProtocolName,
-                 FuncDecl *Param)
+                 Expr *Param)
     : ProtocolName(ProtocolName), Param(Param)
   {}
   
@@ -3919,7 +3923,7 @@ public:
   void setComputedSetter(FuncDecl *Set);
 
   /// \brief Add a behavior to a property.
-  void addBehavior(TypeRepr *Type, FuncDecl *Param);
+  void addBehavior(TypeRepr *Type, Expr *Param);
 
   /// \brief Set a materializeForSet accessor for this declaration.
   ///

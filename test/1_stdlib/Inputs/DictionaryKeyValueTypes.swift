@@ -628,7 +628,7 @@ func slurpFastEnumerationFromSwift(
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -647,7 +647,7 @@ func slurpFastEnumerationFromSwift(
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -670,7 +670,7 @@ func slurpFastEnumerationFromSwift(
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -691,7 +691,7 @@ func slurpFastEnumerationFromSwift(
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectEqual(0, returnedCount)
   }
@@ -990,7 +990,7 @@ func slurpFastEnumerationFromSwift(
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -1009,7 +1009,7 @@ func slurpFastEnumerationFromSwift(
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)

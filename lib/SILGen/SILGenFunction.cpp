@@ -66,10 +66,15 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     return getMagicFunctionName(closure->getParent());
   }
   if (auto absFunc = dyn_cast<AbstractFunctionDecl>(dc)) {
-    // If this is an accessor, use the name of the storage.
     if (auto func = dyn_cast<FuncDecl>(absFunc)) {
-      if (auto storage = func->getAccessorStorageDecl())
+      // If this is an accessor, use the name of the storage.
+      if (auto storage = func->getAccessorStorageDecl()) {
         return storage->getFullName();
+      }
+      // If this is a defer body, use the parent name.
+      if (func->isDeferBody()) {
+        return getMagicFunctionName(func->getParent());
+      }
     }
 
     return absFunc->getFullName();

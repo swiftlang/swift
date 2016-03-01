@@ -1024,17 +1024,18 @@ public:
   /// Instantiate the storage implementation for a behavior-backed property.
   void completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
-                               FuncDecl *BehaviorInitStorage,
+                               FuncDecl *DefaultInitStorage,
+                               FuncDecl *ParamInitStorage,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs);
   
-  /// Instantiate the initial value implementation for a behavior-backed
+  /// Instantiate the parameter implementation for a behavior-backed
   /// property.
-  void completePropertyBehaviorInitialValue(VarDecl *VD,
-                               VarDecl *BehaviorInitialValue,
+  void completePropertyBehaviorParameter(VarDecl *VD,
+                               FuncDecl *BehaviorParameter,
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs);

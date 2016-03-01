@@ -420,7 +420,7 @@ void swift::ide::printSubmoduleInterface(
   auto PrintDecl = [&](Decl *D) -> bool {
     ASTPrinter &Printer = *PrinterToUse;
     if (!shouldPrint(D, AdjustedOptions)) {
-      Printer.avoidPrintDeclPost(D);
+      Printer.callAvoidPrintDeclPost(D);
       return false;
     }
     if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
@@ -451,7 +451,7 @@ void swift::ide::printSubmoduleInterface(
           // Print Ext and add sub-types of Ext.
           for (auto Ext : NTD->getExtensions()) {
             if (!shouldPrint(Ext, AdjustedOptions)) {
-              Printer.avoidPrintDeclPost(Ext);
+              Printer.callAvoidPrintDeclPost(Ext);
               continue;
             }
             if (Ext->hasClangNode())
@@ -618,7 +618,7 @@ void swift::ide::printHeaderInterface(
   for (auto *D : ClangDecls) {
     ASTPrinter &Printer = *PrinterToUse;
     if (!shouldPrint(D, AdjustedOptions)) {
-      Printer.avoidPrintDeclPost(D);
+      Printer.callAvoidPrintDeclPost(D);
       continue;
     }
     if (D->print(Printer, AdjustedOptions))

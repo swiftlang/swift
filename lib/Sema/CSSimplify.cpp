@@ -848,7 +848,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // An @autoclosure function type can be a subtype of a
   // non-@autoclosure function type.
   if (func1->isAutoClosure() != func2->isAutoClosure() &&
-      (func2->isAutoClosure() || kind < TypeMatchKind::Subtype))
+      kind < TypeMatchKind::Subtype)
     return SolutionKind::Error;
   
   // A non-throwing function can be a subtype of a throwing function.
@@ -1480,10 +1480,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                           ConstraintLocator::InstanceType));
     }
 
-    case TypeKind::Function:
-      return matchFunctionTypes(cast<FunctionType>(desugar1),
-                                cast<FunctionType>(desugar2),
-                                kind, flags, locator);
+    case TypeKind::Function: {
+      auto func1 = cast<FunctionType>(desugar1);
+      auto func2 = cast<FunctionType>(desugar2);
+
+      // If the 2nd type is an autoclosure, then we don't actually want to
+      // treat these as parallel. The first type needs wrapping in a closure
+      // despite already being a function type.
+      if (!func1->isAutoClosure() && func2->isAutoClosure())
+        break;
+      return matchFunctionTypes(func1, func2, kind, flags, locator);
+    }
 
     case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:

@@ -940,8 +940,8 @@ SequenceTypeTests.test("flatMap/Sequence") {
   }
 }
 
-% TLazyFlatMapTest = gyb.parseTemplate("{}/Inputs/flatMap.gyb".format(test_path))
-% LazyFlatMapTest = gyb.executeTemplate(TLazyFlatMapTest, Test='SequenceTypeTests', Kinds=['Sequence'])
+% TLazyFlatMapTest = gyb.parse_template("{}/Inputs/flatMap.gyb".format(test_path))
+% LazyFlatMapTest = gyb.execute_template(TLazyFlatMapTest, Test='SequenceTypeTests', Kinds=['Sequence'])
 ${LazyFlatMapTest}
 
 SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {

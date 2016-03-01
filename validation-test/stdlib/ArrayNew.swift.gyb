@@ -749,7 +749,7 @@ class CustomImmutableNSArray : NSArray {
 
   @objc
   override func countByEnumerating(
-    state: UnsafeMutablePointer<NSFastEnumerationState>,
+    with state: UnsafeMutablePointer<NSFastEnumerationState>,
     objects: AutoreleasingUnsafeMutablePointer<AnyObject?>,
     count: Int
   ) -> Int {

@@ -72,7 +72,8 @@ KNOWN_SETTINGS=(
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
-    swift-enable-lto            "0"              "enable LTO compilation of the Swift compiler"
+    swift-enable-lto            "0"              "enable LTO compilation of just Swift."
+    llvm-enable-lto             "0"              "enable LTO compilation of LLVM/Clang."
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
@@ -422,6 +423,16 @@ function set_deployment_target_based_options() {
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
+	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
+		llvm_cmake_options=(
+		    "${llvm_cmake_options[@]}"
+		    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
+		    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
+		    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
+		    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
+		    "-DLLVM_PARALLEL_LINK_JOBS=5"
+		)
+	    fi
             swift_cmake_options=(
                 "${swift_cmake_options[@]}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX="${DARWIN_DEPLOYMENT_VERSION_OSX}"

@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
@@ -1107,7 +1108,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
                            StringRef SDKPath,
-                           StringRef ResourceDir) {
+                           StringRef ResourceDir,
+                           const llvm::Triple &Triple) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
@@ -1235,6 +1237,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
+    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
+  }
+
   if (Args.hasArg(OPT_enable_reflection_metadata)) {
     Opts.StripReflectionMetadata = false;
     Opts.StripReflectionNames = false;
@@ -1305,7 +1311,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts,
-                     getSDKPath(), SearchPathOpts.RuntimeResourcePath)) {
+                     getSDKPath(), SearchPathOpts.RuntimeResourcePath,
+                     LangOpts.Target)) {
     return true;
   }
 

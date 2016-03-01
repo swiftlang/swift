@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// XFAIL: linux
+// XFAIL: freebsd, linux
 
 // RUN: %swiftc_driver -driver-print-actions %s 2>&1 | FileCheck %s -check-prefix=BASIC
 // BASIC: 0: input, "{{.*}}actions.swift", swift

@@ -1682,8 +1682,10 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   }
 
   // Emit only declarations if it is a module with pre-specializations.
+  // And only do it in optimized builds.
   bool emitDeclarationsForOnoneSupport =
-      SILMod->getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT;
+      SILMod->getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT &&
+      SILMod->getOptions().Optimization > SILOptions::SILOptMode::Debug;
 
   // Go through all the SILFunctions in SILMod and write out any
   // mandatory function bodies.

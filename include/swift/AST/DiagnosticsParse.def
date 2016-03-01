@@ -256,6 +256,9 @@ ERROR(addressor_with_getter,none,
 ERROR(addressor_with_setter,none,
       "%select{variable|subscript}0 cannot provide both 'address' and "
       "a setter; use an ordinary getter instead", (unsigned))
+ERROR(behavior_multiple_vars,none,
+      "applying property behavior with parameter to multiple variables is "
+      "not supported", ())
 
 // Import
 ERROR(decl_expected_module_name,none,

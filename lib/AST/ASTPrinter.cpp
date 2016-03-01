@@ -330,26 +330,27 @@ void ASTPrinter::printTextImpl(StringRef Text) {
     printText(Str);
     printIndent();
   }
-  
-  const Decl *PreD = PendingDeclPreCallback;
-  const Decl *LocD = PendingDeclLocCallback;
-  auto NameContext = PendingNamePreCallback;
-  PendingDeclPreCallback = nullptr;
+
+  // Get the pending callbacks and remove them from the printer. They must all
+  // be removed before calling any of them to ensure correct ordering.
+  auto pendingDeclPre = PendingDeclPreCallbacks;
+  PendingDeclPreCallbacks.clear();
+  auto *LocD = PendingDeclLocCallback;
   PendingDeclLocCallback = nullptr;
+  auto NameContext = PendingNamePreCallback;
   PendingNamePreCallback.reset();
 
-  if (PreD) {
+  // Perform pending callbacks.
+  for (const Decl *PreD : pendingDeclPre) {
     if (SynthesizeTarget && PreD->getKind() == DeclKind::Extension)
       printSynthesizedExtensionPre(cast<ExtensionDecl>(PreD), SynthesizeTarget);
     else
       printDeclPre(PreD);
   }
-  if (LocD) {
+  if (LocD)
     printDeclLoc(LocD);
-  }
-  if (NameContext) {
+  if (NameContext)
     printNamePre(*NameContext);
-  }
 
   printText(Text);
 }
@@ -702,7 +703,7 @@ public:
       Printer.printSynthesizedExtensionPost(cast<ExtensionDecl>(D),
                                             Options.TransformContext->getNominal());
     } else {
-      Printer.printDeclPost(D);
+      Printer.callPrintDeclPost(D);
     }
     return true;
   }
@@ -1039,7 +1040,7 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
 bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   auto Result = swift::shouldPrint(D, Options);
   if (!Result && Notify)
-    Printer.avoidPrintDeclPost(D);
+    Printer.callAvoidPrintDeclPost(D);
   return Result;
 }
 
@@ -1826,9 +1827,7 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
   Printer.callPrintDeclPre(param);
-  defer {
-    Printer.printDeclPost(param);
-  };
+  defer { Printer.callPrintDeclPost(param); };
 
   auto printArgName = [&]() {
     // Print argument name.

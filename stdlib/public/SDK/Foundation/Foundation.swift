@@ -704,7 +704,7 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
   func refresh() {
     n = 0
     count = enumerable.countByEnumerating(
-      state._baseAddressIfContiguous,
+      with: state._baseAddressIfContiguous,
       objects: AutoreleasingUnsafeMutablePointer(
         objects._baseAddressIfContiguous),
       count: STACK_BUF_SIZE)

@@ -140,10 +140,10 @@
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomething(_: Copying)
+// CHECK-FOUNDATION: func doSomething(with _: Copying)
 
 // Note: NSObject<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingElse(_: protocol<Copying, ObjectProtocol>)
+// CHECK-FOUNDATION: func doSomethingElse(with _: protocol<Copying, ObjectProtocol>)
 
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
@@ -152,7 +152,7 @@
 // CHECK-FOUNDATION: func remove(_: [AnyObject])
 
 // Note: Skipping "Type" suffix.
-// CHECK-FOUNDATION: func doSomething(_: NSUnderlyingType)
+// CHECK-FOUNDATION: func doSomething(with _: NSUnderlyingType)
 
 // Don't introduce default arguments for lone parameters to setters.
 // CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: NSEnumerationOptions)
@@ -286,7 +286,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func type(ofTypeNamed _: String)
 
 // Look for preposition prior to "of".
-// CHECK-OMIT-NEEDLESS-WORDS: func append(contentsOf _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func append(withContentsOf _: String)
 
 // Leave subscripts alone
 // CHECK-OMIT-NEEDLESS-WORDS: subscript(_: UInt) -> AnyObject { get }
@@ -300,13 +300,16 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
 
 // Elements of C array types
-// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(_: UnsafePointer<Point>, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(with _: UnsafePointer<Point>, count: Int)
 
 // Typedef ending in "Array".
-// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(_: PointArray, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(with _: PointArray, count: Int)
 
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
+
+// Property-name sensitivity in the base name "Self" stripping.
+// CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
 
 // Protocols as contexts
 // CHECK-OMIT-NEEDLESS-WORDS: protocol OMWLanding {

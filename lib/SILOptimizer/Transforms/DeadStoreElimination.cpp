@@ -448,7 +448,7 @@ public:
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
-  ProcessKind getProcessFunctionKind();
+  ProcessKind getProcessFunctionKind(unsigned StoreCount);
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
@@ -516,9 +516,13 @@ unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
   return Iter->second;
 }
 
-DSEContext::ProcessKind DSEContext::getProcessFunctionKind() {
+DSEContext::ProcessKind DSEContext::getProcessFunctionKind(unsigned StoreCount) {
   // Don't optimize function that are marked as 'no.optimize'.
   if (!F->shouldOptimize())
+    return ProcessKind::ProcessNone;
+
+  // Really no point optimizing here as there is no dead stores.
+  if (StoreCount < 1)
     return ProcessKind::ProcessNone;
 
   bool RunOneIteration = true;
@@ -1127,13 +1131,15 @@ bool DSEContext::run() {
   // Is this a one iteration function.
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
 
+  std::pair<int, int> LSCount = std::make_pair(0, 0);
   // Walk over the function and find all the locations accessed by
   // this function.
-  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex,
-                                   BaseToLocIndex, TE);
+  LSLocation::enumerateLSLocations(*F, LocationVault,
+                                   LocToBitIndex,
+                                   BaseToLocIndex, TE, LSCount);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind();
+  ProcessKind Kind = getProcessFunctionKind(LSCount.second);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)
