@@ -907,7 +907,7 @@ addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
                                  StringRef Sanitizer, const ToolChain &TC) {
   // Sanitizer runtime libraries requires C++.
   Arguments.push_back("-lc++");
-  // Add explicit dependcy on -lc++abi, as -lc++ doesn't re-export
+  // Add explicit dependency on -lc++abi, as -lc++ doesn't re-export
   // all RTTI-related symbols that are used.
   Arguments.push_back("-lc++abi");
 
