@@ -1230,10 +1230,49 @@ public:
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
 };
 
-/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
-StringRef parseDeclName(StringRef name,
-                        SmallVectorImpl<StringRef> &argumentLabels,
-                        bool &isFunctionName);
+/// Describes a parsed declaration name.
+struct ParsedDeclName {
+  /// The name of the context of which the corresponding entity should
+  /// become a member.
+  StringRef ContextName;
+
+  /// The base name of the declaration.
+  StringRef BaseName;
+
+  /// The argument labels for a function declaration.
+  SmallVector<StringRef, 4> ArgumentLabels;
+
+  /// Whether this is a function name (vs. a value name).
+  bool IsFunctionName = false;
+
+  /// For a declaration name that makes the declaration into an
+  /// instance member, the index of the "Self" parameter.
+  Optional<unsigned> SelfIndex;
+
+  /// Whether the result is translated into an instance member.
+  bool isInstanceMember() const {
+    return isMember() && static_cast<bool>(SelfIndex);
+  }
+
+  /// Whether the result is translated into a static/class member.
+  bool isClassMember() const {
+    return isMember() && !static_cast<bool>(SelfIndex);
+  }
+
+  /// Determine whether this is a valid name.
+  explicit operator bool() const { return !BaseName.empty(); }
+
+  /// Whether this declaration name turns the declaration into a
+  /// member of some named context.
+  bool isMember() const { return !ContextName.empty(); }
+
+  /// Form a declaration name from this parsed declaration name.
+  DeclName formDeclName(ASTContext &ctx) const;
+};
+
+/// Parse a stringified Swift declaration name,
+/// e.g. "Foo.translateBy(self:x:y:)".
+ParsedDeclName parseDeclName(StringRef name);
 
 /// Form a Swift declaration name from its constituent parts.
 DeclName formDeclName(ASTContext &ctx,

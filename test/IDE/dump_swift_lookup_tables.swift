@@ -25,6 +25,12 @@
 // CHECK-NEXT:     TU: SNTransposeInPlace
 // CHECK-NEXT:   __swift:
 // CHECK-NEXT:     TU: __swift
+// CHECK-NEXT:   adding:
+// CHECK-NEXT:     SNSomeStruct: SNAdding
+// CHECK-NEXT:   defaultX:
+// CHECK-NEXT:     SNSomeStruct: DefaultXValue
+// CHECK-NEXT:   init:
+// CHECK-NEXT:     SNSomeStruct: SNCreate
 // CHECK-NEXT:   makeSomeStruct:
 // CHECK-NEXT:     TU: SNMakeSomeStruct, SNMakeSomeStructForX
 // CHECK-NEXT:   x:

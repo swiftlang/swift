@@ -39,3 +39,12 @@ void SNTransposeInPlace(struct SNSomeStruct *value) __attribute__((swift_private
 typedef struct {
   double x, y, z;
 } SNPoint SWIFT_NAME(Point);
+
+// Importing a value into a member.
+extern double DefaultXValue __attribute__((swift_name("SomeStruct.defaultX")));
+
+// Importing a function as a method.
+struct SNSomeStruct SNAdding(struct SNSomeStruct *value, double x) SWIFT_NAME(SomeStruct.adding(self:x:));
+
+// Importing a function as an initializer.
+struct SNSomeStruct SNCreate(double x) SWIFT_NAME(SomeStruct.init(theX:));

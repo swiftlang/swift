@@ -1956,8 +1956,7 @@ auto ClangImporter::Implementation::importFullName(
   // Anything in an Objective-C category or extension is adjusted to the
   // class context.
   if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
-                         result.EffectiveContext
-                           .dyn_cast<clang::DeclContext *>())) {
+                        result.EffectiveContext.getAsDeclContext())) {
     result.EffectiveContext = category->getClassInterface();
   }
 
@@ -2025,11 +2024,8 @@ auto ClangImporter::Implementation::importFullName(
     bool skipCustomName = false;
 
     // Parse the name.
-    SmallVector<StringRef, 4> argumentNames;
-    bool isFunctionName;
-    StringRef baseName = parseDeclName(nameAttr->getName(), argumentNames,
-                                       isFunctionName);
-    if (baseName.empty()) return result;
+    ParsedDeclName parsedName = parseDeclName(nameAttr->getName());
+    if (!parsedName) return result;
 
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
@@ -2039,7 +2035,7 @@ auto ClangImporter::Implementation::importFullName(
     auto method = dyn_cast<clang::ObjCMethodDecl>(D);
     if (method) {
       unsigned initPrefixLength;
-      if (baseName == "init") {
+      if (parsedName.BaseName == "init") {
         if (!shouldImportAsInitializer(method, initPrefixLength,
                                        result.InitKind)) {
           // We cannot import this as an initializer anyway.
@@ -2062,8 +2058,13 @@ auto ClangImporter::Implementation::importFullName(
 
     if (!skipCustomName) {
       result.HasCustomName = true;
-      result.Imported = formDeclName(SwiftContext, baseName, argumentNames,
-                                     isFunctionName);
+      result.Imported = parsedName.formDeclName(SwiftContext);
+
+      // Handle globals treated as members.
+      if (parsedName.isMember()) {
+        // FIXME: Make sure this thing is global.
+        result.EffectiveContext = parsedName.ContextName;
+      }
 
       if (method) {
         // Get the parameters.
@@ -2072,8 +2073,9 @@ auto ClangImporter::Implementation::importFullName(
           method->param_end()
         };
 
-        result.ErrorInfo = considerErrorImport(*this, method, baseName,
-                                               argumentNames, params,
+        result.ErrorInfo = considerErrorImport(*this, method,
+                                               parsedName.BaseName,
+                                               parsedName.ArgumentLabels, params,
                                                isInitializer,
                                                /*hasCustomName=*/true);
       }
