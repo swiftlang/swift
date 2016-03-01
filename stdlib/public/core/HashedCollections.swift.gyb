@@ -3965,6 +3965,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   /// element exists.
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
+  @inline(__always)
   public mutating func next() -> ${SequenceType}? {
     if _fastPath(_guaranteedNative) {
       return _nativeNext()
