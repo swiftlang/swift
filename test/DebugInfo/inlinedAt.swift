@@ -2,19 +2,19 @@
 // RUN:    | FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | FileCheck %s
 
-#line 100 "abc.swift"
+#setline 100 "abc.swift"
 @inline(__always)
 func h(k : Int) -> Int {        // 101
   return k                      // 102
 }
 
-#line 200 "abc.swift"
+#setline 200 "abc.swift"
 @inline(__always)
 func g(j : Int) -> Int {        // 201
   return h(j)                   // 202
 }
 
-#line 301 "abc.swift"
+#setline 301 "abc.swift"
 public func f(i : Int) -> Int { // 301
   return g(i)                   // 302
 }
