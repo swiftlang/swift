@@ -189,10 +189,8 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   // Split up operations on stack-allocated aggregates (struct, tuple).
   PM.addSROA();
 
-  // Promote stack allocations to values and eliminate redundant
-  // loads.
+  // Promote stack allocations to values.
   PM.addMem2Reg();
-  PM.addRedundantLoadElimination();
 
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
@@ -217,7 +215,12 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
       break;
   }
 
+  // Promote stack allocations to values and eliminate redundant
+  // loads.
   PM.addMem2Reg();
+  PM.addRedundantLoadElimination();
+  //  Do a round of CFG simplification, followed by peepholes, then
+  //  more CFG simplification.
   AddSimplifyCFGSILCombine(PM);
 
   PM.addPerformanceConstantPropagation();
