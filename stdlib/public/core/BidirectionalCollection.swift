@@ -44,7 +44,7 @@ extension BidirectionalCollection {
       return _advanceForward(i, by: n)
     }
     var i = i
-    for var offset: IndexDistance = n; offset != 0; offset = offset + 1 {
+    for _ in 0..<(-n) {
       _previousInPlace(&i)
     }
     return i
@@ -56,9 +56,11 @@ extension BidirectionalCollection {
       return _advanceForward(i, by: n, limit: limit)
     }
     var i = i
-    for var offset: IndexDistance = n; offset != 0 && i != limit;
-      offset = offset + 1 {
-        _previousInPlace(&i)
+    for _ in 0..<(-n) {
+      if (limit == i) {
+        break;
+      }
+      _previousInPlace(&i)
     }
     return i
   }

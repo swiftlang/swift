@@ -353,7 +353,7 @@ extension Collection {
       "Only BidirectionalCollections can be advanced by a negative amount")
     
     var i = i
-    for var offset: IndexDistance = 0; offset != n; offset = offset + 1 {
+    for _ in 0..<n {
       _nextInPlace(&i)
     }
     return i
@@ -368,7 +368,10 @@ extension Collection {
       "Only BidirectionalCollections can be advanced by a negative amount")
     
     var i = i
-    for var offset: IndexDistance = 0; offset != n && i != limit; offset = offset + 1 {
+    for _ in 0..<n {
+      if (limit == i) {
+        break;
+      }
       _nextInPlace(&i)
     }
     return i
