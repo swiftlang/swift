@@ -28,8 +28,6 @@ class NodePointer;
 namespace swift {
 namespace reflection {
 
-class ReflectionContext;
-
 using llvm::cast;
 
 enum class TypeRefKind {
@@ -56,6 +54,9 @@ public:
 
   void dump() const;
   void dump(std::ostream &OS, unsigned Indent = 0) const;
+
+  TypeRefPointer substituteGenerics(ConstTypeRefVector &Substitutions);
+  static TypeRefPointer fromDemangleNode(Demangle::NodePointer Node);
 };
 
 class BuiltinTypeRef final : public TypeRef {
@@ -155,24 +156,24 @@ public:
 };
 
 class FunctionTypeRef final : public TypeRef {
-  TypeRefPointer Input;
+  TypeRefVector Arguments;
   TypeRefPointer Result;
 
 public:
-  FunctionTypeRef(TypeRefPointer Input, TypeRefPointer Result)
-    : TypeRef(TypeRefKind::Function), Input(Input), Result(Result) {}
+  FunctionTypeRef(TypeRefVector Arguments, TypeRefPointer Result)
+    : TypeRef(TypeRefKind::Function), Arguments(Arguments), Result(Result) {}
 
-  static std::shared_ptr<FunctionTypeRef> create(TypeRefPointer Input,
+  static std::shared_ptr<FunctionTypeRef> create(TypeRefVector Arguments,
                                                  TypeRefPointer Result) {
-    return std::make_shared<FunctionTypeRef>(Input, Result);
+    return std::make_shared<FunctionTypeRef>(Arguments, Result);
   }
 
-  TypeRefPointer getInput() {
-    return Input;
+  TypeRefVector getArguments() {
+    return Arguments;
   };
 
-  ConstTypeRefPointer getInput() const {
-    return Input;
+  ConstTypeRefVector getArguments() const {
+    return Arguments;
   };
 
   TypeRefPointer getResult() {
@@ -397,7 +398,7 @@ public:
     return TR->getKind() == TypeRefKind::ObjCClass;
   }
 };
-  
+
 class OpaqueTypeRef final : public TypeRef {
 public:
   OpaqueTypeRef() : TypeRef(TypeRefKind::Opaque) {}
@@ -495,7 +496,10 @@ public:
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
     printHeader("function");
-    printRec(F->getInput().get());
+    printField("input", "");
+    for (auto Arg : F->getArguments())
+      printRec(Arg.get());
+    printField("result", "");
     printRec(F->getResult().get());
     OS << ')';
   }
@@ -557,97 +561,117 @@ public:
     printField("name", OC->getName());
     OS << ')';
   }
-  
+
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
     OS << ')';
   }
 };
 
-TypeRefPointer decodeDemangleNode(Demangle::NodePointer Node) {
-  using NodeKind = Demangle::Node::Kind;
-  switch (Node->getKind()) {
-    case NodeKind::Type:
-      return decodeDemangleNode(Node->getChild(0));
-    case NodeKind::BoundGenericClass:
-    case NodeKind::BoundGenericEnum:
-    case NodeKind::BoundGenericStructure: {
-      auto mangledName = Demangle::mangleNode(Node->getChild(0));
-      auto genericArgs = Node->getChild(1);
-      TypeRefVector Params;
-      for (auto genericArg : *genericArgs)
-        Params.push_back(decodeDemangleNode(genericArg));
+class TypeRefSubstitution
+  : public TypeRefVisitor<TypeRefSubstitution, TypeRefPointer> {
+  ConstTypeRefVector &Substitutions;
+public:
+  TypeRefSubstitution(ConstTypeRefVector &Substitutions)
+  : Substitutions(Substitutions) {}
 
-      return BoundGenericTypeRef::create(mangledName, Params);
+  TypeRefPointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return std::make_shared<BuiltinTypeRef>(*B);
+  }
+
+  TypeRefPointer visitNominalTypeRef(const NominalTypeRef *N) {
+    return std::make_shared<NominalTypeRef>(*N);
+  }
+
+  TypeRefPointer visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    TypeRefVector GenericParams;
+    for (auto Param : BG->getGenericParams())
+      if (auto Substituted = visit(Param.get()))
+        GenericParams.push_back(Substituted);
+      else return nullptr;
+    return std::make_shared<BoundGenericTypeRef>(BG->getMangledName(),
+                                                 GenericParams);
+  }
+
+  TypeRefPointer visitTupleTypeRef(const TupleTypeRef *T) {
+    TypeRefVector Elements;
+    for (auto Element : T->getElements()) {
+      if (auto SubstitutedElement = visit(Element.get()))
+        Elements.push_back(SubstitutedElement);
+      else
+        return nullptr;
     }
-    case NodeKind::Class:
-    case NodeKind::Enum:
-    case NodeKind::Structure: {
-      auto mangledName = Demangle::mangleNode(Node);
-      return NominalTypeRef::create(mangledName);
-    }
-    case NodeKind::BuiltinTypeName: {
-      auto mangledName = Demangle::mangleNode(Node);
-      return BuiltinTypeRef::create(mangledName);
-    }
-    case NodeKind::ExistentialMetatype: {
-      auto instance = decodeDemangleNode(Node->getChild(0));
-      return ExistentialMetatypeTypeRef::create(instance);
-    }
-    case NodeKind::Metatype: {
-      auto instance = decodeDemangleNode(Node->getChild(0));
-      return MetatypeTypeRef::create(instance);
-    }
-    case NodeKind::Protocol: {
-      auto moduleName = Node->getChild(0)->getText();
-      auto name = Node->getChild(1)->getText();
-      return ProtocolTypeRef::create(moduleName, name);
-    }
-    case NodeKind::DependentGenericParamType: {
-      auto depth = Node->getChild(0)->getIndex();
-      auto index = Node->getChild(1)->getIndex();
-      return GenericTypeParameterTypeRef::create(index, depth);
-    }
-    case NodeKind::FunctionType: {
-      auto input = decodeDemangleNode(Node->getChild(0));
-      auto result = decodeDemangleNode(Node->getChild(1));
-      return FunctionTypeRef::create(input, result);
-    }
-    case NodeKind::ArgumentTuple:
-      return decodeDemangleNode(Node->getChild(0));
-    case NodeKind::ReturnType:
-      return decodeDemangleNode(Node->getChild(0));
-    case NodeKind::NonVariadicTuple: {
-      TypeRefVector Elements;
-      for (auto element : *Node)
-        Elements.push_back(decodeDemangleNode(element));
-      return TupleTypeRef::create(Elements);
-    }
-    case NodeKind::TupleElement:
-      return decodeDemangleNode(Node->getChild(0));
-    case NodeKind::DependentGenericType: {
-      return decodeDemangleNode(Node->getChild(1));
-    }
-    case NodeKind::DependentMemberType: {
-      auto member = decodeDemangleNode(Node->getChild(0));
-      auto base = decodeDemangleNode(Node->getChild(1));
-      return DependentMemberTypeRef::create(member, base);
-    }
-    case NodeKind::DependentAssociatedTypeRef:
-      return AssociatedTypeRef::create(Node->getText());
-    default:
+    return std::make_shared<TupleTypeRef>(Elements);
+  }
+
+  TypeRefPointer visitFunctionTypeRef(const FunctionTypeRef *F) {
+    TypeRefVector SubstitutedArguments;
+    for (auto Argument : F->getArguments())
+      if (auto SubstitutedArgument = visit(Argument.get()))
+        SubstitutedArguments.push_back(SubstitutedArgument);
+      else
+        return nullptr;
+
+    auto SubstitutedResult = visit(F->getResult().get());
+    if (!SubstitutedResult)
+      return nullptr;
+
+    return std::make_shared<FunctionTypeRef>(SubstitutedArguments,
+                                             SubstitutedResult);
+  }
+
+  TypeRefPointer visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return std::make_shared<ProtocolTypeRef>(*P);
+  }
+
+  TypeRefPointer
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return std::make_shared<ProtocolCompositionTypeRef>(*PC);
+  }
+
+  TypeRefPointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    if (auto SubstitutedInstance = visit(M->getInstanceType().get()))
+      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
+    else
       return nullptr;
   }
-}
 
-void TypeRef::dump() const {
-  dump(std::cerr);
-}
+  TypeRefPointer
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    if (auto SubstitutedInstance = visit(EM->getInstanceType().get()))
+      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
+    else
+      return nullptr;
+  }
 
-void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
-  PrintTypeRef(OS, Indent).visit(this);
-  OS << "\n";
-}
+  TypeRefPointer
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
+    if (GTP->getIndex() < Substitutions.size())
+      return Substitutions[GTP->getIndex()];
+    return nullptr;
+  }
+
+  TypeRefPointer
+  visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    return std::make_shared<DependentMemberTypeRef>(*DM);
+  }
+
+  TypeRefPointer visitAssociatedTypeRef(const AssociatedTypeRef *AT) {
+    return std::make_shared<AssociatedTypeRef>(*AT);
+  }
+
+  TypeRefPointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return std::make_shared<ForeignClassTypeRef>(*F);
+  }
+
+  TypeRefPointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return std::make_shared<ObjCClassTypeRef>(*OC);
+  }
+
+  TypeRefPointer visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+    return std::make_shared<OpaqueTypeRef>(*Op);
+  }
+};
 
 } // end namespace reflection
 } // end namespace swift

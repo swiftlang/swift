@@ -39,6 +39,12 @@ enum class MetadataKind : uint32_t {
 #include "MetadataKind.def"
 };
 
+template <typename StoredPointer>
+bool metadataKindIsClass(StoredPointer Kind) {
+  return Kind > static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_End) ||
+      Kind < static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_Start);
+}
+
 /// Kinds of Swift nominal type descriptor records.
 enum class NominalTypeKind : uint32_t {
 #define NOMINALTYPEMETADATAKIND(name, value) name = value,

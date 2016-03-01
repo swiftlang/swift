@@ -111,7 +111,7 @@ struct External {
   const StoredPointer PointerValue;
   
   template <typename T>
-  using Pointer = ExternalPointer<Runtime, T>;
+  using Pointer = StoredPointer;
   
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = StoredPointer;
@@ -1102,8 +1102,7 @@ private:
 public:
   /// Get the metadata kind.
   MetadataKind getKind() const {
-    if (Kind > static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_End) ||
-        Kind < static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_Start))
+    if (metadataKindIsClass(Kind))
       return MetadataKind::Class;
     return MetadataKind(Kind);
   }
@@ -1491,6 +1490,12 @@ struct TargetNominalTypeDescriptor {
     return GenericMetadataPatternAndKind.getInt();
   }
 
+  int32_t offsetToNameOffset() const {
+    auto NameAddress = (uint8_t *)&this->Name;
+    auto ThisAddress = (uint8_t *)this;
+    return NameAddress - ThisAddress;
+  }
+
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal
   /// type.
@@ -1513,6 +1518,7 @@ template <typename Runtime>
 struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
+  friend class ReflectionContext;
   TargetClassMetadata() = default;
   constexpr TargetClassMetadata(const TargetHeapMetadata<Runtime> &base,
              ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> superClass,
@@ -1720,6 +1726,12 @@ public:
 
     auto metadataAsWords = reinterpret_cast<const Metadata * const *>(this);
     return metadataAsWords[theClass->GenericParams.Offset - 1];
+  }
+
+  uint32_t offsetToDescriptorOffset() const {
+    auto DescriptionAddress = (uint8_t *)&this->Description;
+    auto ThisAddress = (uint8_t *)this;
+    return DescriptionAddress - ThisAddress;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1962,6 +1974,12 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
     return getter(this);
   }
 
+  StoredPointer offsetToDescriptorOffset() const {
+    auto DescriptionAddress = (uint8_t *)&this->Description;
+    auto ThisAddress = (uint8_t *)this;
+    return DescriptionAddress - ThisAddress;
+  }
+
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Struct;
   }
@@ -1997,6 +2015,12 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
     StoredSize *asWords = reinterpret_cast<StoredSize *>(this);
     asWords += offset;
     return *asWords;
+  }
+
+  StoredPointer offsetToDescriptorOffset() const {
+    auto DescriptionAddress = (uint8_t *)&this->Description;
+    auto ThisAddress = (uint8_t *)this;
+    return DescriptionAddress - ThisAddress;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -2081,11 +2105,11 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     }
   };
 
-  TargetPointer<Runtime, Element> getElements() {
+  Element *getElements() {
     return reinterpret_cast<TargetPointer<Runtime, Element>>(this + 1);
   }
 
-  TargetPointer<Runtime, const Element> getElements() const {
+  const Element *getElements() const {
     return reinterpret_cast<TargetPointer<Runtime, const Element>>(this + 1);
   }
 

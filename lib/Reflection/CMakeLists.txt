@@ -1,2 +1,3 @@
 add_swift_library(swiftReflection
-  TypeRef.cpp)
+  TypeRef.cpp
+  LINK_LIBRARIES swiftBasic)
