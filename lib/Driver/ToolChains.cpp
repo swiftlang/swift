@@ -130,6 +130,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -847,6 +848,76 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
   return II;
 }
 
+static StringRef
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
+  switch (getDarwinPlatformKind(triple)) {
+  case DarwinPlatformKind::MacOS:
+    return "osx";
+  case DarwinPlatformKind::IPhoneOS:
+    return "ios";
+  case DarwinPlatformKind::IPhoneOSSimulator:
+    return "iossim";
+  case DarwinPlatformKind::TvOS:
+    return "tvos";
+  case DarwinPlatformKind::TvOSSimulator:
+    return "tvossim";
+  case DarwinPlatformKind::WatchOS:
+    return "watchos";
+  case DarwinPlatformKind::WatchOSSimulator:
+    return "watchossim";
+  }
+  llvm_unreachable("Unsupported Darwin platform");
+}
+
+static void
+addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
+                           StringRef DarwinLibName, bool AddRPath,
+                           const ToolChain &TC) {
+  SmallString<128> Dir;
+  getRuntimeLibraryPath(Dir, Args, TC);
+  // Remove platform name.
+  llvm::sys::path::remove_filename(Dir);
+  llvm::sys::path::append(Dir, "clang", "lib", "darwin");
+  SmallString<128> P(Dir);
+  llvm::sys::path::append(P, DarwinLibName);
+  Arguments.push_back(Args.MakeArgString(P));
+
+  // Adding the rpaths might negatively interact when other rpaths are involved,
+  // so we should make sure we add the rpaths last, after all user-specified
+  // rpaths. This is currently true from this place, but we need to be
+  // careful if this function is ever called before user's rpaths are emitted.
+  if (AddRPath) {
+    assert(DarwinLibName.endswith(".dylib") && "must be a dynamic library");
+
+    // Add @executable_path to rpath to support having the dylib copied with
+    // the executable.
+    Arguments.push_back("-rpath");
+    Arguments.push_back("@executable_path");
+
+    // Add the path to the resource dir to rpath to support using the dylib
+    // from the default location without copying.
+    Arguments.push_back("-rpath");
+    Arguments.push_back(Args.MakeArgString(Dir));
+  }
+}
+
+static void
+addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
+                                 ArgStringList &Arguments,
+                                 StringRef Sanitizer, const ToolChain &TC) {
+  // Sanitizer runtime libraries requires C++.
+  Arguments.push_back("-lc++");
+  // Add explicit dependcy on -lc++abi, as -lc++ doesn't re-export
+  // all RTTI-related symbols that are used.
+  Arguments.push_back("-lc++abi");
+
+  addLinkRuntimeLibForDarwin(Args, Arguments,
+                    (Twine("libclang_rt.") + Sanitizer + "_" +
+                     getDarwinLibraryNameSuffixForTriple(TC.getTriple()) +
+                     "_dynamic.dylib").str(),
+                     /*AddRPath*/ true, TC);
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const {
@@ -953,6 +1024,12 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     // compiler itself changes.
     Arguments.push_back("-application_extension");
   }
+
+  // Liking in sanitizers will add rpaths, which might negatively interact when
+  // other rpaths are involved, so we should make sure we add the rpaths after
+  // all user-specified rpaths.
+  if (context.OI.SelectedSanitizer == SanitizerKind::Address)
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
