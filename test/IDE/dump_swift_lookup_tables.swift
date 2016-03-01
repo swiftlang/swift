@@ -27,8 +27,12 @@
 // CHECK-NEXT:     TU: __swift
 // CHECK-NEXT:   adding:
 // CHECK-NEXT:     SNSomeStruct: SNAdding
+// CHECK-NEXT:   defaultValue:
+// CHECK-NEXT:     SNSomeStruct: SNSomeStructGetDefault, SNSomeStructSetDefault
 // CHECK-NEXT:   defaultX:
 // CHECK-NEXT:     SNSomeStruct: DefaultXValue
+// CHECK-NEXT:   foo:
+// CHECK-NEXT:     SNSomeStruct: SNSomeStructGetFoo, SNSomeStructSetFoo
 // CHECK-NEXT:   init:
 // CHECK-NEXT:     SNSomeStruct: SNCreate
 // CHECK-NEXT:   makeSomeStruct:

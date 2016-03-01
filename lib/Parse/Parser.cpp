@@ -853,6 +853,18 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
   std::tie(baseName, parameters) = name.split('(');
   if (parameters.empty()) return ParsedDeclName();
 
+  // If the base name is prefixed by "getter:" or "setter:", it's an
+  // accessor.
+  if (baseName.startswith("getter:")) {
+    result.IsGetter = true;
+    result.IsFunctionName = false;
+    baseName = baseName.substr(7);
+  } else if (baseName.startswith("setter:")) {
+    result.IsSetter = true;
+    result.IsFunctionName = false;
+    baseName = baseName.substr(7);
+  }
+
   // Parse the base name.
   if (parseBaseName(baseName)) return ParsedDeclName();
 
@@ -880,6 +892,10 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
       result.ArgumentLabels.push_back(NextParam);
     }
   } while (!parameters.empty());
+
+  // Drop the argument labels for a property accessor; they aren't used.
+  if (result.isPropertyAccessor())
+    result.ArgumentLabels.clear();
 
   return result;
 }

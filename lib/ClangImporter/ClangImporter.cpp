@@ -728,7 +728,7 @@ void ClangImporter::Implementation::addEntryToLookupTable(
       table.addEntry(importedName.Alias, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
-    if (importedName.IsSubscriptAccessor)
+    if (importedName.isSubscriptAccessor())
       table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
@@ -2035,7 +2035,7 @@ auto ClangImporter::Implementation::importFullName(
     auto method = dyn_cast<clang::ObjCMethodDecl>(D);
     if (method) {
       unsigned initPrefixLength;
-      if (parsedName.BaseName == "init") {
+      if (parsedName.BaseName == "init" && parsedName.IsFunctionName) {
         if (!shouldImportAsInitializer(method, initPrefixLength,
                                        result.InitKind)) {
           // We cannot import this as an initializer anyway.
@@ -2066,7 +2066,13 @@ auto ClangImporter::Implementation::importFullName(
         result.EffectiveContext = parsedName.ContextName;
       }
 
-      if (method) {
+      // Map property getters/setters.
+      if (parsedName.IsGetter)
+        result.AccessorKind = ImportedAccessorKind::PropertyGetter;
+      else if (parsedName.IsSetter)
+        result.AccessorKind = ImportedAccessorKind::PropertySetter;
+
+      if (method && parsedName.IsFunctionName) {
         // Get the parameters.
         ArrayRef<const clang::ParmVarDecl *> params{
           method->param_begin(),
@@ -2075,11 +2081,11 @@ auto ClangImporter::Implementation::importFullName(
 
         result.ErrorInfo = considerErrorImport(*this, method,
                                                parsedName.BaseName,
-                                               parsedName.ArgumentLabels, params,
+                                               parsedName.ArgumentLabels,
+                                               params,
                                                isInitializer,
                                                /*hasCustomName=*/true);
       }
-
 
       return result;
     }
@@ -2228,16 +2234,18 @@ auto ClangImporter::Implementation::importFullName(
 
     // Is this one of the accessors for subscripts?
     if (objcMethod->getMethodFamily() == clang::OMF_None &&
-        objcMethod->isInstanceMethod() &&
-        (isNonNullarySelector(objcMethod->getSelector(),
-                              { "objectAtIndexedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "setObject", "atIndexedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "objectForKeyedSubscript" }) ||
-         isNonNullarySelector(objcMethod->getSelector(),
-                              { "setObject", "forKeyedSubscript" })))
-      result.IsSubscriptAccessor = true;
+        objcMethod->isInstanceMethod()) {
+      if (isNonNullarySelector(objcMethod->getSelector(),
+                               { "objectAtIndexedSubscript" }) ||
+          isNonNullarySelector(objcMethod->getSelector(),
+                               { "objectForKeyedSubscript" }))
+        result.AccessorKind = ImportedAccessorKind::SubscriptGetter;
+      else if (isNonNullarySelector(objcMethod->getSelector(),
+                                    { "setObject", "atIndexedSubscript" }) ||
+               isNonNullarySelector(objcMethod->getSelector(),
+                                    { "setObject", "forKeyedSubscript" }))
+        result.AccessorKind = ImportedAccessorKind::SubscriptSetter;
+    }
 
     break;
   }
@@ -2391,7 +2399,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
-  if (OmitNeedlessWords && !result.IsSubscriptAccessor) {
+  if (OmitNeedlessWords && !result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
     // module prefix. If so, strip that prefix off when present.
     if (D->getDeclContext()->getRedeclContext()->isFileContext() &&

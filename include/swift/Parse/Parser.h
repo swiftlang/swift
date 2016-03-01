@@ -1245,9 +1245,22 @@ struct ParsedDeclName {
   /// Whether this is a function name (vs. a value name).
   bool IsFunctionName = false;
 
+  /// Whether this is a getter for the named property.
+  bool IsGetter = false;
+
+  /// Whether this is a setter for the named property.
+  bool IsSetter = false;
+
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
   Optional<unsigned> SelfIndex;
+
+  /// Determine whether this is a valid name.
+  explicit operator bool() const { return !BaseName.empty(); }
+
+  /// Whether this declaration name turns the declaration into a
+  /// member of some named context.
+  bool isMember() const { return !ContextName.empty(); }
 
   /// Whether the result is translated into an instance member.
   bool isInstanceMember() const {
@@ -1259,12 +1272,8 @@ struct ParsedDeclName {
     return isMember() && !static_cast<bool>(SelfIndex);
   }
 
-  /// Determine whether this is a valid name.
-  explicit operator bool() const { return !BaseName.empty(); }
-
-  /// Whether this declaration name turns the declaration into a
-  /// member of some named context.
-  bool isMember() const { return !ContextName.empty(); }
+  /// Whether this is a property accessor.
+  bool isPropertyAccessor() const { return IsGetter || IsSetter; }
 
   /// Form a declaration name from this parsed declaration name.
   DeclName formDeclName(ASTContext &ctx) const;

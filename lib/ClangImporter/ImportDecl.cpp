@@ -3067,7 +3067,7 @@ namespace {
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-        if (importedName.IsSubscriptAccessor) {
+        if (importedName.isSubscriptAccessor()) {
           // If this was a subscript accessor, try to create a
           // corresponding subscript declaration.
           (void)importSubscript(result, decl);
