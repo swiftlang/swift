@@ -1820,7 +1820,90 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   return f;
 }
 
-SILFunction * SILGenModule::
+namespace {
+
+/// Emit a default witness table for a resilient protocol definition.
+class SILGenDefaultWitnessTable
+    : public SILGenWitnessTable<SILGenDefaultWitnessTable> {
+  using super = SILGenWitnessTable<SILGenDefaultWitnessTable>;
+
+public:
+  SILGenModule &SGM;
+  ProtocolDecl *Proto;
+  SILLinkage Linkage;
+
+  SmallVector<SILDefaultWitnessTable::Entry, 8> DefaultWitnesses;
+
+  SILGenDefaultWitnessTable(SILGenModule &SGM, ProtocolDecl *proto)
+      : SGM(SGM), Proto(proto), Linkage(SILLinkage::Public) { }
+
+  void addMissingDefault() {
+    DefaultWitnesses.push_back(SILDefaultWitnessTable::Entry());
+  }
+
+  void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+    addMissingDefault();
+  }
+
+  void addMethod(FuncDecl *fd) {
+    ConcreteDeclRef witness = Proto->getDefaultWitness(fd);
+    if (!witness) {
+      addMissingDefault();
+      return;
+    }
+
+    super::addMethod(fd, witness);
+  }
+
+  void addConstructor(ConstructorDecl *cd) {
+    ConcreteDeclRef witness = Proto->getDefaultWitness(cd);
+    if (!witness) {
+      addMissingDefault();
+      return;
+    }
+
+    super::addConstructor(cd, witness);
+  }
+
+  void addMethod(SILDeclRef requirementRef,
+                 SILDeclRef witnessRef,
+                 IsFreeFunctionWitness_t isFree,
+                 ArrayRef<Substitution> witnessSubs) {
+    SILFunction *witnessFn = SGM.emitProtocolWitness(nullptr, Linkage,
+                                                     requirementRef, witnessRef,
+                                                     isFree, witnessSubs);
+    auto entry = SILDefaultWitnessTable::Entry(requirementRef, witnessFn);
+    DefaultWitnesses.push_back(entry);
+  }
+
+  void addAssociatedType(AssociatedTypeDecl *ty,
+                         ArrayRef<ProtocolDecl *> protos) {
+    // Add a dummy entry for the metatype itself, and then for each conformance.
+    addMissingDefault();
+
+    for (auto *protocol : protos) {
+      // Only reference the witness if the protocol requires it.
+      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+        continue;
+
+      addMissingDefault();
+    }
+  }
+};
+
+}
+
+void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
+  SILDefaultWitnessTable *defaultWitnesses =
+      M.createDefaultWitnessTableDeclaration(protocol);
+
+  SILGenDefaultWitnessTable builder(*this, protocol);
+  builder.visitProtocolDecl(protocol);
+
+  defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
+}
+
+SILFunction *SILGenModule::
 getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
                               CanSILFunctionType thunkType,
                               CanSILFunctionType fromType,
