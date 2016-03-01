@@ -1887,7 +1887,7 @@
         key.usr: "s:FC8__main__2CCcFT_S0_",
         key.offset: 252,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.constructor><decl.name>init</decl.name>()</decl.function.constructor>"
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
       }
     ]
   },
@@ -2257,7 +2257,7 @@
         key.usr: "s:iC8__main__3CC29subscriptFSiSi",
         key.offset: 1111,
         key.length: 95,
-        key.fully_annotated_decl: "<decl.function.subscript><decl.name>subscript</decl.name>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { get set }</decl.function.subscript>",
+        key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { get set }</decl.function.subscript>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,

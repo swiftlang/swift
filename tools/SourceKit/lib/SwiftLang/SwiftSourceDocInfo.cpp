@@ -82,6 +82,11 @@ static StringRef getDeclNameTagForDecl(const Decl *D) {
     // When we're examining the parameter itself, it is the local name that is
     // the name of the variable.
     return LocalParamNameTag;
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Subscript:
+    // The names 'init'/'deinit'/'subscript' are actually keywords.
+    return "syntaxtype.keyword";
   default:
     return "decl.name";
   }
