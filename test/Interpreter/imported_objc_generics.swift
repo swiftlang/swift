@@ -87,13 +87,14 @@ ImportedObjCGenerics.test("SwiftGenerics") {
   expectEqual(NSNumber(integer: 22), openArbitraryContainer(subNumContainer))
 }
 
-// TODO: resolve crash in IRGen from test case below
-/*func makeContainer<T: AnyObject>(x: T) -> Container<T> {*/
-  /*return Container(object: x)*/
-/*}*/
-
 ImportedObjCGenerics.test("SwiftGenerics/Creation") {
-  // TODO: Test above.
+  func makeContainer<T: AnyObject>(x: T) -> Container<T> {
+    return Container(object: x)
+  }
+
+  // TODO: fix IRGen failure below
+  //let c = makeContainer(NSNumber(integer: 22))
+  //expectEqual(NSNumber(integer: 22), c.object)
 }
 
 ImportedObjCGenerics.test("ProtocolConstraints") {
