@@ -1118,8 +1118,8 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
   // a predecessor block but not in the frontier block itself.
   llvm::SmallSetVector<SILBasicBlock *, 16> FrontierBlocks;
 
-  // Blocks where the value is live somewhere inside the block but not at the
-  // end of the block.
+  // Blocks where the value is live at the end of the block and which have
+  // a frontier block as successor.
   llvm::SmallSetVector<SILBasicBlock *, 16> LiveOutBlocks;
 
   /// The lifetime ends if we have a live block and a not-live successor.
@@ -1139,7 +1139,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
       // the last use is part of the frontier.
       SILBasicBlock::iterator Iter(findLastUserInBlock(BB));
       Fr.push_back(&*next(Iter));
-    } else if (DeadInSucc) {
+    } else if (DeadInSucc && mode != IgnoreExitEdges) {
       // The value is not live in some of the successor blocks.
       LiveOutBlocks.insert(BB);
       for (const SILSuccessor &Succ : BB->getSuccessors()) {
