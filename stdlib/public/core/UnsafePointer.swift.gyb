@@ -573,6 +573,16 @@ extension ${Self} {
   public func initialize(newvalue: Pointee) {
     fatalError("unavailable function can't be called")
   }
+
+  @available(*, unavailable, renamed="deinitialize(count:)")
+  public func destroy() {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="deinitialize(count:)")
+  public func destroy(count: Int) {
+    fatalError("unavailable function can't be called")
+  }
 }
 % end # for mutable
 
