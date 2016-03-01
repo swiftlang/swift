@@ -114,7 +114,13 @@ class ConsumedReturnValueToEpilogueRetainMatcher {
 public:
   enum class ExitKind { Return, Throw };
 
-  enum class FindRetainKind { None, Found, Blocked };
+  /// The state on how retains are found in a basic block.
+  enum class FindRetainKind { 
+    None,      ///< Did not find a retain.
+    Found,     ///< Found a retain.
+    Recursion, ///< Found a retain and its due to self-recursion.
+    Blocked    ///< Found a blocking instructions, i.e. MayDecrement.
+  };
 
   using RetainKindValue = std::pair<FindRetainKind, SILInstruction *>;
 
