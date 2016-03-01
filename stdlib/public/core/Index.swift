@@ -169,7 +169,7 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// - Precondition:
   ///   - `start` and `end` are part of the same sequence when conforming to
-  ///     `RandomAccessSequenceType`.
+  ///     `RandomAccessIndex`.
   ///   - `end` is reachable from `self` by incrementation otherwise.
   ///
   /// - Complexity:
