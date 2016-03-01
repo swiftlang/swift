@@ -203,7 +203,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
-    build-jobs ""                                "The number of parallel build jobs to use"
+    build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
@@ -226,6 +226,37 @@ function join_array_with_delimiter() {
 function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
 }
+
+function num_llvm_parallel_lto_link_jobs() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
+            # the formula GB Memory/3.5GB to get the number of parallel link
+            # threads we can support.
+            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000.0/3.5 | bc
+        ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
+function num_swift_parallel_lto_link_jobs() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
+            # the formula GB Memory/6GB to get the number of parallel link
+            # threads we can support.
+            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000/6.0 | bc
+        ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
 
 function set_deployment_target_based_options() {
     llvm_cmake_options=()
@@ -438,7 +469,7 @@ function set_deployment_target_based_options() {
 		    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
-		    "-DLLVM_PARALLEL_LINK_JOBS=5"
+		    "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
 		)
 	    fi
 
@@ -448,6 +479,7 @@ function set_deployment_target_based_options() {
                         "${swift_cmake_options[@]}"
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
                     )
                 fi
             fi
