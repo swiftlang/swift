@@ -103,6 +103,13 @@ func refEnumElements() {
   let z: E3 = .C
 }
 
+class C4 {
+  static var v1: Int = 0
+  final class var v2: Int = 0
+  static func f1() {}
+  final class func f2() {}
+}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -415,3 +422,21 @@ func refEnumElements() {
 // CHECK47-NEXT: T.Type
 // CHECK47-NEXT: <Declaration>T</Declaration>
 // CHECK47-NEXT: <decl.generic_type_param><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>
+
+// RUN: %sourcekitd-test -req=cursor -pos=107:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK48
+// CHECK48: source.lang.swift.decl.var.static (107:14-107:16)
+// CHECK48: <decl.var.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword>
+
+// RUN: %sourcekitd-test -req=cursor -pos=108:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK49
+// CHECK49: source.lang.swift.decl.var.class (108:19-108:21)
+// CHECK49: <decl.var.class>final <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword>
+// FIXME: missing tags on 'final'
+
+// RUN: %sourcekitd-test -req=cursor -pos=109:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK50
+// CHECK50: source.lang.swift.decl.function.method.static (109:15-109:19)
+// CHECK50: <decl.function.method.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword>
+
+// RUN: %sourcekitd-test -req=cursor -pos=110:20 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK51
+// CHECK51: source.lang.swift.decl.function.method.class (110:20-110:24)
+// CHECK51: <decl.function.method.class>final <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword>
+// FIXME: missing tags on 'final'

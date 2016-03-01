@@ -1592,7 +1592,10 @@ ERROR(attr_only_only_one_decl_kind,none,
 
 
 ERROR(override_final,none,
-      "%0 overrides a 'final' %0", (DescriptiveDeclKind))
+      "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
+
+ERROR(override_static,none,
+      "cannot override %0", (DescriptiveDeclKind))
 
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",

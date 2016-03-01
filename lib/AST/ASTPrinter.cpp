@@ -831,10 +831,33 @@ public:
 };
 } // unnamed namespace
 
+static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    return VD->getCorrectStaticSpelling();
+  } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    return PBD->getCorrectStaticSpelling();
+  } else if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    return FD->getCorrectStaticSpelling();
+  } else {
+    return StaticSpellingKind::None;
+  }
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
+
+  // Don't print a redundant 'final' if we are printing a 'static' decl.
+  unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
+  if (Options.PrintImplicitAttrs &&
+      D->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
+    Options.ExcludeAttrList.push_back(DAK_Final);
+  }
+
   D->getAttrs().print(Printer, Options);
+
+  Options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP) {

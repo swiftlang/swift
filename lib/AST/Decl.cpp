@@ -952,14 +952,17 @@ SourceRange PatternBindingDecl::getSourceRange() const {
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
-  if (D->getDeclContext()->getAsClassOrClassExtensionContext())
-    return StaticSpellingKind::KeywordClass;
-  return StaticSpellingKind::KeywordStatic;
+  if (!D->getDeclContext()->getAsClassOrClassExtensionContext())
+    return StaticSpellingKind::KeywordStatic;
+
+  return StaticSpellingKind::KeywordClass;
 }
 
 StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (getStaticSpelling() != StaticSpellingKind::None)
+    return getStaticSpelling();
 
   return getCorrectStaticSpellingForDecl(this);
 }
@@ -3351,6 +3354,10 @@ bool VarDecl::isAnonClosureParam() const {
 StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (auto *PBD = getParentPatternBinding()) {
+    if (PBD->getStaticSpelling() != StaticSpellingKind::None)
+      return PBD->getStaticSpelling();
+  }
 
   return getCorrectStaticSpellingForDecl(this);
 }
@@ -4079,6 +4086,8 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   assert(getDeclContext()->isTypeContext());
   if (!isStatic())
     return StaticSpellingKind::None;
+  if (getStaticSpelling() != StaticSpellingKind::None)
+    return getStaticSpelling();
 
   return getCorrectStaticSpellingForDecl(this);
 }
