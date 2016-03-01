@@ -333,16 +333,16 @@ internal struct _Stdout : OutputStreamType {
     if string.isEmpty { return }
 
     if string._core.isASCII {
-        let result = _swift_stdlib_fwrite_stdout(
-            UnsafePointer(string._core.startASCII), string._core.count, 1)
-        if result != 1 {
-            fatalError("fwrite() returned \(result), expected 1")
-        }
-        return
+      let result = _swift_stdlib_fwrite_stdout(
+        UnsafePointer(string._core.startASCII), string._core.count, 1)
+      if result != 1 {
+        fatalError("fwrite() returned \(result), expected 1")
+      }
+      return
     }
 
     for c in string.utf8 {
-        _swift_stdlib_putchar_unlocked(Int32(c))
+      _swift_stdlib_putchar_unlocked(Int32(c))
     }
   }
 }

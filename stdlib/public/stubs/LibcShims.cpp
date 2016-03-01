@@ -31,7 +31,7 @@ void _swift_stdlib_free(void *ptr) { free(ptr); }
 int _swift_stdlib_putchar_unlocked(int c) { return putchar_unlocked(c); }
 
 __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
-		__swift_size_t nitems) {
+                                           __swift_size_t nitems) {
   return fwrite(ptr, size, nitems, stdout);
 }
 
