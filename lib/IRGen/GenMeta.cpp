@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements IR generation for metadata constructs like
-//  metatypes and modules.  These is presently always trivial, but in
-//  the future we will likely have some sort of physical
-//  representation for at least some metatypes.
+//  This file implements IR generation for type metadata constructs.
 //
 //===----------------------------------------------------------------------===//
 
