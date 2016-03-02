@@ -1,3 +1,4 @@
+// REQUIRES: objc_interop
 // RUN: %target-swift-ide-test -syntax-coloring -playground -source-filename %s | FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -playground -typecheck -source-filename %s | FileCheck %s
 
