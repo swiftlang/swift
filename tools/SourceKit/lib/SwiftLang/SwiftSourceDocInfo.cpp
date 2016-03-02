@@ -76,6 +76,14 @@ static StringRef getTagForPrintNameContext(PrintNameContext context) {
   }
 }
 
+static StringRef getTagForParameter(PrintParameterKind context) {
+  switch (context) {
+  case PrintParameterKind::FunctionParameter:
+    return "decl.var.parameter";
+  }
+  llvm_unreachable("unexpected parameter kind");
+}
+
 static StringRef getDeclNameTagForDecl(const Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Param:
@@ -91,6 +99,43 @@ static StringRef getDeclNameTagForDecl(const Decl *D) {
     return "decl.name";
   }
 }
+
+namespace {
+/// A typesafe union of contexts that the printer can be inside.
+/// Currently: Decl, PrintParameterKind
+class PrintContext {
+  // Use the low bit to determine the type; store the enum value shifted left
+  // to leave the low bit free.
+  const uintptr_t value;
+  static constexpr unsigned declTag = 0;
+  static constexpr unsigned printParameterKindTag = 1;
+  static constexpr unsigned tagMask = 1;
+  bool hasTag(unsigned tag) const { return (value & tagMask) == tag; }
+
+public:
+  PrintContext(const Decl *D) : value(uintptr_t(D)) {
+    static_assert(llvm::PointerLikeTypeTraits<Decl *>::NumLowBitsAvailable > 0,
+                  "missing spare bit in Decl *");
+  }
+  PrintContext(PrintParameterKind K) : value((uintptr_t(K) << 1) | 1) {}
+
+  /// Get the context as a Decl, or nullptr.
+  const Decl *getDecl() const {
+    return hasTag(declTag) ? (const Decl *)value : nullptr;
+  }
+  /// Get the context as a PrintParameterKind, or None.
+  Optional<PrintParameterKind> getPrintParameterKind() const {
+    if (!hasTag(printParameterKindTag))
+      return None;
+    return PrintParameterKind(value >> 1);
+  }
+  /// Whether this is a PrintParameterKind context of the given \p kind.
+  bool is(PrintParameterKind kind) const {
+    auto storedKind = getPrintParameterKind();
+    return storedKind && *storedKind == kind;
+  }
+};
+} // end anonymous namespace
 
 /// An ASTPrinter for annotating declarations with XML tags that describe the
 /// key substructure of the declaration for CursorInfo/DocInfo.
@@ -119,12 +164,12 @@ private:
   // MARK: The ASTPrinter callback interface.
 
   void printDeclPre(const Decl *D) override {
-    DeclStack.emplace_back(D);
+    contextStack.emplace_back(PrintContext(D));
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
   void printDeclPost(const Decl *D) override {
-    assert(DeclStack.back() == D && "unmatched printDeclPre");
-    DeclStack.pop_back();
+    assert(contextStack.back().getDecl() == D && "unmatched printDeclPre");
+    contextStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
   }
 
@@ -136,14 +181,24 @@ private:
   }
 
   void printTypePre(const TypeLoc &TL) override {
-    auto tag = getTypeTagForCurrentDecl();
+    auto tag = getTypeTagForCurrentContext();
     if (!tag.empty())
       openTag(tag);
   }
   void printTypePost(const TypeLoc &TL) override {
-    auto tag = getTypeTagForCurrentDecl();
+    auto tag = getTypeTagForCurrentContext();
     if (!tag.empty())
       closeTag(tag);
+  }
+
+  void printParameterPre(PrintParameterKind kind) override {
+    contextStack.emplace_back(PrintContext(kind));
+    openTag(getTagForParameter(kind));
+  }
+  void printParameterPost(PrintParameterKind kind) override {
+    assert(contextStack.back().is(kind) && "unmatched printParameterPre");
+    contextStack.pop_back();
+    closeTag(getTagForParameter(kind));
   }
 
   void printNamePre(PrintNameContext context) override {
@@ -173,31 +228,33 @@ private:
 
   // MARK: Misc.
 
-  StringRef getTypeTagForCurrentDecl() const {
-    if (const Decl *D = currentDecl()) {
-      switch (D->getKind()) {
-      case DeclKind::Param:
-        return "decl.var.parameter.type";
-      case DeclKind::Var:
-        return "decl.var.type";
-      case DeclKind::Subscript:
-      case DeclKind::Func:
-        return "decl.function.returntype";
-      default:
-        break;
-      }
-    }
-    return "";
-  }
+  StringRef getTypeTagForCurrentContext() const {
+    if (contextStack.empty())
+      return "";
 
-  const Decl *currentDecl() const {
-    return DeclStack.empty() ? nullptr : DeclStack.back();
+    static StringRef parameterTypeTag = "decl.var.parameter.type";
+
+    auto context = contextStack.back();
+    if (context.is(PrintParameterKind::FunctionParameter))
+      return parameterTypeTag;
+    assert(context.getDecl() && "unexpected context kind");
+    switch (context.getDecl()->getKind()) {
+    case DeclKind::Param:
+      return parameterTypeTag;
+    case DeclKind::Var:
+      return "decl.var.type";
+    case DeclKind::Subscript:
+    case DeclKind::Func:
+      return "decl.function.returntype";
+    default:
+      return "";
+    }
   }
 
 private:
-  /// A stack of declarations being printed, used to determine the context for
-  /// other ASTPrinter callbacks.
-  llvm::SmallVector<const Decl *, 3> DeclStack;
+  /// A stack of contexts being printed, used to determine the context for
+  /// subsequent ASTPrinter callbacks.
+  llvm::SmallVector<PrintContext, 3> contextStack;
 };
 
 static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {

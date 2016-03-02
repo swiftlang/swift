@@ -1881,8 +1881,8 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
-  Printer.callPrintDeclPre(param);
-  defer { Printer.callPrintDeclPost(param); };
+  Printer.printParameterPre(PrintParameterKind::FunctionParameter);
+  defer { Printer.printParameterPost(PrintParameterKind::FunctionParameter); };
 
   auto printArgName = [&]() {
     // Print argument name.

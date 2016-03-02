@@ -43,6 +43,15 @@ enum class PrintNameContext {
   FunctionParameterLocal,
 };
 
+/// Describes the kind of parameter-like entity being printed.
+/// E.g.
+/// \code
+///   func foo(<FunctionParameter>x: Int = 2</FunctionParameter>, ...)
+/// \endcode
+enum class PrintParameterKind {
+  FunctionParameter,
+};
+
 /// An abstract class used to print an AST.
 class ASTPrinter {
   unsigned CurrentIndentation = 0;
@@ -105,6 +114,11 @@ public:
   /// Called after printing a synthesized extension.
   virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                              const NominalTypeDecl *NTD) {}
+
+  /// Called before printing a parameter-like entity.
+  virtual void printParameterPre(PrintParameterKind Kind) {}
+  /// Called after printing a parameter-like entity.
+  virtual void printParameterPost(PrintParameterKind Kind) {}
 
   /// Called before printing a name in the given context.
   virtual void printNamePre(PrintNameContext Context) {}
