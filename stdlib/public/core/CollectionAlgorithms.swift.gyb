@@ -22,9 +22,9 @@ IElement = "Iterator.Element"
 // last
 //===----------------------------------------------------------------------===//
 
-extension Collection where Index : BidirectionalIndex {
+extension BidirectionalCollection {
   public var last: Iterator.Element? {
-    return isEmpty ? nil : self[endIndex.predecessor()]
+    return isEmpty ? nil : self[previous(endIndex)]
   }
 }
 
