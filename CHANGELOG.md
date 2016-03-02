@@ -17,6 +17,18 @@ Swift 3
   A new argument to swiftc is provided to select the linker used, and the gold linker
   is set as the default for arm-based platforms.
 
+* Catch blocks in `rethrows` functions may now `throw` errors. For example:
+
+    ```swift
+    func process(f: () throws -> Int) rethrows -> Int {
+        do {
+            return try f()
+        } catch is SomeError {
+            throw OtherError()
+        }
+    }
+    ```
+
 Swift 2.2
 ---------
 
