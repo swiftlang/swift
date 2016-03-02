@@ -40,6 +40,7 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::ide;
 
+namespace {
 class AnnotatedDeclarationPrinter : public XMLEscapingPrinter {
 public:
   AnnotatedDeclarationPrinter(raw_ostream &OS)
@@ -54,6 +55,7 @@ private:
     printXML("</Type>");
   }
 };
+} // end anonymous namespace
 
 static StringRef getTagForDecl(const Decl *D, bool isRef) {
   auto UID = SwiftLangSupport::getUIDForDecl(D, isRef);
@@ -135,7 +137,6 @@ public:
     return storedKind && *storedKind == kind;
   }
 };
-} // end anonymous namespace
 
 /// An ASTPrinter for annotating declarations with XML tags that describe the
 /// key substructure of the declaration for CursorInfo/DocInfo.
@@ -256,6 +257,7 @@ private:
   /// subsequent ASTPrinter callbacks.
   llvm::SmallVector<PrintContext, 3> contextStack;
 };
+} // end anonymous namespace
 
 static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {
   if (Ty.isNull())
