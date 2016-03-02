@@ -25,13 +25,13 @@ switch p {
       // Verify that the branch has a location >= the cleanup.
       // SIL-CHECK-NEXT:  br{{.*}}line:[[@LINE-3]]:17:cleanup
       // CHECK-SCOPES: call {{.*}}markUsed
-      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X1:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg.declare({{.*}}metadata ![[X1:[0-9]+]]
       // CHECK-SCOPES-SAME:                        !dbg ![[X1LOC:[0-9]+]]
-      // CHECK-SCOPES: call void @llvm.dbg.value
-      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X2:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg.declare
+      // CHECK-SCOPES: call void @llvm.dbg.declare({{.*}}metadata ![[X2:[0-9]+]]
       // CHECK-SCOPES-SAME:                        !dbg ![[X2LOC:[0-9]+]]
-      // CHECK-SCOPES: call void @llvm.dbg.value
-      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X3:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg.declare
+      // CHECK-SCOPES: call void @llvm.dbg.declare({{.*}}metadata ![[X3:[0-9]+]]
       // CHECK-SCOPES-SAME:                        !dbg ![[X3LOC:[0-9]+]]
       // CHECK-SCOPES: !DILocalVariable(name: "x",
     case (let x, let y) where x == -y:
