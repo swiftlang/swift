@@ -253,7 +253,7 @@ public:
     /// a critical edges.
     AllowToModifyCFG,
     
-    /// Ignore exit exit edges from the lifetime region at all.
+    /// Ignore exit edges from the lifetime region at all.
     IgnoreExitEdges
   };
 

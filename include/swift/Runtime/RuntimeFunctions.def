@@ -1036,7 +1036,7 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
 // Put here all definitions of runtime functions which are:
-// - only only available when SWIFT_OBJC_INTEROP is enabled
+// - only available when SWIFT_OBJC_INTEROP is enabled
 // - need a global function pointer referring to their implementation,
 //   e.g. those defined FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL or using
 //   the RegisterPreservingCC calling convention.

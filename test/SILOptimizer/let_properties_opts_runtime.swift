@@ -4,7 +4,7 @@
 // REQUIRES: executable_test
 
 // Check that in optimized builds the compiler generates correct code for
-// initializations of let properties, which is assigned multipe times inside
+// initializations of let properties, which is assigned multiple times inside
 // initializers.
 
 public class Foo1 {
@@ -16,10 +16,10 @@ public class Foo1 {
 
   @inline(never)
   init(_ count: Int32) {
-    // Intialize Prop4 unconditionally and only once.
+    // Initialize Prop4 unconditionally and only once.
     Prop4 = 300
     // There are two different assignments to Prop1 and Prop2
-    // on different branchs of the if-statement.
+    // on different branches of the if-statement.
     if count < 2 {
       // Initialize Prop1 and Prop2 conditionally.
       // Use other properties in the definition of Prop1 and Prop2.
