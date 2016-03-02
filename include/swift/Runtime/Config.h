@@ -94,7 +94,7 @@
 #define SWIFT_RT_USE_WRAPPERS_ALWAYS 1
 
 // If defined, it indicates that this calling convention is
-// supported by the currnet target.
+// supported by the current target.
 // TODO: Define it once the runtime calling convention support has
 // been integrated into clang and llvm.
 //#define RT_USE_RegisterPreservingCC
@@ -143,7 +143,7 @@
 #define SWIFT_RT_ENTRY_IMPL(Name) _##Name##_
 
 // Library internal way to invoke the implementation of a runtime entry.
-// E.g. a runtime function  may be called internally via its public API
+// E.g. a runtime function may be called internally via its public API
 // or via the function pointer.
 #define SWIFT_RT_ENTRY_CALL(Name) Name
 
