@@ -415,6 +415,11 @@ public:
     ContextAndInvalid.setInt(true);
   }
 
+  /// Determine whether this conformance is lazily resolved.
+  ///
+  /// This only matters to the AST verifier.
+  bool isLazilyResolved() const { return Resolver != nullptr; }
+
   /// True if the conformance describes a property behavior.
   bool isBehaviorConformance() const {
     return ContextAndInvalid.getPointer().is<AbstractStorageDecl *>();
