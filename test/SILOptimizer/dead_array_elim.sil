@@ -81,7 +81,7 @@ bb0(%0 : $TrivialDestructor):
   return %18 : $()
 }
 
-// CHECK-LABEL: sil @not_all_pathes_release_the_dead_array
+// CHECK-LABEL: sil @not_all_paths_release_the_dead_array
 // CHECK: bb0(%0 : $TrivialDestructor):
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
@@ -90,7 +90,7 @@ bb0(%0 : $TrivialDestructor):
 // CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: strong_release %0
 // CHECK: return
-sil @not_all_pathes_release_the_dead_array : $@convention(thin) (@owned TrivialDestructor) -> () {
+sil @not_all_paths_release_the_dead_array : $@convention(thin) (@owned TrivialDestructor) -> () {
 bb0(%0 : $TrivialDestructor):
   %2 = integer_literal $Builtin.Word, 2
   // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
