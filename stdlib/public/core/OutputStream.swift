@@ -335,11 +335,8 @@ internal struct _Stdout : OutputStreamType {
     if string._core.isASCII {
       defer { _fixLifetime(string) }
 
-      let result = _swift_stdlib_fwrite_stdout(
-        UnsafePointer(string._core.startASCII), string._core.count, 1)
-      if result != 1 {
-        fatalError("fwrite() returned \(result), expected 1")
-      }
+      _swift_stdlib_fwrite_stdout(UnsafePointer(string._core.startASCII),
+                                  string._core.count, 1)
       return
     }
 
