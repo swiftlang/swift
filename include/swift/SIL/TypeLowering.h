@@ -338,6 +338,10 @@ public:
     }
   }
 
+  // Visit this type lowering and all of its children type lowerings.
+  virtual void visit(SILModule &M,
+                     std::function<void(const TypeLowering &)> F) const = 0;
+
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
   void *operator new(size_t size, TypeConverter &tc,
                      IsDependent_t dependent);
