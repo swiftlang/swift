@@ -4,7 +4,7 @@
 // REQUIRES: executable_test
 
 // Check that in optimized builds the compiler generates correct code for
-// initializations of let properties, which is assigned multipe times inside
+// initializations of let properties, which is assigned multiple times inside
 // initializers.
 
 public class Foo1 {
