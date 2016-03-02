@@ -810,7 +810,7 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 
   // Local function to handle the parsing of the base name + context.
   //
-  // Returns true if an error occurred, without recordinf the base name.
+  // Returns true if an error occurred, without recording the base name.
   ParsedDeclName result;
   auto parseBaseName = [&](StringRef text) -> bool {
     // Split the text into context name and base name.
