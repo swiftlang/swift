@@ -596,8 +596,7 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
                                          ARGS, ATTRS)                          \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
-    /* Add an underscore in JIT mode under Linux to enable proper symbol       \
-     * lookup */                                                               \
+    /* Add underscore in JIT mode under Linux to enable proper symbol lookup */\
     const char *Symbol =                                                       \
         (Opts.UseJIT && TargetInfo.OutputObjectFormat == llvm::Triple::ELF)    \
             ? "_" STR(SYMBOL_NAME)                                             \
