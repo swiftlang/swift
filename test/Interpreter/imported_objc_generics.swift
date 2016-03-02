@@ -13,6 +13,8 @@ import Foundation
 import StdlibUnittest
 import ObjCClasses
 
+let wut = Container<NSString>.self
+
 var ImportedObjCGenerics = TestSuite("ImportedObjCGenerics")
 
 ImportedObjCGenerics.test("Creation") {
@@ -92,9 +94,8 @@ ImportedObjCGenerics.test("SwiftGenerics/Creation") {
     return Container(object: x)
   }
 
-  // TODO: fix IRGen failure below
-  //let c = makeContainer(NSNumber(integer: 22))
-  //expectEqual(NSNumber(integer: 22), c.object)
+  let c = makeContainer(NSNumber(integer: 22))
+  expectEqual(NSNumber(integer: 22), c.object)
 }
 
 ImportedObjCGenerics.test("ProtocolConstraints") {

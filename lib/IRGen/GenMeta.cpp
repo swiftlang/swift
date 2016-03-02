@@ -410,7 +410,6 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
 /// need a cache variable in its accessor.
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   assert(!type->hasArchetype());
-  assert(!type->hasUnboundGenericType());
 
   // Value type metadata only requires dynamic initialization on first
   // access if it contains a resilient type.
@@ -493,7 +492,7 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type) {
   if (nominal && !isa<ProtocolDecl>(nominal)) {
     // Metadata accessors for fully-substituted generic types are
     // emitted with shared linkage.
-    if (nominal->isGenericContext()) {
+    if (nominal->isGenericContext() && !nominal->isObjC()) {
       if (isa<BoundGenericType>(type))
         return MetadataAccessStrategy::NonUniqueAccessor;
       assert(isa<UnboundGenericType>(type));
@@ -1259,12 +1258,12 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
 
   // We only take this path for That means
   // everything except non-generic nominal types.
-  auto nominalType = dyn_cast<NominalType>(type);
-  if (!nominalType)
+  auto typeDecl = type->getAnyNominal();
+  if (!typeDecl)
     return emitDirectTypeMetadataRef(IGF, type);
 
-  auto typeDecl = nominalType->getDecl();
-  if (typeDecl->isGenericContext()) {
+  if (typeDecl->isGenericContext() &&
+      !(isa<ClassDecl>(typeDecl) && typeDecl->hasClangNode())) {
     // This is a metadata accessor for a fully substituted generic type.
     return emitDirectTypeMetadataRef(IGF, type);
   }
@@ -1291,8 +1290,6 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
     // Classes that might not have Swift metadata use a different
     // symbol name.
     if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
-      assert(!classDecl->isGenericContext() &&
-             "ObjC class cannot be generic");
       return emitObjCMetadataRef(IGF, classDecl);
     }
 
@@ -1313,13 +1310,41 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
 using MetadataAccessGenerator =
   llvm::function_ref<llvm::Value*(IRGenFunction &IGF, llvm::Constant *cache)>;
 
+static bool isTypeErasedGenericClass(NominalTypeDecl *ntd) {
+  // ObjC classes are type erased.
+  // TODO: Unless they have magic methods...
+  if (auto clas = dyn_cast<ClassDecl>(ntd))
+    return clas->hasClangNode() && clas->isGenericContext();
+  return false;
+}
+
+static bool isTypeErasedGenericClassType(CanType type) {
+  if (auto nom = type->getAnyNominal())
+    return isTypeErasedGenericClass(nom);
+  return false;
+}
+
+// Get the type that exists at runtime to represent a compile-time type.
+static CanType
+getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
+  return CanType(type.transform([&](Type t) -> Type {
+    if (isTypeErasedGenericClassType(CanType(t))) {
+      return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
+    }
+    return t;
+  }));
+}
+
 /// Get or create an accessor function to the given non-dependent type.
 static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
                                         CanType type,
                                         ForDefinition_t shouldDefine,
                                         MetadataAccessGenerator &&generator) {
   assert(!type->hasArchetype());
-  assert(!isa<UnboundGenericType>(type));
+  // Type should be bound unless it's type erased.
+  assert(isTypeErasedGenericClassType(type)
+           ? !isa<BoundGenericType>(type)
+           : !isa<UnboundGenericType>(type));
 
   llvm::Function *accessor =
     IGM.getAddrOfTypeMetadataAccessFunction(type, shouldDefine);
@@ -1365,6 +1390,7 @@ static llvm::Function *getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
                                                  NominalTypeDecl *nominal,
                                                  ForDefinition_t shouldDefine) {
   assert(nominal->isGenericContext());
+  assert(!isTypeErasedGenericClass(nominal));
 
   GenericArguments genericArgs;
   genericArgs.collectTypes(IGM, nominal);
@@ -1439,6 +1465,8 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
 
 /// Produce the type metadata pointer for the given type.
 llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
+  type = getRuntimeReifiedType(IGM, type);
+
   if (type->hasArchetype() ||
       isTypeMetadataAccessTrivial(IGM, type)) {
     return emitDirectTypeMetadataRef(*this, type);
@@ -1459,6 +1487,8 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 /// for the given non-dependent type.
 llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
                                                              CanType type) {
+  type = getRuntimeReifiedType(IGM, type);
+
   assert(!type->hasArchetype() &&
          "cannot create global function to return dependent type metadata");
 
