@@ -127,7 +127,9 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 
 /// Lookup table minor version number.
 ///
-/// When the format changes IN ANY WAY, this number should be incremented.
+/// When the format changes IN ANY WAY, this number should be
+/// incremented. When doing so, also update the comment so we'll get
+/// conflicts if two different changes to the format get merged.
 const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 9; // typedef context kind
 
 /// A lookup table that maps Swift names to the set of Clang
@@ -142,9 +144,12 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 9; // typedef context kind
 class SwiftLookupTable {
 public:
   /// The kind of context in which a name occurs.
+  ///
+  /// Note that values 0 and 1 are reserved for empty and tombstone
+  /// keys.
   enum class ContextKind : uint8_t {
     /// A translation unit.
-    TranslationUnit = 0,
+    TranslationUnit = 2,
     /// A tag declaration (struct, enum, union, C++ class).
     Tag,
     /// An Objective-C class.
@@ -250,6 +255,13 @@ private:
   /// The list of Objective-C categories and extensions.
   llvm::SmallVector<clang::ObjCCategoryDecl *, 4> Categories;
 
+  /// A mapping from stored contexts to the set of global declarations that
+  /// are mapped to members within that context.
+  ///
+  /// The values use the same representation as
+  /// FullTableEntry::DeclsOrMacros.
+  llvm::DenseMap<StoredContext, SmallVector<uintptr_t, 2>> GlobalsAsMembers;
+
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
 
@@ -259,6 +271,12 @@ private:
   /// Find or create the table entry for the given base name. 
   llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator
   findOrCreate(StringRef baseName);
+
+  /// Add the given entry to the list of entries, if it's not already
+  /// present.
+  ///
+  /// \returns true if the entry was added, false otherwise.
+  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uintptr_t> &entries);
 
 public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
@@ -396,6 +414,26 @@ public:
   /// Retrieve the declaration IDs of the categories.
   ArrayRef<clang::serialization::DeclID> categories() const {
     return Categories;
+  }
+};
+
+}
+
+namespace llvm {
+
+template <> struct DenseMapInfo<swift::SwiftLookupTable::ContextKind> {
+  typedef swift::SwiftLookupTable::ContextKind ContextKind;
+  static ContextKind getEmptyKey() {
+    return static_cast<ContextKind>(0);
+  }
+  static ContextKind getTombstoneKey() {
+    return static_cast<ContextKind>(1);
+  }
+  static unsigned getHashValue(ContextKind kind) {
+    return static_cast<unsigned>(kind);
+  }
+  static bool isEqual(ContextKind lhs, ContextKind rhs) {
+    return lhs == rhs;
   }
 };
 

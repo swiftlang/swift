@@ -44,3 +44,6 @@
 // CHECK-NEXT:     SNPoint: y
 // CHECK-NEXT:   z:
 // CHECK-NEXT:     SNPoint: z
+
+// CHECK-NEXT: Globals-as-members mapping:
+// CHECK-NEXT:   SNSomeStruct: DefaultXValue, SNAdding, SNCreate, SNSomeStructGetDefault, SNSomeStructSetDefault, SNSomeStructGetFoo, SNSomeStructSetFoo

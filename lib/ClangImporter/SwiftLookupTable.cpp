@@ -167,6 +167,70 @@ void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
   Categories.push_back(category);
 }
 
+/// Determine whether the entry is a global declaration that is being
+/// mapped as a member of a particular type or extension thereof.
+///
+/// This should only return true when the entry isn't already nested
+/// within a context. For example, it will return false for
+/// enumerators, because those are naturally nested within the
+/// enumeration declaration.
+static bool isGlobalAsMember(SwiftLookupTable::SingleEntry entry,
+                             SwiftLookupTable::StoredContext context) {
+  switch (context.first) {
+  case SwiftLookupTable::ContextKind::TranslationUnit:
+    // We're not mapping this as a member of anything.
+    return false;
+
+  case SwiftLookupTable::ContextKind::Tag:
+  case SwiftLookupTable::ContextKind::ObjCClass:
+  case SwiftLookupTable::ContextKind::ObjCProtocol:
+  case SwiftLookupTable::ContextKind::Typedef:
+    // We're mapping into a type context.
+    break;
+  }
+
+  // Macros are never stored within a non-translation-unit context in
+  // Clang.
+  if (entry.is<clang::MacroInfo *>()) return true;
+
+  // We have a declaration.
+  auto decl = entry.get<clang::NamedDecl *>();
+
+  // Enumerators are always stored within the enumeration, despite
+  // having the translation unit as their redeclaration context.
+  if (isa<clang::EnumConstantDecl>(decl)) return false;
+
+  // If the redeclaration context is namespace-scope, then we're
+  // mapping as a member.
+  return decl->getDeclContext()->getRedeclContext()->isFileContext();
+}
+
+bool SwiftLookupTable::addLocalEntry(SingleEntry newEntry,
+                                     SmallVectorImpl<uintptr_t> &entries) {
+  // Check whether this entry matches any existing entry.
+  auto decl = newEntry.dyn_cast<clang::NamedDecl *>();
+  auto macro = newEntry.dyn_cast<clang::MacroInfo *>();
+  for (auto &existingEntry : entries) {
+    // If it matches an existing declaration, there's nothing to do.
+    if (decl && isDeclEntry(existingEntry) &&
+        matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
+      return false;
+
+    // If it matches an existing macro, overwrite the existing entry.
+    if (macro && isMacroEntry(existingEntry)) {
+      existingEntry = encodeEntry(macro);
+      return false;
+    }
+  }
+
+  // Add an entry to this context.
+  if (decl)
+    entries.push_back(encodeEntry(decl));
+  else
+    entries.push_back(encodeEntry(macro));
+  return true;
+}
+
 void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
                                 EffectiveClangContext effectiveContext) {
   assert(!Reader && "Cannot modify a lookup table stored on disk");
@@ -176,6 +240,12 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   if (!contextOpt) return;
   auto context = *contextOpt;
 
+  // If this is a global imported as a member, record is as such.
+  if (isGlobalAsMember(newEntry, context)) {
+    auto &entries = GlobalsAsMembers[context];
+    (void)addLocalEntry(newEntry, entries);
+  }
+
   // Find the list of entries for this base name.
   auto &entries = LookupTable[name.getBaseName().str()];
   auto decl = newEntry.dyn_cast<clang::NamedDecl *>();
@@ -183,26 +253,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   for (auto &entry : entries) {
     if (entry.Context == context) {
       // We have entries for this context.
-
-      // Check whether this entry matches any existing entry.
-      for (auto &existingEntry : entry.DeclsOrMacros) {
-        // If it matches an existing declaration, there's nothing to do.
-        if (decl && isDeclEntry(existingEntry) && 
-            matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
-          return;
-
-        // If it matches an existing macro, overwrite the existing entry.
-        if (macro && isMacroEntry(existingEntry)) {
-          existingEntry = encodeEntry(macro);
-          return;
-        }
-      }
-
-      // Add an entry to this context.
-      if (decl)
-        entry.DeclsOrMacros.push_back(encodeEntry(decl));
-      else
-        entry.DeclsOrMacros.push_back(encodeEntry(macro));
+      (void)addLocalEntry(newEntry, entry.DeclsOrMacros);
       return;
     }
   }
@@ -216,7 +267,6 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
     entry.DeclsOrMacros.push_back(encodeEntry(macro));
   entries.push_back(entry);
 }
-
 
 auto SwiftLookupTable::findOrCreate(StringRef baseName) 
   -> llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator {
@@ -402,6 +452,37 @@ void SwiftLookupTable::deserializeAll() {
   (void)categories();
 }
 
+/// Print a stored context to the given output stream for debugging purposes.
+static void printStoredContext(SwiftLookupTable::StoredContext context,
+                               llvm::raw_ostream &out)  {
+  switch (context.first) {
+  case SwiftLookupTable::ContextKind::TranslationUnit:
+    out << "TU";
+    break;
+
+  case SwiftLookupTable::ContextKind::Tag:
+  case SwiftLookupTable::ContextKind::ObjCClass:
+  case SwiftLookupTable::ContextKind::ObjCProtocol:
+  case SwiftLookupTable::ContextKind::Typedef:
+    out << context.second;
+    break;
+  }
+}
+
+/// Print a stored entry (Clang macro or declaration) for debugging purposes.
+static void printStoredEntry(const SwiftLookupTable *table, uintptr_t entry,
+                             llvm::raw_ostream &out) {
+  if (SwiftLookupTable::isSerializationIDEntry(entry)) {
+    llvm::errs() << (SwiftLookupTable::isMacroEntry(entry) ? "macro" : "decl")
+                 << " ID #" << SwiftLookupTable::getSerializationID(entry);
+  } else if (SwiftLookupTable::isMacroEntry(entry)) {
+    llvm::errs() << "Macro";
+  } else {
+    auto decl = const_cast<SwiftLookupTable *>(table)->mapStoredDecl(entry);
+    printName(decl, llvm::errs());
+  }
+}
+
 void SwiftLookupTable::dump() const {
   // Dump the base name -> full table entry mappings.
   SmallVector<StringRef, 4> baseNames;
@@ -415,31 +496,12 @@ void SwiftLookupTable::dump() const {
     const auto &entries = LookupTable.find(baseName)->second;
     for (const auto &entry : entries) {
       llvm::errs() << "    ";
-      switch (entry.Context.first) {
-      case ContextKind::TranslationUnit:
-        llvm::errs() << "TU";
-        break;
-
-      case ContextKind::Tag:
-      case ContextKind::ObjCClass:
-      case ContextKind::ObjCProtocol:
-      case ContextKind::Typedef:
-        llvm::errs() << entry.Context.second;
-      }
+      printStoredContext(entry.Context, llvm::errs());
       llvm::errs() << ": ";
 
       interleave(entry.DeclsOrMacros.begin(), entry.DeclsOrMacros.end(),
                  [this](uintptr_t entry) {
-                   if (isSerializationIDEntry(entry)) {
-                     llvm::errs() << (isMacroEntry(entry) ? "macro" : "decl")
-                                  << " ID #" << getSerializationID(entry);
-                   } else if (isMacroEntry(entry)) {
-                     llvm::errs() << "Macro";
-                   } else {
-                     auto decl = const_cast<SwiftLookupTable *>(this)
-                                   ->mapStoredDecl(entry);
-                     printName(decl, llvm::errs());
-                   }
+                   printStoredEntry(this, entry, llvm::errs());
                  },
                  [] {
                    llvm::errs() << ", ";
@@ -469,6 +531,30 @@ void SwiftLookupTable::dump() const {
                  llvm::errs() << ", ";
                });
     llvm::errs() << "\n";
+  }
+
+  if (!GlobalsAsMembers.empty()) {
+    llvm::errs() << "Globals-as-members mapping:\n";
+    SmallVector<StoredContext, 4> contexts;
+    for (const auto &entry : GlobalsAsMembers) {
+      contexts.push_back(entry.first);
+    }
+    llvm::array_pod_sort(contexts.begin(), contexts.end());
+    for (auto context : contexts) {
+      llvm::errs() << "  ";
+      printStoredContext(context, llvm::errs());
+      llvm::errs() << ": ";
+
+      const auto &entries = GlobalsAsMembers.find(context)->second;
+      interleave(entries.begin(), entries.end(),
+                 [this](uintptr_t entry) {
+                   printStoredEntry(this, entry, llvm::errs());
+                 },
+                 [] {
+                   llvm::errs() << ", ";
+                 });
+      llvm::errs() << "\n";
+    }
   }
 }
 
