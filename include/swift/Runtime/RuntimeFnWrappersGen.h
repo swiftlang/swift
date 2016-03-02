@@ -1,4 +1,4 @@
-//===-- RuntimeFnWrapperGen.h - LLVM IR Generation for runtime functions --===//
+//===--- RuntimeFnWrappersGen.h - LLVM IR Generation for runtime functions ===//
 //
 // This source file is part of the Swift.org open source project
 //
