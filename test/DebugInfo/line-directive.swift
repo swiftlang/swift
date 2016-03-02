@@ -1,14 +1,14 @@
 func markUsed<T>(t: T) {}
 func f() {
   if 1==1 {
-#line 42 "abc.swift"
+#setline 42 "abc.swift"
     markUsed("Hello World")
-#line
+#setline
   }
   markUsed("Test")
-#line 142 "abc.swift"
+#setline 142 "abc.swift"
   markUsed("abc again")
-#line 142 "def.swift"
+#setline 142 "def.swift"
   markUsed("jump directly to def")
 }
 
