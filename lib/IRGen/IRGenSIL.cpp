@@ -582,7 +582,7 @@ public:
                               StringRef Name, unsigned ArgNo,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
-    if (IGM.Opts.Optimize ||
+    if (IGM.Opts.Optimize || (ArgNo == 0) ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
         Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
