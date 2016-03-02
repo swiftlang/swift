@@ -207,38 +207,14 @@ public:
 
 struct SynthesizedExtensionAnalyzer::Implementation {
 
-  struct UnapplicableCondition {
-    std::function<bool(Type)> FirstCondition;
-    std::function<bool(Type)> SecondCondition;
-    bool isHit(Type First, Type Second) {
-      return FirstCondition(First->getDesugaredType()) &&
-             SecondCondition(Second->getDesugaredType());
-    }
-  };
-
   ExtensionDecl *Ext;
   Type BaseType;
   DeclContext *DC;
   std::unique_ptr<ArchetypeSelfTransformer> pTransform;
-  std::vector<UnapplicableCondition> KnownConditions;
-
-  bool isHitAnyKnowConditions(Type First, Type Second) {
-    return KnownConditions.end() !=
-      std::find_if(KnownConditions.begin(), KnownConditions.end(),
-                   [&](UnapplicableCondition &Condition) {
-                     return Condition.isHit(First, Second);
-                   });
-  }
 
   Implementation(ExtensionDecl *Ext, NominalTypeDecl *Target):
     Ext(Ext), BaseType(Target->getDeclaredTypeInContext()),
-    DC(Target), pTransform(new ArchetypeSelfTransformer(Target)) {
-
-      // Condition: Tuple never conforms to nominals.
-      KnownConditions.push_back({
-        [](Type T){ return T->getKind() == TypeKind::Tuple;},
-        [](Type T){ return T->getAnyNominal();}});
-  }
+    DC(Target), pTransform(new ArchetypeSelfTransformer(Target)) {}
 };
 
 SynthesizedExtensionAnalyzer::
@@ -254,11 +230,18 @@ bool SynthesizedExtensionAnalyzer::isApplicable() {
       continue;
     StringRef FirstType = std::get<0>(TupleOp.getValue());
     StringRef SecondType = std::get<1>(TupleOp.getValue());
+    RequirementReprKind Kind = std::get<2>(TupleOp.getValue());
     Type First = Impl.pTransform->checkMemberTypeInternal(FirstType);
     Type Second = lookUpTypeInContext(Impl.DC, SecondType);
     if (First && Second) {
-      if (Impl.isHitAnyKnowConditions(First, Second))
-        return false;
+      First = First->getDesugaredType();
+      Second = Second->getDesugaredType();
+      switch (Kind) {
+        case RequirementReprKind::TypeConstraint:
+          return canPossiblyConvertTo(First, Second, *Impl.DC);
+        case RequirementReprKind::SameType:
+          return canPossiblyEqual(First, Second, *Impl.DC);
+      }
     }
   }
   return true;
