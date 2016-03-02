@@ -85,6 +85,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SuperChars
     single-source/TwoSum
     single-source/TypeFlood
+    single-source/UTF8Decode
     single-source/Walsh
     single-source/XorLoop
 )
