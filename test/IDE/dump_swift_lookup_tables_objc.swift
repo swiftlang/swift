@@ -5,6 +5,7 @@
 // RUN: FileCheck -check-prefix=CHECK-OMIT-NEEDLESS-WORDS %s < %t-omit-needless-words.log
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 // CHECK-LABEL: <<Foundation lookup table>>
 // CHECK:   NSTimeIntervalSince1970:

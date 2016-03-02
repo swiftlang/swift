@@ -19,6 +19,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_BASIC_RELATIVEPOINTER_H
+#define SWIFT_BASIC_RELATIVEPOINTER_H
+
 #include <cstdint>
 
 namespace swift {
@@ -326,3 +329,4 @@ using FarRelativeDirectPointer = RelativeDirectPointer<T, Nullable, intptr_t>;
 
 }
 
+#endif // SWIFT_BASIC_RELATIVEPOINTER_H

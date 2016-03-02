@@ -253,6 +253,79 @@ void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
   --builder.Impl->NumUnresolvedNestedTypes;
 }
 
+/// Retrieve the conformance for the superclass constraint of the given
+/// potential archetype (if present) to the given protocol.
+///
+/// \param pa The potential archetype whose superclass constraint is being
+/// queried.
+///
+/// \param proto The protocol to which we are establishing conformance.
+///
+/// \param conformsSource The requirement source for the conformance to the
+/// given protocol.
+///
+/// \param builder The archetype builder in which the potential archetype
+/// resides.
+static ProtocolConformance *getSuperConformance(
+                              ArchetypeBuilder::PotentialArchetype *pa,
+                              ProtocolDecl *proto,
+                              RequirementSource &conformsSource,
+                              ArchetypeBuilder &builder) {
+  // Get the superclass constraint.
+  Type superclass = pa->getSuperclass();
+  if (!superclass) return nullptr;
+
+  // Lookup the conformance of the superclass to this protocol.
+  auto conformance =
+    builder.getModule().lookupConformance(superclass, proto,
+                                          builder.getLazyResolver());
+  switch (conformance.getInt()) {
+  case ConformanceKind::Conforms: {
+    // Conformance to this protocol is redundant; update the requirement source
+    // appropriately.
+    updateRequirementSource(
+      conformsSource,
+      RequirementSource(RequirementSource::Protocol,
+                        pa->getSuperclassSource().getLoc()));
+    return conformance.getPointer();
+  }
+
+  case ConformanceKind::DoesNotConform:
+  case ConformanceKind::UncheckedConforms:
+    return nullptr;
+  }
+}
+
+/// If there is a same-type requirement to be added for the given nested type
+/// due to a superclass constraint on the parent type, add it now.
+static void maybeAddSameTypeRequirementForNestedType(
+              ArchetypeBuilder::PotentialArchetype *parentPA,
+              ArchetypeBuilder::PotentialArchetype *nestedPA,
+              RequirementSource fromSource,
+              ProtocolConformance *superConformance,
+              ArchetypeBuilder &builder) {
+  auto assocType = nestedPA->getResolvedAssociatedType();
+  assert(assocType && "Not resolved to an associated type?");
+
+  // If there's no super conformance, we're done.
+  if (!superConformance) return;
+
+  // Dig out the type witness.
+  auto concreteType =
+    superConformance->getTypeWitness(assocType, builder.getLazyResolver())
+      .getReplacement();
+  if (!concreteType) return;
+
+  // Add the same-type constraint.
+  RequirementSource source(RequirementSource::Protocol, fromSource.getLoc());
+  concreteType = ArchetypeBuilder::mapTypeOutOfContext(
+                   superConformance->getDeclContext(), concreteType);
+  if (auto otherPA = builder.resolveArchetype(concreteType))
+    builder.addSameTypeRequirementBetweenArchetypes(nestedPA, otherPA, source);
+  else
+    builder.addSameTypeRequirementToConcrete(nestedPA, concreteType, source);
+}
+
 bool ArchetypeBuilder::PotentialArchetype::addConformance(
        ProtocolDecl *proto, 
        const RequirementSource &source,
@@ -271,7 +344,13 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
   }
 
   // Add this conformance.
-  ConformsTo.insert(std::make_pair(proto, source));
+  auto inserted = ConformsTo.insert(std::make_pair(proto, source)).first;
+
+  // Determine whether there is a superclass constraint where the
+  // superclass conforms to this protocol.
+  ProtocolConformance *superConformance = getSuperConformance(this, proto,
+                                                              inserted->second,
+                                                              builder);
 
   // Check whether any associated types in this protocol resolve
   // nested types of this potential archetype.
@@ -287,6 +366,12 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
     // If the nested type was not already resolved, do so now.
     if (!known->second.front()->getResolvedAssociatedType()) {
       known->second.front()->resolveAssociatedType(assocType, builder);
+
+      // If there's a superclass constraint that conforms to the protocol,
+      // add the appropriate same-type relationship.
+      maybeAddSameTypeRequirementForNestedType(this, known->second.front(),
+                                               source, superConformance,
+                                               builder);
       continue;
     }
 
@@ -299,6 +384,11 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
     otherPA->SameTypeSource = RequirementSource(RequirementSource::Inferred,
                                                 source.getLoc());
     known->second.push_back(otherPA);
+
+    // If there's a superclass constraint that conforms to the protocol,
+    // add the appropriate same-type relationship.
+    maybeAddSameTypeRequirementForNestedType(this, otherPA, source,
+                                             superConformance, builder);
   }
 
   return true;
@@ -367,8 +457,8 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   if (Representative != this)
     return getRepresentative()->getNestedType(nestedName, builder);
 
+    // If we already have a nested type with this name, return it.
   llvm::TinyPtrVector<PotentialArchetype *> &nested = NestedTypes[nestedName];
-    
   if (!nested.empty()) {
     return nested.front();
   }
@@ -376,7 +466,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   // Attempt to resolve this nested type to an associated type
   // of one of the protocols to which the parent potential
   // archetype conforms.
-  for (const auto &conforms : ConformsTo) {
+  for (auto &conforms : ConformsTo) {
     for (auto member : conforms.first->lookupDirect(nestedName)) {
       auto assocType = dyn_cast<AssociatedTypeDecl>(member);
       if (!assocType)
@@ -387,15 +477,22 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 
       // If we have resolved this nested type to more than one associated
       // type, create same-type constraints between them.
+      RequirementSource source(RequirementSource::Inferred, SourceLoc());
       if (!nested.empty()) {
         pa->Representative = nested.front()->getRepresentative();
         pa->Representative->EquivalenceClass.push_back(pa);
-        pa->SameTypeSource = RequirementSource(RequirementSource::Inferred,
-                                               SourceLoc());
+        pa->SameTypeSource = source;
       }
 
       // Add this resolved nested type.
       nested.push_back(pa);
+
+      // If there's a superclass constraint that conforms to the protocol,
+      // add the appropriate same-type relationship.
+      ProtocolConformance *superConformance =
+        getSuperConformance(this, conforms.first, conforms.second, builder);
+      maybeAddSameTypeRequirementForNestedType(this, pa, source,
+                                               superConformance, builder);
     }
   }
 
@@ -856,10 +953,38 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
         });
   }
 
+  // Local function to handle the update of superclass conformances
+  // when the superclass constraint changes.
+  auto updateSuperclassConformances = [&] {
+    for (auto &conforms : T->ConformsTo) {
+      if (auto superConformance = getSuperConformance(T, conforms.first,
+                                                      conforms.second, *this)) {
+        for (auto req : conforms.first->getMembers()) {
+          auto assocType = dyn_cast<AssociatedTypeDecl>(req);
+          if (!assocType) continue;
+
+          const auto &nestedTypes = T->getNestedTypes();
+          auto nested = nestedTypes.find(assocType->getName());
+          if (nested == nestedTypes.end()) continue;
+
+          for (auto nestedPA : nested->second) {
+            if (nestedPA->getResolvedAssociatedType() == assocType)
+              maybeAddSameTypeRequirementForNestedType(T, nestedPA,
+                                                       Source,
+                                                       superConformance, *this);
+          }
+        }
+      }
+    }
+  };
+
   // If T already has a superclass, make sure it's related.
   if (T->Superclass) {
     if (T->Superclass->isSuperclassOf(Superclass, nullptr)) {
       T->Superclass = Superclass;
+
+      // We've strengthened the bound, so update superclass conformances.
+      updateSuperclassConformances();
     } else if (!Superclass->isSuperclassOf(T->Superclass, nullptr)) {
       Diags.diagnose(Source.getLoc(),
                      diag::requires_superclass_conflict, T->getName(),
@@ -876,6 +1001,8 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   T->Superclass = Superclass;
   T->SuperclassSource = Source;
 
+  // Update based on these conformances.
+  updateSuperclassConformances();
   return false;
 }
 

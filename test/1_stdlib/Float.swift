@@ -223,7 +223,7 @@ func checkQNaN(qnan: TestFloat) {
 }
 
 func testNaN() {
-  var stdlibDefaultNaN = TestFloat.NaN
+  var stdlibDefaultNaN = TestFloat.nan
   checkQNaN(stdlibDefaultNaN)
 
   var stdlibQNaN = TestFloat.quietNaN

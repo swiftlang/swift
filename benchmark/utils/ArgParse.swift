@@ -46,7 +46,7 @@ public func parseArgs(validOptions: [String]? = nil)
   for arg in Process.arguments[1..<Process.arguments.count] {
     // If the argument doesn't match the optional argument pattern. Add
     // it to the positional argument list and continue...
-    if passThroughArgs || !arg.characters.startsWith("-".characters) {
+    if passThroughArgs || !arg.characters.starts(with: "-".characters) {
       positionalArgs.append(arg)
       continue
     }
@@ -55,7 +55,7 @@ public func parseArgs(validOptions: [String]? = nil)
       continue
     }
     // Attempt to split it into two components separated by an equals sign.
-    let components = arg.componentsSeparatedBy("=")
+    let components = arg.componentsSeparated(by: "=")
     let optionName = components[0]
     if validOptions != nil && !validOptions!.contains(optionName) {
       print("Invalid option: \(arg)")

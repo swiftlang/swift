@@ -111,7 +111,7 @@ ErrorProtocolTests.test("default domain and code") {
 enum SillyError: ErrorProtocol { case JazzHands }
 
 ErrorProtocolTests.test("try!")
-  .skip(.Custom({ _isFastAssertConfiguration() },
+  .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration()
                         ? "'try!' expression unexpectedly raised an error: "

@@ -25,7 +25,7 @@ extension Unmanaged where Instance : TestProtocol1 {
 var UnmanagedTests = TestSuite("Unmanaged")
 
 UnmanagedTests.test("fromOpaque()/trap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "init(bitPattern:) does a _stdlibAssert() for null pointers"))
   .code {

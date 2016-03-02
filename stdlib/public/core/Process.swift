@@ -31,8 +31,8 @@ public enum Process {
     = nil
 
   internal enum _ProcessArgumentsState {
-    case NotYetComputed
-    case ComputedArguments([String])
+    case notYetComputed
+    case computedArguments([String])
   }
 
   internal static var _arguments: [String]? = nil 

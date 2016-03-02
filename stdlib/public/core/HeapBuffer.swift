@@ -48,7 +48,7 @@ class _HeapBufferStorage<Value, Element> : NonObjectiveCBase {
   /// `_HeapBufferStorage<Value,Element>`.
   typealias Buffer = _HeapBuffer<Value, Element>
   deinit {
-    Buffer(self)._value.deinitializePointee()
+    Buffer(self)._value.deinitialize()
   }
 
   @warn_unused_result
@@ -181,7 +181,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
       size: totalSize,
       alignmentMask: alignMask)
     self._storage = Builtin.castToNativeObject(object)
-    self._value.initializePointee(initializer)
+    self._value.initialize(with: initializer)
   }
 
   public // @testable

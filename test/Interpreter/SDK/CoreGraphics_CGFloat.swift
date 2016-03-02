@@ -70,19 +70,19 @@ CGFloatTestSuite.test("comparisons") {
   expectFalse(x <= z)
   expectTrue(x >= z)
   expectTrue(x > z)
-  checkComparable(.GT, x, z)
+  checkComparable(.gt, x, z)
 
   expectTrue(z < x)
   expectTrue(z <= x)
   expectFalse(z >= x)
   expectFalse(z > x)
-  checkComparable(.LT, z, x)
+  checkComparable(.lt, z, x)
 
   expectFalse(x < y)
   expectTrue(x <= y)
   expectTrue(x >= y)
   expectFalse(x > y)
-  checkComparable(.EQ, x, y)
+  checkComparable(.eq, x, y)
 }
 
 
@@ -105,7 +105,7 @@ CGFloatTestSuite.test("arithmetic") {
 CGFloatTestSuite.test("striding") {
   if true {
     var result = [CGFloat]()
-    for f in (1.0 as CGFloat).strideTo(2.0, by: 0.5) {
+    for f in stride(from: (1.0 as CGFloat), to: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5 ], result)
@@ -113,7 +113,7 @@ CGFloatTestSuite.test("striding") {
 
   if true {
     var result = [CGFloat]()
-    for f in (1.0 as CGFloat).strideThrough(2.0, by: 0.5) {
+    for f in stride(from: (1.0 as CGFloat), through: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5, 2.0 ], result)

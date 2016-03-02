@@ -1,31 +1,4 @@
 {
-  "Lazy Views": [
-    "Algorithm.swift",
-    "Flatten.swift",
-    "FlatMap.swift",
-    "Map.swift",
-    "Join.swift",
-    "Zip.swift",
-    "Filter.swift",
-    "Reverse.swift",
-    "Slice.swift",
-    "SequenceWrapper.swift",
-    "LazyCollection.swift",
-    "LazySequence.swift",
-    "ExistentialCollection.swift"
-  ],
-  "Array": [
-    "ArrayBody.swift",
-    "ArrayBuffer.swift",
-    "ArrayBufferProtocol.swift",
-    "ArrayCast.swift",
-    "ArrayType.swift",
-    "Arrays.swift",
-    "CocoaArray.swift",
-    "ContiguousArrayBuffer.swift",
-    "SliceBuffer.swift",
-    "SwiftNativeNSArray.swift"
-  ],
   "Assert": [
     "Assert.swift",
     "AssertCommon.swift"
@@ -68,7 +41,36 @@
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
     "Index.swift",
-    "Existential.swift"
+    "Existential.swift",
+    {
+      "Type-erased": [
+        "ExistentialCollection.swift"
+      ],
+      "Lazy Views": [
+        "Algorithm.swift",
+        "Flatten.swift",
+        "FlatMap.swift",
+        "Map.swift",
+        "Join.swift",
+        "Zip.swift",
+        "Filter.swift",
+        "Reverse.swift",
+        "Slice.swift",
+        "SequenceWrapper.swift",
+        "LazyCollection.swift",
+        "LazySequence.swift"],
+      "Array": [
+        "ArrayBody.swift",
+        "ArrayBuffer.swift",
+        "ArrayBufferType.swift",
+        "ArrayCast.swift",
+        "ArrayType.swift",
+        "Arrays.swift",
+        "CocoaArray.swift",
+        "ContiguousArrayBuffer.swift",
+        "SliceBuffer.swift",
+        "SwiftNativeNSArray.swift"]
+    }
   ],
   "C": [
     "BridgeObjectiveC.swift",
@@ -88,6 +90,7 @@
     "IntegerArithmetic.swift",
     "FixedPoint.swift",
     "IntegerParsing.swift",
+    "Bit.swift",
     "SetAlgebra.swift"
   ],
   "Optional": [
@@ -99,10 +102,13 @@
     "UnsafePointer.swift",
     "UnsafeBufferPointer.swift"
   ],
+  "Protocols": [
+    "CompilerProtocols.swift",
+    "ShadowProtocols.swift"
+  ],
   "Misc": [
     "Interval.swift",
     "Hashing.swift",
-    "CompilerProtocols.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
@@ -114,11 +120,9 @@
     "Print.swift",
     "REPL.swift",
     "Runtime.swift",
-    "ShadowProtocols.swift",
     "Shims.swift",
     "Unmanaged.swift",
     "Availability.swift",
-    "Bit.swift",
     "Process.swift",
     "Tuple.swift"
   ]

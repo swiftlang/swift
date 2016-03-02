@@ -107,7 +107,7 @@ class FixedSizedRefArrayOfOptionalStorage<T> : _HeapBufferStorage<Int, T?> {
   deinit {
     let buffer = Buffer(self)
     for i in 0..<buffer.value {
-      (buffer.baseAddress + i).deinitializePointee()
+      (buffer.baseAddress + i).deinitialize()
     }
   }
 }
@@ -121,7 +121,7 @@ struct FixedSizedRefArrayOfOptional<T>
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
     for var i = 0; i < capacity; ++i {
-      (buffer.baseAddress + i).initializePointee(.none)
+      (buffer.baseAddress + i).initialize(with: .none)
     }
 
     buffer.value = capacity

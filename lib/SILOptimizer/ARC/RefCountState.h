@@ -22,6 +22,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include <algorithm>
 
 namespace swift {
@@ -73,7 +74,8 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I) {
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+                           RCIdentityFunctionInfo *RCFI) {
     assert(I->size() == 1);
 
     // Are we already tracking a ref count modification?
@@ -86,7 +88,7 @@ public:
     KnownSafe = false;
 
     // Initialize value.
-    RCRoot = stripCasts((*I->begin())->getOperand(0));
+    RCRoot = RCFI->getRCIdentityRoot((*I->begin())->getOperand(0));
 
     // Clear our insertion point list.
     InsertPts = ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
@@ -204,7 +206,8 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I);
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+                           RCIdentityFunctionInfo *RCFI);
 
   /// Update this reference count's state given the instruction \p I. \p
   /// InsertPt is the point furthest up the CFG where we can move the currently
@@ -349,7 +352,8 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I);
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+                           RCIdentityFunctionInfo *RCFI);
 
   /// Initialize the state given the consumed argument Arg.
   void initWithArg(SILArgument *Arg);

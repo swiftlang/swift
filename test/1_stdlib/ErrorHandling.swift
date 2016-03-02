@@ -197,9 +197,9 @@ ErrorHandlingTests.test("ErrorHandling/min") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/startsWith") {
+ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
   do {
-    let x: Bool = try [1, 2, 3].startsWith([1, 2]) { _, _ in
+    let x: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -217,9 +217,9 @@ ErrorHandlingTests.test("ErrorHandling/elementsEqual") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/lexicographicalCompare") {
+ErrorHandlingTests.test("ErrorHandling/lexicographicallyPrecedes(_:)") {
   do {
-    let x: Bool = try [1, 2, 3].lexicographicalCompare([0, 2, 3]) { _, _ in
+    let x: Bool = try [1, 2, 3].lexicographicallyPrecedes([0, 2, 3]) { _, _ in
       throw SillyError.JazzHands
       return false
     }

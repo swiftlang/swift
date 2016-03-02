@@ -30,7 +30,7 @@ ChangeStoredToComputedTest.test("ChangeStoredToComputed") {
   }
 
   do {
-    func increaseTemperature(inout t: Int) {
+    func increaseTemperature(t: inout Int) {
       t += 10
     }
 

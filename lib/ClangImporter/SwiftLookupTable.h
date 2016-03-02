@@ -37,9 +37,21 @@ class NamedDecl;
 class DeclContext;
 class MacroInfo;
 class ObjCCategoryDecl;
+class TypedefNameDecl;
 }
 
 namespace swift {
+
+/// The context into which a Clang declaration will be imported.
+///
+/// When the context into which a declaration will be imported
+/// matches a Clang declaration context (the common case), the
+/// result will be expressed as a declaration context. Otherwise,
+/// if the Clang type is not itself a declaration context (for
+/// example, a typedef that comes into Swift as a strong type),
+/// the Clang type declaration will be provided.
+typedef llvm::PointerUnion<clang::DeclContext *, clang::TypedefNameDecl *>
+  EffectiveClangContext;
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
@@ -51,7 +63,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 7; // enum case casing
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 8; // NS prefix stripping
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -188,9 +200,9 @@ public:
   /// Maps a stored entry to an actual Clang AST node.
   SingleEntry mapStored(uintptr_t &entry);
 
-  /// Translate a Clang DeclContext into a context kind and name.
+  /// Translate a Clang effective context into a context kind and name.
   llvm::Optional<std::pair<ContextKind, StringRef>>
-  translateContext(clang::DeclContext *context);
+  translateContext(EffectiveClangContext context);
 
   /// Add an entry to the lookup table.
   ///
@@ -198,7 +210,7 @@ public:
   /// \param newEntry The Clang declaration or macro.
   /// \param effectiveContext The effective context in which name lookup occurs.
   void addEntry(DeclName name, SingleEntry newEntry,
-                clang::DeclContext *effectiveContext);
+                EffectiveClangContext effectiveContext);
 
   /// Add an Objective-C category or extension to the table.
   void addCategory(clang::ObjCCategoryDecl *category);

@@ -39,6 +39,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include <utility> 
 
 namespace swift {
 
@@ -479,7 +480,8 @@ public:
                                    std::vector<LSLocation> &LSLocationVault,
                                    LSLocationIndexMap &LocToBit,
                                    LSLocationBaseMap &BaseToLoc,
-                                   TypeExpansionAnalysis *TE);
+                                   TypeExpansionAnalysis *TE,
+                                   std::pair<int, int> &LSCount);
 };
 
 static inline llvm::hash_code hash_value(const LSLocation &L) {

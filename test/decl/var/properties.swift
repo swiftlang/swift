@@ -66,7 +66,7 @@ var a5: X {
 
 // Reading/writing properties
 func accept_x(x: X) { }
-func accept_x_inout(inout x: X) { }
+func accept_x_inout(x: inout X) { }
 
 func test_global_properties(x: X) {
   accept_x(a1)
@@ -479,7 +479,7 @@ func getS() -> S {
   return s
 }
 
-func test_extension_properties(inout s: S, inout x: X) {
+func test_extension_properties(s: inout S, x: inout X) {
   accept_x(s.x)
   accept_x(s.x2)
   accept_x(s.x3)
@@ -511,7 +511,7 @@ func test_extension_properties(inout s: S, inout x: X) {
 
 extension S {
   mutating
-  func test(inout other_x: X) {
+  func test(other_x: inout X) {
     x = other_x
     x2 = other_x
     x3 = other_x // expected-error{{cannot assign to property: 'x3' is a get-only property}}
@@ -536,7 +536,7 @@ struct Beth {
   var c: Int
 }
 
-func accept_int_inout(inout c: Int) { }
+func accept_int_inout(c: inout Int) { }
 func accept_int(c: Int) { }
 
 func test_settable_of_nonsettable(a: Aleph) {
@@ -558,7 +558,7 @@ struct MonoStruct {
     return 0
   }
 
-  static var zang = UnicodeScalar()
+  static var zang = UnicodeScalar("\0")
 
   static var zung: UInt16 {
     get {
@@ -884,7 +884,7 @@ class Box {
   }
 }
 
-func double(inout val: Int) {
+func double(val: inout Int) {
   val *= 2
 }
 

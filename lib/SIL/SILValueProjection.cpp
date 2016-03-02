@@ -335,22 +335,27 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
 
 }
 
-void LSLocation::enumerateLSLocations(SILFunction &F,
-                                      std::vector<LSLocation> &Locations,
-                                      LSLocationIndexMap &IndexMap,
-                                     LSLocationBaseMap &BaseMap,
-                                      TypeExpansionAnalysis *TypeCache) {
+void
+LSLocation::
+enumerateLSLocations(SILFunction &F,
+                     std::vector<LSLocation> &Locations,
+                     LSLocationIndexMap &IndexMap,
+                     LSLocationBaseMap &BaseMap,
+                     TypeExpansionAnalysis *TypeCache,
+                     std::pair<int, int> &LSCount) {
   // Enumerate all locations accessed by the loads or stores.
   for (auto &B : F) {
     for (auto &I : B) {
       if (auto *LI = dyn_cast<LoadInst>(&I)) {
         enumerateLSLocation(&I.getModule(), LI->getOperand(), Locations,
                             IndexMap, BaseMap, TypeCache);
+        ++LSCount.first;
         continue;
       }
       if (auto *SI = dyn_cast<StoreInst>(&I)) {
         enumerateLSLocation(&I.getModule(), SI->getDest(), Locations,
                             IndexMap, BaseMap, TypeCache);
+        ++LSCount.second;
         continue;
       }
     }

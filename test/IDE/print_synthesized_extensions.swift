@@ -54,17 +54,17 @@ public struct S1<T> : P1, P2 {
 
 // CHECK: <synthesized>/// Synthesized extension from P1
 // CHECK: extension S1 where T : P2 {
-// CHECK:     <decl:Func>public func <loc>ef1(t: T)</loc></decl>
-// CHECK:     <decl:Func>public func <loc>ef2(t: <ref:Struct>S2</ref>)</loc></decl>
+// CHECK:     <decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
+// CHECK:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK: }</synthesized>
 
 // CHECK: <synthesized>/// Synthesized extension from P1
 // CHECK: extension S1 where T == P2, S2 : P3 {
-// CHECK:     <decl:Func>public func <loc>ef3(t: <ref:Protocol>P2</ref>)</loc></decl>
-// CHECK:     <decl:Func>public func <loc>ef4(t: <ref:Protocol>P2</ref>)</loc></decl>
+// CHECK:     <decl:Func>public func <loc>ef3(<decl:Param>t: <ref:Protocol>P2</ref></decl>)</loc></decl>
+// CHECK:     <decl:Func>public func <loc>ef4(<decl:Param>t: <ref:Protocol>P2</ref></decl>)</loc></decl>
 // CHECK: }</synthesized>
 
 // CHECK: <synthesized>/// Synthesized extension from P1
 // CHECK: extension S1 where S2 : P3 {
-// CHECK:     <decl:Func>public func <loc>ef5(t: <ref:Struct>S2</ref>)</loc></decl>
+// CHECK:     <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK: }</synthesized>

@@ -1065,8 +1065,8 @@ bb0(%io : $*X, %1 : $Array<X>):
   %bl = integer_literal $Builtin.Int1, 0
   %b = struct $Bool (%bl : $Builtin.Int1)
 
-  %f = function_ref @get_element : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> @out X
-  %a = apply %f(%io, %i, %b, %1) : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> @out X
+  %f = function_ref @get_element : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<X>) -> @out X
+  %a = apply %f(%io, %i, %b, %b, %1) : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<X>) -> @out X
 
   %r = tuple()
   return %r : $()
@@ -1130,7 +1130,7 @@ bb0(%0 : $Array<X>):
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
 sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()
-sil [_semantics "array.get_element"] @get_element : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> @out X
+sil [_semantics "array.get_element"] @get_element : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<X>) -> @out X
 sil [_semantics "array.make_mutable"] @make_mutable : $@convention(method) (@inout Array<X>) -> ()
 sil [_semantics "array.get_element_address"] @get_element_address : $@convention(method) (Int32, @guaranteed Array<X>) -> UnsafeMutablePointer<X>
 sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32

@@ -19,12 +19,12 @@ struct B : _ObjectiveCBridgeable {
   }
   static func _forceBridgeFromObjectiveC(
     x: A,
-    inout result: B?
+    result: inout B?
   ){
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: A,
-    inout result: B?
+    result: inout B?
   ) -> Bool {
     return true
   }
@@ -63,12 +63,12 @@ struct F : _ObjectiveCBridgeable {
   }
   static func _forceBridgeFromObjectiveC(
     x: E,
-    inout result: F?
+    result: inout F?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: E,
-    inout result: F?
+    result: inout F?
   ) -> Bool {
     return true
   }
@@ -93,12 +93,12 @@ struct H : _ObjectiveCBridgeable {
   }
   static func _forceBridgeFromObjectiveC(
     x: G,
-    inout result: H?
+    result: inout H?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: G,
-    inout result: H?
+    result: inout H?
   ) -> Bool {
     return true
   }
@@ -126,12 +126,12 @@ struct I : _ObjectiveCBridgeable {
   }
   static func _forceBridgeFromObjectiveC(
     x: AnyObject,
-    inout result: I?
+    result: inout I?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
     x: AnyObject,
-    inout result: I?
+    result: inout I?
   ) -> Bool {
     return true
   }

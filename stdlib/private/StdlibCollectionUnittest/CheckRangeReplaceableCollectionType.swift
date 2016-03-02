@@ -13,29 +13,29 @@
 import StdlibUnittest
 
 internal enum RangeSelection {
-  case EmptyRange
-  case LeftEdge
-  case RightEdge
-  case Middle
-  case LeftHalf
-  case RightHalf
+  case emptyRange
+  case leftEdge
+  case rightEdge
+  case middle
+  case leftHalf
+  case rightHalf
 
   internal func rangeOf<
     C : Collection
   >(collection: C) -> Range<C.Index> {
     switch self {
-      case .EmptyRange: return collection.endIndex..<collection.endIndex
-      case .LeftEdge: return collection.startIndex..<collection.startIndex
-      case .RightEdge: return collection.endIndex..<collection.endIndex
-      case .Middle:
+      case .emptyRange: return collection.endIndex..<collection.endIndex
+      case .leftEdge: return collection.startIndex..<collection.startIndex
+      case .rightEdge: return collection.endIndex..<collection.endIndex
+      case .middle:
         let start = collection.startIndex.advanced(by: collection.count / 4)
         let end = collection.startIndex.advanced(by: 3 * collection.count / 4)
         return start...end
-      case .LeftHalf:
+      case .leftHalf:
         let start = collection.startIndex
         let end = start.advanced(by: collection.count / 2)
         return start..<end
-      case .RightHalf:
+      case .rightHalf:
         let start = collection.startIndex.advanced(by: collection.count / 2)
         let end = collection.endIndex
         return start..<end
@@ -44,17 +44,17 @@ internal enum RangeSelection {
 }
 
 internal enum IndexSelection {
-  case Start
-  case Middle
-  case End
-  case Last
+  case start
+  case middle
+  case end
+  case last
 
   internal func indexIn<C : Collection>(collection: C) -> C.Index {
     switch self {
-      case .Start: return collection.startIndex
-      case .Middle: return collection.startIndex.advanced(by: collection.count / 2)
-      case .End: return collection.endIndex
-      case .Last: return collection.startIndex.advanced(by: collection.count - 1)
+      case .start: return collection.startIndex
+      case .middle: return collection.startIndex.advanced(by: collection.count / 2)
+      case .end: return collection.endIndex
+      case .last: return collection.startIndex.advanced(by: collection.count - 1)
     }
   }
 }
@@ -147,7 +147,7 @@ internal struct InsertContentsOfTest {
     self.newElements = newElements.map(OpaqueValue.init)
     self.indexSelection = indexSelection
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "insertContentsOf() test data")
+    self.loc = SourceLoc(file, line, comment: "insert(contentsOf:at:) test data")
   }
 }
 
@@ -332,6 +332,44 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
     expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
 ]
 
+let replaceRangeTests: [ReplaceRangeTest] = [
+  ReplaceRangeTest(
+    collection: [],
+    newElements: [],
+    rangeSelection: .emptyRange,
+    expected: []),
+
+  ReplaceRangeTest(
+    collection: [],
+    newElements: [1010, 2020, 3030],
+    rangeSelection: .emptyRange,
+    expected: [1010, 2020, 3030]),
+
+  ReplaceRangeTest(
+    collection: [4040],
+    newElements: [1010, 2020, 3030],
+    rangeSelection: .leftEdge,
+    expected: [1010, 2020, 3030, 4040]),
+
+  ReplaceRangeTest(
+    collection: [1010],
+    newElements: [2020, 3030, 4040],
+    rangeSelection: .rightEdge,
+    expected: [1010, 2020, 3030, 4040]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030],
+    newElements: [4040],
+    rangeSelection: .rightEdge,
+    expected: [1010, 2020, 3030, 4040]),
+
+  ReplaceRangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    newElements: [9090],
+    rangeSelection: .middle,
+    expected: [1010, 9090, 5050]),
+]
+
 extension TestSuite {
   /// Adds a set of tests for `RangeReplaceableCollection`.
   ///
@@ -416,45 +454,7 @@ self.test("\(testNamePrefix).init(Sequence)/semantics") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).replaceSubrange()/semantics") {
-  let tests: [ReplaceRangeTest] = [
-    ReplaceRangeTest(
-      collection: [],
-      newElements: [],
-      rangeSelection: .EmptyRange,
-      expected: []),
-
-    ReplaceRangeTest(
-      collection: [],
-      newElements: [1010, 2020, 3030],
-      rangeSelection: .EmptyRange,
-      expected: [1010, 2020, 3030]),
-
-    ReplaceRangeTest(
-      collection: [4040],
-      newElements: [1010, 2020, 3030],
-      rangeSelection: .LeftEdge,
-      expected: [1010, 2020, 3030, 4040]),
-
-    ReplaceRangeTest(
-      collection: [1010],
-      newElements: [2020, 3030, 4040],
-      rangeSelection: .RightEdge,
-      expected: [1010, 2020, 3030, 4040]),
-
-    ReplaceRangeTest(
-      collection: [1010, 2020, 3030],
-      newElements: [4040],
-      rangeSelection: .RightEdge,
-      expected: [1010, 2020, 3030, 4040]),
-
-    ReplaceRangeTest(
-      collection: [1010, 2020, 3030, 4040, 5050],
-      newElements: [9090],
-      rangeSelection: .Middle,
-      expected: [1010, 9090, 5050]),
-  ]
-
-  for test in tests {
+  for test in replaceRangeTests {
     var c = makeWrappedCollection(test.collection)
     let rangeToReplace = test.rangeSelection.rangeOf(c)
     let newElements =
@@ -501,15 +501,15 @@ self.test("\(testNamePrefix).append()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// appendContents(of:)
+// append(contentsOf:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).appendContents(of:)/semantics") {
+self.test("\(testNamePrefix).append(contentsOf:)/semantics") {
   for test in appendContentsOfTests {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))
-    c.appendContents(of: newElements)
+    c.append(contentsOf: newElements)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },
@@ -526,37 +526,37 @@ self.test("\(testNamePrefix).insert()/semantics") {
     InsertTest(
       collection: [],
       newElement: 1010,
-      indexSelection: IndexSelection.Start,
+      indexSelection: IndexSelection.start,
       expected: [1010]),
 
     InsertTest(
       collection: [2020],
       newElement: 1010,
-      indexSelection: .Start,
+      indexSelection: .start,
       expected: [1010, 2020]),
 
     InsertTest(
       collection: [1010],
       newElement: 2020,
-      indexSelection: .End,
+      indexSelection: .end,
       expected: [1010, 2020]),
 
     InsertTest(
       collection: [2020, 3030, 4040, 5050],
       newElement: 1010,
-      indexSelection: .Start,
+      indexSelection: .start,
       expected: [1010, 2020, 3030, 4040, 5050]),
 
     InsertTest(
       collection: [1010, 2020, 3030, 4040],
       newElement: 5050,
-      indexSelection: .End,
+      indexSelection: .end,
       expected: [1010, 2020, 3030, 4040, 5050]),
 
     InsertTest(
       collection: [1010, 2020, 4040, 5050],
       newElement: 3030,
-      indexSelection: .Middle,
+      indexSelection: .middle,
       expected: [1010, 2020, 3030, 4040, 5050]),
   ]
 
@@ -572,75 +572,75 @@ self.test("\(testNamePrefix).insert()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// insertContentsOf()
+// insert(contentsOf:at:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).insertContentsOf()/semantics") {
+self.test("\(testNamePrefix).insert(contentsOf:at:)/semantics") {
   let tests: [InsertContentsOfTest] = [
     InsertContentsOfTest(
       collection: [],
       newElements: [],
-      indexSelection: IndexSelection.Start,
+      indexSelection: IndexSelection.start,
       expected: []),
 
     InsertContentsOfTest(
       collection: [],
       newElements: [1010],
-      indexSelection: .Start,
+      indexSelection: .start,
       expected: [1010]),
 
     InsertContentsOfTest(
       collection: [],
       newElements: [1010, 2020, 3030, 4040],
-      indexSelection: .Start,
+      indexSelection: .start,
       expected: [1010, 2020, 3030, 4040]),
 
     InsertContentsOfTest(
       collection: [2020],
       newElements: [1010],
-      indexSelection: .Start,
+      indexSelection: .start,
       expected: [1010, 2020]),
 
     InsertContentsOfTest(
       collection: [1010],
       newElements: [2020],
-      indexSelection: .End,
+      indexSelection: .end,
       expected: [1010, 2020]),
 
     InsertContentsOfTest(
       collection: [4040],
       newElements: [1010, 2020, 3030],
-      indexSelection: .Start,
+      indexSelection: .start,
       expected: [1010, 2020, 3030, 4040]),
 
     InsertContentsOfTest(
       collection: [1010],
       newElements: [2020, 3030, 4040],
-      indexSelection: .End,
+      indexSelection: .end,
       expected: [1010, 2020, 3030, 4040]),
 
     InsertContentsOfTest(
       collection: [1010, 2020, 4040, 5050],
       newElements: [3030],
-      indexSelection: .Middle,
+      indexSelection: .middle,
       expected: [1010, 2020, 3030, 4040, 5050]),
 
     InsertContentsOfTest(
       collection: [4040, 5050, 6060],
       newElements: [1010, 2020, 3030],
-      indexSelection: .Start,
+      indexSelection: .start,
       expected: [1010, 2020, 3030, 4040, 5050, 6060]),
 
     InsertContentsOfTest(
       collection: [1010, 2020, 3030],
       newElements: [4040, 5050, 6060],
-      indexSelection: .End,
+      indexSelection: .end,
       expected: [1010, 2020, 3030, 4040, 5050, 6060]),
 
     InsertContentsOfTest(
       collection: [1010, 2020, 3030, 7070, 8080, 9090],
       newElements: [4040, 5050, 6060],
-      indexSelection: .Middle,
+      indexSelection: .middle,
       expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080, 9090]),
   ]
 
@@ -648,7 +648,7 @@ self.test("\(testNamePrefix).insertContentsOf()/semantics") {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))
-    c.insertContentsOf(newElements, at: test.indexSelection.indexIn(c))
+    c.insert(contentsOf: newElements, at: test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },
@@ -664,25 +664,25 @@ self.test("\(testNamePrefix).remove(at:)/semantics") {
   let tests: [RemoveAtIndexTest] = [
     RemoveAtIndexTest(
       collection: [1010],
-      indexSelection: .Start,
+      indexSelection: .start,
       expectedRemovedElement: 1010,
       expectedCollection: []),
 
     RemoveAtIndexTest(
       collection: [1010, 2020, 3030],
-      indexSelection: .Start,
+      indexSelection: .start,
       expectedRemovedElement: 1010,
       expectedCollection: [2020, 3030]),
 
     RemoveAtIndexTest(
       collection: [1010, 2020, 3030],
-      indexSelection: .Middle,
+      indexSelection: .middle,
       expectedRemovedElement: 2020,
       expectedCollection: [1010, 3030]),
 
     RemoveAtIndexTest(
       collection: [1010, 2020, 3030],
-      indexSelection: .Last,
+      indexSelection: .last,
       expectedRemovedElement: 3030,
       expectedCollection: [1010, 2020]),
   ]
@@ -767,42 +767,42 @@ self.test("\(testNamePrefix).removeSubrange()/semantics") {
   let tests: [RemoveRangeTest] = [
     RemoveRangeTest(
       collection: [],
-      rangeSelection: .EmptyRange,
+      rangeSelection: .emptyRange,
       expected: []),
 
     RemoveRangeTest(
       collection: [1010],
-      rangeSelection: .Middle,
+      rangeSelection: .middle,
       expected: []),
 
     RemoveRangeTest(
       collection: [1010, 2020, 3030, 4040],
-      rangeSelection: .LeftHalf,
+      rangeSelection: .leftHalf,
       expected: [3030, 4040]),
 
     RemoveRangeTest(
       collection: [1010, 2020, 3030, 4040],
-      rangeSelection: .RightHalf,
+      rangeSelection: .rightHalf,
       expected: [1010, 2020]),
 
     RemoveRangeTest(
       collection: [1010, 2020, 3030, 4040, 5050],
-      rangeSelection: .Middle,
+      rangeSelection: .middle,
       expected: [1010, 5050]),
 
     RemoveRangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
-      rangeSelection: .LeftHalf,
+      rangeSelection: .leftHalf,
       expected: [4040, 5050, 6060]),
 
     RemoveRangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
-      rangeSelection: .RightHalf,
+      rangeSelection: .rightHalf,
       expected: [1010, 2020, 3030]),
 
     RemoveRangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
-      rangeSelection: .Middle,
+      rangeSelection: .middle,
       expected: [1010, 6060]),
   ]
 

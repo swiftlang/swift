@@ -40,6 +40,10 @@ PASS(ArrayCountPropagation, "array-count-propagation",
      "Propagate the count of arrays")
 PASS(ArrayElementPropagation, "array-element-propagation",
      "Propagate the value of array elements")
+PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",
+     "Dump MemBehavior and ReleaseBehavior results from calling "
+     "SILInstruction::{getMemoryBehavior,getReleasingBehavior}()"
+     " on all instructions")
 PASS(BasicCalleePrinter, "basic-callee-printer",
      "Construct basic callee analysis and use it to print callees "
      "for testing purposes")

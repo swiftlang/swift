@@ -54,7 +54,7 @@ static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
 /// can be inlined, the loop unrolled and the memory accesses merged.
 template <unsigned count> static void small_memcpy(void *dest, const void *src) {
   uint8_t *d8 = (uint8_t*)dest, *s8 = (uint8_t*)src;
-  for (unsigned int i = 0; i < count; i++) {
+  for (unsigned i = 0; i < count; i++) {
     *d8++ = *s8++;
   }
 }

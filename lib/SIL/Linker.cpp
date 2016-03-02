@@ -125,6 +125,22 @@ bool SILLinkerVisitor::processFunction(StringRef Name) {
   return true;
 }
 
+/// Process Decl, recursively deserializing any thing Decl may reference.
+SILFunction *SILLinkerVisitor::lookupFunction(StringRef Name,
+                                              SILLinkage Linkage) {
+
+  auto *NewFn = Loader->lookupSILFunction(Name, /* declarationOnly */ true,
+                                          Linkage);
+
+  if (!NewFn)
+    return nullptr;
+
+  assert(NewFn->isExternalDeclaration() &&
+         "SIL function lookup should never read function bodies");
+
+  return NewFn;
+}
+
 
 /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
 /// transitively references.
@@ -182,7 +198,7 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 
 bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
   // Ok we have a function ref inst, grab the callee.
-  SILFunction *Callee = AI->getCalleeFunction();
+  SILFunction *Callee = AI->getReferencedFunction();
   if (!Callee)
     return false;
 
@@ -199,7 +215,7 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
 }
 
 bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
-  SILFunction *Callee = PAI->getCalleeFunction();
+  SILFunction *Callee = PAI->getReferencedFunction();
   if (!Callee)
     return false;
   if (!isLinkAll() && !Callee->isTransparent() &&

@@ -60,7 +60,8 @@ public:
   DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
   DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageType, Size size,
                 Alignment align);
-  DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info);
+  DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info,
+                bool Unwrap);
   DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
                 llvm::Type *StorageType, Size size,
                 Alignment align);
@@ -81,7 +82,8 @@ public:
 
   // Determine whether this type is an Archetype itself.
   bool isArchetype() const {
-    return Type->getLValueOrInOutObjectType()->getKind() == TypeKind::Archetype;
+    return Type->getLValueOrInOutObjectType()->getDesugaredType()->getKind() ==
+           TypeKind::Archetype;
   }
 
   /// LValues, inout args, and Archetypes are implicitly indirect by

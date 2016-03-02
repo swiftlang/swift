@@ -22,6 +22,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <cstdlib>
 #include <string>
 
 static llvm::cl::opt<bool>
@@ -96,6 +97,11 @@ static llvm::StringRef substrAfter(llvm::StringRef whole,
 }
 
 int main(int argc, char **argv) {
+#if defined(__CYGWIN__)
+  // Cygwin clang 3.5.2 with '-O3' generates CRASHING BINARY,
+  // if main()'s first function call is passing argv[0].
+  std::rand();
+#endif  
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   swift::Demangle::DemangleOptions options;

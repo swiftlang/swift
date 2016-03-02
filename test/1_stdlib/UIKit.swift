@@ -12,13 +12,13 @@ func printOrientation(o: UIDeviceOrientation) {
 }
 
 print("Device orientations")
-printOrientation(UIDeviceOrientation.Unknown)
-printOrientation(UIDeviceOrientation.Portrait)
-printOrientation(UIDeviceOrientation.PortraitUpsideDown)
-printOrientation(UIDeviceOrientation.LandscapeLeft)
-printOrientation(UIDeviceOrientation.LandscapeRight)
-printOrientation(UIDeviceOrientation.FaceUp)
-printOrientation(UIDeviceOrientation.FaceDown)
+printOrientation(UIDeviceOrientation.unknown)
+printOrientation(UIDeviceOrientation.portrait)
+printOrientation(UIDeviceOrientation.portraitUpsideDown)
+printOrientation(UIDeviceOrientation.landscapeLeft)
+printOrientation(UIDeviceOrientation.landscapeRight)
+printOrientation(UIDeviceOrientation.faceUp)
+printOrientation(UIDeviceOrientation.faceDown)
 // CHECK:      Device orientations
 // CHECK-NEXT: false false, false false, false, false false
 // CHECK-NEXT: true true, false false, false, true true
@@ -35,11 +35,11 @@ func printOrientation(o: UIInterfaceOrientation) {
 }
 
 print("Interface orientations")
-printOrientation(UIInterfaceOrientation.Unknown)
-printOrientation(UIInterfaceOrientation.Portrait)
-printOrientation(UIInterfaceOrientation.PortraitUpsideDown)
-printOrientation(UIInterfaceOrientation.LandscapeLeft)
-printOrientation(UIInterfaceOrientation.LandscapeRight)
+printOrientation(UIInterfaceOrientation.unknown)
+printOrientation(UIInterfaceOrientation.portrait)
+printOrientation(UIInterfaceOrientation.portraitUpsideDown)
+printOrientation(UIInterfaceOrientation.landscapeLeft)
+printOrientation(UIInterfaceOrientation.landscapeRight)
 // CHECK:      Interface orientations
 // CHECK-NEXT: false false, false false
 // CHECK-NEXT: true true, false false

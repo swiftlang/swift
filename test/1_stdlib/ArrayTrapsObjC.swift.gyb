@@ -28,7 +28,7 @@ class Derived : Base { }
 class Derived2 : Derived { }
 
 ArrayTraps.test("downcast1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -40,7 +40,7 @@ ArrayTraps.test("downcast1")
 }
 
 ArrayTraps.test("downcast2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -52,7 +52,7 @@ ArrayTraps.test("downcast2")
 }
 
 ArrayTraps.test("downcast3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -71,7 +71,7 @@ class ObjCBase : NSObject, ObjCProto { }
 class ObjCDerived : ObjCBase { }
 
 ArrayTraps.test("downcast4")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -83,7 +83,7 @@ ArrayTraps.test("downcast4")
 }
 
 ArrayTraps.test("bounds_with_downcast")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
@@ -119,7 +119,7 @@ class ViolateInoutSafetySwitchToObjcBuffer {
   }
 
   @inline(never)
-  func runLoop(inout A: [ElementClass]) {
+  func runLoop(A: inout [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
@@ -140,7 +140,7 @@ class ViolateInoutSafetySwitchToObjcBuffer {
 }
 
 ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))  
   .crashOutputMatches(_isDebugAssertConfiguration() ?
@@ -162,7 +162,7 @@ class ViolateInoutSafetyNeedElementTypeCheck {
   }
 
   @inline(never)
-  func runLoop(inout A : [ElementClass]) {
+  func runLoop(A: inout [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
@@ -183,7 +183,7 @@ class ViolateInoutSafetyNeedElementTypeCheck {
 }
 
 ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))  
   .crashOutputMatches(_isDebugAssertConfiguration() ?

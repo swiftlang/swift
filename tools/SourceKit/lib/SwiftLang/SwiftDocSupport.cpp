@@ -92,6 +92,8 @@ public:
   }
 
   void printDeclPre(const Decl *D) override {
+    if (isa<ParamDecl>(D))
+      return; // Parameters are handled specially in addParameters().
     unsigned StartOffset = OS.tell();
     EntitiesStack.emplace_back(D, StartOffset);
   }
@@ -104,6 +106,9 @@ public:
   }
 
   void printDeclPost(const Decl *D) override {
+    if (isa<ParamDecl>(D))
+      return; // Parameters are handled specially in addParameters().
+
     assert(EntitiesStack.back().Dcl == D);
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
@@ -200,6 +205,11 @@ static bool initDocEntityInfo(const Decl *D, bool IsRef, DocEntityInfo &Info,
     ide::getDocumentationCommentAsXML(D, OS);
 
     initDocGenericParams(D, Info);
+
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
+      SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
+    }
   }
 
   return false;

@@ -59,7 +59,7 @@ tests.test("_isUniquelyReferenced/OptionalNativeObject") {
 class XObjC : NSObject {}
 
 tests.test("_isUnique_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -70,7 +70,7 @@ tests.test("_isUnique_native/SpareBitTrap")
 }
 
 tests.test("_isUniqueOrPinned_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -81,7 +81,7 @@ tests.test("_isUniqueOrPinned_native/SpareBitTrap")
 }
 
 tests.test("_isUnique_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -91,7 +91,7 @@ tests.test("_isUnique_native/NonNativeTrap")
 }
 
 tests.test("_isUniqueOrPinned_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
@@ -139,8 +139,8 @@ struct ContainsP { var p: P }
 func exerciseArrayValueWitnesses<T>(value: T) {
   let buf = UnsafeMutablePointer<T>(allocatingCapacity: 5)
 
-  (buf + 0).initializePointee(value)
-  (buf + 1).initializePointee(value)
+  (buf + 0).initialize(with: value)
+  (buf + 1).initialize(with: value)
   
   Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
   Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)

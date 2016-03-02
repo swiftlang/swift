@@ -332,11 +332,12 @@ func testSelectorStyleArguments2(let x: Int,
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
+// expected-warning@-1 {{'inout' before a parameter name is deprecated, place it before the parameter type instead}}
 }
 
 
 
-func updateInt(inout x : Int) {}
+func updateInt(x : inout Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
@@ -435,7 +436,7 @@ struct StructWithDelegatingInit {
 func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} expected-error 2 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
-struct F {
+struct F { // expected-note 2 {{in declaration of 'F'}}
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error 2 {{expected declaration}}
   }
   

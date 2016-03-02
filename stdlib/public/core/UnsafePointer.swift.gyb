@@ -143,9 +143,9 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
   // FIXME: add tests (since the `count` has been added)
-  public func initializePointee(newValue: Pointee, count: Int = 1) {
+  public func initialize(with newValue: Pointee, count: Int = 1) {
     _stdlibAssert(count >= 0,
-      "${Self}.initializePointee with negative count")
+      "${Self}.initialize(with:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
@@ -156,14 +156,14 @@ public struct ${Self}<Pointee>
   /// Retrieve the `pointee`, returning the referenced memory to an
   /// uninitialized state.
   ///
-  /// Equivalent to `{ defer { deinitializePointee() }; return pointee }()`, but
+  /// Equivalent to `{ defer { deinitialize() }; return pointee }()`, but
   /// more efficient.
   ///
   /// - Precondition: The pointee is initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
   @warn_unused_result
-  public func take() -> Pointee {
+  public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
 
@@ -243,7 +243,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initializePointee((source + i).move())
+    //   (self + i).initialize(with: (source + i).move())
     // }
   }
 
@@ -276,7 +276,7 @@ public struct ${Self}<Pointee>
     // var src = source + count
     // var dst = self + count
     // while dst != self {
-    //   (--dst).initializePointee((--src).move())
+    //   (--dst).initialize(with: (--src).move())
     // }
   }
 
@@ -305,7 +305,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initializePointee(source[i])
+    //   (self + i).initialize(with: source[i])
     // }
   }
 
@@ -319,7 +319,7 @@ public struct ${Self}<Pointee>
   public func initializeFrom<
     C : Collection where C.Iterator.Element == Pointee
   >(source: C) {
-    source._initializeTo(self)
+    source._copyContents(initializing: self)
   }
 
   /// Replace `count` initialized `Pointee`s starting at `self` with
@@ -358,8 +358,8 @@ public struct ${Self}<Pointee>
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func deinitializePointee(count count: Int = 1) {
-    _stdlibAssert(count >= 0, "${Self}.deinitializePointee with negative count")
+  public func deinitialize(count count: Int = 1) {
+    _stdlibAssert(count >= 0, "${Self}.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
@@ -408,7 +408,7 @@ public struct ${Self}<Pointee>
   /// of a `Pointee` which is written into buffer before this method returns.
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
-    inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
+    buffer: inout U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -419,7 +419,7 @@ public struct ${Self}<Pointee>
   /// of buffer.
   @_transparent public
   func _withBridgeValue<U, R>(
-    inout buffer: U, @noescape body: UnsafeMutablePointer<U> -> R
+    buffer: inout U, @noescape body: UnsafeMutablePointer<U> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -531,12 +531,12 @@ public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
 }
 
 @_transparent
-public func += <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
+public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @_transparent
-public func -= <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
+public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs - rhs
 }
 
@@ -569,13 +569,18 @@ extension ${Self} {
     }
   }
 
-  @available(*, unavailable, renamed="initializePointee")
+  @available(*, unavailable, renamed="initialize(with:)")
   public func initialize(newvalue: Pointee) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="take")
-  public func move() -> Pointee {
+  @available(*, unavailable, renamed="deinitialize(count:)")
+  public func destroy() {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="deinitialize(count:)")
+  public func destroy(count: Int) {
     fatalError("unavailable function can't be called")
   }
 }

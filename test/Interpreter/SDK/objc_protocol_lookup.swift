@@ -37,3 +37,44 @@ func check(x: AnyObject) {
 check(NSString()) // CHECK: true true
 check(C()) // CHECK: true true
 check(D()) // CHECK: true true
+
+// Make sure partial application of methods with @autoreleased
+// return values works
+
+var count = 0
+
+class Juice : NSObject {
+  override init() {
+    count += 1
+  }
+
+  deinit {
+    count -= 1
+  }
+}
+
+@objc protocol Fruit {
+  optional var juice: Juice { get }
+}
+
+class Durian : NSObject, Fruit {
+  init(juice: Juice) {
+    self.juice = juice
+  }
+
+  var juice: Juice
+}
+
+func consume(fruit: Fruit) {
+  _ = fruit.juice
+}
+
+autoreleasepool {
+  let tasty = Durian(juice: Juice())
+  print(count) // CHECK: 1
+  consume(tasty)
+}
+
+do {
+  print(count) // CHECK: 0
+}

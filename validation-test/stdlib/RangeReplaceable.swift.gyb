@@ -30,7 +30,7 @@ RangeReplaceableTestSuite.test("append/dispatch") {
 
 RangeReplaceableTestSuite.test("appendContentsOf/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.appendContents(of: [ 2, 3 ].map(OpaqueValue.init))
+  tester.append(contentsOf: [ 2, 3 ].map(OpaqueValue.init))
   expectCustomizable(tester, tester.log.appendContentsOf)
 }
 
@@ -40,10 +40,10 @@ RangeReplaceableTestSuite.test("insert/dispatch") {
   expectCustomizable(tester, tester.log.insert)
 }
 
-RangeReplaceableTestSuite.test("insertContentsOf/dispatch") {
+RangeReplaceableTestSuite.test("insert(contentsOf:at:)/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.insertContentsOf(
-    [ 2, 3 ].map(OpaqueValue.init),
+  tester.insert(
+    contentsOf: [ 2, 3 ].map(OpaqueValue.init),
     at: tester.base.endIndex)
   expectCustomizable(tester, tester.log.insertContentsOf)
 }
@@ -114,35 +114,21 @@ func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
 %   ('Defaulted{}RangeReplaceableSlice'.format(traversal), traversal)
 %     for traversal in traversals
 % ]
-% other_array_types = [ 'Array', 'ArraySlice', 'ContiguousArray' ]
-% collections += [(array, 'RandomAccess') for array in other_array_types]
 
 % for Base, traversal in collections:
-%     oob_behavior = '.None' if Base in other_array_types else '.ExpectationFailure' 
 %     collection_or_slice = 'Slice' if 'Slice' in Base else 'Collection'
-if true {
+do {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  // `Array`, `ArraySlice`, and `ContiguousArrayBuffer` have no expectation of
-  // failure for advancing their indexes "out of bounds", because they are just
-  // `Int`.
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = ${oob_behavior}
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .expectationFailure
 
   RangeReplaceableTestSuite.add${traversal}RangeReplaceable${collection_or_slice}Tests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
-%     if Base in other_array_types:
-      return ${Base}(elements)
-%     else:
       return ${Base}(elements: elements)
-%     end
     },
     wrapValue: identity,
     extractValue: identity,
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-%     if Base in other_array_types:
-      return ${Base}(elements)
-%     else:
       return ${Base}(elements: elements)
-%     end
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
@@ -150,21 +136,13 @@ if true {
 
   RangeReplaceableTestSuite.add${traversal}RangeReplaceable${collection_or_slice}Tests(
     makeCollection: { (elements: [LifetimeTracked]) in
-%     if Base in other_array_types:
-      return ${Base}(elements)
-%     else:
       return ${Base}(elements: elements)
-%     end
     },
     wrapValue: { (element: OpaqueValue<Int>) in LifetimeTracked(element.value) },
     extractValue: { (element: LifetimeTracked) in OpaqueValue(element.value) },
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
       // FIXME: use LifetimeTracked.
-%     if Base in other_array_types:
-      return ${Base}(elements)
-%     else:
       return ${Base}(elements: elements)
-%     end
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,

@@ -42,7 +42,7 @@ public struct Character :
       shift += 8
     }
 
-    UTF8.encode(scalar, output: output)
+    UTF8.encode(scalar, sendingOutputTo: output)
     asInt |= (~0) << shift
     _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
@@ -96,7 +96,7 @@ public struct Character :
       s.startIndex.successor() == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    let (count, initialUTF8) = s._core._encodeSomeUTF8(0)
+    let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
     // Notice that the result of sizeof() is a small non-zero number and can't
     // overflow when multiplied by 8.
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
@@ -199,9 +199,10 @@ public struct Character :
 
   struct _SmallUTF16 : Collection {
     init(_ u8: UInt64) {
-      let count = UTF16.measure(
-        UTF8.self, input: _SmallUTF8(u8).makeIterator(),
-        repairIllFormedSequences: true)!.0
+      let count = UTF16.transcodedLength(
+        of: _SmallUTF8(u8).makeIterator(),
+        decodedAs: UTF8.self,
+        repairingIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
       var u16: UInt64 = 0
@@ -210,8 +211,10 @@ public struct Character :
         u16 = u16 | UInt64($0)
       }
       transcode(
-        UTF8.self, UTF16.self, _SmallUTF8(u8).makeIterator(), output,
-        stoppingOnError: false)
+        _SmallUTF8(u8).makeIterator(),
+        from: UTF8.self, to: UTF16.self,
+        stoppingOnError: false,
+        sendingOutputTo: output)
       self.data = u16
     }
 
@@ -324,7 +327,7 @@ public func <(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
   case let (.small(lbits), .small(rbits)) where
     // Note: This is consistent with Foundation but unicode incorrect.
-    // See String._lessThanASCII.
+    // See String._compareASCII.
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
     && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
     return Bool(Builtin.cmp_ult_Int63(lbits, rbits))

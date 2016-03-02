@@ -26,7 +26,7 @@ func condUnreachable() {
 // DEBUG-LABEL: sil hidden @_TF25conditionally_unreachable15condUnreachableFT_T_ 
 // DEBUG-NOT:     cond_br
 // DEBUG:         function_ref @foo
-// DEBUG-NOT:     unreachable
+// DEBUG-NOT:     {{ unreachable}}
 // DEBUG:         return
 
 // RELEASE-LABEL: sil hidden @_TF25conditionally_unreachable15condUnreachableFT_T_ 
@@ -34,4 +34,4 @@ func condUnreachable() {
 // RELEASE-NOT:     function_ref @foo
 // RELEASE-NOT:     return
 // RELEASE-NOT:     builtin
-// RELEASE:         unreachable
+// RELEASE:         {{ unreachable}}

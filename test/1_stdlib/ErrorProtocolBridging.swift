@@ -85,7 +85,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     case let x as NSCocoaError:
       cocoaCode = x._code
       expectTrue(x.isFileError)
-      expectEqual(x, NSCocoaError.FileNoSuchFileError)
+      expectEqual(x, NSCocoaError.fileNoSuchFileError)
       expectEqual(x.hashValue, NSFileNoSuchFileError)
     default:
       cocoaCode = nil
@@ -98,7 +98,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
 
     let isNoSuchFileError: Bool
     switch e {
-    case NSCocoaError.FileNoSuchFileError:
+    case NSCocoaError.fileNoSuchFileError:
       isNoSuchFileError = true
     default:
       isNoSuchFileError = false
@@ -113,7 +113,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     let eURL: ErrorProtocol = nsURL
     let isBadURLError: Bool
     switch eURL {
-    case NSURLError.BadURL:
+    case NSURLError.badURL:
       isBadURLError = true
     default:
       isBadURLError = false

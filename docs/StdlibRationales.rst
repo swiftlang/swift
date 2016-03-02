@@ -49,7 +49,7 @@ e.g. ``Int(text: String)``, yielding a ``Int?``. When other forms provide
 added convenience, they may be provided as well. For example::
 
   String.Index(s.utf16.startIndex.successor(), within: s) // canonical
-  s.utf16.startIndex.successor().samePositionIn(s)        // alternate
+  s.utf16.startIndex.successor().samePosition(in: s)      // alternate
 
 Converting initializers generally take one parameter. A converting
 initializer's first parameter should not have an argument label unless

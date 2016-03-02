@@ -115,7 +115,7 @@ public class ManagedBuffer<Value, Element>
 
   /// Destroy the stored Value.
   deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.deinitializePointee() }
+    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.deinitialize() }
   }
 
   /// The stored `Value` instance.
@@ -150,8 +150,8 @@ public class ManagedBuffer<Value, Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements) -> Void in
-///            pointerToElements.deinitializePointee(count: self.count)
-///            pointerToValue.deinitializePointee()
+///            pointerToElements.deinitialize(count: self.count)
+///            pointerToValue.deinitialize()
 ///          }
 ///        }
 ///
@@ -190,7 +190,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
     // initialize the value field
     withUnsafeMutablePointerToValue {
-      $0.initializePointee(
+      $0.initialize(with: 
         initialValue(
           buffer: self.buffer,
           capacity: {
@@ -472,12 +472,12 @@ public func == <Value, Element>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(inout object: T) -> Bool
+public func isUniquelyReferencedNonObjC<T : AnyObject>(object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
 
-internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T) -> Bool {
+internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T) -> Bool {
   return _isUniqueOrPinned(&object)
 }
 
@@ -504,7 +504,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
-  inout object: T
+  object: inout T
 ) -> Bool {
   return _isUnique(&object)
 }
@@ -533,7 +533,7 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
-  inout object: T?
+  object: inout T?
 ) -> Bool {
   return _isUnique(&object)
 }

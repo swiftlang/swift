@@ -28,6 +28,11 @@ public func print(
   separator: String = " ",
   terminator: String = "\n"
 ) {
+#if os(Windows)
+  // FIXME: This fix is for 'crash at hook(output.left)' in cygwin.
+  //        Proper fix is needed. see: https://bugs.swift.org/browse/SR-612
+  let _playgroundPrintHook: ((String)->Void)? = nil
+#endif
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
     _print(
@@ -86,7 +91,7 @@ public func print<Target : OutputStream>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
-  inout to output: Target
+  to output: inout Target
 ) {
   _print(items, separator: separator, terminator: terminator, to: &output)
 }
@@ -107,7 +112,7 @@ public func debugPrint<Target : OutputStream>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
-  inout to output: Target
+  to output: inout Target
 ) {
   _debugPrint(
     items, separator: separator, terminator: terminator, to: &output)
@@ -119,7 +124,7 @@ internal func _print<Target : OutputStream>(
   items: [Any],
   separator: String = " ",
   terminator: String = "\n",
-  inout to output: Target
+  to output: inout Target
 ) {
   var prefix = ""
   output._lock()
@@ -138,7 +143,7 @@ internal func _debugPrint<Target : OutputStream>(
   items: [Any],
   separator: String = " ",
   terminator: String = "\n",
-  inout to output: Target
+  to output: inout Target
 ) {
   var prefix = ""
   output._lock()
@@ -162,15 +167,15 @@ public func debugPrint<T>(_: T, appendNewline: Bool = true) {}
 
 //===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
 @available(*, unavailable, message="Please use the 'to' label for the target stream: 'print((...), to: &...)'")
-public func print<T>(_: T, inout _: OutputStream) {}
+public func print<T>(_: T, _: inout OutputStream) {}
 @available(*, unavailable, message="Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")
-public func debugPrint<T>(_: T, inout _: OutputStream) {}
+public func debugPrint<T>(_: T, _: inout OutputStream) {}
 
 @available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'print((...), terminator: \"\", toStream: &...)'")
-public func print<T>(_: T, inout _: OutputStream, appendNewline: Bool = true) {}
+public func print<T>(_: T, _: inout OutputStream, appendNewline: Bool = true) {}
 @available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'debugPrint((...), terminator: \"\", toStream: &...)'")
 public func debugPrint<T>(
-  _: T, inout _: OutputStream, appendNewline: Bool = true
+  _: T, _: inout OutputStream, appendNewline: Bool = true
 ) {}
 //===----------------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//

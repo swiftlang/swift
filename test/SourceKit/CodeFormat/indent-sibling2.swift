@@ -24,12 +24,19 @@ public func ==(lhs: ProtobufJSONToken, rhs: ProtobufJSONToken) -> Bool {
   }
 }
 
+func f(a : Int,
+        bb b : Int,
+      cc c :Int) -> Int {
+  return 1
+}
+
 // RUN: %sourcekitd-test -req=format -line=6 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=7 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=8 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=9 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=19 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=20 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=29 -length=1 %s >>%t.response
 // RUN: FileCheck --strict-whitespace %s <%t.response
 
 //                        "foo(0,"
@@ -45,3 +52,6 @@ public func ==(lhs: ProtobufJSONToken, rhs: ProtobufJSONToken) -> Bool {
 // CHECK: key.sourcetext: "       (.COMMA, .COMMA),"
 //                        "          (.COMMA, .COMMA),"
 // CHECK: key.sourcetext: "          (.BEGIN_OBJECT, .BEGIN_OBJECT),"
+
+//                        "        bb b : Int,"
+// CHECK: key.sourcetext: "        cc c :Int) -> Int {"

@@ -87,10 +87,10 @@ infix operator +-+= {}
 infix func +-+ (x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
 prefix func +-+ (x: Int) -> Int {}
 
-prefix func -+- (inout y: Int) -> Int {} // expected-note 2{{found this candidate}}
-postfix func -+- (inout x: Int) -> Int {} // expected-note 2{{found this candidate}}
+prefix func -+- (y: inout Int) -> Int {} // expected-note 2{{found this candidate}}
+postfix func -+- (x: inout Int) -> Int {} // expected-note 2{{found this candidate}}
 
-infix func +-+= (inout x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
+infix func +-+= (x: inout Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
 
 var n = 0
 
@@ -167,7 +167,7 @@ infix operator ? {}  // expected-error {{expected operator name in operator decl
 
 infix operator ??= {}
 
-func ??= <T>(inout result : T?, rhs : Int) {  // ok
+func ??= <T>(result : inout T?, rhs : Int) {  // ok
 }
 
 

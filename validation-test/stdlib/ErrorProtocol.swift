@@ -34,7 +34,7 @@ struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
 
   func makeThreadLocalData() {}
 
-  func thread1(raceData: RaceData, inout _: Void) -> Observation3Int {
+  func thread1(raceData: RaceData, _: inout Void) -> Observation3Int {
     let ns = raceData.error as NSError
     // Use valueForKey to bypass bridging, so we can verify that the identity
     // of the unbridged NSString object is stable.

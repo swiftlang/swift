@@ -151,7 +151,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 
 /// If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
-  SILFunction *F = AI->getCalleeFunction();
+  SILFunction *F = AI->getReferencedFunction();
   if (!F || !F->isGlobalInit())
     return;
 
@@ -281,13 +281,16 @@ void SILGlobalOpt::collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG) {
 
 /// Return the callee of a once call.
 static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
-  assert(BI->getNumOperands() == 2 && "once call should have 3 operands.");
-  if (auto *TTTF = dyn_cast<ThinToThickFunctionInst>(BI->getOperand(1))) {
-    if (auto *FR = dyn_cast<FunctionRefInst>(TTTF->getOperand()))
-       return FR->getReferencedFunction();
-  } else if (auto *FR = dyn_cast<FunctionRefInst>(BI->getOperand(1))) {
+  assert(BI->getNumOperands() == 2 && "once call should have 2 operands.");
+
+  auto Callee = BI->getOperand(1);
+  assert(cast<SILFunctionType>(Callee->getType().getSwiftRValueType())
+                 ->getRepresentation() == SILFunctionTypeRepresentation::Thin &&
+         "Expected thin function representation!");
+
+  if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
     return FR->getReferencedFunction();
-  }
+
   return nullptr;
 }
 
@@ -347,8 +350,8 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
   ApplyInst *AI = dyn_cast<ApplyInst>(CBR->getCondition());
   if (!AI)
     return false;
-  
-  SILFunction *F = AI->getCalleeFunction();
+
+  SILFunction *F = AI->getReferencedFunction();
   if (!F || !F->hasSemanticsAttrs())
     return false;
 
@@ -435,8 +438,8 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       while (Node) {
         SILBasicBlock *DomParentBB = Node->getBlock();
         if (isAvailabilityCheck(DomParentBB)) {
-          DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb" <<
-                DomParentBB->getDebugID() << "\n");
+          DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb"
+                             << DomParentBB->getDebugID() << "\n");
           break;
         }
         BB = DomParentBB;
@@ -573,20 +576,23 @@ static SILInstruction *convertLoadSequence(SILInstruction *I,
     return Value;
 
   if (auto *LI = dyn_cast<LoadInst>(I)) {
-    Value = convertLoadSequence(cast<SILInstruction>(LI->getOperand()), Value, B);
+    Value =
+        convertLoadSequence(cast<SILInstruction>(LI->getOperand()), Value, B);
     LI->replaceAllUsesWith(Value);
     return Value;
   }
 
   // It is a series of struct_element_addr followed by load.
   if(auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
-    Value = convertLoadSequence(cast<SILInstruction>(SEAI->getOperand()), Value, B);
+    Value =
+        convertLoadSequence(cast<SILInstruction>(SEAI->getOperand()), Value, B);
     auto *SEI = B.createStructExtract(SEAI->getLoc(), Value, SEAI->getField());
     return SEI;
   }
 
   if(auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
-    Value = convertLoadSequence(cast<SILInstruction>(TEAI->getOperand()), Value, B);
+    Value =
+        convertLoadSequence(cast<SILInstruction>(TEAI->getOperand()), Value, B);
     auto *TEI = B.createTupleExtract(TEAI->getLoc(), Value, TEAI->getFieldNo());
     return TEI;
   }
@@ -666,7 +672,8 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
 /// We analyze the body of globalinit_func to see if it can be statically
 /// initialized. If yes, we set the initial value of the SILGlobalVariable and
 /// remove the "once" call to globalinit_func from the addressor.
-void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls) {
+void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
+                                       GlobalInitCalls &Calls) {
   if (UnhandledOnceCallee)
     return;
 

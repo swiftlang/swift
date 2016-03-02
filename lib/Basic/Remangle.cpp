@@ -24,6 +24,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include <vector>
+#include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
 
@@ -444,6 +445,16 @@ void Remangler::mangleSuffix(Node *node) {
 
 void Remangler::mangleGenericSpecialization(Node *node) {
   Out << "TSg";
+  mangleChildNodes(node); // GenericSpecializationParams
+
+  // Specializations are just prepended to already-mangled names.
+  resetSubstitutions();
+
+  // Start another mangled name.
+  Out << "__T";
+}
+void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
+  Out << "TSr";
   mangleChildNodes(node); // GenericSpecializationParams
 
   // Specializations are just prepended to already-mangled names.

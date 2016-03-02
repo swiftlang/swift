@@ -1590,21 +1590,30 @@ public:
 /// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'.  Also
 /// used to represent the operands to a binary operator.  Note that
 /// expressions like '(4)' are represented with a ParenExpr.
-class TupleExpr : public Expr {
-  // FIXME: We can't use llvm::TrailingObjects yet because there are *three*
-  // trailing buffers here.
+class TupleExpr final : public Expr,
+    private llvm::TrailingObjects<TupleExpr, Expr *, Identifier, SourceLoc> {
+  friend TrailingObjects;
+
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
   unsigned NumElements;
+
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return getNumElements();
+  }
+  size_t numTrailingObjects(OverloadToken<Identifier>) const {
+    return hasElementNames() ? getNumElements() : 0;
+  }
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return hasElementNames() ? getNumElements() : 0;
+  }
 
   /// Retrieve the buffer containing the element names.
   MutableArrayRef<Identifier> getElementNamesBuffer() {
     if (!hasElementNames())
       return { };
 
-    return { reinterpret_cast<Identifier *>(
-               getElements().data() + getNumElements()), 
-             getNumElements() };
+    return { getTrailingObjects<Identifier>(), getNumElements() };
   }
 
   /// Retrieve the buffer containing the element name locations.
@@ -1612,9 +1621,7 @@ class TupleExpr : public Expr {
     if (!hasElementNameLocs())
       return { };
     
-    return { reinterpret_cast<SourceLoc *>(
-               getElementNamesBuffer().data() + getNumElements()), 
-             getNumElements() };
+    return { getTrailingObjects<SourceLoc>(), getNumElements() };
   }
 
   TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
@@ -1652,12 +1659,12 @@ public:
 
   /// Retrieve the elements of this tuple.
   MutableArrayRef<Expr*> getElements() {
-    return { reinterpret_cast<Expr **>(this + 1), getNumElements() };
+    return { getTrailingObjects<Expr *>(), getNumElements() };
   }
 
   /// Retrieve the elements of this tuple.
   ArrayRef<Expr*> getElements() const {
-    return { reinterpret_cast<Expr *const *>(this + 1), getNumElements() };
+    return { getTrailingObjects<Expr *>(), getNumElements() };
   }
   
   unsigned getNumElements() const { return NumElements; }
@@ -1676,17 +1683,12 @@ public:
 
   /// Retrieve the element names for a tuple.
   ArrayRef<Identifier> getElementNames() const { 
-    if (!hasElementNames())
-      return { };
-
-    return { reinterpret_cast<const Identifier *>(
-               getElements().data() + getNumElements()),
-               getNumElements() };
+    return const_cast<TupleExpr *>(this)->getElementNamesBuffer();
   }
   
   /// Retrieve the ith element name.
   Identifier getElementName(unsigned i) const {
-    return hasElementNames()? getElementNames()[i] : Identifier();
+    return hasElementNames() ? getElementNames()[i] : Identifier();
   }
   
   /// Whether this tuple has element name locations.
@@ -1696,12 +1698,7 @@ public:
 
   /// Retrieve the locations of the element names for a tuple.
   ArrayRef<SourceLoc> getElementNameLocs() const {
-    if (!hasElementNameLocs())
-      return { };
-
-    return { reinterpret_cast<const SourceLoc *>(
-               getElementNames().data() + getNumElements()), 
-             getNumElements() };
+    return const_cast<TupleExpr *>(this)->getElementNameLocsBuffer();
   }
 
   /// Retrieve the location of the ith label, if known.

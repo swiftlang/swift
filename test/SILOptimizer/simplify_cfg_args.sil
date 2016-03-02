@@ -309,7 +309,7 @@ bb7:
 sil @fold_unreachable_terminators2 : $@convention(thin) (EA) -> Int32 {
 // CHECK: bb0
 bb0(%0 : $EA):
-// CHECK-NEXT:  [[VAL:%[a-zA-Z0-9]+]] = unchecked_enum_data %0 : $EA, #EA.cB!enumelt.1 // user: %2
+// CHECK-NEXT:  [[VAL:%[a-zA-Z0-9]+]] = unchecked_enum_data %0 : $EA, #EA.cB!enumelt.1{{.*}} // user: %2
 // CHECK-NEXT: return [[VAL]] : $Int32
   switch_enum %0 : $EA, case #EA.cA!enumelt: bb1, case #EA.cB!enumelt.1: bb3, case #EA.cC!enumelt.1: bb5
 

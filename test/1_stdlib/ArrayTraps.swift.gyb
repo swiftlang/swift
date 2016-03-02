@@ -39,7 +39,7 @@ var ${ArrayTy}Traps = TestSuite("${ArrayTy}Traps")
 %   for io in ['read', 'write']:
 
 ${ArrayTy}Traps.test("bounds1/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -48,7 +48,7 @@ ${ArrayTy}Traps.test("bounds1/${io}")
 }
 
 ${ArrayTy}Traps.test("bounds2/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -57,7 +57,7 @@ ${ArrayTy}Traps.test("bounds2/${io}")
 }
 
 ${ArrayTy}Traps.test("bounds3/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -66,7 +66,7 @@ ${ArrayTy}Traps.test("bounds3/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds0/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -75,7 +75,7 @@ ${ArrayTy}Traps.test("sliceBounds0/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds1/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -84,7 +84,7 @@ ${ArrayTy}Traps.test("sliceBounds1/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds2/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -93,7 +93,7 @@ ${ArrayTy}Traps.test("sliceBounds2/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds3/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -111,7 +111,7 @@ ${ArrayTy}Traps.test("PopFromEmpty") {
 
 %   for index in -1, 2:
 ${ArrayTy}Traps.test("${'insert(_:at:)/%s' % index}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -123,7 +123,7 @@ ${ArrayTy}Traps.test("${'insert(_:at:)/%s' % index}")
 
 %   for index in -1, 1, 2:
 ${ArrayTy}Traps.test("${'remove(at:)/%s' % index}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -135,7 +135,7 @@ ${ArrayTy}Traps.test("${'remove(at:)/%s' % index}")
 % end
 
 ArrayTraps.test("unsafeLength")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {

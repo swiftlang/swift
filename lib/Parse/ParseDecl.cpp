@@ -251,6 +251,9 @@ bool Parser::parseTopLevel() {
   } else if (Tok.is(tok::kw_sil_coverage_map)) {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseSILCoverageMap();
+  } else if (Tok.is(tok::kw_sil_scope)) {
+    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
+    parseSILScope();
   } else {
     parseBraceItems(Items,
                     allowTopLevelCode() ? BraceItemListKind::TopLevelCode
@@ -1902,7 +1905,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     // 'class' is a modifier on func, but is also a top-level decl.
     case tok::kw_class: {
       SourceLoc ClassLoc = consumeToken(tok::kw_class);
-      
+
       // If 'class' is a modifier on another decl kind, like var or func,
       // then treat it as a modifier.
       if (isStartOfDecl()) {
@@ -1916,7 +1919,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         }
         continue;
       }
-      
+
       // Otherwise this is the start of a class declaration.
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
       Status = DeclResult;
@@ -1991,7 +1994,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Convenience);
         continue;
       }
-        
+
       // Otherwise this is not a context-sensitive keyword.
       SWIFT_FALLTHROUGH;
 
@@ -2005,13 +2008,28 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                                                   false);
         }
       }
+
       diagnose(Tok, diag::expected_decl);
+
+      if (CurDeclContext) {
+        if (auto nominal = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
+          diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
+                   nominal->getName());
+        } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
+          if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
+            if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
+              diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
+                idRepr->getComponentRange().front()->getIdentifier());
+            }
+          }
+        }
+      }
       return makeParserErrorResult<Decl>();
-  
+
     case tok::unknown:
       consumeToken(tok::unknown);
       continue;
-        
+
     // Unambiguous top level decls.
     case tok::kw_import:
       DeclResult = parseDeclImport(Flags, Attributes);
@@ -2113,7 +2131,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       break;
     }
-  
+
     // If we 'break' out of the switch, break out of the loop too.
     break;
   }
@@ -2607,13 +2625,13 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
   bool foundActive = false;
   SmallVector<IfConfigDeclClause, 4> Clauses;
-  
+
+  ConditionalCompilationExprState ConfigState;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     
-    ConditionalCompilationExprState ConfigState;
     if (isElse) {
       ConfigState.setConditionActive(!foundActive);
     } else {
@@ -2647,16 +2665,21 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       scope.emplace(this, ScopeKind::Brace, /*inactiveConfigBlock=*/true);
     
     SmallVector<Decl*, 8> Decls;
-    ParserStatus Status;
-    while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
-           Tok.isNot(tok::pound_elseif)) {
-      Status = parseDecl(Decls, Flags);
-
-      if (Status.isError()) {
-        diagnose(Tok, diag::expected_close_to_if_directive);
-        skipUntilConditionalBlockClose();
-        break;
-      }
+    if (ConfigState.shouldParse()) {
+      ParserStatus Status;
+      while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
+             Tok.isNot(tok::pound_elseif)) {
+          Status = parseDecl(Decls, Flags);
+          if (Status.isError()) {
+            diagnose(Tok, diag::expected_close_to_if_directive);
+            skipUntilConditionalBlockClose();
+            break;
+          }
+        }
+      } else {
+      DiagnosticTransaction DT(Diags);
+      skipUntilConditionalBlockClose();
+      DT.abort();
     }
 
     Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
@@ -3781,10 +3804,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
 
-  bool HasBehavior = false;
-  SourceLoc BehaviorLBracket, BehaviorRBracket;
-  TypeRepr *BehaviorType;
-
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
   defer {
@@ -3829,27 +3848,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
   };
   
-  // Check for a behavior declaration.
-  if (Context.LangOpts.EnableExperimentalPropertyBehaviors
-      && Tok.is(tok::l_square)) {
-    BehaviorLBracket = consumeToken(tok::l_square);
-    // TODO: parse visibility (public/private/internal)
-    auto type = parseType(diag::expected_behavior_name,
-                          /*handle completion*/ true);
-    // TODO: recovery. could scan to next closing bracket
-    if (type.isParseError())
-      return makeParserError();
-    if (type.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    BehaviorType = type.get();
-    if (!Tok.is(tok::r_square)) {
-      diagnose(Tok.getLoc(), diag::expected_rsquare_after_behavior_name);
-      return makeParserError();
-    }
-    BehaviorRBracket = consumeToken(tok::r_square);
-    HasBehavior = true;
-  }
-
   do {
     Pattern *pattern;
     {
@@ -3869,8 +3867,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
-      if (HasBehavior)
-        VD->addBehavior(BehaviorLBracket, BehaviorType, BehaviorRBracket);
       VD->getAttrs() = Attributes;
       Decls.push_back(VD);
     });
@@ -3956,9 +3952,72 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         return makeParserError();
     }
     
+    // Parse a behavior block if present.
+    if (consumeIf(tok::kw___behavior)) {
+      auto type = parseType(diag::expected_behavior_name,
+                            /*handle completion*/ true);
+      if (type.isParseError())
+        return makeParserError();
+      if (type.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+      
+      // Parse a following trailing closure argument.
+      // FIXME: Handle generalized parameters.
+      Expr *paramExpr = nullptr;
+      if (Tok.is(tok::l_brace)) {
+        // Record the variables that we're trying to set up.  This allows us
+        // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
+        // decl (even though names aren't injected into scope when the parameter
+        // is parsed).
+        SmallVector<VarDecl *, 4> Vars;
+        Vars.append(DisabledVars.begin(), DisabledVars.end());
+        pattern->collectVariables(Vars);
+        
+        llvm::SaveAndRestore<decltype(DisabledVars)>
+        RestoreCurVars(DisabledVars, Vars);
+        
+        llvm::SaveAndRestore<decltype(DisabledVarReason)>
+        RestoreReason(DisabledVarReason, diag::var_init_self_referential);
+
+        // Set up a decl context for the closure.
+        // This will be recontextualized to a method we synthesize during
+        // type checking.
+        if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
+          initContext = Context.createPatternBindingContext(CurDeclContext);
+        Optional<ParseFunctionBody> initParser;
+        Optional<ContextChange> topLevelParser;
+        if (topLevelDecl)
+          topLevelParser.emplace(*this, topLevelDecl,
+                                 &State->getTopLevelContext());
+        if (initContext)
+          initParser.emplace(*this, initContext);
+
+        auto closure = parseExprClosure();
+        usedInitContext = true;
+        if (closure.isParseError())
+          return makeParserError();
+        if (closure.hasCodeCompletion())
+          return makeParserCodeCompletionStatus();
+        paramExpr = closure.get();
+      }
+
+      unsigned numVars = 0;
+      pattern->forEachVariable([&](VarDecl *VD) {
+        ++numVars;
+        // TODO: Support parameter closure with multiple vars. This is tricky
+        // since the behavior's parameter type may be dependent on the
+        // property type, so we'd need to clone the closure expr for each var
+        // to re-type-check it.
+        if (numVars > 1 && paramExpr) {
+          diagnose(paramExpr->getLoc(), diag::behavior_multiple_vars);
+          paramExpr = nullptr;
+        }
+        
+        VD->addBehavior(type.get(), paramExpr);
+      });
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
-    if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
+    } else if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
       HasAccessors = true;
       
       if (auto *boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc,

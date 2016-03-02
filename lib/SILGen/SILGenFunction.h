@@ -487,7 +487,7 @@ public:
   void enterDebugScope(SILLocation Loc) {
     auto *Parent =
         DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
-    auto *DS = new (SGM.M) SILDebugScope(Loc, getFunction(), Parent);
+    auto *DS = new (SGM.M) SILDebugScope(Loc, &getFunction(), Parent);
     DebugScopeStack.push_back(DS);
     B.setCurrentDebugScope(DS);
   }
@@ -938,6 +938,8 @@ public:
 
   void emitConditionalPBD(PatternBindingDecl *PBD, SILBasicBlock *FailBB);
 
+  void usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt *stmt,
+                                        const llvm::function_ref<void(void)> &f);
   void emitSwitchStmt(SwitchStmt *S);
   void emitSwitchFallthrough(FallthroughStmt *S);
 

@@ -19,6 +19,7 @@
 #include "swift/Runtime/Debug.h"
 #include "Private.h"
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 #include <new>
 #include <string>

@@ -3098,6 +3098,12 @@ public:
   bool isPolymorphic() const { return GenericSig != nullptr; }
   CanGenericSignature getGenericSignature() const { return GenericSig; }
 
+  CanType getSelfInstanceType() const;
+
+  /// If this a @convention(witness_method) function with an abstract
+  /// self parameter, return the protocol constraint for the Self type.
+  ProtocolDecl *getDefaultWitnessMethodProtocol(ModuleDecl &M) const;
+
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 
   /// \brief Returns the language-level calling convention of the function.
@@ -3119,8 +3125,8 @@ public:
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                               ModuleDecl *astModule,
-                                               ArrayRef<Substitution> subs);
+                                      ModuleDecl *astModule,
+                                      ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),

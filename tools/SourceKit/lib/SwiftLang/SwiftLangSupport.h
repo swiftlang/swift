@@ -263,6 +263,17 @@ public:
                                swift::AccessorKind AccKind,
                                llvm::raw_ostream &OS);
 
+  /// Annotates a declaration with XML tags that describe the key substructure
+  /// of the declaration for CursorInfo/DocInfo.
+  ///
+  /// Prints declarations with decl- and type-specific tags derived from the
+  /// UIDs used for decl/refs.
+  ///
+  /// FIXME: This move to libIDE, but currently depends on the UIdentVisitor.
+  static void printFullyAnnotatedDeclaration(const swift::ValueDecl *VD,
+                                             swift::Type BaseTy,
+                                             llvm::raw_ostream &OS);
+
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
   static std::string resolvePathSymlinks(StringRef FilePath);

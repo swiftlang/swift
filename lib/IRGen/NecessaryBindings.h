@@ -21,11 +21,14 @@
 #ifndef SWIFT_IRGEN_NECESSARYBINDINGS_H
 #define SWIFT_IRGEN_NECESSARYBINDINGS_H
 
+#include "GenericRequirement.h"
 #include "llvm/ADT/SetVector.h"
 #include "swift/AST/Types.h"
 
 namespace swift {
-  class ArchetypeType;
+  class CanType;
+  class ProtocolDecl;
+  class ProtocolConformanceRef;
 
 namespace irgen {
   class Address;
@@ -36,7 +39,7 @@ namespace irgen {
 /// NecessaryBindings - The set of metadata that must be saved in
 /// order to perform some set of operations on a type.
 class NecessaryBindings {
-  llvm::SetVector<ArchetypeType*> Types;
+  llvm::SetVector<GenericRequirement> Requirements;
 
 public:
   NecessaryBindings() = default;
@@ -48,14 +51,16 @@ public:
                                                   CanSILFunctionType substType,
                                                   ArrayRef<Substitution> subs);
   
-  /// Collect the necessary bindings to perform value operations on a type.
-  static NecessaryBindings forValueOperations(IRGenModule &IGM, CanType type);
+  /// Add whatever information is necessary to reconstruct type metadata
+  /// for the given type.
+  void addTypeMetadata(CanType type);
 
-  /// Add bindings required by the given archetype.
-  void addArchetype(CanArchetypeType archetype);
+  /// Add whatever information is necessary to reconstruct a witness table
+  /// reference for the given type.
+  void addProtocolConformance(CanType type, ProtocolConformanceRef conf);
 
   /// Is the work to do trivial?
-  bool empty() const { return Types.empty(); }
+  bool empty() const { return Requirements.empty(); }
 
   /// Returns the required size of the bindings.
   /// Pointer alignment is sufficient.

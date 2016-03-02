@@ -112,22 +112,22 @@ func pickRandom<T>(a: [T]) -> T {
 
 func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
   switch s._variantStorage {
-  case .Native:
+  case .native:
     return true
-  case .Cocoa:
+  case .cocoa:
     return false
   }
 }
 
 func isNativeNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NativeSetStorage").length > 0
+  return className.range(of: "NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOf("NSSet").length > 0 ||
-    className.rangeOf("NSCFSet").length > 0
+  return className.range(of: "NSSet").length > 0 ||
+    className.range(of: "NSCFSet").length > 0
 }
 
 func getBridgedEmptyNSSet() -> NSSet {
@@ -799,7 +799,7 @@ SetTestSuite.test("COW.Fast.UnionInPlaceSmallSetDoesNotReallocate") {
 SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
-    let originalCapacity = s._variantStorage.native.capacity
+    let originalCapacity = s._variantStorage.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
@@ -807,7 +807,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(s, to: Int.self)
-    expectTrue(s._variantStorage.native.capacity < originalCapacity)
+    expectTrue(s._variantStorage.asNative.capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
@@ -820,19 +820,19 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
     var identity1 = unsafeBitCast(s, to: Int.self)
-    let originalCapacity = s._variantStorage.native.capacity
+    let originalCapacity = s._variantStorage.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
-    expectEqual(originalCapacity, s._variantStorage.native.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
-    expectEqual(originalCapacity, s._variantStorage.native.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
   }
@@ -861,7 +861,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWFastSet()
     var identity1 = unsafeBitCast(s1, to: Int.self)
-    let originalCapacity = s1._variantStorage.native.capacity
+    let originalCapacity = s1._variantStorage.asNative.capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
 
@@ -872,7 +872,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
-    expectEqual(originalCapacity, s2._variantStorage.native.capacity)
+    expectEqual(originalCapacity, s2._variantStorage.asNative.capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(1010))
 
@@ -885,7 +885,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
-    let originalCapacity = s._variantStorage.native.capacity
+    let originalCapacity = s._variantStorage.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
@@ -893,7 +893,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(s, to: Int.self)
-    expectTrue(s._variantStorage.native.capacity < originalCapacity)
+    expectTrue(s._variantStorage.asNative.capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
@@ -906,19 +906,19 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
     var identity1 = unsafeBitCast(s, to: Int.self)
-    let originalCapacity = s._variantStorage.native.capacity
+    let originalCapacity = s._variantStorage.asNative.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
-    expectEqual(originalCapacity, s._variantStorage.native.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, to: Int.self))
-    expectEqual(originalCapacity, s._variantStorage.native.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
   }
@@ -947,7 +947,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, to: Int.self)
-    let originalCapacity = s1._variantStorage.native.capacity
+    let originalCapacity = s1._variantStorage.asNative.capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
 
@@ -958,7 +958,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
-    expectEqual(originalCapacity, s2._variantStorage.native.capacity)
+    expectEqual(originalCapacity, s2._variantStorage.asNative.capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(TestKeyTy(1010)))
 
@@ -1171,22 +1171,22 @@ class CustomImmutableNSSet : NSSet {
 
   @objc(copyWithZone:)
   override func copy(with zone: NSZone) -> AnyObject {
-    ++CustomImmutableNSSet.timesCopyWithZoneWasCalled
+    CustomImmutableNSSet.timesCopyWithZoneWasCalled += 1
     return self
   }
 
   override func member(object: AnyObject) -> AnyObject? {
-    ++CustomImmutableNSSet.timesMemberWasCalled
+    CustomImmutableNSSet.timesMemberWasCalled += 1
     return getAsNSSet([ 1010, 1020, 1030 ]).member(object)
   }
 
   override func objectEnumerator() -> NSEnumerator {
-    ++CustomImmutableNSSet.timesObjectEnumeratorWasCalled
+    CustomImmutableNSSet.timesObjectEnumeratorWasCalled += 1
     return getAsNSSet([ 1010, 1020, 1030 ]).objectEnumerator()
   }
 
   override var count: Int {
-    ++CustomImmutableNSSet.timesCountWasCalled
+    CustomImmutableNSSet.timesCountWasCalled += 1
     return 3
   }
 
@@ -1402,7 +1402,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
@@ -1430,7 +1430,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
@@ -3434,7 +3434,7 @@ class MockSetWithCustomCount : NSSet {
   }
 
   override var count: Int {
-    ++MockSetWithCustomCount.timesCountWasCalled
+    MockSetWithCustomCount.timesCountWasCalled += 1
     return _count
   }
 

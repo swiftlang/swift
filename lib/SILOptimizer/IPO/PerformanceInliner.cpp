@@ -46,9 +46,6 @@ namespace {
   llvm::cl::opt<int> TestThreshold("sil-inline-test-threshold",
                                         llvm::cl::init(-1), llvm::cl::Hidden);
 
-  llvm::cl::opt<int> TestOpt("sil-inline-test",
-                                   llvm::cl::init(0), llvm::cl::Hidden);
-
   // The following constants define the cost model for inlining.
 
   // The base value for every call: it represents the benefit of removing the
@@ -508,7 +505,7 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   for (auto &BB : *Callee)
     for (auto &I : BB)
       if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getCalleeFunction() == Callee)
+        if (Apply.getReferencedFunction() == Callee)
           return true;
   return false;
 }
@@ -516,8 +513,8 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
 // Returns the callee of an apply_inst if it is basically inlineable.
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
-  SILFunction *Callee = AI.getCalleeFunction();
-  
+  SILFunction *Callee = AI.getReferencedFunction();
+
   if (!Callee) {
     return nullptr;
   }
@@ -663,8 +660,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               SILLoopAnalysis *LA,
                                               ConstantTracker &callerTracker,
                                               unsigned &NumCallerBlocks) {
-  SILFunction *Callee = AI.getCalleeFunction();
-  
+  SILFunction *Callee = AI.getReferencedFunction();
+
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
   
@@ -687,14 +684,12 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
       
-      auto ICost = instructionInlineCost(I);
-      
       if (testThreshold >= 0) {
         // We are in test-mode: use a simplified cost model.
         CalleeCost += testCost(&I);
       } else {
         // Use the regular cost model.
-        CalleeCost += unsigned(ICost);
+        CalleeCost += unsigned(instructionInlineCost(I));
       }
       
       if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
@@ -713,7 +708,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     SILBasicBlock *takenBlock = getTakenBlock(block->getTerminator(),
                                               constTracker);
     if (takenBlock) {
-      Benefit += ConstTerminatorBenefit + TestOpt;
+      Benefit += ConstTerminatorBenefit;
       domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
         return child->getSinglePredecessor() != block || child == takenBlock;
       });
@@ -769,14 +764,21 @@ bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
     return false;
   
   unsigned CalleeCost = 0;
-  
+  int testThreshold = TestThreshold;
+
   for (SILBasicBlock &Block : *Callee) {
     for (SILInstruction &I : Block) {
-      auto ICost = instructionInlineCost(I);
-      CalleeCost += (unsigned)ICost;
-
-      if (CalleeCost > TrivialFunctionThreshold)
-        return false;
+      if (testThreshold >= 0) {
+        // We are in test-mode: use a simplified cost model.
+        CalleeCost += testCost(&I);
+        if (CalleeCost > 0)
+          return false;
+      } else {
+        // Use the regular cost model.
+        CalleeCost += unsigned(instructionInlineCost(I));
+        if (CalleeCost > TrivialFunctionThreshold)
+          return false;
+      }
     }
   }
   DEBUG(
@@ -793,6 +795,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   DominanceInfo *DT = DA->get(Caller);
   SILLoopInfo *LI = LA->get(Caller);
 
+  ColdBlockInfo ColdBlocks(DA);
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
 
@@ -820,7 +823,7 @@ void SILPerformanceInliner::collectAppliesToInline(
       }
     }
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
-      if (ColdBlockInfo::isSlowPath(block, child)) {
+      if (ColdBlocks.isSlowPath(block, child)) {
         // Handle cold blocks separately.
         visitColdBlocks(InitialCandidates, child, DT);
         return false;
@@ -832,7 +835,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   // Calculate how many times a callee is called from this caller.
   llvm::DenseMap<SILFunction *, unsigned> CalleeCount;
   for (auto AI : InitialCandidates) {
-    SILFunction *Callee = AI.getCalleeFunction();
+    SILFunction *Callee = AI.getReferencedFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
     CalleeCount[Callee]++;
   }
@@ -840,7 +843,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   // Now copy each candidate callee that has a small enough number of
   // call sites into the final set of call sites.
   for (auto AI : InitialCandidates) {
-    SILFunction *Callee = AI.getCalleeFunction();
+    SILFunction *Callee = AI.getReferencedFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     const unsigned CallsToCalleeThreshold = 1024;
@@ -869,7 +872,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
   // Second step: do the actual inlining.
   for (auto AI : AppliesToInline) {
-    SILFunction *Callee = AI.getCalleeFunction();
+    SILFunction *Callee = AI.getReferencedFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     if (!Callee->shouldOptimize()) {

@@ -12,9 +12,9 @@ func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   d: Dictionary<KeyTy, ValueTy>) -> Bool {
   switch d._variantStorage {
-  case .Native:
+  case .native:
     return true
-  case .Cocoa:
+  case .cocoa:
     return false
   }
 }
@@ -26,18 +26,18 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
 
 func isNativeNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOf("_NativeDictionaryStorageOwner").length > 0
+  return className.range(of: "_NativeDictionaryStorageOwner").length > 0
 }
 
 func isCocoaNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOf("NSDictionary").length > 0 ||
-    className.rangeOf("NSCFDictionary").length > 0
+  return className.range(of: "NSDictionary").length > 0 ||
+    className.range(of: "NSCFDictionary").length > 0
 }
 
 func isNativeNSArray(d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOf("_SwiftDeferredNSArray").length > 0
+  return className.range(of: "_SwiftDeferredNSArray").length > 0
 }
 
 // Compare two arrays as sets.
@@ -45,7 +45,7 @@ func equalsUnordered<T : Comparable>(
   lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
 ) -> Bool {
   func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
-    return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
+    return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
   }
   return lhs.sorted(isOrderedBefore: comparePair)
     .elementsEqual(rhs.sorted(isOrderedBefore: comparePair)) {
@@ -370,7 +370,7 @@ struct TestBridgedKeyTy
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
+    result: inout TestBridgedKeyTy?
   ) {
     _bridgedKeyBridgeOperations.fetchAndAdd(1)
     result = TestBridgedKeyTy(x.value)
@@ -378,7 +378,7 @@ struct TestBridgedKeyTy
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
+    result: inout TestBridgedKeyTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -435,7 +435,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCValueTy,
-    inout result: TestBridgedValueTy?
+    result: inout TestBridgedValueTy?
   ) {
     TestBridgedValueTy.bridgeOperations += 1
     result = TestBridgedValueTy(x.value)
@@ -443,7 +443,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCValueTy,
-    inout result: TestBridgedValueTy?
+    result: inout TestBridgedValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -493,7 +493,7 @@ struct TestBridgedEquatableValueTy
 
   static func _forceBridgeFromObjectiveC(
     x: TestObjCEquatableValueTy,
-    inout result: TestBridgedEquatableValueTy?
+    result: inout TestBridgedEquatableValueTy?
   ) {
     _bridgedEquatableValueBridgeOperations.fetchAndAdd(1)
     result = TestBridgedEquatableValueTy(x.value)
@@ -501,7 +501,7 @@ struct TestBridgedEquatableValueTy
 
   static func _conditionallyBridgeFromObjectiveC(
     x: TestObjCEquatableValueTy,
-    inout result: TestBridgedEquatableValueTy?
+    result: inout TestBridgedEquatableValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
@@ -628,7 +628,7 @@ func slurpFastEnumerationFromSwift(
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -647,7 +647,7 @@ func slurpFastEnumerationFromSwift(
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -670,7 +670,7 @@ func slurpFastEnumerationFromSwift(
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -679,7 +679,7 @@ func slurpFastEnumerationFromSwift(
     }
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
-      let value: AnyObject = d.object(for: key)!
+      let value: AnyObject = d.object(forKey: key)!
       let kv = (key, value)
       sink(kv)
       itemsReturned += 1
@@ -691,7 +691,7 @@ func slurpFastEnumerationFromSwift(
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectEqual(0, returnedCount)
   }
@@ -716,7 +716,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
   slurpFastEnumerationFromSwift(
     d, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(for: key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = (key, value)
     sink(kv)
   }
@@ -763,7 +763,7 @@ func < (
 ) -> Bool {
   let lhsElements = [ lhs.value, Int(bitPattern: lhs.valueIdentity) ]
   let rhsElements = [ rhs.value, Int(bitPattern: rhs.valueIdentity) ]
-  return lhsElements.lexicographicalCompare(rhsElements)
+  return lhsElements.lexicographicallyPrecedes(rhsElements)
 }
 
 func _equalsWithoutElementIdentity(
@@ -896,7 +896,7 @@ func < (
 ) -> Bool {
   let lhsElements = [ lhs.value, Int(bitPattern: lhs.valueIdentity) ]
   let rhsElements = [ rhs.value, Int(bitPattern: rhs.valueIdentity) ]
-  return lhsElements.lexicographicalCompare(rhsElements)
+  return lhsElements.lexicographicallyPrecedes(rhsElements)
 }
 
 func _makeExpectedSetContents(
@@ -990,7 +990,7 @@ func slurpFastEnumerationFromSwift(
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -1009,7 +1009,7 @@ func slurpFastEnumerationFromSwift(
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
+      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
     expectNotEqual(nil, state.mutationsPtr)
@@ -1114,7 +1114,7 @@ func < (
     rhs.key, rhs.value, Int(bitPattern: rhs.keyIdentity),
     Int(bitPattern: rhs.valueIdentity)
   ]
-  return lhsElements.lexicographicalCompare(rhsElements)
+  return lhsElements.lexicographicallyPrecedes(rhsElements)
 }
 
 func _equalsUnorderedWithoutElementIdentity(

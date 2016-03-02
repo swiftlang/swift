@@ -497,6 +497,15 @@ build the Debug variant of the Swift standard library and SDK overlay""",
     run_tests_group.add_argument("-B", "--benchmark",
         help="run the Swift Benchmark Suite after building",
         action="store_true")
+    run_tests_group.add_argument("--skip-test-linux",
+        help="skip testing Swift stdlibs for Linux",
+        action="store_true")
+    run_tests_group.add_argument("--skip-test-freebsd",
+        help="skip testing Swift stdlibs for FreeBSD",
+        action="store_true")
+    run_tests_group.add_argument("--skip-test-cygwin",
+        help="skip testing Swift stdlibs for Cygwin",
+        action="store_true")
 
     parser.add_argument("-o", "--test-optimized",
         help="run the test suite in optimized mode too (implies --test)",
@@ -506,6 +515,15 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         title="Run build")
     run_build_group.add_argument("-S", "--skip-build",
         help="generate build directory only without building",
+        action="store_true")
+    run_build_group.add_argument("--skip-build-linux",
+        help="skip building Swift stdlibs for Linux",
+        action="store_true")
+    run_build_group.add_argument("--skip-build-freebsd",
+        help="skip building Swift stdlibs for FreeBSD",
+        action="store_true")
+    run_build_group.add_argument("--skip-build-cygwin",
+        help="skip building Swift stdlibs for Cygwin",
         action="store_true")
 
     run_build_group.add_argument("--skip-build-benchmarks",
@@ -686,6 +704,10 @@ the number of parallel build jobs to use""",
             "--skip-test-xctest",
             "--skip-test-foundation",
             "--skip-test-libdispatch",
+            "--skip-test-linux",
+            "--skip-test-freebsd",
+            "--skip-test-cygwin",
+            "--skip-test-osx",
             "--skip-test-ios",
             "--skip-test-tvos",
             "--skip-test-watchos",
@@ -764,6 +786,9 @@ the number of parallel build jobs to use""",
             "--skip-build-cmark",
             "--skip-build-llvm",
             "--skip-build-swift",
+            "--skip-build-linux",
+            "--skip-build-freebsd",
+            "--skip-build-cygwin",
             "--skip-build-osx",
             "--skip-build-ios",
             "--skip-build-ios-device",
@@ -883,6 +908,10 @@ the number of parallel build jobs to use""",
         "--build-jobs", str(args.build_jobs),
         "--workspace", SWIFT_SOURCE_ROOT
     ]
+    if args.install_symroot:
+        build_script_impl_args += [
+            "--install-symroot", os.path.abspath(args.install_symroot)
+        ]
     if args.build_foundation:
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant
@@ -890,6 +919,18 @@ the number of parallel build jobs to use""",
     if args.cmake_generator == 'Ninja' and \
        not swift_build_support.ninja.is_ninja_installed():
         build_script_impl_args += ["--build-ninja"]
+    if args.skip_build_linux:
+        build_script_impl_args += ["--skip-build-linux"]
+    if args.skip_build_freebsd:
+        build_script_impl_args += ["--skip-build-freebsd"]
+    if args.skip_build_cygwin:
+        build_script_impl_args += ["--skip-build-cygwin"]
+    if args.skip_test_linux:
+        build_script_impl_args += ["--skip-test-linux"]
+    if args.skip_test_freebsd:
+        build_script_impl_args += ["--skip-test-freebsd"]
+    if args.skip_test_cygwin:
+        build_script_impl_args += ["--skip-test-cygwin"]
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add

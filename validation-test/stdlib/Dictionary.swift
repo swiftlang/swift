@@ -701,7 +701,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
@@ -709,7 +709,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, to: Int.self)
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
@@ -722,19 +722,19 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d, to: Int.self)
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
   }
@@ -763,7 +763,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, to: Int.self)
-    let originalCapacity = d1._variantStorage.native.capacity
+    let originalCapacity = d1._variantStorage.asNative.capacity
     assert(d1.count == 3)
     assert(d1[10] == 1010)
 
@@ -774,7 +774,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
-    assert(d2._variantStorage.native.capacity == originalCapacity)
+    assert(d2._variantStorage.asNative.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[10] == nil)
 
@@ -787,7 +787,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
@@ -795,7 +795,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(d, to: Int.self)
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
@@ -808,19 +808,19 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d, to: Int.self)
-    let originalCapacity = d._variantStorage.native.capacity
+    let originalCapacity = d._variantStorage.asNative.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d._variantStorage.asNative.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
   }
@@ -849,7 +849,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, to: Int.self)
-    let originalCapacity = d1._variantStorage.native.capacity
+    let originalCapacity = d1._variantStorage.asNative.capacity
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
@@ -860,7 +860,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity == originalCapacity)
+    assert(d2._variantStorage.asNative.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestKeyTy(10)] == nil)
 
@@ -1263,7 +1263,7 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   override func countByEnumerating(
-      state: UnsafeMutablePointer<NSFastEnumerationState>,
+      with state: UnsafeMutablePointer<NSFastEnumerationState>,
       objects: AutoreleasingUnsafeMutablePointer<AnyObject?>, count: Int) -> Int {
     var theState = state.pointee
     if theState.state == 0 {
@@ -1276,7 +1276,7 @@ class ParallelArrayDictionary : NSDictionary {
     return 0
   }
 
-  override func object(for aKey: AnyObject) -> AnyObject? {
+  override func object(forKey aKey: AnyObject) -> AnyObject? {
     return value
   }
 
@@ -1320,22 +1320,22 @@ class CustomImmutableNSDictionary : NSDictionary {
 
   @objc(copyWithZone:)
   override func copy(with zone: NSZone) -> AnyObject {
-    ++CustomImmutableNSDictionary.timesCopyWithZoneWasCalled
+    CustomImmutableNSDictionary.timesCopyWithZoneWasCalled += 1
     return self
   }
 
-  override func object(for aKey: AnyObject) -> AnyObject? {
-    ++CustomImmutableNSDictionary.timesObjectForKeyWasCalled
-    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).object(for: aKey)
+  override func object(forKey aKey: AnyObject) -> AnyObject? {
+    CustomImmutableNSDictionary.timesObjectForKeyWasCalled += 1
+    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).object(forKey: aKey)
   }
 
   override func keyEnumerator() -> NSEnumerator {
-    ++CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled
+    CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled += 1
     return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).keyEnumerator()
   }
 
   override var count: Int {
-    ++CustomImmutableNSDictionary.timesCountWasCalled
+    CustomImmutableNSDictionary.timesCountWasCalled += 1
     return 3
   }
 
@@ -1359,7 +1359,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
 
   // Delete the key from the NSMutableDictionary.
   assert(nsd[TestObjCKeyTy(10)] != nil)
-  nsd.removeObject(for: TestObjCKeyTy(10))
+  nsd.removeObject(forKey: TestObjCKeyTy(10))
   assert(nsd[TestObjCKeyTy(10)] == nil)
 
   // Find an existing key, again.
@@ -1384,7 +1384,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 
   // Delete the key from the NSMutableDictionary.
   assert(nsd[TestBridgedKeyTy(10)] != nil)
-  nsd.removeObject(for: TestBridgedKeyTy(10))
+  nsd.removeObject(forKey: TestBridgedKeyTy(10))
   assert(nsd[TestBridgedKeyTy(10)] == nil)
 
   // Find an existing key, again.
@@ -1547,7 +1547,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, to: Int.self))
 
   var pairs = Array<(Int, Int)>()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var (key, value) = d[i]
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs += [kv]
@@ -1575,7 +1575,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, to: Int.self))
 
   var pairs = Array<(Int, Int)>()
-  for var i = startIndex; i != endIndex; ++i {
+  for i in startIndex..<endIndex {
     var (key, value) = d[i]
     let kv = (key.value, value.value)
     pairs += [kv]
@@ -2001,7 +2001,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2016,7 +2016,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 != unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity >= originalCapacity)
+    assert(d._variantStorage.asNative.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2036,7 +2036,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity < originalCapacity)
+    assert(d2._variantStorage.asNative.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2056,7 +2056,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity >= originalCapacity)
+    assert(d2._variantStorage.asNative.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2084,7 +2084,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d._variantStorage.asNative.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2099,7 +2099,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, to: Int.self))
-    assert(d._variantStorage.native.capacity >= originalCapacity)
+    assert(d._variantStorage.asNative.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2119,7 +2119,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity < originalCapacity)
+    assert(d2._variantStorage.asNative.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
@@ -2139,7 +2139,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantStorage.native.capacity >= originalCapacity)
+    assert(d2._variantStorage.asNative.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
@@ -2541,29 +2541,29 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.Count") {
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  var v: AnyObject? = d.object(for: TestObjCKeyTy(10))
+  var v: AnyObject? = d.object(forKey: TestObjCKeyTy(10))
   expectEqual(1010, (v as! TestObjCValueTy).value)
   let idValue10 = unsafeBitCast(v, to: UInt.self)
 
-  v = d.object(for: TestObjCKeyTy(20))
+  v = d.object(forKey: TestObjCKeyTy(20))
   expectEqual(1020, (v as! TestObjCValueTy).value)
   let idValue20 = unsafeBitCast(v, to: UInt.self)
 
-  v = d.object(for: TestObjCKeyTy(30))
+  v = d.object(forKey: TestObjCKeyTy(30))
   expectEqual(1030, (v as! TestObjCValueTy).value)
   let idValue30 = unsafeBitCast(v, to: UInt.self)
 
-  expectEmpty(d.object(for: TestObjCKeyTy(40)))
+  expectEmpty(d.object(forKey: TestObjCKeyTy(40)))
 
   for i in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
-      d.object(for: TestObjCKeyTy(10)), to: UInt.self))
+      d.object(forKey: TestObjCKeyTy(10)), to: UInt.self))
 
     expectEqual(idValue20, unsafeBitCast(
-      d.object(for: TestObjCKeyTy(20)), to: UInt.self))
+      d.object(forKey: TestObjCKeyTy(20)), to: UInt.self))
 
     expectEqual(idValue30, unsafeBitCast(
-      d.object(for: TestObjCKeyTy(30)), to: UInt.self))
+      d.object(forKey: TestObjCKeyTy(30)), to: UInt.self))
   }
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -2580,7 +2580,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
     var dataPairs = Array<(Int, Int)>()
     var identityPairs = Array<(UInt, UInt)>()
     while let key = enumerator.nextObject() {
-      let value: AnyObject = d.object(for: key)!
+      let value: AnyObject = d.object(forKey: key)!
 
       let dataPair =
         ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
@@ -2705,7 +2705,7 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(for: key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2812,7 +2812,7 @@ DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(for: key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2842,7 +2842,7 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(for: key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2878,7 +2878,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
 
   var pairs = Array<(key: Int, value: Int)>()
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(for: key)!
+    let value: AnyObject = d.object(forKey: key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -3449,13 +3449,13 @@ class MockDictionaryWithCustomCount : NSDictionary {
     return self
   }
 
-  override func object(for aKey: AnyObject) -> AnyObject? {
+  override func object(forKey aKey: AnyObject) -> AnyObject? {
     expectUnreachable()
     return NSObject()
   }
 
   override var count: Int {
-    ++MockDictionaryWithCustomCount.timesCountWasCalled
+    MockDictionaryWithCustomCount.timesCountWasCalled += 1
     return _count
   }
 

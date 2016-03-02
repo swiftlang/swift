@@ -34,6 +34,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Basic/Defer.h" // Must come after include of Tokens.def.
 #include "swift/Config.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -329,21 +330,27 @@ void ASTPrinter::printTextImpl(StringRef Text) {
     printText(Str);
     printIndent();
   }
-  
-  const Decl *PreD = PendingDeclPreCallback;
-  const Decl *LocD = PendingDeclLocCallback;
-  PendingDeclPreCallback = nullptr;
+
+  // Get the pending callbacks and remove them from the printer. They must all
+  // be removed before calling any of them to ensure correct ordering.
+  auto pendingDeclPre = PendingDeclPreCallbacks;
+  PendingDeclPreCallbacks.clear();
+  auto *LocD = PendingDeclLocCallback;
   PendingDeclLocCallback = nullptr;
-  
-  if (PreD) {
+  auto NameContext = PendingNamePreCallback;
+  PendingNamePreCallback.reset();
+
+  // Perform pending callbacks.
+  for (const Decl *PreD : pendingDeclPre) {
     if (SynthesizeTarget && PreD->getKind() == DeclKind::Extension)
       printSynthesizedExtensionPre(cast<ExtensionDecl>(PreD), SynthesizeTarget);
     else
       printDeclPre(PreD);
   }
-  if (LocD) {
+  if (LocD)
     printDeclLoc(LocD);
-  }
+  if (NameContext)
+    printNamePre(*NameContext);
 
   printText(Text);
 }
@@ -394,12 +401,16 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
 
-  case PrintNameContext::FunctionParameter:
+  case PrintNameContext::FunctionParameterExternal:
+  case PrintNameContext::FunctionParameterLocal:
     return !canBeArgumentLabel(keyword);
   }
 }
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
+  callPrintNamePre(Context);
+  defer { printNamePost(Context); };
+
   if (Name.empty()) {
     *this << "_";
     return;
@@ -590,11 +601,17 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printTypeLoc(const TypeLoc &TL) {
     if (Options.TransformContext && TL.getType()) {
       if (auto RT = Options.TransformContext->transform(TL.getType())) {
+        Printer.printTypePre(TypeLoc::withoutLoc(RT));
         PrintOptions FreshOptions;
         RT.print(Printer, FreshOptions);
+        Printer.printTypePost(TypeLoc::withoutLoc(RT));
         return;
       }
     }
+
+    Printer.printTypePre(TL);
+    defer { Printer.printTypePost(TL); };
+
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
     if ((Options.PreferTypeRepr && TL.hasLocation()) ||
@@ -686,7 +703,7 @@ public:
       Printer.printSynthesizedExtensionPost(cast<ExtensionDecl>(D),
                                             Options.TransformContext->getNominal());
     } else {
-      Printer.printDeclPost(D);
+      Printer.callPrintDeclPost(D);
     }
     return true;
   }
@@ -703,20 +720,6 @@ void PrintAST::printAttributes(const Decl *D) {
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
   auto TheTypeLoc = TP->getTypeLoc();
   if (TheTypeLoc.hasLocation()) {
-    // If the outer typeloc is an InOutTypeRepr, print the inout before the
-    // subpattern.
-    if (auto *IOT = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
-      TheTypeLoc = TypeLoc(IOT->getBase());
-      Type T = TheTypeLoc.getType();
-      if (T) {
-        if (auto *IOT = T->getAs<InOutType>()) {
-          T = IOT->getObjectType();
-          TheTypeLoc.setType(T);
-        }
-      }
-
-      Printer << "inout ";
-    }
 
     printPattern(TP->getSubPattern());
     Printer << ": ";
@@ -724,15 +727,10 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
     return;
   }
 
-  Type T = TP->getType();
-  if (auto *IOT = T->getAs<InOutType>()) {
-    T = IOT->getObjectType();
-    Printer << "inout ";
-  }
 
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  T.print(Printer, Options);
+  TP->getType().print(Printer, Options);
 }
 
 void PrintAST::printPattern(const Pattern *pattern) {
@@ -976,6 +974,17 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
+  if (Options.ExplodeEnumCaseDecls) {
+    if (isa<EnumElementDecl>(D))
+      return true;
+    if (isa<EnumCaseDecl>(D))
+      return false;
+  } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+    // Enum elements are printed as part of the EnumCaseDecl, unless they were
+    // imported without source info.
+    return !EED->getSourceRange().isValid();
+  }
+
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessibilityFilter > Accessibility::Private &&
@@ -1006,6 +1015,14 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     }
   }
 
+  // If asked to skip overrides and witnesses, do so.
+  if (Options.SkipOverrides) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->getOverriddenDecl()) return false;
+      if (!VD->getSatisfiedProtocolRequirements().empty()) return false;
+    }
+  }
+
   // We need to handle PatternBindingDecl as a special case here because its
   // attributes can only be retrieved from the inside VarDecls.
   if (auto *PD = dyn_cast<PatternBindingDecl>(D)) {
@@ -1023,7 +1040,7 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
 bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   auto Result = swift::shouldPrint(D, Options);
   if (!Result && Notify)
-    Printer.avoidPrintDeclPost(D);
+    Printer.callAvoidPrintDeclPost(D);
   return Result;
 }
 
@@ -1809,61 +1826,40 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
+  Printer.callPrintDeclPre(param);
+  defer { Printer.callPrintDeclPost(param); };
+
   auto printArgName = [&]() {
     // Print argument name.
     auto ArgName = param->getArgumentName();
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
       if (!ArgNameIsAPIByDefault && !ArgName.empty())
         Printer << " _";
       break;
     case PrintOptions::ArgAndParamPrintingMode::MatchSource:
       if (ArgName == BodyName && ArgNameIsAPIByDefault) {
-        Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+        Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
         break;
       }
       if (ArgName.empty() && !ArgNameIsAPIByDefault) {
-        Printer.printName(BodyName, PrintNameContext::FunctionParameter);
+        Printer.printName(BodyName, PrintNameContext::FunctionParameterLocal);
         break;
       }
       SWIFT_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::BothAlways:
-      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
       Printer << " ";
-      Printer.printName(BodyName, PrintNameContext::FunctionParameter);
+      Printer.printName(BodyName, PrintNameContext::FunctionParameterLocal);
       break;
     }
     Printer << ": ";
   };
 
   auto TheTypeLoc = param->getTypeLoc();
-  if (TheTypeLoc.getTypeRepr()) {
-    // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
-    // subpattern.
-    if (auto *IOTR = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
-      TheTypeLoc = TypeLoc(IOTR->getBase());
-      if (Type T = TheTypeLoc.getType()) {
-        if (auto *IOT = T->getAs<InOutType>()) {
-          TheTypeLoc.setType(IOT->getObjectType());
-        }
-      }
-
-      Printer << "inout ";
-    }
-  } else {
-    if (param->hasType())
-      TheTypeLoc = TypeLoc::withoutLoc(param->getType());
-    
-    if (Type T = TheTypeLoc.getType()) {
-      if (auto *IOT = T->getAs<InOutType>()) {
-        Printer << "inout ";
-        TheTypeLoc.setType(IOT->getObjectType());
-      }
-    }
-  }
 
   // If the parameter is autoclosure, or noescape, print it.  This is stored
   // on the type of the decl, not on the typerepr.
@@ -1880,6 +1876,9 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   }
 
   printArgName();
+
+  if (!TheTypeLoc.getTypeRepr() && param->hasType())
+    TheTypeLoc = TypeLoc::withoutLoc(param->getType());
 
   auto ContainsFunc = [&] (DeclAttrKind Kind) {
     return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
@@ -2090,12 +2089,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Type ResultTy = decl->getResultType();
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
-        if (Options.TransformContext) {
-          ResultTy = Options.TransformContext->transform(ResultTy);
-          PrintOptions FreshOptions;
-          ResultTy->print(Printer, FreshOptions);
-        } else
-          ResultTy->print(Printer, Options);
+        // Use the non-repr external type, but reuse the TypeLoc printing code.
+        printTypeLoc(TypeLoc::withoutLoc(ResultTy));
       }
     }
 
@@ -2138,8 +2133,6 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
 }
 
 void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
-  if (!decl->shouldPrintInContext(Options))
-    return;
   printDocumentationComment(decl);
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
@@ -2159,7 +2152,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
                        /*isAPINameByDefault*/[](unsigned)->bool{return false;});
   });
   Printer << " -> ";
-  decl->getElementType().print(Printer, Options);
+  printTypeLoc(decl->getElementTypeLoc());
 
   printAccessors(decl);
 }
@@ -2524,12 +2517,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     }
   }
 
-  if (auto EED = dyn_cast<EnumElementDecl>(this)) {
-    // Enum elements are printed as part of the EnumCaseDecl, unless they were
-    // imported without source info.
-    return !EED->getSourceRange().isValid();
-
-  } else if (isa<IfConfigDecl>(this)) {
+  if (isa<IfConfigDecl>(this)) {
     return PO.PrintIfConfig;
   }
 
@@ -2831,16 +2819,13 @@ public:
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
       Type EltType = TD.getType();
-      if (auto *IOT = EltType->getAs<InOutType>()) {
-        Printer << "inout ";
-        EltType = IOT->getObjectType();
-      }
+
 
       if (TD.hasName()) {
-        Printer.printName(TD.getName(), PrintNameContext::FunctionParameter);
+        Printer.printName(TD.getName(),
+                          PrintNameContext::FunctionParameterExternal);
         Printer << ": ";
       }
-
       if (TD.isVararg()) {
         visit(TD.getVarargBaseTy());
         Printer << "...";

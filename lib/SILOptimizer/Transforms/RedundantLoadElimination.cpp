@@ -97,6 +97,14 @@ using namespace swift;
 
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
+/// Return the deallocate stack instructions corresponding to the given
+/// AllocStackInst.
+static SILInstruction *findAllocStackInst(SILInstruction *I) {
+  if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(I))
+    return dyn_cast<SILInstruction>(DSI->getOperand());
+  return nullptr;
+}
+
 /// ComputeAvailSetMax - If we ignore all unknown writes, what is the max
 /// available set that can reach the a certain point in a basic block. This
 /// helps generating the genset and killset. i.e. if there is no downward visible
@@ -376,6 +384,12 @@ public:
   void processUnknownWriteInstForGenKillSet(RLEContext &Ctx, SILInstruction *I);
   void processUnknownWriteInstForRLE(RLEContext &Ctx, SILInstruction *I);
 
+
+  void processDeallocStackInst(RLEContext &Ctx, SILInstruction *I,
+                               RLEKind Kind);
+  void processDeallocStackInstForGenKillSet(RLEContext &Ctx, SILInstruction *I);
+  void processDeallocStackInstForRLE(RLEContext &Ctx, SILInstruction *I);
+
   /// Process LoadInst. Extract LSLocations from LoadInst.
   void processLoadInst(RLEContext &Ctx, LoadInst *LI, RLEKind Kind);
 
@@ -472,7 +486,7 @@ public:
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
-  ProcessKind getProcessFunctionKind();
+  ProcessKind getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount);
 
   /// Run the iterative data flow until convergence.
   void runIterativeRLE();
@@ -965,6 +979,49 @@ void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
   llvm_unreachable("Unknown RLE compute kind");
 }
 
+void BlockState::
+processDeallocStackInstForGenKillSet(RLEContext &Ctx, SILInstruction *I) {
+  SILValue ASI = findAllocStackInst(I);
+  for (unsigned i = 0; i < LocationNum; ++i) {
+    LSLocation &R = Ctx.getLocation(i);
+    if (R.getBase() != ASI)
+      continue;
+    // MayAlias.
+    stopTrackingLocation(BBGenSet, i);
+    startTrackingLocation(BBKillSet, i);
+  }
+}
+
+void BlockState::
+processDeallocStackInstForRLE(RLEContext &Ctx, SILInstruction *I) {
+  SILValue ASI = findAllocStackInst(I);
+  for (unsigned i = 0; i < LocationNum; ++i) {
+    LSLocation &R = Ctx.getLocation(i);
+    if (R.getBase() != ASI)
+      continue;
+    // MayAlias.
+    stopTrackingLocation(ForwardSetIn, i);
+    stopTrackingValue(ForwardValIn, i);
+  }
+}
+
+void BlockState::
+processDeallocStackInst(RLEContext &Ctx, SILInstruction *I, RLEKind Kind) {
+  // Are we computing the genset and killset ?
+  if (isComputeAvailGenKillSet(Kind)) {
+    processDeallocStackInstForGenKillSet(Ctx, I);
+    return;
+  }
+
+  // Are we computing the available value or doing RLE ?
+  if (isComputeAvailValue(Kind) || isPerformingRLE(Kind)) {
+    processDeallocStackInstForRLE(Ctx, I);
+    return;
+  }
+
+  llvm_unreachable("Unknown RLE compute kind");
+}
+
 
 void BlockState::processInstructionWithKind(RLEContext &Ctx,
                                             SILInstruction *Inst,
@@ -979,6 +1036,11 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
   // value to use instead of this load.
   if (auto *LI = dyn_cast<LoadInst>(Inst)) {
     processLoadInst(Ctx, LI, Kind);
+    return;
+  }
+
+  if (auto *DSI = dyn_cast<DeallocStackInst>(Inst)) {
+    processDeallocStackInst(Ctx, DSI, Kind);
     return;
   }
 
@@ -1000,10 +1062,23 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
   }
 }
 
-RLEContext::ProcessKind RLEContext::getProcessFunctionKind() {
+RLEContext::ProcessKind
+RLEContext::
+getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
+  // Don't optimize function that are marked as 'no.optimize'.
+  if (!Fn->shouldOptimize())
+    return ProcessKind::ProcessNone;
+
+  // Really no point optimizing here as there is no forwardable loads.
+  if (LoadCount + StoreCount < 2)
+    return ProcessKind::ProcessNone;
+
   bool RunOneIteration = true;
   unsigned BBCount = 0;
   unsigned LocationCount = LocationVault.size();
+
+  if (LocationCount == 0) 
+    return ProcessKind::ProcessNone;
 
   // If all basic blocks will have their predecessors processed if
   // the basic blocks in the functions are iterated in post order.
@@ -1360,14 +1435,16 @@ bool RLEContext::run() {
   // Phase 3. we compute the real forwardable value at a given point.
   //
   // Phase 4. we perform the redundant load elimination.
-
   // Walk over the function and find all the locations accessed by
   // this function.
-  LSLocation::enumerateLSLocations(*Fn, LocationVault, LocToBitIndex,
-                                   BaseToLocIndex, TE);
+  std::pair<int, int> LSCount = std::make_pair(0, 0); 
+  LSLocation::enumerateLSLocations(*Fn, LocationVault,
+                                   LocToBitIndex,
+                                   BaseToLocIndex, TE,
+                                   LSCount);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind();
+  ProcessKind Kind = getProcessFunctionKind(LSCount.first, LSCount.second);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)

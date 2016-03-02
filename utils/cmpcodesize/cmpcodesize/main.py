@@ -18,7 +18,7 @@ import glob
 import collections
 
 from cmpcodesize.compare import \
-    compareFunctionSizes, compareSizesOfFile, listFunctionSizes, readSizes
+    compare_function_sizes, compare_sizes_of_file, list_function_sizes, read_sizes
 
 
 SHORTCUTS = {
@@ -176,16 +176,16 @@ How to specify files:
         if not newFiles:
             sizes = collections.defaultdict(int)
             for file in oldFiles:
-                readSizes(sizes, file, True, False)
-            print(listFunctionSizes(sizes.items()))
+                read_sizes(sizes, file, True, False)
+            print(os.linesep.join(list_function_sizes(sizes.items())))
         else:
-            compareFunctionSizes(oldFiles, newFiles)
+            compare_function_sizes(oldFiles, newFiles)
     else:
         print("%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent"))
         if parsed_arguments.sum_sizes:
-            compareSizesOfFile(oldFiles, newFiles,
-                               parsed_arguments.all_sections,
-                               parsed_arguments.list_categories)
+            compare_sizes_of_file(oldFiles, newFiles,
+                                  parsed_arguments.all_sections,
+                                  parsed_arguments.list_categories)
         else:
             if len(oldFiles) != len(newFiles):
                 sys.exit("number of new files must be the same of old files")
@@ -195,9 +195,9 @@ How to specify files:
 
             for idx, oldFile in enumerate(oldFiles):
                 newFile = newFiles[idx]
-                compareSizesOfFile([oldFile], [newFile],
-                                   parsed_arguments.all_sections,
-                                   parsed_arguments.list_categories)
+                compare_sizes_of_file([oldFile], [newFile],
+                                      parsed_arguments.all_sections,
+                                      parsed_arguments.list_categories)
 
 if __name__ == '__main__':
     main()

@@ -25,9 +25,9 @@ struct CX: _ObjectiveCBridgeable {
     return ObjCX()
   }
 
-  static func _forceBridgeFromObjectiveC(source: ObjCX, inout result: CX?) {}
+  static func _forceBridgeFromObjectiveC(source: ObjCX, result: inout CX?) {}
 
-  static func _conditionallyBridgeFromObjectiveC(source: ObjCX, inout result: CX?) -> Bool {
+  static func _conditionallyBridgeFromObjectiveC(source: ObjCX, result: inout CX?) -> Bool {
     return false
   }
 }
@@ -55,7 +55,7 @@ func test0() -> Bool {
 // a more general, but less effective swift_bridgeNonVerbatimFromObjectiveC, which
 // also performs conformance checks at runtime.
 // CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc30testBridgedCastFromObjCtoSwiftFCSo8NSStringSS
-// CHECK-NOT: cast
+// CHECK-NOT: {{ cast}}
 // CHECK: witness_method $String, #_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: metatype $@thick String.Type
 // CHECK: apply
@@ -67,7 +67,7 @@ public func testBridgedCastFromObjCtoSwift(ns: NSString) -> String {
 
 // Check that compiler understands that this cast always succeeds
 // CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc30testBridgedCastFromSwiftToObjCFSSCSo8NSString
-// CHECK-NOT: cast
+// CHECK-NOT: {{ cast}}
 // CHECK: function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
 // CHECK: apply
 // CHECK: return

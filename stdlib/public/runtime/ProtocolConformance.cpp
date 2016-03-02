@@ -33,7 +33,6 @@
 
 using namespace swift;
 
-
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 
@@ -143,6 +142,8 @@ const {
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift2_proto"
 #elif defined(__ELF__)
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
+#elif defined(__CYGWIN__)
+#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".sw2prtc"
 #endif
 
 namespace {
@@ -156,86 +157,68 @@ namespace {
     }
   };
 
+  struct ConformanceCacheKey {
+    /// Either a Metadata* or a NominalTypeDescriptor*.
+    const void *Type;
+    const ProtocolDescriptor *Proto;
+
+    ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
+      : Type(type), Proto(proto) {}
+  };
+
   struct ConformanceCacheEntry {
   private:
     const void *Type; 
     const ProtocolDescriptor *Proto;
-    uintptr_t Data;
-    // All Darwin 64-bit platforms reserve the low 2^32 of address space, which
-    // is more than enough invalid pointer values for any realistic generation
-    // number. It's a little easier to overflow on 32-bit, so we need an extra
-    // bit there.
-#if !__LP64__
-    bool Success;
-#endif
-
-    ConformanceCacheEntry(const void *type,
-                          const ProtocolDescriptor *proto,
-                          uintptr_t Data, bool Success)
-      : Type(type), Proto(proto), Data(Data)
-#if !__LP64__
-        , Success(Success)
-#endif
-    {
-#if __LP64__
-#  if __APPLE__
-      assert((!Success && Data <= 0xFFFFFFFFU) ||
-             (Success && Data > 0xFFFFFFFFU));
-#  elif __linux__ || __FreeBSD__
-      assert((!Success && Data <= 0x0FFFU) ||
-             (Success && Data > 0x0FFFU));
-#  else
-#    error "port me"
-#  endif
-#endif
-  }
+    std::atomic<const WitnessTable *> Table;
+    std::atomic<uintptr_t> FailureGeneration;
 
   public:
-    ConformanceCacheEntry() = default;
-
-    static ConformanceCacheEntry createSuccess(
-        const void *type, const ProtocolDescriptor *proto,
-        const swift::WitnessTable *witness) {
-      return ConformanceCacheEntry(type, proto, (uintptr_t) witness, true);
+    ConformanceCacheEntry(ConformanceCacheKey key,
+                          const WitnessTable *table,
+                          uintptr_t failureGeneration)
+      : Type(key.Type), Proto(key.Proto), Table(table),
+        FailureGeneration(failureGeneration) {
     }
 
-    static ConformanceCacheEntry createFailure(
-        const void *type, const ProtocolDescriptor *proto,
-        unsigned failureGeneration) {
-      return ConformanceCacheEntry(type, proto, (uintptr_t) failureGeneration,
-          false);
+    int compareWithKey(const ConformanceCacheKey &key) const {
+      if (key.Type != Type) {
+        return (uintptr_t(key.Type) < uintptr_t(Type) ? -1 : 1);
+      } else if (key.Proto != Proto) {
+        return (uintptr_t(key.Proto) < uintptr_t(Proto) ? -1 : 1);
+      } else {
+        return 0;
+      }
     }
 
-    /// \returns true if the entry represents an entry for the pair \p type
-    /// and \p proto.
-    bool matches(const void *type, const ProtocolDescriptor *proto) {
-      return type == Type && Proto == proto;
+    template <class... Args>
+    static size_t getExtraAllocationSize(Args &&... ignored) {
+      return 0;
     }
-   
+
     bool isSuccessful() const {
-#if __LP64__
-#  if __APPLE__
-      return Data > 0xFFFFFFFFU;
-#  elif __linux__ || __FreeBSD__
-      return Data > 0x0FFFU;
-#  else
-#    error "port me"
-#  endif
-#else
-      return Success;
-#endif
+      return Table.load(std::memory_order_relaxed) != nullptr;
+    }
+
+    void makeSuccessful(const WitnessTable *table) {
+      Table.store(table, std::memory_order_release);
+    }
+
+    void updateFailureGeneration(uintptr_t failureGeneration) {
+      assert(!isSuccessful());
+      FailureGeneration.store(failureGeneration, std::memory_order_relaxed);
     }
     
     /// Get the cached witness table, if successful.
     const WitnessTable *getWitnessTable() const {
       assert(isSuccessful());
-      return (const WitnessTable *)Data;
+      return Table.load(std::memory_order_acquire);
     }
     
     /// Get the generation number under which this lookup failed.
     unsigned getFailureGeneration() const {
       assert(!isSuccessful());
-      return Data;
+      return FailureGeneration.load(std::memory_order_relaxed);
     }
   };
 }
@@ -245,7 +228,7 @@ namespace {
 static void _initializeCallbacksToInspectDylib();
 
 struct ConformanceState {
-  ConcurrentMap<size_t, ConformanceCacheEntry> Cache;
+  ConcurrentMap<ConformanceCacheEntry> Cache;
   std::vector<ConformanceSection> SectionsToScan;
   pthread_mutex_t SectionsToScanLock;
   
@@ -253,6 +236,34 @@ struct ConformanceState {
     SectionsToScan.reserve(16);
     pthread_mutex_init(&SectionsToScanLock, nullptr);
     _initializeCallbacksToInspectDylib();
+  }
+
+  void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
+                    const WitnessTable *witness) {
+    auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
+                                    witness, uintptr_t(0));
+
+    // If the entry was already present, we may need to update it.
+    if (!result.second) {
+      result.first->makeSuccessful(witness);
+    }
+  }
+
+  void cacheFailure(const void *type, const ProtocolDescriptor *proto) {
+    uintptr_t failureGeneration = SectionsToScan.size();
+    auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
+                                    (const WitnessTable *) nullptr,
+                                    failureGeneration);
+
+    // If the entry was already present, we may need to update it.
+    if (!result.second) {
+      result.first->updateFailureGeneration(failureGeneration);
+    }
+  }
+
+  ConformanceCacheEntry *findCached(const void *type,
+                                    const ProtocolDescriptor *proto) {
+    return Cache.find(ConformanceCacheKey(type, proto));
   }
 };
 
@@ -332,6 +343,31 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
   dlclose(handle);
   return 0;
 }
+#elif defined(__CYGWIN__)
+static int _addImageProtocolConformances(struct dl_phdr_info *info,
+                                          size_t size, void * /*data*/) {
+  void *handle;
+  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
+    handle = dlopen(nullptr, RTLD_LAZY);
+  } else
+    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+
+  unsigned long conformancesSize;
+  const uint8_t *conformances =
+    _swift_getSectionDataPE(handle, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
+                           &conformancesSize);
+
+  if (!conformances) {
+    // if there are no conformances, don't hold this handle open.
+    dlclose(handle);
+    return 0;
+  }
+
+  _addImageProtocolConformancesBlock(conformances, conformancesSize);
+
+  dlclose(handle);
+  return 0;
+}
 #endif
 
 static void _initializeCallbacksToInspectDylib() {
@@ -346,6 +382,8 @@ static void _initializeCallbacksToInspectDylib() {
   // FIXME: Find a way to have this continue to happen after.
   // rdar://problem/19045112
   dl_iterate_phdr(_addImageProtocolConformances, nullptr);
+#elif defined(__CYGWIN__)
+  _swift_dl_iterate_phdr(_addImageProtocolConformances, nullptr);
 #else
 # error No known mechanism to inspect dynamic libraries on this platform.
 #endif
@@ -360,12 +398,6 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
                                           const ProtocolConformanceRecord *end){
   auto &C = Conformances.get();
   _registerProtocolConformances(C, begin, end);
-}
-
-static size_t hashTypeProtocolPair(const void *type,
-                                   const ProtocolDescriptor *protocol) {
-  // A simple hash function for the conformance pair.
-  return (size_t)type + ((size_t)protocol >> 2);
 }
 
 /// Search the witness table in the ConformanceCache. \returns a pair of the
@@ -387,28 +419,21 @@ recur_inside_cache_lock:
   // See if we have a cached conformance. Try the specific type first.
 
   {
-    // Hash and lookup the type-protocol pair in the cache.
-    size_t hash = hashTypeProtocolPair(type, protocol);
-
     // Check if the type-protocol entry exists in the cache entry that we found.
-    while (auto *Value = C.Cache.findValueByKey(hash)) {
-      if (Value->matches(type, protocol)) {
-        if (Value->isSuccessful())
-          return std::make_pair(Value->getWitnessTable(), true);
+    if (auto *Value = C.findCached(type, protocol)) {
+      if (Value->isSuccessful())
+        return std::make_pair(Value->getWitnessTable(), true);
 
-        if (type == origType)
-          foundEntry = Value;
+      // If we're still looking up for the original type, remember that
+      // we found an exact match.
+      if (type == origType)
+        foundEntry = Value;
 
-        // If we got a cached negative response, check the generation number.
-        if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
-          // We found an entry with a negative value.
-          return std::make_pair(nullptr, true);
-        }
+      // If we got a cached negative response, check the generation number.
+      if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
+        // We found an entry with a negative value.
+        return std::make_pair(nullptr, true);
       }
-
-      // The entry that we fetched does not match our key due to a collision.
-      // If we have a collision increase the hash value by one and try again.
-      hash++;
     }
   }
 
@@ -419,19 +444,12 @@ recur_inside_cache_lock:
     auto *description = type->getNominalTypeDescriptor();
 
     // Hash and lookup the type-protocol pair in the cache.
-    size_t hash = hashTypeProtocolPair(description, protocol);
+    if (auto *Value = C.findCached(description, protocol)) {
+      if (Value->isSuccessful())
+        return std::make_pair(Value->getWitnessTable(), true);
 
-    while (auto *Value = C.Cache.findValueByKey(hash)) {
-      if (Value->matches(description, protocol)) {
-        if (Value->isSuccessful())
-          return std::make_pair(Value->getWitnessTable(), true);
-
-        // We don't try to cache negative responses for generic
-        // patterns.
-      }
-
-      // If we have a collision increase the hash value by one and try again.
-      hash++;
+      // We don't try to cache negative responses for generic
+      // patterns.
     }
   }
 
@@ -523,15 +541,8 @@ recur:
     }
 
 
-    // Hash and lookup the type-protocol pair in the cache.
-    size_t hash = hashTypeProtocolPair(type, protocol);
-    auto E = ConformanceCacheEntry::createFailure(type, protocol,
-                                                  C.SectionsToScan.size());
-
-    while (!C.Cache.tryToAllocateNewNode(hash, E)) {
-      // If we have a collision increase the hash value by one and try again.
-      hash++;
-    }
+    // Save the failure for this type-protocol pair in the cache.
+    C.cacheFailure(type, protocol);
 
     pthread_mutex_unlock(&C.SectionsToScanLock);
     return nullptr;
@@ -560,19 +571,11 @@ recur:
           continue;
 
         // Store the type-protocol pair in the cache.
-        size_t hash = hashTypeProtocolPair(metadata, P);
-
         auto witness = record.getWitnessTable(metadata);
-        ConformanceCacheEntry E;
-        if (witness)
-          E = ConformanceCacheEntry::createSuccess(metadata, P, witness);
-        else
-          E = ConformanceCacheEntry::createFailure(metadata, P,
-                                                   C.SectionsToScan.size());
-
-        while (!C.Cache.tryToAllocateNewNode(hash, E)) {
-          // If we have a collision increase the hash value by one and try again.
-          hash++;
+        if (witness) {
+          C.cacheSuccess(metadata, P, witness);
+        } else {
+          C.cacheFailure(metadata, P);
         }
 
       // If the record provides a nondependent witness table for all instances
@@ -595,16 +598,8 @@ recur:
         if (!isRelatedType(type, R, /*isMetadata=*/false))
           continue;
 
-        // Hash and store the type-protocol pair in the cache.
-        size_t hash = hashTypeProtocolPair(R, P);
-        auto E = ConformanceCacheEntry::createSuccess(R, P,
-                                  record.getStaticWitnessTable());
-
-        while (!C.Cache.tryToAllocateNewNode(hash, E)) {
-          // If we have a collision increase the hash value by one and try again.
-          hash++;
-        }
-
+        // Store the type-protocol pair in the cache.
+        C.cacheSuccess(R, P, record.getStaticWitnessTable());
       }
     }
   }

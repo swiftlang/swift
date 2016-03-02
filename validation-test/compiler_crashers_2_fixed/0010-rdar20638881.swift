@@ -36,7 +36,7 @@ extension Q_SequenceDefaults {
     var p = baseAddress
     var iter = self.makeIterator()
     while let element? = iter.next() {
-      p.initializePointee(element)
+      p.initialize(with: element)
       p += 1
     }
   }

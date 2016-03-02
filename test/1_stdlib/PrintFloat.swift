@@ -57,7 +57,7 @@ PrintTests.test("Printable") {
 
   expectPrinted("inf", Float.infinity)
   expectPrinted("-inf", -Float.infinity)
-  expectPrinted("nan", Float.NaN)
+  expectPrinted("nan", Float.nan)
   expectPrinted("0.0", asFloat32(0.0))
   expectPrinted("1.0", asFloat32(1.0))
   expectPrinted("-1.0", asFloat32(-1.0))
@@ -66,7 +66,7 @@ PrintTests.test("Printable") {
 
   expectPrinted("inf", Double.infinity)
   expectPrinted("-inf", -Double.infinity)
-  expectPrinted("nan", Double.NaN)
+  expectPrinted("nan", Double.nan)
   expectPrinted("0.0", asFloat64(0.0))
   expectPrinted("1.0", asFloat64(1.0))
   expectPrinted("-1.0", asFloat64(-1.0))

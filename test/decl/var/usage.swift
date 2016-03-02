@@ -76,7 +76,7 @@ func property() -> Int {
 }
 
 
-func testInOut(inout x : Int) {  // Ok.
+func testInOut(x : inout Int) {  // Ok.
 }
 
 struct TestStruct {

@@ -169,6 +169,7 @@ _TTSgSi_ ---> _TTSgSi_
 _TTSgSi__ ---> _TTSgSi__
 _TTSgSiS_ ---> _TTSgSiS_
 _TTSgSi__xyz ---> _TTSgSi__xyz
+_TTSr5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <Swift.Int> of test.generic <A> (A) -> A
 _TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_31 ---> partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool) with unmangled suffix "31"
 _TiC4Meow5MyCls9subscriptFT1iSi_Sf ---> Meow.MyCls.subscript (i : Swift.Int) -> Swift.Float
 _TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> mangling.ليهمابتكلموشعربي؟ () -> ()

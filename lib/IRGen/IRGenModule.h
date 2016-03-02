@@ -322,6 +322,7 @@ public:
   const llvm::Triple &Triple;
   llvm::TargetMachine *TargetMachine;
   SILModule *SILMod;
+  ModuleDecl *getSwiftModule() const;
   llvm::SmallString<128> OutputFilename;
   IRGenModuleDispatcher &dispatcher;
   

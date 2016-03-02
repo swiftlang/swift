@@ -165,6 +165,7 @@ public:
 
   UIdent visitFuncDecl(const FuncDecl *D);
   UIdent visitVarDecl(const VarDecl *D);
+  UIdent visitParamDecl(const ParamDecl *D);
   UIdent visitExtensionDecl(const ExtensionDecl *D);
   UIdent visitAssociatedTypeDecl(const AssociatedTypeDecl *D) {
     return IsRef ? KindRefAssociatedType : KindDeclAssociatedType;
@@ -236,6 +237,11 @@ UIdent UIdentVisitor::visitVarDecl(const VarDecl *D) {
   if (DC->isLocalContext())
     return IsRef ? KindRefVarLocal : KindDeclVarLocal;
   return IsRef ? KindRefVarGlobal : KindDeclVarGlobal;
+}
+
+UIdent UIdentVisitor::visitParamDecl(const ParamDecl *D) {
+  // There is no KindRefVarParam. It's not usually an interesting difference.
+  return IsRef ? KindRefVarLocal : KindDeclVarParam;
 }
 
 UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {

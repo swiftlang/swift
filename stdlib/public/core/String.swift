@@ -143,7 +143,7 @@ extension String {
     encoding: Encoding.Type, input: Input
   ) -> String? {
     let (stringBufferOptional, _) =
-        _StringBuffer.fromCodeUnits(encoding, input: input,
+        _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: false)
     if let stringBuffer = stringBufferOptional {
       return String(_storage: stringBuffer)
@@ -161,7 +161,7 @@ extension String {
     encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool) {
     let (stringBuffer, hadError) =
-        _StringBuffer.fromCodeUnits(encoding, input: input,
+        _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: true)
     return (String(_storage: stringBuffer!), hadError)
   }
@@ -260,7 +260,7 @@ extension String : CustomDebugStringConvertible {
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
-      result += us.escape(asASCII: false)
+      result += us.escaped(asASCII: false)
     }
     result += "\""
     return result
@@ -508,7 +508,7 @@ public func + (lhs: String, rhs: String) -> String {
 }
 
 // String append
-public func += (inout lhs: String, rhs: String) {
+public func += (lhs: inout String, rhs: String) {
   if lhs.isEmpty {
     lhs = rhs
   }
@@ -529,7 +529,7 @@ extension String {
     start: UnsafeMutablePointer<UTF8.CodeUnit>,
     utf8CodeUnitCount: Int
   ) {
-    resultStorage.initializePointee(
+    resultStorage.initialize(with: 
       String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))
@@ -580,20 +580,20 @@ extension String {
 extension String {
   public mutating func reserveCapacity(n: Int) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.reserveCapacity(n)
+      (v: inout CharacterView) in v.reserveCapacity(n)
     }
   }
   public mutating func append(c: Character) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.append(c)
+      (v: inout CharacterView) in v.append(c)
     }
   }
   
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence where S.Iterator.Element == Character
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.appendContents(of: newElements)
+      (v: inout CharacterView) in v.append(contentsOf: newElements)
     }
   }
   
@@ -668,7 +668,7 @@ extension String {
     bounds: Range<Index>, with newElements: C
   ) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.replaceSubrange(bounds, with: newElements)
+      (v: inout CharacterView) in v.replaceSubrange(bounds, with: newElements)
     }
   }
 
@@ -691,7 +691,7 @@ extension String {
   /// - Complexity: O(`self.count`).
   public mutating func insert(newElement: Character, at i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.insert(newElement, at: i)
+      (v: inout CharacterView) in v.insert(newElement, at: i)
     }
   }
 
@@ -700,11 +700,11 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func insertContentsOf<
+  public mutating func insert<
     S : Collection where S.Iterator.Element == Character
-  >(newElements: S, at i: Index) {
+  >(contentsOf newElements: S, at i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.insertContentsOf(newElements, at: i)
+      (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
     }
   }
 
@@ -715,7 +715,7 @@ extension String {
   /// - Complexity: O(`self.count`).
   public mutating func remove(at i: Index) -> Character {
     return withMutableCharacters {
-      (inout v: CharacterView) in v.remove(at: i)
+      (v: inout CharacterView) in v.remove(at: i)
     }
   }
 
@@ -726,7 +726,7 @@ extension String {
   /// - Complexity: O(`self.count`).
   public mutating func removeSubrange(bounds: Range<Index>) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.removeSubrange(bounds)
+      (v: inout CharacterView) in v.removeSubrange(bounds)
     }
   }
 
@@ -739,7 +739,7 @@ extension String {
   ///   when `self` is going to be grown again.
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
+      (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
     }
   }
 }
@@ -923,9 +923,9 @@ extension String.Index {
     _ utf16Index: String.UTF16Index,
     within characters: String
   ) {
-    if let me = utf16Index.samePositionIn(
-      characters.unicodeScalars
-    )?.samePositionIn(characters) {
+    if let me = utf16Index.samePosition(
+      in: characters.unicodeScalars
+    )?.samePosition(in: characters) {
       self = me
     }
     else {
@@ -942,9 +942,9 @@ extension String.Index {
     _ utf8Index: String.UTF8Index,
     within characters: String
   ) {
-    if let me = utf8Index.samePositionIn(
-      characters.unicodeScalars
-    )?.samePositionIn(characters) {
+    if let me = utf8Index.samePosition(
+      in: characters.unicodeScalars
+    )?.samePosition(in: characters) {
       self = me
     }
     else {
@@ -957,8 +957,8 @@ extension String.Index {
   ///
   /// - Precondition: `self` is an element of `String(utf8).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf8: String.UTF8View
+  public func samePosition(
+    in utf8: String.UTF8View
   ) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -968,8 +968,8 @@ extension String.Index {
   ///
   /// - Precondition: `self` is an element of `String(utf16).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    utf16: String.UTF16View
+  public func samePosition(
+    in utf16: String.UTF16View
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
@@ -979,8 +979,8 @@ extension String.Index {
   ///
   /// - Precondition: `self` is an element of `String(unicodeScalars).indices`.
   @warn_unused_result
-  public func samePositionIn(
-    unicodeScalars: String.UnicodeScalarView
+  public func samePosition(
+    in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {
     return String.UnicodeScalarView.Index(self, within: unicodeScalars)
   }
@@ -988,14 +988,21 @@ extension String.Index {
 
 extension String {
   @available(*, unavailable, renamed="append")
-  public mutating func appendContents(of other: String) {
+  public mutating func appendContentsOf(other: String) {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed="appendContents(of:)")
+  @available(*, unavailable, renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="insert(contentsOf:at:)")
+  public mutating func insertContentsOf<
+    S : Collection where S.Iterator.Element == Character
+  >(newElements: S, at i: Index) {
     fatalError("unavailable function can't be called")
   }
 

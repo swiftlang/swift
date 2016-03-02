@@ -13,7 +13,7 @@
 import TestsUtils
 
 @inline(never)
-func memset(inout a: [Int], _ c: Int) {
+func memset(a: inout [Int], _ c: Int) {
   for i in 0..<a.count {
     a[i] = c
   }

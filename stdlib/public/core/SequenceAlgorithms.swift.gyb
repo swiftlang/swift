@@ -113,7 +113,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 % end
 
 //===----------------------------------------------------------------------===//
-// startsWith()
+// starts(with:)
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -141,10 +141,10 @@ else:
 }%
   ${comment}
   @warn_unused_result
-  public func startsWith<
+  public func starts<
     PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
   >(
-    possiblePrefix: PossiblePrefix${"," if preds else ""}
+    with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
     @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
@@ -223,7 +223,7 @@ else:
 % end
 
 //===----------------------------------------------------------------------===//
-// lexicographicalCompare()
+// lexicographicallyPrecedes()
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -262,7 +262,7 @@ else:
 
   ${comment}
   @warn_unused_result
-  public func lexicographicalCompare<
+  public func lexicographicallyPrecedes<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
@@ -392,11 +392,11 @@ extension Sequence {
   ///   and *N* is the length of the result.
   @warn_unused_result
   public func flatMap<S : Sequence>(
-    transform: (${GElement}) throws -> S
+    @noescape transform: (${GElement}) throws -> S
   ) rethrows -> [S.${GElement}] {
     var result: [S.${GElement}] = []
     for element in self {
-      result.appendContents(of: try transform(element))
+      result.append(contentsOf: try transform(element))
     }
     return result
   }
@@ -446,6 +446,26 @@ extension Sequence {
   public func reverse() -> [Iterator.Element] {
     fatalError("unavailable function can't be called")
   }
+
+  @available(*, unavailable, renamed="starts")
+  public func startsWith<
+    PossiblePrefix : Sequence where PossiblePrefix.Iterator.Element == Iterator.Element
+  >(
+    with possiblePrefix: PossiblePrefix,
+    @noescape isEquivalent: (Iterator.Element, Iterator.Element) throws -> Bool
+  ) rethrows-> Bool {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lexicographicallyPrecedes")
+  public func lexicographicalCompare<
+    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
+  >(
+    other: OtherSequence,
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
+  ) rethrows -> Bool {
+    fatalError("unavailable function can't be called")
+  }
 }
 
 extension Sequence where Iterator.Element : Comparable {
@@ -456,6 +476,24 @@ extension Sequence where Iterator.Element : Comparable {
 
   @available(*, unavailable, renamed="max")
   public func maxElement() -> Iterator.Element? {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="starts")
+  public func startsWith<
+    PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
+  >(
+    with possiblePrefix: PossiblePrefix
+  ) -> Bool {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="lexicographicallyPrecedes")
+  public func lexicographicalCompare<
+    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
+  >(
+    other: OtherSequence
+  ) -> Bool {
     fatalError("unavailable function can't be called")
   }
 }

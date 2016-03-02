@@ -29,6 +29,7 @@
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
 
+#include <cstdio>
 #include <forward_list>
 #include <random>
 
@@ -931,8 +932,8 @@ public:
 
     const size_t buf_size = 11;
     char * const id_buf = (char*)Context.Allocate(buf_size, 1);
-    std::uniform_int_distribution<unsigned int> Distribution(0, 0x7fffffffu);
-    const unsigned int id_num = Distribution(RNG);
+    std::uniform_int_distribution<unsigned> Distribution(0, 0x7fffffffu);
+    const unsigned id_num = Distribution(RNG);
     ::snprintf(id_buf, buf_size, "%u", id_num);
     Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, 
                                                     SourceLoc(), true);

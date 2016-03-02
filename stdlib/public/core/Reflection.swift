@@ -79,27 +79,27 @@ extension Int {
 /// How children of this value should be presented in the IDE.
 public enum _MirrorDisposition {
   /// As a struct.
-  case Struct
+  case `struct`
   /// As a class.
-  case Class
+  case `class`
   /// As an enum.
-  case Enum
+  case `enum`
   /// As a tuple.
-  case Tuple
+  case tuple
   /// As a miscellaneous aggregate with a fixed set of children.
-  case Aggregate
+  case aggregate
   /// As a container that is accessed by index.
-  case IndexContainer
+  case indexContainer
   /// As a container that is accessed by key.
-  case KeyContainer
+  case keyContainer
   /// As a container that represents membership of its values.
-  case MembershipContainer
+  case membershipContainer
   /// As a miscellaneous container with a variable number of children.
-  case Container
+  case container
   /// An Optional which can have either zero or one children.
-  case Optional
+  case optional
   /// An Objective-C object imported in Swift.
-  case ObjCObject
+  case objCObject
 }
 
 /// The type returned by `_reflect(x)`; supplies an API for runtime
@@ -138,7 +138,7 @@ public protocol _Mirror {
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
-  out.initializePointee(String(reflecting: x))
+  out.initialize(with: String(reflecting: x))
 }
 
 /// Produce a mirror for any value. If the value's type conforms to
@@ -152,7 +152,7 @@ public func _reflect<T>(x: T) -> _Mirror
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(
   value: T,
-  inout to target: TargetStream,
+  to target: inout TargetStream,
   name: String? = nil,
   indent: Int = 0,
   maxDepth: Int = .max,
@@ -194,12 +194,12 @@ public func dump<T>(
 /// Dump an object's contents. User code should use dump().
 internal func _dump_unlocked<TargetStream : OutputStream>(
   value: Any,
-  inout to target: TargetStream,
+  to target: inout TargetStream,
   name: String?,
   indent: Int,
   maxDepth: Int,
-  inout maxItemCounter: Int,
-  inout visitedItems: [ObjectIdentifier : Int]
+  maxItemCounter: inout Int,
+  visitedItems: inout [ObjectIdentifier : Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
@@ -292,11 +292,11 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 /// that superclass.
 internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
   mirror mirror: Mirror,
-  inout to target: TargetStream,
+  to target: inout TargetStream,
   indent: Int,
   maxDepth: Int,
-  inout maxItemCounter: Int,
-  inout visitedItems: [ObjectIdentifier : Int]
+  maxItemCounter: inout Int,
+  visitedItems: inout [ObjectIdentifier : Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
@@ -404,7 +404,7 @@ struct _OpaqueMirror : _Mirror {
   }
   var summary: String { return data.summary }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: _MirrorDisposition { return .Aggregate }
+  var disposition: _MirrorDisposition { return .aggregate }
 }
 
 internal struct _TupleMirror : _Mirror {
@@ -424,7 +424,7 @@ internal struct _TupleMirror : _Mirror {
 
   var summary: String { return "(\(count) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: _MirrorDisposition { return .Tuple }
+  var disposition: _MirrorDisposition { return .tuple }
 }
 
 struct _StructMirror : _Mirror {
@@ -446,7 +446,7 @@ struct _StructMirror : _Mirror {
     return _typeName(valueType)
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: _MirrorDisposition { return .Struct }
+  var disposition: _MirrorDisposition { return .`struct` }
 }
 
 struct _EnumMirror : _Mirror {
@@ -476,7 +476,7 @@ struct _EnumMirror : _Mirror {
     return typeName
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: _MirrorDisposition { return .Enum }
+  var disposition: _MirrorDisposition { return .`enum` }
 }
 
 @warn_unused_result
@@ -527,7 +527,7 @@ struct _ClassMirror : _Mirror {
     return nil
 #endif
   }
-  var disposition: _MirrorDisposition { return .Class }
+  var disposition: _MirrorDisposition { return .`class` }
 }
 
 struct _ClassSuperMirror : _Mirror {
@@ -550,7 +550,7 @@ struct _ClassSuperMirror : _Mirror {
     return _typeName(data.metadata)
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: _MirrorDisposition { return .Class }
+  var disposition: _MirrorDisposition { return .`class` }
 }
 
 struct _MetatypeMirror : _Mirror {
@@ -575,7 +575,7 @@ struct _MetatypeMirror : _Mirror {
   var quickLookObject: PlaygroundQuickLook? { return nil }
 
   // Special disposition for types?
-  var disposition: _MirrorDisposition { return .Aggregate }
+  var disposition: _MirrorDisposition { return .aggregate }
 }
 
 extension ObjectIdentifier {

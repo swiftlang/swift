@@ -1587,9 +1587,9 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
          "mismatched protocol conformances");
 
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
+    assert(protocols[i].getProtocol()
+             == witnessConformances[i].getRequirement());
     auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,
-                                     protocols[i].getProtocol(),
-                                     protocols[i].getInfo(),
                                      witnessConformances[i]);
     body(i, table);
   }
@@ -1670,8 +1670,9 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   // Should only be one conformance, for the ErrorProtocol protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
+  (void) entry;
+  assert(entry.getProtocol() == conformances[0].getRequirement());
   auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
-                                     entry.getProtocol(), entry.getInfo(),
                                      conformances[0]);
   
   // Call the runtime to allocate the box.

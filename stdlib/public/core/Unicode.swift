@@ -18,20 +18,25 @@
 ///
 /// A unicode scalar value, an indication that no more unicode scalars
 /// are available, or an indication of a decoding error.
-public enum UnicodeDecodingResult {
-  case ScalarValue(UnicodeScalar)
-  case EmptyInput
-  case Error
+public enum UnicodeDecodingResult : Equatable {
+  case scalarValue(UnicodeScalar)
+  case emptyInput
+  case error
+}
 
-  /// Returns `true` if `self` indicates no more unicode scalars are
-  /// available.
-  public var isEmptyInput: Bool {
-    switch self {
-    case .EmptyInput:
-      return true
-    default:
-      return false
-    }
+public func == (
+  lhs: UnicodeDecodingResult,
+  rhs: UnicodeDecodingResult
+) -> Bool {
+  switch (lhs, rhs) {
+  case (.scalarValue(let lhsScalar), .scalarValue(let rhsScalar)):
+    return lhsScalar == rhsScalar
+  case (.emptyInput, .emptyInput):
+    return true
+  case (.error, .error):
+    return true
+  default:
+    return false
   }
 }
 
@@ -61,11 +66,14 @@ public protocol UnicodeCodec {
   /// - parameter next: An iterator over the code units to be decoded.
   mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout next: I) -> UnicodeDecodingResult
+  >(next: inout I) -> UnicodeDecodingResult
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
-  static func encode(input: UnicodeScalar, output: (CodeUnit) -> Void)
+  static func encode(
+    input: UnicodeScalar,
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
+  )
 }
 
 /// A codec for [UTF-8](http://www.unicode.org/glossary/#UTF_8).
@@ -77,51 +85,9 @@ public struct UTF8 : UnicodeCodec {
 
   public init() {}
 
-  /// Returns the number of expected trailing bytes for a given first byte: 0,
-  /// 1, 2 or 3.  If the first byte cannot start a valid UTF-8 code unit
-  /// sequence, returns 4.
-  @warn_unused_result
-  public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
-    if _fastPath(cu0 & 0x80 == 0) {
-      // 0x00 -- 0x7f: 1-byte sequences.
-      return 0
-    }
-
-    // 0xc0 -- 0xc1: invalid first byte.
-    // 0xc2 -- 0xdf: 2-byte sequences.
-    // 0xe0 -- 0xef: 3-byte sequences.
-    // 0xf0 -- 0xf4: 4-byte sequences.
-    // 0xf5 -- 0xff: invalid first byte.
-
-    // The rules above are represented as a lookup table.  The lookup table
-    // consists of two words, where `high` contains the high bit of the result,
-    // `low` contains the low bit.
-    //
-    // Bit patterns:
-    // high | low | meaning
-    // -----+-----+----------------
-    //   0  |  0  | 2-byte sequence
-    //   0  |  1  | 3-byte sequence
-    //   1  |  0  | 4-byte sequence
-    //   1  |  1  | invalid
-    //
-    // This implementation allows us to handle these cases without branches.
-
-    //    ---------0xf?-------  ---------0xe?-------  ---------0xd?-------  ---------0xc?-------
-    let low: UInt64 =
-        0b1111_1111__1110_0000__1111_1111__1111_1111__0000_0000__0000_0000__0000_0000__0000_0011
-    let high: UInt64 =
-        0b1111_1111__1111_1111__0000_0000__0000_0000__0000_0000__0000_0000__0000_0000__0000_0011
-
-    let index = UInt64(max(0, Int(cu0) - 0xc0))
-    let highBit = ((high >> index) & 1) << 1
-    let lowBit = (low >> index) & 1
-    return UInt8(1 + (highBit | lowBit))
-  }
-
   /// Lookahead buffer used for UTF-8 decoding.  New bytes are inserted at LSB,
   /// and bytes are read at MSB.
-  var _decodeLookahead: UInt32 = 0
+  internal var _decodeLookahead: UInt32 = 0
 
   /// Flags with layout: `0bxxxx_yyyy`.
   ///
@@ -138,85 +104,68 @@ public struct UTF8 : UnicodeCodec {
   ///
   /// This representation is crafted to allow one to consume a byte from a
   /// buffer with a shift, and update flags with a single-bit right shift.
-  var _lookaheadFlags: UInt8 = 0
+  internal var _lookaheadFlags: UInt8 = 0
 
-  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
-  /// unit sequence.
+
+  /// Returns `true` if the LSB bytes in `buffer` are a well-formed UTF-8 code
+  /// unit sequence. The lowest byte is considered the first code unit.
+  ///
+  /// - Requires: There is at least one used byte in `buffer`, and the unused
+  /// space in `buffer` is filled with some value not matching the UTF-8
+  /// continuation byte form (`0b10xxxxxx`).
   @warn_unused_result
-  static func _isValidUTF8Impl(buffer: UInt32, length: UInt8) -> Bool {
-    switch length {
-    case 4:
-      let cu3 = UInt8((buffer >> 24) & 0xff)
-      if cu3 < 0x80 || cu3 > 0xbf {
-        return false
-      }
-      fallthrough
-    case 3:
-      let cu2 = UInt8((buffer >> 16) & 0xff)
-      if cu2 < 0x80 || cu2 > 0xbf {
-        return false
-      }
-      fallthrough
-    case 2:
-      let cu0 = UInt8(buffer & 0xff)
-      let cu1 = UInt8((buffer >> 8) & 0xff)
-      switch cu0 {
-      case 0xe0:
-        if cu1 < 0xa0 || cu1 > 0xbf {
-          return false
-        }
-      case 0xed:
-        if cu1 < 0x80 || cu1 > 0x9f {
-          return false
-        }
-      case 0xf0:
-        if cu1 < 0x90 || cu1 > 0xbf {
-          return false
-        }
-      case 0xf4:
-        if cu1 < 0x80 || cu1 > 0x8f {
-          return false
-        }
-      default:
-        _sanityCheck(cu0 >= 0xc2 && cu0 <= 0xf4,
-            "invalid first bytes should be handled in the caller")
-        if cu1 < 0x80 || cu1 > 0xbf {
-          return false
-        }
-      }
-      return true
+  public // @testable
+  static func _isValidUTF8(buffer: UInt32) -> Bool {
 
-    default:
-      _sanityCheckFailure("one-byte sequences should be handled in the caller")
+    if _fastPath(buffer & 0x80 == 0) {
+      return true // 0x00 -- 0x7f: 1-byte sequences (ASCII).
     }
-  }
 
-  /// Returns `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
-  /// unit sequence.
-  @warn_unused_result
-  static func _isValidUTF8(buffer: UInt32, validBytes: UInt8) -> Bool {
-    _sanityCheck(validBytes & 0b0000_1111 != 0,
-        "input buffer should not be empty")
+    // Determine sequence length using high 5 bits of 1st byte. We use a
+    // look-up table to branch less. 1-byte sequences are handled above.
+    //
+    //  case | pattern | description
+    // ----------------------------
+    //   00  |  110xx  | 2-byte sequence
+    //   01  |  1110x  | 3-byte sequence
+    //   10  |  11110  | 4-byte sequence
+    //   11  |  other  | invalid
+    //
+    //                     11xxx      10xxx      01xxx      00xxx
+    let lut0: UInt32 = 0b1011_0000__1111_1111__1111_1111__1111_1111
+    let lut1: UInt32 = 0b1100_0000__1111_1111__1111_1111__1111_1111
 
-    let cu0 = UInt8(buffer & 0xff)
-    let trailingBytes = _numTrailingBytes(cu0)
-    switch trailingBytes {
-    case 0:
+    let index = (buffer >> 3) & 0x1f
+    let bit0 = (lut0 >> index) & 1
+    let bit1 = (lut1 >> index) & 1
+
+    switch (bit1, bit0) {
+    case (0, 0): // 2-byte sequence.
+      // Require 10xx xxxx  110x xxxx.
+      if buffer & 0xc0e0 != 0x80c0 { return false }
+      // Disallow xxxx xxxx  xxx0 000x (<= 7 bits case).
+      if buffer & 0x001e == 0x0000 { return false }
       return true
-
-    case 1, 2, 3:
-      // We *don't* need to check the if the buffer actually contains at least
-      // `trailingBytes` bytes.  Here's why.
-      //
-      // If the buffer is not full -- contains fewer than 4 bytes, we are at
-      // EOF, and the buffer will be padded with 0x00.  Thus, an incomplete
-      // code unit sequence just before EOF would be seen by code below as
-      // padded with nuls.  This sequence will be rejected by the logic in
-      // `_isValidUTF8Impl`, because the nul byte is not a valid continuation
-      // byte for UTF-8.
-      return _isValidUTF8Impl(buffer, length: trailingBytes + 1)
-
-    default:
+    case (0, 1): // 3-byte sequence.
+      // Require 10xx xxxx  10xx xxxx  1110 xxxx.
+      if buffer & 0xc0c0f0 != 0x8080e0 { return false }
+      // Disallow xxxx xxxx  xx0x xxxx  xxxx 0000 (<= 11 bits case).
+      if buffer & 0x00200f == 0x000000 { return false }
+      // Disallow xxxx xxxx  xx1x xxxx  xxxx 1101 (surrogate code points).
+      if buffer & 0x00200f == 0x00200d { return false }
+      return true
+    case (1, 0): // 4-byte sequence.
+      // Require 10xx xxxx  10xx xxxx  10xx xxxx  1111 0xxx.
+      if buffer & 0xc0c0c0f8 != 0x808080f0 { return false }
+      // Disallow xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx x000 (<= 16 bits case).
+      if buffer & 0x00003007 == 0x00000000 { return false }
+      // Case xxxx xxxx  xxxx xxxx  xxxx xxxx  xxxx x1xx.
+      if buffer & 0x00000004 == 0x00000004 {
+        // Require xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx xx00 (<= 0x10FFFF).
+        if buffer & 0x00003003 != 0x00000000 { return false }
+      }
+      return true
+    default: // Invalid sequence.
       return false
     }
   }
@@ -224,7 +173,7 @@ public struct UTF8 : UnicodeCodec {
   /// Given an ill-formed sequence, find the length of its maximal subpart.
   @inline(never)
   @warn_unused_result
-  static func _findMaximalSubpartOfIllFormedUTF8Sequence(
+  internal static func _findMaximalSubpartOfIllFormedUTF8Sequence(
       buffer: UInt32, validBytes: UInt8) -> UInt8 {
     var buffer = buffer
     var validBytes = validBytes
@@ -236,7 +185,7 @@ public struct UTF8 : UnicodeCodec {
 
     _sanityCheck(validBytes != 0,
         "input buffer should not be empty")
-    _sanityCheck(!UTF8._isValidUTF8(buffer, validBytes: validBytes),
+    _sanityCheck(!UTF8._isValidUTF8(buffer),
         "input sequence should be ill-formed UTF-8")
 
     // Unicode 6.3.0, D93b:
@@ -334,7 +283,7 @@ public struct UTF8 : UnicodeCodec {
   /// - parameter next: An iterator over the code units to be decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout next: I) -> UnicodeDecodingResult {
+  >(next: inout I) -> UnicodeDecodingResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
     // iterator.
     if _lookaheadFlags & 0b1111_0000 == 0 {
@@ -356,7 +305,7 @@ public struct UTF8 : UnicodeCodec {
             _lookaheadFlags |= 0b0001_0000
           case 0b0000:
             _lookaheadFlags |= 0b1000_0000
-            return .EmptyInput
+            return .emptyInput
           default:
             _sanityCheckFailure("bad value in _lookaheadFlags")
           }
@@ -366,7 +315,7 @@ public struct UTF8 : UnicodeCodec {
     }
 
     if _slowPath(_lookaheadFlags & 0b0000_1111 == 0) {
-      return .EmptyInput
+      return .emptyInput
     }
 
     if _slowPath(_lookaheadFlags & 0b1111_0000 != 0) {
@@ -390,14 +339,14 @@ public struct UTF8 : UnicodeCodec {
     // The first byte to read is located at MSB of `_decodeLookahead`.  Get a
     // representation of the buffer where we can read bytes starting from LSB.
     var buffer = _decodeLookahead.byteSwapped
-    if _slowPath(!UTF8._isValidUTF8(buffer, validBytes: _lookaheadFlags)) {
+    if _slowPath(!UTF8._isValidUTF8(buffer)) {
       // The code unit sequence is ill-formed.  According to Unicode
       // recommendation, replace the maximal subpart of ill-formed sequence
       // with one replacement character.
       _lookaheadFlags >>=
           UTF8._findMaximalSubpartOfIllFormedUTF8Sequence(buffer,
               validBytes: _lookaheadFlags)
-      return .Error
+      return .error
     }
 
     // At this point we know that `buffer` starts with a well-formed code unit
@@ -412,7 +361,7 @@ public struct UTF8 : UnicodeCodec {
 
     if cu0 < 0x80 {
       // 1-byte sequences.
-      return .ScalarValue(UnicodeScalar(UInt32(cu0)))
+      return .scalarValue(UnicodeScalar(UInt32(cu0)))
     }
 
     // Start with octet 1 (we'll mask off high bits later).
@@ -424,7 +373,7 @@ public struct UTF8 : UnicodeCodec {
     result = (result << 6) | UInt32(cu1 & 0x3f)
     if cu0 < 0xe0 {
       // 2-byte sequences.
-      return .ScalarValue(UnicodeScalar(result & 0x000007ff)) // 11 bits
+      return .scalarValue(UnicodeScalar(result & 0x000007ff)) // 11 bits
     }
 
     let cu2 = UInt8(buffer & 0xff)
@@ -433,21 +382,21 @@ public struct UTF8 : UnicodeCodec {
     result = (result << 6) | UInt32(cu2 & 0x3f)
     if cu0 < 0xf0 {
       // 3-byte sequences.
-      return .ScalarValue(UnicodeScalar(result & 0x0000ffff)) // 16 bits
+      return .scalarValue(UnicodeScalar(result & 0x0000ffff)) // 16 bits
     }
 
     // 4-byte sequences.
     let cu3 = UInt8(buffer & 0xff)
     _lookaheadFlags >>= 1
     result = (result << 6) | UInt32(cu3 & 0x3f)
-    return .ScalarValue(UnicodeScalar(result & 0x001fffff)) // 21 bits
+    return .scalarValue(UnicodeScalar(result & 0x001fffff)) // 21 bits
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -469,13 +418,13 @@ public struct UTF8 : UnicodeCodec {
         else {
           c >>= 6
           buf1 = (buf1 & 0x3F) | 0x80 // 10xxxxxx
-          put(UInt8(c | 0xF0)) // 11110xxx
+          processCodeUnit(UInt8(c | 0xF0)) // 11110xxx
         }
-        put(buf1)
+        processCodeUnit(buf1)
       }
-      put(buf2)
+      processCodeUnit(buf2)
     }
-    put(buf3)
+    processCodeUnit(buf3)
   }
 
   /// Returns `true` if `byte` is a continuation byte of the form
@@ -484,8 +433,6 @@ public struct UTF8 : UnicodeCodec {
   public static func isContinuation(byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
-
-  var _value =  UInt8()
 }
 
 /// A codec for [UTF-16](http://www.unicode.org/glossary/#UTF_16).
@@ -520,9 +467,9 @@ public struct UTF16 : UnicodeCodec {
   /// - parameter next: An *iterator* over the code units to be decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> UnicodeDecodingResult {
+  >(input: inout I) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
-      return .EmptyInput
+      return .emptyInput
     }
 
     // Note: maximal subpart of ill-formed sequence for UTF-16 can only have
@@ -536,7 +483,7 @@ public struct UTF16 : UnicodeCodec {
       } else {
         // Set EOF flag.
         _lookaheadFlags |= 0b01
-        return .EmptyInput
+        return .emptyInput
       }
     } else {
       // Fetch code unit from the lookahead buffer and note this fact in flags.
@@ -550,12 +497,12 @@ public struct UTF16 : UnicodeCodec {
     if _fastPath((unit0 >> 11) != 0b1101_1) {
       // Neither high-surrogate, nor low-surrogate -- sequence of 1 code unit,
       // decoding is trivial.
-      return .ScalarValue(UnicodeScalar(unit0))
+      return .scalarValue(UnicodeScalar(unit0))
     }
 
     if _slowPath((unit0 >> 10) == 0b1101_11) {
       // `unit0` is a low-surrogate.  We have an ill-formed sequence.
-      return .Error
+      return .error
     }
 
     // At this point we know that `unit0` is a high-surrogate.
@@ -569,14 +516,14 @@ public struct UTF16 : UnicodeCodec {
 
       // We have seen a high-surrogate and EOF, so we have an ill-formed
       // sequence.
-      return .Error
+      return .error
     }
 
     if _fastPath((unit1 >> 10) == 0b1101_11) {
       // `unit1` is a low-surrogate.  We have a well-formed surrogate pair.
 
       let result = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
-      return .ScalarValue(UnicodeScalar(result))
+      return .scalarValue(UnicodeScalar(result))
     }
 
     // Otherwise, we have an ill-formed sequence.  These are the possible
@@ -590,7 +537,7 @@ public struct UTF16 : UnicodeCodec {
     // Save the second code unit in the lookahead buffer.
     _decodeLookahead = unit1
     _lookaheadFlags |= 0b10
-    return .Error
+    return .error
   }
 
   /// Try to decode one Unicode scalar, and return the actual number of code
@@ -598,16 +545,16 @@ public struct UTF16 : UnicodeCodec {
   /// units than required for this scalar.
   mutating func _decodeOne<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> (UnicodeDecodingResult, Int) {
+  >(input: inout I) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
-    case .ScalarValue(let us):
+    case .scalarValue(let us):
       return (result, UTF16.width(us))
 
-    case .EmptyInput:
+    case .emptyInput:
       return (result, 0)
 
-    case .Error:
+    case .error:
       return (result, 1)
     }
   }
@@ -616,21 +563,19 @@ public struct UTF16 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
     if scalarValue <= UInt32(UInt16.max) {
-      put(UInt16(scalarValue))
+      processCodeUnit(UInt16(scalarValue))
     }
     else {
       let lead_offset = UInt32(0xd800) - UInt32(0x10000 >> 10)
-      put(UInt16(lead_offset + (scalarValue >> 10)))
-      put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
+      processCodeUnit(UInt16(lead_offset + (scalarValue >> 10)))
+      processCodeUnit(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
   }
-
-  var _value = UInt16()
 }
 
 /// A codec for [UTF-32](http://www.unicode.org/glossary/#UTF_32).
@@ -655,18 +600,18 @@ public struct UTF32 : UnicodeCodec {
   /// - parameter next: An iterator over the code units to be decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> UnicodeDecodingResult {
+  >(input: inout I) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
   }
 
   static func _decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(inout input: I) -> UnicodeDecodingResult {
-    guard let x = input.next() else { return .EmptyInput }
+  >(input: inout I) -> UnicodeDecodingResult {
+    guard let x = input.next() else { return .emptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
-      return .ScalarValue(UnicodeScalar(x))
+      return .scalarValue(UnicodeScalar(x))
     } else {
-      return .Error
+      return .error
     }
   }
 
@@ -674,9 +619,9 @@ public struct UTF32 : UnicodeCodec {
   /// calling `output` on each `CodeUnit`.
   public static func encode(
     input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
+    sendingOutputTo processCodeUnit: (CodeUnit) -> Void
   ) {
-    put(UInt32(input))
+    processCodeUnit(UInt32(input))
   }
 }
 
@@ -690,10 +635,13 @@ public func transcode<
   Input : IteratorProtocol,
   InputEncoding : UnicodeCodec,
   OutputEncoding : UnicodeCodec
-  where InputEncoding.CodeUnit == Input.Element>(
-  inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
-  _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
-  stoppingOnError stopOnError: Bool
+  where InputEncoding.CodeUnit == Input.Element
+>(
+  input: Input,
+  from inputEncoding: InputEncoding.Type,
+  to outputEncoding: OutputEncoding.Type,
+  stoppingOnError stopOnError: Bool,
+  sendingOutputTo processCodeUnit: (OutputEncoding.CodeUnit) -> Void
 ) -> Bool {
   var input = input
 
@@ -704,17 +652,17 @@ public func transcode<
   var inputDecoder = inputEncoding.init()
   var hadError = false
   var scalar = inputDecoder.decode(&input)
-  while !scalar.isEmptyInput {
+  while scalar != .emptyInput {
     switch scalar {
-    case .ScalarValue(let us):
-      OutputEncoding.encode(us, output: output)
-    case .EmptyInput:
+    case .scalarValue(let us):
+      OutputEncoding.encode(us, sendingOutputTo: processCodeUnit)
+    case .emptyInput:
       _sanityCheckFailure("should not enter the loop when input becomes empty")
-    case .Error:
+    case .error:
       if stopOnError {
         return (hadError: true)
       } else {
-        OutputEncoding.encode("\u{fffd}", output: output)
+        OutputEncoding.encode("\u{fffd}", sendingOutputTo: processCodeUnit)
         hadError = true
       }
     }
@@ -898,8 +846,9 @@ extension UTF16 {
 
   public // @testable
   static func _copy<T : _StringElement, U : _StringElement>(
-    source: UnsafeMutablePointer<T>,
-    destination: UnsafeMutablePointer<U>, count: Int
+    source source: UnsafeMutablePointer<T>,
+    destination: UnsafeMutablePointer<U>,
+    count: Int
   ) {
     if strideof(T.self) == strideof(U.self) {
       _memcpy(
@@ -923,12 +872,14 @@ extension UTF16 {
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
   @warn_unused_result
-  public static func measure<
-      Encoding : UnicodeCodec, Input : IteratorProtocol
-      where Encoding.CodeUnit == Input.Element
+  public static func transcodedLength<
+    Encoding : UnicodeCodec, Input : IteratorProtocol
+    where Encoding.CodeUnit == Input.Element
   >(
-    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-  ) -> (Int, Bool)? {
+    of input: Input,
+    decodedAs sourceEncoding: Encoding.Type,
+    repairingIllFormedSequences: Bool
+  ) -> (count: Int, isASCII: Bool)? {
     var input = input
     var count = 0
     var isAscii = true
@@ -937,15 +888,15 @@ extension UTF16 {
     loop:
     while true {
       switch inputDecoder.decode(&input) {
-      case .ScalarValue(let us):
+      case .scalarValue(let us):
         if us.value > 0x7f {
           isAscii = false
         }
         count += width(us)
-      case .EmptyInput:
+      case .emptyInput:
         break loop
-      case .Error:
-        if !repairIllFormedSequences {
+      case .error:
+        if !repairingIllFormedSequences {
           return nil
         }
         isAscii = false
@@ -958,4 +909,30 @@ extension UTF16 {
 
 @available(*, unavailable, renamed="UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
+
+@available(*, unavailable, message="use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'")
+public func transcode<
+  Input : IteratorProtocol,
+  InputEncoding : UnicodeCodec,
+  OutputEncoding : UnicodeCodec
+  where InputEncoding.CodeUnit == Input.Element
+>(
+  inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
+  _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
+  stoppingOnError stopOnError: Bool
+) -> Bool {
+  fatalError("unavailable function can't be called")
+}
+
+extension UTF16 {
+  @available(*, unavailable, message="use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
+  public static func measure<
+    Encoding : UnicodeCodec, Input : IteratorProtocol
+    where Encoding.CodeUnit == Input.Element
+  >(
+    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
+  ) -> (Int, Bool)? {
+    fatalError("unavailable function can't be called")
+  }
+}
 

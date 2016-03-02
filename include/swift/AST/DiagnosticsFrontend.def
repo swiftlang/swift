@@ -52,6 +52,9 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
   "unsupported target architecture: '%0'", (StringRef))
 
+ERROR(error_unsupported_opt_for_target, none,
+  "unsupported option '%0' for target '%1'", (StringRef, StringRef))
+
 ERROR(cannot_open_file,none,
   "cannot open file '%0' (%1)", (StringRef, StringRef))
 ERROR(cannot_open_serialized_file,none,
@@ -67,6 +70,8 @@ ERROR(error_unknown_arg,none,
   "unknown argument: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
   "invalid value '%1' in '%0'", (StringRef, StringRef))
+ERROR(error_unsupported_option_argument,none,
+  "unsupported argument '%1' to option '%0'", (StringRef, StringRef))
 ERROR(error_immediate_mode_missing_stdlib,none,
   "could not load the swift standard library", ())
 ERROR(error_immediate_mode_missing_library,none,

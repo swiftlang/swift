@@ -75,7 +75,7 @@ public func &${op} <T : _IntegerArithmetic>(lhs: T, rhs: T) -> T {
 /// ${Action} `lhs` and `rhs` and stores ${result} in `lhs`, trapping in
 /// case of arithmetic overflow (except in -Ounchecked builds).
 @_transparent
-public func ${op}= <T : _IntegerArithmetic>(inout lhs: T, rhs: T) {
+public func ${op}= <T : _IntegerArithmetic>(lhs: inout T, rhs: T) {
   lhs = lhs ${op} rhs
 }
 % end

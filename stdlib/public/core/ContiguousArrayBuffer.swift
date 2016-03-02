@@ -103,9 +103,9 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
-    __manager._elementPointer.deinitializePointee(
+    __manager._elementPointer.deinitialize(
       count: __manager._valuePointer.pointee.count)
-    __manager._valuePointer.deinitializePointee()
+    __manager._valuePointer.deinitialize()
     _fixLifetime(__manager)
   }
 
@@ -149,7 +149,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     let resultPtr = result.baseAddress
     let p = __manager._elementPointer
     for i in 0..<count {
-      (resultPtr + i).initializePointee(_bridgeToObjectiveCUnconditional(p[i]))
+      (resultPtr + i).initialize(with: _bridgeToObjectiveCUnconditional(p[i]))
     }
     _fixLifetime(__manager)
     return result
@@ -242,7 +242,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     let verbatim = false
 #endif
 
-    __bufferPointer._valuePointer.initializePointee(
+    __bufferPointer._valuePointer.initialize(with: 
       _ArrayBody(
         count: count,
         capacity: capacity,
@@ -378,8 +378,9 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  public func _uninitializedCopy(
-    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
+  public func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _sanityCheck(bounds.startIndex >= 0)
     _sanityCheck(bounds.endIndex >= bounds.startIndex)
@@ -504,7 +505,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 /// Append the elements of `rhs` to `lhs`.
 public func += <
   Element, C : Collection where C.Iterator.Element == Element
-> (inout lhs: _ContiguousArrayBuffer<Element>, rhs: C) {
+> (lhs: inout _ContiguousArrayBuffer<Element>, rhs: C) {
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(rhs.count)
 
@@ -560,7 +561,7 @@ internal func _copySequenceToNativeArrayBuffer<
 
   var iterator = source.makeIterator()
 
-  // FIXME(performance): use _initializeTo().
+  // FIXME(performance): use _copyContents(initializing:).
 
   // Add elements up to the initial capacity without checking for regrowth.
   for _ in 0..<initialCapacity {
@@ -613,8 +614,8 @@ internal func _copyCollectionToNativeArrayBuffer<
   var p = result.firstElementAddress
   var i = source.startIndex
   for _ in 0..<count {
-    // FIXME(performance): use _initializeTo().
-    p.initializePointee(source[i])
+    // FIXME(performance): use _copyContents(initializing:).
+    p.initialize(with: source[i])
     i._successorInPlace()
     p._successorInPlace()
   }
@@ -674,7 +675,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
     remainingCapacity -= 1
 
-    p.initializePointee(element)
+    p.initialize(with: element)
     p += 1
   }
 

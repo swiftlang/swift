@@ -25,8 +25,9 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  func _uninitializedCopy(
-    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
+  func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
 
   /// Get or set the index'th element.
@@ -169,7 +170,7 @@ extension _ArrayBufferProtocol {
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initializePointee(newValues[i])
+        (elements + j).initialize(with: newValues[i])
         i._successorInPlace()
       }
       _expectEnd(i, newValues)
@@ -207,7 +208,7 @@ extension _ArrayBufferProtocol {
         newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subRange
-        (newTailStart + tailCount).deinitializePointee(
+        (newTailStart + tailCount).deinitialize(
           count: shrinkage - tailCount)
       }
     }

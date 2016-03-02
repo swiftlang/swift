@@ -18,7 +18,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/Attr.h"
 
 using namespace swift;
 

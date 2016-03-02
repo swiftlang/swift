@@ -32,6 +32,11 @@
 -(void)drawGreebies:(nonnull SEGreebieArray*)greebies;
 @end
 
+@interface ABCDoodle : NSObject
+@property (nonatomic,copy,nonnull) NSArray<ABCDoodle *> *doodles;
+-(void)addDoodle:(nonnull ABCDoodle *)doodle;
+@end
+
 @protocol OMWLanding
 -(void)flipLanding;
 @end

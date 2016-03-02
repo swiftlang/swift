@@ -256,7 +256,7 @@ extension ${Self} : FloatingPoint {
   }
 
   /// A quiet NaN.
-  public static var NaN: ${Self} {
+  public static var nan: ${Self} {
     return quietNaN
   }
 
@@ -586,16 +586,16 @@ extension ${Self} {
 
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
+public prefix func ++ (rhs: inout ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
+public prefix func -- (rhs: inout ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
+public postfix func ++ (lhs: inout ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
 @_transparent
 @available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
+public postfix func -- (lhs: inout ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 
 
@@ -646,7 +646,7 @@ public func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 % for op in '+', '-', '*', '/', '%':
 @_transparent
-public func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
+public func ${op}= (lhs: inout ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 % end
 
 % if bits == 80:

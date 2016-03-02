@@ -33,7 +33,6 @@
 #include "swift/Config.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
-#include "clang/AST/DeclVisitor.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
@@ -1201,7 +1200,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (swiftCtx) VarDecl(
       isStatic,
-      /*isLet=*/false, noLoc, swiftCtx.Id_NSErrorDomain, stringTy, swiftDecl);
+      /*isLet=*/false, noLoc, swiftCtx.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
@@ -1441,7 +1440,8 @@ namespace {
         // 'typedef const void *FooRef;' as CF types if they have the
         // right attributes or match our name whitelist.
         if (!SwiftType) {
-          auto DC = Impl.importDeclContextOf(Decl);
+          auto DC = Impl.importDeclContextOf(Decl,
+                                             importedName.EffectiveContext);
           if (!DC)
             return nullptr;
 
@@ -1567,7 +1567,7 @@ namespace {
         }
       }
 
-      auto DC = Impl.importDeclContextOf(Decl);
+      auto DC = Impl.importDeclContextOf(Decl, importedName.EffectiveContext);
       if (!DC)
         return nullptr;
 
@@ -2418,7 +2418,10 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
+      auto importedName = Impl.importFullName(decl);
+      if (!importedName) return nullptr;
+
+      auto name = importedName.Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2428,7 +2431,7 @@ namespace {
         // constant with that integral type.
 
         // The context where the constant will be introduced.
-        auto dc = Impl.importDeclContextOf(clangEnum);
+        auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
         if (!dc)
           return nullptr;
 
@@ -2459,7 +2462,8 @@ namespace {
         // The enumeration was mapped to a struct containing the integral
         // type. Create a constant with that struct type.
 
-        auto dc = Impl.importDeclContextOf(clangEnum);
+        // The context where the constant will be introduced.
+        auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
         if (!dc)
           return nullptr;
 
@@ -2491,6 +2495,9 @@ namespace {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available
         // independently.
+
+        // FIXME: This is gross. We shouldn't have to import
+        // everything to get at the individual constants.
         return nullptr;
       }
       }
@@ -2513,11 +2520,12 @@ namespace {
             return nullptr;
         }
       }
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
-      if (name.empty())
-        return nullptr;
+      auto importedName = Impl.importFullName(decl);
+      if (!importedName) return nullptr;
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto name = importedName.Imported.getBaseName();
+
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
 
@@ -2537,13 +2545,13 @@ namespace {
     }
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
-      auto dc = Impl.importDeclContextOf(decl);
-      if (!dc)
-        return nullptr;
-
       // Determine the name of the function.
       auto importedName = Impl.importFullName(decl);
       if (!importedName)
+        return nullptr;
+
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      if (!dc)
         return nullptr;
 
       DeclName name = importedName.Imported;
@@ -2608,11 +2616,12 @@ namespace {
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
-      if (name.empty())
-        return nullptr;
+      auto importedName = Impl.importFullName(decl);
+      if (!importedName) return nullptr;
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto name = importedName.Imported.getBaseName();
+
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
 
@@ -2654,11 +2663,12 @@ namespace {
         return nullptr;
 
       // Variables are imported as... variables.
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
-      if (name.empty())
-        return nullptr;
+      auto importedName = Impl.importFullName(decl);
+      if (!importedName) return nullptr;
 
-      auto dc = Impl.importDeclContextOf(decl);
+      auto name = importedName.Imported.getBaseName();
+
+      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
 
@@ -5577,17 +5587,26 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 }
 
 DeclContext *
-ClangImporter::Implementation::importDeclContextOf(const clang::Decl *D) {
-  const clang::DeclContext *DC = D->getDeclContext();
+ClangImporter::Implementation::importDeclContextOf(
+  const clang::Decl *D,
+  EffectiveClangContext context)
+{
+  if (const clang::DeclContext *dc = context.dyn_cast<clang::DeclContext *>()) {
+    if (dc->isTranslationUnit()) {
+      if (auto *M = getClangModuleForDecl(D))
+        return M;
+      else
+        return nullptr;
+    }
 
-  if (DC->isTranslationUnit()) {
-    if (auto *M = getClangModuleForDecl(D))
-      return M;
-    else
-      return nullptr;
+    return importDeclContextImpl(dc);
   }
 
-  return importDeclContextImpl(DC);
+  // Import the typedef-name as a declaration.
+  auto decl = importDecl(context.get<clang::TypedefNameDecl *>());
+  if (!decl) return nullptr;
+
+  return cast_or_null<DeclContext>(decl);
 }
 
 ValueDecl *

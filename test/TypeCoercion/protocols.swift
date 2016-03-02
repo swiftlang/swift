@@ -85,9 +85,9 @@ struct NotFormattedPrintable1 {
 
 func testFormattedPrintableCoercion(ip1: IsPrintable1,
                                     ip2: IsPrintable2,
-                                    inout fp: FormattedPrintable,
-                                    inout p: MyPrintable,
-                                    inout op: OtherPrintable,
+                                    fp: inout FormattedPrintable,
+                                    p: inout MyPrintable,
+                                    op: inout OtherPrintable,
                                     nfp1: NotFormattedPrintable1) {
   fp = ip1
   fp = ip2 // expected-error{{value of type 'IsPrintable2' does not conform to 'FormattedPrintable' in assignment}}
@@ -100,20 +100,20 @@ func testFormattedPrintableCoercion(ip1: IsPrintable1,
 protocol Document : Titled, MyPrintable {
 }
 
-func testMethodsAndVars(fp: FormattedPrintable, f: TestFormat, inout doc: Document) {
+func testMethodsAndVars(fp: FormattedPrintable, f: TestFormat, doc: inout Document) {
   fp.print(f)
   fp.print()
   doc.title = "Gone with the Wind"
   doc.print()
 }
 
-func testDocumentCoercion(inout doc: Document, ip1: IsPrintable1, l: Lackey) {
+func testDocumentCoercion(doc: inout Document, ip1: IsPrintable1, l: Lackey) {
   doc = ip1
   doc = l // expected-error{{value of type 'Lackey' does not conform to 'Document' in assignment}}
 }
 
 // Check coercion of references.
-func refCoercion(inout p: MyPrintable) { }
+func refCoercion(p: inout MyPrintable) { }
 var p : MyPrintable = IsPrintable1()
 var fp : FormattedPrintable = IsPrintable1()
 var ip1 : IsPrintable1
@@ -138,7 +138,7 @@ struct IsIntToStringSubscriptable {
   subscript(i: Int) -> String { get {} set {} }
 }
 
-func testIntSubscripting(inout i_s: IntSubscriptable,
+func testIntSubscripting(i_s: inout IntSubscriptable,
                          iis: IsIntSubscriptable,
                          ids: IsDoubleSubscriptable,
                          iiss: IsIntToStringSubscriptable) {

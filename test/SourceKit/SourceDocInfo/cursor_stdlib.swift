@@ -27,7 +27,7 @@ func foo2(var a : [S1]) {
 
 // RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-ITERATOR %s
 // CHECK-ITERATOR-NOT: _AnyIteratorBase
-// CHECK-ITERATOR: <Group>Lazy Views</Group>
+// CHECK-ITERATOR: <Group>Collection/Type-erased</Group>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT1 %s
 // CHECK-REPLACEMENT1: <Group>Collection</Group>
@@ -39,7 +39,7 @@ func foo2(var a : [S1]) {
 // CHECK-REPLACEMENT1: RELATED END
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT2 %s
-// CHECK-REPLACEMENT2: <Group>Array</Group>
+// CHECK-REPLACEMENT2: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT2: <Declaration>mutating func append(newElement: <Type usr="s:Si">Int</Type>)</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
@@ -50,5 +50,5 @@ func foo2(var a : [S1]) {
 // CHECK-REPLACEMENT3: sorted(@noescape isOrderedBefore _: @noescape (S1, S1) -&gt; Bool) -&gt; [S1]</RelatedName>
 
 // RUN: %sourcekitd-test -req=cursor -pos=18:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
-// CHECK-REPLACEMENT4: <Group>Array</Group>
+// CHECK-REPLACEMENT4: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT4: <Declaration>mutating func append(newElement: <Type usr="s:V13cursor_stdlib2S1">S1</Type>)</Declaration>

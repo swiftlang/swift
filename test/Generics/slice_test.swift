@@ -44,19 +44,19 @@ class Vector<T> {
       let size = Int(Builtin.sizeof(T.self))
       let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
       for i in 0..<length {
-        (newbase + i).initializePointee((base+i).take())
+        (newbase + i).initialize(with: (base+i).move())
       }
       c_free(base)
       base = newbase
       capacity = newcapacity
     }
-    (base+length).initializePointee(elem)
+    (base+length).initialize(with: elem)
     length += 1
   }
 
   func pop_back() -> T {
     length -= 1
-    return (base + length).take()
+    return (base + length).move()
   }
 
   subscript (i : Int) -> T {
@@ -76,7 +76,7 @@ class Vector<T> {
 
   deinit {
     for i in 0..<length {
-      (base + i).deinitializePointee()
+      (base + i).deinitialize()
     }
     c_free(base)
   }
@@ -86,7 +86,7 @@ protocol Comparable {
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
-func sort<T : Comparable>(inout array: [T]) {
+func sort<T : Comparable>(array: inout [T]) {
   for i in 0..<array.count {
     for j in i+1..<array.count {
       if array[j] < array[i] {

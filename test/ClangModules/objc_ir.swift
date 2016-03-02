@@ -88,7 +88,7 @@ func almostSubscriptable(as1 as1: AlmostSubscriptable, a: A) {
 // CHECK: define hidden void @_TF7objc_ir13protocolTypesFT1aCSo7NSMince1bPSo9NSRuncing__T_(%CSo7NSMince*, %objc_object*) {{.*}} {
 func protocolTypes(a a: NSMince, b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
-  a.eat(b)
+  a.eat(with: b)
   // CHECK: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(eatWith:)", align 8
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE:%.*]]*, i8*, i8*)*)([[OPAQUE:%.*]]* {{%.*}}, i8* [[SEL]], i8* {{%.*}})
 }

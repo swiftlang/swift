@@ -13,7 +13,9 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
-#include "swift/AST/Attr.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/AST/AttrKind.h"
+#include "swift/AST/Identifier.h"
 #include <vector>
 
 namespace swift {
@@ -111,6 +113,13 @@ struct PrintOptions {
   /// \c false.
   bool ExplodePatternBindingDecls = false;
 
+  /// If true, the printer will explode an enum case like this:
+  /// \code
+  ///   case A, B
+  /// \endcode
+  /// into multiple case declarations.
+  bool ExplodeEnumCaseDecls = false;
+
   /// \brief Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
@@ -137,6 +146,10 @@ struct PrintOptions {
 
   /// Whether to skip printing 'import' declarations.
   bool SkipImports = false;
+
+  /// \brief Whether to skip printing overrides and witnesses for
+  /// protocol requirements.
+  bool SkipOverrides = false;
 
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
@@ -345,6 +358,7 @@ struct PrintOptions {
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.ExcludeAttrList.push_back(DAK_Swift3Migration);
     PO.SkipPrivateStdlibDecls = true;
+    PO.ExplodeEnumCaseDecls = true;
     return PO;
   }
 };
