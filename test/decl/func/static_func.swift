@@ -61,12 +61,13 @@ extension E {
 }
 
 class C {
-  static func f1() {} // expected-note {{overridden declaration is here}}
+  static func f1() {} // expected-note 3{{overridden declaration is here}}
   class func f2() {}
   class func f3() {}
   class func f4() {} // expected-note {{overridden declaration is here}}
   class func f5() {} // expected-note {{overridden declaration is here}}
   static final func f6() {} // expected-error {{static declarations are already final}} {{10-16=}}
+  final class func f7() {} // expected-note 3{{overridden declaration is here}}
 }
 
 extension C {
@@ -78,12 +79,22 @@ extension C {
 }
 
 class C_Derived : C {
-  override static func f1() {} // expected-error {{class method overrides a 'final' class method}}
+  override static func f1() {} // expected-error {{cannot override static method}}
   override class func f2() {}
   class override func f3() {}
 
   override class func ef2() {} // expected-error {{declarations from extensions cannot be overridden yet}}
   class override func ef3() {} // expected-error {{declarations from extensions cannot be overridden yet}}
+  override static func f7() {} // expected-error {{static method overrides a 'final' class method}}
+}
+
+class C_Derived2 : C {
+  override final class func f1() {} // expected-error {{cannot override static method}}
+  override final class func f7() {} // expected-error {{class method overrides a 'final' class method}}
+}
+class C_Derived3 : C {
+  override class func f1() {} // expected-error {{cannot override static method}}
+  override class func f7() {} // expected-error {{class method overrides a 'final' class method}}
 }
 
 extension C_Derived {

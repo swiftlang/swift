@@ -5153,8 +5153,19 @@ public:
       }
 
       // FIXME: Customize message to the kind of thing.
-      TC.diagnose(Override, diag::override_final, 
-                  Override->getDescriptiveKind());
+      auto baseKind = Base->getDescriptiveKind();
+      switch (baseKind) {
+      case DescriptiveDeclKind::StaticLet:
+      case DescriptiveDeclKind::StaticVar:
+      case DescriptiveDeclKind::StaticMethod:
+        TC.diagnose(Override, diag::override_static, baseKind);
+        break;
+      default:
+        TC.diagnose(Override, diag::override_final,
+                    Override->getDescriptiveKind(), baseKind);
+        break;
+      }
+
       TC.diagnose(Base, diag::overridden_here);
     }
 

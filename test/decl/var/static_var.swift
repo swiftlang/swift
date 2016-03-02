@@ -212,15 +212,25 @@ class C2 {
 }
 
 class ClassHasVars {
-  static var computedStatic: Int { return 0 } // expected-note {{overridden declaration is here}}
+  static var computedStatic: Int { return 0 } // expected-note 3{{overridden declaration is here}}
+  final class var computedFinalClass: Int { return 0 } // expected-note 3{{overridden declaration is here}}
   class var computedClass: Int { return 0 }
   var computedInstance: Int { return 0 }
 }
 
 class ClassOverridesVars : ClassHasVars {
-  override static var computedStatic: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
+  override static var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
+  override static var computedFinalClass: Int { return 1 } // expected-error {{static var overrides a 'final' class var}}
   override class var computedClass: Int { return 1 }
   override var computedInstance: Int { return 1 }
+}
+class ClassOverridesVars2 : ClassHasVars {
+  override final class var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
+  override final class var computedFinalClass: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
+}
+class ClassOverridesVars3 : ClassHasVars {
+  override class var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
+  override class var computedFinalClass: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
 }
 
 struct S2 {

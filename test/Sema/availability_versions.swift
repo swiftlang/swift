@@ -1312,7 +1312,7 @@ class ClassForFixit {
 
   static var fixitForReferenceInStaticPropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing class var}} {{3-3=@available(OSX 10.51, *)\n  }}
+      // expected-note@-2 {{add @available attribute to enclosing static var}} {{3-3=@available(OSX 10.51, *)\n  }}
       // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.51, *)\n}}
 
   var fixitForReferenceInPropertyTypeMultiple: ClassAvailableOn10_51? = nil, other: Int = 7
