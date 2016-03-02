@@ -793,7 +793,7 @@ static void addRetainsForConvertedDirectResults(SILBuilder &Builder,
       IsSelfRecursionEpilogueRetain |= (AI == X);
     }
 
-    // We do not create an retain if this ApplyInst is a self-recursion.
+    // We do not create a retain if this ApplyInst is a self-recursion.
     if (IsSelfRecursionEpilogueRetain)
       continue;
 
