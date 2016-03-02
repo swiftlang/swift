@@ -159,14 +159,19 @@ public:
   static bool contextRequiresName(ContextKind kind);
 
   /// A single entry referencing either a named declaration or a macro.
-  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *> SingleEntry;
+  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *>
+    SingleEntry;
+
+  /// A stored version of the context of an entity, which is Clang
+  /// ASTContext-independent.
+  typedef std::pair<ContextKind, StringRef> StoredContext;
 
   /// An entry in the table of C entities indexed by full Swift name.
   struct FullTableEntry {
     /// The context in which the entities with the given name occur, e.g.,
     /// a class, struct, translation unit, etc.
     /// is always the canonical DeclContext for the entity.
-    std::pair<ContextKind, StringRef> Context;
+    StoredContext Context;
 
     /// The set of Clang declarations and macros with this name and in
     /// this context.
@@ -268,8 +273,7 @@ public:
   SingleEntry mapStored(uintptr_t &entry);
 
   /// Translate a Clang effective context into a context kind and name.
-  llvm::Optional<std::pair<ContextKind, StringRef>>
-  translateContext(EffectiveClangContext context);
+  llvm::Optional<StoredContext> translateContext(EffectiveClangContext context);
 
   /// Add an entry to the lookup table.
   ///
@@ -292,8 +296,7 @@ private:
   /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName,
-         llvm::Optional<std::pair<ContextKind, StringRef>> searchContext);
+  lookup(StringRef baseName, llvm::Optional<StoredContext> searchContext);
 
 public:
   /// Lookup an unresolved context name and resolve it to a Clang

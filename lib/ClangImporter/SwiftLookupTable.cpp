@@ -57,7 +57,7 @@ bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
 }
 
 /// Try to translate the given Clang declaration into a context.
-static Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>>
+static Optional<SwiftLookupTable::StoredContext>
 translateDeclToContext(clang::NamedDecl *decl) {
   // Tag declaration.
   if (auto tag = dyn_cast<clang::TagDecl>(decl)) {
@@ -94,7 +94,7 @@ translateDeclToContext(clang::NamedDecl *decl) {
   return None;
 }
 
-Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>>
+Optional<SwiftLookupTable::StoredContext>
 SwiftLookupTable::translateContext(EffectiveClangContext context) {
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
@@ -243,9 +243,8 @@ auto SwiftLookupTable::findOrCreate(StringRef baseName)
 }
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
-SwiftLookupTable::lookup(
-    StringRef baseName,
-    llvm::Optional<std::pair<ContextKind, StringRef>> searchContext) {
+SwiftLookupTable::lookup(StringRef baseName,
+                         llvm::Optional<StoredContext> searchContext) {
 
   SmallVector<SwiftLookupTable::SingleEntry, 4> result;
 
@@ -272,7 +271,7 @@ SmallVector<SwiftLookupTable::SingleEntry, 4>
 SwiftLookupTable::lookup(StringRef baseName,
                          EffectiveClangContext searchContext) {
   // Translate context.
-  Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>> context;
+  Optional<StoredContext> context;
   if (searchContext) {
     context = translateContext(searchContext);
     if (!context) return { };
