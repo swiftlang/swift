@@ -1785,7 +1785,7 @@
     key.kind: source.lang.swift.decl.var.global,
     key.name: "globV",
     key.usr: "s:v8__main__5globVSi",
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globV</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globV</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type></decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -1799,7 +1799,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "x",
         key.usr: "s:vC8__main__3CC01xSi",
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type></decl.var.instance>"
       }
     ]
   },
@@ -1815,7 +1815,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "instV",
         key.usr: "s:vC8__main__2CC5instVCS_3CC0",
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>instV</decl.name>: <ref.class usr=\"s:C8__main__3CC0\">CC0</ref.class></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>instV</decl.name>: <decl.var.type><ref.class usr=\"s:C8__main__3CC0\">CC0</ref.class></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -2078,7 +2078,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "extV",
         key.usr: "s:vC8__main__2CC4extVSi",
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>extV</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>extV</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
@@ -2108,7 +2108,7 @@
     key.kind: source.lang.swift.decl.var.global,
     key.name: "globV2",
     key.usr: "s:v8__main__6globV2CS_5SubCC",
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globV2</decl.name>: <ref.class usr=\"s:C8__main__5SubCC\">SubCC</ref.class></decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globV2</decl.name>: <decl.var.type><ref.class usr=\"s:C8__main__5SubCC\">SubCC</ref.class></decl.var.type></decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.class,
@@ -2122,7 +2122,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "value",
         key.usr: "s:vC8__main__16ComputedProperty5valueSi",
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>value</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>value</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
@@ -2150,7 +2150,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "readOnly",
         key.usr: "s:vC8__main__16ComputedProperty8readOnlySi",
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>readOnly</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>readOnly</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
@@ -2352,7 +2352,7 @@
     key.kind: source.lang.swift.decl.var.global,
     key.name: "globReadOnly",
     key.usr: "s:v8__main__12globReadOnlyVS_2S2",
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globReadOnly</decl.name>: <ref.struct usr=\"s:V8__main__2S2\">S2</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>globReadOnly</decl.name>: <decl.var.type><ref.struct usr=\"s:V8__main__2S2\">S2</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.function.accessor.getter,
@@ -2480,7 +2480,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
         key.usr: "s:vP8__main__5Prot21pSi",
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
@@ -2531,7 +2531,7 @@
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "p",
         key.usr: "s:vV8__main__2S11pSi",
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,

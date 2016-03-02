@@ -477,7 +477,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:vC4cake2C11pSi",
         key.offset: 51,
         key.length: 10,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
@@ -601,7 +601,7 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
         key.usr: "s:vP4cake4Prot1pSi",
         key.offset: 280,
         key.length: 18,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>p</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,

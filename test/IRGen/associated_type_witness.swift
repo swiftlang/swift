@@ -118,7 +118,7 @@ struct Computed<T, U> : Assocked {
 //   Witness table instantiation function for Computed : Assocked.
 // CHECK-LABEL: define hidden i8** @_TWauRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_(%swift.type*)
 // CHECK:         entry:
-// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_, %swift.type* %0, i8** null)
+// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_22DerivedFromSimpleAssocS_, %swift.type* %0, i8** null)
 // CHECK-NEXT:     ret i8** [[WTABLE]]
 
 
@@ -158,7 +158,7 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 //   Witness table instantiation function for GenericComputed : HasSimpleAssoc..
 // CHECK-LABEL: define hidden i8** @_TWauRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_(%swift.type*)
 // CHECK-NEXT:   entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_, %swift.type* %0, i8** null)
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGuRx23associated_type_witness1PrGVS_15GenericComputedx_S_14HasSimpleAssocS_, %swift.type* %0, i8** null)
 // CHECK-NEXT:    ret i8** %1
 
 

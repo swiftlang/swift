@@ -49,7 +49,7 @@ class SILEpilogueRetainReleaseMatcherDumper : public SILModuleTransform {
       llvm::outs() << "START: sil @" << Fn.getName() << "\n";
 
       // Handle @owned return value.
-      ConsumedReturnValueToEpilogueRetainMatcher RetMap(RCIA->get(&Fn), AA, &Fn); 
+      ConsumedResultToEpilogueRetainMatcher RetMap(RCIA->get(&Fn), AA, &Fn); 
       for (auto &RI : RetMap)
         llvm::outs() << *RI;
 

@@ -48,6 +48,7 @@ set(swift_runtime_sources
     Once.cpp
     ProtocolConformance.cpp
     Reflection.cpp
+    RuntimeEntrySymbols.cpp
     SwiftObject.cpp)
 
 # Acknowledge that the following sources are known.

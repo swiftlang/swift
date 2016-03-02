@@ -38,7 +38,7 @@ func allToInt<T>(x: T) -> Int {
   // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
   // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}([[BUFFER]]* [[BUF]], %swift.opaque* %0, %swift.type* %T)
   // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[TEMP]], %swift.type* %T, %swift.type* @_TMSi, i64 7)
+  // CHECK: call i1 @rt_swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[TEMP]], %swift.type* %T, %swift.type* @_TMSi, i64 7)
   // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
   // CHECK: [[INT_RESULT:%.*]] = load i64, i64* [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]
@@ -50,7 +50,7 @@ func intToAll<T>(x: Int) -> T {
   // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
   // CHECK: store i64 %1, i64* [[T0]],
   // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* @_TMSi, %swift.type* %T, i64 7)
+  // CHECK: call i1 @rt_swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* @_TMSi, %swift.type* %T, i64 7)
   return x as! T
 }
 
@@ -94,6 +94,6 @@ func classExistentialToOpaqueArchetype<T>(x: ObjCProto1) -> T {
   // CHECK: [[LOCAL:%.*]] = alloca %P13generic_casts10ObjCProto1_
   // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %P13generic_casts10ObjCProto1_* [[LOCAL]] to %swift.opaque*
   // CHECK: [[PROTO_TYPE:%.*]] = call %swift.type* @_TMaP13generic_casts10ObjCProto1_()
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
+  // CHECK: call i1 @rt_swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
   return x as! T
 }

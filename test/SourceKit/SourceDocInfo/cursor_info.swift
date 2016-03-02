@@ -129,7 +129,7 @@ func refEnumElements() {
 // CHECK3-NEXT: s:vF11cursor_info3gooFSiT_L_1xSi{{$}}
 // CHECK3-NEXT: Int{{$}}
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
-// CHECK3-NEXT: <decl.var.parameter>let <decl.var.parameter.name>x</decl.var.parameter.name>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
+// CHECK3-NEXT: <decl.var.parameter>let <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:18 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK4 %s
 // CHECK4:      source.lang.swift.ref.var.global ({{.*}}Foo.framework/Headers/Foo.h:62:12-62:21)
@@ -138,7 +138,7 @@ func refEnumElements() {
 // CHECK4-NEXT: Int32{{$}}
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:Vs5Int32">Int32</Type></Declaration>
-// CHECK4-NEXT: <decl.var.global>var <decl.name>fooIntVar</decl.name>: <ref.struct usr="s:Vs5Int32">Int32</ref.struct></decl.var.global>
+// CHECK4-NEXT: <decl.var.global>var <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:Vs5Int32">Int32</ref.struct></decl.var.type></decl.var.global>
 // CHECK4-NEXT: <Variable file="{{[^"]+}}Foo.h" line="{{[0-9]+}}" column="{{[0-9]+}}"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK5 %s
@@ -177,22 +177,22 @@ func refEnumElements() {
 // RUN: %sourcekitd-test -req=cursor -pos=23:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK9 %s
 // CHECK9:      source.lang.swift.decl.var.global (23:5-23:15)
 // CHECK9: <Declaration>var testString: <Type usr="s:SS">String</Type></Declaration>
-// CHECK9: <decl.var.global>var <decl.name>testString</decl.name>: <ref.struct usr="s:SS">String</ref.struct></decl.var.global>
+// CHECK9: <decl.var.global>var <decl.name>testString</decl.name>: <decl.var.type><ref.struct usr="s:SS">String</ref.struct></decl.var.type></decl.var.global>
 
 // RUN: %sourcekitd-test -req=cursor -pos=24:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK10 %s
 // CHECK10: source.lang.swift.decl.var.global (24:5-24:18)
 // CHECK10: <Declaration>let testLetString: <Type usr="s:SS">String</Type></Declaration>
-// CHECK10: <decl.var.global>let <decl.name>testLetString</decl.name>: <ref.struct usr="s:SS">String</ref.struct></decl.var.global>
+// CHECK10: <decl.var.global>let <decl.name>testLetString</decl.name>: <decl.var.type><ref.struct usr="s:SS">String</ref.struct></decl.var.type></decl.var.global>
 
 // RUN: %sourcekitd-test -req=cursor -pos=26:20 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK11 %s
 // CHECK11: source.lang.swift.decl.var.parameter (26:19-26:23)
 // CHECK11: <Declaration>let arg1: <Type usr="s:Si">Int</Type></Declaration>
-// CHECK11: <decl.var.parameter>let <decl.var.parameter.name>arg1</decl.var.parameter.name>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
+// CHECK11: <decl.var.parameter>let <decl.var.parameter.name>arg1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=28:24 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK12 %s
 // CHECK12: source.lang.swift.decl.var.parameter (28:23-28:27)
 // CHECK12: <Declaration>var arg1: <Type usr="s:Si">Int</Type></Declaration>
-// CHECK12: <decl.var.parameter>var <decl.var.parameter.name>arg1</decl.var.parameter.name>: <ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter>
+// CHECK12: <decl.var.parameter>var <decl.var.parameter.name>arg1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)

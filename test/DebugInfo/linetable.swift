@@ -33,8 +33,8 @@ func main(x: Int64) -> Void
         {
             var result = my_class.do_something(x)
             markUsed(result)
-// CHECK: call {{.*}} @swift_release {{.*}}
-// CHECK: call {{.*}} @swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
+// CHECK: call {{.*}} @rt_swift_release {{.*}}
+// CHECK: call {{.*}} @rt_swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
 // CHECK-NEXT: bitcast
 // CHECK-NEXT: llvm.lifetime.end
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]

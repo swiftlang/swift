@@ -47,6 +47,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::pound_if:
+  case tok::pound_setline:
     return true;
 
   case tok::pound_line:
@@ -291,7 +292,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     PreviousHadSemi = false;
     if (isStartOfDecl()
         && Tok.isNot(tok::pound_if)
-        && Tok.isNot(tok::pound_line)) {
+        && Tok.isNot(tok::pound_setline)) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
       if (Status.isError()) {
@@ -345,7 +346,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
 
     } else if (Tok.is(tok::pound_line)) {
-      ParserStatus Status = parseLineDirective();
+      ParserStatus Status = parseLineDirective(true);
+      BraceItemsStatus |= Status;
+      NeedParseErrorRecovery = Status.isError();
+    } else if (Tok.is(tok::pound_setline)) {
+      ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isError();
     } else if (IsTopLevel) {
@@ -558,7 +563,11 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::pound_line:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
-    return parseLineDirective();
+    return parseLineDirective(true);
+  case tok::pound_setline:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseLineDirective(false);
   case tok::kw_while:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtWhile(LabelInfo);

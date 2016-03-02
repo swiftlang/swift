@@ -26,6 +26,8 @@
 
 using namespace swift;
 
+using BasicBlockRetainValue = std::pair<SILBasicBlock *, SILValue>;
+
 //===----------------------------------------------------------------------===//
 //                             Decrement Analysis
 //===----------------------------------------------------------------------===//
@@ -450,29 +452,19 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 //===----------------------------------------------------------------------===//
 //                          Owned Argument Utilities
 //===----------------------------------------------------------------------===//
-ConsumedReturnValueToEpilogueRetainMatcher::
-ConsumedReturnValueToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
-                                           AliasAnalysis *AA,
-                                           SILFunction *F,
-                                           ExitKind Kind)
-    : F(F), RCFI(RCFI), AA(AA), Kind(Kind) {
+ConsumedResultToEpilogueRetainMatcher::
+ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
+                                      AliasAnalysis *AA,
+                                      SILFunction *F)
+    : F(F), RCFI(RCFI), AA(AA) {
   recompute();
 }
 
-void ConsumedReturnValueToEpilogueRetainMatcher::recompute() {
+void ConsumedResultToEpilogueRetainMatcher::recompute() {
   EpilogueRetainInsts.clear();
 
   // Find the return BB of F. If we fail, then bail.
-  SILFunction::iterator BB;
-  switch (Kind) {
-  case ExitKind::Return:
-    BB = F->findReturnBB();
-    break;
-  case ExitKind::Throw:
-    BB = F->findThrowBB();
-    break;
-  }
-
+  SILFunction::iterator BB = F->findReturnBB();
   if (BB == F->end()) {
     HasBlock = false;
     return;
@@ -481,9 +473,8 @@ void ConsumedReturnValueToEpilogueRetainMatcher::recompute() {
   findMatchingRetains(&*BB);
 }
 
-
 void
-ConsumedReturnValueToEpilogueRetainMatcher::
+ConsumedResultToEpilogueRetainMatcher::
 findMatchingRetains(SILBasicBlock *BB) {
   // Iterate over the instructions post-order and find retains associated with
   // return value.
@@ -502,47 +493,71 @@ findMatchingRetains(SILBasicBlock *BB) {
   // OK. we've found the return value, now iterate on the CFG to find all the
   // post-dominating retains.
   constexpr unsigned WorkListMaxSize = 8;
-  RV = RCFI->getRCIdentityRoot(RV);
+
   llvm::DenseSet<SILBasicBlock *> RetainFrees;
-  llvm::SmallVector<SILBasicBlock *, 4> WorkList;
+  llvm::SmallVector<BasicBlockRetainValue, 4> WorkList;
   llvm::DenseSet<SILBasicBlock *> HandledBBs;
-  WorkList.push_back(BB);
+  WorkList.push_back(std::make_pair(BB, RV));
   HandledBBs.insert(BB);
   while (!WorkList.empty()) {
-    auto *CBB = WorkList.pop_back_val();
-    RetainKindValue Kind = findMatchingRetainsInner(CBB, RV);
-
     // Too many blocks ?.
     if (WorkList.size() > WorkListMaxSize) {
       EpilogueRetainInsts.clear();
       return;
     }
 
-    // There is a MayDecrement instruction.
-    if (Kind.first == FindRetainKind::Blocked)
-      return;
-  
-    if (Kind.first == FindRetainKind::None) {
-      RetainFrees.insert(CBB);
+    // Try to find a retain %value in this basic block.
+    auto BVP = WorkList.pop_back_val();
+    RetainKindValue Kind = findMatchingRetainsInner(BVP.first, BVP.second);
 
+    // We've found a retain on this path.
+    if (Kind.first == FindRetainKind::Found) { 
+      EpilogueRetainInsts.push_back(Kind.second);
+      continue;
+    }
+
+    // There is a MayDecrement instruction.
+    if (Kind.first == FindRetainKind::Blocked) {
+      EpilogueRetainInsts.clear();
+      return;
+    }
+
+    // There is a self-recursion. Use the apply instruction as the retain.
+    if (Kind.first == FindRetainKind::Recursion) {
+      EpilogueRetainInsts.push_back(Kind.second);
+      continue;
+    }
+  
+    // Did not find a retain in this block, try to go to its predecessors.
+    if (Kind.first == FindRetainKind::None) {
       // We can not find a retain in a block with no predecessors.
-      if (CBB->getPreds().begin() == CBB->getPreds().end()) {
+      if (BVP.first->getPreds().begin() == BVP.first->getPreds().end()) {
         EpilogueRetainInsts.clear();
         return;
       }
 
-      // Check the predecessors.
-      for (auto X : CBB->getPreds()){
+      // This block does not have a retain.
+      RetainFrees.insert(BVP.first);
+
+      // If this is a SILArgument of current basic block, we can split it up to
+      // values in the predecessors.
+      SILArgument *SA = dyn_cast<SILArgument>(BVP.second);
+      if (SA && SA->getParent() != BVP.first)
+        SA = nullptr;
+
+      for (auto X : BVP.first->getPreds()){
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
-        WorkList.push_back(X);
+        // Try to use the predecessor edge-value.
+        if (SA && SA->getIncomingValue(X)) {
+          WorkList.push_back(std::make_pair(X, SA->getIncomingValue(X)));
+        }
+        else 
+          WorkList.push_back(std::make_pair(X, BVP.second));
+   
         HandledBBs.insert(X);
       }
     }
-
-    // We've found a retain on this path.
-    if (Kind.first == FindRetainKind::Found) 
-      EpilogueRetainInsts.push_back(Kind.second);
   }
 
   // For every block with retain, we need to check the transitive
@@ -569,10 +584,15 @@ findMatchingRetains(SILBasicBlock *BB) {
   // all the post-dominating epilogue retains.
 }
 
-ConsumedReturnValueToEpilogueRetainMatcher::RetainKindValue
-ConsumedReturnValueToEpilogueRetainMatcher::
+ConsumedResultToEpilogueRetainMatcher::RetainKindValue
+ConsumedResultToEpilogueRetainMatcher::
 findMatchingRetainsInner(SILBasicBlock *BB, SILValue V) {
   for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
+    // Handle self-recursion.
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(&*II))
+      if (AI->getCalleeFunction() == BB->getParent()) 
+        return std::make_pair(FindRetainKind::Recursion, AI);
+    
     // If we do not have a retain_value or strong_retain...
     if (!isa<RetainValueInst>(*II) && !isa<StrongRetainInst>(*II)) {
       // we can ignore it if it can not decrement the reference count of the

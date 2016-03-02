@@ -2946,7 +2946,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                 behaviorProto->getName());
   }
   
-  // If the property was declared with an parameter, but the behavior didn't
+  // If the property was declared with a parameter, but the behavior didn't
   // use it, complain.
   // TODO: The initializer could eventually be consumed by DI-style
   // initialization.

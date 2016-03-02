@@ -21,17 +21,17 @@ import re
 import bisect
 import subprocess
 
-line_pattern = re.compile(r'^// ###line ([0-9]+) "([^"]+)"\s*')
+line_pattern = re.compile(r'^// ###setline ([0-9]+) "([^"]+)"\s*')
 
 def _make_line_map(filename, stream=None):
     """
     >>> from StringIO import StringIO
     >>> _make_line_map('box',
-    ... StringIO('''// ###line 3 "foo.bar"
+    ... StringIO('''// ###setline 3 "foo.bar"
     ... line 2
     ... line 3
     ... line 4
-    ... // ###line 20 "baz.txt"
+    ... // ###setline 20 "baz.txt"
     ... line 6
     ... line 7
     ... '''))

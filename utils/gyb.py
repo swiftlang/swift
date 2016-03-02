@@ -529,7 +529,7 @@ class ParseContext:
 class ExecutionContext:
     """State we pass around during execution of a template"""
 
-    def __init__(self, line_directive='// ###line', **local_bindings):
+    def __init__(self, line_directive='// ###setline', **local_bindings):
         self.local_bindings = local_bindings
         self.line_directive = line_directive
         self.local_bindings['__context__'] = self
@@ -955,14 +955,14 @@ def execute_template(ast, line_directive='', **local_bindings):
     ... % else:
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
-    >>> print execute_template(ast, line_directive='//#line', x=1),
-    //#line 1 "/dummy.file"
+    >>> print execute_template(ast, line_directive='//#setline', x=1),
+    //#setline 1 "/dummy.file"
     Nothing
-    //#line 4 "/dummy.file"
+    //#setline 4 "/dummy.file"
     0
-    //#line 4 "/dummy.file"
+    //#setline 4 "/dummy.file"
     1
-    //#line 4 "/dummy.file"
+    //#setline 4 "/dummy.file"
     2
 
     >>> ast = parse_template('/dummy.file', text=
@@ -973,10 +973,10 @@ def execute_template(ast, line_directive='', **local_bindings):
     ... % end
     ... ${a}
     ... ''')
-    >>> print execute_template(ast, line_directive='//#line', x=1),
-    //#line 1 "/dummy.file"
+    >>> print execute_template(ast, line_directive='//#setline', x=1),
+    //#setline 1 "/dummy.file"
     Nothing
-    //#line 6 "/dummy.file"
+    //#setline 6 "/dummy.file"
     [0, 1, 2]
     """
     executionContext = ExecutionContext(line_directive=line_directive, **local_bindings)
@@ -1059,7 +1059,7 @@ def main():
     parser.add_argument('--test', action='store_true', default=False, help='Run a self-test')
     parser.add_argument('--verbose-test', action='store_true', default=False, help='Run a verbose self-test')
     parser.add_argument('--dump', action='store_true', default=False, help='Dump the parsed template to stdout')
-    parser.add_argument('--line-directive', default='// ###line', help='Line directive prefix; empty => no line markers')
+    parser.add_argument('--line-directive', default='// ###setline', help='Line directive prefix; empty => no line markers')
 
     args = parser.parse_args(sys.argv[1:])
 
