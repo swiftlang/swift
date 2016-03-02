@@ -110,10 +110,8 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 /// retains for a specific function.
 ///
 /// TODO: This really needs a better name.
-class ConsumedReturnValueToEpilogueRetainMatcher {
+class ConsumedResultToEpilogueRetainMatcher {
 public:
-  enum class ExitKind { Return, Throw };
-
   /// The state on how retains are found in a basic block.
   enum class FindRetainKind { 
     None,      ///< Did not find a retain.
@@ -128,7 +126,6 @@ private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
   AliasAnalysis *AA;
-  ExitKind Kind;
   // We use a list of instructions for now so that we can keep the same interface
   // and handle exploded retain_value later.
   RetainList EpilogueRetainInsts;
@@ -136,10 +133,9 @@ private:
 
 public:
   /// Finds matching releases in the return block of the function \p F.
-  ConsumedReturnValueToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
-                                             AliasAnalysis *AA,
-                                             SILFunction *F,
-                                             ExitKind Kind = ExitKind::Return);
+  ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
+                                        AliasAnalysis *AA,
+                                        SILFunction *F);
 
   /// Finds matching releases in the provided block \p BB.
   void findMatchingRetains(SILBasicBlock *BB);

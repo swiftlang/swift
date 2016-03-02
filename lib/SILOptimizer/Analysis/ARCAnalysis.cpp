@@ -452,29 +452,19 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 //===----------------------------------------------------------------------===//
 //                          Owned Argument Utilities
 //===----------------------------------------------------------------------===//
-ConsumedReturnValueToEpilogueRetainMatcher::
-ConsumedReturnValueToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
-                                           AliasAnalysis *AA,
-                                           SILFunction *F,
-                                           ExitKind Kind)
-    : F(F), RCFI(RCFI), AA(AA), Kind(Kind) {
+ConsumedResultToEpilogueRetainMatcher::
+ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
+                                      AliasAnalysis *AA,
+                                      SILFunction *F)
+    : F(F), RCFI(RCFI), AA(AA) {
   recompute();
 }
 
-void ConsumedReturnValueToEpilogueRetainMatcher::recompute() {
+void ConsumedResultToEpilogueRetainMatcher::recompute() {
   EpilogueRetainInsts.clear();
 
   // Find the return BB of F. If we fail, then bail.
-  SILFunction::iterator BB;
-  switch (Kind) {
-  case ExitKind::Return:
-    BB = F->findReturnBB();
-    break;
-  case ExitKind::Throw:
-    BB = F->findThrowBB();
-    break;
-  }
-
+  SILFunction::iterator BB = F->findReturnBB();
   if (BB == F->end()) {
     HasBlock = false;
     return;
@@ -484,7 +474,7 @@ void ConsumedReturnValueToEpilogueRetainMatcher::recompute() {
 }
 
 void
-ConsumedReturnValueToEpilogueRetainMatcher::
+ConsumedResultToEpilogueRetainMatcher::
 findMatchingRetains(SILBasicBlock *BB) {
   // Iterate over the instructions post-order and find retains associated with
   // return value.
@@ -594,8 +584,8 @@ findMatchingRetains(SILBasicBlock *BB) {
   // all the post-dominating epilogue retains.
 }
 
-ConsumedReturnValueToEpilogueRetainMatcher::RetainKindValue
-ConsumedReturnValueToEpilogueRetainMatcher::
+ConsumedResultToEpilogueRetainMatcher::RetainKindValue
+ConsumedResultToEpilogueRetainMatcher::
 findMatchingRetainsInner(SILBasicBlock *BB, SILValue V) {
   for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
     // Handle self-recursion.

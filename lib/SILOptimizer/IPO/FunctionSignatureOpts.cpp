@@ -648,7 +648,7 @@ bool SignatureAnalyzer::analyze() {
       ResultDescList[0].hasConvention(ResultConvention::Owned)) {
     auto &RI = ResultDescList[0];
     // We have an @owned return value, find the epilogue retains now.
-    ConsumedReturnValueToEpilogueRetainMatcher RVToReturnRetainMap(RCIA, AA, F);
+    ConsumedResultToEpilogueRetainMatcher RVToReturnRetainMap(RCIA, AA, F);
     auto Retains = RVToReturnRetainMap.getEpilogueRetains();
     // We do not need to worry about the throw block, as the return value is only
     // going to be used in the return block/normal block of the try_apply instruction.
