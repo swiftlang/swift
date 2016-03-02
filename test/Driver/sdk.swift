@@ -5,7 +5,6 @@
 // RUN: env SDKROOT=%S/../Inputs/clang-importer-sdk %swiftc_driver_plain -target x86_64-apple-macosx10.9  -g -driver-print-jobs %s 2>&1 | FileCheck %s --check-prefix OSX
 // RUN: env SDKROOT=%S/../Inputs/clang-importer-sdk %swiftc_driver_plain -target x86_64-unknown-linux-gnu -g -driver-print-jobs %s 2>&1 | FileCheck %s --check-prefix LINUX
 // RUN: env SDKROOT=%S/../Inputs/clang-importer-sdk %swiftc_driver_plain -target x86_64-unknown-freebsd   -g -driver-print-jobs %s 2>&1 | FileCheck %s --check-prefix FREEBSD
-// RUN: env -u SDKROOT %swiftc_driver_plain -target x86_64-unknown-freebsd11.0 -g -driver-print-jobs %s 2>&1 | FileCheck %s --check-prefix FREEBSDNOSDK
 
 // OSX-NOT: warning: no such SDK:
 // OSX: bin/swift
@@ -35,11 +34,6 @@
 // FREEBSD: bin/{{.+}} {{.*}}swift_begin.o
 // FREEBSD: {{-syslibroot|--sysroot}} {{.*}}/Inputs/clang-importer-sdk
 // FREEBSD: {{.*}}swift_end.o
-
-// FREEBSDNOSDK-NOT: warning: no such SDK:
-// FREEBSDNOSDK: bin/swift
-// FREEBSDNOSDK: Driver/sdk.swift
-// FREEBSDNOSDK: -sdk /
 
 // RUN: %swift_driver -driver-print-jobs -repl -sdk %S/Inputs/nonexistent-sdk 2>&1 | FileCheck %s --check-prefix=SDKWARNING
 // RUN: %swift_driver -driver-print-jobs -sdk %S/Inputs/nonexistent-sdk 2>&1 | FileCheck %s --check-prefix=SDKWARNING
