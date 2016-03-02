@@ -1654,9 +1654,8 @@ public:
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
   bool
-  isAvailabilitySafeForConformance(ValueDecl *witness,
-                                   ValueDecl *requirement,
-                                   NormalProtocolConformance *conformance,
+  isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
+                                   ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
 
   /// Returns an over-approximation of the range of operating system versions
