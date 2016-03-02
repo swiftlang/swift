@@ -115,7 +115,7 @@ bb2:
   return %18 : $()
 }
 
-// CHECK-LABEL: sil @releaese_dead_array_on_two_branches
+// CHECK-LABEL: sil @release_dead_array_on_two_branches
 // CHECK: bb0(%0 : $TrivialDestructor, %1 : $TrivialDestructor):
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
@@ -125,7 +125,7 @@ bb2:
 // CHECK-NEXT: strong_retain %1
 // CHECK-NEXT: strong_release %1
 // CHECK: return
-sil @releaese_dead_array_on_two_branches : $@convention(thin) (@owned TrivialDestructor, @owned TrivialDestructor) -> () {
+sil @release_dead_array_on_two_branches : $@convention(thin) (@owned TrivialDestructor, @owned TrivialDestructor) -> () {
 bb0(%0 : $TrivialDestructor, %1 : $TrivialDestructor):
   %2 = integer_literal $Builtin.Word, 2
   // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
