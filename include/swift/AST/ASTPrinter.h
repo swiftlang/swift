@@ -35,6 +35,8 @@ namespace swift {
 enum class PrintNameContext {
   /// Normal context
   Normal,
+  /// Keyword context, where no keywords are escaped.
+  Keyword,
   /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
   /// Function parameter context, where keywords other than let/var/inout are
@@ -144,6 +146,12 @@ public:
   ASTPrinter &operator<<(UUID UU);
 
   ASTPrinter &operator<<(DeclName name);
+
+  void printKeyword(StringRef Name) {
+    callPrintNamePre(PrintNameContext::Keyword);
+    *this << Name;
+    printNamePost(PrintNameContext::Keyword);
+  }
 
   void printName(Identifier Name,
                  PrintNameContext Context = PrintNameContext::Normal);
