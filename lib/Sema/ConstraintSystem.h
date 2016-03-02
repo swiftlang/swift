@@ -779,7 +779,11 @@ typedef llvm::ilist<Constraint> ConstraintList;
 
 enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
-  AllowFixes = 0x01
+  AllowFixes = 0x01,
+  
+  /// Set if the client prefers fixits to be in the form of force unwrapping
+  /// or optional chaining to return an optional.
+  PreferForceUnwrapToOptional = 0x02,
 };
 
 /// Options that affect the constraint system as a whole.
