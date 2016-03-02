@@ -16,7 +16,7 @@ public class Foo1 {
 
   @inline(never)
   init(_ count: Int32) {
-    // Intialize Prop4 unconditionally and only once.
+    // Initialize Prop4 unconditionally and only once.
     Prop4 = 300
     // There are two different assignments to Prop1 and Prop2
     // on different branchs of the if-statement.
