@@ -138,7 +138,7 @@
 // Bring in visibility attribute macros for library visibility.
 #include "llvm/Support/Compiler.h"
 
-// Generates a name of the runtime enrty's implementation by
+// Generates a name of the runtime entry's implementation by
 // adding an underscore as a prefix and a suffix.
 #define SWIFT_RT_ENTRY_IMPL(Name) _##Name##_
 
