@@ -786,19 +786,9 @@ void PrintAST::printAttributes(const Decl *D) {
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
-  auto TheTypeLoc = TP->getTypeLoc();
-  if (TheTypeLoc.hasLocation()) {
-
-    printPattern(TP->getSubPattern());
-    Printer << ": ";
-    printTypeLoc(TheTypeLoc);
-    return;
-  }
-
-
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  TP->getType().print(Printer, Options);
+  printTypeLoc(TP->getTypeLoc());
 }
 
 void PrintAST::printPattern(const Pattern *pattern) {
@@ -1878,11 +1868,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     });
   if (decl->hasType()) {
     Printer << ": ";
-    if (Options.TransformContext)
-      Options.TransformContext->transform(decl->getType()).
-        print(Printer, Options);
-    else
-      decl->getType().print(Printer, Options);
+    // Use the non-repr external type, but reuse the TypeLoc printing code.
+    printTypeLoc(TypeLoc::withoutLoc(decl->getType()));
   }
 
   printAccessors(decl);

@@ -178,6 +178,8 @@ private:
       switch (D->getKind()) {
       case DeclKind::Param:
         return "decl.var.parameter.type";
+      case DeclKind::Var:
+        return "decl.var.type";
       case DeclKind::Subscript:
       case DeclKind::Func:
         return "decl.function.returntype";

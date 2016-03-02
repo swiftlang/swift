@@ -3031,7 +3031,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:vVSC8FooEnum18rawValueVs6UInt32",
         key.offset: 153,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
@@ -3049,7 +3049,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Variable file=Foo.h line=\"18\" column=\"3\"><Name>FooEnum1X</Name><USR>c:@E@FooEnum1@FooEnum1X</USR><Declaration>var FooEnum1X: FooEnum1 { get }</Declaration><Abstract><Para> Aaa.  FooEnum1X.  Bbb.</Para></Abstract></Variable>",
     key.offset: 176,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum1X</decl.name>: <ref.struct usr=\"c:@E@FooEnum1\">FooEnum1</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum1X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooEnum1\">FooEnum1</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.struct,
@@ -3118,7 +3118,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:vVSC8FooEnum28rawValueVs6UInt32",
         key.offset: 325,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
@@ -3135,7 +3135,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum2@FooEnum2X",
     key.offset: 348,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum2X</decl.name>: <ref.struct usr=\"c:@E@FooEnum2\">FooEnum2</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum2X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooEnum2\">FooEnum2</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -3143,7 +3143,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum2@FooEnum2Y",
     key.offset: 380,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum2Y</decl.name>: <ref.struct usr=\"c:@E@FooEnum2\">FooEnum2</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum2Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooEnum2\">FooEnum2</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.struct,
@@ -3212,7 +3212,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:vVSC8FooEnum38rawValueVs6UInt32",
         key.offset: 529,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
@@ -3229,7 +3229,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum3@FooEnum3X",
     key.offset: 552,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum3X</decl.name>: <ref.struct usr=\"c:@E@FooEnum3\">FooEnum3</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum3X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooEnum3\">FooEnum3</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -3237,7 +3237,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum3@FooEnum3Y",
     key.offset: 584,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum3Y</decl.name>: <ref.struct usr=\"c:@E@FooEnum3\">FooEnum3</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooEnum3Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooEnum3\">FooEnum3</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.enum,
@@ -3332,7 +3332,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@E@FooRuncingOptions@FooRuncingEnableMince",
         key.offset: 805,
         key.length: 49,
-        key.fully_annotated_decl: "<decl.var.static>static var <decl.name>EnableMince</decl.name>: <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct> { get }</decl.var.static>"
+        key.fully_annotated_decl: "<decl.var.static>static var <decl.name>EnableMince</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.type> { get }</decl.var.static>"
       },
       {
         key.kind: source.lang.swift.decl.var.static,
@@ -3340,7 +3340,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@E@FooRuncingOptions@FooRuncingEnableQuince",
         key.offset: 859,
         key.length: 50,
-        key.fully_annotated_decl: "<decl.var.static>static var <decl.name>EnableQuince</decl.name>: <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct> { get }</decl.var.static>"
+        key.fully_annotated_decl: "<decl.var.static>static var <decl.name>EnableQuince</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.type> { get }</decl.var.static>"
       }
     ]
   },
@@ -3358,7 +3358,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@FooStruct1@FI@x",
         key.offset: 936,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -3366,7 +3366,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@FooStruct1@FI@y",
         key.offset: 953,
         key.length: 13,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>y</decl.name>: <ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>y</decl.name>: <decl.var.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -3416,7 +3416,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@FooStruct2@FI@x",
         key.offset: 1038,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -3424,7 +3424,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@FooStruct2@FI@y",
         key.offset: 1055,
         key.length: 13,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>y</decl.name>: <ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>y</decl.name>: <decl.var.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -3482,7 +3482,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@SA@FooStructTypedef2@FI@x",
         key.offset: 1188,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -3490,7 +3490,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@SA@FooStructTypedef2@FI@y",
         key.offset: 1205,
         key.length: 13,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>y</decl.name>: <ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>y</decl.name>: <decl.var.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -3542,7 +3542,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Variable file=Foo.h line=\"62\" column=\"12\"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa.  fooIntVar.  Bbb.</Para></Abstract></Variable>",
     key.offset: 1296,
     key.length: 20,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>fooIntVar</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
@@ -3779,7 +3779,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(pl)FooProtocolBase(py)fooProperty1",
         key.offset: 2049,
         key.length: 35,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty1</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -3787,7 +3787,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(pl)FooProtocolBase(py)fooProperty2",
         key.offset: 2089,
         key.length: 35,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty2</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -3795,7 +3795,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(pl)FooProtocolBase(py)fooProperty3",
         key.offset: 2129,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty3</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty3</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get }</decl.var.instance>"
       }
     ]
   },
@@ -3919,7 +3919,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(py)fooProperty1",
         key.offset: 2528,
         key.length: 23,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty1</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -3927,7 +3927,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(py)fooProperty2",
         key.offset: 2556,
         key.length: 23,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty2</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -3935,7 +3935,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(py)fooProperty3",
         key.offset: 2584,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty3</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>fooProperty3</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -4017,7 +4017,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3647@macro@FOO_MACRO_1",
     key.offset: 2810,
     key.length: 30,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_1</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4025,7 +4025,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3669@macro@FOO_MACRO_2",
     key.offset: 2841,
     key.length: 30,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_2</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4033,7 +4033,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3691@macro@FOO_MACRO_3",
     key.offset: 2872,
     key.length: 30,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_3</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_3</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4041,7 +4041,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3755@macro@FOO_MACRO_4",
     key.offset: 2903,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_4</decl.name>: <ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_4</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4049,7 +4049,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3787@macro@FOO_MACRO_5",
     key.offset: 2935,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_5</decl.name>: <ref.struct usr=\"s:Vs6UInt64\">UInt64</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_5</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt64\">UInt64</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4057,7 +4057,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3937@macro@FOO_MACRO_REDEF_1",
     key.offset: 2967,
     key.length: 36,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_REDEF_1</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_REDEF_1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4065,7 +4065,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3994@macro@FOO_MACRO_REDEF_2",
     key.offset: 3004,
     key.length: 36,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_REDEF_2</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FOO_MACRO_REDEF_2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
@@ -4097,7 +4097,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@_InternalStruct@FI@x",
         key.offset: 3123,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.constructor,
@@ -4238,7 +4238,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)assignable",
         key.offset: 3540,
         key.length: 42,
-        key.fully_annotated_decl: "<decl.var.instance>unowned(unsafe) var <decl.name>assignable</decl.name>: <ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>! { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>unowned(unsafe) var <decl.name>assignable</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -4246,7 +4246,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)unsafeAssignable",
         key.offset: 3587,
         key.length: 48,
-        key.fully_annotated_decl: "<decl.var.instance>unowned(unsafe) var <decl.name>unsafeAssignable</decl.name>: <ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>! { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>unowned(unsafe) var <decl.name>unsafeAssignable</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -4254,7 +4254,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)retainable",
         key.offset: 3640,
         key.length: 26,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>retainable</decl.name>: <ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>! { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>retainable</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -4262,7 +4262,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)strongRef",
         key.offset: 3671,
         key.length: 25,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>strongRef</decl.name>: <ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>! { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>strongRef</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -4270,7 +4270,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)copyable",
         key.offset: 3701,
         key.length: 35,
-        key.fully_annotated_decl: "<decl.var.instance>@NSCopying var <decl.name>copyable</decl.name>: <ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>! { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>@NSCopying var <decl.name>copyable</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -4278,7 +4278,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)weakRef",
         key.offset: 3741,
         key.length: 28,
-        key.fully_annotated_decl: "<decl.var.instance>weak var <decl.name>weakRef</decl.name>: <ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>! { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>weak var <decl.name>weakRef</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { get set }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -4286,7 +4286,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)scalar",
         key.offset: 3774,
         key.length: 17,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>scalar</decl.name>: <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct> { get set }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>scalar</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { get set }</decl.var.instance>"
       }
     ]
   },
@@ -4639,7 +4639,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:vVSC11FooSubEnum18rawValueVs6UInt32",
         key.offset: 4535,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance>var <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
@@ -4656,7 +4656,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1X",
     key.offset: 4558,
     key.length: 37,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooSubEnum1X</decl.name>: <ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooSubEnum1X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4664,7 +4664,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1Y",
     key.offset: 4596,
     key.length: 37,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooSubEnum1Y</decl.name>: <ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooSubEnum1Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { get }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -4672,6 +4672,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:FooSub.h@Ea@FooSubUnnamedEnumeratorA1",
     key.offset: 4634,
     key.length: 42,
-    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooSubUnnamedEnumeratorA1</decl.name>: <ref.struct usr=\"s:Si\">Int</ref.struct> { get }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global>var <decl.name>FooSubUnnamedEnumeratorA1</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { get }</decl.var.global>"
   }
 ]
