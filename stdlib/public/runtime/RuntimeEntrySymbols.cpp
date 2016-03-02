@@ -1,4 +1,4 @@
-//===--- RuntimeEntrySymbols.cpp - Define symbols for runtime entries  --===//
+//===--- RuntimeEntrySymbols.cpp - Define symbols for runtime entries -----===//
 //
 // This source file is part of the Swift.org open source project
 //
