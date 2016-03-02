@@ -214,7 +214,7 @@ sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(meth
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
 // CHECK:   [[ALIGN32:%.*]] = load i32, i32* [[T1]], align 4
 // CHECK:   [[ALIGN:%.*]] = zext i32 [[ALIGN32]] to i64
-// CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], i64 [[SIZE]], i64 [[ALIGN]])
+// CHECK:   call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* [[METADATA]], i64 [[SIZE]], i64 [[ALIGN]])
 sil @RootGeneric_fragile_dependent_alloc : $<G> () -> RootGeneric<G> {
 entry:
   %x = alloc_ref $RootGeneric<G>

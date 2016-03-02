@@ -20,7 +20,7 @@ bb0(%0 : $Optional<() -> ()>):
   // CHECK: br i1 [[T0]], label
   // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
   // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*
-  // CHECK: call void @swift_retain(%swift.refcounted* [[CTX]])
+  // CHECK: call void @rt_swift_retain(%swift.refcounted* [[CTX]])
   // CHECK: br label
   retain_value %0 : $Optional<() -> ()>
   

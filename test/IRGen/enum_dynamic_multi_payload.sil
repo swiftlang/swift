@@ -384,7 +384,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      <label>:[[RIGHT]]
-  // CHECK:        call void {{.*}} @swift_release
+  // CHECK:        call void {{.*}} @rt_swift_release
   // CHECK:      <label>:[[NOOP]]
   destroy_addr %a : $*EitherOr<T, C>
 
@@ -412,7 +412,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[RIGHT]]
-  // CHECK:        call void @swift_retain
+  // CHECK:        call void @rt_swift_retain
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      <label>:[[TRIVIAL]]
   // CHECK:        call void @llvm.memcpy
