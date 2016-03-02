@@ -1,7 +1,20 @@
-// RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name.h > %t.log 2>&1
+// RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name.h -I %S/Inputs/custom-modules > %t.log 2>&1
 // RUN: FileCheck %s < %t.log
 
 // REQUIRES: objc_interop
+import ImportAsMember
+
+// CHECK-LABEL: <<ImportAsMember lookup table>>
+// CHECK-NEXT: Base name -> entry mappings:
+// CHECK:        Struct1:
+// CHECK-NEXT:     TU: IAMStruct1
+// CHECK:        init:
+// CHECK-NEXT:     IAMStruct1: IAMStruct1CreateSimple
+// CHECK:        radius:
+// CHECK-NEXT:     IAMStruct1: IAMStruct1GetRadius, IAMStruct1SetRadius
+
+// CHECK: Globals-as-members mapping:
+// CHECK-NEXT: IAMStruct1CreateSimple, IAMStruct1GetRadius, IAMStruct1SetRadius
 
 // CHECK-LABEL: <<Bridging header lookup table>>
 // CHECK-NEXT:      Base name -> entry mappings:

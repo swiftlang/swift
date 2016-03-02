@@ -2,3 +2,8 @@ module OmitNeedlessWords {
   export *
   header "OmitNeedlessWords.h"
 }
+
+module ImportAsMember {
+  export *
+  header "ImportAsMember.h"
+}

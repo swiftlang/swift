@@ -130,7 +130,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// When the format changes IN ANY WAY, this number should be
 /// incremented. When doing so, also update the comment so we'll get
 /// conflicts if two different changes to the format get merged.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 9; // typedef context kind
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 10; // globals-as-members
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -316,6 +316,10 @@ private:
   SmallVector<SingleEntry, 4>
   lookup(StringRef baseName, llvm::Optional<StoredContext> searchContext);
 
+  /// Retrieve the set of global declarations that are going to be
+  /// imported as members into the given context.
+  SmallVector<SingleEntry, 4> lookupGlobalsAsMembers(StoredContext context);
+
 public:
   /// Lookup an unresolved context name and resolve it to a Clang
   /// named declaration.
@@ -341,6 +345,11 @@ public:
 
   /// Retrieve the set of Objective-C categories and extensions.
   ArrayRef<clang::ObjCCategoryDecl *> categories();
+
+  /// Retrieve the set of global declarations that are going to be
+  /// imported as members into the given context.
+  SmallVector<SingleEntry, 4>
+  lookupGlobalsAsMembers(EffectiveClangContext context);
 
   /// Deserialize all entries.
   void deserializeAll();
@@ -374,16 +383,19 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
 
   void *SerializedTable;
   ArrayRef<clang::serialization::DeclID> Categories;
+  void *GlobalsAsMembersTable;
 
   SwiftLookupTableReader(clang::ModuleFileExtension *extension,
                          clang::ASTReader &reader,
                          clang::serialization::ModuleFile &moduleFile,
                          std::function<void()> onRemove,
                          void *serializedTable,
-                         ArrayRef<clang::serialization::DeclID> categories)
+                         ArrayRef<clang::serialization::DeclID> categories,
+                         void *globalsAsMembersTable)
     : ModuleFileExtensionReader(extension), Reader(reader),
       ModuleFile(moduleFile), OnRemove(onRemove),
-      SerializedTable(serializedTable), Categories(categories) { }
+      SerializedTable(serializedTable), Categories(categories),
+      GlobalsAsMembersTable(globalsAsMembersTable) { }
 
 public:
   /// Create a new lookup table reader for the given AST reader and stream
@@ -415,6 +427,17 @@ public:
   ArrayRef<clang::serialization::DeclID> categories() const {
     return Categories;
   }
+
+  /// Retrieve the set of contexts that have globals-as-members
+  /// injected into them.
+  SmallVector<SwiftLookupTable::StoredContext, 4> getGlobalsAsMembersContexts();
+
+  /// Retrieve the set of global declarations that are going to be
+  /// imported as members into the given context.
+  ///
+  /// \returns true if we found anything, false otherwise.
+  bool lookupGlobalsAsMembers(SwiftLookupTable::StoredContext context,
+                              SmallVectorImpl<uintptr_t> &entries);
 };
 
 }
