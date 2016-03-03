@@ -27,7 +27,7 @@ public func run_UTF8Decode(N: Int) {
 
   let strings = [ ascii, russian, japanese, emoji ].map { Array($0.utf8) }
 
-  for _ in 1...1000*N {
+  for _ in 1...200*N {
     for string in strings {
       var generator = string.generate()
       var utf8 = UTF8()
