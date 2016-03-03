@@ -91,7 +91,7 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Whether we have exhausted the generator.  Note that this doesn't mean
   /// we are done decoding, as there might still be bytes left in the buffer.
-  var _atEnd: Bool = false
+  var _didExhaustGenerator: Bool = false
 
   /// Start or continue decoding a UTF-8 sequence.
   ///
@@ -111,7 +111,7 @@ public struct UTF8 : UnicodeCodecType {
     G : GeneratorType where G.Element == CodeUnit
     >(next: inout G) -> UnicodeDecodingResult {
 
-      refillBuffer: if !_atEnd {
+      refillBuffer: if !_didExhaustGenerator {
         // Bufferless ASCII fastpath.
         if _fastPath(_bitsInBuffer == 0) {
           if let codeUnit = next.next() {
@@ -121,8 +121,8 @@ public struct UTF8 : UnicodeCodecType {
               _decodeBuffer = UInt32(codeUnit)
               _bitsInBuffer = 8
             }
-          } else { // Exhausted generator.
-            _atEnd = true
+          } else {
+            _didExhaustGenerator = true
             return .EmptyInput
           }
         } else if(_decodeBuffer & 0x80 == 0) {
@@ -138,8 +138,8 @@ public struct UTF8 : UnicodeCodecType {
             // We use & 0x1f to make the compiler omit a bounds check branch.
             _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
             _bitsInBuffer = _bitsInBuffer &+ 8
-          } else { // Exhausted generator.
-            _atEnd = true
+          } else {
+            _didExhaustGenerator = true
             if _bitsInBuffer == 0 { return .EmptyInput }
             break // We still have some bytes left in our buffer.
           }
