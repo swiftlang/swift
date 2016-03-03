@@ -100,6 +100,7 @@ public struct IndexingGenerator<Elements : Indexable>
   /// element exists.
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
+  @inline(__always)
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
