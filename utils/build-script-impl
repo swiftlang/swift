@@ -138,13 +138,10 @@ KNOWN_SETTINGS=(
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
-    skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
     skip-test-ios-host          ""               "set to skip testing the host parts of the iOS toolchain"
-    skip-test-tvos              ""               "set to skip testing Swift stdlibs for tvOS"
     skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
     skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
-    skip-test-watchos           ""               "set to skip testing Swift stdlibs for Apple watchOS"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
     skip-test-validation        ""               "set to skip validation test suite"
@@ -626,7 +623,6 @@ if [[ "${SKIP_IOS}" ]] ; then
     SKIP_BUILD_IOS=1
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS=1
     SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
@@ -635,7 +631,6 @@ if [[ "${SKIP_TVOS}" ]] ; then
     SKIP_BUILD_TVOS=1
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS=1
     SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
@@ -644,7 +639,6 @@ if [[ "${SKIP_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS=1
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS=1
     SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
@@ -653,7 +647,6 @@ if [[ "${SKIP_BUILD_IOS}" ]] ; then
     SKIP_BUILD_IOS=1
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS=1
     SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
@@ -662,7 +655,6 @@ if [[ "${SKIP_BUILD_TVOS}" ]] ; then
     SKIP_BUILD_TVOS=1
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS=1
     SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
@@ -671,7 +663,6 @@ if [[ "${SKIP_BUILD_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS=1
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS=1
     SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
@@ -700,21 +691,6 @@ fi
 
 if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_IOS}" ]] ; then
-    SKIP_TEST_IOS_HOST=1
-    SKIP_TEST_IOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_TVOS}" ]] ; then
-    SKIP_TEST_TVOS_HOST=1
-    SKIP_TEST_TVOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_WATCHOS}" ]] ; then
-    SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
