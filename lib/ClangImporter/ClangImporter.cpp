@@ -3310,6 +3310,15 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
                             owner.Impl.importDecl(category)))
         results.push_back(extension);
     }
+
+    // Add any extensions created during this import
+    for (auto mapItr : owner.Impl.extensionPoints) {
+      // TODO: Any other entry points where we need to add these? Is there any
+      // way to to instead marshal the extension through the consumer more
+      // directly?
+      results.push_back(mapItr.getSecond());
+    }
+
   }
 }
 
@@ -4003,6 +4012,25 @@ static bool isVisibleClangEntry(clang::ASTContext &ctx,
   return true;
 }
 
+ExtensionDecl *ClangImporter::Implementation::getOrCreateExtensionPoint(
+    NominalTypeDecl *typeToExtend, const clang::Decl *clangDecl) {
+  const clang::Module *submodule = *getClangSubmoduleForDecl(clangDecl);
+  auto key = std::make_pair(typeToExtend, submodule);
+  if (extensionPoints.count(key))
+    return extensionPoints[key];
+
+  SourceLoc noLoc{};
+  auto swiftTyLoc = TypeLoc::withoutLoc(typeToExtend->getDeclaredType());
+  auto ext = ExtensionDecl::create(SwiftContext, noLoc, swiftTyLoc, {},
+                                   importDeclContextOf(clangDecl), nullptr,
+                                   typeToExtend->getClangNode());
+  ext->setValidated();
+  typeToExtend->addExtension(ext);
+
+  extensionPoints[key] = ext;
+  return ext;
+}
+
 void ClangImporter::Implementation::importGlobalsAsMembers(
     SwiftLookupTable &table, clang::TypeDecl *type,
     VisibleDeclConsumer &consumer) {
@@ -4032,6 +4060,7 @@ void ClangImporter::Implementation::importGlobalsAsMembers(
         // FIXME: should I be adding it to the consumer? Or, would normal
         // attempts at name lookup do this for me? Should I add any created
         // extensions?
+        // consumer.foundDecl(swiftMemberDecl, DeclVisibilityKind::MemberOfCurrentNominal);
       }
     }
   }

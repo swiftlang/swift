@@ -2686,8 +2686,18 @@ namespace {
       if (!type)
         return nullptr;
 
+      // If we're importing as a member, be sure to add to an extension
+      IterableDeclContext *addMemberTo = nullptr;
+      bool isStatic = false;
+      if (auto nomTypeDecl = dyn_cast<NominalTypeDecl>(dc)) {
+        auto ext = Impl.getOrCreateExtensionPoint(nomTypeDecl, decl);
+        addMemberTo = ext;
+        dc = ext;
+        isStatic = true;
+      }
+
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       /*static*/ false,
+                       isStatic,
                        Impl.shouldImportGlobalAsLet(decl->getType()),
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
@@ -2695,11 +2705,8 @@ namespace {
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
 
-      if (auto nomTypeDecl = dyn_cast<NominalTypeDecl>(dc)) {
-        // FIXME: instead, we should have an extension per submodule to add to
-        IterableDeclContext *addMemberTo = nomTypeDecl;
+      if (addMemberTo)
         addMemberTo->addMember(result);
-      }
 
       return result;
     }

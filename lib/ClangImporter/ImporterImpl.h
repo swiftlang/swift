@@ -332,6 +332,11 @@ public:
   /// in that module, e.g., the Foundation module uses the "NS" prefix.
   llvm::StringMap<std::string> ModulePrefixes;
 
+  /// \brief Provide a single extension point for any given type per clang
+  /// submodule
+  llvm::DenseMap<std::pair<NominalTypeDecl *, const clang::Module *>,
+                 ExtensionDecl *> extensionPoints;
+
   /// Is the given identifier a reserved name in Swift?
   static bool isSwiftReservedName(StringRef name);
 
@@ -411,6 +416,11 @@ public:
   bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
                                  unsigned &prefixLength,
                                  CtorInitializerKind &kind);
+
+  /// Fetch a single, unique extension declaration for each imported Swift type
+  /// for each Clang submodule.
+  ExtensionDecl *getOrCreateExtensionPoint(NominalTypeDecl *typeToExtend,
+                                           const clang::Decl *clangDecl);
 
 private:
   /// \brief Generation number that is used for crude versioning.
