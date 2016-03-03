@@ -21,8 +21,10 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/CommandLine.h"
 
+#if __APPLE__
 #include "mach_messages.h"
 #include "mach_helpers.h"
+#endif
 
 #include <iostream>
 #include <csignal>
@@ -195,6 +197,8 @@ static int doDumpReflectionSections(std::string BinaryFilename,
 
   return EXIT_SUCCESS;
 }
+
+#if __APPLE__
 
 static mach_port_t createReceivePort() {
   kern_return_t error;
@@ -425,6 +429,8 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
   return EXIT_SUCCESS;
 }
 
+#endif // __APPLE__
+
 int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Test\n");
   switch (options::Action) {
@@ -432,7 +438,13 @@ int main(int argc, char *argv[]) {
     return doDumpReflectionSections(options::BinaryFilename,
                                     options::Architecture);
   case ActionType::DumpHeapInstance:
+#if __APPLE__
     return doDumpHeapInstance(options::BinaryFilename);
+#else
+    std::cerr << "Dumping heap instances not available on this platform";
+    std::cerr << std::endl;
+    return EXIT_FAILURE;
+#endif
   case ActionType::None:
     llvm::cl::PrintHelpMessage();
     return EXIT_FAILURE;
