@@ -2695,6 +2695,12 @@ namespace {
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
 
+      if (auto nomTypeDecl = dyn_cast<NominalTypeDecl>(dc)) {
+        // FIXME: instead, we should have an extension per submodule to add to
+        IterableDeclContext *addMemberTo = nomTypeDecl;
+        addMemberTo->addMember(result);
+      }
+
       return result;
     }
 

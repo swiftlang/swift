@@ -5,10 +5,15 @@ struct __attribute__((swift_name("Struct1"))) IAMStruct1 {
   double x, y, z;
 };
 
-struct IAMStruct1 IAMStruct1CreateSimple(int value) __attribute__((swift_name("Struct1.init(value:)")));
+extern int IAMStruct1GlobalVar __attribute__((swift_name("Struct1.globalVar")));
 
-double IAMStruct1GetRadius(struct IAMStruct1 s) __attribute__((swift_name("getter:Struct1.radius(self:)")));
+extern struct IAMStruct1 IAMStruct1CreateSimple(int value)
+    __attribute__((swift_name("Struct1.init(value:)")));
 
-void IAMStruct1SetRadius(struct IAMStruct1 s, double radius) __attribute__((swift_name("setter:Struct1.radius(self:_:)")));
+extern double IAMStruct1GetRadius(struct IAMStruct1 s)
+    __attribute__((swift_name("getter:Struct1.radius(self:)")));
+
+extern void IAMStruct1SetRadius(struct IAMStruct1 s, double radius)
+    __attribute__((swift_name("setter:Struct1.radius(self:_:)")));
 
 #endif // IMPORT_AS_MEMBER_H

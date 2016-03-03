@@ -4003,6 +4003,40 @@ static bool isVisibleClangEntry(clang::ASTContext &ctx,
   return true;
 }
 
+void ClangImporter::Implementation::importGlobalsAsMembers(
+    SwiftLookupTable &table, clang::TypeDecl *type,
+    VisibleDeclConsumer &consumer) {
+  EffectiveClangContext effectiveCtx{};
+  if (auto dc = dyn_cast<clang::DeclContext>(type)) {
+    effectiveCtx = {dc};
+  } else if (auto tnd = dyn_cast<clang::TypedefNameDecl>(type)) {
+    effectiveCtx = {tnd};
+  } else {
+    // No much we can do
+    return;
+  }
+
+  // FIXME: might this re-add the same context twice? should we have a
+  // PtrSet of contexts already done?
+  auto members = table.lookupGlobalsAsMembers(effectiveCtx);
+  for (auto member : members) {
+    if (auto namedDecl = member.dyn_cast<clang::NamedDecl *>()) {
+      if (auto funcDecl = dyn_cast<clang::FunctionDecl>(namedDecl)) {
+        // TODO: support functions
+        (void)funcDecl;
+        continue;
+      }
+
+      auto swiftMemberDecl = cast_or_null<ValueDecl>(importDeclReal(namedDecl));
+      if (swiftMemberDecl) {
+        // FIXME: should I be adding it to the consumer? Or, would normal
+        // attempts at name lookup do this for me? Should I add any created
+        // extensions?
+      }
+    }
+  }
+}
+
 void ClangImporter::Implementation::lookupValue(
        SwiftLookupTable &table, DeclName name,
        VisibleDeclConsumer &consumer) {
@@ -4036,8 +4070,14 @@ void ClangImporter::Implementation::lookupValue(
       continue;
 
     // If the name matched, report this result.
-    if (decl->getFullName().matchesRef(name))
+    if (decl->getFullName().matchesRef(name)) {
       consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+
+      // FIXME: is this the right place to do this?
+      if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>())
+        if (auto typeDecl = dyn_cast<clang::TypeDecl>(clangDecl))
+          importGlobalsAsMembers(table, typeDecl, consumer);
+    }
 
     // If there is an alternate declaration and the name matches,
     // report this result.
