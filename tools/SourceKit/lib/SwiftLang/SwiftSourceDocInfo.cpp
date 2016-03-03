@@ -24,6 +24,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -485,6 +486,19 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
 
   SmallString<64> SS;
   auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
+  bool InSynthesizedExtension = false;
+  if (BaseType) {
+    if(auto Target = BaseType->getAnyNominal()) {
+      if(auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
+                                                    getInnermostTypeContext())) {
+        llvm::SmallPtrSet<ExtensionDecl*, 15> Exts;
+        SynthesizedExtensionAnalyzer Analyzer(Target);
+        Analyzer.findSynthesizedExtensions(Exts);
+        InSynthesizedExtension = Exts.count(Ext) != 0;
+      }
+    }
+  }
+
   unsigned NameBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
@@ -496,11 +510,9 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   {
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printUSR(VD, OS);
-    if (BaseType){
-      if(auto Target = BaseType->getAnyNominal()) {
+    if (InSynthesizedExtension) {
         OS << LangSupport::SynthesizedUSRSeparator;
-        SwiftLangSupport::printUSR(Target, OS);
-      }
+        SwiftLangSupport::printUSR(BaseType->getAnyNominal(), OS);
     }
   }
   unsigned USREnd = SS.size();
@@ -536,7 +548,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned GroupBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    if (auto OP = VD->getGroupName())
+    auto *GroupVD = InSynthesizedExtension ? BaseType->getAnyNominal() : VD;
+    if (auto OP = GroupVD->getGroupName())
       OS << OP.getValue();
   }
   unsigned GroupEnd = SS.size();

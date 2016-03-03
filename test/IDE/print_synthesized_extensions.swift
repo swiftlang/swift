@@ -69,11 +69,8 @@ public struct S3<T> : P1 {
 // CHECK:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK: }</synthesized>
 
-// CHECK: <synthesized>/// Synthesized extension from P1
-// CHECK: extension S1 where T == P2, S2 : P3 {
-// CHECK:     <decl:Func>public func <loc>ef3(<decl:Param>t: <ref:Protocol>P2</ref></decl>)</loc></decl>
-// CHECK:     <decl:Func>public func <loc>ef4(<decl:Param>t: <ref:Protocol>P2</ref></decl>)</loc></decl>
-// CHECK: }</synthesized>
+// No applicable extensions for S2
+// CHECK-NOT: extension S2 where
 
 // No applicable extensions for S3
 // CHECK-NOT: extension S3 where
