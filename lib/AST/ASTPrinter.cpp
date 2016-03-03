@@ -253,6 +253,17 @@ bool SynthesizedExtensionAnalyzer::isApplicable(ExtensionDecl *Ext) {
 
 SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
+bool SynthesizedExtensionAnalyzer::
+isInSynthesizedExtension(const ValueDecl *VD) {
+  if(auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
+                                                getInnermostTypeContext())) {
+    llvm::SmallPtrSet<ExtensionDecl*, 15> Exts;
+    findSynthesizedExtensions(Exts);
+    return Exts.count(Ext) != 0;
+  }
+  return false;
+}
+
 void SynthesizedExtensionAnalyzer::
 findSynthesizedExtensions(llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
     if (Impl.Target->getKind() == DeclKind::Protocol)

@@ -489,13 +489,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   bool InSynthesizedExtension = false;
   if (BaseType) {
     if(auto Target = BaseType->getAnyNominal()) {
-      if(auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
-                                                    getInnermostTypeContext())) {
-        llvm::SmallPtrSet<ExtensionDecl*, 15> Exts;
-        SynthesizedExtensionAnalyzer Analyzer(Target);
-        Analyzer.findSynthesizedExtensions(Exts);
-        InSynthesizedExtension = Exts.count(Ext) != 0;
-      }
+      SynthesizedExtensionAnalyzer Analyzer(Target);
+      InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
     }
   }
 

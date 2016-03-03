@@ -22,6 +22,7 @@ namespace swift {
 class GenericParamList;
 class CanType;
 class Decl;
+class ValueDecl;
 class ExtensionDecl;
 class NominalTypeDecl;
 class TypeBase;
@@ -61,6 +62,7 @@ public:
   SynthesizedExtensionAnalyzer(NominalTypeDecl *Target);
   ~SynthesizedExtensionAnalyzer();
   void findSynthesizedExtensions(llvm::SmallPtrSetImpl<ExtensionDecl*> &Scratch);
+  bool isInSynthesizedExtension(const ValueDecl *VD);
 };
 
 /// Options for printing AST nodes.
