@@ -2294,6 +2294,8 @@ private:
       return;
     NodePointer typelist = pointer->getChild(1);
     print(pointer->getChild(0));
+    if (!Options.DisplayGenericTypeList)
+      return;
     Printer << "<";
     printChildren(typelist, ", ");
     Printer << ">";

@@ -33,6 +33,7 @@ struct DemangleOptions {
   bool DisplayTypeOfIVarFieldOffset = true;
   bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
+  bool DisplayGenericTypeList = true;
   bool DisplayExtensionContexts = true;
   bool DisplayUnmangledSuffix = true;
   bool DisplayModuleNames = true;

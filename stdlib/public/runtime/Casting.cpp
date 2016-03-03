@@ -86,6 +86,7 @@ static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
   options.QualifyEntities = qualified;
+  options.DisplayGenericTypeList = false;
 
   // Demangle the basic type name.
   result += Demangle::demangleTypeAsString(ntd->Name,

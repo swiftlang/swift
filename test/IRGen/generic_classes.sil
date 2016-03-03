@@ -9,11 +9,11 @@ import Swift
 
 // -- offset of RootGeneric<T>.x
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"C15generic_classes11RootGeneric\00"
+// CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [35 x i8] c"GC15generic_classes11RootGenericx_\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
 // CHECK: @_TMnC15generic_classes11RootGeneric = {{(protected )?}}constant <{ {{.*}} i32 }> <{
 // --       name
-// CHECK:   [32 x i8]* [[ROOTGENERIC_NAME]]
+// CHECK:   [35 x i8]* [[ROOTGENERIC_NAME]]
 // --       num fields
 // CHECK:   i32 3,
 // --       field offset vector offset

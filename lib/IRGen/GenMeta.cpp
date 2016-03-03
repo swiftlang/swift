@@ -85,12 +85,14 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 // FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 // resolving relative references to coalesceable symbols.
 // It should be removed when fixed. rdar://problem/22674524
-static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
+static llvm::Constant *getMangledTypeName(IRGenModule &IGM,
+                                          NominalTypeDecl *Decl,
                                       bool willBeRelativelyAddressed = false) {
-  auto name = LinkEntity::forTypeMangling(type);
-  llvm::SmallString<32> mangling;
-  name.mangle(mangling);
-  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
+  Mangle::Mangler mangler;
+  mangler.setModuleContext(Decl->getModuleContext());
+  mangler.mangleType(Decl->getDeclaredInterfaceType()->getCanonicalType(), 0);
+  return IGM.getAddrOfGlobalString(mangler.finalize(),
+                                   willBeRelativelyAddressed);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -1857,9 +1859,8 @@ namespace {
 
     void addName() {
       NominalTypeDecl *ntd = asImpl().getTarget();
-      addRelativeAddress(getMangledTypeName(IGM,
-                                 ntd->getDeclaredType()->getCanonicalType(),
-                                 /*willBeRelativelyAddressed*/ true));
+      addRelativeAddress(getMangledTypeName(IGM, ntd,
+                                           /*willBeRelativelyAddressed*/ true));
     }
     
     void addGenericMetadataPatternAndKind() {
@@ -4672,8 +4673,7 @@ namespace {
     }
 
     void addForeignName() {
-      CanType targetType = asImpl().getTargetType();
-      asImpl().addWord(getMangledTypeName(IGM, targetType));
+      asImpl().addWord(getMangledTypeName(IGM, asImpl().Target));
     }
 
     void addUniquePointer() {
