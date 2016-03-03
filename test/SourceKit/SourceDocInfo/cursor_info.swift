@@ -311,7 +311,7 @@ func refEnumElements() {
 // CHECK33-NEXT: s:V11cursor_info2S2
 // CHECK33-NEXT: S2.Type
 // CHECK33-NEXT: <Declaration>struct S2&lt;T, U&gt;</Declaration>
-// CHECK33-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S2</decl.name>&lt;<decl.generic_type_param usr="s:tV11cursor_info2S21TMx"><decl.name>T</decl.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.name>U</decl.name></decl.generic_type_param>&gt;</decl.struct>
+// CHECK33-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S2</decl.name>&lt;<decl.generic_type_param usr="s:tV11cursor_info2S21TMx"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.struct>
 
 // RUN: %sourcekitd-test -req=cursor -pos=81:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK34
 // CHECK34: source.lang.swift.decl.function.method.instance (81:8-81:48)
@@ -319,7 +319,7 @@ func refEnumElements() {
 // CHECK34-NEXT: s:FV11cursor_info2S23foou0_rFFT_T_FT_T_
 // CHECK34-NEXT: <T, U> (S2<T, U>) -> <V, W> (() -> ()) -> () -> ()
 // CHECK34-NEXT: <Declaration>func foo&lt;V, W&gt;(closure: () -&gt; ()) -&gt; () -&gt; ()</Declaration>
-// CHECK34-NEXT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.name>V</decl.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.name>W</decl.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; ()</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; ()</decl.function.returntype></decl.function.method.instance>
+// CHECK34-NEXT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>V</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>W</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; ()</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; ()</decl.function.returntype></decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=83:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK35
 // CHECK35: source.lang.swift.decl.class (83:7-83:9)
@@ -327,7 +327,7 @@ func refEnumElements() {
 // CHECK35-NEXT: s:C11cursor_info2C4
 // CHECK35-NEXT: C4.Type
 // CHECK35-NEXT: <Declaration>class C4&lt;T, U&gt;</Declaration>
-// CHECK35-NEXT: <decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>C4</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.name>T</decl.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.name>U</decl.name></decl.generic_type_param>&gt;</decl.class>
+// CHECK35-NEXT: <decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>C4</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.class>
 
 // RUN: %sourcekitd-test -req=cursor -pos=84:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK36
 // CHECK36: source.lang.swift.decl.enum (84:6-84:8)
@@ -335,7 +335,7 @@ func refEnumElements() {
 // CHECK36-NEXT: s:O11cursor_info2E1
 // CHECK36-NEXT: E1.Type
 // CHECK36-NEXT: <Declaration>enum E1&lt;T, U&gt;</Declaration>
-// CHECK36-NEXT: <decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>E1</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.name>T</decl.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.name>U</decl.name></decl.generic_type_param>&gt;</decl.enum>
+// CHECK36-NEXT: <decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>E1</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.enum>
 
 // RUN: %sourcekitd-test -req=cursor -pos=86:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK37
 // CHECK37: source.lang.swift.decl.function.free (86:6-86:111)
@@ -407,3 +407,11 @@ func refEnumElements() {
 // CHECK46-NEXT: C
 // CHECK46: <Declaration>case C</Declaration>
 // CHECK46-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=80:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK47
+// CHECK47: source.lang.swift.decl.generic_type_param (80:11-80:12)
+// CHECK47-NEXT: T
+// CHECK47-NEXT: s:tV11cursor_info2S21TMx
+// CHECK47-NEXT: T.Type
+// CHECK47-NEXT: <Declaration>T</Declaration>
+// CHECK47-NEXT: <decl.generic_type_param><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>

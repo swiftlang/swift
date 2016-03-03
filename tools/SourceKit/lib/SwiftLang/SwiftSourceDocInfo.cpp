@@ -67,6 +67,7 @@ static StringRef getTagForDecl(const Decl *D, bool isRef) {
 
 static StringRef ExternalParamNameTag = "decl.var.parameter.argument_label";
 static StringRef LocalParamNameTag = "decl.var.parameter.name";
+static StringRef GenericParamNameTag = "decl.generic_type_param.name";
 static StringRef SyntaxKeywordTag = "syntaxtype.keyword";
 
 static StringRef getTagForParameter(PrintParameterKind context) {
@@ -85,6 +86,8 @@ static StringRef getDeclNameTagForDecl(const Decl *D) {
     // When we're examining the parameter itself, it is the local name that is
     // the name of the variable.
     return LocalParamNameTag;
+  case DeclKind::GenericTypeParam:
+    return ""; // Handled by printName.
   case DeclKind::Constructor:
   case DeclKind::Destructor:
   case DeclKind::Subscript:
@@ -169,10 +172,14 @@ private:
   }
 
   void printDeclLoc(const Decl *D) override {
-    openTag(getDeclNameTagForDecl(D));
+    auto tag = getDeclNameTagForDecl(D);
+    if (!tag.empty())
+      openTag(tag);
   }
   void printDeclNameEndLoc(const Decl *D) override {
-    closeTag(getDeclNameTagForDecl(D));
+    auto tag = getDeclNameTagForDecl(D);
+    if (!tag.empty())
+      closeTag(tag);
   }
 
   void printTypePre(const TypeLoc &TL) override {
@@ -241,7 +248,7 @@ private:
       return "";
 
     static StringRef parameterTypeTag = "decl.var.parameter.type";
-    static StringRef genericParamTypeTag = "decl.generic_type_param.type";
+    static StringRef genericParamTypeTag = "decl.generic_type_param.constraint";
 
     auto context = contextStack.back();
     if (context.is(PrintParameterKind::FunctionParameter))
@@ -277,7 +284,7 @@ private:
     case PrintNameContext::Keyword:
       return SyntaxKeywordTag;
     case PrintNameContext::GenericParameter:
-      return "decl.name"; // FIXME: should this be more specific?
+      return GenericParamNameTag;
     default:
       return "";
     }
