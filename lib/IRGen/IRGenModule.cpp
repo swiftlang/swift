@@ -200,7 +200,8 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     Int32Ty,                // size
     Int32Ty,                // flags
     Int16Ty,                // minimum witness count
-    Int16Ty                 // default witness count
+    Int16Ty,                // default witness count
+    Int32Ty                 // padding
   });
   
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();

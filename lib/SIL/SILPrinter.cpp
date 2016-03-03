@@ -2104,10 +2104,14 @@ void SILWitnessTable::dump() const {
 void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   // sil_default_witness_table <Protocol> <MinSize>
   OS << "sil_default_witness_table"
-     << " " << getProtocol()->getName()
-     << " " << getMinimumWitnessTableSize() << " {\n";
+     << " " << getProtocol()->getName() << " {\n";
   
   for (auto &witness : getEntries()) {
+    if (!witness.isValid()) {
+      OS << " no_default\n";
+      continue;
+    }
+
     // method #declref: @function
     OS << "  method ";
     witness.getRequirement().print(OS);

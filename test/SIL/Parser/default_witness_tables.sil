@@ -34,13 +34,21 @@ bb0(%0 : $*Self):
 sil public_external @defaultE : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
 
-// CHECK-LABEL: sil_default_witness_table ResilientProtocol 4 {
+// CHECK-LABEL: sil_default_witness_table ResilientProtocol {
+// CHECK: no_default
+// CHECK: no_default
+// CHECK: no_default
+// CHECK: no_default
 // CHECK: #ResilientProtocol.defaultC!1: @defaultC
 // CHECK: #ResilientProtocol.defaultD!1: @defaultD
 // CHECK: #ResilientProtocol.defaultE!1: @defaultE
 // CHECK: }
 
-sil_default_witness_table ResilientProtocol 4 {
+sil_default_witness_table ResilientProtocol {
+  no_default
+  no_default
+  no_default
+  no_default
   method #ResilientProtocol.defaultC!1: @defaultC
   method #ResilientProtocol.defaultD!1: @defaultD
   method #ResilientProtocol.defaultE!1: @defaultE

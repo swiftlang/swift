@@ -3162,6 +3162,9 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
   // witness tables should not reference SILFunctions without
   // public/public_external linkage.
   for (const Entry &E : getEntries()) {
+    if (!E.isValid())
+      continue;
+
     SILFunction *F = E.getWitness();
     assert(!isLessVisibleThan(F->getLinkage(), SILLinkage::Public) &&
            "Default witness tables should not reference internal "

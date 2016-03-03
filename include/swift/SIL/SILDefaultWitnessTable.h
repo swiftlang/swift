@@ -57,11 +57,11 @@ public:
       : Requirement(Requirement), Witness(Witness) {}
 
     bool isValid() const {
-      return Requirement.isNull();
+      return !Requirement.isNull();
     }
 
     const SILDeclRef &getRequirement() const {
-      assert(!Requirement.isNull());
+      assert(isValid());
       return Requirement;
     }
     SILFunction *getWitness() const {
@@ -94,7 +94,6 @@ private:
 
   /// Private constructor for making SILDefaultWitnessTable definitions.
   SILDefaultWitnessTable(SILModule &M, const ProtocolDecl *Protocol,
-                         unsigned MinimumWitnessTableSizeInWords,
                          ArrayRef<Entry> entries);
 
   void addDefaultWitnessTable();
@@ -107,11 +106,9 @@ public:
   /// Create a new SILDefaultWitnessTable definition with the given entries.
   static SILDefaultWitnessTable *create(SILModule &M,
                                         const ProtocolDecl *Protocol,
-                                        unsigned MinimumWitnessTableSizeInWords,
                                         ArrayRef<Entry> entries);
 
-  void convertToDefinition(unsigned MinimumWitnessTableSizeInWords,
-                           ArrayRef<Entry> entries);
+  void convertToDefinition(ArrayRef<Entry> entries);
 
   ~SILDefaultWitnessTable();
 
@@ -122,25 +119,31 @@ public:
   const ProtocolDecl *getProtocol() const { return Protocol; }
 
   /// Return the minimum witness table size, in words.
-  unsigned getMinimumWitnessTableSize() const {
-    return MinimumWitnessTableSizeInWords;
-  }
+  ///
+  /// This will not change if requirements with default implementations are
+  /// added at the end of the protocol.
+  unsigned getMinimumWitnessTableSize() const;
 
   /// Return the default witness table size, in words.
   ///
-  /// The runtime size of a witness table is the minimum size plus the default
-  /// size -- if a conformance omits any of the default witnesses, they will be
-  /// copied in at runtime.
-  ///
-  /// For now, we assume each default entry is a single word; this assumption
-  /// will no longer hold if we decide to implement resilient associated type
-  /// requirements.
+  /// This is the number of resilient default entries that were known when the
+  /// protocol definition was compiled; at runtime, it may be smaller or larger,
+  /// so this should only be used when emitting metadata for the protocol
+  /// definition itself.
   unsigned getDefaultWitnessTableSize() const {
-    return Entries.size();
+    return Entries.size() - getMinimumWitnessTableSize();
   }
 
   /// Return all of the default witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
+
+  /// Return all of the resilient default implementations.
+  ///
+  /// This is the array of witnesses actually emitted as part of the protocol's
+  /// metadata; see the comment in getMinimumWitnessTableSize().
+  ArrayRef<Entry> getResilientDefaultEntries() {
+    return Entries.slice(getMinimumWitnessTableSize());
+  }
 
   /// Verify that the default witness table is well-formed.
   void verify(const SILModule &M) const;

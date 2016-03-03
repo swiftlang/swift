@@ -4328,13 +4328,6 @@ bool Parser::parseSILDefaultWitnessTable() {
   // Parse the protocol.
   ProtocolDecl *protocol = parseProtocolDecl(*this, WitnessState);
 
-  // Parse the minimum witness table size.
-  unsigned minimumWitnessTableSize;
-  if (WitnessState.parseInteger(
-          minimumWitnessTableSize,
-          diag::sil_invalid_minimum_witness_table_size))
-    return true;
-
   // Parse the body.
   SourceLoc LBraceLoc = Tok.getLoc();
   consumeToken(tok::l_brace);
@@ -4349,8 +4342,13 @@ bool Parser::parseSILDefaultWitnessTable() {
       Identifier EntryKeyword;
       SourceLoc KeywordLoc;
       if (parseIdentifier(EntryKeyword, KeywordLoc,
-            diag::expected_tok_in_sil_instr, "method"))
+            diag::expected_tok_in_sil_instr, "method, no_default"))
         return true;
+
+      if (EntryKeyword.str() == "no_default") {
+        witnessEntries.push_back(SILDefaultWitnessTable::Entry());
+        continue;
+      }
 
       if (EntryKeyword.str() != "method") {
         diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "method");
@@ -4382,9 +4380,7 @@ bool Parser::parseSILDefaultWitnessTable() {
   parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                      LBraceLoc);
   
-  SILDefaultWitnessTable::create(*SIL->M, protocol,
-                                 minimumWitnessTableSize,
-                                 witnessEntries);
+  SILDefaultWitnessTable::create(*SIL->M, protocol, witnessEntries);
   BodyScope.reset();
   return false;
 }
