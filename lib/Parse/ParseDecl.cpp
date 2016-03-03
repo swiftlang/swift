@@ -1741,6 +1741,11 @@ static bool isParenthesizedUnowned(Parser &P) {
 bool Parser::isStartOfDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
+
+  // 'init' invocation is not start of a declaration
+  if (Tok.is(tok::kw_init)) {
+    return !isa<ConstructorDecl>(CurDeclContext);
+  }
   
   // The protocol keyword needs more checking to reject "protocol<Int>".
   if (Tok.is(tok::kw_protocol)) {
