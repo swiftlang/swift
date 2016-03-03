@@ -4891,7 +4891,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
 }
 
 namespace {
-  const unsigned NumProtocolDescriptorFields = 12;
+  const unsigned NumProtocolDescriptorFields = 13;
 
   class ProtocolDescriptorBuilder : public ConstantBuilder<> {
     ProtocolDecl *Protocol;
@@ -5005,12 +5005,18 @@ namespace {
         addConstantInt16(DefaultWitnesses->getMinimumWitnessTableSize());
         addConstantInt16(DefaultWitnesses->getDefaultWitnessTableSize());
 
+        // Unused padding
+        addConstantInt32(0);
+
         for (auto entry : DefaultWitnesses->getResilientDefaultEntries()) {
           addWord(IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition));
         }
       } else {
         addConstantInt16(0);
         addConstantInt16(0);
+
+        // Unused padding
+        addConstantInt32(0);
       }
     }
 
