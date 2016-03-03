@@ -1790,17 +1790,17 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // Create the witness.
   Type selfType;
 
-  // If we are emitting a witness thunk for a concrete conformance, this is
-  // the conforming type. If the witness is a free function, there is no
-  // Self type.
+  // If the witness is a free function, there is no Self type.
   if (!isFree) {
+    // If we are emitting a witness thunk for a concrete conformance, Self is
+    // just the conforming type.
     if (conformance) {
       selfType = conformance->getType();
 
-    // For default implementations, this is the contextual type of Self in an
-    // extension, or one we get around to default implementations in protocol
-    // bodies, a protocol.
-    } else if (!isFree) {
+    // For default implementations, Self is the contextual type of the
+    // extension (or, once we add default implementations inside protocols,
+    // the protocol's Self type).
+    } else {
       DeclContext *dc = witness.getDecl()->getDeclContext();
       assert(dc->getAsProtocolOrProtocolExtensionContext());
       selfType = dc->getDeclaredTypeOfContext();
