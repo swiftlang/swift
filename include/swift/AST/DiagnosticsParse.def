@@ -552,10 +552,6 @@ ERROR(sil_witness_assoc_not_found,none,
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
-// SIL Default Witness Table
-ERROR(sil_invalid_minimum_witness_table_size,none,
-      "minimum witness table size must be an integer", ())
-
 // SIL Coverage Map
 ERROR(sil_coverage_func_not_found, none,
       "sil function not found %0", (Identifier))
