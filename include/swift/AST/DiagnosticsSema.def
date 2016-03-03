@@ -2045,7 +2045,8 @@ NOTE(fix_unqualified_access_top_level_multi,none,
 ERROR(type_of_metatype,none,
       "'.dynamicType' is not allowed after a type name", ())
 ERROR(invalid_noescape_use,none,
-      "@noescape parameter %0 may only be called", (Identifier))
+      "@noescape %select{value|parameter}1 %0 may only be called",
+      (Identifier, bool))
 NOTE(noescape_autoclosure,none,
     "parameter %0 is implicitly @noescape because it was declared @autoclosure",
      (Identifier))

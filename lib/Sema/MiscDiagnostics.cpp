@@ -424,8 +424,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// The DRE argument is a reference to a noescape parameter.  Verify that
     /// its uses are ok.
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
-      // This only cares about declarations marked noescape.
-      if (!DRE->getDecl()->getAttrs().hasAttribute<NoEscapeAttr>())
+      // This only cares about declarations of noescape function type.
+      auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
+      if (!AFT || !AFT->isNoEscape())
         return;
 
       // Only diagnose this once.  If we check and accept this use higher up in
@@ -440,7 +441,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  DRE->getDecl()->getName());
+                  DRE->getDecl()->getName(), isa<ParamDecl>(DRE->getDecl()));
       if (DRE->getDecl()->getAttrs().hasAttribute<AutoClosureAttr>() &&
           DRE->getDecl()->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
