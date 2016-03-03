@@ -1336,8 +1336,10 @@ using HeapMetadata = TargetHeapMetadata<InProcess>;
 /// structure that describes how to find and parse a generic parameter vector
 /// within the type metadata for an instance of a nominal type.
 struct GenericParameterDescriptor {
-  /// The offset of the descriptor in the metadata record.  This is
-  /// meaningful if either NumGenericRequirements is nonzero or 
+  /// The offset to the first generic argument from the start of
+  /// metadata record.
+  ///
+  /// This is meaningful if either NumGenericRequirements is nonzero or
   /// (for classes) if Flags.hasParent() is true.
   uint32_t Offset;
 
