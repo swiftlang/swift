@@ -29,6 +29,13 @@ struct BenchResults {
     self.mean = mean
     self.sd = sd
     self.median = median
+
+    // Sanity the bounds of our results
+    preconditionFailure(self.min <= self.max, "Min should always be <= max")
+    preconditionFailure(self.min <= self.mean, "Min should always be <= mean")
+    preconditionFailure(self.min <= self.median, "Min should always be <= median")
+    preconditionFailure(self.max >= self.mean, "Max should always be >= mean")
+    preconditionFailure(self.max >= self.median, "Max should always be >= median")
   }
 }
 
