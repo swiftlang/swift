@@ -5005,7 +5005,7 @@ namespace {
         addConstantInt16(DefaultWitnesses->getMinimumWitnessTableSize());
         addConstantInt16(DefaultWitnesses->getDefaultWitnessTableSize());
 
-        for (auto entry : DefaultWitnesses->getEntries()) {
+        for (auto entry : DefaultWitnesses->getResilientDefaultEntries()) {
           addWord(IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition));
         }
       } else {

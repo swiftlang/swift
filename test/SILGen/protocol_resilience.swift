@@ -14,10 +14,14 @@ protocol InternalProtocol {
   func f()
 }
 
-// CHECK-LABEL: sil_default_witness_table P 0 {
+// CHECK-LABEL: sil_default_witness_table P {
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil_default_witness_table ResilientProtocol 4 {
+// CHECK-LABEL: sil_default_witness_table ResilientProtocol {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
 // CHECK-NEXT: }
 
 // GLOBAL-NOT: sil_default_witness_table InternalProtocol

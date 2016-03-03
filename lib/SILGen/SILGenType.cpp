@@ -519,33 +519,36 @@ namespace {
 struct SILGenDefaultWitnessTable
     : public SILWitnessVisitor<SILGenDefaultWitnessTable> {
 
-  unsigned MinimumWitnessCount;
   SmallVector<SILDefaultWitnessTable::Entry, 8> DefaultWitnesses;
 
-  SILGenDefaultWitnessTable() : MinimumWitnessCount(0) {}
+  SILGenDefaultWitnessTable() {}
+
+  void addMissingDefault() {
+    DefaultWitnesses.push_back(SILDefaultWitnessTable::Entry());
+  }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
-    MinimumWitnessCount++;
+    addMissingDefault();
   }
 
   void addMethod(FuncDecl *func) {
-    MinimumWitnessCount++;
+    addMissingDefault();
   }
 
   void addConstructor(ConstructorDecl *ctor) {
-    MinimumWitnessCount++;
+    addMissingDefault();
   }
 
   void addAssociatedType(AssociatedTypeDecl *ty,
                          ArrayRef<ProtocolDecl *> protos) {
-    MinimumWitnessCount++;
+    addMissingDefault();
 
     for (auto *protocol : protos) {
       // Only reference the witness if the protocol requires it.
       if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
         continue;
 
-      MinimumWitnessCount++;
+      addMissingDefault();
     }
   }
 };
@@ -559,6 +562,5 @@ void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   SILGenDefaultWitnessTable builder;
   builder.visitProtocolDecl(protocol);
 
-  defaultWitnesses->convertToDefinition(builder.MinimumWitnessCount,
-                                        builder.DefaultWitnesses);
+  defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
 }

@@ -21,7 +21,7 @@ import resilient_protocol
 
 // CHECK: @_TMp19protocol_resilience17ResilientProtocol = {{(protected )?}}constant <{{.*}}> <{
 // CHECK-SAME:   i32 1031,
-// CHECK-SAME:   i16 2,
+// CHECK-SAME:   i16 4,
 // CHECK-SAME:   i16 4,
 // CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultC,
 // CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultD
@@ -156,7 +156,11 @@ bb0(%0 : $@thick Self.Type):
 }
 
 
-sil_default_witness_table ResilientProtocol 2 {
+sil_default_witness_table ResilientProtocol {
+  no_default
+  no_default
+  no_default
+  no_default
   method #ResilientProtocol.defaultC!1: @defaultC
   method #ResilientProtocol.defaultD!1: @defaultD
   method #ResilientProtocol.defaultE!1: @defaultE
