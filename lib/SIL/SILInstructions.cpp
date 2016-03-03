@@ -1274,3 +1274,48 @@ ArrayRef<ProtocolConformanceRef>
 InitExistentialMetatypeInst::getConformances() const {
   return {getTrailingObjects<ProtocolConformanceRef>(), NumConformances};
 }
+
+MarkUninitializedBehaviorInst *
+MarkUninitializedBehaviorInst::create(SILModule &M,
+                                      SILDebugLocation DebugLoc,
+                                      SILValue InitStorage,
+                                      ArrayRef<Substitution> InitStorageSubs,
+                                      SILValue Storage,
+                                      SILValue Setter,
+                                      ArrayRef<Substitution> SetterSubs,
+                                      SILValue Self,
+                                      SILType Ty) {
+  auto totalSubs = InitStorageSubs.size() + SetterSubs.size();
+  auto mem = M.allocateInst(sizeof(MarkUninitializedBehaviorInst)
+                              + additionalSizeToAlloc<Substitution>(totalSubs),
+                            alignof(MarkUninitializedBehaviorInst));
+  return ::new (mem) MarkUninitializedBehaviorInst(DebugLoc,
+                                                   InitStorage, InitStorageSubs,
+                                                   Storage,
+                                                   Setter, SetterSubs,
+                                                   Self,
+                                                   Ty);
+}
+
+MarkUninitializedBehaviorInst::MarkUninitializedBehaviorInst(
+                                        SILDebugLocation DebugLoc,
+                                        SILValue InitStorage,
+                                        ArrayRef<Substitution> InitStorageSubs,
+                                        SILValue Storage,
+                                        SILValue Setter,
+                                        ArrayRef<Substitution> SetterSubs,
+                                        SILValue Self,
+                                        SILType Ty)
+  : SILInstruction(ValueKind::MarkUninitializedBehaviorInst, DebugLoc, Ty),
+    Operands(this, InitStorage, Storage, Setter, Self),
+    NumInitStorageSubstitutions(InitStorageSubs.size()),
+    NumSetterSubstitutions(SetterSubs.size())
+{
+  auto *trailing = getTrailingObjects<Substitution>();
+  for (unsigned i = 0; i < InitStorageSubs.size(); ++i) {
+    ::new ((void*)trailing++) Substitution(InitStorageSubs[i]);
+  }
+  for (unsigned i = 0; i < SetterSubs.size(); ++i) {
+    ::new ((void*)trailing++) Substitution(SetterSubs[i]);
+  }
+}
