@@ -203,11 +203,8 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if done {
-      return nil
-    }
     if stride > 0 ? current >= end : current <= end {
-      if current == end {
+      if current == end && !done {
         done = true
         return current
       }
