@@ -87,9 +87,9 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
       return GenericTypeParameterTypeRef::create(index, depth);
     }
     case NodeKind::FunctionType: {
-      auto input = fromDemangleNode(Node->getChild(0));
       TypeRefVector arguments;
-      if (auto tuple = llvm::dyn_cast<TupleTypeRef>(input.get()))
+      auto input = fromDemangleNode(Node->getChild(0));
+      if (auto tuple = dyn_cast<TupleTypeRef>(input.get()))
         arguments = tuple->getElements();
       else
         arguments = { input };

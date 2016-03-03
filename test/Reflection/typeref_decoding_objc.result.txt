@@ -32,11 +32,10 @@ aMetatype: TypesToReflect.C.Type
 
 aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> Swift.Int
 (function
-  (tuple
-    (nominal TypesToReflect.C)
-    (nominal TypesToReflect.S)
-    (nominal TypesToReflect.E)
-    (nominal Swift.Int))
+  (nominal TypesToReflect.C)
+  (nominal TypesToReflect.S)
+  (nominal TypesToReflect.E)
+  (nominal Swift.Int)
   (nominal Swift.Int))
 
 TypesToReflect.S
@@ -68,11 +67,10 @@ aMetatype: TypesToReflect.C.Type
 
 aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> Swift.Int
 (function
-  (tuple
-    (nominal TypesToReflect.C)
-    (nominal TypesToReflect.S)
-    (nominal TypesToReflect.E)
-    (nominal Swift.Int))
+  (nominal TypesToReflect.C)
+  (nominal TypesToReflect.S)
+  (nominal TypesToReflect.E)
+  (nominal Swift.Int)
   (nominal Swift.Int))
 
 TypesToReflect.E
@@ -108,11 +106,10 @@ Function: (TypesToReflect.E.Type) -> ((TypesToReflect.C, TypesToReflect.S, Types
     (nominal TypesToReflect.E))
   (function
     (function
-      (tuple
-        (nominal TypesToReflect.C)
-        (nominal TypesToReflect.S)
-        (nominal TypesToReflect.E)
-        (nominal Swift.Int))
+      (nominal TypesToReflect.C)
+      (nominal TypesToReflect.S)
+      (nominal TypesToReflect.E)
+      (nominal Swift.Int)
       (tuple))
     (nominal TypesToReflect.E)))
 
@@ -121,10 +118,9 @@ Tuple: (TypesToReflect.E.Type) -> (TypesToReflect.C, TypesToReflect.S, Swift.Int
   (metatype
     (nominal TypesToReflect.E))
   (function
-    (tuple
-      (nominal TypesToReflect.C)
-      (nominal TypesToReflect.S)
-      (nominal Swift.Int))
+    (nominal TypesToReflect.C)
+    (nominal TypesToReflect.S)
+    (nominal Swift.Int)
     (nominal TypesToReflect.E)))
 
 IndirectTuple: (TypesToReflect.E.Type) -> (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> TypesToReflect.E
@@ -132,11 +128,10 @@ IndirectTuple: (TypesToReflect.E.Type) -> (TypesToReflect.C, TypesToReflect.S, T
   (metatype
     (nominal TypesToReflect.E))
   (function
-    (tuple
-      (nominal TypesToReflect.C)
-      (nominal TypesToReflect.S)
-      (nominal TypesToReflect.E)
-      (nominal Swift.Int))
+    (nominal TypesToReflect.C)
+    (nominal TypesToReflect.S)
+    (nominal TypesToReflect.E)
+    (nominal Swift.Int)
     (nominal TypesToReflect.E)))
 
 Metatype: (TypesToReflect.E.Type) -> (TypesToReflect.E.Type) -> TypesToReflect.E
@@ -173,11 +168,10 @@ aMetatype: TypesToReflect.C.Type
 
 aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> Swift.Int
 (function
-  (tuple
-    (nominal TypesToReflect.C)
-    (nominal TypesToReflect.S)
-    (nominal TypesToReflect.E)
-    (nominal Swift.Int))
+  (nominal TypesToReflect.C)
+  (nominal TypesToReflect.S)
+  (nominal TypesToReflect.E)
+  (nominal Swift.Int)
   (nominal Swift.Int))
 
 nsObject: __ObjC.NSObject
@@ -557,12 +551,11 @@ Tuple: <A> (TypesToReflect.E1<A>.Type) -> (TypesToReflect.C1<A>, TypesToReflect.
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0)))
   (function
-    (tuple
-      (bound-generic TypesToReflect.C1
-        (generic-type-parameter index=0 depth=0))
-      (bound-generic TypesToReflect.S1
-        (generic-type-parameter index=0 depth=0))
-      (nominal Swift.Int))
+    (bound-generic TypesToReflect.C1
+      (generic-type-parameter index=0 depth=0))
+    (bound-generic TypesToReflect.S1
+      (generic-type-parameter index=0 depth=0))
+    (nominal Swift.Int)
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
@@ -644,12 +637,11 @@ Tuple: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (TypesToRef
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0)))
   (function
-    (tuple
-      (bound-generic TypesToReflect.C2
-        (generic-type-parameter index=0 depth=0))
-      (bound-generic TypesToReflect.S2
-        (generic-type-parameter index=0 depth=0))
-      (nominal Swift.Int))
+    (bound-generic TypesToReflect.C2
+      (generic-type-parameter index=0 depth=0))
+    (bound-generic TypesToReflect.S2
+      (generic-type-parameter index=0 depth=0))
+    (nominal Swift.Int)
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
@@ -744,12 +736,11 @@ Tuple: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (TypesToRef
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0)))
   (function
-    (tuple
-      (bound-generic TypesToReflect.C3
-        (generic-type-parameter index=0 depth=0))
-      (bound-generic TypesToReflect.S3
-        (generic-type-parameter index=0 depth=0))
-      (nominal Swift.Int))
+    (bound-generic TypesToReflect.C3
+      (generic-type-parameter index=0 depth=0))
+    (bound-generic TypesToReflect.S3
+      (generic-type-parameter index=0 depth=0))
+    (nominal Swift.Int)
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 

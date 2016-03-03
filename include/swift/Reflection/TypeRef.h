@@ -29,6 +29,7 @@ namespace swift {
 namespace reflection {
 
 using llvm::cast;
+using llvm::dyn_cast;
 
 enum class TypeRefKind {
 #define TYPEREF(Id, Parent) Id,
@@ -496,10 +497,8 @@ public:
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
     printHeader("function");
-    printField("input", "");
     for (auto Arg : F->getArguments())
       printRec(Arg.get());
-    printField("result", "");
     printRec(F->getResult().get());
     OS << ')';
   }
