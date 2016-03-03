@@ -26,6 +26,11 @@ class D {
 		x = 1
 #endif
 	}
+
+#if !BAR
+    func overload(a: Int) {}
+    func overload(b: String) {} // should not result in an error
+#endif
 }
 
 var d = D()
