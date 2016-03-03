@@ -1076,11 +1076,11 @@ void CompletionBuilder::getDescription(SwiftResult *result, raw_ostream &OS,
       if (C.is(ChunkKind::Equal))
         isOperator = true;
 
-      if (C.getKind() == ChunkKind::TypeAnnotation ||
-          C.getKind() == ChunkKind::CallParameterClosureType ||
-          C.getKind() == ChunkKind::Whitespace)
+      if (C.is(ChunkKind::TypeAnnotation) ||
+          C.is(ChunkKind::CallParameterClosureType) ||
+          C.is(ChunkKind::Whitespace))
         continue;
-      if (isOperator && C.getKind() == ChunkKind::CallParameterType)
+      if (isOperator && C.is(ChunkKind::CallParameterType))
         continue;
       if (C.hasText()) {
         TextSize += C.getText().size();
