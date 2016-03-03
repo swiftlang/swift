@@ -1035,10 +1035,12 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
         } else {
           Printer << ", ";
         }
+        Printer.printParameterPre(PrintParameterKind::GenericRequirement);
         Printer << std::get<0>(E);
         Printer << (RequirementReprKind::SameType == std::get<2>(E) ? " == " :
                                                                       " : ");
         Printer << std::get<1>(E);
+        Printer.printParameterPost(PrintParameterKind::GenericRequirement);
       }
     return;
   }
@@ -1054,6 +1056,11 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
     } else {
       Printer << ", ";
     }
+
+    Printer.printParameterPre(PrintParameterKind::GenericRequirement);
+    defer {
+      Printer.printParameterPost(PrintParameterKind::GenericRequirement);
+    };
 
     switch (req.getKind()) {
     case RequirementReprKind::TypeConstraint:

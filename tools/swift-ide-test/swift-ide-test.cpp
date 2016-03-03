@@ -1589,10 +1589,12 @@ public:
     OS << "</decl>";
   }
   void printParameterPre(PrintParameterKind Kind, const Decl *D) override {
-    OS << "<decl:Param>";
+    if (D)
+      printDeclPre(D);
   }
   void printParameterPost(PrintParameterKind Kind, const Decl *D) override {
-    OS << "</decl>";
+    if (D)
+      printDeclPost(D);
   }
 
 

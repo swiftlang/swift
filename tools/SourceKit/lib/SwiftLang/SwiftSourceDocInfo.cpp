@@ -76,6 +76,8 @@ static StringRef getTagForParameter(PrintParameterKind context) {
     return "decl.var.parameter";
   case PrintParameterKind::GenericParameter:
     return "decl.generic_type_param";
+  case PrintParameterKind::GenericRequirement:
+    return "decl.generic_type_requirement";
   }
   llvm_unreachable("unexpected parameter kind");
 }
@@ -255,6 +257,8 @@ private:
       return parameterTypeTag;
     if (context.is(PrintParameterKind::GenericParameter))
       return genericParamTypeTag;
+    if (context.is(PrintParameterKind::GenericRequirement))
+      return "";
 
     assert(context.getDecl() && "unexpected context kind");
     switch (context.getDecl()->getKind()) {

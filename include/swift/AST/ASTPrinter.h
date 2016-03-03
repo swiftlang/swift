@@ -52,6 +52,7 @@ enum class PrintNameContext {
 /// \endcode
 enum class PrintParameterKind {
   GenericParameter,
+  GenericRequirement,
   FunctionParameter,
 };
 
