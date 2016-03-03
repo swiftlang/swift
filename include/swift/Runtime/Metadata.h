@@ -2218,6 +2218,9 @@ struct TargetProtocolDescriptor {
   /// Only meaningful if ProtocolDescriptorFlags::IsResilient is set.
   uint16_t DefaultWitnessTableSizeInWords;
 
+  /// Reserved. Really just here to zero-pad the structure on 64-bit.
+  uint32_t Reserved;
+
   /// Default requirements are tail-allocated here.
   void **getDefaultWitnesses() const {
     return (void **) (this + 1);
