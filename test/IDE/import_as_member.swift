@@ -12,7 +12,7 @@
 // PRINT-NEXT:   static var globalVar: Int32
 // PRINT-NEXT: }
 
-// RUN: %target-swift-frontend %s -parse -I %S/Inputs/custom-modules -verify
+// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
 
 import ImportAsMember
 
@@ -24,4 +24,3 @@ let gVarFail = IAMStruct1GlobalVar
   // expected-error@-1{{use of unresolved identifier 'IAMStruct1GlobalVar'}}
 let gVar = Struct1.globalVar
 
-print("\(gVar)")
