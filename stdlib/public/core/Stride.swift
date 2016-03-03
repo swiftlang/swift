@@ -198,7 +198,7 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
   var current: Element
   let end: Element
   let stride: Element.Stride
-  var done: Bool = false
+  var didReturnEnd: Bool = false
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -207,8 +207,8 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
       // This check is needed because if we just changed the above operators
       // to > and <, respectively, we might advance current past the end
       // and throw it out of bounds (e.g. above Int.max) unnecessarily.
-      if current == end && !done {
-        done = true
+      if current == end && !didReturnEnd {
+        didReturnEnd = true
         return current
       }
       return nil
