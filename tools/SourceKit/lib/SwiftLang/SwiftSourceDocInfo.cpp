@@ -143,10 +143,11 @@ public:
 ///     func <decl.name>foo</decl.name>
 ///     (
 ///     <decl.var.parameter>
-///       <decl.var.parameter.name.local>x</decl.var.parameter.name.local>:
+///       <decl.var.parameter.name>x</decl.var.parameter.name>:
 ///       <ref.struct usr="Si">Int</ref.struct>
 ///     </decl.var.parameter>
-///     ) -> <ref.struct usr="Si">Int</ref.struct>
+///     ) -> <decl.function.returntype>
+///            <ref.struct usr="Si">Int</ref.struct></decl.function.returntype>
 ///  </decl.function.free>
 /// \endverbatim
 class FullyAnnotatedDeclarationPrinter final : public XMLEscapingPrinter {
