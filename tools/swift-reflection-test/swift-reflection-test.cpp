@@ -26,6 +26,8 @@
 #include "mach_helpers.h"
 #endif
 
+#include <unistd.h>
+
 #include <iostream>
 #include <csignal>
 
