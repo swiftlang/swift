@@ -1532,11 +1532,6 @@ public:
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
-  void visitAbstractStorageDecl(AbstractStorageDecl *d) {
-    ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
-    addAbstractStorageDecl(d, witness);
-  }
-
   void addAssociatedType(AssociatedTypeDecl *td,
                          ArrayRef<ProtocolDecl *> protos) {
     // Find the substitution info for the witness type.
@@ -1586,6 +1581,11 @@ public:
         td, protocol, conformance
       });
     }
+  }
+
+  void visitAbstractStorageDecl(AbstractStorageDecl *d) {
+    ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
+    addAbstractStorageDecl(d, witness);
   }
 };
 
@@ -1642,6 +1642,23 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
     lastEmittedConformance = normal;
   }
   return table;
+}
+
+static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
+                                         ProtocolConformance *conformance,
+                                         SILDeclRef requirement,
+                                         SILDeclRef witness,
+                                         ArrayRef<Substitution> witnessSubs) {
+  if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
+    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+      auto reqFn = cast<FuncDecl>(requirement.getDecl());
+      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
+      return gen.maybeEmitMaterializeForSetThunk(conformance, reqFn, witnessFn,
+                                                 witnessSubs);
+    }
+  }
+
+  return false;
 }
 
 SILFunction *
@@ -1807,15 +1824,20 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     }
   }
 
-  SILGenFunction(*this, *f)
-    .emitProtocolWitness(conformance,
-                         selfType,
-                         AbstractionPattern(reqtOrigTy),
-                         reqtSubstTy,
-                         requirement, witness,
-                         witnessSubs, isFree);
+  SILGenFunction gen(*this, *f);
 
-  f->verify();
+  // Open-code certain protocol witness "thunks".
+  if (maybeOpenCodeProtocolWitness(gen, conformance, requirement,
+                                   witness, witnessSubs)) {
+    assert(!isFree);
+    return f;
+  }
+
+  gen.emitProtocolWitness(selfType,
+                          AbstractionPattern(reqtOrigTy),
+                          reqtSubstTy,
+                          requirement, witness,
+                          witnessSubs, isFree);
 
   return f;
 }
@@ -1888,6 +1910,16 @@ public:
 
       addMissingDefault();
     }
+  }
+
+  void visitAbstractStorageDecl(AbstractStorageDecl *d) {
+    ConcreteDeclRef witness = Proto->getDefaultWitness(d);
+    if (!witness) {
+      addMissingDefault();
+      return;
+    }
+
+    addAbstractStorageDecl(d, witness);
   }
 };
 

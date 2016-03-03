@@ -2709,24 +2709,6 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
-static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
-                                         ProtocolConformance *conformance,
-                                         SILDeclRef requirement,
-                                         SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs,
-                                         ArrayRef<ManagedValue> origParams) {
-  if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
-    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
-      auto reqFn = cast<FuncDecl>(requirement.getDecl());
-      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
-      return gen.maybeEmitMaterializeForSetThunk(conformance, reqFn, witnessFn,
-                                                 witnessSubs, origParams);
-    }
-  }
-
-  return false;
-}
-
 enum class WitnessDispatchKind {
   Static,
   Dynamic,
@@ -2921,43 +2903,33 @@ substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
   }
 }
 
-void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
-                                         Type selfType,
+void SILGenFunction::emitProtocolWitness(Type selfType,
                                          AbstractionPattern reqtOrigTy,
                                          CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
                                          ArrayRef<Substitution> witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
-  auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
-
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
-  
+
   SILLocation loc(witness.getDecl());
   FullExpr scope(Cleanups, CleanupLocation::get(loc));
-  
+ 
+  auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
   auto thunkTy = F.getLoweredFunctionType();
-  
+
   SmallVector<ManagedValue, 8> origParams;
   // TODO: Should be able to accept +0 values here, once
   // forwardFunctionArguments/emitApply are able to.
   collectThunkParams(loc, origParams, /*allowPlusZero*/ false);
-  
+
   // Handle special abstraction differences in "self".
   // If the witness is a free function, drop it completely.
   // WAY SPECULATIVE TODO: What if 'self' comprised multiple SIL-level params?
   if (isFree)
     origParams.pop_back();
-
-  // Open-code certain protocol witness "thunks".
-  // FIXME: Redo MaterializeForSet emission to not take the conformance
-  if (conformance) {
-    if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
-                                     witness, witnessSubs, origParams))
-      return;
-  }
 
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
