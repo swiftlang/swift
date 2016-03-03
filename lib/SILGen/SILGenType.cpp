@@ -59,18 +59,6 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   if (derived == base)
     return getFunction(derived, NotForDefinition);
 
-  // Generate the thunk name.
-  // TODO: If we allocated a new vtable slot for the derived method, then
-  // further derived methods would potentially need multiple thunks, and we
-  // would need to mangle the base method into the symbol as well.
-  auto name = derived.mangle("_TTV");
-
-  // If we already emitted this thunk, reuse it.
-  // TODO: Allocating new vtable slots for derived methods with different ABIs
-  // would invalidate the assumption that the same thunk is correct, as above.
-  if (auto existingThunk = M.lookUpFunction(name))
-    return existingThunk;
-
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
   auto baseInfo = Types.getConstantInfo(base);
@@ -84,6 +72,18 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // a thunk.
   if (overrideInfo == derivedInfo)
     return getFunction(derived, NotForDefinition);
+
+  // Generate the thunk name.
+  // TODO: If we allocated a new vtable slot for the derived method, then
+  // further derived methods would potentially need multiple thunks, and we
+  // would need to mangle the base method into the symbol as well.
+  auto name = derived.mangle("_TTV");
+
+  // If we already emitted this thunk, reuse it.
+  // TODO: Allocating new vtable slots for derived methods with different ABIs
+  // would invalidate the assumption that the same thunk is correct, as above.
+  if (auto existingThunk = M.lookUpFunction(name))
+    return existingThunk;
 
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
