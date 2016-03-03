@@ -67,6 +67,7 @@ static StringRef getTagForDecl(const Decl *D, bool isRef) {
 
 static StringRef ExternalParamNameTag = "decl.var.parameter.argument_label";
 static StringRef LocalParamNameTag = "decl.var.parameter.name";
+static StringRef SyntaxKeywordTag = "syntaxtype.keyword";
 
 static StringRef getTagForPrintNameContext(PrintNameContext context) {
   switch (context) {
@@ -74,6 +75,8 @@ static StringRef getTagForPrintNameContext(PrintNameContext context) {
     return ExternalParamNameTag;
   case PrintNameContext::FunctionParameterLocal:
     return LocalParamNameTag;
+  case PrintNameContext::Keyword:
+    return SyntaxKeywordTag;
   default:
     return "";
   }
@@ -97,7 +100,7 @@ static StringRef getDeclNameTagForDecl(const Decl *D) {
   case DeclKind::Destructor:
   case DeclKind::Subscript:
     // The names 'init'/'deinit'/'subscript' are actually keywords.
-    return "syntaxtype.keyword";
+    return SyntaxKeywordTag;
   default:
     return "decl.name";
   }
