@@ -168,26 +168,25 @@ public struct UTF8 : UnicodeCodecType {
       }
   }
 
-  /// Attempts to decode a single UTF-8 code unit sequence in `buffer` (LSB
-  /// first).
+  /// Attempts to decode a single UTF-8 code unit sequence starting at the LSB
+  /// of `buffer`.
+  ///
+  /// - Returns:
+  ///   - result: The decoded code point if the code unit sequence is
+  ///   well-formed; `nil` otherwise.
+  ///   - length: The length of the code unit sequence in bytes if it is
+  ///   well-formed; otherwise the *maximal subpart of the ill-formed
+  ///   sequence* (Unicode 8.0.0, Ch 3.9, D93b), i.e. the number of leading
+  ///   code units that were valid or 1 in case none were valid. Unicode
+  ///   recommends to skip these bytes bytes and replace them by a single
+  ///   replacement character (U+FFFD).
   ///
   /// - Requires: There is at least one used byte in `buffer`, and the unused
   /// space in `buffer` is filled with some value not matching the UTF-8
   /// continuation byte form (`0b10xxxxxx`).
-  /// - Returns: If the code unit sequence starting at the LSB is valid, returns
-  /// a tuple of the decoded code point and the number of bytes used to encode
-  /// it.  If the code sequence is ill-formed, returns a tuple of `nil` and the
-  /// *maximal subpart of the ill-formed sequence*, i.e. the number of bytes
-  /// that should be skipped (and optionally replaced by a single replacement
-  /// character U+FFFD).
   @warn_unused_result
   public // @testable
   static func _decodeOne(buffer: UInt32) -> (result: UInt32?, length: UInt8) {
-    // In case of a ill-formed sequence we return the length of it's maximal
-    // subpart, as defined in Unicode 8.0.0, Ch 3, D93b. Effectively this is
-    // the number of leading code units that were valid, or 1 in case none
-    // were valid. This indicates the amount of bytes to skip in the input
-    // (and optionally replace by a single replacement character U+FFFD).
 
     if buffer & 0x80 == 0 { // 1-byte sequence (ASCII), [ XXX XXX XXX CU0 ].
       let value = buffer & 0xff
