@@ -71,51 +71,131 @@ public protocol UnicodeCodecType {
 
 /// A codec for [UTF-8](http://www.unicode.org/glossary/#UTF_8).
 public struct UTF8 : UnicodeCodecType {
+  // See Unicode 8.0.0, Ch 3.9, UTF-8.
+  // http://www.unicode.org/versions/Unicode8.0.0/ch03.pdf
 
-  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
-  /// encoding.
+  /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit)
+  /// values for this encoding.
   public typealias CodeUnit = UInt8
 
   public init() {}
 
-  /// Lookahead buffer used for UTF-8 decoding.  New bytes are inserted at LSB,
-  /// and bytes are read at MSB.
-  var _decodeLookahead: UInt32 = 0
+  /// Lookahead buffer used for UTF-8 decoding.  New bytes are inserted at MSB,
+  /// and bytes are read at LSB.  Note that we need to use a buffer, because
+  /// in case of invalid subsequences we sometimes don't know whether we should
+  /// consume a certain byte before looking at it.
+  var _decodeBuffer: UInt32 = 0
 
-  /// Flags with layout: `0bxxxx_yyyy`.
-  ///
-  /// `xxxx` is the EOF flag.  It means that the input generator has signaled
-  /// end of sequence.  Out of the four bits, only one bit can be set.  The bit
-  /// position specifies how many bytes have been consumed from the lookahead
-  /// buffer already.  A value of `1000` means that there are `yyyy` bytes in
-  /// the buffer, `0100` means that there are `yyyy - 1` bytes, `0010` --
-  /// `yyyy - 2`, `0001` -- `yyyy - 3`.
-  ///
-  /// `yyyy` specifies how many bytes are valid in the lookahead buffer.  Value
-  /// is expressed in unary code.  Valid values: `1111` (4), `0111` (3),
-  /// `0011` (2), `0001` (1), `0000` (0).
-  ///
-  /// This representation is crafted to allow one to consume a byte from a
-  /// buffer with a shift, and update flags with a single-bit right shift.
-  var _lookaheadFlags: UInt8 = 0
+  /// The amount of bits in `_decodeBuffer` that are current filled.
+  var _bitsInBuffer: UInt8 = 0
 
+  /// Whether we have exhausted the end of the generator.  Note that this
+  /// doesn't mean we are done decoding, as the buffer might have bytes left.
+  var _atEnd: Bool = false
 
-  /// Returns `true` if the LSB bytes in `buffer` are a well-formed UTF-8 code
-  /// unit sequence. The lowest byte is considered the first code unit.
+  /// Start or continue decoding a UTF-8 sequence.
+  ///
+  /// In order to decode a code unit sequence completely, this function should
+  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// can have an internal buffer that is pre-filled with data from the input
+  /// generator.
+  ///
+  /// Because of buffering, it is impossible to find the corresponding position
+  /// in the generator for a given returned `UnicodeScalar` or an error.
+  ///
+  /// - parameter next: A generator of code units to be decoded. Repeated
+  /// calls to this method on the same instance should always reuse the same
+  /// generator.  Failing to do so will result in undefined behavior.
+  public mutating func decode<
+    G : GeneratorType where G.Element == CodeUnit
+    >(next: inout G) -> UnicodeDecodingResult {
+
+      refillBuffer: if !_atEnd {
+        // Bufferless ASCII fastpath.
+        if _fastPath(_bitsInBuffer == 0) {
+          if let codeUnit = next.next() {
+            if codeUnit & 0x80 == 0 {
+              return .Result(UnicodeScalar(_unchecked: UInt32(codeUnit)))
+            } else { // Non-ASCII, switch to buffering mode.
+              _decodeBuffer = UInt32(codeUnit)
+              _bitsInBuffer = 8
+            }
+          } else {
+            _atEnd = true
+            return .EmptyInput
+          }
+        } else if(_decodeBuffer & 0x80 == 0) {
+          // ASCII in buffer.  We don't refill the buffer so we can return
+          // to bufferless mode once we've exhausted it.
+          break refillBuffer
+        }
+        // Buffering mode.
+        // Fill buffer back to 4 bytes (or as many as left in the generator).
+        _sanityCheck(_bitsInBuffer < 32)
+        repeat {
+          if let codeUnit = next.next() {
+            // We use & 0x1f to make the compiler omit a bounds check branch.
+            _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
+            _bitsInBuffer = _bitsInBuffer &+ 8
+          } else { // Reached end.
+            _atEnd = true
+            if _bitsInBuffer == 0 { return .EmptyInput }
+            break // We still have some bytes left in our buffer.
+          }
+        } while _bitsInBuffer < 32
+      } else if _bitsInBuffer == 0 {
+        return .EmptyInput
+      }
+
+      // Decode one unicode scalar.
+      // Note our empty bytes are always 0x00, which is required for this call.
+      let (result, length) = UTF8._decodeOne(_decodeBuffer)
+
+      // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
+      let bitsConsumed = 8 &* length
+      _sanityCheck(1...4 ~= length && bitsConsumed <= _bitsInBuffer)
+      // Swift doesn't allow shifts greater than or equal to the # of bits.
+      // _decodeBuffer >>= UInt32(bitsConsumed) & 0x1f
+      _decodeBuffer = UInt32(truncatingBitPattern:
+        UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x1f))
+      _bitsInBuffer = _bitsInBuffer &- bitsConsumed
+
+      if _fastPath(result != nil) {
+        return .Result(UnicodeScalar(_unchecked: result!))
+      } else {
+        return .Error // Ill-formed UTF-8 code unit sequence.
+      }
+  }
+
+  /// Attempts to decode a single UTF-8 code unit sequence in `buffer` (LSB
+  /// first).
   ///
   /// - Requires: There is at least one used byte in `buffer`, and the unused
   /// space in `buffer` is filled with some value not matching the UTF-8
   /// continuation byte form (`0b10xxxxxx`).
+  /// - Returns: If the code unit sequence starting at the LSB is valid, returns
+  /// a tuple of the decoded code point and the number of bytes used to encode
+  /// it.  If the code sequence is ill-formed, returns a tuple of `nil` and the
+  /// *maximal subpart of the ill-formed sequence*, i.e. the number of bytes
+  /// that should be skipped (and optionally replaced by a single replacement
+  /// character U+FFFD).
   @warn_unused_result
   public // @testable
-  static func _isValidUTF8(buffer: UInt32) -> Bool {
+  static func _decodeOne(buffer: UInt32) -> (result: UInt32?, length: UInt8) {
+    // In case of a ill-formed sequence we return the length of it's maximal
+    // subpart, as defined in Unicode 8.0.0, Ch 3, D93b. Effectively this is
+    // the number of leading code units that were valid, or 1 in case none
+    // were valid. This indicates the amount of bytes to skip in the input
+    // (and optionally replace by a single replacement character U+FFFD).
 
-    if _fastPath(buffer & 0x80 == 0) {
-      return true // 0x00 -- 0x7f: 1-byte sequences (ASCII).
+    if buffer & 0x80 == 0 { // 1-byte sequence (ASCII), [ XXX XXX XXX CU0 ].
+      let value = buffer & 0xff
+      return (value, 1)
     }
 
-    // Determine sequence length using high 5 bits of 1st byte. We use a
-    // look-up table to branch less. 1-byte sequences are handled above.
+    // Determine sequence length using high 5 bits of 1st byte.  We use a
+    // look-up table to branch less.  1-byte sequences are handled above.
     //
     //  case | pattern | description
     // ----------------------------
@@ -133,256 +213,57 @@ public struct UTF8 : UnicodeCodecType {
     let bit1 = (lut1 >> index) & 1
 
     switch (bit1, bit0) {
-    case (0, 0): // 2-byte sequence.
+    case (0, 0): // 2-byte sequence, [ XXX XXX CU1 CU0 ].
       // Require 10xx xxxx  110x xxxx.
-      if buffer & 0xc0e0 != 0x80c0 { return false }
+      if _slowPath(buffer & 0xc0e0 != 0x80c0) { return (nil, 1) }
       // Disallow xxxx xxxx  xxx0 000x (<= 7 bits case).
-      if buffer & 0x001e == 0x0000 { return false }
-      return true
-    case (0, 1): // 3-byte sequence.
-      // Require 10xx xxxx  10xx xxxx  1110 xxxx.
-      if buffer & 0xc0c0f0 != 0x8080e0 { return false }
+      if _slowPath(buffer & 0x001e == 0x0000) { return (nil, 1) }
+      // Extract data bits.
+      let value = (buffer & 0x3f00) >> 8
+                | (buffer & 0x001f) << 6
+      return (value, 2)
+
+    case (0, 1): // 3-byte sequence, [ XXX CU2 CU1 CU0 ].
       // Disallow xxxx xxxx  xx0x xxxx  xxxx 0000 (<= 11 bits case).
-      if buffer & 0x00200f == 0x000000 { return false }
+      if _slowPath(buffer & 0x00200f == 0x000000) { return (nil, 1) }
       // Disallow xxxx xxxx  xx1x xxxx  xxxx 1101 (surrogate code points).
-      if buffer & 0x00200f == 0x00200d { return false }
-      return true
-    case (1, 0): // 4-byte sequence.
-      // Require 10xx xxxx  10xx xxxx  10xx xxxx  1111 0xxx.
-      if buffer & 0xc0c0c0f8 != 0x808080f0 { return false }
+      if _slowPath(buffer & 0x00200f == 0x00200d) { return (nil, 1) }
+      // Require 10xx xxxx  10xx xxxx  1110 xxxx.
+      if _slowPath(buffer & 0xc0c0f0 != 0x8080e0) {
+        if buffer & 0x00c000 != 0x008000 { return (nil, 1) }
+        return (nil, 2) // Only return this if all checks on CU0 & CU1 passed.
+      }
+      // Extract data bits.
+      let value = (buffer & 0x3f0000) >> 16
+                | (buffer & 0x003f00) >> 2
+                | (buffer & 0x00000f) << 12
+      return (value, 3)
+
+    case (1, 0): // 4-byte sequence, [ CU3 CU2 CU1 CU0 ].
       // Disallow xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx x000 (<= 16 bits case).
-      if buffer & 0x00003007 == 0x00000000 { return false }
+      if _slowPath(buffer & 0x00003007 == 0x00000000) { return (nil, 1) }
       // Case xxxx xxxx  xxxx xxxx  xxxx xxxx  xxxx x1xx.
       if buffer & 0x00000004 == 0x00000004 {
         // Require xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx xx00 (<= 0x10FFFF).
-        if buffer & 0x00003003 != 0x00000000 { return false }
+        if _slowPath(buffer & 0x00003003 != 0x00000000) { return (nil, 1) }
       }
-      return true
-    default: // Invalid sequence.
-      return false
-    }
-  }
-
-  /// Given an ill-formed sequence, find the length of its maximal subpart.
-  @inline(never)
-  @warn_unused_result
-  static func _findMaximalSubpartOfIllFormedUTF8Sequence(
-      buffer: UInt32, validBytes: UInt8) -> UInt8 {
-    var buffer = buffer
-    var validBytes = validBytes
-    // This function is '@inline(never)' because it is used only in the error
-    // handling path.
-
-    // Clear EOF flag, we don't care about it.
-    validBytes &= 0b0000_1111
-
-    _sanityCheck(validBytes != 0,
-        "input buffer should not be empty")
-    _sanityCheck(!UTF8._isValidUTF8(buffer),
-        "input sequence should be ill-formed UTF-8")
-
-    // Unicode 6.3.0, D93b:
-    //
-    //     Maximal subpart of an ill-formed subsequence: The longest code unit
-    //     subsequence starting at an unconvertible offset that is either:
-    //     a. the initial subsequence of a well-formed code unit sequence, or
-    //     b. a subsequence of length one.
-
-    // Perform case analysis.  See Unicode 6.3.0, Table 3-7. Well-Formed UTF-8
-    // Byte Sequences.
-
-    let cu0 = UInt8(buffer & 0xff)
-    buffer >>= 8
-    validBytes >>= 1
-    if (cu0 >= 0xc2 && cu0 <= 0xdf) {
-      // First byte is valid, but we know that this code unit sequence is
-      // invalid, so the maximal subpart has to end after the first byte.
-      return 1
-    }
-
-    if validBytes == 0 {
-      return 1
-    }
-
-    let cu1 = UInt8(buffer & 0xff)
-    buffer >>= 8
-    validBytes >>= 1
-
-    if (cu0 == 0xe0) {
-      return (cu1 >= 0xa0 && cu1 <= 0xbf) ? 2 : 1
-    }
-    if (cu0 >= 0xe1 && cu0 <= 0xec) {
-      return (cu1 >= 0x80 && cu1 <= 0xbf) ? 2 : 1
-    }
-    if (cu0 == 0xed) {
-      return (cu1 >= 0x80 && cu1 <= 0x9f) ? 2 : 1
-    }
-    if (cu0 >= 0xee && cu0 <= 0xef) {
-      return (cu1 >= 0x80 && cu1 <= 0xbf) ? 2 : 1
-    }
-    if (cu0 == 0xf0) {
-      if (cu1 >= 0x90 && cu1 <= 0xbf) {
-        if validBytes == 0 {
-          return 2
-        }
-
-        let cu2 = UInt8(buffer & 0xff)
-        return (cu2 >= 0x80 && cu2 <= 0xbf) ? 3 : 2
+      // Require 10xx xxxx  10xx xxxx  10xx xxxx  1111 0xxx.
+      if _slowPath(buffer & 0xc0c0c0f8 != 0x808080f0) {
+        if buffer & 0x0000c000 != 0x00008000 { return (nil, 1) }
+        // We can return 2/3 here because all other checks on those CUs passed.
+        if buffer & 0x00c00000 != 0x00800000 { return (nil, 2) }
+        return (nil, 3)
       }
-      return 1
+      // Extract data bits.
+      let value = (buffer & 0x3f000000) >> 24
+                | (buffer & 0x003f0000) >> 10
+                | (buffer & 0x00003f00) << 4
+                | (buffer & 0x00000007) << 18
+      return (value, 4)
+
+    default: // Invalid sequence (CU0 invalid).
+      return (nil, 1)
     }
-    if (cu0 >= 0xf1 && cu0 <= 0xf3) {
-      if (cu1 >= 0x80 && cu1 <= 0xbf) {
-        if validBytes == 0 {
-          return 2
-        }
-
-        let cu2 = UInt8(buffer & 0xff)
-        return (cu2 >= 0x80 && cu2 <= 0xbf) ? 3 : 2
-      }
-      return 1
-    }
-    if (cu0 == 0xf4) {
-      if (cu1 >= 0x80 && cu1 <= 0x8f) {
-        if validBytes == 0 {
-          return 2
-        }
-
-        let cu2 = UInt8(buffer & 0xff)
-        return (cu2 >= 0x80 && cu2 <= 0xbf) ? 3 : 2
-      }
-      return 1
-    }
-
-    _sanityCheck((cu0 >= 0x80 && cu0 <= 0xc1) || cu0 >= 0xf5,
-        "case analysis above should have handled all valid first bytes")
-
-    // There are no well-formed sequences that start with these bytes.  Maximal
-    // subpart is defined to have length 1 in these cases.
-    return 1
-  }
-
-  /// Start or continue decoding a UTF sequence.
-  ///
-  /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
-  /// Checking that the generator was exhausted is not sufficient.  The decoder
-  /// can have an internal buffer that is pre-filled with data from the input
-  /// generator.
-  ///
-  /// Because of buffering, it is impossible to find the corresponding position
-  /// in the generator for a given returned `UnicodeScalar` or an error.
-  ///
-  /// - parameter next: A generator of code units to be decoded.
-  public mutating func decode<
-    G : GeneratorType where G.Element == CodeUnit
-  >(next: inout G) -> UnicodeDecodingResult {
-    // If the EOF flag is not set, fill the lookahead buffer from the input
-    // generator.
-    if _lookaheadFlags & 0b1111_0000 == 0 {
-      // Add more bytes into the buffer until we have 4.
-      while _lookaheadFlags != 0b0000_1111 {
-        if let codeUnit = next.next() {
-          _decodeLookahead = (_decodeLookahead << 8) | UInt32(codeUnit)
-          _lookaheadFlags = (_lookaheadFlags << 1) | 1
-        } else {
-          // Set the EOF flag.
-          switch _lookaheadFlags & 0b0000_1111 {
-          case 0b1111:
-            _sanityCheckFailure("should have not entered buffer refill loop")
-          case 0b0111:
-            _lookaheadFlags |= 0b0100_0000
-          case 0b0011:
-            _lookaheadFlags |= 0b0010_0000
-          case 0b0001:
-            _lookaheadFlags |= 0b0001_0000
-          case 0b0000:
-            _lookaheadFlags |= 0b1000_0000
-            return .EmptyInput
-          default:
-            _sanityCheckFailure("bad value in _lookaheadFlags")
-          }
-          break
-        }
-      }
-    }
-
-    if _slowPath(_lookaheadFlags & 0b0000_1111 == 0) {
-      return .EmptyInput
-    }
-
-    if _slowPath(_lookaheadFlags & 0b1111_0000 != 0) {
-      // Reached EOF.  Restore the invariant: first unread byte is always at
-      // MSB.
-      switch _lookaheadFlags & 0b1111_0000 {
-      case 0b1000_0000:
-        break
-      case 0b0100_0000:
-        _decodeLookahead <<= 1 * 8
-      case 0b0010_0000:
-        _decodeLookahead <<= 2 * 8
-      case 0b0001_0000:
-        _decodeLookahead <<= 3 * 8
-      default:
-        _sanityCheckFailure("bad value in _lookaheadFlags")
-      }
-      _lookaheadFlags = (_lookaheadFlags & 0b0000_1111) | 0b1000_0000
-    }
-
-    // The first byte to read is located at MSB of `_decodeLookahead`.  Get a
-    // representation of the buffer where we can read bytes starting from LSB.
-    var buffer = _decodeLookahead.byteSwapped
-    if _slowPath(!UTF8._isValidUTF8(buffer)) {
-      // The code unit sequence is ill-formed.  According to Unicode
-      // recommendation, replace the maximal subpart of ill-formed sequence
-      // with one replacement character.
-      _lookaheadFlags >>=
-          UTF8._findMaximalSubpartOfIllFormedUTF8Sequence(buffer,
-              validBytes: _lookaheadFlags)
-      return .Error
-    }
-
-    // At this point we know that `buffer` starts with a well-formed code unit
-    // sequence.  Decode it.
-    //
-    // When consuming bytes from the `buffer`, we just need to update
-    // `_lookaheadFlags`.  The stored buffer in `_decodeLookahead` will be
-    // shifted at the beginning of the next decoding cycle.
-    let cu0 = UInt8(buffer & 0xff)
-    buffer >>= 8
-    _lookaheadFlags >>= 1
-
-    if cu0 < 0x80 {
-      // 1-byte sequences.
-      return .Result(UnicodeScalar(UInt32(cu0)))
-    }
-
-    // Start with octet 1 (we'll mask off high bits later).
-    var result = UInt32(cu0)
-
-    let cu1 = UInt8(buffer & 0xff)
-    buffer >>= 8
-    _lookaheadFlags >>= 1
-    result = (result << 6) | UInt32(cu1 & 0x3f)
-    if cu0 < 0xe0 {
-      // 2-byte sequences.
-      return .Result(UnicodeScalar(result & 0x000007ff)) // 11 bits
-    }
-
-    let cu2 = UInt8(buffer & 0xff)
-    buffer >>= 8
-    _lookaheadFlags >>= 1
-    result = (result << 6) | UInt32(cu2 & 0x3f)
-    if cu0 < 0xf0 {
-      // 3-byte sequences.
-      return .Result(UnicodeScalar(result & 0x0000ffff)) // 16 bits
-    }
-
-    // 4-byte sequences.
-    let cu3 = UInt8(buffer & 0xff)
-    _lookaheadFlags >>= 1
-    result = (result << 6) | UInt32(cu3 & 0x3f)
-    return .Result(UnicodeScalar(result & 0x001fffff)) // 21 bits
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
@@ -426,8 +307,6 @@ public struct UTF8 : UnicodeCodecType {
   public static func isContinuation(byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
-
-  var _value =  UInt8()
 }
 
 /// A codec for [UTF-16](http://www.unicode.org/glossary/#UTF_16).
@@ -897,3 +776,16 @@ extension UTF16 {
   }
 }
 
+// Unchecked init to avoid precondition branches in hot code paths were we
+// already know the value is a valid unicode scalar.
+extension UnicodeScalar {
+  /// Create an instance with numeric value `value`, bypassing the regular
+  /// precondition checks for code point validity.
+  init(_unchecked value: UInt32) {
+    _sanityCheck(value < 0xD800 || value > 0xDFFF,
+      "high- and low-surrogate code points are not valid Unicode scalar values")
+    _sanityCheck(value <= 0x10FFFF, "value is outside of Unicode codespace")
+
+    self._value = value
+  }
+}
