@@ -410,22 +410,32 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
     } else {
       SourceLoc StartLoc = Tok.getLoc();
-      ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
-      BraceItemsStatus |= ExprOrStmtStatus;
-      if (ExprOrStmtStatus.isError())
-        NeedParseErrorRecovery = true;
-      diagnoseDiscardedClosure(*this, Result);
-      if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
-        // If this is a normal library, you can't have expressions or statements
-        // outside at the top level.
-        diagnose(StartLoc,
-                 Result.is<Stmt*>() ? diag::illegal_top_level_stmt
-                                    : diag::illegal_top_level_expr);
-        Result = ASTNode();
-      }
+      if (Tok.is(tok::kw_init)) {
+        if (auto CD = dyn_cast<ConstructorDecl>(CurDeclContext)) {
+          // Hint at missing 'self.' or 'super.' then skip this statement.
+          bool isConvenient = CD->isConvenienceInit();
+          diagnose(StartLoc, diag::invalid_nested_init, isConvenient)
+            .fixItInsert(StartLoc, isConvenient ? "self." : "super.");
+          NeedParseErrorRecovery = true;
+        }
+      } else {
+        ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
+        BraceItemsStatus |= ExprOrStmtStatus;
+        if (ExprOrStmtStatus.isError())
+          NeedParseErrorRecovery = true;
+        diagnoseDiscardedClosure(*this, Result);
+        if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
+          // If this is a normal library, you can't have expressions or
+          // statements outside at the top level.
+          diagnose(StartLoc,
+                   Result.is<Stmt*>() ? diag::illegal_top_level_stmt
+                                      : diag::illegal_top_level_expr);
+          Result = ASTNode();
+        }
 
-      if (!Result.isNull())
-        Entries.push_back(Result);
+        if (!Result.isNull())
+          Entries.push_back(Result);
+      }
     }
 
     if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
