@@ -204,6 +204,9 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
   /// element exists.
   public mutating func next() -> Element? {
     if stride > 0 ? current >= end : current <= end {
+      // This check is needed because if we just changed the above operators
+      // to > and <, respectively, we might advance current past the end
+      // and throw it out of bounds (e.g. above Int.max) unnecessarily.
       if current == end && !done {
         done = true
         return current
