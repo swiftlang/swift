@@ -953,7 +953,9 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       }
       auto NM = Arg->getAnyNominal();
       assert(NM && "Cannot get nominal type.");
-      Printer << NM->getNameStr();
+      Printer.printParameterPre(PrintParameterKind::GenericParameter, NM);
+      Printer << NM->getNameStr(); // FIXME: PrintNameContext::GenericParameter
+      Printer.printParameterPost(PrintParameterKind::GenericParameter, NM);
     }
   } else {
     for (auto GP : Params->getParams()) {
@@ -962,8 +964,10 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       } else {
         Printer << ", ";
       }
-      Printer.printName(GP->getName());
+      Printer.printParameterPre(PrintParameterKind::GenericParameter, GP);
+      Printer.printName(GP->getName(), PrintNameContext::GenericParameter);
       printInherited(GP);
+      Printer.printParameterPost(PrintParameterKind::GenericParameter, GP);
     }
     printWhereClause(Params->getRequirements());
   }
@@ -1762,10 +1766,9 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 }
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
-  recordDeclLoc(decl,
-    [&]{
-      Printer.printName(decl->getName());
-    });
+  recordDeclLoc(decl, [&] {
+    Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
+  });
 
   printInherited(decl, decl->getInherited(), { });
 }
@@ -1948,8 +1951,10 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
-  Printer.printParameterPre(PrintParameterKind::FunctionParameter);
-  defer { Printer.printParameterPost(PrintParameterKind::FunctionParameter); };
+  Printer.printParameterPre(PrintParameterKind::FunctionParameter, param);
+  defer {
+    Printer.printParameterPost(PrintParameterKind::FunctionParameter, param);
+  };
 
   auto printArgName = [&]() {
     // Print argument name.

@@ -69,23 +69,12 @@ static StringRef ExternalParamNameTag = "decl.var.parameter.argument_label";
 static StringRef LocalParamNameTag = "decl.var.parameter.name";
 static StringRef SyntaxKeywordTag = "syntaxtype.keyword";
 
-static StringRef getTagForPrintNameContext(PrintNameContext context) {
-  switch (context) {
-  case PrintNameContext::FunctionParameterExternal:
-    return ExternalParamNameTag;
-  case PrintNameContext::FunctionParameterLocal:
-    return LocalParamNameTag;
-  case PrintNameContext::Keyword:
-    return SyntaxKeywordTag;
-  default:
-    return "";
-  }
-}
-
 static StringRef getTagForParameter(PrintParameterKind context) {
   switch (context) {
   case PrintParameterKind::FunctionParameter:
     return "decl.var.parameter";
+  case PrintParameterKind::GenericParameter:
+    return "decl.generic_type_param";
   }
   llvm_unreachable("unexpected parameter kind");
 }
@@ -196,11 +185,18 @@ private:
       closeTag(tag);
   }
 
-  void printParameterPre(PrintParameterKind kind) override {
+  void printParameterPre(PrintParameterKind kind, const Decl *D) override {
     contextStack.emplace_back(PrintContext(kind));
-    openTag(getTagForParameter(kind));
+    auto tag = getTagForParameter(kind);
+
+    if (D && kind == PrintParameterKind::GenericParameter) {
+      assert(isa<ValueDecl>(D) && "unexpected non-value decl for param");
+      openTagWithUSRForDecl(tag, cast<ValueDecl>(D));
+    } else {
+      openTag(tag);
+    }
   }
-  void printParameterPost(PrintParameterKind kind) override {
+  void printParameterPost(PrintParameterKind kind, const Decl *D) override {
     assert(contextStack.back().is(kind) && "unmatched printParameterPre");
     contextStack.pop_back();
     closeTag(getTagForParameter(kind));
@@ -219,10 +215,10 @@ private:
 
   void printTypeRef(const TypeDecl *TD, Identifier name) override {
     auto tag = getTagForDecl(TD, /*isRef=*/true);
-    OS << "<" << tag << " usr=\"";
-    SwiftLangSupport::printUSR(TD, OS);
-    OS << "\">";
+    openTagWithUSRForDecl(tag, TD);
+    insideRef = true;
     XMLEscapingPrinter::printTypeRef(TD, name);
+    insideRef = false;
     closeTag(tag);
   }
 
@@ -231,6 +227,12 @@ private:
   void openTag(StringRef tag) { OS << "<" << tag << ">"; }
   void closeTag(StringRef tag) { OS << "</" << tag << ">"; }
 
+  void openTagWithUSRForDecl(StringRef tag, const ValueDecl *VD) {
+    OS << "<" << tag << " usr=\"";
+    SwiftLangSupport::printUSR(VD, OS);
+    OS << "\">";
+  }
+
   // MARK: Misc.
 
   StringRef getTypeTagForCurrentContext() const {
@@ -238,14 +240,20 @@ private:
       return "";
 
     static StringRef parameterTypeTag = "decl.var.parameter.type";
+    static StringRef genericParamTypeTag = "decl.generic_type_param.type";
 
     auto context = contextStack.back();
     if (context.is(PrintParameterKind::FunctionParameter))
       return parameterTypeTag;
+    if (context.is(PrintParameterKind::GenericParameter))
+      return genericParamTypeTag;
+
     assert(context.getDecl() && "unexpected context kind");
     switch (context.getDecl()->getKind()) {
     case DeclKind::Param:
       return parameterTypeTag;
+    case DeclKind::GenericTypeParam:
+      return genericParamTypeTag;
     case DeclKind::Var:
       return "decl.var.type";
     case DeclKind::Subscript:
@@ -256,10 +264,29 @@ private:
     }
   }
 
+  StringRef getTagForPrintNameContext(PrintNameContext context) {
+    if (insideRef)
+      return "";
+
+    switch (context) {
+    case PrintNameContext::FunctionParameterExternal:
+      return ExternalParamNameTag;
+    case PrintNameContext::FunctionParameterLocal:
+      return LocalParamNameTag;
+    case PrintNameContext::Keyword:
+      return SyntaxKeywordTag;
+    case PrintNameContext::GenericParameter:
+      return "decl.name"; // FIXME: should this be more specific?
+    default:
+      return "";
+    }
+  }
+
 private:
   /// A stack of contexts being printed, used to determine the context for
   /// subsequent ASTPrinter callbacks.
   llvm::SmallVector<PrintContext, 3> contextStack;
+  bool insideRef = false;
 };
 } // end anonymous namespace
 

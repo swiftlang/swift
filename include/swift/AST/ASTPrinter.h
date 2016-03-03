@@ -51,6 +51,7 @@ enum class PrintNameContext {
 ///   func foo(<FunctionParameter>x: Int = 2</FunctionParameter>, ...)
 /// \endcode
 enum class PrintParameterKind {
+  GenericParameter,
   FunctionParameter,
 };
 
@@ -118,9 +119,11 @@ public:
                                              const NominalTypeDecl *NTD) {}
 
   /// Called before printing a parameter-like entity.
-  virtual void printParameterPre(PrintParameterKind Kind) {}
+  virtual void printParameterPre(PrintParameterKind Kind,
+                                 const Decl *D = nullptr) {}
   /// Called after printing a parameter-like entity.
-  virtual void printParameterPost(PrintParameterKind Kind) {}
+  virtual void printParameterPost(PrintParameterKind Kind,
+                                  const Decl *D = nullptr) {}
 
   /// Called before printing a name in the given context.
   virtual void printNamePre(PrintNameContext Context) {}
