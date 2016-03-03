@@ -420,47 +420,47 @@ protocol ProtocolA {}
 protocol ProtocolB {}
 
 Runtime.test("Generic class ObjC runtime names") {
-  expectEqual("_TtGGC1a12GenericClassx_Si_",
+  expectEqual("_TtGC1a12GenericClassSi_",
               NSStringFromClass(GenericClass<Int>.self))
-  expectEqual("_TtGGC1a12GenericClassx_VS_11PlainStruct_",
+  expectEqual("_TtGC1a12GenericClassVS_11PlainStruct_",
               NSStringFromClass(GenericClass<PlainStruct>.self))
-  expectEqual("_TtGGC1a12GenericClassx_OS_9PlainEnum_",
+  expectEqual("_TtGC1a12GenericClassOS_9PlainEnum_",
               NSStringFromClass(GenericClass<PlainEnum>.self))
-  expectEqual("_TtGGC1a12GenericClassx_TVS_11PlainStructOS_9PlainEnumS1___",
+  expectEqual("_TtGC1a12GenericClassTVS_11PlainStructOS_9PlainEnumS1___",
               NSStringFromClass(GenericClass<(PlainStruct, PlainEnum, PlainStruct)>.self))
-  expectEqual("_TtGGC1a12GenericClassx_MVS_11PlainStruct_",
+  expectEqual("_TtGC1a12GenericClassMVS_11PlainStruct_",
               NSStringFromClass(GenericClass<PlainStruct.Type>.self))
-  expectEqual("_TtGGC1a12GenericClassx_FMVS_11PlainStructS1__",
+  expectEqual("_TtGC1a12GenericClassFMVS_11PlainStructS1__",
               NSStringFromClass(GenericClass<PlainStruct.Type -> PlainStruct>.self))
 
-  expectEqual("_TtGGC1a12GenericClassx_FzMVS_11PlainStructS1__",
+  expectEqual("_TtGC1a12GenericClassFzMVS_11PlainStructS1__",
               NSStringFromClass(GenericClass<PlainStruct.Type throws -> PlainStruct>.self))
-  expectEqual("_TtGGC1a12GenericClassx_FTVS_11PlainStructROS_9PlainEnum_Si_",
+  expectEqual("_TtGC1a12GenericClassFTVS_11PlainStructROS_9PlainEnum_Si_",
               NSStringFromClass(GenericClass<(PlainStruct, inout PlainEnum) -> Int>.self))
 
-  expectEqual("_TtGGC1a12GenericClassx_PS_9ProtocolA__",
+  expectEqual("_TtGC1a12GenericClassPS_9ProtocolA__",
               NSStringFromClass(GenericClass<ProtocolA>.self))
-  expectEqual("_TtGGC1a12GenericClassx_PS_9ProtocolAS_9ProtocolB__",
+  expectEqual("_TtGC1a12GenericClassPS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<protocol<ProtocolA, ProtocolB>>.self))
-  expectEqual("_TtGGC1a12GenericClassx_PMPS_9ProtocolAS_9ProtocolB__",
+  expectEqual("_TtGC1a12GenericClassPMPS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<protocol<ProtocolA, ProtocolB>.Type>.self))
-  expectEqual("_TtGGC1a12GenericClassx_MPS_9ProtocolAS_9ProtocolB__",
+  expectEqual("_TtGC1a12GenericClassMPS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<protocol<ProtocolB, ProtocolA>.Protocol>.self))
 
-  expectEqual("_TtGGC1a12GenericClassx_CSo7CFArray_",
+  expectEqual("_TtGC1a12GenericClassCSo7CFArray_",
               NSStringFromClass(GenericClass<CFArray>.self))
-  expectEqual("_TtGGC1a12GenericClassx_VSC9NSDecimal_",
+  expectEqual("_TtGC1a12GenericClassVSC9NSDecimal_",
               NSStringFromClass(GenericClass<NSDecimal>.self))
-  expectEqual("_TtGGC1a12GenericClassx_CSo8NSObject_",
+  expectEqual("_TtGC1a12GenericClassCSo8NSObject_",
               NSStringFromClass(GenericClass<NSObject>.self))
-  expectEqual("_TtGGC1a12GenericClassx_CSo8NSObject_",
+  expectEqual("_TtGC1a12GenericClassCSo8NSObject_",
               NSStringFromClass(GenericClass<NSObject>.self))
-  expectEqual("_TtGGC1a12GenericClassx_PSo9NSCopying__",
+  expectEqual("_TtGC1a12GenericClassPSo9NSCopying__",
               NSStringFromClass(GenericClass<NSCopying>.self))
-  expectEqual("_TtGGC1a12GenericClassx_PSo9NSCopyingS_9ProtocolAS_9ProtocolB__",
+  expectEqual("_TtGC1a12GenericClassPSo9NSCopyingS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<protocol<ProtocolB, NSCopying, ProtocolA>>.self))
 
-  expectEqual("_TtGGC1a17MultiGenericClassxq__GGVS_13GenericStructx_Si_GGOS_11GenericEnumx_GGS2_x_Si___",
+  expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
                                                   GenericEnum<GenericEnum<Int>>>.self))
 }

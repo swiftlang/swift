@@ -9,8 +9,6 @@
 // CHECK-NEXT:     TU: SNFoo
 // CHECK-NEXT:   Blue:
 // CHECK-NEXT:     SNColorChoice: SNColorBlue
-// CHECK-NEXT:   DefaultXValue:
-// CHECK-NEXT:     TU: DefaultXValue
 // CHECK-NEXT:   Green:
 // CHECK-NEXT:     SNColorChoice: SNColorGreen
 // CHECK-NEXT:   MyInt:
@@ -19,26 +17,24 @@
 // CHECK-NEXT:     TU: SNPoint
 // CHECK-NEXT:   Rouge:
 // CHECK-NEXT:     SNColorChoice: SNColorRed
-// CHECK-NEXT:   SNAdding:
-// CHECK-NEXT:     TU: SNAdding
 // CHECK-NEXT:   SNColorChoice:
 // CHECK-NEXT:     TU: SNColorChoice, SNColorChoice
-// CHECK-NEXT:   SNCreate:
-// CHECK-NEXT:     TU: SNCreate
-// CHECK-NEXT:   SNSomeStructGetDefault:
-// CHECK-NEXT:     TU: SNSomeStructGetDefault
-// CHECK-NEXT:   SNSomeStructGetFoo:
-// CHECK-NEXT:     TU: SNSomeStructGetFoo
-// CHECK-NEXT:   SNSomeStructSetDefault:
-// CHECK-NEXT:     TU: SNSomeStructSetDefault
-// CHECK-NEXT:   SNSomeStructSetFoo:
-// CHECK-NEXT:     TU: SNSomeStructSetFoo
 // CHECK-NEXT:   SomeStruct:
 // CHECK-NEXT:     TU: SNSomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace:
 // CHECK-NEXT:     TU: SNTransposeInPlace
 // CHECK-NEXT:   __swift:
 // CHECK-NEXT:     TU: __swift
+// CHECK-NEXT:   adding:
+// CHECK-NEXT:     SNSomeStruct: SNAdding
+// CHECK-NEXT:   defaultValue:
+// CHECK-NEXT:     SNSomeStruct: SNSomeStructGetDefault, SNSomeStructSetDefault
+// CHECK-NEXT:   defaultX:
+// CHECK-NEXT:     SNSomeStruct: DefaultXValue
+// CHECK-NEXT:   foo:
+// CHECK-NEXT:     SNSomeStruct: SNSomeStructGetFoo, SNSomeStructSetFoo
+// CHECK-NEXT:   init:
+// CHECK-NEXT:     SNSomeStruct: SNCreate
 // CHECK-NEXT:   makeSomeStruct:
 // CHECK-NEXT:     TU: SNMakeSomeStruct, SNMakeSomeStructForX
 // CHECK-NEXT:   x:

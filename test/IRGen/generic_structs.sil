@@ -8,11 +8,11 @@ import Builtin
 //    of the metadata pattern, and no independent vwtable symbol
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [37 x i8] c"GV15generic_structs13SingleDynamicx_\00"
+// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"V15generic_structs13SingleDynamic\00"
 // CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private constant [3 x i8] c"x\00\00"
 // CHECK: @_TMnV15generic_structs13SingleDynamic = {{(protected )?}}constant <{ {{.*}} i32 }> <{
 // --       name
-// CHECK:   [37 x i8]* [[SINGLEDYNAMIC_NAME]]
+// CHECK:   [34 x i8]* [[SINGLEDYNAMIC_NAME]]
 // --       field count
 // CHECK:   i32 1,
 // --       field offset vector offset
@@ -49,11 +49,11 @@ import Builtin
 
 // -- Nominal type descriptor for generic struct with protocol requirements
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [49 x i8] c"GV15generic_structs23DynamicWithRequirementsxq__\00"
+// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"V15generic_structs23DynamicWithRequirements\00"
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
 // CHECK: @_TMnV15generic_structs23DynamicWithRequirements = {{(protected )?}}constant <{ {{.*}} i32 }> <{
 // --       name
-// CHECK-SAME: [49 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
+// CHECK-SAME: [44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
 // --       field count
 // CHECK-SAME: i32 2,
 // --       field offset vector offset
