@@ -69,6 +69,16 @@ struct Y1 {
   }
 }
 
+// Mutating getters on constants (https://bugs.swift.org/browse/SR-845)
+struct Y2 {
+  subscript(_: Int) -> Int {
+    mutating get { return 0 }
+  }
+}
+
+let y2 = Y2() // expected-note{{change 'let' to 'var' to make it mutable}}{{1-4=var}}
+_ = y2[0] // expected-error{{cannot use mutating getter on immutable value: 'y2' is a 'let' constant}}
+
 // Parsing errors
 // FIXME: Recovery here is horrible
 struct A0 { // expected-note{{in declaration of 'A0'}}
@@ -163,4 +173,3 @@ struct A8 { // expected-note{{in declaration of 'A8'}}
     }
   }
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}
-
