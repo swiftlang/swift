@@ -639,7 +639,7 @@ struct VisitNodeResult {
     _decls.clear();
     _types.clear();
     _tuple_type_element = swift::TupleTypeElt();
-    _error = "";
+    _error.clear();
   }
 
   bool
@@ -2484,7 +2484,17 @@ VisitNodeTypeList (SwiftASTContext *ast,
       }
       else
       {
+        // If we run into any errors parsing getting any types for a type list
+        // we need to bail out and return an error. We have cases where a private
+        // typealias was used in a mangled variable name. The private typealias
+        // are not included in the modules that are available to the debugger.
+        // This was contained inside of a bound generic structure type that was
+        // expecting two types. If we don't bail out, we end up filling in just
+        // one type in "result" instead of two and then the compiler will crash
+        // later when it tries to create the bound generic from only 1 type.
+        result.Clear();
         result._error = type_result._error;
+        break;
       }
     }
   }
