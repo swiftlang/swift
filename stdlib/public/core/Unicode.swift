@@ -86,11 +86,11 @@ public struct UTF8 : UnicodeCodecType {
   /// consume a certain byte before looking at it.
   var _decodeBuffer: UInt32 = 0
 
-  /// The amount of bits in `_decodeBuffer` that are current filled.
+  /// The number of bits in `_decodeBuffer` that are current filled.
   var _bitsInBuffer: UInt8 = 0
 
-  /// Whether we have exhausted the end of the generator.  Note that this
-  /// doesn't mean we are done decoding, as the buffer might have bytes left.
+  /// Whether we have exhausted the generator.  Note that this doesn't mean
+  /// we are done decoding, as there might still be bytes left in the buffer.
   var _atEnd: Bool = false
 
   /// Start or continue decoding a UTF-8 sequence.
@@ -104,7 +104,7 @@ public struct UTF8 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A generator of code units to be decoded. Repeated
+  /// - parameter next: A generator of code units to be decoded.  Repeated
   /// calls to this method on the same instance should always reuse the same
   /// generator.  Failing to do so will result in undefined behavior.
   public mutating func decode<
@@ -121,7 +121,7 @@ public struct UTF8 : UnicodeCodecType {
               _decodeBuffer = UInt32(codeUnit)
               _bitsInBuffer = 8
             }
-          } else {
+          } else { // Exhausted generator.
             _atEnd = true
             return .EmptyInput
           }
@@ -131,14 +131,14 @@ public struct UTF8 : UnicodeCodecType {
           break refillBuffer
         }
         // Buffering mode.
-        // Fill buffer back to 4 bytes (or as many as left in the generator).
+        // Fill buffer back to 4 bytes (or as many as are left in the generator).
         _sanityCheck(_bitsInBuffer < 32)
         repeat {
           if let codeUnit = next.next() {
             // We use & 0x1f to make the compiler omit a bounds check branch.
             _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
             _bitsInBuffer = _bitsInBuffer &+ 8
-          } else { // Reached end.
+          } else { // Exhausted generator.
             _atEnd = true
             if _bitsInBuffer == 0 { return .EmptyInput }
             break // We still have some bytes left in our buffer.
@@ -155,8 +155,8 @@ public struct UTF8 : UnicodeCodecType {
       // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
       let bitsConsumed = 8 &* length
       _sanityCheck(1...4 ~= length && bitsConsumed <= _bitsInBuffer)
-      // Swift doesn't allow shifts greater than or equal to the # of bits.
-      // _decodeBuffer >>= UInt32(bitsConsumed) & 0x1f
+      // Swift doesn't allow shifts greater than or equal to the type width.
+      // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
       _decodeBuffer = UInt32(truncatingBitPattern:
         UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x1f))
       _bitsInBuffer = _bitsInBuffer &- bitsConsumed
@@ -177,7 +177,7 @@ public struct UTF8 : UnicodeCodecType {
   ///   - length: The length of the code unit sequence in bytes if it is
   ///   well-formed; otherwise the *maximal subpart of the ill-formed
   ///   sequence* (Unicode 8.0.0, Ch 3.9, D93b), i.e. the number of leading
-  ///   code units that were valid or 1 in case none were valid. Unicode
+  ///   code units that were valid or 1 in case none were valid.  Unicode
   ///   recommends to skip these bytes bytes and replace them by a single
   ///   replacement character (U+FFFD).
   ///
@@ -230,7 +230,7 @@ public struct UTF8 : UnicodeCodecType {
       // Require 10xx xxxx  10xx xxxx  1110 xxxx.
       if _slowPath(buffer & 0xc0c0f0 != 0x8080e0) {
         if buffer & 0x00c000 != 0x008000 { return (nil, 1) }
-        return (nil, 2) // Only return this if all checks on CU0 & CU1 passed.
+        return (nil, 2) // All checks on CU0 & CU1 passed.
       }
       // Extract data bits.
       let value = (buffer & 0x3f0000) >> 16
@@ -241,7 +241,7 @@ public struct UTF8 : UnicodeCodecType {
     case (1, 0): // 4-byte sequence, [ CU3 CU2 CU1 CU0 ].
       // Disallow xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx x000 (<= 16 bits case).
       if _slowPath(buffer & 0x00003007 == 0x00000000) { return (nil, 1) }
-      // Case xxxx xxxx  xxxx xxxx  xxxx xxxx  xxxx x1xx.
+      // If xxxx xxxx  xxxx xxxx  xxxx xxxx  xxxx x1xx.
       if buffer & 0x00000004 == 0x00000004 {
         // Require xxxx xxxx  xxxx xxxx  xx00 xxxx  xxxx xx00 (<= 0x10FFFF).
         if _slowPath(buffer & 0x00003003 != 0x00000000) { return (nil, 1) }
@@ -249,7 +249,7 @@ public struct UTF8 : UnicodeCodecType {
       // Require 10xx xxxx  10xx xxxx  10xx xxxx  1111 0xxx.
       if _slowPath(buffer & 0xc0c0c0f8 != 0x808080f0) {
         if buffer & 0x0000c000 != 0x00008000 { return (nil, 1) }
-        // We can return 2/3 here because all other checks on those CUs passed.
+        // All other checks on CU0, CU1 & CU2 passed.
         if buffer & 0x00c00000 != 0x00800000 { return (nil, 2) }
         return (nil, 3)
       }
