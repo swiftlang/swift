@@ -939,7 +939,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
-    LSLocation::reduce(L, Mod, Alives, TE);
+    LSLocation::reduce(L, Mod, Alives);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (Alives.size() > MaxPartialDeadStoreCountLimit)

@@ -21,10 +21,11 @@ using namespace swift;
 //                              Utility Functions
 //===----------------------------------------------------------------------===//
 
-static inline void removeLSLocations(LSLocationValueMap &Values,
-                                     LSLocationList &FirstLevel) {
-  for (auto &X : FirstLevel)
+static void
+removeLSLocations(LSLocationValueMap &Values, LSLocationList &NextLevel) {
+  for (auto &X : NextLevel) {
     Values.erase(X);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -36,10 +37,11 @@ void SILValueProjection::print(SILModule *Mod) {
   Path.getValue().print(llvm::outs(), *Mod);
 }
 
-SILValue SILValueProjection::createExtract(SILValue Base,
-                                           const Optional<ProjectionPath> &Path,
-                                           SILInstruction *Inst,
-                                           bool IsValExt) {
+SILValue
+SILValueProjection::createExtract(SILValue Base,
+                                  const Optional<ProjectionPath> &Path,
+                                  SILInstruction *Inst,
+                                  bool IsValExt) {
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (!Path || Path->empty())
@@ -70,144 +72,115 @@ SILValue SILValueProjection::createExtract(SILValue Base,
   return LastExtract;
 }
 
-//===----------------------------------------------------------------------===//
-//                              Load Store Value
-//===----------------------------------------------------------------------===//
-
-void LSValue::expand(SILValue Base, SILModule *M, LSValueList &Vals,
-                     TypeExpansionAnalysis *TE) {
-  // To expand a LSValue to its indivisible parts, we first get the
-  // address projection paths from the accessed type to each indivisible field,
-  // i.e. leaf nodes, then we append these projection paths to the Base.
-  for (const auto &P : TE->getTypeExpansion((*Base).getType(), M, TEKind::TELeaf)) {
+void
+LSValue::expand(SILValue Base, SILModule *M, LSValueList &Vals,
+                TypeExpansionAnalysis *TE) {
+  for (const auto &P : TE->getTypeExpansion((*Base).getType(), M)) {
     Vals.push_back(LSValue(Base, P.getValue()));
   }
 }
 
-SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
-                         LSLocationValueMap &Values,
-                         SILInstruction *InsertPt,
-                         TypeExpansionAnalysis *TE) {
-  // Walk bottom up the projection tree, try to reason about how to construct
-  // a single SILValue out of all the available values for all the memory
-  // locations.
+void
+LSValue::reduceInner(LSLocation &Base, SILModule *M, LSLocationValueMap &Values,
+                     SILInstruction *InsertPt) {
+  // If this is a class reference type, we have reached end of the type tree.
+  if (Base.getType(M).getClassOrBoundGenericClass())
+    return;
+
+  // This is a leaf node, we must have a value for it.
+  LSLocationList NextLevel;
+  Base.getNextLevelLSLocations(NextLevel, M);
+  if (NextLevel.empty())
+    return;
+
+  // This is not a leaf node, reduce the next level node one by one.
+  for (auto &X : NextLevel) {
+    LSValue::reduceInner(X, M, Values, InsertPt);
+  }
+
+  // This is NOT a leaf node, we need to construct a value for it.
+  auto Iter = NextLevel.begin();
+  LSValue &FirstVal = Values[*Iter];
+
+  // There is only 1 children node and its value's projection path is not
+  // empty, keep stripping it.
+  if (NextLevel.size() == 1 && !FirstVal.hasEmptyProjectionPath()) {
+    Values[Base] = FirstVal.stripLastLevelProjection();
+    // We have a value for the parent, remove all the values for children.
+    removeLSLocations(Values, NextLevel);
+    return;
+  }
+
+  bool HasIdenticalBase = true;
+  SILValue FirstBase = FirstVal.getBase();
+  for (auto &X : NextLevel) {
+    HasIdenticalBase &= (FirstBase == Values[X].getBase());
+  }
+
+  // This is NOT a leaf node and it has multiple children, but they have the
+  // same value base.
+  if (NextLevel.size() > 1 && HasIdenticalBase) {
+    if (!FirstVal.hasEmptyProjectionPath()) {
+      Values[Base] = FirstVal.stripLastLevelProjection();
+      // We have a value for the parent, remove all the values for children.
+      removeLSLocations(Values, NextLevel);
+      return;
+    }
+  }
+
+  // In 3 cases do we need aggregation.
   //
-  // First, get a list of all the leaf nodes and intermediate nodes for the
-  // Base memory location.
-  LSLocationList ALocs;
-  const ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeExpansion(Base.getType(M), M, TEKind::TENode)) {
-    ALocs.push_back(LSLocation(Base.getBase(), BasePath, P.getValue()));
+  // 1. If there is only 1 child and we cannot strip off any projections,
+  //    that means we need to create an aggregation.
+  // 
+  // 2. There are multiple children and they have the same base, but empty
+  //    projection paths.
+  //
+  // 3. Children have values from different bases, We need to create
+  //    extractions and aggregation in this case.
+  //
+  llvm::SmallVector<SILValue, 8> Vals;
+  for (auto &X : NextLevel) {
+    Vals.push_back(Values[X].materialize(InsertPt));
   }
+  SILBuilder Builder(InsertPt);
+  Builder.setCurrentDebugScope(InsertPt->getFunction()->getDebugScope());
+  
+  // We use an auto-generated SILLocation for now.
+  NullablePtr<swift::SILInstruction> AI =
+      Projection::createAggFromFirstLevelProjections(
+          Builder, RegularLocation::getAutoGeneratedLocation(),
+          Base.getType(M).getObjectType(),
+          Vals);
 
-  // Second, go from leaf nodes to their parents. This guarantees that at the
-  // point the parent is processed, its children have been processed already.
-  for (auto I = ALocs.rbegin(), E = ALocs.rend(); I != E; ++I) {
-    // This is a leaf node, we have a value for it.
-    //
-    // Reached the end of the projection tree, this is a leaf node.
-    LSLocationList FirstLevel;
-    I->getFirstLevelLSLocations(FirstLevel, M);
-    if (FirstLevel.empty())
-      continue;
+  // This is the Value for the current base.
+  ProjectionPath P(Base.getType(M));
+  Values[Base] = LSValue(SILValue(AI.get()), P);
+  removeLSLocations(Values, NextLevel);
+}
 
-    // If this is a class reference type, we have reached end of the type tree.
-    if (I->getType(M).getClassOrBoundGenericClass())
-      continue;
-
-    // This is NOT a leaf node, we need to construct a value for it.
-
-    // There is only 1 children node and its value's projection path is not
-    // empty, keep stripping it.
-    auto Iter = FirstLevel.begin();
-    LSValue &FirstVal = Values[*Iter];
-    if (FirstLevel.size() == 1 && !FirstVal.hasEmptyProjectionPath()) {
-      Values[*I] = FirstVal.stripLastLevelProjection();
-      // We have a value for the parent, remove all the values for children.
-      removeLSLocations(Values, FirstLevel);
-      continue;
-    }
-    
-    // If there are more than 1 children and all the children nodes have
-    // LSValues with the same base and non-empty projection path. we can get
-    // away by not extracting value for every single field.
-    //
-    // Simply create a new node with all the aggregated base value, i.e.
-    // stripping off the last level projection.
-    bool HasIdenticalValueBase = true;
-    SILValue FirstBase = FirstVal.getBase();
-    Iter = std::next(Iter);
-    for (auto EndIter = FirstLevel.end(); Iter != EndIter; ++Iter) {
-      LSValue &V = Values[*Iter];
-      HasIdenticalValueBase &= (FirstBase == V.getBase());
-    }
-
-    if (FirstLevel.size() > 1 && HasIdenticalValueBase && 
-        !FirstVal.hasEmptyProjectionPath()) {
-      Values[*I] = FirstVal.stripLastLevelProjection();
-      // We have a value for the parent, remove all the values for children.
-      removeLSLocations(Values, FirstLevel);
-      continue;
-    }
-
-    // In 3 cases do we need aggregation.
-    //
-    // 1. If there is only 1 child and we cannot strip off any projections,
-    // that means we need to create an aggregation.
-    // 
-    // 2. There are multiple children and they have the same base, but empty
-    // projection paths.
-    //
-    // 3. Children have values from different bases, We need to create
-    // extractions and aggregation in this case.
-    //
-    llvm::SmallVector<SILValue, 8> Vals;
-    for (auto &X : FirstLevel) {
-      Vals.push_back(Values[X].materialize(InsertPt));
-    }
-    SILBuilder Builder(InsertPt);
-    Builder.setCurrentDebugScope(InsertPt->getFunction()->getDebugScope());
-    
-    // We use an auto-generated SILLocation for now.
-    // TODO: make the sil location more precise.
-    NullablePtr<swift::SILInstruction> AI =
-        Projection::createAggFromFirstLevelProjections(
-            Builder, RegularLocation::getAutoGeneratedLocation(),
-            I->getType(M).getObjectType(),
-            Vals);
-    // This is the Value for the current node.
-    ProjectionPath P(Base.getType(M));
-    Values[*I] = LSValue(SILValue(AI.get()), P);
-    removeLSLocations(Values, FirstLevel);
-
-    // Keep iterating until we have reach the top-most level of the projection
-    // tree.
-    // i.e. the memory location represented by the Base.
-  }
-
-  assert(Values.size() == 1 && "Should have a single location this point");
-
+SILValue
+LSValue::reduce(LSLocation &Base, SILModule *M, LSLocationValueMap &Values,
+                SILInstruction *InsertPt) {
+  LSValue::reduceInner(Base, M, Values, InsertPt);
   // Finally materialize and return the forwarding SILValue.
   return Values.begin()->second.materialize(InsertPt);
 }
 
-//===----------------------------------------------------------------------===//
-//                                  Memory Location
-//===----------------------------------------------------------------------===//
-
-bool LSLocation::isMustAliasLSLocation(const LSLocation &RHS,
-                                       AliasAnalysis *AA) {
+bool
+LSLocation::isMustAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA) {
   // If the bases are not must-alias, the locations may not alias.
   if (!AA->isMustAlias(Base, RHS.getBase()))
     return false;
   // If projection paths are different, then the locations cannot alias.
   if (!hasIdenticalProjectionPath(RHS))
     return false;
+  // Must-alias base and identical projection path. Same object!.
   return true;
 }
 
-bool LSLocation::isMayAliasLSLocation(const LSLocation &RHS,
-                                      AliasAnalysis *AA) {
+bool
+LSLocation::isMayAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA) {
   // If the bases do not alias, then the locations cannot alias.
   if (AA->isNoAlias(Base, RHS.getBase()))
     return false;
@@ -215,28 +188,12 @@ bool LSLocation::isMayAliasLSLocation(const LSLocation &RHS,
   // could alias.
   if (hasNonEmptySymmetricPathDifference(RHS))
     return false;
+  // We can not prove the 2 locations do not alias.
   return true;
 }
 
-
-bool LSLocation::isNonEscapingLocalLSLocation(SILFunction *Fn,
-                                              EscapeAnalysis *EA) {
-  // An alloc_stack is definitely dead at the end of the function.
-  if (isa<AllocStackInst>(Base))
-    return true;
-  // For other allocations we ask escape analysis.		
-  auto *ConGraph = EA->getConnectionGraph(Fn);
-  if (isa<AllocationInst>(Base)) {
-    auto *Node = ConGraph->getNodeOrNull(Base, EA);
-    if (Node && !Node->escapes()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void LSLocation::getFirstLevelLSLocations(LSLocationList &Locs,
-                                          SILModule *Mod) {
+void
+LSLocation::getNextLevelLSLocations(LSLocationList &Locs, SILModule *Mod) {
   SILType Ty = getType(Mod);
   llvm::SmallVector<Projection, 8> Out;
   Projection::getFirstLevelProjections(Ty, *Mod, Out);
@@ -248,64 +205,48 @@ void LSLocation::getFirstLevelLSLocations(LSLocationList &Locs,
   }
 }
 
-void LSLocation::expand(LSLocation Base, SILModule *M, LSLocationList &Locs,
-                        TypeExpansionAnalysis *TE) {
-  // To expand a memory location to its indivisible parts, we first get the
-  // address projection paths from the accessed type to each indivisible field,
-  // i.e. leaf nodes, then we append these projection paths to the Base.
-  //
-  // Construct the LSLocation by appending the projection path from the
-  // accessed node to the leaf nodes.
+void
+LSLocation::expand(LSLocation Base, SILModule *M, LSLocationList &Locs,
+                   TypeExpansionAnalysis *TE) {
   const ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeExpansion(Base.getType(M), M, TEKind::TELeaf)) {
+  for (const auto &P : TE->getTypeExpansion(Base.getType(M), M)) {
     Locs.push_back(LSLocation(Base.getBase(), BasePath, P.getValue()));
   }
 }
 
-void LSLocation::reduce(LSLocation Base, SILModule *M, LSLocationSet &Locs,
-                        TypeExpansionAnalysis *TE) {
-  // First, construct the LSLocation by appending the projection path from the
-  // accessed node to the leaf nodes.
-  LSLocationList Nodes;
-  const ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeExpansion(Base.getType(M), M, TEKind::TENode)) {
-    Nodes.push_back(LSLocation(Base.getBase(), BasePath, P.getValue()));
+bool
+LSLocation::reduce(LSLocation Base, SILModule *M, LSLocationSet &Locs) {
+  // If this is a class reference type, we have reached end of the type tree.
+  if (Base.getType(M).getClassOrBoundGenericClass())
+    return Locs.find(Base) != Locs.end();
+
+  // This is a leaf node.
+  LSLocationList NextLevel;
+  Base.getNextLevelLSLocations(NextLevel, M);
+  if (NextLevel.empty())
+    return Locs.find(Base) != Locs.end();
+
+  // This is not a leaf node, try to find whether all its children are alive.
+  bool Alive = true;
+  for (auto &X : NextLevel) {
+    Alive &= LSLocation::reduce(X, M, Locs);
   }
 
-  // Second, go from leaf nodes to their parents. This guarantees that at the
-  // point the parent is processed, its children have been processed already.
-  for (auto I = Nodes.rbegin(), E = Nodes.rend(); I != E; ++I) {
-    LSLocationList FirstLevel;
-    I->getFirstLevelLSLocations(FirstLevel, M);
-    // Reached the end of the projection tree, this is a leaf node.
-    if (FirstLevel.empty())
-      continue;
-
-    // If this is a class reference type, we have reached end of the type tree.
-    if (I->getType(M).getClassOrBoundGenericClass())
-      continue;
-
-    // This is NOT a leaf node, check whether all its first level children are
-    // alive.
-    bool Alive = true;
-    for (auto &X : FirstLevel) {
-      Alive &= Locs.find(X) != Locs.end();
-    }
-
-    // All first level locations are alive, create the new aggregated location.
-    if (Alive) {
-      for (auto &X : FirstLevel)
-        Locs.erase(X);
-      Locs.insert(*I);
-    }
+  // All next level locations are alive, create the new aggregated location.
+  if (Alive) {
+    for (auto &X : NextLevel)
+      Locs.erase(X);
+    Locs.insert(Base);
   }
+  return Alive;
 }
 
-void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
-                                     std::vector<LSLocation> &Locations,
-                                     LSLocationIndexMap &IndexMap,
-                                     LSLocationBaseMap &BaseMap,
-                                     TypeExpansionAnalysis *TypeCache) {
+void
+LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
+                                std::vector<LSLocation> &Locations,
+                                LSLocationIndexMap &IndexMap,
+                                LSLocationBaseMap &BaseMap,
+                                TypeExpansionAnalysis *TypeCache) {
   // We have processed this SILValue before.
   if (BaseMap.find(Mem) != BaseMap.end())
     return;
@@ -327,22 +268,20 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
   LSLocationList Locs;
   LSLocation::expand(L, M, Locs, TypeCache);
   for (auto &Loc : Locs) {
-   if (IndexMap.find(Loc) != IndexMap.end())
-     continue;
-   IndexMap[Loc] = Locations.size();
-   Locations.push_back(Loc);
+    if (IndexMap.find(Loc) != IndexMap.end())
+      continue;
+    IndexMap[Loc] = Locations.size();
+    Locations.push_back(Loc);
   }
-
 }
 
 void
-LSLocation::
-enumerateLSLocations(SILFunction &F,
-                     std::vector<LSLocation> &Locations,
-                     LSLocationIndexMap &IndexMap,
-                     LSLocationBaseMap &BaseMap,
-                     TypeExpansionAnalysis *TypeCache,
-                     std::pair<int, int> &LSCount) {
+LSLocation::enumerateLSLocations(SILFunction &F,
+                                 std::vector<LSLocation> &Locations,
+                                 LSLocationIndexMap &IndexMap,
+                                 LSLocationBaseMap &BaseMap,
+                                 TypeExpansionAnalysis *TypeCache,
+                                 std::pair<int, int> &LSCount) {
   // Enumerate all locations accessed by the loads or stores.
   for (auto &B : F) {
     for (auto &I : B) {

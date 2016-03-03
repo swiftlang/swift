@@ -216,7 +216,7 @@ public:
         }
 
         // This should get the original (unexpanded) location back.
-        LSLocation::reduce(L, &Fn.getModule(), SLocs, TE);
+        LSLocation::reduce(L, &Fn.getModule(), SLocs);
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : SLocs) {
           Loc.print(&Fn.getModule());

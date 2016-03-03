@@ -563,15 +563,6 @@ public:
                                                 SILModule *Mod,
                                                 ProjectionPathList &P);
 
-  /// Given the SILType Base, expand every intermediate and leaf nodes in the
-  /// type tree.
-  ///
-  /// NOTE: this function returns a single empty projection path if the BaseType
-  /// is a leaf node in the type tree.
-  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
-                                                SILModule *Mod,
-                                                ProjectionPathList &P);
-
   /// Return true if the given projection paths in \p CPaths does not cover
   /// all the fields with non-trivial semantics, false otherwise.
   static bool hasUncoveredNonTrivials(SILType B, SILModule *Mod,

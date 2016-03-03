@@ -43,7 +43,6 @@
 
 namespace swift {
 
-/// forward declarations.
 class SILValueProjection;
 class LSLocation;
 class LSValue;
@@ -201,38 +200,6 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 /// consists of a base that is the tracked SILValue, and a projection path to
 /// the represented field.
 ///
-/// In this example below, 2 LSValues will be created for the 2 stores,
-/// they will have %6 and %7 as their Bases and empty projection paths.
-///
-///  struct A {
-///    var a: Int
-///    var b: Int
-///  }
-///
-/// sil hidden @test_1 : $@convention(thin) () -> () {
-///   %0 = alloc_stack $A  // var x                   // users: %4, %7
-///   %5 = integer_literal $Builtin.Int64, 19         // user: %6
-///   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-///   %7 = struct_element_addr %0 : $*A, #A.a         // user: %8
-///   store %6 to %7 : $*Int                          // id: %8
-///   %9 = integer_literal $Builtin.Int64, 20         // user: %10
-///   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-///   %11 = struct_element_addr %0 : $*A, #A.b        // user: %12
-///   store %10 to %11 : $*Int                        // id: %12
-/// }
-///
-/// In this example below, 2 LSValues will be created with %3 as their
-/// bases and #a and #b as their projection paths respectively.
-///
-/// sil hidden @test_1 : $@convention(thin) () -> () {
-///   %0 = alloc_stack $A  // var x                   // users: %4, %6
-///   // function_ref a.A.init (a.A.Type)() -> a.A
-///   %1 = function_ref @a.A.init : $@convention(thin) (@thin A.Type) -> A
-///   %2 = metatype $@thin A.Type                     // user: %3
-///   %3 = apply %1(%2) : $@convention(thin) (@thin A.Type) -> A // user: %4
-///   store %3 to %0 : $*A                            // id: %4
-/// }
-///
 /// LSValue can take 2 forms.
 ///
 /// 1. It can take a concrete value, i.e. with a valid Base and ProjectionPath.
@@ -342,16 +309,13 @@ public:
   ///
   /// NOTE: reduce assumes that every component of the location has a concrete
   /// (i.e. not coverings set) available value in LocAndVal.
-  ///
-  /// TODO: we do not really need the llvm::DenseMap<LSLocation, LSValue> here
-  /// we only need a map between the projection tree of a SILType and the value
-  /// each leaf node takes. This will be implemented once ProjectionPath memory
-  /// cost is reduced and made copyable (its copy constructor is deleted at the
-  /// moment).
+
+  static void reduceInner(LSLocation &Base, SILModule *Mod,
+                         LSLocationValueMap &LocAndVal,
+                         SILInstruction *InsertPt);
   static SILValue reduce(LSLocation &Base, SILModule *Mod,
                          LSLocationValueMap &LocAndVal,
-                         SILInstruction *InsertPt,
-                         TypeExpansionAnalysis *TE);
+                         SILInstruction *InsertPt);
 };
 
 static inline llvm::hash_code hash_value(const LSValue &V) {
@@ -383,24 +347,6 @@ using LSLocationBaseMap = llvm::DenseMap<SILValue, LSLocation>;
 ///
 /// Base will point to %1, but not %2. Projection path will indicate which
 /// field is accessed.
-///
-/// Canonicalizing LSLocation reduces the # of the LSLocations we keep in
-/// the LSLocationVault, and this in turn reduces the # of bits each basic
-/// block keeps.
-///
-/// Moreover, without canonicalization, it's more difficult to implement the
-/// intersection operator in DSE/RLE?
-///
-/// We basically need to compare every pair of LSLocation and find the ones
-/// that must alias O(n^2). Or we need to go through every LSLocation in the
-/// vault and turn on/off the bits for the MustAlias ones whenever we want to
-/// turn a LSLocation bit on/off. Both are expensive.
-///
-/// Canonicalizing suffers from the same problem, but to a lesser extend. i.e.
-/// 2 LSLocations with different bases but happen to be the same object and
-/// field. By doing canonicalization, the intersection is simply a bitwise AND
-/// (No AA involved).
-///
 class LSLocation : public SILValueProjection {
 public:
   /// Constructors.
@@ -435,12 +381,12 @@ public:
 
   /// Returns the type of the object the LSLocation represents.
   SILType getType(SILModule *M) {
-     return Path.getValue().getMostDerivedType(*M);
+    return Path.getValue().getMostDerivedType(*M);
   }
 
   /// Get the first level locations based on this location's first level
   /// projection.
-  void getFirstLevelLSLocations(LSLocationList &Locs, SILModule *Mod);
+  void getNextLevelLSLocations(LSLocationList &Locs, SILModule *Mod);
 
   /// Check whether the 2 LSLocations may alias each other or not.
   bool isMayAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA);
@@ -465,8 +411,7 @@ public:
 
   /// Given a set of locations derived from the same base, try to merge/reduce
   /// them into smallest number of LSLocations possible.
-  static void reduce(LSLocation Base, SILModule *Mod, LSLocationSet &Locs,
-                     TypeExpansionAnalysis *TE);
+  static bool reduce(LSLocation Base, SILModule *Mod, LSLocationSet &Locs);
 
   /// Enumerate the given Mem LSLocation.
   static void enumerateLSLocation(SILModule *M, SILValue Mem,

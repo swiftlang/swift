@@ -654,7 +654,7 @@ SILValue BlockState::reduceValuesAtEndOfBlock(RLEContext &Ctx, LSLocation &L) {
   // forward.
   SILValue TheForwardingValue;
   TheForwardingValue = LSValue::reduce(L, &BB->getModule(), Values,
-                                       BB->getTerminator(), Ctx.getTE());
+                                       BB->getTerminator());
   /// Return the forwarding value.
   return TheForwardingValue;
 }
@@ -679,7 +679,7 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
 
   // Reduce the available values into a single SILValue we can use to forward.
   SILModule *Mod = &I->getModule();
-  SILValue TheForwardingValue = LSValue::reduce(L, Mod, Values, I, Ctx.getTE());
+  SILValue TheForwardingValue = LSValue::reduce(L, Mod, Values, I);
   if (!TheForwardingValue)
     return false;
 
@@ -1238,7 +1238,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 
     // Reduce the available values into a single SILValue we can use to forward
     SILInstruction *IPt = CurBB->getTerminator();
-    Values[CurBB] = LSValue::reduce(L, &BB->getModule(), LSValues, IPt, TE);
+    Values[CurBB] = LSValue::reduce(L, &BB->getModule(), LSValues, IPt);
   }
 
   // Finally, collect all the values for the SILArgument, materialize it using
@@ -1271,7 +1271,7 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
   // For locations which we do not have concrete values for in this basic
   // block, try to reduce it to the minimum # of locations possible, this
   // will help us to generate as few SILArguments as possible.
-  LSLocation::reduce(L, Mod, CSLocs, TE);
+  LSLocation::reduce(L, Mod, CSLocs);
 
   // To handle covering value, we need to go to the predecessors and
   // materialize them there.

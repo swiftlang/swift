@@ -20,22 +20,9 @@
 
 namespace swift {
 
-/// Type expansion kind.
-enum class TEKind { 
-  TELeaf, // Leaf nodes expansion.
-  TENode  // Intermediate and leaf nodes expansion.
-}; 
-
-using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
-
 /// This analysis determines memory effects during destruction.
 class TypeExpansionAnalysis : public SILAnalysis {
-  /// Caches the type to leaf node expansion.
-  TypeExpansionMap TELeafCache;
-  /// Caches the type to each node expansion, including intermediate nodes as
-  /// well as leaf nodes in the type tree.
-  TypeExpansionMap TENodeCache;
-
+  llvm::DenseMap<SILType, ProjectionPathList> ExpansionCache;
 public:
   TypeExpansionAnalysis(SILModule *M)
       : SILAnalysis(AnalysisKind::TypeExpansion) {}
@@ -45,8 +32,8 @@ public:
   }
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.
-  const ProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod,
-                                                TEKind K);
+  const ProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod);
 };
+
 }
 #endif

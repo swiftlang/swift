@@ -23,32 +23,22 @@ using namespace swift;
 // memory usage of this cache.
 static const int TypeExpansionAnalysisMaxCacheSize = 4096;
 
-const ProjectionPathList &
-TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod, TEKind Kind){
-  // Which cache we should be looking up.
-  bool IsLeaf = Kind == TEKind::TELeaf;
-  TypeExpansionMap &Cache = IsLeaf ? TELeafCache : TENodeCache;
-
+const ProjectionPathList&
+TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod) {
   // Check whether we have the type expansion.
-  auto Iter = Cache.find(B);
-  if (Iter != Cache.end()) {
+  auto Iter = ExpansionCache.find(B);
+  if (Iter != ExpansionCache.end()) {
     return Iter->second;
   }   
 
   // Flush the cache if the size of the cache is too large.
-  if (Cache.size() > TypeExpansionAnalysisMaxCacheSize) {
-    Cache.clear();
+  if (ExpansionCache.size() > TypeExpansionAnalysisMaxCacheSize) {
+    ExpansionCache.clear();
   }
 
   // Build the type expansion for the leaf nodes.
-  if (IsLeaf) {
-    ProjectionPath::expandTypeIntoLeafProjectionPaths(B, Mod, Cache[B]);
-    return Cache[B];
-  }
-
-  // Build the type expansion for the internal and leaf nodes.
-  ProjectionPath::expandTypeIntoNodeProjectionPaths(B, Mod, Cache[B]);
-  return Cache[B];
+  ProjectionPath::expandTypeIntoLeafProjectionPaths(B, Mod, ExpansionCache[B]);
+  return ExpansionCache[B];
 }
 
 SILAnalysis *swift::createTypeExpansionAnalysis(SILModule *M) {
