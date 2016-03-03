@@ -125,6 +125,7 @@ extension String {
       ///
       /// - Requires: The next value is representable.
       @warn_unused_result
+      @inline(__always)
       public func successor() -> Index {
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
         let hiNibble = currentUnit >> 4
