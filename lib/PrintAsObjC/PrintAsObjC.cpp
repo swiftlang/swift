@@ -612,12 +612,11 @@ private:
 
     if (!clangTy.isNull() && isNSUInteger(clangTy)) {
       os << "NSUInteger " << objCName;
+      if (hasReservedName)
+        os << "_";
     } else {
-      print(ty, OTK_None, objCName.str());
+      print(ty, OTK_None, objCName);
     }
-
-    if (hasReservedName)
-      os << "_";
 
     os << ";\n";
   }
@@ -1121,8 +1120,10 @@ private:
       if (tupleTy->getNumElements() == 0) {
         os << "void";
       } else {
-        interleave(tupleTy->getElementTypes(),
-                   [this](Type ty) { print(ty, OTK_None); },
+        interleave(tupleTy->getElements(),
+                   [this](TupleTypeElt elt) {
+                     print(elt.getType(), OTK_None, elt.getName());
+                   },
                    [this] { os << ", "; });
       }
     } else {
@@ -1173,15 +1174,19 @@ private:
   /// visitPart().
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
-             StringRef name = "") {
+             Identifier name = Identifier()) {
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
     decltype(openFunctionTypes) savedFunctionTypes;
     savedFunctionTypes.swap(openFunctionTypes);
 
     visitPart(ty, optionalKind);
-    if (!name.empty())
+    if (!name.empty()) {
       os << ' ' << name;
+      if (isClangKeyword(name)) {
+        os << '_';
+      }
+    }
     while (!openFunctionTypes.empty()) {
       const FunctionType *openFunctionTy = openFunctionTypes.pop_back_val();
       finishFunctionType(openFunctionTy);
