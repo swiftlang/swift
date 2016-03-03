@@ -374,6 +374,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::ExclamationMark:
     case Chunk::ChunkKind::QuestionMark:
     case Chunk::ChunkKind::Ampersand:
+    case Chunk::ChunkKind::Equal:
     case Chunk::ChunkKind::Whitespace:
       AnnotatedTextChunk = C.isAnnotation();
       SWIFT_FALLTHROUGH;
@@ -951,6 +952,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
+    case CodeCompletionString::Chunk::ChunkKind::Equal:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
       return i;
@@ -2919,6 +2921,22 @@ public:
       addPostfixOperatorCompletion(op, *T);
   }
 
+  void addAssignmentOperator(Type RHSType, Type resultType) {
+    CodeCompletionResultBuilder builder(
+        Sink, CodeCompletionResult::ResultKind::Pattern,
+        SemanticContextKind::None, {});
+
+    if (HaveLeadingSpace)
+      builder.addAnnotatedWhitespace(" ");
+    else
+      builder.addWhitespace(" ");
+    builder.addEqual();
+    builder.addWhitespace(" ");
+    assert(RHSType && resultType);
+    builder.addCallParameter(Identifier(), Identifier(), RHSType, false, true);
+    addTypeAnnotation(builder, resultType);
+  }
+
   void addInfixOperatorCompletion(OperatorDecl *op, Type resultType,
                                   Type RHSType) {
     // FIXME: we should get the semantic context of the function, not the
@@ -3065,6 +3083,12 @@ public:
       default:
         llvm_unreachable("unexpected operator kind");
       }
+    }
+
+    if (leadingSequence.empty() && LHS->getType() &&
+        LHS->getType()->isAssignableType()) {
+      addAssignmentOperator(LHS->getType()->getRValueType(),
+                            CurrDeclContext->getASTContext().TheEmptyTupleType);
     }
 
     // FIXME: unify this with the ?.member completions.

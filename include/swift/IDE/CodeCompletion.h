@@ -104,6 +104,7 @@ public:
     ExclamationMark,
     QuestionMark,
     Ampersand,
+    Equal,
     Whitespace,
 
     /// The first chunk of a substring that describes the parameter for a
@@ -193,6 +194,7 @@ public:
            Kind == ChunkKind::ExclamationMark ||
            Kind == ChunkKind::QuestionMark ||
            Kind == ChunkKind::Ampersand ||
+           Kind == ChunkKind::Equal ||
            Kind == ChunkKind::Whitespace ||
            Kind == ChunkKind::CallParameterName ||
            Kind == ChunkKind::CallParameterInternalName ||

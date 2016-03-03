@@ -1026,8 +1026,13 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
   if (FirstTextChunk.hasValue()) {
     for (auto C : str->getChunks().slice(*FirstTextChunk)) {
 
-      if (C.getKind() == ChunkKind::BraceStmtWithCursor)
+      if (C.is(ChunkKind::BraceStmtWithCursor))
         break;
+
+      if (C.is(ChunkKind::Equal)) {
+        OS << C.getText();
+        break;
+      }
 
       bool shouldPrint = !C.isAnnotation();
       switch (C.getKind()) {
@@ -1064,8 +1069,13 @@ void CompletionBuilder::getDescription(SwiftResult *result, raw_ostream &OS,
   if (FirstTextChunk.hasValue()) {
     for (auto C : str->getChunks().slice(*FirstTextChunk)) {
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-      if (C.getKind() == ChunkKind::BraceStmtWithCursor)
+      if (C.is(ChunkKind::BraceStmtWithCursor))
         break;
+
+      // FIXME: we need a more uniform way to handle operator completions.
+      if (C.is(ChunkKind::Equal))
+        isOperator = true;
+
       if (C.getKind() == ChunkKind::TypeAnnotation ||
           C.getKind() == ChunkKind::CallParameterClosureType ||
           C.getKind() == ChunkKind::Whitespace)
