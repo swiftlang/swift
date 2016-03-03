@@ -168,35 +168,6 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   AdjustedOptions.PrintDefaultParameterPlaceholder = true;
 }
 
-void findExtensionsFromConformingProtocols(Decl *D,
-                                           llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
-  NominalTypeDecl* NTD = dyn_cast<NominalTypeDecl>(D);
-  if (!NTD || NTD->getKind() == DeclKind::Protocol)
-    return;
-  std::vector<NominalTypeDecl*> Unhandled;
-  auto addTypeLocNominal = [&](TypeLoc TL){
-    if (TL.getType()) {
-      if (auto D = TL.getType()->getAnyNominal()) {
-        Unhandled.push_back(D);
-      }
-    }
-  };
-  for (auto TL : NTD->getInherited()) {
-    addTypeLocNominal(TL);
-  }
-  while(!Unhandled.empty()) {
-    NominalTypeDecl* Back = Unhandled.back();
-    Unhandled.pop_back();
-    for (ExtensionDecl *E : Back->getExtensions()) {
-      if(E->isConstrainedExtension())
-        Results.insert(E);
-      for (auto TL : Back->getInherited()) {
-        addTypeLocNominal(TL);
-      }
-    }
-  }
-}
-
 ArrayRef<StringRef>
 swift::ide::collectModuleGroups(Module *M, std::vector<StringRef> &Scratch) {
   for (auto File : M->getFiles()) {
@@ -476,13 +447,11 @@ void swift::ide::printSubmoduleInterface(
 
           // Print synthesized extensions.
           llvm::SmallPtrSet<ExtensionDecl *, 10> ExtensionsFromConformances;
-          findExtensionsFromConformingProtocols(D, ExtensionsFromConformances);
+          SynthesizedExtensionAnalyzer Analyzer(NTD);
+          Analyzer.findSynthesizedExtensions(ExtensionsFromConformances);
           AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
           for (auto ET : ExtensionsFromConformances) {
             if (!shouldPrint(ET, AdjustedOptions))
-              continue;
-            SynthesizedExtensionAnalyzer Analyzer(ET, NTD);
-            if (!Analyzer.isApplicable())
               continue;
             Printer << "\n";
             ET->print(Printer, AdjustedOptions);

@@ -206,25 +206,25 @@ public:
 };
 
 struct SynthesizedExtensionAnalyzer::Implementation {
-
-  ExtensionDecl *Ext;
+  NominalTypeDecl *Target;
   Type BaseType;
   DeclContext *DC;
   std::unique_ptr<ArchetypeSelfTransformer> pTransform;
 
-  Implementation(ExtensionDecl *Ext, NominalTypeDecl *Target):
-    Ext(Ext), BaseType(Target->getDeclaredTypeInContext()),
+  Implementation(NominalTypeDecl *Target):
+    Target(Target),
+    BaseType(Target->getDeclaredTypeInContext()),
     DC(Target), pTransform(new ArchetypeSelfTransformer(Target)) {}
 };
 
 SynthesizedExtensionAnalyzer::
-SynthesizedExtensionAnalyzer(ExtensionDecl *Proto, NominalTypeDecl *Target):
-  Impl(*(new Implementation(Proto, Target))) {}
+SynthesizedExtensionAnalyzer(NominalTypeDecl *Target):
+  Impl(*(new Implementation(Target))) {}
 
-bool SynthesizedExtensionAnalyzer::isApplicable() {
-  if (!Impl.Ext->getGenericParams())
+bool SynthesizedExtensionAnalyzer::isApplicable(ExtensionDecl *Ext) {
+  if (!Ext->getGenericParams())
     return true;
-  for (auto Req : Impl.Ext->getGenericParams()->getRequirements()){
+  for (auto Req : Ext->getGenericParams()->getRequirements()){
     auto TupleOp = Req.getAsAnalyzedWrittenString();
     if (!TupleOp)
       continue;
@@ -238,15 +238,48 @@ bool SynthesizedExtensionAnalyzer::isApplicable() {
       Second = Second->getDesugaredType();
       switch (Kind) {
         case RequirementReprKind::TypeConstraint:
-          return canPossiblyConvertTo(First, Second, *Impl.DC);
+          if(!canPossiblyConvertTo(First, Second, *Impl.DC))
+            return false;
+          break;
         case RequirementReprKind::SameType:
-          return canPossiblyEqual(First, Second, *Impl.DC);
+          if (!canPossiblyEqual(First, Second, *Impl.DC))
+            return false;
+          break;
       }
     }
   }
   return true;
 }
+
 SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
+
+void SynthesizedExtensionAnalyzer::
+findSynthesizedExtensions(llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
+    if (Impl.Target->getKind() == DeclKind::Protocol)
+      return;
+    std::vector<NominalTypeDecl*> Unhandled;
+    auto addTypeLocNominal = [&](TypeLoc TL){
+      if (TL.getType()) {
+        if (auto D = TL.getType()->getAnyNominal()) {
+          Unhandled.push_back(D);
+        }
+      }
+    };
+    for (auto TL : Impl.Target->getInherited()) {
+      addTypeLocNominal(TL);
+    }
+    while(!Unhandled.empty()) {
+      NominalTypeDecl* Back = Unhandled.back();
+      Unhandled.pop_back();
+      for (ExtensionDecl *E : Back->getExtensions()) {
+        if(E->isConstrainedExtension() && isApplicable(E))
+          Results.insert(E);
+        for (auto TL : Back->getInherited()) {
+          addTypeLocNominal(TL);
+        }
+      }
+    }
+  }
 }
 
 PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
