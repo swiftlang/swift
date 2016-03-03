@@ -92,6 +92,9 @@ struct ASTContext::Implementation {
 
   /// The declaration of Swift.UInt.
   NominalTypeDecl *UIntDecl = nullptr;
+  
+  /// The declaration of Swift.UInt32.
+  NominalTypeDecl *UInt32Decl = nullptr;
 
   /// The declaration of Swift.Float.
   NominalTypeDecl *FloatDecl = nullptr;
@@ -534,6 +537,12 @@ NominalTypeDecl *ASTContext::getUIntDecl() const {
   if (!Impl.UIntDecl)
     Impl.UIntDecl = findStdlibType(*this, "UInt", 0);
   return Impl.UIntDecl;
+}
+
+NominalTypeDecl *ASTContext::getUInt32Decl() const {
+  if (!Impl.UInt32Decl)
+    Impl.UInt32Decl = findStdlibType(*this, "UInt32", 0);
+  return Impl.UInt32Decl;
 }
 
 NominalTypeDecl *ASTContext::getFloatDecl() const {
