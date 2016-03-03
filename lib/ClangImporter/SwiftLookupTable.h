@@ -44,14 +44,79 @@ namespace swift {
 
 /// The context into which a Clang declaration will be imported.
 ///
-/// When the context into which a declaration will be imported
-/// matches a Clang declaration context (the common case), the
-/// result will be expressed as a declaration context. Otherwise,
-/// if the Clang type is not itself a declaration context (for
-/// example, a typedef that comes into Swift as a strong type),
-/// the Clang type declaration will be provided.
-typedef llvm::PointerUnion<clang::DeclContext *, clang::TypedefNameDecl *>
-  EffectiveClangContext;
+/// When the context into which a declaration will be imported matches
+/// a Clang declaration context (the common case), the result will be
+/// expressed as a declaration context. Otherwise, if the Clang type
+/// is not itself a declaration context (for example, a typedef that
+/// comes into Swift as a strong type), the Clang type declaration
+/// will be provided. Finally, if the context is known only via its
+/// Swift name, this will be recorded as
+class EffectiveClangContext {
+public:
+  enum Kind {
+    DeclContext,
+    TypedefContext,
+    UnresolvedContext,
+  };
+
+private:
+  Kind TheKind;
+
+  union {
+    clang::DeclContext *DC;
+    clang::TypedefNameDecl *Typedef;
+    struct {
+      const char *Data;
+      unsigned Length;
+    } Unresolved;
+  };
+
+  
+public:
+  EffectiveClangContext() : TheKind(DeclContext) {
+    DC = nullptr;
+  }
+
+  EffectiveClangContext(clang::DeclContext *dc) : TheKind(DeclContext) {
+    DC = dc;
+  }
+
+  EffectiveClangContext(clang::TypedefNameDecl *typedefName)
+    : TheKind(TypedefContext)
+  {
+    Typedef = typedefName;
+  }
+
+  EffectiveClangContext(StringRef unresolved) : TheKind(UnresolvedContext) {
+    Unresolved.Data = unresolved.data();
+    Unresolved.Length = unresolved.size();
+  }
+
+  /// Determine whether this effective Clang context was set.
+  explicit operator bool() const {
+    return getKind() != DeclContext || DC != nullptr;
+  }
+
+  /// Determine the kind of effective Clang context.
+  Kind getKind() const { return TheKind; }
+
+  /// Retrieve the declaration context.
+  clang::DeclContext *getAsDeclContext() {
+    return getKind() == DeclContext ? DC : nullptr;
+  }
+
+  /// Retrieve the typedef declaration.
+  clang::TypedefNameDecl *getTypedefName() const {
+    assert(getKind() == TypedefContext);
+    return Typedef;
+  }
+
+  /// Retrieve the unresolved context name.
+  StringRef getUnresolvedName() const {
+    assert(getKind() == UnresolvedContext);
+    return StringRef(Unresolved.Data, Unresolved.Length);
+  }
+};
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
@@ -63,7 +128,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 8; // NS prefix stripping
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 9; // typedef context kind
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -86,20 +151,27 @@ public:
     ObjCClass,
     /// An Objective-C protocol.
     ObjCProtocol,
+    /// A typedef that produces a strong type in Swift.
+    Typedef,
   };
 
   /// Determine whether the given context requires a name to disambiguate.
   static bool contextRequiresName(ContextKind kind);
 
   /// A single entry referencing either a named declaration or a macro.
-  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *> SingleEntry;
+  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *>
+    SingleEntry;
+
+  /// A stored version of the context of an entity, which is Clang
+  /// ASTContext-independent.
+  typedef std::pair<ContextKind, StringRef> StoredContext;
 
   /// An entry in the table of C entities indexed by full Swift name.
   struct FullTableEntry {
     /// The context in which the entities with the given name occur, e.g.,
     /// a class, struct, translation unit, etc.
     /// is always the canonical DeclContext for the entity.
-    std::pair<ContextKind, StringRef> Context;
+    StoredContext Context;
 
     /// The set of Clang declarations and macros with this name and in
     /// this context.
@@ -201,8 +273,7 @@ public:
   SingleEntry mapStored(uintptr_t &entry);
 
   /// Translate a Clang effective context into a context kind and name.
-  llvm::Optional<std::pair<ContextKind, StringRef>>
-  translateContext(EffectiveClangContext context);
+  llvm::Optional<StoredContext> translateContext(EffectiveClangContext context);
 
   /// Add an entry to the lookup table.
   ///
@@ -215,16 +286,33 @@ public:
   /// Add an Objective-C category or extension to the table.
   void addCategory(clang::ObjCCategoryDecl *category);
 
+private:
   /// Lookup the set of entities with the given base name.
   ///
   /// \param baseName The base name to search for. All results will
   /// have this base name.
   ///
   /// \param searchContext The context in which the resulting set of
-  /// entities should reside. This may be null to indicate that
+  /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName, clang::DeclContext *searchContext);
+  lookup(StringRef baseName, llvm::Optional<StoredContext> searchContext);
+
+public:
+  /// Lookup an unresolved context name and resolve it to a Clang
+  /// named declaration.
+  clang::NamedDecl *resolveContext(StringRef unresolvedName);
+
+  /// Lookup the set of entities with the given base name.
+  ///
+  /// \param baseName The base name to search for. All results will
+  /// have this base name.
+  ///
+  /// \param searchContext The context in which the resulting set of
+  /// entities should reside. This may be None to indicate that
+  /// all results from all contexts should be produced.
+  SmallVector<SingleEntry, 4>
+  lookup(StringRef baseName, EffectiveClangContext searchContext);
 
   /// Retrieve the set of base names that are stored in the lookup table.
   SmallVector<StringRef, 4> allBaseNames();

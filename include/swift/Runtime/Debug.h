@@ -83,15 +83,18 @@ static inline void crash(const char *message) {
 LLVM_ATTRIBUTE_NORETURN
 extern void
 fatalError(uint32_t flags, const char *format, ...);
+  
+struct InProcess;
 
-struct Metadata;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
 
 // swift_dynamicCastFailure halts using fatalError()
 // with a description of a failed cast's types.
 LLVM_ATTRIBUTE_NORETURN
 void
-swift_dynamicCastFailure(const swift::Metadata *sourceType,
-                         const swift::Metadata *targetType, 
+swift_dynamicCastFailure(const Metadata *sourceType,
+                         const Metadata *targetType,
                          const char *message = nullptr);
 
 // swift_dynamicCastFailure halts using fatalError()

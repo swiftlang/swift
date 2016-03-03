@@ -2946,7 +2946,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                 behaviorProto->getName());
   }
   
-  // If the property was declared with an parameter, but the behavior didn't
+  // If the property was declared with a parameter, but the behavior didn't
   // use it, complain.
   // TODO: The initializer could eventually be consumed by DI-style
   // initialization.
@@ -5909,17 +5909,15 @@ bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
 }
 
 bool TypeChecker::isAvailabilitySafeForConformance(
-    ValueDecl *witness, ValueDecl *requirement,
-    NormalProtocolConformance *conformance,
-    AvailabilityContext &requirementInfo) {
-  DeclContext *DC = conformance->getDeclContext();
+    ProtocolDecl *proto, ValueDecl *requirement, ValueDecl *witness,
+    DeclContext *dc, AvailabilityContext &requirementInfo) {
 
   // We assume conformances in
   // non-SourceFiles have already been checked for availability.
-  if (!DC->getParentSourceFile())
+  if (!dc->getParentSourceFile())
     return true;
 
-  NominalTypeDecl *conformingDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *conformingDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   assert(conformingDecl && "Must have conforming declaration");
 
   // Make sure that any access of the witness through the protocol
@@ -5944,10 +5942,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   witnessInfo.constrainWith(infoForConformingDecl);
   requirementInfo.constrainWith(infoForConformingDecl);
 
-  ProtocolDecl *protocolDecl = conformance->getProtocol();
   AvailabilityContext infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(protocolDecl->getLoc(),
-                                            protocolDecl);
+      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
 
   witnessInfo.constrainWith(infoForProtocolDecl);
   requirementInfo.constrainWith(infoForProtocolDecl);

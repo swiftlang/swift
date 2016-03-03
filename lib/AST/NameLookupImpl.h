@@ -223,12 +223,23 @@ private:
   void visitCaseStmt(CaseStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
-    for (const auto &CLI : S->getCaseLabelItems()) {
-      auto *P = CLI.getPattern();
-      if (!isReferencePointInRange(P->getSourceRange()))
-        checkPattern(P, DeclVisibilityKind::LocalVariable);
+    // Pattern names aren't visible in the patterns themselves,
+    // just in the body or in where guards.
+    auto body = S->getBody();
+    bool inPatterns = isReferencePointInRange(S->getLabelItemsRange());
+    auto items = S->getCaseLabelItems();
+    if (inPatterns) {
+      for (const auto &CLI : items) {
+        auto guard = CLI.getGuardExpr();
+        if (guard && isReferencePointInRange(guard->getSourceRange())) {
+          inPatterns = false;
+          break;
+        }
+      }
     }
-    visit(S->getBody());
+    if (!inPatterns && items.size() > 0)
+      checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+    visit(body);
   }
 
   void visitDoCatchStmt(DoCatchStmt *S) {

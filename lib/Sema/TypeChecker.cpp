@@ -624,6 +624,15 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 }
 
+void swift::finishTypeChecking(SourceFile &SF) {
+  auto &Ctx = SF.getASTContext();
+  TypeChecker TC(Ctx);
+
+  for (auto D : SF.Decls)
+    if (auto PD = dyn_cast<ProtocolDecl>(D))
+      TC.inferDefaultWitnesses(PD);
+}
+
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   Ctx.diagnoseAttrsRequiringFoundation(SF);
@@ -678,8 +687,27 @@ bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext *DC) {
     return TC->isConvertibleTo(Ty1, Ty2, DC);
   } else {
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    TypeChecker TC(Ctx, Diags);
-    return TC.isConvertibleTo(Ty1, Ty2, DC);
+    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, DC);
+  }
+}
+
+Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
+  auto &Ctx = DC->getASTContext();
+  auto ReturnResult = [](UnqualifiedLookup &Lookup) {
+    if (auto Result = Lookup.getSingleTypeResult())
+      return Result->getDeclaredType();
+    return Type();
+  };
+  if (Ctx.getLazyResolver()) {
+    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
+                             Ctx.getLazyResolver(), false, SourceLoc(), true);
+    return ReturnResult(Lookup);
+  } else {
+    DiagnosticEngine Diags(Ctx.SourceMgr);
+    LazyResolver *Resolver = new TypeChecker(Ctx, Diags);
+    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
+                             Resolver, false, SourceLoc(), true);
+    return ReturnResult(Lookup);
   }
 }
 

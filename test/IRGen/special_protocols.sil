@@ -5,18 +5,21 @@ protocol AnyObject: class {}
 // --                 0x0000_0049: special protocol 01, class, empty, swift
 // CHECK:         i32 73,
 // CHECK:         i16 0,
-// CHECK:         i16 0 }
+// CHECK:         i16 0,
+// CHECK:         i32 0 }
 
 protocol ErrorProtocol {}
 // CHECK-LABEL: @_TMps13ErrorProtocol = {{(protected )?}}constant %swift.protocol {
 // --                 0x0000_0087: special protocol 02, non-class, witness, swift
 // CHECK:         i32 135,
 // CHECK:         i16 0,
-// CHECK:         i16 0 }
+// CHECK:         i16 0,
+// CHECK:         i32 0 }
 
 protocol PlainOldProtocol {}
 // CHECK-LABEL: @_TMps16PlainOldProtocol = {{(protected )?}}constant %swift.protocol {
 // --                 0x0000_0007: no special protocol, non-class, witness, swift
 // CHECK:         i32 7,
 // CHECK:         i16 0,
-// CHECK:         i16 0 }
+// CHECK:         i16 0,
+// CHECK:         i32 0 }

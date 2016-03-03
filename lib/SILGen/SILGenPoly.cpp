@@ -2734,16 +2734,14 @@ enum class WitnessDispatchKind {
 };
 
 static WitnessDispatchKind
-getWitnessDispatchKind(ProtocolConformance *conformance,
-                       SILDeclRef witness,
-                       bool isFree) {
+getWitnessDispatchKind(Type selfType, SILDeclRef witness, bool isFree) {
   // Free functions are always statically dispatched...
   if (isFree)
     return WitnessDispatchKind::Static;
 
   // If we have a non-class, non-objc method or a class, objc method that is
   // final, we do not dynamic dispatch.
-  ClassDecl *C = conformance->getType()->getClassOrBoundGenericClass();
+  ClassDecl *C = selfType->getClassOrBoundGenericClass();
   if (!C)
     return WitnessDispatchKind::Static;
 
@@ -2924,11 +2922,14 @@ substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
 }
 
 void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
+                                         Type selfType,
+                                         AbstractionPattern reqtOrigTy,
+                                         CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
                                          ArrayRef<Substitution> witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
-  auto witnessKind = getWitnessDispatchKind(conformance, witness, isFree);
+  auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
 
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
@@ -2951,9 +2952,12 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     origParams.pop_back();
 
   // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
-                                   witness, witnessSubs, origParams))
-    return;
+  // FIXME: Redo MaterializeForSet emission to not take the conformance
+  if (conformance) {
+    if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
+                                     witness, witnessSubs, origParams))
+      return;
+  }
 
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
@@ -2964,24 +2968,11 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
         ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
         ->getCanonicalType());
   }
-  CanType witnessSubstInputTy = witnessSubstTy.getInput();
-  
-  // Get the type of the requirement, so we can use it as an
-  // abstraction pattern.
-  auto reqtInfo = getConstantInfo(requirement);
-
-  // FIXME: reqtSubstTy is already computed in SGM::emitProtocolWitness(),
-  // but its called witnessSubstIfaceTy there; the mapTypeIntoContext()
-  // calls should be pushed down into thunk emission.
-  CanAnyFunctionType reqtSubstTy = SGM.substSelfTypeIntoProtocolRequirementType(
-      cast<GenericFunctionType>(reqtInfo.LoweredInterfaceType),
-      conformance);
   CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())
       ->getCanonicalType();
   CanType reqtSubstResultTy = F.mapTypeIntoContext(reqtSubstTy.getResult())
       ->getCanonicalType();
 
-  AbstractionPattern reqtOrigTy(reqtInfo.LoweredInterfaceType);
   AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
@@ -3017,7 +3008,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
       ManagedValue &selfParam = origParams.back();
       SILValue selfAddr = selfParam.getUnmanagedValue();
       selfParam = emitLoad(loc, selfAddr,
-                           getTypeLowering(conformance->getType()),
+                           getTypeLowering(selfType),
                            SGFContext(),
                            IsNotTake);
     }
@@ -3030,7 +3021,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     .translate(reqtOrigInputTy,
                reqtSubstInputTy,
                witnessOrigTy.getFunctionInputType(),
-               witnessSubstInputTy);
+               witnessSubstTy.getInput());
 
   SILValue witnessFnRef = getWitnessFunctionRef(*this, witness, witnessKind,
                                                 witnessParams, loc);

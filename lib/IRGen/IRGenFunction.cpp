@@ -96,7 +96,6 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
   auto allocAttrs = IGF.IGM.getAllocAttrs();
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
-  call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setAttributes(allocAttrs);
   return call;
 }
@@ -128,7 +127,6 @@ llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getInitStackObjectFn(), { metadata, object }, name);
   call->setDoesNotThrow();
-  call->setCallingConv(IGM.RuntimeCC);
   return call;
 }
 
@@ -137,7 +135,6 @@ llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getVerifyEndOfLifetimeFn(), { object }, name);
   call->setDoesNotThrow();
-  call->setCallingConv(IGM.RuntimeCC);
   return call;
 }
 
@@ -150,7 +147,6 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
   
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getAllocBoxFn(), typeMetadata);
-  call->setCallingConv(IGM.RuntimeCC);
   call->setAttributes(attrs);
 
   box = Builder.CreateExtractValue(call, 0);
@@ -165,7 +161,7 @@ void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
 
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getDeallocBoxFn(), box);
-  call->setCallingConv(IGM.RuntimeCC);
+  call->setCallingConv(IGM.DefaultCC);
   call->setAttributes(attrs);
 }
 
@@ -180,16 +176,21 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
                                        attrKinds);
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getProjectBoxFn(), box);
-  call->setCallingConv(IGM.RuntimeCC);
+  call->setCallingConv(IGM.DefaultCC);
   call->setAttributes(attrs);
   return call;
 }
 
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
                                  std::initializer_list<llvm::Value *> args) {
+  auto cc = IGF.IGM.DefaultCC;
+  if (auto fun = dyn_cast<llvm::Function>(fn))
+    cc = fun->getCallingConv();
+
+
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
 

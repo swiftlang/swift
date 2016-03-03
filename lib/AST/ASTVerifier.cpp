@@ -1734,6 +1734,10 @@ struct ASTNodeBase {};
       if (!normal)
         return;
 
+      // If the conformance is lazily resolved, don't check it; that can cause
+      // massive deserialization at a point where the compiler cannot handle it.
+      if (normal->isLazilyResolved()) return;
+
       // Translate the owning declaration into a DeclContext.
       NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(decl);
       DeclContext *conformingDC;

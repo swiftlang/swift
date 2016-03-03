@@ -27,6 +27,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -3350,6 +3351,8 @@ class ProtocolDecl : public NominalTypeDecl {
 
   ArrayRef<ProtocolDecl *> InheritedProtocols;
 
+  llvm::DenseMap<ValueDecl *, ConcreteDeclRef> DefaultWitnesses;
+
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
   unsigned HasMissingRequirements : 1;
@@ -3492,6 +3495,23 @@ public:
 
   void setHasMissingRequirements(bool newValue) {
     HasMissingRequirements = newValue;
+  }
+
+  /// Returns the default witness for a requirement, or nullptr if there is
+  /// no default.
+  ConcreteDeclRef getDefaultWitness(ValueDecl *requirement) {
+    auto found = DefaultWitnesses.find(requirement);
+    if (found == DefaultWitnesses.end())
+      return nullptr;
+    return found->second;
+  }
+
+  /// Record the default witness for a requirement.
+  void setDefaultWitness(ValueDecl *requirement, ConcreteDeclRef witness) {
+    assert(witness);
+    auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
+    assert(pair.second && "Already have a default witness!");
+    (void) pair;
   }
 
   /// Set the list of inherited protocols.

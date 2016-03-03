@@ -1814,7 +1814,9 @@ function(_add_swift_executable_single name)
       COMPILE_FLAGS " ${c_compile_flags}")
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
-
+  if (SWIFT_PARALLEL_LINK_JOBS)
+    set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
+  endif()
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})

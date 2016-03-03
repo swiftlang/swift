@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -82,6 +83,13 @@ private:
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                      const NominalTypeDecl *NTD) override {
     return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
+  }
+
+  void printParameterPre(PrintParameterKind Kind) override {
+    return OtherPrinter.printParameterPre(Kind);
+  }
+  void printParameterPost(PrintParameterKind Kind) override {
+    return OtherPrinter.printParameterPost(Kind);
   }
 
   void printNamePre(PrintNameContext Context) override {
@@ -158,35 +166,6 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   AdjustedOptions.VarInitializers = false;
 
   AdjustedOptions.PrintDefaultParameterPlaceholder = true;
-}
-
-void findExtensionsFromConformingProtocols(Decl *D,
-                                           llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
-  NominalTypeDecl* NTD = dyn_cast<NominalTypeDecl>(D);
-  if (!NTD || NTD->getKind() == DeclKind::Protocol)
-    return;
-  std::vector<NominalTypeDecl*> Unhandled;
-  auto addTypeLocNominal = [&](TypeLoc TL){
-    if (TL.getType()) {
-      if (auto D = TL.getType()->getAnyNominal()) {
-        Unhandled.push_back(D);
-      }
-    }
-  };
-  for (auto TL : NTD->getInherited()) {
-    addTypeLocNominal(TL);
-  }
-  while(!Unhandled.empty()) {
-    NominalTypeDecl* Back = Unhandled.back();
-    Unhandled.pop_back();
-    for (ExtensionDecl *E : Back->getExtensions()) {
-      if(E->isConstrainedExtension())
-        Results.insert(E);
-      for (auto TL : Back->getInherited()) {
-        addTypeLocNominal(TL);
-      }
-    }
-  }
 }
 
 ArrayRef<StringRef>
@@ -468,7 +447,8 @@ void swift::ide::printSubmoduleInterface(
 
           // Print synthesized extensions.
           llvm::SmallPtrSet<ExtensionDecl *, 10> ExtensionsFromConformances;
-          findExtensionsFromConformingProtocols(D, ExtensionsFromConformances);
+          SynthesizedExtensionAnalyzer Analyzer(NTD);
+          Analyzer.findSynthesizedExtensions(ExtensionsFromConformances);
           AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
           for (auto ET : ExtensionsFromConformances) {
             if (!shouldPrint(ET, AdjustedOptions))

@@ -22,17 +22,46 @@
 namespace swift {
 namespace reflection {
 
+class FieldRecordFlags {
+  using int_type = uint32_t;
+  enum : int_type {
+    IsObjC = 0x00000001,
+  };
+  int_type Data;
+public:
+  bool isObjC() const {
+    return Data & IsObjC;
+  }
+
+  void setIsObjC(bool ObjC) {
+    if (ObjC)
+      Data |= IsObjC;
+    else
+      Data &= ~IsObjC;
+  }
+
+  int_type getRawValue() const {
+    return Data;
+  }
+};
+
 class FieldRecord {
+  const FieldRecordFlags Flags;
   const RelativeDirectPointer<const char> MangledTypeName;
   const RelativeDirectPointer<const char> FieldName;
 
 public:
+  FieldRecord() = delete;
   std::string getMangledTypeName() const {
     return MangledTypeName.get();
   }
 
   std::string getFieldName()  const {
     return FieldName.get();
+  }
+
+  bool isObjC() const {
+    return Flags.isObjC();
   }
 };
 

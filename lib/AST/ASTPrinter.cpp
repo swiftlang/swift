@@ -50,6 +50,30 @@
 using namespace swift;
 namespace swift {
 
+std::unique_ptr<llvm::DenseMap<StringRef, Type>>
+collectNameTypeMap(Type Ty, const DeclContext *DC) {
+  std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap(
+    new llvm::DenseMap<StringRef, Type>());
+  Type BaseTy = Ty->getRValueType();
+
+  do {
+    auto D = BaseTy->getNominalOrBoundGenericNominal();
+    if (!D || !D->getGenericParams())
+      continue;
+    SmallVector<Type, 3> Scrach;
+    auto Args = BaseTy->getAllGenericArgs(Scrach);
+    const auto ParamDecls = D->getGenericParams()->getParams();
+    assert(ParamDecls.size() == Args.size());
+
+    // Map type parameter names with their instantiating arguments.
+    for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+      (*IdMap)[ParamDecls[I]->getName().str()] = Args[I];
+    }
+  } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
+  return IdMap;
+}
+
+
 class PrinterArchetypeTransformer {
 public:
   virtual Type transform(Type Ty) = 0;
@@ -59,32 +83,12 @@ public:
 
 class PrinterArchetypeNameTransformer : public PrinterArchetypeTransformer{
   Type BaseTy;
-  const DeclContext *DC;
   llvm::DenseMap<TypeBase *, Type> Cache;
-  llvm::DenseMap<StringRef, Type> IdMap;
+  std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap;
 
 public:
   PrinterArchetypeNameTransformer(Type Ty, const DeclContext *DC) :
-    BaseTy(Ty->getRValueType()), DC(DC){
-    (void) this->DC;
-      
-      Type BaseTy = Ty->getRValueType();
-      
-      do {
-        auto D = BaseTy->getNominalOrBoundGenericNominal();
-        if (!D || !D->getGenericParams())
-          continue;
-        SmallVector<Type, 3> Scrach;
-        auto Args = BaseTy->getAllGenericArgs(Scrach);
-        const auto ParamDecls = D->getGenericParams()->getParams();
-        assert(ParamDecls.size() == Args.size());
-        
-        // Map type parameter names with their instantiating arguments.
-        for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
-          IdMap[ParamDecls[I]->getName().str()] = Args[I];
-        }
-      } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
-    }
+    BaseTy(Ty->getRValueType()), IdMap(collectNameTypeMap(Ty, DC)){}
 
   StringRef transform(StringRef TypeName) override {
     return TypeName;
@@ -103,7 +107,7 @@ public:
       auto Result = Ty;
       
       // Iterate the IdMap to find the argument type of the given param name.
-      for (auto It = IdMap.begin(); It != IdMap.end(); ++ It) {
+      for (auto It = IdMap->begin(); It != IdMap->end(); ++ It) {
         if (Id == It->getFirst()) {
           Result = It->getSecond();
           break;
@@ -174,7 +178,8 @@ public:
     return Ty.transform(F);
   }
 
-  StringRef transform(StringRef TypeName) override {
+  Type checkMemberTypeInternal(StringRef TypeName) {
+    ASTContext &Ctx = DC.getASTContext();
     llvm::SmallVector<StringRef, 4> Parts;
     TypeName.split(Parts, '.');
     std::vector<Identifier> Names;
@@ -183,8 +188,11 @@ public:
         continue;
       Names.push_back(Ctx.getIdentifier(Parts[I]));
     }
-    Type Result = checkMemberType(DC, BaseTy, Names);
-    if (Result) {
+    return checkMemberType(DC, BaseTy, Names);
+  }
+
+  StringRef transform(StringRef TypeName) override {
+    if (auto Result = checkMemberTypeInternal(TypeName)) {
       Result = Result->getDesugaredType();
       std::unique_ptr<std::string> pBuffer(new std::string);
       llvm::raw_string_ostream OS(*pBuffer);
@@ -196,6 +204,93 @@ public:
     return tryNamedArchetypeTransform(TypeName);
   }
 };
+
+struct SynthesizedExtensionAnalyzer::Implementation {
+  NominalTypeDecl *Target;
+  Type BaseType;
+  DeclContext *DC;
+  std::unique_ptr<ArchetypeSelfTransformer> pTransform;
+
+  Implementation(NominalTypeDecl *Target):
+    Target(Target),
+    BaseType(Target->getDeclaredTypeInContext()),
+    DC(Target), pTransform(new ArchetypeSelfTransformer(Target)) {}
+};
+
+SynthesizedExtensionAnalyzer::
+SynthesizedExtensionAnalyzer(NominalTypeDecl *Target):
+  Impl(*(new Implementation(Target))) {}
+
+bool SynthesizedExtensionAnalyzer::isApplicable(ExtensionDecl *Ext) {
+  if (!Ext->getGenericParams())
+    return true;
+  for (auto Req : Ext->getGenericParams()->getRequirements()){
+    auto TupleOp = Req.getAsAnalyzedWrittenString();
+    if (!TupleOp)
+      continue;
+    StringRef FirstType = std::get<0>(TupleOp.getValue());
+    StringRef SecondType = std::get<1>(TupleOp.getValue());
+    RequirementReprKind Kind = std::get<2>(TupleOp.getValue());
+    Type First = Impl.pTransform->checkMemberTypeInternal(FirstType);
+    Type Second = lookUpTypeInContext(Impl.DC, SecondType);
+    if (First && Second) {
+      First = First->getDesugaredType();
+      Second = Second->getDesugaredType();
+      switch (Kind) {
+        case RequirementReprKind::TypeConstraint:
+          if(!canPossiblyConvertTo(First, Second, *Impl.DC))
+            return false;
+          break;
+        case RequirementReprKind::SameType:
+          if (!canPossiblyEqual(First, Second, *Impl.DC))
+            return false;
+          break;
+      }
+    }
+  }
+  return true;
+}
+
+SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
+
+bool SynthesizedExtensionAnalyzer::
+isInSynthesizedExtension(const ValueDecl *VD) {
+  if(auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
+                                                getInnermostTypeContext())) {
+    llvm::SmallPtrSet<ExtensionDecl*, 15> Exts;
+    findSynthesizedExtensions(Exts);
+    return Exts.count(Ext) != 0;
+  }
+  return false;
+}
+
+void SynthesizedExtensionAnalyzer::
+findSynthesizedExtensions(llvm::SmallPtrSetImpl<ExtensionDecl*> &Results) {
+    if (Impl.Target->getKind() == DeclKind::Protocol)
+      return;
+    std::vector<NominalTypeDecl*> Unhandled;
+    auto addTypeLocNominal = [&](TypeLoc TL){
+      if (TL.getType()) {
+        if (auto D = TL.getType()->getAnyNominal()) {
+          Unhandled.push_back(D);
+        }
+      }
+    };
+    for (auto TL : Impl.Target->getInherited()) {
+      addTypeLocNominal(TL);
+    }
+    while(!Unhandled.empty()) {
+      NominalTypeDecl* Back = Unhandled.back();
+      Unhandled.pop_back();
+      for (ExtensionDecl *E : Back->getExtensions()) {
+        if(E->isConstrainedExtension() && isApplicable(E))
+          Results.insert(E);
+        for (auto TL : Back->getInherited()) {
+          addTypeLocNominal(TL);
+        }
+      }
+    }
+  }
 }
 
 PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
@@ -392,11 +487,31 @@ ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   return *this;
 }
 
+// FIXME: We need to undef 'defer' when including Tokens.def. It is restored
+// below.
+#undef defer
+
+ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
+  StringRef name;
+  switch (keyword) {
+
+#define KEYWORD(KW) case tok::kw_##KW: name = #KW; break;
+#define POUND_KEYWORD(KW) case tok::pound_##KW: name = "#"#KW; break;
+#include "swift/Parse/Tokens.def"
+  default:
+    llvm_unreachable("unexpected keyword kind");
+  }
+  printer.printKeyword(name);
+  return printer;
+}
+
 /// Determine whether to escape the given keyword in the given context.
 static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   switch (context) {
   case PrintNameContext::Normal:
     return true;
+  case PrintNameContext::Keyword:
+    return false;
 
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
@@ -409,10 +524,10 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
   callPrintNamePre(Context);
-  defer { printNamePost(Context); };
 
   if (Name.empty()) {
     *this << "_";
+    printNamePost(Context);
     return;
   }
   bool IsKeyword = llvm::StringSwitch<bool>(Name.str())
@@ -429,7 +544,12 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
   *this << Name.str();
   if (IsKeyword)
     *this << "`";
+
+  printNamePost(Context);
 }
+
+// FIXME: Restore defer after Tokens.def.
+#define defer defer_impl
 
 void StreamPrinter::printText(StringRef Text) {
   OS << Text;
@@ -557,10 +677,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
     case StaticSpellingKind::None:
       llvm_unreachable("should not be called for non-static decls");
     case StaticSpellingKind::KeywordStatic:
-      Printer << "static ";
+      Printer << tok::kw_static << " ";
       break;
     case StaticSpellingKind::KeywordClass:
-      Printer<< "class ";
+      Printer << tok::kw_class << " ";
       break;
     }
   }
@@ -568,15 +688,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printAccessibility(Accessibility access, StringRef suffix = "") {
     switch (access) {
     case Accessibility::Private:
-      Printer << "private";
+      Printer << tok::kw_private;
       break;
     case Accessibility::Internal:
       if (!Options.PrintInternalAccessibilityKeyword)
         return;
-      Printer << "internal";
+      Printer << tok::kw_internal;
       break;
     case Accessibility::Public:
-      Printer << "public";
+      Printer << tok::kw_public;
       break;
     }
     Printer << suffix << " ";
@@ -718,19 +838,9 @@ void PrintAST::printAttributes(const Decl *D) {
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
-  auto TheTypeLoc = TP->getTypeLoc();
-  if (TheTypeLoc.hasLocation()) {
-
-    printPattern(TP->getSubPattern());
-    Printer << ": ";
-    printTypeLoc(TheTypeLoc);
-    return;
-  }
-
-
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  TP->getType().print(Printer, Options);
+  printTypeLoc(TP->getTypeLoc());
 }
 
 void PrintAST::printPattern(const Pattern *pattern) {
@@ -774,7 +884,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(pattern);
-    Printer << "is ";
+    Printer << tok::kw_is << " ";
     isa->getCastTypeLoc().getType().print(Printer, Options);
     break;
   }
@@ -807,7 +917,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
 
   case PatternKind::Bool:
-    Printer << (cast<BoolPattern>(pattern)->getValue() ? "true" : "false");
+    Printer << (cast<BoolPattern>(pattern)->getValue() ? tok::kw_true
+                                                       : tok::kw_false);
     break;
 
   case PatternKind::Expr:
@@ -816,7 +927,9 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Var:
     if (!Options.SkipIntroducerKeywords)
-      Printer << (cast<VarPattern>(pattern)->isLet() ? "let " : "var ");
+      Printer << (cast<VarPattern>(pattern)->isLet() ? tok::kw_let
+                                                     : tok::kw_var)
+              << " ";
     printPattern(cast<VarPattern>(pattern)->getSubPattern());
   }
 }
@@ -890,7 +1003,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       bool First = true;
       for (auto &E : Elements) {
         if (First) {
-          Printer << " where ";
+          Printer << " " << tok::kw_where << " ";
           First = false;
         } else {
           Printer << ", ";
@@ -909,7 +1022,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       continue;
 
     if (isFirst) {
-      Printer << " where ";
+      Printer << " " << tok::kw_where << " ";
       isFirst = false;
     } else {
       Printer << ", ";
@@ -1138,11 +1251,19 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     }
 
     Printer << " {";
-    if (mutatingGetter) Printer << " mutating";
-    Printer << " get";
+    if (mutatingGetter) {
+      Printer << " ";
+      Printer.printKeyword("mutating");
+    }
+    Printer << " ";
+    Printer.printKeyword("get");
     if (settable) {
-      if (nonmutatingSetter) Printer << " nonmutating";
-      Printer << " set";
+      if (nonmutatingSetter) {
+        Printer << " ";
+        Printer.printKeyword("nonmutating");
+      }
+      Printer << " ";
+      Printer.printKeyword("set");
     }
     Printer << " }";
     return;
@@ -1170,14 +1291,18 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       return;
     if (!PrintAccessorBody) {
       if (isAccessorAssumedNonMutating(Accessor)) {
-        if (Accessor->isMutating())
-          Printer << " mutating";
+        if (Accessor->isMutating()) {
+          Printer << " ";
+          Printer.printKeyword("mutating");
+        }
       } else {
         if (Accessor->isExplicitNonMutating()) {
-          Printer << " nonmutating";
+          Printer << " ";
+          Printer.printKeyword("nonmutating");
         }
       }
-      Printer << " " << Label;
+      Printer << " ";
+      Printer.printKeyword(Label); // Contextual keyword get, set, ...
     } else {
       Printer.printNewline();
       IndentRAII IndentMore(*this);
@@ -1318,7 +1443,7 @@ void PrintAST::printInherited(const Decl *decl,
     bool PrintedInherited = false;
 
     if (explicitClass) {
-      Printer << " : class";
+      Printer << " : " << tok::kw_class;
       PrintedInherited = true;
     } else if (superclass) {
       bool ShouldPrintSuper = true;
@@ -1335,7 +1460,7 @@ void PrintAST::printInherited(const Decl *decl,
     bool UseProtocolCompositionSyntax =
         PrintAsProtocolComposition && protos.size() > 1;
     if (UseProtocolCompositionSyntax) {
-      Printer << " : protocol<";
+      Printer << " : " << tok::kw_protocol << "<";
       PrintedColon = true;
     }
     for (auto Proto : protos) {
@@ -1382,7 +1507,7 @@ void PrintAST::printInherited(const Decl *decl,
     Printer << " : ";
 
     if (explicitClass)
-      Printer << " class, ";
+      Printer << " " << tok::kw_class << ", ";
 
     interleave(TypesToPrint, [&](TypeLoc TL) {
       printTypeLoc(TL);
@@ -1438,31 +1563,31 @@ static void getModuleEntities(ImportDecl *Import,
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
   printAttributes(decl);
-  Printer << "import ";
+  Printer << tok::kw_import << " ";
 
   switch (decl->getImportKind()) {
   case ImportKind::Module:
     break;
   case ImportKind::Type:
-    Printer << "typealias ";
+    Printer << tok::kw_typealias << " ";
     break;
   case ImportKind::Struct:
-    Printer << "struct ";
+    Printer << tok::kw_struct << " ";
     break;
   case ImportKind::Class:
-    Printer << "class ";
+    Printer << tok::kw_class << " ";
     break;
   case ImportKind::Enum:
-    Printer << "enum ";
+    Printer << tok::kw_enum << " ";
     break;
   case ImportKind::Protocol:
-    Printer << "protocol ";
+    Printer << tok::kw_protocol << " ";
     break;
   case ImportKind::Var:
-    Printer << "var ";
+    Printer << tok::kw_var << " ";
     break;
   case ImportKind::Func:
-    Printer << "func ";
+    Printer << tok::kw_func << " ";
     break;
   }
 
@@ -1487,7 +1612,7 @@ void PrintAST::printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl* E
     ExtDecl->getExtendedType()->getAnyNominal()->getName().str() << "\n";
   printDocumentationComment(ExtDecl);
   printAttributes(ExtDecl);
-  Printer << "extension ";
+  Printer << tok::kw_extension << " ";
   Printer << Decl->getName().str();
   printInherited(ExtDecl);
   if (auto *GPs = ExtDecl->getGenericParams()) {
@@ -1617,7 +1742,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAttributes(decl);
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
-    Printer << "typealias ";
+    Printer << tok::kw_typealias << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -1649,7 +1774,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   if (!Options.SkipIntroducerKeywords)
-    Printer << "associatedtype ";
+    Printer << tok::kw_associatedtype << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -1674,7 +1799,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
     if (!Options.SkipIntroducerKeywords)
-      Printer << "enum ";
+      Printer << tok::kw_enum << " ";
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -1699,7 +1824,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
     if (!Options.SkipIntroducerKeywords)
-      Printer << "struct ";
+      Printer << tok::kw_struct << " ";
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -1724,7 +1849,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
     if (!Options.SkipIntroducerKeywords)
-      Printer << "class ";
+      Printer << tok::kw_class << " ";
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -1751,7 +1876,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
     if (!Options.SkipIntroducerKeywords)
-      Printer << "protocol ";
+      Printer << tok::kw_protocol << " ";
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -1802,7 +1927,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (!Options.SkipIntroducerKeywords) {
     if (decl->isStatic())
       printStaticKeyword(decl->getCorrectStaticSpelling());
-    Printer << (decl->isLet() ? "let " : "var ");
+    Printer << (decl->isLet() ? tok::kw_let : tok::kw_var) << " ";
   }
   recordDeclLoc(decl,
     [&]{
@@ -1810,11 +1935,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     });
   if (decl->hasType()) {
     Printer << ": ";
-    if (Options.TransformContext)
-      Options.TransformContext->transform(decl->getType()).
-        print(Printer, Options);
-    else
-      decl->getType().print(Printer, Options);
+    // Use the non-repr external type, but reuse the TypeLoc printing code.
+    printTypeLoc(TypeLoc::withoutLoc(decl->getType()));
   }
 
   printAccessors(decl);
@@ -1826,8 +1948,8 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
-  Printer.callPrintDeclPre(param);
-  defer { Printer.callPrintDeclPost(param); };
+  Printer.printParameterPre(PrintParameterKind::FunctionParameter);
+  defer { Printer.printParameterPost(PrintParameterKind::FunctionParameter); };
 
   auto printArgName = [&]() {
     // Print argument name.
@@ -1925,7 +2047,7 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
     auto defaultArgStr
       = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
     if (defaultArgStr.empty())
-      Printer << "default";
+      Printer << tok::kw_default;
     else
       Printer << defaultArgStr;
   }
@@ -1960,9 +2082,9 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   if (AFD->isBodyThrowing()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
-      Printer << " rethrows";
+      Printer << " " << tok::kw_rethrows;
     else
-      Printer << " throws";
+      Printer << " " << tok::kw_throws;
   }
 }
 
@@ -2067,9 +2189,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (!Options.SkipIntroducerKeywords) {
         if (decl->isStatic() && !decl->isOperator())
           printStaticKeyword(decl->getCorrectStaticSpelling());
-        if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>())
-          Printer << "mutating ";
-        Printer << "func ";
+        if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
+          Printer.printKeyword("mutating");
+          Printer << " ";
+        }
+        Printer << tok::kw_func << " ";
       }
       recordDeclLoc(decl,
         [&]{ // Name
@@ -2123,7 +2247,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
     printDocumentationComment(elems[0]);
   }
   printAttributes(decl);
-  Printer << "case ";
+  Printer << tok::kw_case << " ";
 
   interleave(elems.begin(), elems.end(),
     [&](EnumElementDecl *elt) {
@@ -2137,7 +2261,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
   printAttributes(decl);
-  Printer << "case ";
+  Printer << tok::kw_case << " ";
   printEnumElement(decl);
 }
 
@@ -2164,11 +2288,12 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
   if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
-      !decl->getAttrs().hasAttribute<ConvenienceAttr>())
-    Printer << "convenience ";
-  else
-    if (decl->getInitKind() == CtorInitializerKind::Factory)
+      !decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
+    Printer.printKeyword("convenience");
+    Printer << " ";
+  } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
       Printer << "/*not inherited*/ ";
+  }
   
   recordDeclLoc(decl,
     [&]{
@@ -2218,7 +2343,8 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 }
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
-  Printer << "infix operator ";
+  Printer.printKeyword("infix");
+  Printer << " " << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2229,29 +2355,31 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     IndentRAII indentMore(*this);
     if (!decl->isAssociativityImplicit()) {
       indent();
-      Printer << "associativity ";
+      Printer.printKeyword("associativity");
+      Printer << " ";
       switch (decl->getAssociativity()) {
       case Associativity::None:
-        Printer << "none";
+        Printer.printKeyword("none");
         break;
       case Associativity::Left:
-        Printer << "left";
+        Printer.printKeyword("left");
         break;
       case Associativity::Right:
-        Printer << "right";
+        Printer.printKeyword("right");
         break;
       }
       Printer.printNewline();
     }
     if (!decl->isPrecedenceImplicit()) {
       indent();
-      Printer << "precedence " << decl->getPrecedence();
+      Printer.printKeyword("precedence");
+      Printer << " " << decl->getPrecedence();
       Printer.printNewline();
     }
     if (!decl->isAssignmentImplicit()) {
       indent();
       if (decl->isAssignment())
-        Printer << "assignment";
+        Printer.printKeyword("assignment");
       else
         Printer << "/* not assignment */";
       Printer.printNewline();
@@ -2262,7 +2390,8 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
 }
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
-  Printer << "prefix operator ";
+  Printer.printKeyword("prefix");
+  Printer << " " << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2273,7 +2402,8 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
-  Printer << "postfix operator ";
+  Printer.printKeyword("postfix");
+  Printer << " " << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2294,7 +2424,7 @@ void PrintAST::visitBraceStmt(BraceStmt *stmt) {
 }
 
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
-  Printer << "return";
+  Printer << tok::kw_return;
   if (stmt->hasResult()) {
     Printer << " ";
     // FIXME: print expression.
@@ -2302,27 +2432,27 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
 }
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
-  Printer << "throw ";
+  Printer << tok::kw_throw << " ";
   // FIXME: print expression.
 }
 
 void PrintAST::visitDeferStmt(DeferStmt *stmt) {
-  Printer << "defer ";
+  Printer << tok::kw_defer << " ";
   visit(stmt->getBodyAsWritten());
 }
 
 void PrintAST::visitIfStmt(IfStmt *stmt) {
-  Printer << "if ";
+  Printer << tok::kw_if << " ";
   // FIXME: print condition
   Printer << " ";
   visit(stmt->getThenStmt());
   if (auto elseStmt = stmt->getElseStmt()) {
-    Printer << " else ";
+    Printer << " " << tok::kw_else << " ";
     visit(elseStmt);
   }
 }
 void PrintAST::visitGuardStmt(GuardStmt *stmt) {
-  Printer << "guard ";
+  Printer << tok::kw_guard << " ";
   // FIXME: print condition
   Printer << " ";
   visit(stmt->getBody());
@@ -2334,11 +2464,11 @@ void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
 
   for (auto &Clause : stmt->getClauses()) {
     if (&Clause == &*stmt->getClauses().begin())
-      Printer << "#if "; // FIXME: print condition
+      Printer << tok::pound_if << " "; // FIXME: print condition
     else if (Clause.Cond)
-      Printer << "#elseif"; // FIXME: print condition
+      Printer << tok::pound_elseif << ""; // FIXME: print condition
     else
-      Printer << "#else";
+      Printer << tok::pound_else;
     Printer.printNewline();
     if (printASTNodes(Clause.Elements)) {
       Printer.printNewline();
@@ -2346,30 +2476,30 @@ void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
     }
   }
   Printer.printNewline();
-  Printer << "#endif";
+  Printer << tok::pound_endif;
 }
 
 void PrintAST::visitWhileStmt(WhileStmt *stmt) {
-  Printer << "while ";
+  Printer << tok::kw_while << " ";
   // FIXME: print condition
   Printer << " ";
   visit(stmt->getBody());
 }
 
 void PrintAST::visitRepeatWhileStmt(RepeatWhileStmt *stmt) {
-  Printer << "do ";
+  Printer << tok::kw_do << " ";
   visit(stmt->getBody());
-  Printer << " while ";
+  Printer << " " << tok::kw_while << " ";
   // FIXME: print condition
 }
 
 void PrintAST::visitDoStmt(DoStmt *stmt) {
-  Printer << "do ";
+  Printer << tok::kw_do << " ";
   visit(stmt->getBody());
 }
 
 void PrintAST::visitDoCatchStmt(DoCatchStmt *stmt) {
-  Printer << "do ";
+  Printer << tok::kw_do << " ";
   visit(stmt->getBody());
   for (auto clause : stmt->getCatches()) {
     visitCatchStmt(clause);
@@ -2377,10 +2507,10 @@ void PrintAST::visitDoCatchStmt(DoCatchStmt *stmt) {
 }
 
 void PrintAST::visitCatchStmt(CatchStmt *stmt) {
-  Printer << "catch ";
+  Printer << tok::kw_catch << " ";
   printPattern(stmt->getErrorPattern());
   if (auto guard = stmt->getGuardExpr()) {
-    Printer << " where ";
+    Printer << " " << tok::kw_where << " ";
     // FIXME: print guard expression
     (void) guard;
   }
@@ -2389,7 +2519,7 @@ void PrintAST::visitCatchStmt(CatchStmt *stmt) {
 }
 
 void PrintAST::visitForStmt(ForStmt *stmt) {
-  Printer << "for (";
+  Printer << tok::kw_for << " (";
   // FIXME: print initializer
   Printer << "; ";
   if (stmt->getCond().isNonNull()) {
@@ -2402,28 +2532,28 @@ void PrintAST::visitForStmt(ForStmt *stmt) {
 }
 
 void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
-  Printer << "for ";
+  Printer << tok::kw_for << " ";
   printPattern(stmt->getPattern());
-  Printer << " in ";
+  Printer << " " << tok::kw_in << " ";
   // FIXME: print container
   Printer << " ";
   visit(stmt->getBody());
 }
 
 void PrintAST::visitBreakStmt(BreakStmt *stmt) {
-  Printer << "break";
+  Printer << tok::kw_break;
 }
 
 void PrintAST::visitContinueStmt(ContinueStmt *stmt) {
-  Printer << "continue";
+  Printer << tok::kw_continue;
 }
 
 void PrintAST::visitFallthroughStmt(FallthroughStmt *stmt) {
-  Printer << "fallthrough";
+  Printer << tok::kw_fallthrough;
 }
 
 void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
-  Printer << "switch ";
+  Printer << tok::kw_switch << " ";
   // FIXME: print subject
   Printer << "{";
   Printer.printNewline();
@@ -2437,17 +2567,17 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
 
 void PrintAST::visitCaseStmt(CaseStmt *CS) {
   if (CS->isDefault()) {
-    Printer << "default";
+    Printer << tok::kw_default;
   } else {
     auto PrintCaseLabelItem = [&](const CaseLabelItem &CLI) {
       if (auto *P = CLI.getPattern())
         printPattern(P);
       if (CLI.getGuardExpr()) {
-        Printer << " where ";
+        Printer << " " << tok::kw_where << " ";
         // FIXME: print guard expr
       }
     };
-    Printer << "case ";
+    Printer << tok::kw_case << " ";
     interleave(CS->getCaseLabelItems(), PrintCaseLabelItem,
                [&] { Printer << ", "; });
   }
@@ -2458,7 +2588,7 @@ void PrintAST::visitCaseStmt(CaseStmt *CS) {
 }
 
 void PrintAST::visitFailStmt(FailStmt *stmt) {
-  Printer << "return nil";
+  Printer << tok::kw_return << " " << tok::kw_nil;
 }
 
 void Decl::print(raw_ostream &os) const {
@@ -3034,7 +3164,7 @@ public:
     printWithParensIfNotSimple(T->getInput());
     
     if (T->throws())
-      Printer << " throws";
+      Printer << " " << tok::kw_throws;
     
     Printer << " -> ";
     T->getResult().print(Printer, Options);
@@ -3047,7 +3177,7 @@ public:
     printWithParensIfNotSimple(T->getInput());
 
     if (T->throws())
-      Printer << " throws";
+      Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
     T->getResult().print(Printer, Options);
@@ -3164,7 +3294,7 @@ public:
         continue;
 
       if (isFirstReq) {
-        Printer << " where ";
+        Printer << " " << tok::kw_where << " ";
         isFirstReq = false;
       } else {
         Printer << ", ";
@@ -3196,7 +3326,7 @@ public:
     printWithParensIfNotSimple(T->getInput());
 
     if (T->throws())
-      Printer << " throws";
+      Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
     T->getResult().print(Printer, Options);
@@ -3301,7 +3431,7 @@ public:
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *T) {
-    Printer << "protocol<";
+    Printer << tok::kw_protocol << "<";
     bool First = true;
     for (auto Proto : T->getProtocols()) {
       if (First)
@@ -3319,7 +3449,7 @@ public:
   }
 
   void visitInOutType(InOutType *T) {
-    Printer << "inout ";
+    Printer << tok::kw_inout << " ";
     visit(T->getObjectType());
   }
 

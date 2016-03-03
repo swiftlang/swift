@@ -1706,10 +1706,11 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_var:
   case tok::pound_if:
   case tok::identifier:
+  case tok::pound_setline:
     return true;
   case tok::pound_line:
-    // #line at the start of the line is a directive, #line within a line is
-    // an expression.
+    // #line at the start of the line is a directive, but it's deprecated.
+    // #line within a line is an expression.
     return Tok.isAtStartOfLine();
 
   case tok::kw_try:
@@ -1740,6 +1741,11 @@ static bool isParenthesizedUnowned(Parser &P) {
 bool Parser::isStartOfDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
+
+  // 'init' invocation is not start of a declaration
+  if (Tok.is(tok::kw_init)) {
+    return !isa<ConstructorDecl>(CurDeclContext);
+  }
   
   // The protocol keyword needs more checking to reject "protocol<Int>".
   if (Tok.is(tok::kw_protocol)) {
@@ -2093,8 +2099,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       break;
     }
+    case tok::pound_setline:
+      Status = parseLineDirective(false);
+      break;
     case tok::pound_line:
-      Status = parseLineDirective();
+      Status = parseLineDirective(true);
       break;
 
     case tok::kw_func:
@@ -2556,15 +2565,20 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return DCC.fixupParserResult(status, ext);
 }
 
-ParserStatus Parser::parseLineDirective() {
-  SourceLoc Loc = consumeToken(tok::pound_line);
+ParserStatus Parser::parseLineDirective(bool isLine) {
+  SourceLoc Loc = consumeToken(isLine ? tok::pound_line
+                                      : tok::pound_setline);
+  if (isLine) {
+    diagnose(Loc, diag::line_directive_style_deprecated)
+        .fixItReplace(Loc, "#setline");
+  }
   bool WasInPoundLineEnvironment = InPoundLineEnvironment;
   if (WasInPoundLineEnvironment) {
     SourceMgr.closeVirtualFile(Loc);
     InPoundLineEnvironment = false;
   }
 
-  // #line\n returns to the main buffer.
+  // #setline\n returns to the main buffer.
   if (Tok.isAtStartOfLine()) {
     if (!WasInPoundLineEnvironment) {
       diagnose(Tok, diag::unexpected_line_directive);
@@ -2573,7 +2587,7 @@ ParserStatus Parser::parseLineDirective() {
     return makeParserSuccess();
   }
 
-  // #line 42 "file.swift"\n
+  // #setline 42 "file.swift"\n
   if (Tok.isNot(tok::integer_literal)) {
     diagnose(Tok, diag::expected_line_directive_number);
     return makeParserError();
@@ -2594,7 +2608,9 @@ ParserStatus Parser::parseLineDirective() {
     return makeParserError();
   }
 
-  auto Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#line");
+  auto Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                    isLine ? "#line"
+                                                           : "#setline");
   if (!Filename.hasValue())
     return makeParserError();
 

@@ -74,7 +74,7 @@ func propertyAccess(b b: B) {
 
 // CHECK: define hidden [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(
 func downcast(a a: A) -> B {
-  // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_B")
+  // CHECK: [[T0:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_B")
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
   return a as! B

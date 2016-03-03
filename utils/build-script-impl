@@ -138,13 +138,10 @@ KNOWN_SETTINGS=(
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
-    skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
     skip-test-ios-host          ""               "set to skip testing the host parts of the iOS toolchain"
-    skip-test-tvos              ""               "set to skip testing Swift stdlibs for tvOS"
     skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
     skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
-    skip-test-watchos           ""               "set to skip testing Swift stdlibs for Apple watchOS"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
     skip-test-validation        ""               "set to skip validation test suite"
@@ -203,7 +200,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
-    build-jobs ""                                "The number of parallel build jobs to use"
+    build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
@@ -226,6 +223,37 @@ function join_array_with_delimiter() {
 function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
 }
+
+function num_llvm_parallel_lto_link_jobs() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
+            # the formula GB Memory/3.5GB to get the number of parallel link
+            # threads we can support.
+            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000.0/3.5 | bc
+        ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
+function num_swift_parallel_lto_link_jobs() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
+            # the formula GB Memory/6GB to get the number of parallel link
+            # threads we can support.
+            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000/6.0 | bc
+        ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
 
 function set_deployment_target_based_options() {
     llvm_cmake_options=()
@@ -424,15 +452,35 @@ function set_deployment_target_based_options() {
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
             )
 	    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
+                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
+                    llvm_cmake_options=(
+                        "${llvm_cmake_options[@]}"
+                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                    )
+                fi
+
 		llvm_cmake_options=(
 		    "${llvm_cmake_options[@]}"
 		    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
 		    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
-		    "-DLLVM_PARALLEL_LINK_JOBS=5"
+		    "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
 		)
 	    fi
+
+            if [[ $(true_false "${SWIFT_ENABLE_LTO}") = "TRUE" ]]; then
+                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
+                    swift_cmake_options=(
+                        "${swift_cmake_options[@]}"
+                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
+                        "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
+                    )
+                fi
+            fi
+
             swift_cmake_options=(
                 "${swift_cmake_options[@]}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX="${DARWIN_DEPLOYMENT_VERSION_OSX}"
@@ -575,7 +623,6 @@ if [[ "${SKIP_IOS}" ]] ; then
     SKIP_BUILD_IOS=1
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS=1
     SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
@@ -584,7 +631,6 @@ if [[ "${SKIP_TVOS}" ]] ; then
     SKIP_BUILD_TVOS=1
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS=1
     SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
@@ -593,7 +639,6 @@ if [[ "${SKIP_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS=1
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS=1
     SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
@@ -602,7 +647,6 @@ if [[ "${SKIP_BUILD_IOS}" ]] ; then
     SKIP_BUILD_IOS=1
     SKIP_BUILD_IOS_DEVICE=1
     SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS=1
     SKIP_TEST_IOS_HOST=1
     SKIP_TEST_IOS_SIMULATOR=1
 fi
@@ -611,7 +655,6 @@ if [[ "${SKIP_BUILD_TVOS}" ]] ; then
     SKIP_BUILD_TVOS=1
     SKIP_BUILD_TVOS_DEVICE=1
     SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS=1
     SKIP_TEST_TVOS_HOST=1
     SKIP_TEST_TVOS_SIMULATOR=1
 fi
@@ -620,7 +663,6 @@ if [[ "${SKIP_BUILD_WATCHOS}" ]] ; then
     SKIP_BUILD_WATCHOS=1
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS=1
     SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
@@ -649,21 +691,6 @@ fi
 
 if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_IOS}" ]] ; then
-    SKIP_TEST_IOS_HOST=1
-    SKIP_TEST_IOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_TVOS}" ]] ; then
-    SKIP_TEST_TVOS_HOST=1
-    SKIP_TEST_TVOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TEST_WATCHOS}" ]] ; then
-    SKIP_TEST_WATCHOS_HOST=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
@@ -738,6 +765,18 @@ function true_false() {
             exit 1
             ;;
     esac
+}
+
+function cmake_version() {
+    echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
+}
+
+function cmake_needs_to_specify_standard_computed_defaults() {
+    if [[ $(cmake_version) = "3.4.0" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
 }
 
 # A list of deployment targets to cross-compile the Swift host tools for.

@@ -39,6 +39,12 @@ namespace swift {
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, DeclContext *DC);
 
+  bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
+
+  bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
+
+  Type lookUpTypeInContext(DeclContext *DC, StringRef Name);
+
   /// \brief Given an unresolved member E and its parent P, this function tries
   /// to infer the type of E.
   /// \returns true on success, false on error.

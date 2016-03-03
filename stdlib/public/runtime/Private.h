@@ -23,7 +23,6 @@
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
-  struct ProtocolDescriptor;
 
 #if SWIFT_HAS_ISA_MASKING
   SWIFT_RUNTIME_EXPORT

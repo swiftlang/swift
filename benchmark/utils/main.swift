@@ -90,6 +90,7 @@ import StringWalk
 import SuperChars
 import TwoSum
 import TypeFlood
+import UTF8Decode
 import Walsh
 import XorLoop
 
@@ -171,6 +172,7 @@ precommitTests = [
   "SuperChars": run_SuperChars,
   "TwoSum": run_TwoSum,
   "TypeFlood": run_TypeFlood,
+  "UTF8Decode": run_UTF8Decode,
   "Walsh": run_Walsh,
   "XorLoop": run_XorLoop,
 ]

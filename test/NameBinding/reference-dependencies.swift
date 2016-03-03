@@ -126,7 +126,7 @@ private struct ThreeTildeTypeImpl : ThreeTilde {
 func overloadedOnProto<T>(_: T) {}
 func overloadedOnProto<T: ThreeTilde>(_: T) {}
 
-// CHECK-DAG: !private "~~~"
+// CHECK-DAG: - "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
 
 var topLevelComputedProperty: Bool {

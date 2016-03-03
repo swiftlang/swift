@@ -3,11 +3,11 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
+// CHECK: %swift.refcounted = type {
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OBJC_CLASS:%objc_class]] = type {
 // CHECK: [[OPAQUE:%swift.opaque]] = type
 // CHECK: [[A:%C8subclass1A]] = type <{ [[REF:%swift.refcounted]], %Si, %Si }>
-// CHECK: [[REF]] = type {
 // CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[B:%C8subclass1B]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 

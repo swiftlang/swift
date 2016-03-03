@@ -30,31 +30,31 @@ DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 def parse_results(res, optset):
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
-    SCORERE = re.compile(r"(\d+),[ \t]*(\w+)," +
-                         ",".join([r"[ \t]*([\d.]+)"] * 7))
+    score_re = re.compile(r"(\d+),[ \t]*(\w+)," +
+                          ",".join([r"[ \t]*([\d.]+)"] * 7))
     # The Totals line would be parsed like this.
-    TOTALRE = re.compile(r"()(Totals)," +
-                         ",".join([r"[ \t]*([\d.]+)"] * 7))
-    KEYGROUP = 2
-    VALGROUP = 4
-    MEMGROUP = 9
+    total_re = re.compile(r"()(Totals)," +
+                          ",".join([r"[ \t]*([\d.]+)"] * 7))
+    key_group = 2
+    val_group = 4
+    mem_group = 9
 
     tests = []
     for line in res.split():
-        m = SCORERE.match(line)
+        m = score_re.match(line)
         if not m:
-            m = TOTALRE.match(line)
+            m = total_re.match(line)
             if not m:
                 continue
-        testresult = int(m.group(VALGROUP))
-        testname = m.group(KEYGROUP)
+        testresult = int(m.group(val_group))
+        testname = m.group(key_group)
         test = {}
         test['Data'] = [testresult]
         test['Info'] = {}
         test['Name'] = "nts.swift/" + optset + "." + testname + ".exec"
         tests.append(test)
         if testname != 'Totals':
-            mem_testresult = int(m.group(MEMGROUP))
+            mem_testresult = int(m.group(mem_group))
             mem_test = {}
             mem_test['Data'] = [mem_testresult]
             mem_test['Info'] = {}
@@ -89,26 +89,26 @@ def instrument_test(driver_path, test, num_samples):
                             [peak_memory])
 
     # Average sample results
-    NUM_SAMPLES_INDEX = 2
-    MIN_INDEX = 3
-    MAX_INDEX = 4
-    AVG_START_INDEX = 5
+    num_samples_index = 2
+    min_index = 3
+    max_index = 4
+    avg_start_index = 5
 
     # TODO: Correctly take stdev
     avg_test_output = test_outputs[0]
-    avg_test_output[AVG_START_INDEX:] = map(int,
-                                            avg_test_output[AVG_START_INDEX:])
+    avg_test_output[avg_start_index:] = map(int,
+                                            avg_test_output[avg_start_index:])
     for test_output in test_outputs[1:]:
-        for i in range(AVG_START_INDEX, len(test_output)):
+        for i in range(avg_start_index, len(test_output)):
             avg_test_output[i] += int(test_output[i])
-    for i in range(AVG_START_INDEX, len(avg_test_output)):
+    for i in range(avg_start_index, len(avg_test_output)):
         avg_test_output[i] = int(round(avg_test_output[i] /
                                        float(len(test_outputs))))
-    avg_test_output[NUM_SAMPLES_INDEX] = num_samples
-    avg_test_output[MIN_INDEX] = min(test_outputs,
-                                     key=lambda x: x[MIN_INDEX])[MIN_INDEX]
-    avg_test_output[MAX_INDEX] = max(test_outputs,
-                                     key=lambda x: x[MAX_INDEX])[MAX_INDEX]
+    avg_test_output[num_samples_index] = num_samples
+    avg_test_output[min_index] = min(test_outputs,
+                                     key=lambda x: x[min_index])[min_index]
+    avg_test_output[max_index] = max(test_outputs,
+                                     key=lambda x: x[max_index])[max_index]
     avg_test_output = map(str, avg_test_output)
 
     return avg_test_output

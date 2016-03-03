@@ -805,50 +805,103 @@ swift::operator!(ConditionalCompilationExprState state) {
   return {!state.isConditionActive(), state.getKind()};
 }
 
-/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
-StringRef swift::parseDeclName(StringRef name,
-                               SmallVectorImpl<StringRef> &argumentLabels,
-                               bool &isFunctionName) {
-  if (name.empty()) return "";
+ParsedDeclName swift::parseDeclName(StringRef name) {
+  if (name.empty()) return ParsedDeclName();
 
+  // Local function to handle the parsing of the base name + context.
+  //
+  // Returns true if an error occurred, without recording the base name.
+  ParsedDeclName result;
+  auto parseBaseName = [&](StringRef text) -> bool {
+    // Split the text into context name and base name.
+    StringRef contextName, baseName;
+    std::tie(contextName, baseName) = text.split('.');
+    if (baseName.empty()) {
+      baseName = contextName;
+      contextName = StringRef();
+    } else if (contextName.empty()) {
+      return true;
+    }
+
+    // Make sure we have an identifier for the base name.
+    if (!Lexer::isIdentifier(baseName) || baseName == "_")
+      return true;
+
+    // If we have a context, make sure it is an identifier.
+    if (!contextName.empty() &&
+        (!Lexer::isIdentifier(contextName) || contextName == "_"))
+      return true;
+
+    // Record the results.
+    result.ContextName = contextName;
+    result.BaseName = baseName;
+    return false;
+  };
+
+  // If this is not a function name, just parse the base name and
+  // we're done.
   if (name.back() != ')') {
-    isFunctionName = false;
-    if (Lexer::isIdentifier(name) && name != "_")
-      return name;
-
-    return "";
+    if (parseBaseName(name)) return ParsedDeclName();
+    return result;
   }
 
-  isFunctionName = true;
+  // We have a function name.
+  result.IsFunctionName = true;
 
-  StringRef BaseName, Parameters;
-  std::tie(BaseName, Parameters) = name.split('(');
-  if (!Lexer::isIdentifier(BaseName) || BaseName == "_")
-    return "";
+  // Split the base name from the parameters.
+  StringRef baseName, parameters;
+  std::tie(baseName, parameters) = name.split('(');
+  if (parameters.empty()) return ParsedDeclName();
 
-  if (Parameters.empty())
-    return "";
-  Parameters = Parameters.drop_back(); // ')'
+  // If the base name is prefixed by "getter:" or "setter:", it's an
+  // accessor.
+  if (baseName.startswith("getter:")) {
+    result.IsGetter = true;
+    result.IsFunctionName = false;
+    baseName = baseName.substr(7);
+  } else if (baseName.startswith("setter:")) {
+    result.IsSetter = true;
+    result.IsFunctionName = false;
+    baseName = baseName.substr(7);
+  }
 
-  if (Parameters.empty())
-    return BaseName;
+  // Parse the base name.
+  if (parseBaseName(baseName)) return ParsedDeclName();
 
-  if (Parameters.back() != ':')
-    return "";
+  parameters = parameters.drop_back(); // ')'
+  if (parameters.empty()) return result;
 
+  if (parameters.back() != ':')
+    return ParsedDeclName();
+
+  bool isMember = !result.ContextName.empty();
   do {
     StringRef NextParam;
-    std::tie(NextParam, Parameters) = Parameters.split(':');
+    std::tie(NextParam, parameters) = parameters.split(':');
 
     if (!Lexer::isIdentifier(NextParam))
-      return "";
-    if (NextParam == "_")
-      argumentLabels.push_back("");
-    else
-      argumentLabels.push_back(NextParam);
-  } while (!Parameters.empty());
+      return ParsedDeclName();
+    if (NextParam == "_") {
+      result.ArgumentLabels.push_back("");
+    } else if (isMember && NextParam == "self") {
+      // For a member, "self" indicates the self parameter. There can
+      // only be one such parameter.
+      if (result.SelfIndex) return ParsedDeclName();
+      result.SelfIndex = result.ArgumentLabels.size();
+    } else {
+      result.ArgumentLabels.push_back(NextParam);
+    }
+  } while (!parameters.empty());
 
-  return BaseName;
+  // Drop the argument labels for a property accessor; they aren't used.
+  if (result.isPropertyAccessor())
+    result.ArgumentLabels.clear();
+
+  return result;
+}
+
+DeclName ParsedDeclName::formDeclName(ASTContext &ctx) const {
+  return swift::formDeclName(ctx, BaseName, ArgumentLabels, IsFunctionName);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
@@ -883,11 +936,5 @@ DeclName swift::formDeclName(ASTContext &ctx,
 }
 
 DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {
-  // Parse the name string.
-  SmallVector<StringRef, 4> argumentLabels;
-  bool isFunctionName;
-  StringRef baseName = parseDeclName(name, argumentLabels, isFunctionName);
-
-  // Form the result.
-  return formDeclName(ctx, baseName, argumentLabels, isFunctionName);
+  return parseDeclName(name).formDeclName(ctx);
 }

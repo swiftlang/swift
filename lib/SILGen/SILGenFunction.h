@@ -591,7 +591,15 @@ public:
   
   /// Generate a protocol witness entry point, invoking 'witness' at the
   /// abstraction level of 'requirement'.
+  ///
+  /// \param conformance Either a concrete conformance, or nullptr if emitting
+  /// a default witness method.
+  ///
+  /// FIXME: Shouldn't take a conformance
   void emitProtocolWitness(ProtocolConformance *conformance,
+                           Type selfType,
+                           AbstractionPattern reqtOrigTy,
+                           CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
                            SILDeclRef witness,
                            ArrayRef<Substitution> witnessSubs,

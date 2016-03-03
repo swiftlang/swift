@@ -55,7 +55,7 @@ public protocol UnicodeCodec {
   /// Start or continue decoding a UTF sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
   /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// iterator.
@@ -272,7 +272,7 @@ public struct UTF8 : UnicodeCodec {
   /// Start or continue decoding a UTF sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.emptyInput`.
   /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// iterator.

@@ -1546,7 +1546,14 @@ Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
 }
 
 Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
-  auto Triple = getCommentForDecl(D);
+  auto GroupD = D;
+
+  // Extensions always exist in the same group with the nominal.
+  if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
+                                                getInnermostTypeContext())) {
+    GroupD = ED->getExtendedType()->getAnyNominal();
+  }
+  auto Triple = getCommentForDecl(GroupD);
   if (!Triple.hasValue()) {
     return None;
   }

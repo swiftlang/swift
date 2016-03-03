@@ -128,74 +128,74 @@ How to specify files:
 
     if separator_token in parsed_arguments.files:
         separator_index = parsed_arguments.files.index(separator_token)
-        oldFiles = parsed_arguments.files[:separator_index]
-        newFiles = parsed_arguments.files[separator_index + 1:]
+        old_files = parsed_arguments.files[:separator_index]
+        new_files = parsed_arguments.files[separator_index + 1:]
     else:
-        oldFileArgs = parsed_arguments.files
+        old_file_args = parsed_arguments.files
 
-        oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
-        newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
+        old_build_dir = os.environ.get("SWIFT_OLD_BUILDDIR")
+        new_build_dir = os.environ.get("SWIFT_NEW_BUILDDIR")
 
         if not parsed_arguments.files:
-            assert oldBuildDir and newBuildDir, \
+            assert old_build_dir and new_build_dir, \
                 'Incorrect usage: You must specify either a list of ' + \
                 'files, or have both $SWIFT_OLD_BUILDDIR and ' + \
                 '$SWIFT_NEW_BUILDDIR environment variables set.\n' + \
                 '$SWIFT_OLD_BUILDDIR = {0}\n$SWIFT_NEW_BUILDDIR = {1}'.format(
-                    oldBuildDir, newBuildDir)
-            oldFileArgs = list(SHORTCUTS.keys())
+                    old_build_dir, new_build_dir)
+            old_file_args = list(SHORTCUTS.keys())
 
-        oldFiles = []
-        newFiles = []
-        numExpanded = 0
-        for file in oldFileArgs:
+        old_files = []
+        new_files = []
+        num_expanded = 0
+        for file in old_file_args:
             if file in SHORTCUTS:
                 file = SHORTCUTS[file]
 
-            if not file.startswith("./") and oldBuildDir and newBuildDir:
-                oldExpanded = glob.glob(os.path.join(oldBuildDir, file))
-                newExpanded = glob.glob(os.path.join(newBuildDir, file))
-                if oldExpanded and newExpanded:
-                    oldFiles.extend(oldExpanded)
-                    newFiles.extend(newExpanded)
-                    numExpanded += 1
+            if not file.startswith("./") and old_build_dir and new_build_dir:
+                old_expanded = glob.glob(os.path.join(old_build_dir, file))
+                new_expanded = glob.glob(os.path.join(new_build_dir, file))
+                if old_expanded and new_expanded:
+                    old_files.extend(old_expanded)
+                    new_files.extend(new_expanded)
+                    num_expanded += 1
 
-        if numExpanded != 0 and numExpanded != len(oldFileArgs):
+        if num_expanded != 0 and num_expanded != len(old_file_args):
             sys.exit("mix of expanded/not-expanded arguments")
-        if numExpanded == 0:
-            if len(oldFileArgs) > 2:
+        if num_expanded == 0:
+            if len(old_file_args) > 2:
                 sys.exit("too many arguments")
-            oldFiles = oldFileArgs[0:1]
-            newFiles = oldFileArgs[1:2]
+            old_files = old_file_args[0:1]
+            new_files = old_file_args[1:2]
 
-    for file in (oldFiles + newFiles):
+    for file in (old_files + new_files):
         if not os.path.isfile(file):
             sys.exit("file " + file + " not found")
 
     if parsed_arguments.list_functions:
-        if not newFiles:
+        if not new_files:
             sizes = collections.defaultdict(int)
-            for file in oldFiles:
+            for file in old_files:
                 read_sizes(sizes, file, True, False)
             print(os.linesep.join(list_function_sizes(sizes.items())))
         else:
-            compare_function_sizes(oldFiles, newFiles)
+            compare_function_sizes(old_files, new_files)
     else:
         print("%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent"))
         if parsed_arguments.sum_sizes:
-            compare_sizes_of_file(oldFiles, newFiles,
+            compare_sizes_of_file(old_files, new_files,
                                   parsed_arguments.all_sections,
                                   parsed_arguments.list_categories)
         else:
-            if len(oldFiles) != len(newFiles):
+            if len(old_files) != len(new_files):
                 sys.exit("number of new files must be the same of old files")
 
-            oldFiles.sort
-            newFiles.sort
+            old_files.sort
+            new_files.sort
 
-            for idx, oldFile in enumerate(oldFiles):
-                newFile = newFiles[idx]
-                compare_sizes_of_file([oldFile], [newFile],
+            for idx, old_file in enumerate(old_files):
+                new_file = new_files[idx]
+                compare_sizes_of_file([old_file], [new_file],
                                       parsed_arguments.all_sections,
                                       parsed_arguments.list_categories)
 

@@ -383,7 +383,7 @@ llvm::Value *irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destBuffer.getAddress(), srcBuffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributesForAggResult(call, false);
 
   return call;
@@ -399,7 +399,7 @@ llvm::Value *irgen::emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destBuffer.getAddress(), srcBuffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return call;
 }
@@ -414,7 +414,7 @@ llvm::Value *irgen::emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destBuffer.getAddress(), srcBuffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributesForAggResult(call, false);
 
   return call;
@@ -430,7 +430,7 @@ llvm::Value *irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destBuffer.getAddress(), srcBuffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return call;
 }
@@ -444,7 +444,7 @@ llvm::Value *irgen::emitAllocateBufferCall(IRGenFunction &IGF,
     = IGF.emitValueWitnessForLayout(T, ValueWitness::AllocateBuffer);
   llvm::CallInst *result =
     IGF.Builder.CreateCall(allocateFn, {buffer.getAddress(), metadata});
-  result->setCallingConv(IGF.IGM.RuntimeCC);
+  result->setCallingConv(IGF.IGM.DefaultCC);
   result->setDoesNotThrow();
   return result;
 }
@@ -458,7 +458,7 @@ llvm::Value *irgen::emitProjectBufferCall(IRGenFunction &IGF,
     = IGF.emitValueWitnessForLayout(T, ValueWitness::ProjectBuffer);
   llvm::CallInst *result =
     IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
-  result->setCallingConv(IGF.IGM.RuntimeCC);
+  result->setCallingConv(IGF.IGM.DefaultCC);
   result->setDoesNotThrow();
   return result;
 }
@@ -471,7 +471,7 @@ llvm::Value *irgen::emitProjectBufferCall(IRGenFunction &IGF,
                                             ValueWitness::ProjectBuffer);
   llvm::CallInst *result =
     IGF.Builder.CreateCall(projectFn, {buffer.getAddress(), metadata});
-  result->setCallingConv(IGF.IGM.RuntimeCC);
+  result->setCallingConv(IGF.IGM.DefaultCC);
   result->setDoesNotThrow();
   return result;
 }
@@ -487,7 +487,7 @@ void irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 
@@ -501,7 +501,7 @@ llvm::Value *irgen::emitInitializeBufferWithTakeCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return call;
 }
@@ -516,7 +516,7 @@ llvm::Value *irgen::emitInitializeBufferWithCopyCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return call;
 }
@@ -534,7 +534,7 @@ void irgen::emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), count, metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 
@@ -549,7 +549,7 @@ void irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 
@@ -565,7 +565,7 @@ void irgen::emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), count, metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 
@@ -581,7 +581,7 @@ void irgen::emitInitializeArrayWithTakeBackToFrontCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), count, metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 
@@ -595,7 +595,7 @@ void irgen::emitAssignWithCopyCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 void irgen::emitAssignWithCopyCall(IRGenFunction &IGF,
@@ -608,7 +608,7 @@ void irgen::emitAssignWithCopyCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 
@@ -623,7 +623,7 @@ void irgen::emitAssignWithTakeCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall(copyFn,
       {destObject.getAddress(), srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
 }
 
@@ -636,7 +636,7 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
                                    ValueWitness::Destroy);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {object.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 
@@ -650,7 +650,7 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
                                    ValueWitness::DestroyArray);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {object.getAddress(), count, metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 
@@ -663,7 +663,7 @@ void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
                                    ValueWitness::DestroyBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
@@ -673,7 +673,7 @@ void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
                                    ValueWitness::DestroyBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 
@@ -685,7 +685,7 @@ void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
                                    ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
@@ -696,7 +696,7 @@ void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
                                    ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 
@@ -711,7 +711,7 @@ llvm::Value *irgen::emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
   
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
   return call;
 }
@@ -727,7 +727,7 @@ llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
                                        ValueWitness::StoreExtraInhabitant);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {destObject.getAddress(), index, metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
   return call;
 }
@@ -741,7 +741,7 @@ llvm::Value *irgen::emitGetEnumTagCall(IRGenFunction &IGF,
                                        ValueWitness::GetEnumTag);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
   return call;
 }
@@ -756,7 +756,7 @@ void irgen::emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
                                       ValueWitness::DestructiveProjectEnumData);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {srcObject.getAddress(), metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 
@@ -773,7 +773,7 @@ void irgen::emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
     llvm::ConstantInt::get(IGF.IGM.Int32Ty, tag);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, {srcObject.getAddress(), tagValue, metadata});
-  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
 

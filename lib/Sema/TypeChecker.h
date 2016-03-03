@@ -895,6 +895,9 @@ public:
   AnyFunctionType::ExtInfo
   applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
 
+  /// Infer default value witnesses for all requirements in the given protocol.
+  void inferDefaultWitnesses(ProtocolDecl *proto);
+
   /// Determine whether the given (potentially constrained) protocol extension
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
@@ -1654,9 +1657,8 @@ public:
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
   bool
-  isAvailabilitySafeForConformance(ValueDecl *witness,
-                                   ValueDecl *requirement,
-                                   NormalProtocolConformance *conformance,
+  isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
+                                   ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
 
   /// Returns an over-approximation of the range of operating system versions

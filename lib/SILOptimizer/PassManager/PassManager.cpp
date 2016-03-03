@@ -301,15 +301,44 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   // invocation.
   llvm::DenseMap<SILFunction *, unsigned> CountOptimized;
 
+  // Count of how many iterations we've had since any function was
+  // popped off the function worklist. This is used to ensure progress
+  // and eliminate the chance of going into an infinite loop in cases
+  // where (for example) we have recursive type-based specialization
+  // happening.
+  unsigned IterationsWithoutProgress = 0;
+
+  // The maximum number of functions we'll optimize without popping
+  // any off the worklist. This is expected to non-zero.
+  const unsigned MaxIterationsWithoutProgress = 20;
+
   // Pop functions off the worklist, and run all function transforms
   // on each of them.
   while (!FunctionWorklist.empty() && continueTransforming()) {
     auto *F = FunctionWorklist.back();
 
+    // If we've done many iterations without progress, pop the current
+    // function and any other function we've run any optimizations on
+    // on from the stack and then continue.
+    if (IterationsWithoutProgress == (MaxIterationsWithoutProgress - 1)) {
+      // Pop the current (potentially not-yet-optimized) function off.
+      FunctionWorklist.pop_back();
+      IterationsWithoutProgress = 0;
+
+      // Pop any remaining functions that have been optimized (at
+      // least through some portion of the pipeline).
+      while (!FunctionWorklist.empty() &&
+             CountOptimized[FunctionWorklist.back()] > 0)
+        FunctionWorklist.pop_back();
+
+      continue;
+    }
+
     if (CountOptimized[F] > SILFunctionPassPipelineLimit) {
       DEBUG(llvm::dbgs() << "*** Hit limit optimizing: " << F->getName()
                          << '\n');
       FunctionWorklist.pop_back();
+      IterationsWithoutProgress = 0;
       continue;
     }
 
@@ -323,9 +352,11 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
 
     runPassesOnFunction(FuncTransforms, F, runToCompletion);
     ++CountOptimized[F];
+    ++IterationsWithoutProgress;
 
     if (runToCompletion) {
       FunctionWorklist.pop_back();
+      IterationsWithoutProgress = 0;
       clearRestartPipeline();
       continue;
     }
@@ -336,8 +367,10 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
     // done with this function and can pop it off and continue.
     // Otherwise, we'll return to this function and reoptimize after
     // processing the new functions that were added.
-    if (F == FunctionWorklist.back() && !shouldRestartPipeline())
+    if (F == FunctionWorklist.back() && !shouldRestartPipeline()) {
       FunctionWorklist.pop_back();
+      IterationsWithoutProgress = 0;
+    }
 
     clearRestartPipeline();
   }

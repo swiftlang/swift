@@ -1319,3 +1319,12 @@ protocol ProtocolToExtend {
 
 extension ProtocolToExtend where Self.Assoc == Int {}
 // PREFER_TYPE_REPR_PRINTING: extension ProtocolToExtend where Self.Assoc == Int {
+
+#if true
+#elseif false
+#else
+#endif
+// PASS_PRINT_AST: #if
+// PASS_PRINT_AST: #elseif
+// PASS_PRINT_AST: #else
+// PASS_PRINT_AST: #endif

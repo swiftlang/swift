@@ -1588,6 +1588,13 @@ public:
   void printDeclPost(const Decl *D) override {
     OS << "</decl>";
   }
+  void printParameterPre(PrintParameterKind Kind) override {
+    OS << "<decl:Param>";
+  }
+  void printParameterPost(PrintParameterKind Kind) override {
+    OS << "</decl>";
+  }
+
 
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     const NominalTypeDecl *NTD) override {

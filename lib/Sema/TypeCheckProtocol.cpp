@@ -35,6 +35,7 @@ using namespace swift;
 
 namespace {
   struct RequirementMatch;
+  struct RequirementCheck;
 
   class WitnessChecker {
   protected:
@@ -64,6 +65,18 @@ namespace {
                          unsigned &bestIdx,
                          bool &doNotDiagnoseMatches);
 
+    bool checkWitnessAccessibility(Accessibility *requiredAccess,
+                                   ValueDecl *requirement,
+                                   ValueDecl *witness,
+                                   bool *isSetter);
+
+    bool checkWitnessAvailability(ValueDecl *requirement,
+                                  ValueDecl *witness,
+                                  AvailabilityContext *requirementInfo);
+
+    RequirementCheck checkWitness(Accessibility requiredAccess,
+                                  ValueDecl *requirement,
+                                  RequirementMatch match);
   };
 
   /// \brief The result of matching a particular declaration to a given
@@ -150,6 +163,30 @@ namespace {
     /// The witness has an IUO that should be translated into a true
     /// optional. This is not a type-safety problem.
     IUOToOptional,
+  };
+
+  /// Once a witness has been found, there are several reasons it may
+  /// not be usable.
+  enum class CheckKind : unsigned {
+    /// The witness is OK.
+    Success,
+
+    /// The witness is less accessible than the requirement.
+    Accessibility,
+
+    /// The witness is storage whose setter is less accessible than the
+    /// requirement.
+    AccessibilityOfSetter,
+
+    /// The witness is less available than the requirement.
+    Availability,
+
+    /// The witness requires optional adjustments.
+    OptionalityConflict,
+
+    /// The witness is a constructor which is more failable than the
+    /// requirement.
+    ConstructorFailability,
   };
 
   /// Describes an optional adjustment made to a witness.
@@ -313,6 +350,12 @@ namespace {
     /// \brief Associated type substitutions needed to match the witness.
     SmallVector<Substitution, 2> WitnessSubstitutions;
 
+    ConcreteDeclRef getWitness(ASTContext &ctx) const {
+      if (WitnessSubstitutions.empty())
+        return Witness;
+      return ConcreteDeclRef(ctx, Witness, WitnessSubstitutions);
+    }
+
     /// Classify the provided optionality issues for use in diagnostics.
     /// FIXME: Enumify this
     unsigned classifyOptionalityIssues(ValueDecl *requirement) const {
@@ -347,6 +390,32 @@ namespace {
     void addOptionalityFixIts(const ASTContext &ctx,
                               ValueDecl *witness, 
                               InFlightDiagnostic &diag) const;
+  };
+
+  /// \brief Describes the suitability of the chosen witness for
+  /// the requirement.
+  struct RequirementCheck {
+    CheckKind Kind;
+
+    /// The required accessibility, if the check failed due to the
+    /// witness being less accessible than the requirement.
+    Accessibility RequiredAccess;
+
+    /// The required availability, if the check failed due to the
+    /// witness being less available than the requirement.
+    AvailabilityContext RequiredAvailability;
+
+    RequirementCheck(CheckKind kind)
+      : Kind(kind), RequiredAccess(Accessibility::Public),
+        RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
+
+    RequirementCheck(CheckKind kind, Accessibility requiredAccess)
+      : Kind(kind), RequiredAccess(requiredAccess),
+        RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
+
+    RequirementCheck(CheckKind kind, AvailabilityContext requiredAvailability)
+      : Kind(kind), RequiredAccess(Accessibility::Public),
+        RequiredAvailability(requiredAvailability) { }
   };
 }
 
@@ -865,11 +934,18 @@ matchWitness(TypeChecker &tc,
     // the required type and the witness type.
     cs.emplace(tc, dc, ConstraintSystemOptions());
 
-    Type model;
-    if (conformance)
-      model = conformance->getType();
-    else
-      model = dc->getDeclaredTypeInContext();
+    Type selfIfaceTy = proto->getProtocolSelf()->getDeclaredType();
+    Type selfTy;
+
+    // For a concrete conformance, use the conforming type as the
+    // base type of the requirement and witness lookup.
+    if (conformance) {
+      selfTy = conformance->getType();
+
+    // For a default witness, use the requirement's context archetype.
+    } else {
+      selfTy = ArchetypeBuilder::mapTypeIntoContext(dc, selfIfaceTy);
+    }
 
     // Open up the witness type.
     witnessType = witness->getInterfaceType();
@@ -881,7 +957,7 @@ matchWitness(TypeChecker &tc,
                        LocatorPathElt(ConstraintLocator::Witness, witness));
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
-        = cs->getTypeOfMemberReference(model, witness,
+        = cs->getTypeOfMemberReference(selfTy, witness,
                                       /*isTypeReference=*/false,
                                       /*isDynamicResult=*/false,
                                       witnessLocator,
@@ -903,7 +979,7 @@ matchWitness(TypeChecker &tc,
     DeclContext *reqDC = req->getInnermostDeclContext();
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
     std::tie(openedFullReqType, reqType)
-      = cs->getTypeOfMemberReference(model, req,
+      = cs->getTypeOfMemberReference(selfTy, req,
                                      /*isTypeReference=*/false,
                                      /*isDynamicResult=*/false,
                                      locator,
@@ -912,31 +988,45 @@ matchWitness(TypeChecker &tc,
 
     // Bind the associated types.
     for (const auto &replacement : replacements) {
-      if (auto gpType = replacement.first->getAs<GenericTypeParamType>()) {
-        // Record the type variable for 'Self'.
-        if (gpType->getDepth() == 0 && gpType->getIndex() == 0) {
-          cs->SelfTypeVar = replacement.second;
-          continue;
-        }
-        
-        // Replace any other type variable with the archetype within
-        // the requirement's context.
-        cs->addConstraint(ConstraintKind::Bind,
-                          replacement.second,
-                          ArchetypeBuilder::mapTypeIntoContext(reqDC, gpType),
-                          locator);
 
-      // Associated type of 'Self'.
-      } else if (auto assocType = getReferencedAssocTypeOfProtocol(
+      // If we have a concrete conformance, handle Self-derived type parameters
+      // differently.
+      if (conformance) {
+        if (replacement.first->is<GenericTypeParamType>()) {
+          // For a concrete conformance, we record the type variable for 'Self'
+          // without doing anything else. See the comment for SelfTypeVar in
+          // ConstraintSystem.h.
+          if (selfIfaceTy->isEqual(replacement.first)) {
+            cs->SelfTypeVar = replacement.second;
+            continue;
+          }
+
+          // Inner generic parameter of the requirement -- fall through below.
+
+        } else if (auto assocType = getReferencedAssocTypeOfProtocol(
                                                     replacement.first, proto)) {
-        if (conformance) {
+
+          // Look up the associated type witness.
           cs->addConstraint(ConstraintKind::Bind,
                             replacement.second,
                             conformance->getTypeWitness(assocType, nullptr)
                                  .getReplacement(),
                             locator);
+          continue;
+        } else {
+          continue;
         }
       }
+
+      // Replace any other type variable with the archetype within the
+      // requirement's context.
+      auto contextTy = ArchetypeBuilder::mapTypeIntoContext(
+          reqDC, replacement.first);
+
+      cs->addConstraint(ConstraintKind::Bind,
+                        replacement.second,
+                        contextTy,
+                        locator);
     }
     reqType = reqType->getRValueType();
 
@@ -973,7 +1063,7 @@ matchWitness(TypeChecker &tc,
     if (openedFullWitnessType->hasTypeVariable()) {
       // Figure out the context we're substituting into.
       auto witnessDC = witness->getInnermostDeclContext();
-      
+
       // Compute the set of substitutions we'll need for the witness.
       solution->computeSubstitutions(witness->getInterfaceType(),
                                      witnessDC, openedFullWitnessType,
@@ -1132,6 +1222,93 @@ bool WitnessChecker::findBestWitness(ValueDecl *requirement,
 
   // If there are multiple equally-good candidates, we fail.
   return isReallyBest;
+}
+
+bool WitnessChecker::
+checkWitnessAccessibility(Accessibility *requiredAccess,
+                          ValueDecl *requirement,
+                          ValueDecl *witness,
+                          bool *isSetter) {
+  *isSetter = false;
+
+  // FIXME: Handle "private(set)" requirements.
+  *requiredAccess = std::min(Proto->getFormalAccess(), *requiredAccess);
+
+  if (*requiredAccess > Accessibility::Private) {
+    if (witness->getFormalAccess() < *requiredAccess)
+      return true;
+
+    if (requirement->isSettable(DC)) {
+      *isSetter = true;
+
+      auto ASD = cast<AbstractStorageDecl>(witness);
+      const DeclContext *accessDC = nullptr;
+      if (*requiredAccess == Accessibility::Internal)
+        accessDC = DC->getParentModule();
+      if (!ASD->isSetterAccessibleFrom(accessDC))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+bool WitnessChecker::
+checkWitnessAvailability(ValueDecl *requirement,
+                         ValueDecl *witness,
+                         AvailabilityContext *requiredAvailability) {
+  return (!TC.getLangOpts().DisableAvailabilityChecking &&
+          !TC.isAvailabilitySafeForConformance(Proto, requirement, witness,
+                                               DC, *requiredAvailability));
+}
+
+RequirementCheck WitnessChecker::
+checkWitness(Accessibility requiredAccess,
+             ValueDecl *requirement,
+             RequirementMatch match) {
+  if (!match.OptionalAdjustments.empty())
+    return CheckKind::OptionalityConflict;
+
+  bool isSetter = false;
+  if (checkWitnessAccessibility(&requiredAccess, requirement,
+                                match.Witness, &isSetter)) {
+    CheckKind kind = (isSetter
+                      ? CheckKind::AccessibilityOfSetter
+                      : CheckKind::Accessibility);
+    return RequirementCheck(kind, requiredAccess);
+  }
+
+  auto requiredAvailability = AvailabilityContext::alwaysAvailable();
+  if (checkWitnessAvailability(requirement, match.Witness,
+                               &requiredAvailability)) {
+    return RequirementCheck(CheckKind::Availability, requiredAvailability);
+  }
+
+  // A non-failable initializer requirement cannot be satisfied
+  // by a failable initializer.
+  if (auto ctor = dyn_cast<ConstructorDecl>(requirement)) {
+    if (ctor->getFailability() == OTK_None) {
+      auto witnessCtor = cast<ConstructorDecl>(match.Witness);
+
+      switch (witnessCtor->getFailability()) {
+      case OTK_None:
+        // Okay
+        break;
+
+      case OTK_ImplicitlyUnwrappedOptional:
+        // Only allowed for non-@objc protocols.
+        if (!Proto->isObjC())
+          break;
+
+        SWIFT_FALLTHROUGH;
+
+      case OTK_Optional:
+        return CheckKind::ConstructorFailability;
+      }
+    }
+  }
+
+  return CheckKind::Success;
 }
 
 # pragma mark Witness resolution
@@ -1698,36 +1875,8 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
     return;
   }
 
-  auto requiredAvailability = AvailabilityContext::alwaysAvailable();
-
-  if (!TC.getLangOpts().DisableAvailabilityChecking &&
-      !TC.isAvailabilitySafeForConformance(match.Witness, requirement,
-                                           Conformance, requiredAvailability)) {
-    auto witness = match.Witness;
-    diagnoseOrDefer(requirement, false,
-      [witness, requirement, requiredAvailability](
-          TypeChecker &tc, NormalProtocolConformance *conformance) {
-        // FIXME: The problem may not be the OS version.
-        tc.diagnose(witness,
-                    diag::availability_protocol_requires_version,
-                    conformance->getProtocol()->getFullName(),
-                    witness->getFullName(),
-                    prettyPlatformString(targetPlatform(tc.getLangOpts())),
-                    requiredAvailability.getOSVersion().getLowerEndpoint()
-                    );
-        tc.diagnose(requirement, diag::availability_protocol_requirement_here);
-        tc.diagnose(conformance->getLoc(),
-                    diag::availability_conformance_introduced_here);
-      });
-  }
-
   // Record this witness in the conformance.
-  ConcreteDeclRef witness;
-  if (match.WitnessSubstitutions.empty())
-    witness = match.Witness;
-  else
-    witness = ConcreteDeclRef(TC.Context, match.Witness,
-                              match.WitnessSubstitutions);
+  ConcreteDeclRef witness = match.getWitness(TC.Context);
   Conformance->setWitness(requirement, witness);
 
   // Synthesize accessors for the protocol witness table to use.
@@ -1825,11 +1974,12 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   if (typeDecl) {
     // Check access.
-    Accessibility requiredAccess =
-      std::min(Proto->getFormalAccess(),
-               Adoptee->getAnyNominal()->getFormalAccess());
+    Accessibility requiredAccess = Adoptee->getAnyNominal()->getFormalAccess();
+    bool isSetter = false;
+    if (checkWitnessAccessibility(&requiredAccess, assocType, typeDecl,
+                                  &isSetter)) {
+      assert(!isSetter);
 
-    if (typeDecl->getFormalAccess() < requiredAccess) {
       diagnoseOrDefer(assocType, false,
         [typeDecl, requiredAccess, assocType](
           TypeChecker &tc, NormalProtocolConformance *conformance) {
@@ -1994,8 +2144,56 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         });
     }
 
-    // If the optionality didn't line up, complain.
-    if (!best.OptionalAdjustments.empty()) {
+    Accessibility requiredAccess = Adoptee->getAnyNominal()->getFormalAccess();
+    auto check = checkWitness(requiredAccess, requirement, best);
+
+    switch (check.Kind) {
+    case CheckKind::Success:
+      break;
+
+    case CheckKind::Accessibility:
+    case CheckKind::AccessibilityOfSetter: {
+      diagnoseOrDefer(requirement, false,
+        [witness, check, requirement](
+          TypeChecker &tc, NormalProtocolConformance *conformance) {
+        auto proto = conformance->getProtocol();
+        bool protoForcesAccess =
+            (check.RequiredAccess == proto->getFormalAccess());
+        auto diagKind = protoForcesAccess
+                          ? diag::witness_not_accessible_proto
+                          : diag::witness_not_accessible_type;
+        bool isSetter = (check.Kind == CheckKind::AccessibilityOfSetter);
+
+        auto diag = tc.diagnose(witness, diagKind,
+                                getRequirementKind(requirement),
+                                witness->getFullName(),
+                                isSetter,
+                                check.RequiredAccess,
+                                proto->getName());
+        fixItAccessibility(diag, witness, check.RequiredAccess, isSetter);
+      });
+      break;
+    }
+
+    case CheckKind::Availability: {
+      diagnoseOrDefer(requirement, false,
+        [witness, requirement, check](
+            TypeChecker &tc, NormalProtocolConformance *conformance) {
+          // FIXME: The problem may not be the OS version.
+          tc.diagnose(witness,
+                      diag::availability_protocol_requires_version,
+                      conformance->getProtocol()->getFullName(),
+                      witness->getFullName(),
+                      prettyPlatformString(targetPlatform(tc.getLangOpts())),
+                      check.RequiredAvailability.getOSVersion().getLowerEndpoint());
+          tc.diagnose(requirement, diag::availability_protocol_requirement_here);
+          tc.diagnose(conformance->getLoc(),
+                      diag::availability_conformance_introduced_here);
+        });
+      break;
+    }
+
+    case CheckKind::OptionalityConflict:
       diagnoseOrDefer(requirement, false,
         [witness, best, requirement](TypeChecker &tc,
                                      NormalProtocolConformance *conformance) {
@@ -2015,110 +2213,52 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           tc.diagnose(requirement, diag::protocol_requirement_here,
                       requirement->getFullName());
       });
-    }
+      break;
 
-    // If the match isn't accessible enough, complain.
-    // FIXME: Handle "private(set)" requirements.
-    Accessibility requiredAccess =
-      std::min(Proto->getFormalAccess(),
-               Adoptee->getAnyNominal()->getFormalAccess());
-    bool shouldDiagnose = false;
-    bool shouldDiagnoseSetter = false;
-    if (requiredAccess > Accessibility::Private) {
-      shouldDiagnose = (best.Witness->getFormalAccess() < requiredAccess);
-
-      if (!shouldDiagnose && requirement->isSettable(DC)) {
-        auto ASD = cast<AbstractStorageDecl>(best.Witness);
-        const DeclContext *accessDC = nullptr;
-        if (requiredAccess == Accessibility::Internal)
-          accessDC = DC->getParentModule();
-        shouldDiagnoseSetter = !ASD->isSetterAccessibleFrom(accessDC);
-      }
-    }
-    if (shouldDiagnose || shouldDiagnoseSetter) {
+    case CheckKind::ConstructorFailability:
       diagnoseOrDefer(requirement, false,
-        [witness, requiredAccess, requirement, shouldDiagnoseSetter](
-          TypeChecker &tc, NormalProtocolConformance *conformance) {
-        auto proto = conformance->getProtocol();
-        bool protoForcesAccess = (requiredAccess == proto->getFormalAccess());
-        auto diagKind = protoForcesAccess
-                          ? diag::witness_not_accessible_proto
-                          : diag::witness_not_accessible_type;
-          auto diag = tc.diagnose(witness, diagKind,
-                                  getRequirementKind(requirement),
-                                  witness->getFullName(),
-                                  shouldDiagnoseSetter,
-                                  requiredAccess,
-                                  proto->getName());
-          fixItAccessibility(diag, witness, requiredAccess,
-                             shouldDiagnoseSetter);
+        [witness, requirement](TypeChecker &tc,
+                               NormalProtocolConformance *conformance) {
+          auto ctor = cast<ConstructorDecl>(requirement);
+          auto witnessCtor = cast<ConstructorDecl>(witness);
+          tc.diagnose(witness->getLoc(),
+                      diag::witness_initializer_failability,
+                      ctor->getFullName(),
+                      witnessCtor->getFailability()
+                        == OTK_ImplicitlyUnwrappedOptional)
+            .highlight(witnessCtor->getFailabilityLoc());
         });
-    }
 
-    if (auto ctor = dyn_cast<ConstructorDecl>(requirement)) {
-      // If we have an initializer requirement and the conforming type
-      // is a non-final class, the witness must be 'required'.
-      // We exempt Objective-C initializers from this requirement
-      // because there is no equivalent to 'required' in Objective-C.
-      ClassDecl *classDecl = nullptr;
-      auto witnessCtor = cast<ConstructorDecl>(best.Witness);
-      if (((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
-           !classDecl->isFinal()) &&
-          !witnessCtor->isRequired() &&
-          !witnessCtor->getDeclContext()
-             ->getAsProtocolOrProtocolExtensionContext() &&
-          !witnessCtor->hasClangNode()) {
-        // FIXME: We're not recovering (in the AST), so the Fix-It
-        // should move.
-        diagnoseOrDefer(requirement, false,
-          [witness, requirement](
-             TypeChecker &tc, NormalProtocolConformance *conformance) {
-            bool inExtension = isa<ExtensionDecl>(witness->getDeclContext());
-            auto diag = tc.diagnose(witness->getLoc(),
-                                    diag::witness_initializer_not_required,
-                                    requirement->getFullName(), inExtension,
-                                    conformance->getType());
-            if (!witness->isImplicit() && !inExtension)
-              diag.fixItInsert(witness->getStartLoc(), "required ");
-          });
-      }
-
-      // A non-failable initializer requirement cannot be satisfied
-      // by a failable initializer.
-      if (ctor->getFailability() == OTK_None) {
-        switch (witnessCtor->getFailability()) {
-        case OTK_None:
-          // Okay
-          break;
-
-        case OTK_ImplicitlyUnwrappedOptional:
-          // Only allowed for non-@objc protocols.
-          if (!Proto->isObjC())
-            break;
-
-          SWIFT_FALLTHROUGH;
-
-        case OTK_Optional:
-          diagnoseOrDefer(requirement, false,
-            [witness, requirement](TypeChecker &tc,
-                                   NormalProtocolConformance *conformance) {
-              auto ctor = cast<ConstructorDecl>(requirement);
-              auto witnessCtor = cast<ConstructorDecl>(witness);
-              tc.diagnose(witness->getLoc(),
-                          diag::witness_initializer_failability,
-                          ctor->getFullName(),
-                          witnessCtor->getFailability()
-                            == OTK_ImplicitlyUnwrappedOptional)
-                .highlight(witnessCtor->getFailabilityLoc());
-            });
-          break;
-        }
-      }
+      break;
     }
 
     ClassDecl *classDecl = Adoptee->getClassOrBoundGenericClass();
 
     if (classDecl && !classDecl->isFinal()) {
+      // If we have an initializer requirement and the conforming type
+      // is a non-final class, the witness must be 'required'.
+      // We exempt Objective-C initializers from this requirement
+      // because there is no equivalent to 'required' in Objective-C.
+      if (auto ctor = dyn_cast<ConstructorDecl>(best.Witness)) {
+        if (!ctor->isRequired() &&
+            !ctor->getDeclContext()->getAsProtocolOrProtocolExtensionContext() &&
+            !ctor->hasClangNode()) {
+          // FIXME: We're not recovering (in the AST), so the Fix-It
+          // should move.
+          diagnoseOrDefer(requirement, false,
+            [ctor, requirement](
+               TypeChecker &tc, NormalProtocolConformance *conformance) {
+              bool inExtension = isa<ExtensionDecl>(ctor->getDeclContext());
+              auto diag = tc.diagnose(ctor->getLoc(),
+                                      diag::witness_initializer_not_required,
+                                      requirement->getFullName(), inExtension,
+                                      conformance->getType());
+              if (!ctor->isImplicit() && !inExtension)
+                diag.fixItInsert(ctor->getStartLoc(), "required ");
+            });
+        }
+      }
+
       // Check whether this requirement uses Self in a way that might
       // prevent conformance from succeeding.
       auto selfKind = Proto->findProtocolSelfReferences(requirement,
@@ -2192,7 +2332,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // If the requirement is optional, it's okay. We'll satisfy this via
   // our handling of default definitions.
-  // FIXME: also check for a default definition here.
+  //
+  // FIXME: revisit this once we get default definitions in protocol bodies.
   //
   // Treat 'unavailable' implicitly as if it were 'optional'.
   // The compiler will reject actual uses.
@@ -2281,7 +2422,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
-// FIXME: use default definitions??
+// FIXME: revisit this once we get default implementations in protocol bodies.
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
                        ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
@@ -2293,8 +2434,6 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
     recordOptionalWitness(requirement);
     return ResolveWitnessResult::Success;
   }
-
-  // FIXME: Default definition.
 
   diagnoseOrDefer(requirement, true,
     [requirement](TypeChecker &tc, NormalProtocolConformance *conformance) {
@@ -3995,6 +4134,74 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
         
   default:
     return nullptr;
+  }
+}
+
+namespace {
+  class DefaultWitnessChecker : public WitnessChecker {
+    
+  public:
+    DefaultWitnessChecker(TypeChecker &tc,
+                          ProtocolDecl *proto)
+      : WitnessChecker(tc, proto, proto->getDeclaredType(), proto) { }
+
+    ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
+    void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
+  };
+}
+
+ResolveWitnessResult
+DefaultWitnessChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Must be a value witness");
+
+  // Find the best default witness for the requirement.
+  SmallVector<RequirementMatch, 4> matches;
+  unsigned numViable = 0;
+  unsigned bestIdx = 0;
+  bool doNotDiagnoseMatches = false;
+
+  if (findBestWitness(
+                 requirement, nullptr, nullptr,
+                 /* out parameters: */
+                 matches, numViable, bestIdx, doNotDiagnoseMatches)) {
+
+    auto &best = matches[bestIdx];
+
+    // Perform the same checks as conformance witness matching, but silently
+    // ignore the candidate instead of diagnosing anything.
+    auto check = checkWitness(Accessibility::Public, requirement, best);
+    if (check.Kind != CheckKind::Success)
+      return ResolveWitnessResult::ExplicitFailed;
+
+    // Record the match.
+    recordWitness(requirement, best);
+    return ResolveWitnessResult::Success;
+  }
+
+  // We have either no matches or an ambiguous match.
+  return ResolveWitnessResult::Missing;
+}
+
+void DefaultWitnessChecker::recordWitness(ValueDecl *requirement,
+                                          const RequirementMatch &match) {
+  Proto->setDefaultWitness(requirement, match.getWitness(TC.Context));
+
+  // FIXME: Synthesize accessors (or really, just materializeForSet) if this
+  // is a computed property?
+}
+
+void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
+  DefaultWitnessChecker checker(*this, proto);
+
+  for (auto *requirement : proto->getMembers()) {
+    if (isa<AssociatedTypeDecl>(requirement))
+      continue;
+
+    if (requirement->isInvalid())
+      continue;
+
+    if (auto *valueDecl = dyn_cast<ValueDecl>(requirement))
+      checker.resolveWitnessViaLookup(valueDecl);
   }
 }
 

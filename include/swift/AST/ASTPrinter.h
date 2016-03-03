@@ -35,12 +35,23 @@ namespace swift {
 enum class PrintNameContext {
   /// Normal context
   Normal,
+  /// Keyword context, where no keywords are escaped.
+  Keyword,
   /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
   /// Function parameter context, where keywords other than let/var/inout are
   /// not escaped.
   FunctionParameterExternal,
   FunctionParameterLocal,
+};
+
+/// Describes the kind of parameter-like entity being printed.
+/// E.g.
+/// \code
+///   func foo(<FunctionParameter>x: Int = 2</FunctionParameter>, ...)
+/// \endcode
+enum class PrintParameterKind {
+  FunctionParameter,
 };
 
 /// An abstract class used to print an AST.
@@ -106,6 +117,11 @@ public:
   virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                              const NominalTypeDecl *NTD) {}
 
+  /// Called before printing a parameter-like entity.
+  virtual void printParameterPre(PrintParameterKind Kind) {}
+  /// Called after printing a parameter-like entity.
+  virtual void printParameterPost(PrintParameterKind Kind) {}
+
   /// Called before printing a name in the given context.
   virtual void printNamePre(PrintNameContext Context) {}
   /// Called after printing a name in the given context.
@@ -130,6 +146,12 @@ public:
   ASTPrinter &operator<<(UUID UU);
 
   ASTPrinter &operator<<(DeclName name);
+
+  void printKeyword(StringRef Name) {
+    callPrintNamePre(PrintNameContext::Keyword);
+    *this << Name;
+    printNamePost(PrintNameContext::Keyword);
+  }
 
   void printName(Identifier Name,
                  PrintNameContext Context = PrintNameContext::Normal);

@@ -52,38 +52,38 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
             print("-- Warning: Can't locate source file %s" % file)
             continue
 
-        destPath = os.path.join(dest_root_dir, os.path.relpath(file_paths[0],
+        dest_path = os.path.join(dest_root_dir, os.path.relpath(file_paths[0],
                                                                src_root_dirs[0]))
 
         if all([os.path.islink(item) for item in file_paths]):
             # It's a symlink in all found instances, copy the link.
-            print("-- Creating symlink %s" % destPath)
-            os.symlink(os.readlink(file_paths[0]), destPath)
+            print("-- Creating symlink %s" % dest_path)
+            os.symlink(os.readlink(file_paths[0]), dest_path)
         elif all([os.path.isdir(item) for item in file_paths]):
             # It's a subdir in all found instances.
             # See if we should copy verbatim or create the destination subdir.
             if file in copy_verbatim_subpaths:
-                print("-- Copying subdir verbatim %s" % destPath)
-                if os.path.isdir(destPath):
-                    shutil.rmtree(destPath)
-                shutil.copytree(file_paths[0], destPath, symlinks=True)
+                print("-- Copying subdir verbatim %s" % dest_path)
+                if os.path.isdir(dest_path):
+                    shutil.rmtree(dest_path)
+                shutil.copytree(file_paths[0], dest_path, symlinks=True)
             else:
-                print("-- Creating subdir %s" % destPath)
-                if not os.path.isdir(destPath):
-                    os.makedirs(destPath)
+                print("-- Creating subdir %s" % dest_path)
+                if not os.path.isdir(dest_path):
+                    os.makedirs(dest_path)
         elif all([os.path.isfile(item) for item in file_paths]):
             # It's a regular file in all found instances, see if they're identical.
             if all([filecmp.cmp(item, file_paths[0]) for item in file_paths]):
                 # All instances are identical, just copy the unique file.
-                print("-- Copying file %s" % destPath)
-                shutil.copy2(file_paths[0], destPath)
+                print("-- Copying file %s" % dest_path)
+                shutil.copy2(file_paths[0], dest_path)
             elif all([os.access(item, os.X_OK) for item in file_paths]):
                 # Multiple instances are different and executable, try lipo.
                 if verbose:
-                    print("-- Running lipo %s to %s" % (file_paths, destPath))
+                    print("-- Running lipo %s to %s" % (file_paths, dest_path))
                 else:
-                    print("-- Running lipo %s" % destPath)
-                check_call(lipo_cmd + ["-output", destPath] + file_paths,
+                    print("-- Running lipo %s" % dest_path)
+                check_call(lipo_cmd + ["-output", dest_path] + file_paths,
                            print_command=verbose, verbose=verbose)
             else:
                 # Multiple instances are different, and they're not executable.

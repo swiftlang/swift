@@ -263,6 +263,9 @@ static void getResultStructure(
         C.is(ChunkKind::CallParameterBegin))
       break;
 
+    if (C.is(ChunkKind::Equal))
+      isOperator = true;
+
     if (C.hasText())
       textSize += C.getText().size();
   }
@@ -858,18 +861,22 @@ static bool checkInnerResult(CodeCompletionResult *result, bool &hasDot,
   if (!chunks.empty() &&
       chunks[0].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasDot = true;
+    return true;
   } else if (chunks.size() >= 2 &&
              chunks[0].is(
                  CodeCompletionString::Chunk::ChunkKind::QuestionMark) &&
              chunks[1].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasQDot = true;
+    return true;
   } else if (result->getKind() ==
                  CodeCompletion::SwiftResult::ResultKind::Declaration &&
              result->getAssociatedDeclKind() ==
                  CodeCompletionDeclKind::Constructor) {
     hasInit = true;
+    return true;
+  } else {
+    return false;
   }
-  return hasInit || hasDot || hasQDot;
 }
 
 template <typename Result>
