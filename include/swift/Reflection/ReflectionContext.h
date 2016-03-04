@@ -36,7 +36,8 @@ template <typename Runtime>
 using SharedTargetMetadataRef = std::shared_ptr<TargetMetadata<Runtime>>;
 
 template <typename Runtime>
-using SharedTargetNominalTypeDescriptorRef = std::shared_ptr<TargetNominalTypeDescriptor<Runtime>>;
+using SharedTargetNominalTypeDescriptorRef
+  = std::shared_ptr<TargetNominalTypeDescriptor<Runtime>>;
 
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
@@ -70,7 +71,8 @@ class ReflectionContext {
   }
 
   template <typename M>
-  SharedTargetMetadataRef<Runtime> _readMetadata(StoredPointer Address, size_t Size = sizeof(M)) {
+  SharedTargetMetadataRef<Runtime> _readMetadata(StoredPointer Address,
+                                                 size_t Size = sizeof(M)) {
     uint8_t *Buffer = (uint8_t *)malloc(Size);
     if (!Reader.readBytes(Address, Buffer, Size)) {
       free(Buffer);
@@ -147,9 +149,10 @@ public:
       case MetadataKind::ErrorObject:
         return _readMetadata<TargetEnumMetadata<Runtime>>(Address);
       case MetadataKind::Existential:
-        return _readMetadata<TargetClassMetadata<Runtime>>(Address);
+        return _readMetadata<TargetExistentialTypeMetadata<Runtime>>(Address);
       case MetadataKind::ExistentialMetatype:
-        return _readMetadata<TargetClassMetadata<Runtime>>(Address);
+        return _readMetadata<
+          TargetExistentialMetatypeMetadata<Runtime>>(Address);
       case MetadataKind::ForeignClass:
         return _readMetadata<TargetForeignClassMetadata<Runtime>>(Address);
       case MetadataKind::Function:
