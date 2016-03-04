@@ -275,8 +275,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Unhandled.pop_back();
       for (ExtensionDecl *E : Back->getExtensions()) {
         if(E->isConstrainedExtension()) {
-          auto Info = isApplicable(E);
-          if (Info.isValid())
+          if (auto Info = isApplicable(E))
             (*pMap)[E] = Info;
         }
         for (auto TL : Back->getInherited()) {

@@ -57,7 +57,7 @@ private:
 struct SynthesizedExtensionInfo {
   ExtensionDecl *Ext = nullptr;
   std::vector<StringRef> KnownSatisifiedRequirments;
-  bool isValid() { return Ext; }
+  operator bool() const { return Ext; }
 };
 
 class SynthesizedExtensionAnalyzer {
