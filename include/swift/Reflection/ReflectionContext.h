@@ -53,6 +53,7 @@ struct ReflectionInfo {
 template <typename Runtime>
 class ReflectionContext {
   using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
 
   std::vector<ReflectionInfo> ReflectionInfos;
   std::unordered_map<StoredPointer, TypeRefPointer> TypeRefCache;
@@ -69,8 +70,7 @@ class ReflectionContext {
   }
 
   template <typename M>
-  SharedTargetMetadataRef<Runtime> _readMetadata(StoredPointer Address) {
-    auto Size = sizeof(M);
+  SharedTargetMetadataRef<Runtime> _readMetadata(StoredPointer Address, size_t Size = sizeof(M)) {
     uint8_t *Buffer = (uint8_t *)malloc(Size);
     if (!Reader.readBytes(Address, Buffer, Size)) {
       free(Buffer);
@@ -83,6 +83,7 @@ class ReflectionContext {
                                               free((void*)Meta);
                                             });
   }
+  
 
 public:
   ReflectionContext(MemoryReader &Reader) : Reader(Reader) {}
@@ -167,8 +168,17 @@ public:
         return _readMetadata<TargetEnumMetadata<Runtime>>(Address);
       case MetadataKind::Struct:
         return _readMetadata<TargetStructMetadata<Runtime>>(Address);
-      case MetadataKind::Tuple:
-        return _readMetadata<TargetTupleTypeMetadata<Runtime>>(Address);
+      case MetadataKind::Tuple: {
+        auto NumElementsAddress = Address +
+          TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
+        StoredSize NumElements;
+        if (!Reader.readInteger(NumElementsAddress, &NumElements))
+          return nullptr;
+        auto TotalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
+          NumElements * sizeof(StoredPointer);
+        return _readMetadata<TargetTupleTypeMetadata<Runtime>>(Address,
+                                                               TotalSize);
+      }
       default:
         return nullptr;
       }
@@ -302,7 +312,20 @@ public:
     case MetadataKind::Tuple: {
       auto TupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta.get());
       TypeRefVector Elements;
-      llvm_unreachable("todo");
+      StoredPointer ElementAddress = MetadataAddress +
+        sizeof(TargetTupleTypeMetadata<Runtime>);
+      using Element = typename TargetTupleTypeMetadata<Runtime>::Element;
+      for (StoredPointer i = 0; i < TupleMeta->NumElements; ++i,
+           ElementAddress += sizeof(Element)) {
+        Element E;
+        if (!Reader.readBytes(ElementAddress, (uint8_t*)&E, sizeof(Element)))
+          return nullptr;
+
+        if (auto ElementTypeRef = getTypeRef(E.Type))
+          Elements.push_back(ElementTypeRef);
+        else
+          return nullptr;
+      }
       return TupleTypeRef::create(Elements);
     }
     case MetadataKind::Function: {

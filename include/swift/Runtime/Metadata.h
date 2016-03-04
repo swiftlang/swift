@@ -2101,11 +2101,11 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     }
   };
 
-  Element *getElements() {
+  TargetPointer<Runtime, Element> getElements() {
     return reinterpret_cast<TargetPointer<Runtime, Element>>(this + 1);
   }
 
-  const Element *getElements() const {
+  TargetPointer<Runtime, const Element> getElements() const {
     return reinterpret_cast<TargetPointer<Runtime, const Element>>(this + 1);
   }
 
@@ -2116,6 +2116,8 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   Element &getElement(unsigned i) {
     return getElements()[i];
   }
+
+  static constexpr StoredSize OffsetToNumElements = sizeof(TargetMetadata<Runtime>);
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Tuple;
