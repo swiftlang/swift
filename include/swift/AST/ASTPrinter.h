@@ -126,6 +126,8 @@ public:
                                              const NominalTypeDecl *NTD) {}
 
   /// Called before printing a structured entity.
+  ///
+  /// Callers should use callPrintStructurePre().
   virtual void printStructurePre(PrintStructureKind Kind,
                                  const Decl *D = nullptr) {}
   /// Called after printing a structured entity.
@@ -234,6 +236,16 @@ public:
   void callPrintNamePre(PrintNameContext Context) {
     assert(!PendingNamePreCallback && "unexpected nested callPrintNamePre");
     PendingNamePreCallback = Context;
+  }
+
+  /// Make a callback to printStructurePre(), performing any necessary
+  /// bookkeeping.
+  void callPrintStructurePre(PrintStructureKind Kind, const Decl *D = nullptr) {
+    // FIXME: As a hack, print an empty string to force the pending callbacks.
+    // The real fix is to incorporate the structure kinds into the pending
+    // callbacks, interleaved with the decls.
+    printTextImpl("");
+    printStructurePre(Kind, D);
   }
 
   /// To sanitize a malformed utf8 string to a well-formed one.

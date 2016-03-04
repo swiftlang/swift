@@ -1042,7 +1042,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       }
       auto NM = Arg->getAnyNominal();
       assert(NM && "Cannot get nominal type.");
-      Printer.printStructurePre(PrintStructureKind::GenericParameter, NM);
+      Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, NM);
       Printer << NM->getNameStr(); // FIXME: PrintNameContext::GenericParameter
       Printer.printStructurePost(PrintStructureKind::GenericParameter, NM);
     }
@@ -1053,7 +1053,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       } else {
         Printer << ", ";
       }
-      Printer.printStructurePre(PrintStructureKind::GenericParameter, GP);
+      Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, GP);
       Printer.printName(GP->getName(), PrintNameContext::GenericParameter);
       printInherited(GP);
       Printer.printStructurePost(PrintStructureKind::GenericParameter, GP);
@@ -1101,7 +1101,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
         } else {
           Printer << ", ";
         }
-        Printer.printStructurePre(PrintStructureKind::GenericRequirement);
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
         Printer << std::get<0>(E);
         Printer << (RequirementReprKind::SameType == std::get<2>(E) ? " == " :
                                                                       " : ");
@@ -1123,7 +1123,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       Printer << ", ";
     }
 
-    Printer.printStructurePre(PrintStructureKind::GenericRequirement);
+    Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
     defer {
       Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     };
@@ -2056,7 +2056,7 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
-  Printer.printStructurePre(PrintStructureKind::FunctionParameter, param);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionParameter, param);
   defer {
     Printer.printStructurePost(PrintStructureKind::FunctionParameter, param);
   };
