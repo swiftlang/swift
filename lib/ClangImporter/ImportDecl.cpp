@@ -2557,6 +2557,67 @@ namespace {
       DeclName name = importedName.Imported;
       bool hasCustomName = importedName.HasCustomName;
 
+      // TODO: refactor into separate function and share with other kinds of
+      // import-as-member
+      if (name.getBaseName().str() == "init") {
+        auto nomTypeDecl = cast<NominalTypeDecl>(dc);
+        auto ext = Impl.getOrCreateExtensionPoint(nomTypeDecl, decl);
+        IterableDeclContext *addMemberTo = ext;
+        dc = ext;
+
+        bool allowNSUIntegerAsInt =
+            Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
+
+        ArrayRef<Identifier> argNames = name.getArgumentNames();
+        auto parameterList = Impl.importFunctionParameterList(
+            decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
+            allowNSUIntegerAsInt, argNames);
+
+        if (!parameterList)
+          return nullptr;
+
+        SourceLoc noLoc{};
+        auto selfParam = ParamDecl::createSelf(noLoc, dc, false);
+
+        auto &SwiftCtx = Impl.SwiftContext;
+        name = {SwiftCtx, SwiftCtx.Id_init, parameterList};
+
+        OptionalTypeKind initOptionality;
+        {
+
+          bool isAuditedResult =
+              (decl && (decl->hasAttr<clang::CFAuditedTransferAttr>() ||
+                        decl->hasAttr<clang::CFReturnsRetainedAttr>() ||
+                        decl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
+          // Check if we know more about the type from our whitelists.
+          OptionalTypeKind returnOptKind;
+          if (decl->hasAttr<clang::ReturnsNonNullAttr>()) {
+            returnOptKind = OTK_None;
+          } else {
+            returnOptKind = OTK_ImplicitlyUnwrappedOptional;
+          }
+
+          // Import the result type.
+          auto swiftResultTy =
+              Impl.importType(decl->getReturnType(),
+                              (isAuditedResult ? ImportTypeKind::AuditedResult
+                                               : ImportTypeKind::Result),
+                              allowNSUIntegerAsInt,
+                              /*isFullyBridgeable*/ true, returnOptKind);
+
+          swiftResultTy->getAnyOptionalObjectType(initOptionality);
+        }
+
+        auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
+            decl, name, noLoc, initOptionality, noLoc, selfParam, parameterList,
+            /*GenericParams=*/nullptr, noLoc, dc);
+
+        finishFuncDecl(decl, result);
+        if (addMemberTo)
+          addMemberTo->addMember(result);
+        return result;
+      }
+
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
       ParameterList *bodyParams = nullptr;
@@ -2588,16 +2649,21 @@ namespace {
       result->setBodyResultType(resultTy);
 
       result->setAccessibility(Accessibility::Public);
+      finishFuncDecl(decl, result);
+      return result;
+    }
 
+    void finishFuncDecl(const clang::FunctionDecl *decl,
+                        AbstractFunctionDecl *result) {
       if (decl->isNoReturn())
-        result->getAttrs().add(
-            new (Impl.SwiftContext) NoReturnAttr(/*IsImplicit=*/false));
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   NoReturnAttr(/*IsImplicit=*/false));
 
       // Keep track of inline function bodies so that we can generate
       // IR from them using Clang's IR generator.
       if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>() ||
-           !decl->isExternallyVisible())
-          && decl->hasBody()) {
+           !decl->isExternallyVisible()) &&
+          decl->hasBody()) {
         Impl.registerExternalDecl(result);
       }
 
@@ -2605,8 +2671,6 @@ namespace {
       if (decl->isVariadic()) {
         Impl.markUnavailable(result, "Variadic function is unavailable");
       }
-
-      return result;
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
