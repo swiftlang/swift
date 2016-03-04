@@ -473,6 +473,8 @@ public:
       if (*moduleOpt)
         moduleName = (*moduleOpt)->getTopLevelModuleName();
     }
+    if (moduleName.empty())
+      moduleName = decl->getASTContext().getLangOpts().CurrentModule;
 
     StringRef enumName =
       decl->getDeclName() ? decl->getName()

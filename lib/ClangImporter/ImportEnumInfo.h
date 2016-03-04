@@ -60,7 +60,7 @@ class EnumInfo {
 
   /// The enum's common constant name prefix, which will be stripped from
   /// constants
-  StringRef constantNamePrefix = StringRef();
+  std::string constantNamePrefix = StringRef();
 
   /// The identifying attribute for specially imported enums
   ///
