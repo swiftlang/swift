@@ -59,7 +59,9 @@ public protocol UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A generator of code units to be decoded.
+  /// - Parameter next: A generator of code units to be decoded.  Repeated
+  /// calls to this method on the same instance should always reuse the same
+  /// generator.  Failing to do so will result in undefined behavior.
   mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(next: inout G) -> UnicodeDecodingResult
@@ -104,7 +106,7 @@ public struct UTF8 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A generator of code units to be decoded.  Repeated
+  /// - Parameter next: A generator of code units to be decoded.  Repeated
   /// calls to this method on the same instance should always reuse the same
   /// generator.  Failing to do so will result in undefined behavior.
   public mutating func decode<
@@ -338,7 +340,9 @@ public struct UTF16 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A generator of code units to be decoded.
+  /// - Parameter next: A generator of code units to be decoded.  Repeated
+  /// calls to this method on the same instance should always reuse the same
+  /// generator.  Failing to do so will result in undefined behavior.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(input: inout G) -> UnicodeDecodingResult {
@@ -473,7 +477,9 @@ public struct UTF32 : UnicodeCodecType {
   /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A generator of code units to be decoded.
+  /// - Parameter next: A generator of code units to be decoded.  Repeated
+  /// calls to this method on the same instance should always reuse the same
+  /// generator.  Failing to do so will result in undefined behavior.
   public mutating func decode<
     G : GeneratorType where G.Element == CodeUnit
   >(input: inout G) -> UnicodeDecodingResult {
