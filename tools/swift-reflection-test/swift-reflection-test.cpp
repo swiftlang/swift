@@ -417,14 +417,13 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
 
       error = mach_port_deallocate(mach_task_self(), childPort);
       guardMachError(error, "mach_port_deallocate");
-      exit(EXIT_SUCCESS);
     }
   }
 
+  kill(pid, SIGTERM);
+
   error = task_set_bootstrap_port(mach_task_self(), bootstrap_port);
   guardMachError(error, "reset task_set_bootstrap_port");
-
-  kill(pid, SIGTERM);
 
   error = mach_port_deallocate(mach_task_self(), childPort);
   guardMachError(error, "mach_port_deallocate");
