@@ -204,28 +204,63 @@ public:
   }
 
   TypeRefVector
-  getGenericSubstitutions(TypeRefPointer Unsubstituted,
-                          StoredPointer MetadataAddress) {
-    if (!Unsubstituted || !MetadataAddress)
-      return {};
-
-    if (!llvm::isa<BoundGenericTypeRef>(Unsubstituted.get()))
-      return {};
-
-    auto Meta = readMetadata(MetadataAddress);
-    if (!Meta)
-      return {};
-
+  getGenericArguments(StoredPointer MetadataAddress,
+                      SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor){
     TypeRefVector GenericArgTypeRefs;
-    llvm_unreachable("todo");
+    auto NumGenericParams = Descriptor->GenericParams.NumPrimaryParams;
+    auto OffsetToGenericArgs
+      = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset);
+    auto AddressOfGenericArgAddress = MetadataAddress + OffsetToGenericArgs;
+
+    using ArgIndex = decltype(Descriptor->GenericParams.NumPrimaryParams);
+    for (ArgIndex i = 0; i < NumGenericParams; ++i,
+         AddressOfGenericArgAddress += sizeof(StoredPointer)) {
+        StoredPointer GenericArgAddress;
+        if (!Reader.readInteger(AddressOfGenericArgAddress,
+                                &GenericArgAddress))
+          return {};
+      if (auto GenericArg = getTypeRef(GenericArgAddress))
+        GenericArgTypeRefs.push_back(GenericArg);
+      else
+        return {};
+      }
     return GenericArgTypeRefs;
   }
 
   TypeRefPointer
   resolveDependentMembers(TypeRefPointer Unresolved,
                           StoredPointer MetadataAddress) {
-    llvm_unreachable("todo");
+    // TODO: Resolve dependent members
     return Unresolved;
+  }
+
+  TypeRefPointer
+  getNominalTypeRef(StoredPointer MetadataAddress,
+                    StoredPointer DescriptorAddress) {
+    auto Descriptor = readNominalTypeDescriptor(DescriptorAddress);
+    if (!Descriptor)
+      return nullptr;
+
+    auto NameAddress
+      = resolveRelativeOffset<int32_t>(DescriptorAddress +
+                                       Descriptor->offsetToNameOffset());
+    auto MangledName = Reader.readString(NameAddress);
+    if (MangledName.empty())
+      return nullptr;
+
+    auto DemangleNode = Demangle::demangleTypeAsNode(MangledName);
+    if (!DemangleNode)
+      return nullptr;
+
+    TypeRefPointer Nominal;
+    if (Descriptor->GenericParams.NumPrimaryParams) {
+      auto Args = getGenericArguments(MetadataAddress, Descriptor);
+      Nominal = BoundGenericTypeRef::create(MangledName, Args);
+    } else {
+      Nominal = TypeRef::fromDemangleNode(DemangleNode);
+    }
+    TypeRefCache.insert({MetadataAddress, Nominal});
+    return Nominal;
   }
 
   TypeRefPointer getTypeRef(StoredPointer MetadataAddress) {
@@ -245,28 +280,8 @@ public:
       auto DescriptorAddress
         = resolveRelativeOffset<StoredPointer>(MetadataAddress +
                                          ClassMeta->offsetToDescriptorOffset());
-      auto Descriptor = readNominalTypeDescriptor(DescriptorAddress);
-      if (!Descriptor)
-        return nullptr;
 
-      auto NameAddress
-        = resolveRelativeOffset<int32_t>(DescriptorAddress +
-                                         Descriptor->offsetToNameOffset());
-      auto MangledName = Reader.readString(NameAddress);
-      if (MangledName.empty())
-        return nullptr;
-
-      auto DemangleNode = Demangle::demangleTypeAsNode(MangledName);
-      if (!DemangleNode)
-        return nullptr;
-
-      auto Unsubstituted = TypeRef::fromDemangleNode(DemangleNode);
-      auto Substitutions = getGenericSubstitutions(Unsubstituted,
-                                                   MetadataAddress);
-      auto Substituted = Unsubstituted->substituteGenerics(Substitutions);
-      auto Resolved = resolveDependentMembers(Substituted, MetadataAddress);
-      TypeRefCache.insert({MetadataAddress, Resolved});
-      return Resolved;
+      return getNominalTypeRef(MetadataAddress, DescriptorAddress);
     }
     case MetadataKind::Struct: {
       auto StructMeta = cast<TargetStructMetadata<Runtime>>(Meta.get());
@@ -274,28 +289,7 @@ public:
       auto DescriptorAddress
         = resolveRelativeOffset<StoredPointer>(MetadataAddress +
                                         StructMeta->offsetToDescriptorOffset());
-      auto Descriptor = readNominalTypeDescriptor(DescriptorAddress);
-      if (!Descriptor)
-        return nullptr;
-
-      auto NameAddress
-        = resolveRelativeOffset<int32_t>(DescriptorAddress +
-                                         Descriptor->offsetToNameOffset());
-      auto MangledName = Reader.readString(NameAddress);
-      if (MangledName.empty())
-        return nullptr;
-
-      auto DemangleNode = Demangle::demangleTypeAsNode(MangledName);
-      if (!DemangleNode)
-        return nullptr;
-
-      auto Unsubstituted = TypeRef::fromDemangleNode(DemangleNode);
-      auto Substitutions = getGenericSubstitutions(Unsubstituted,
-                                                   MetadataAddress);
-      auto Substituted = Unsubstituted->substituteGenerics(Substitutions);
-      auto Resolved = resolveDependentMembers(Substituted, MetadataAddress);
-      TypeRefCache.insert({MetadataAddress, Resolved});
-      return Resolved;
+      return getNominalTypeRef(MetadataAddress, DescriptorAddress);
     }
     case MetadataKind::Enum:
     case MetadataKind::Optional: {
@@ -303,26 +297,7 @@ public:
       auto DescriptorAddress
         = resolveRelativeOffset<StoredPointer>(MetadataAddress +
                                           EnumMeta->offsetToDescriptorOffset());
-      auto Descriptor = readNominalTypeDescriptor(DescriptorAddress);
-      if (!Descriptor)
-        return nullptr;
-
-      auto NameAddress
-        = resolveRelativeOffset<int32_t>(DescriptorAddress +
-                                         Descriptor->offsetToNameOffset());
-      auto MangledName = Reader.readString(NameAddress);
-      if (MangledName.empty()) return nullptr;
-
-      auto DemangleNode = Demangle::demangleTypeAsNode(MangledName);
-      if (!DemangleNode) return nullptr;
-
-      auto Unsubstituted = TypeRef::fromDemangleNode(DemangleNode);
-      auto Substitutions = getGenericSubstitutions(Unsubstituted,
-                                                   MetadataAddress);
-      auto Substituted = Unsubstituted->substituteGenerics(Substitutions);
-      auto Resolved = resolveDependentMembers(Substituted, MetadataAddress);
-      TypeRefCache.insert({MetadataAddress, Resolved});
-      return Resolved;
+      return getNominalTypeRef(MetadataAddress, DescriptorAddress);
     }
     case MetadataKind::Tuple: {
       auto TupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta.get());

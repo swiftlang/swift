@@ -1222,9 +1222,9 @@ public:
     case MetadataKind::Class: {
       const auto cls = static_cast<const TargetClassMetadata<Runtime> *>(this);
       if (!cls->isTypeMetadata())
-        return nullptr;
+        return 0;
       if (cls->isArtificialSubclass())
-        return nullptr;
+        return 0;
       return cls->getDescription();
     }
     case MetadataKind::Struct:
@@ -1242,7 +1242,7 @@ public:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
-      return nullptr;
+      return 0;
     }
   }
   
@@ -1379,7 +1379,7 @@ struct EnumTypeDescriptor;
 template <typename Runtime>
 struct TargetNominalTypeDescriptor {
   using StoredPointer = typename Runtime::StoredPointer;
-  /// The mangled name of the nominal type, with no generic parameters.
+  /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
   
   /// The following fields are kind-dependent.
@@ -1628,11 +1628,11 @@ public:
   /// created for various dynamic purposes like KVO?
   bool isArtificialSubclass() const {
     assert(isTypeMetadata());
-    return Description == nullptr;
+    return Description == 0;
   }
   void setArtificialSubclass() {
     assert(isTypeMetadata());
-    Description = nullptr;
+    Description = 0;
   }
 
   ClassFlags getFlags() const {
@@ -1914,6 +1914,7 @@ using ForeignClassMetadata = TargetForeignClassMetadata<InProcess>;
 /// The common structure of metadata for structs and enums.
 template <typename Runtime>
 struct TargetValueMetadata : public TargetMetadata<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
   TargetValueMetadata(MetadataKind Kind,
     ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
                       description,
@@ -1948,6 +1949,12 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this);
     return (asWords + Description->GenericParams.Offset);
   }
+
+  StoredPointer offsetToDescriptorOffset() const {
+    auto DescriptionAddress = (uint8_t *)&this->Description;
+    auto ThisAddress = (uint8_t *)this;
+    return DescriptionAddress - ThisAddress;
+  }
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 
@@ -1973,12 +1980,6 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
       return nullptr;
     
     return getter(this);
-  }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    auto DescriptionAddress = (uint8_t *)&this->Description;
-    auto ThisAddress = (uint8_t *)this;
-    return DescriptionAddress - ThisAddress;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -2016,12 +2017,6 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
     StoredSize *asWords = reinterpret_cast<StoredSize *>(this);
     asWords += offset;
     return *asWords;
-  }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    auto DescriptionAddress = (uint8_t *)&this->Description;
-    auto ThisAddress = (uint8_t *)this;
-    return DescriptionAddress - ThisAddress;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {

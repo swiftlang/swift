@@ -313,6 +313,7 @@ static bool machReadBytes(const addr_t Address, uint8_t *Dest, uint64_t Size) {
   mach_msg_type_number_t SizeRead = 0;
   vm_offset_t Data = 0;
   auto Result = vm_read(childTask, Address, Size, &Data, &SizeRead);
+  guardMachError(Result, "vm_read");
   if (Result == KERN_SUCCESS && SizeRead == Size) {
     memmove(reinterpret_cast<void *>(Dest),
             reinterpret_cast<void *>(Data), Size);
