@@ -45,12 +45,15 @@ enum class PrintNameContext {
   FunctionParameterLocal,
 };
 
-/// Describes the kind of parameter-like entity being printed.
+/// Describes the kind of structured entity being printed.
+///
+/// This includes printables with sub-structure that cannot be completely
+/// handled by the printDeclPre/printDeclPost callbacks.
 /// E.g.
 /// \code
 ///   func foo(<FunctionParameter>x: Int = 2</FunctionParameter>, ...)
 /// \endcode
-enum class PrintParameterKind {
+enum class PrintStructureKind {
   GenericParameter,
   GenericRequirement,
   FunctionParameter,
@@ -119,11 +122,11 @@ public:
   virtual void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                              const NominalTypeDecl *NTD) {}
 
-  /// Called before printing a parameter-like entity.
-  virtual void printParameterPre(PrintParameterKind Kind,
+  /// Called before printing a structured entity.
+  virtual void printStructurePre(PrintStructureKind Kind,
                                  const Decl *D = nullptr) {}
-  /// Called after printing a parameter-like entity.
-  virtual void printParameterPost(PrintParameterKind Kind,
+  /// Called after printing a structured entity.
+  virtual void printStructurePost(PrintStructureKind Kind,
                                   const Decl *D = nullptr) {}
 
   /// Called before printing a name in the given context.

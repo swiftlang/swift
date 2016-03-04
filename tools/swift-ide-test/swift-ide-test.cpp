@@ -1588,11 +1588,11 @@ public:
   void printDeclPost(const Decl *D) override {
     OS << "</decl>";
   }
-  void printParameterPre(PrintParameterKind Kind, const Decl *D) override {
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
     if (D)
       printDeclPre(D);
   }
-  void printParameterPost(PrintParameterKind Kind, const Decl *D) override {
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
     if (D)
       printDeclPost(D);
   }

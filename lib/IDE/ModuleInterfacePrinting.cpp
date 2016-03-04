@@ -85,11 +85,11 @@ private:
     return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
   }
 
-  void printParameterPre(PrintParameterKind Kind, const Decl *D) override {
-    return OtherPrinter.printParameterPre(Kind, D);
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePre(Kind, D);
   }
-  void printParameterPost(PrintParameterKind Kind, const Decl *D) override {
-    return OtherPrinter.printParameterPost(Kind, D);
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePost(Kind, D);
   }
 
   void printNamePre(PrintNameContext Context) override {

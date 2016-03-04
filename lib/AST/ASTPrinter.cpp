@@ -1041,9 +1041,9 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       }
       auto NM = Arg->getAnyNominal();
       assert(NM && "Cannot get nominal type.");
-      Printer.printParameterPre(PrintParameterKind::GenericParameter, NM);
+      Printer.printStructurePre(PrintStructureKind::GenericParameter, NM);
       Printer << NM->getNameStr(); // FIXME: PrintNameContext::GenericParameter
-      Printer.printParameterPost(PrintParameterKind::GenericParameter, NM);
+      Printer.printStructurePost(PrintStructureKind::GenericParameter, NM);
     }
   } else {
     for (auto GP : Params->getParams()) {
@@ -1052,10 +1052,10 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       } else {
         Printer << ", ";
       }
-      Printer.printParameterPre(PrintParameterKind::GenericParameter, GP);
+      Printer.printStructurePre(PrintStructureKind::GenericParameter, GP);
       Printer.printName(GP->getName(), PrintNameContext::GenericParameter);
       printInherited(GP);
-      Printer.printParameterPost(PrintParameterKind::GenericParameter, GP);
+      Printer.printStructurePost(PrintStructureKind::GenericParameter, GP);
     }
     printWhereClause(Params->getRequirements());
   }
@@ -1100,12 +1100,12 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
         } else {
           Printer << ", ";
         }
-        Printer.printParameterPre(PrintParameterKind::GenericRequirement);
+        Printer.printStructurePre(PrintStructureKind::GenericRequirement);
         Printer << std::get<0>(E);
         Printer << (RequirementReprKind::SameType == std::get<2>(E) ? " == " :
                                                                       " : ");
         Printer << std::get<1>(E);
-        Printer.printParameterPost(PrintParameterKind::GenericRequirement);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
     return;
   }
@@ -1122,9 +1122,9 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       Printer << ", ";
     }
 
-    Printer.printParameterPre(PrintParameterKind::GenericRequirement);
+    Printer.printStructurePre(PrintStructureKind::GenericRequirement);
     defer {
-      Printer.printParameterPost(PrintParameterKind::GenericRequirement);
+      Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     };
 
     switch (req.getKind()) {
@@ -2055,9 +2055,9 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
-  Printer.printParameterPre(PrintParameterKind::FunctionParameter, param);
+  Printer.printStructurePre(PrintStructureKind::FunctionParameter, param);
   defer {
-    Printer.printParameterPost(PrintParameterKind::FunctionParameter, param);
+    Printer.printStructurePost(PrintStructureKind::FunctionParameter, param);
   };
 
   auto printArgName = [&]() {

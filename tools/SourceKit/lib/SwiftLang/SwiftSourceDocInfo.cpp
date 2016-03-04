@@ -70,13 +70,13 @@ static StringRef LocalParamNameTag = "decl.var.parameter.name";
 static StringRef GenericParamNameTag = "decl.generic_type_param.name";
 static StringRef SyntaxKeywordTag = "syntaxtype.keyword";
 
-static StringRef getTagForParameter(PrintParameterKind context) {
+static StringRef getTagForParameter(PrintStructureKind context) {
   switch (context) {
-  case PrintParameterKind::FunctionParameter:
+  case PrintStructureKind::FunctionParameter:
     return "decl.var.parameter";
-  case PrintParameterKind::GenericParameter:
+  case PrintStructureKind::GenericParameter:
     return "decl.generic_type_param";
-  case PrintParameterKind::GenericRequirement:
+  case PrintStructureKind::GenericRequirement:
     return "decl.generic_type_requirement";
   }
   llvm_unreachable("unexpected parameter kind");
@@ -102,13 +102,13 @@ static StringRef getDeclNameTagForDecl(const Decl *D) {
 
 namespace {
 /// A typesafe union of contexts that the printer can be inside.
-/// Currently: Decl, PrintParameterKind
+/// Currently: Decl, PrintStructureKind
 class PrintContext {
   // Use the low bit to determine the type; store the enum value shifted left
   // to leave the low bit free.
   const uintptr_t value;
   static constexpr unsigned declTag = 0;
-  static constexpr unsigned printParameterKindTag = 1;
+  static constexpr unsigned PrintStructureKindTag = 1;
   static constexpr unsigned tagMask = 1;
   bool hasTag(unsigned tag) const { return (value & tagMask) == tag; }
 
@@ -117,21 +117,21 @@ public:
     static_assert(llvm::PointerLikeTypeTraits<Decl *>::NumLowBitsAvailable > 0,
                   "missing spare bit in Decl *");
   }
-  PrintContext(PrintParameterKind K) : value((uintptr_t(K) << 1) | 1) {}
+  PrintContext(PrintStructureKind K) : value((uintptr_t(K) << 1) | 1) {}
 
   /// Get the context as a Decl, or nullptr.
   const Decl *getDecl() const {
     return hasTag(declTag) ? (const Decl *)value : nullptr;
   }
-  /// Get the context as a PrintParameterKind, or None.
-  Optional<PrintParameterKind> getPrintParameterKind() const {
-    if (!hasTag(printParameterKindTag))
+  /// Get the context as a PrintStructureKind, or None.
+  Optional<PrintStructureKind> getPrintStructureKind() const {
+    if (!hasTag(PrintStructureKindTag))
       return None;
-    return PrintParameterKind(value >> 1);
+    return PrintStructureKind(value >> 1);
   }
-  /// Whether this is a PrintParameterKind context of the given \p kind.
-  bool is(PrintParameterKind kind) const {
-    auto storedKind = getPrintParameterKind();
+  /// Whether this is a PrintStructureKind context of the given \p kind.
+  bool is(PrintStructureKind kind) const {
+    auto storedKind = getPrintStructureKind();
     return storedKind && *storedKind == kind;
   }
 };
@@ -195,19 +195,19 @@ private:
       closeTag(tag);
   }
 
-  void printParameterPre(PrintParameterKind kind, const Decl *D) override {
+  void printStructurePre(PrintStructureKind kind, const Decl *D) override {
     contextStack.emplace_back(PrintContext(kind));
     auto tag = getTagForParameter(kind);
 
-    if (D && kind == PrintParameterKind::GenericParameter) {
+    if (D && kind == PrintStructureKind::GenericParameter) {
       assert(isa<ValueDecl>(D) && "unexpected non-value decl for param");
       openTagWithUSRForDecl(tag, cast<ValueDecl>(D));
     } else {
       openTag(tag);
     }
   }
-  void printParameterPost(PrintParameterKind kind, const Decl *D) override {
-    assert(contextStack.back().is(kind) && "unmatched printParameterPre");
+  void printStructurePost(PrintStructureKind kind, const Decl *D) override {
+    assert(contextStack.back().is(kind) && "unmatched printStructurePre");
     contextStack.pop_back();
     closeTag(getTagForParameter(kind));
   }
@@ -253,11 +253,11 @@ private:
     static StringRef genericParamTypeTag = "decl.generic_type_param.constraint";
 
     auto context = contextStack.back();
-    if (context.is(PrintParameterKind::FunctionParameter))
+    if (context.is(PrintStructureKind::FunctionParameter))
       return parameterTypeTag;
-    if (context.is(PrintParameterKind::GenericParameter))
+    if (context.is(PrintStructureKind::GenericParameter))
       return genericParamTypeTag;
-    if (context.is(PrintParameterKind::GenericRequirement))
+    if (context.is(PrintStructureKind::GenericRequirement))
       return "";
 
     assert(context.getDecl() && "unexpected context kind");
