@@ -56,7 +56,7 @@ private:
 
 struct SynthesizedExtensionInfo {
   ExtensionDecl *Ext = nullptr;
-  std::vector<StringRef> KnownSatisifiedRequirments;
+  std::vector<StringRef> KnownSatisfiedRequirements;
   operator bool() const { return Ext; }
 };
 

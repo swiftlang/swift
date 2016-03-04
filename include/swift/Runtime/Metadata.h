@@ -120,8 +120,7 @@ struct External {
   using RelativeDirectPointer = std::make_signed<StoredPointer>;
 };
 
-/// Template template for branching on native pointer types versus
-/// external ones
+/// Template for branching on native pointer types versus external ones
 template <typename Runtime, template <typename> class Pointee>
 using TargetMetadataPointer
   = typename Runtime::template Pointer<Pointee<Runtime>>;
