@@ -239,7 +239,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           case RequirementReprKind::TypeConstraint:
             if(!canPossiblyConvertTo(First, Second, *DC))
               return Result;
-            else if (isConvertibleTo(First, Second, DC))
+            else if (isConvertibleTo(First, Second, *DC))
               Result.KnownSatisifiedRequirments.push_back(Req.getAsWrittenString());
             break;
           case RequirementReprKind::SameType:

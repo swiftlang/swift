@@ -678,16 +678,16 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   return true;
 }
 
-bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext *DC) {
-  auto &Ctx = DC->getASTContext();
+bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext &DC) {
+  auto &Ctx = DC.getASTContext();
 
   // We try to reuse the type checker associated with the ast context first.
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
-    return TC->isConvertibleTo(Ty1, Ty2, DC);
+    return TC->isConvertibleTo(Ty1, Ty2, &DC);
   } else {
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, DC);
+    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, &DC);
   }
 }
 

@@ -318,7 +318,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   Ty.visit([&](Type T) {
     if (!Result && (T->getAnyNominal() == NTD ||
                     isConvertibleTo(T, NTD->getDeclaredType(),
-                                    VD->getDeclContext()))) {
+                                    *VD->getDeclContext()))) {
       Result = T;
     }
   });
