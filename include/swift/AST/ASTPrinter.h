@@ -67,11 +67,6 @@ enum class PrintStructureKind {
 class ASTPrinter {
   unsigned CurrentIndentation = 0;
   unsigned PendingNewlines = 0;
-  /// The queue of pending printDeclPre callbacks that will be run when we print
-  /// a non-whitespace character.
-  SmallVector<const Decl *, 4> PendingDeclPreCallbacks;
-  const Decl *PendingDeclLocCallback = nullptr;
-  Optional<PrintNameContext> PendingNamePreCallback;
   const NominalTypeDecl *SynthesizeTarget = nullptr;
 
   void printTextImpl(StringRef Text);
@@ -192,60 +187,51 @@ public:
     PendingNewlines++;
   }
 
+  void forceNewlines() {
+    if (PendingNewlines > 0) {
+      llvm::SmallString<16> Str;
+      for (unsigned i = 0; i != PendingNewlines; ++i)
+        Str += '\n';
+      PendingNewlines = 0;
+      printText(Str);
+      printIndent();
+    }
+  }
+
   virtual void printIndent();
 
   // MARK: Callback interface wrappers that perform ASTPrinter bookkeeping.
 
-  /// Schedule a \c printDeclPre callback to be called as soon as a
-  /// non-whitespace character is printed.
-  void callPrintDeclPre(const Decl *D) {
-    PendingDeclPreCallbacks.emplace_back(D);
-  }
+   /// Make a callback to printDeclPre(), performing any necessary bookeeping.
+  void callPrintDeclPre(const Decl *D);
 
   /// Make a callback to printDeclPost(), performing any necessary bookeeping.
   void callPrintDeclPost(const Decl *D) {
-    if (!PendingDeclPreCallbacks.empty() &&
-        PendingDeclPreCallbacks.back() == D) {
-      // Nothing printed for D; skip both pre and post callbacks.
-      // Ideally we wouldn't get as far as setting up the callback if we aren't
-      // going to print anything, but currently that would mean walking the
-      // children of top-level code decls to determine.
-      PendingDeclPreCallbacks.pop_back();
-      return;
-    }
     printDeclPost(D);
   }
 
   /// Make a callback to avoidPrintDeclPost(), performing any necessary
   /// bookkeeping.
   void callAvoidPrintDeclPost(const Decl *D) {
-    assert((PendingDeclPreCallbacks.empty() ||
-            PendingDeclPreCallbacks.back() != D) &&
-           "printDeclPre should not be called on avoided decl");
     avoidPrintDeclPost(D);
   }
 
-  /// Schedule a \c printDeclLoc callback to be called as soon as a
-  /// non-whitespace character is printed.
+   /// Make a callback to printDeclLoc(), performing any necessary bookeeping.
   void callPrintDeclLoc(const Decl *D) {
-    assert(!PendingDeclLocCallback && "unexpected nested callPrintDeclLoc");
-    PendingDeclLocCallback = D;
+    forceNewlines();
+    printDeclLoc(D);
   }
 
-  /// Schedule a \c printNamePre callback to be called as soon as a
-  /// non-whitespace character is printed.
+   /// Make a callback to printNamePre(), performing any necessary bookeeping.
   void callPrintNamePre(PrintNameContext Context) {
-    assert(!PendingNamePreCallback && "unexpected nested callPrintNamePre");
-    PendingNamePreCallback = Context;
+    forceNewlines();
+    printNamePre(Context);
   }
 
   /// Make a callback to printStructurePre(), performing any necessary
   /// bookkeeping.
   void callPrintStructurePre(PrintStructureKind Kind, const Decl *D = nullptr) {
-    // FIXME: As a hack, print an empty string to force the pending callbacks.
-    // The real fix is to incorporate the structure kinds into the pending
-    // callbacks, interleaved with the decls.
-    printTextImpl("");
+    forceNewlines();
     printStructurePre(Kind, D);
   }
 

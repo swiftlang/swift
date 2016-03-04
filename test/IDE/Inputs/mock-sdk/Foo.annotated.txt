@@ -195,17 +195,17 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   <decl:Constructor><loc>init()</loc></decl>
   <decl:Constructor><loc>init(<decl:Param>x: <ref:Struct>Int32</ref></decl>)</loc></decl>
 }</decl>
-<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
+<decl:Extension>extension <loc><ref:Class>FooClassBase</ref></loc> {
   <decl:Func>class func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Func>func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
 }</decl>
-<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
+<decl:Extension>extension <loc><ref:Class>FooClassBase</ref></loc> {
   <decl:Func>class func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Func>func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Func>class func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Func>func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
 }</decl>
-<decl:Extension>extension <ref:Class><loc>FooClassBase</ref></loc> {
+<decl:Extension>extension <loc><ref:Class>FooClassBase</ref></loc> {
   <decl:Func>class func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Func>func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
 }</decl>
@@ -265,11 +265,11 @@ func <loc>FooCFTypeRelease(<decl:Param>_: <ref:Class>FooCFType</ref>!</decl>)</l
   <decl:Constructor><loc>init!()</loc></decl>
   <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
 }</decl>
-<decl:Extension>extension <ref:Class><loc>FooRepeatedMembers</ref></loc> {
+<decl:Extension>extension <loc><ref:Class>FooRepeatedMembers</ref></loc> {
   <decl:Var>var <loc>repeatedPropertyInCategory</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Func>func <loc>repeatedMethodInCategory()</loc></decl>
 }</decl>
-<decl:Extension>extension <ref:Class><loc>FooRepeatedMembers</ref></loc> {
+<decl:Extension>extension <loc><ref:Class>FooRepeatedMembers</ref></loc> {
   <decl:Var>var <loc>repeatedPropertyFromCategory</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Func>func <loc>repeatedMethodFromCategory()</loc></decl>
 }</decl>

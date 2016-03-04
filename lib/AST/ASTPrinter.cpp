@@ -481,37 +481,7 @@ void ASTPrinter::printIndent() {
 }
 
 void ASTPrinter::printTextImpl(StringRef Text) {
-  if (PendingNewlines != 0) {
-    llvm::SmallString<16> Str;
-    for (unsigned i = 0; i != PendingNewlines; ++i)
-      Str += '\n';
-    PendingNewlines = 0;
-
-    printText(Str);
-    printIndent();
-  }
-
-  // Get the pending callbacks and remove them from the printer. They must all
-  // be removed before calling any of them to ensure correct ordering.
-  auto pendingDeclPre = PendingDeclPreCallbacks;
-  PendingDeclPreCallbacks.clear();
-  auto *LocD = PendingDeclLocCallback;
-  PendingDeclLocCallback = nullptr;
-  auto NameContext = PendingNamePreCallback;
-  PendingNamePreCallback.reset();
-
-  // Perform pending callbacks.
-  for (const Decl *PreD : pendingDeclPre) {
-    if (SynthesizeTarget && PreD->getKind() == DeclKind::Extension)
-      printSynthesizedExtensionPre(cast<ExtensionDecl>(PreD), SynthesizeTarget);
-    else
-      printDeclPre(PreD);
-  }
-  if (LocD)
-    printDeclLoc(LocD);
-  if (NameContext)
-    printNamePre(*NameContext);
-
+  forceNewlines();
   printText(Text);
 }
 
@@ -527,6 +497,15 @@ void ASTPrinter::printTypeRef(const TypeDecl *TD, Identifier Name) {
 
 void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
+}
+
+void ASTPrinter::callPrintDeclPre(const Decl *D) {
+  forceNewlines();
+
+  if (SynthesizeTarget && D->getKind() == DeclKind::Extension)
+    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget);
+  else
+    printDeclPre(D);
 }
 
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
@@ -674,11 +653,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
     const clang::RawComment *RC = ClangContext.getRawCommentForAnyRedecl(D);
     if (!RC)
       return;
-
-    if (!Options.PrintRegularClangComments) {
-      Printer.printNewline();
-      indent();
-    }
 
     bool Invalid;
     unsigned StartLocCol =
@@ -882,6 +856,23 @@ public:
                       D->getKind() == DeclKind::Extension;
     if (Synthesize)
       Printer.setSynthesizedTarget(Options.TransformContext->getNominal());
+
+    // We want to print a newline before doc comments.  Swift code already
+    // handles this, but we need to insert it for clang doc comments when not
+    // printing other clang comments. Do it now so the printDeclPre callback
+    // happens after the newline.
+    if (Options.PrintDocumentationComments &&
+        !Options.PrintRegularClangComments &&
+        D->hasClangNode()) {
+      auto clangNode = D->getClangNode();
+      auto clangDecl = clangNode.getAsDecl();
+      if (clangDecl &&
+          clangDecl->getASTContext().getRawCommentForAnyRedecl(clangDecl)) {
+        Printer.printNewline();
+        indent();
+      }
+    }
+
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
     if (Synthesize) {
