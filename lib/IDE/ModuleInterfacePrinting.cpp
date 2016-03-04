@@ -446,11 +446,11 @@ void swift::ide::printSubmoduleInterface(
             continue;
 
           // Print synthesized extensions.
-          llvm::SmallPtrSet<ExtensionDecl *, 10> ExtensionsFromConformances;
+          std::vector<ExtensionDecl*> scratch;
           SynthesizedExtensionAnalyzer Analyzer(NTD);
-          Analyzer.findSynthesizedExtensions(ExtensionsFromConformances);
-          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
-          for (auto ET : ExtensionsFromConformances) {
+          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                                    &Analyzer);
+          for (auto ET : Analyzer.getAllSynthesizedExtensions(scratch)) {
             if (!shouldPrint(ET, AdjustedOptions))
               continue;
             Printer << "\n";
