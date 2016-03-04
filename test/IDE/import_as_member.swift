@@ -17,6 +17,10 @@
 // PRINT:      extension Struct1 {
 // PRINT-NEXT:   static var globalVar: Double
 // PRINT-NEXT:   init(value value: Double)
+// PRINT-NEXT:   func invert() -> Struct1
+// PRINT-NEXT:   func translate(radians radians: Double) -> Struct1
+// PRINT-NEXT:   func selfComesLast(x x: Double)
+// PRINT-NEXT:   func selfComesThird(a a: Int32, b b: Float, x x: Double)
 // PRINT-NEXT: }
 
 // RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules

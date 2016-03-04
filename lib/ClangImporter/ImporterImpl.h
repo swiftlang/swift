@@ -830,6 +830,9 @@ public:
     /// than refuse to import the initializer.
     bool DroppedVariadic = false;
 
+    /// Whether this is a global being imported as a member
+    bool ImportAsMember = false;
+
     /// What kind of accessor this name refers to, if any.
     ImportedAccessorKind AccessorKind = ImportedAccessorKind::None;
 
@@ -849,6 +852,10 @@ public:
     /// For names that map Objective-C error handling conventions into
     /// throwing Swift methods, describes how the mapping is performed.
     Optional<ImportedErrorInfo> ErrorInfo;
+
+    /// For a declaration name that makes the declaration into an
+    /// instance member, the index of the "Self" parameter.
+    Optional<unsigned> SelfIndex = None;
 
     /// Produce just the imported name, for clients that don't care
     /// about the details.
@@ -884,6 +891,14 @@ public:
         return true;
       }
     }
+
+    bool isImportAsInstanceMember() const {
+      return ImportAsMember && SelfIndex;
+    }
+    bool isImportAsMethod() const {
+      return isImportAsInstanceMember() && !isPropertyAccessor();
+    }
+
   };
 
   /// Flags that control the import of names in importFullName.

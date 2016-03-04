@@ -2064,6 +2064,9 @@ auto ClangImporter::Implementation::importFullName(
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
         result.EffectiveContext = parsedName.ContextName;
+        if (parsedName.SelfIndex)
+          result.SelfIndex = parsedName.SelfIndex;
+        result.ImportAsMember = true;
       }
 
       // Map property getters/setters.

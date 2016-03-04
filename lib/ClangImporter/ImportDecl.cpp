@@ -2544,6 +2544,58 @@ namespace {
       return result;
     }
 
+    ParameterList *getNonSelfParamList(
+        const clang::FunctionDecl *decl, unsigned selfIdx,
+        ArrayRef<Identifier> argNames, bool allowNSUIntegerAsInt) {
+      assert(decl->getNumParams() == argNames.size() + 1 &&
+             selfIdx < decl->getNumParams() && "where's self?");
+      SmallVector<const clang::ParmVarDecl *, 4> nonSelfParams;
+      for (unsigned i = 0; i < decl->getNumParams(); ++i) {
+        if (i == selfIdx)
+          continue;
+        nonSelfParams.push_back(decl->getParamDecl(i));
+      }
+      return Impl.importFunctionParameterList(decl, nonSelfParams,
+                                              decl->isVariadic(),
+                                              allowNSUIntegerAsInt, argNames);
+    }
+
+    Decl *importAsMethod(const clang::FunctionDecl *decl, DeclName name,
+                         DeclContext *dc, unsigned selfIdx,
+                         bool allowNSUIntegerAsInt) {
+      auto &SwiftCtx = Impl.SwiftContext;
+      SourceLoc noLoc{};
+      SmallVector<ParameterList *, 2> bodyParams;
+      bodyParams.push_back(ParameterList::createWithoutLoc(
+          ParamDecl::createSelf(noLoc, dc, false)));
+      bodyParams.push_back(getNonSelfParamList(
+          decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt));
+
+      auto swiftResultTy = Impl.importFunctionReturnType(
+          decl, decl->getReturnType(), allowNSUIntegerAsInt);
+
+      auto loc = Impl.importSourceLoc(decl->getLocation());
+      auto nameLoc = Impl.importSourceLoc(decl->getLocation());
+      auto result = FuncDecl::create(
+          SwiftCtx, noLoc, StaticSpellingKind::None, loc, name, nameLoc, noLoc,
+          noLoc,
+          /*GenericParams=*/nullptr,
+          ParameterList::getFullType(swiftResultTy, bodyParams),
+          bodyParams, TypeLoc::withoutLoc(swiftResultTy), dc, decl);
+
+      result->setBodyResultType(swiftResultTy);
+      result->setAccessibility(Accessibility::Public);
+
+      if (dc->getAsClassOrClassExtensionContext())
+        // FIXME: only if the class itself is not marked final
+        result->getAttrs().add(new (SwiftCtx) FinalAttr(/*IsImplicit=*/false));
+
+      // FIXME: Need to either store or communicate selfIdx to SILGen. Or, maybe
+      // SILGen recomputes it?
+      finishFuncDecl(decl, result);
+      return result;
+    }
+
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       // Determine the name of the function.
       auto importedName = Impl.importFullName(decl);
@@ -2557,15 +2609,15 @@ namespace {
       DeclName name = importedName.Imported;
       bool hasCustomName = importedName.HasCustomName;
 
-      if (dc->isTypeContext()) {
-        // Import as member
+      if (importedName.ImportAsMember) {
+        // Import this function as member
+          bool allowNSUIntegerAsInt =
+              Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 
         // TODO: refactor into separate function and share with other kinds of
         // import-as-member
         if (name.getBaseName().str() == "init") {
-          bool allowNSUIntegerAsInt =
-              Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
-
+          SourceLoc noLoc{};
           ArrayRef<Identifier> argNames = name.getArgumentNames();
           auto parameterList = Impl.importFunctionParameterList(
               decl, {decl->param_begin(), decl->param_end()},
@@ -2574,7 +2626,6 @@ namespace {
           if (!parameterList)
             return nullptr;
 
-          SourceLoc noLoc{};
           auto selfParam = ParamDecl::createSelf(noLoc, dc, false);
 
           OptionalTypeKind initOptionality;
@@ -2590,6 +2641,13 @@ namespace {
           finishFuncDecl(decl, result);
           return result;
         }
+
+        if (importedName.isImportAsMethod()) {
+          return importAsMethod(decl, name, dc,
+                                importedName.SelfIndex.getValue(),
+                                allowNSUIntegerAsInt);
+        }
+
 
         // TODO: properties and methods
         return nullptr;
