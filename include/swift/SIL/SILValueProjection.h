@@ -170,12 +170,6 @@ public:
 
   /// Print the SILValueProjection.
   virtual void print(SILModule *Mod); 
-
-  /// Create a path of AddrProjection or ValueProjection with the given VA
-  /// and Path.
-  static SILValue createExtract(SILValue VA,
-                                const Optional<ProjectionPath> &Path,
-                                SILInstruction *Inst, bool IsValExt);
 };
 
 static inline llvm::hash_code hash_value(const SILValueProjection &S) {
@@ -283,7 +277,7 @@ public:
   SILValue materialize(SILInstruction *Inst) {
     if (IsCoveringValue)
       return SILValue();
-    return SILValueProjection::createExtract(Base, Path, Inst, true);
+    return Path.getValue().createExtract(Base, Inst, true);
   }
 
   void print(SILModule *Mod) {

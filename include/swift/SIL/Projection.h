@@ -537,6 +537,10 @@ public:
     return *this;
   }
 
+  /// Create a path of AddrProjection or ValueProjection with the given VA
+  /// and Path.
+  SILValue createExtract(SILValue VA, SILInstruction *Inst, bool IsVal) const;
+
   /// Create a new projection path from the SILValue Start to End.  Returns
   /// Nothing::None if there is no such path.
   ///
@@ -568,7 +572,7 @@ public:
   static bool hasUncoveredNonTrivials(SILType B, SILModule *Mod,
                                       ProjectionPathSet &CPaths);
 
-  /// Returns true if the two paths have a non-empty symmetric
+    /// Returns true if the two paths have a non-empty symmetric
   /// difference.
   ///
   /// This means that the two objects have the same base but access different

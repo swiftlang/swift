@@ -960,10 +960,8 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     // We merely setup the remaining live stores, but do not materialize in IR
     // yet, These stores will be materialized before the algorithm exits.
     for (auto &X : Alives) {
-      SILValue Value =
-          SILValueProjection::createExtract(Val, X.getPath(), I, true);
-      SILValue Addr =
-          SILValueProjection::createExtract(Mem, X.getPath(), I, false);
+      SILValue Value = X.getPath()->createExtract(Val, I, true);
+      SILValue Addr = X.getPath()->createExtract(Mem, I, false);
       S->LiveStores[Addr] = Value;
     }
 
