@@ -60,7 +60,7 @@ Action(llvm::cl::desc("Mode:"),
          clEnumValN(ActionType::DumpHeapInstance,
                     "dump-heap-instance",
                     "Dump the field layout for a heap instance by running "
-                    "a swift exectuable"),
+                    "a Swift executable"),
          clEnumValEnd));
 
 static llvm::cl::opt<std::string>
