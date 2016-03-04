@@ -773,6 +773,11 @@ public:
   static OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
                                                       clang::QualType type);
 
+  /// Whether NSUInteger can be imported as Int in certain contexts. If false,
+  /// should always be imported as UInt.
+  static bool shouldAllowNSUIntegerAsInt(bool isFromSystemModule,
+                                         const clang::NamedDecl *decl);
+
   /// Omit needless words in a function name.
   bool omitNeedlessWordsInFunctionName(
          clang::Sema &clangSema,
@@ -1192,6 +1197,23 @@ public:
                           bool hasCustomName,
                           ParameterList *&parameterList,
                           DeclName &name);
+
+  /// \brief Import the parameter list for a function
+  ///
+  /// \param clangDecl The underlying declaration, if any; should only be
+  ///   considered for any attributes it might carry.
+  /// \param params The parameter types to the function.
+  /// \param isVariadic Whether the function is variadic.
+  /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
+  ///        in certain contexts. If false, it will always be imported as UInt.
+  /// \param argNames The argument names
+  ///
+  /// \returns The imported parameter list on success, or null on failure
+  ParameterList *
+  importFunctionParameterList(const clang::FunctionDecl *clangDecl,
+                              ArrayRef<const clang::ParmVarDecl *> params,
+                              bool isVariadic, bool allowNSUIntegerAsInt,
+                              ArrayRef<Identifier> argNames);
 
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);
