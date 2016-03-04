@@ -75,7 +75,10 @@ public func scatter<T>(a: [T], _ idx: [Int]) -> [T] {
 public func withArrayOfCStrings<R>(
   args: [String], _ body: ([UnsafeMutablePointer<CChar>]) -> R
 ) -> R {
-
+  // TODO: swift-3-indexing-model - last doesn't yet show up on arrays
+  fatalError("FIXME: swift-3-indexing-model")
+  
+  /*
   let argsCounts = Array(args.map { $0.utf8.count + 1 })
   let argsOffsets = [ 0 ] + scan(argsCounts, 0, +)
   let argsBufferSize = argsOffsets.last!
@@ -94,5 +97,6 @@ public func withArrayOfCStrings<R>(
     cStrings[cStrings.count - 1] = nil
     return body(cStrings)
   }
+  */
 }
 
