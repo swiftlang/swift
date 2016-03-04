@@ -231,7 +231,7 @@ ErrorTypeBridgingTests.test("enum-to-NSError round trip") {
   autoreleasepool {
     // Emulate throwing an error from Objective-C.
     func throwNSError(error: EnumError) throws {
-      throw NSError(domain: "\(EnumError.self)", code: error.rawValue,
+      throw NSError(domain: "main.EnumError", code: error.rawValue,
                     userInfo: [:])
     }
 
