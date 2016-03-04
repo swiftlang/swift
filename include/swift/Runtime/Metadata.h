@@ -2030,19 +2030,21 @@ using EnumMetadata = TargetEnumMetadata<InProcess>;
 template <typename Runtime>
 struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
+
+  // TODO: Make this target agnostic
   using Argument = FlaggedPointer<const TargetMetadata<Runtime> *, 0>;
 
-  FunctionTypeFlags Flags;
+  TargetFunctionTypeFlags<Runtime> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, TargetMetadata> ResultType;
 
-  Argument *getArguments() {
-    return reinterpret_cast<Argument *>(this + 1);
+  TargetPointer<Runtime, Argument> getArguments() {
+    return reinterpret_cast<TargetPointer<Runtime, Argument>>(this + 1);
   }
 
-  const Argument *getArguments() const {
-    return reinterpret_cast<const Argument *>(this + 1);
+  TargetPointer<Runtime, const Argument> getArguments() const {
+    return reinterpret_cast<TargetPointer<Runtime, const Argument>>(this + 1);
   }
   
   StoredSize getNumArguments() const {
@@ -2052,6 +2054,8 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getConvention();
   }
   bool throws() const { return Flags.throws(); }
+
+  static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Function;

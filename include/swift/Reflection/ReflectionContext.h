@@ -330,8 +330,27 @@ public:
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta.get());
+      StoredPointer FlagsAddress = MetadataAddress +
+        TargetFunctionTypeMetadata<Runtime>::OffsetToFlags;
+      TargetFunctionTypeFlags<Runtime> Flags;
+      if (!Reader.readBytes(FlagsAddress, (uint8_t*)&Flags, sizeof(Flags)))
+        return nullptr;
       TypeRefVector Arguments;
-      llvm_unreachable("todo");
+      StoredPointer ArgumentAddress = MetadataAddress +
+        sizeof(TargetFunctionTypeMetadata<Runtime>);
+      for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
+           ArgumentAddress += sizeof(StoredPointer)) {
+        StoredPointer FlaggedArgumentAddress;
+        if (!Reader.readInteger(ArgumentAddress, &FlaggedArgumentAddress))
+          return nullptr;
+        // TODO: Use target-agnostic FlaggedPointer to mask this!
+        FlaggedArgumentAddress &= ~((StoredPointer)1);
+        if (auto ArgumentTypeRef = getTypeRef(FlaggedArgumentAddress))
+          Arguments.push_back(ArgumentTypeRef);
+        else
+          return nullptr;
+      }
+
       auto Result = getTypeRef(Function->ResultType);
       return FunctionTypeRef::create(Arguments, Result);
     }
