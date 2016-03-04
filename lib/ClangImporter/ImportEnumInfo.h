@@ -17,6 +17,7 @@
 #ifndef SWIFT_CLANG_IMPORT_ENUM_H
 #define SWIFT_CLANG_IMPORT_ENUM_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "clang/AST/Attr.h"
 #include "clang/Basic/SourceLocation.h"
@@ -60,7 +61,7 @@ class EnumInfo {
 
   /// The enum's common constant name prefix, which will be stripped from
   /// constants
-  std::string constantNamePrefix = StringRef();
+  StringRef constantNamePrefix = StringRef();
 
   /// The identifying attribute for specially imported enums
   ///
@@ -71,9 +72,10 @@ class EnumInfo {
 public:
   EnumInfo() = default;
 
-  EnumInfo(const clang::EnumDecl *decl, clang::Preprocessor &pp) {
+  EnumInfo(ASTContext &ctx, const clang::EnumDecl *decl,
+           clang::Preprocessor &pp) {
     classifyEnum(decl, pp);
-    determineConstantNamePrefix(decl);
+    determineConstantNamePrefix(ctx, decl);
   }
 
   EnumKind getKind() const { return kind; }
@@ -92,7 +94,7 @@ public:
   }
 
 private:
-  void determineConstantNamePrefix(const clang::EnumDecl *);
+  void determineConstantNamePrefix(ASTContext &ctx, const clang::EnumDecl *);
   void classifyEnum(const clang::EnumDecl *, clang::Preprocessor &);
 };
 }

@@ -497,7 +497,7 @@ public:
     // If there is no name for linkage, the computation is trivial and we
     // wouldn't be able to perform name-based caching anyway.
     if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(decl, preprocessor);
+      return importer::EnumInfo(SwiftContext, decl, preprocessor);
 
     SmallString<32> keyScratch;
     auto key = getEnumInfoKey(decl, keyScratch);
@@ -505,7 +505,7 @@ public:
     if (known != enumInfos.end())
       return known->second;
 
-    importer::EnumInfo enumInfo(decl, preprocessor);
+    importer::EnumInfo enumInfo(SwiftContext, decl, preprocessor);
     enumInfos[key] = enumInfo;
     return enumInfo;
   }
