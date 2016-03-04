@@ -60,6 +60,7 @@ enum class PrintStructureKind {
   GenericParameter,
   GenericRequirement,
   FunctionParameter,
+  BuiltinAttribute,
 };
 
 /// An abstract class used to print an AST.

@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -298,7 +299,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName());
     } else {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName(getAttrName(), /*needAt=*/true);
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     }
     return true;
 
@@ -310,6 +313,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   default:
     break;
   }
+
+  Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  defer { Printer.printStructurePost(PrintStructureKind::BuiltinAttribute); };
 
   switch (getKind()) {
   case DAK_Semantics:

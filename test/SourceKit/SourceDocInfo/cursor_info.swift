@@ -463,11 +463,11 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=119:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK54
 // CHECK54: source.lang.swift.decl.class (119:13-119:15)
-// CHECK54: <decl.class><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name> <syntaxtype.keyword>class
+// CHECK54: <decl.class><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>class
 
 // RUN: %sourcekitd-test -req=cursor -pos=122:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK55
 // CHECK55: source.lang.swift.decl.function.method.instance (122:8-122:12)
-// CHECK55: <decl.function.method.instance><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name>(mmm1) <syntaxtype.attribute.name>@noreturn</syntaxtype.attribute.name> <syntaxtype.keyword>func
+// CHECK55: <decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name>(mmm1)</syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@noreturn</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func
 
 // RUN: %sourcekitd-test -req=cursor -pos=126:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK56
 // CHECK56: source.lang.swift.decl.var.instance (126:7-126:9)
