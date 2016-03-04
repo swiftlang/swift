@@ -694,11 +694,11 @@ extension ${Self} : _ArrayProtocol {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func appendContents<
+  public mutating func append<
     S : Sequence
     where
     S.Iterator.Element == Element
-  >(of newElements: S) {
+  >(contentsOf newElements: S) {
     self += newElements
   }
 
@@ -707,11 +707,11 @@ extension ${Self} : _ArrayProtocol {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func appendContents<
+  public mutating func append<
     C : Collection
     where
     C.Iterator.Element == Element
-  >(of newElements: C) {
+  >(contentsOf newElements: C) {
     self += newElements
   }
 
