@@ -25,7 +25,7 @@ class C1 {
   @warn_unused_result
   func f1() { }
 
-  @warn_unused_result(message="huzzah")
+  @warn_unused_result(message: "huzzah")
   static func f2() { }
 }
 
@@ -52,12 +52,12 @@ func testInitsPositive() {
 // ---------------------------------------------------------------------------
 
 struct Mutating1 {
-  @warn_unused_result(mutable_variant="fooInPlace")
+  @warn_unused_result(mutable_variant: "fooInPlace")
   func foo() -> Mutating1 { return self }
 
   mutating func fooInPlace() { }
 
-  @warn_unused_result(message="zug zug", mutable_variant="barInPlace")
+  @warn_unused_result(message: "zug zug", mutable_variant: "barInPlace")
   func bar(x: Int, y: Int) -> Mutating1 { return self }
 
   mutating func barInPlace(x: Int, y: Int) { }
@@ -78,22 +78,22 @@ func testMutating1(m1: Mutating1, m2: Mutating1) {
 // ---------------------------------------------------------------------------
 struct BadAttributes1 {
   @warn_unused_result(blarg) func f1() { } // expected-warning{{unknown parameter 'blarg' in 'warn_unused_result' attribute}}
-  @warn_unused_result(wibble="foo") func f2() { } // expected-warning{{unknown parameter 'wibble' in 'warn_unused_result' attribute}}
-  @warn_unused_result(message) func f3() { } // expected-error{{expected '=' following 'message' parameter}}
-  @warn_unused_result(message=) func f4() { } // expected-error{{'=' must have consistent whitespace on both sides}}
-  // expected-error@-1{{expected a string following '=' for 'message' parameter}}
-  @warn_unused_result(message=blah) func f5() { } // expected-error{{expected a string following '=' for 'message' parameter}}
+  @warn_unused_result(wibble:"foo") func f2() { } // expected-warning{{unknown parameter 'wibble' in 'warn_unused_result' attribute}}
+  @warn_unused_result(message) func f3() { } // expected-error{{expected ':' following 'message' parameter}}
+  @warn_unused_result(message=) func f4() { } // expected-error{{'=' must have consistent whitespace on both sides}} // expected-warning{{'=' is deprecated}}
+  // expected-error@-1{{expected a string following ':' for 'message' parameter}}
+  @warn_unused_result(message: blah) func f5() { } // expected-error{{expected a string following ':' for 'message' parameter}}
 
-  @warn_unused_result(mutable_variant="oops") static func f6() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a non-instance method}}
-  @warn_unused_result(mutable_variant="oops") init() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a non-function}}
-  @warn_unused_result(mutable_variant="oops") mutating func f7() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a mutating method}}
+  @warn_unused_result(mutable_variant: "oops") static func f6() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a non-instance method}}
+  @warn_unused_result(mutable_variant: "oops") init() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a non-function}}
+  @warn_unused_result(mutable_variant: "oops") mutating func f7() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a mutating method}}
 }
 
 class BadAttributes2 {
-  @warn_unused_result(mutable_variant="oops") func f1() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a method of a class}}
+  @warn_unused_result(mutable_variant: "oops") func f1() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a method of a class}}
 }
 
-@warn_unused_result(mutable_variant="oops") func badMutableVariant() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a non-method}}
+@warn_unused_result(mutable_variant: "oops") func badMutableVariant() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a non-method}}
 
 
 // ---------------------------------------------------------------------------

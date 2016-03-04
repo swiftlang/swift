@@ -518,9 +518,9 @@ class d0170_TestAvailability {
 // PASS_COMMON-NEXT: {{^}}  @available(*, unavailable){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f1(){{$}}
 
-  @available(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee")
+  @available(*, unavailable, message: "aaa \"bbb\" ccc\nddd\0eee")
   func f2() {}
-// PASS_COMMON-NEXT: {{^}}  @available(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee"){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(*, unavailable, message: "aaa \"bbb\" ccc\nddd\0eee"){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f2(){{$}}
 
   @available(iOS, unavailable)
@@ -536,8 +536,8 @@ class d0170_TestAvailability {
 // PASS_COMMON-NEXT: {{^}}  func f4(){{$}}
 
 // Convert long-form @available() to short form when possible.
-  @available(iOS, introduced=8.0)
-  @available(OSX, introduced=10.10)
+  @available(iOS, introduced: 8.0)
+  @available(OSX, introduced: 10.10)
   func f5() {}
 // PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, OSX 10.10, *){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f5(){{$}}
@@ -1286,16 +1286,16 @@ struct d2900_TypeSugar1 {
 
 // @warn_unused_result attribute
 public struct ArrayThingy {
-    // PASS_PRINT_AST: @warn_unused_result(mutable_variant="sort")
+    // PASS_PRINT_AST: @warn_unused_result(mutable_variant: "sort")
     // PASS_PRINT_AST-NEXT: public func sort() -> ArrayThingy
-    @warn_unused_result(mutable_variant="sort")
+    @warn_unused_result(mutable_variant: "sort")
     public func sort() -> ArrayThingy { return self }
 
     public mutating func sort() { }
 
-    // PASS_PRINT_AST: @warn_unused_result(message="dummy", mutable_variant="reverseInPlace")
+    // PASS_PRINT_AST: @warn_unused_result(message: "dummy", mutable_variant: "reverseInPlace")
     // PASS_PRINT_AST-NEXT: public func reverse() -> ArrayThingy
-    @warn_unused_result(message="dummy", mutable_variant="reverseInPlace")
+    @warn_unused_result(message: "dummy", mutable_variant: "reverseInPlace")
     public func reverse() -> ArrayThingy { return self }
 
     public mutating func reverseInPlace() { }
@@ -1305,9 +1305,9 @@ public struct ArrayThingy {
     @warn_unused_result
     public func mineGold() -> Int { return 0 }
 
-    // PASS_PRINT_AST: @warn_unused_result(message="oops")
+    // PASS_PRINT_AST: @warn_unused_result(message: "oops")
     // PASS_PRINT_AST-NEXT: public func mineCopper() -> Int
-    @warn_unused_result(message="oops")
+    @warn_unused_result(message: "oops")
     public func mineCopper() -> Int { return 0 }
 }
 
