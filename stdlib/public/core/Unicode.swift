@@ -157,8 +157,9 @@ public struct UTF8 : UnicodeCodecType {
       _sanityCheck(1...4 ~= length && bitsConsumed <= _bitsInBuffer)
       // Swift doesn't allow shifts greater than or equal to the type width.
       // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
+      // Mask with 0x3f to let the compiler omit the '>= 64' bounds check.
       _decodeBuffer = UInt32(truncatingBitPattern:
-        UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x1f))
+        UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x3f))
       _bitsInBuffer = _bitsInBuffer &- bitsConsumed
 
       if _fastPath(result != nil) {
