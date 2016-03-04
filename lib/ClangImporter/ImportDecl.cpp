@@ -2557,63 +2557,43 @@ namespace {
       DeclName name = importedName.Imported;
       bool hasCustomName = importedName.HasCustomName;
 
-      // TODO: refactor into separate function and share with other kinds of
-      // import-as-member
-      if (name.getBaseName().str() == "init") {
-        bool allowNSUIntegerAsInt =
-            Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
+      if (dc->isTypeContext()) {
+        // Import as member
 
-        ArrayRef<Identifier> argNames = name.getArgumentNames();
-        auto parameterList = Impl.importFunctionParameterList(
-            decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
-            allowNSUIntegerAsInt, argNames);
+        // TODO: refactor into separate function and share with other kinds of
+        // import-as-member
+        if (name.getBaseName().str() == "init") {
+          bool allowNSUIntegerAsInt =
+              Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 
-        if (!parameterList)
-          return nullptr;
+          ArrayRef<Identifier> argNames = name.getArgumentNames();
+          auto parameterList = Impl.importFunctionParameterList(
+              decl, {decl->param_begin(), decl->param_end()},
+              decl->isVariadic(), allowNSUIntegerAsInt, argNames);
 
-        SourceLoc noLoc{};
-        auto selfParam = ParamDecl::createSelf(noLoc, dc, false);
+          if (!parameterList)
+            return nullptr;
 
-        auto &SwiftCtx = Impl.SwiftContext;
-        name = {SwiftCtx, SwiftCtx.Id_init, parameterList};
+          SourceLoc noLoc{};
+          auto selfParam = ParamDecl::createSelf(noLoc, dc, false);
 
-        OptionalTypeKind initOptionality;
-        {
-
-          bool isAuditedResult =
-              (decl && (decl->hasAttr<clang::CFAuditedTransferAttr>() ||
-                        decl->hasAttr<clang::CFReturnsRetainedAttr>() ||
-                        decl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
-          // Check if we know more about the type from our whitelists.
-          OptionalTypeKind returnOptKind;
-          if (decl->hasAttr<clang::ReturnsNonNullAttr>()) {
-            returnOptKind = OTK_None;
-          } else {
-            returnOptKind = OTK_ImplicitlyUnwrappedOptional;
-          }
-
-          // Import the result type.
-          auto swiftResultTy =
-              Impl.importType(decl->getReturnType(),
-                              (isAuditedResult ? ImportTypeKind::AuditedResult
-                                               : ImportTypeKind::Result),
-                              allowNSUIntegerAsInt,
-                              /*isFullyBridgeable*/ true, returnOptKind);
-
+          OptionalTypeKind initOptionality;
+          auto swiftResultTy = Impl.importFunctionReturnType(
+              decl, decl->getReturnType(), allowNSUIntegerAsInt);
           swiftResultTy->getAnyOptionalObjectType(initOptionality);
+
+          auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
+              decl, name, noLoc, initOptionality, noLoc, selfParam,
+              parameterList,
+              /*GenericParams=*/nullptr, noLoc, dc);
+
+          finishFuncDecl(decl, result);
+          return result;
         }
 
-        auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            decl, name, noLoc, initOptionality, noLoc, selfParam, parameterList,
-            /*GenericParams=*/nullptr, noLoc, dc);
-
-        finishFuncDecl(decl, result);
-        return result;
-      }
-
-      // FIXME: Cannot import anything into a type context from here on.
-      if (dc->isTypeContext())
+        // TODO: properties and methods
         return nullptr;
+      }
 
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.

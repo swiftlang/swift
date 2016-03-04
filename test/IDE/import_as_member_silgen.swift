@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -I %S/Inputs/custom-modules %s 2>&1 | FileCheck --check-prefix=SIL %s
 import ImportAsMember
 
-public func returnGlobalVar() -> Int32 {
+public func returnGlobalVar() -> Double {
 	return Struct1.globalVar
 }
 // SIL-LABEL: sil {{.*}}returnGlobalVar{{.*}} () -> Int32 {

@@ -1245,7 +1245,7 @@ bool ClangImporter::Implementation::shouldAllowNSUIntegerAsInt(
     bool isFromSystemModule, const clang::NamedDecl *decl) {
   if (isFromSystemModule)
     if (auto identInfo = decl->getIdentifier())
-      return !nameContainsUnsigned(decl->getName());
+      return !nameContainsUnsigned(identInfo->getName());
   return false;
 }
 
@@ -1332,18 +1332,10 @@ static OptionalTypeKind getParamOptionality(
   return OTK_ImplicitlyUnwrappedOptional;
 }
 
-Type ClangImporter::Implementation::
-importFunctionType(const clang::FunctionDecl *clangDecl,
-                   clang::QualType resultType,
-                   ArrayRef<const clang::ParmVarDecl *> params,
-                   bool isVariadic, bool isNoReturn,
-                   bool isFromSystemModule, bool hasCustomName,
-                   ParameterList *&parameterList, DeclName &name) {
-
-  bool allowNSUIntegerAsInt =
-      shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
-
-  // CF function results can be managed if they are audited or
+Type ClangImporter::Implementation::importFunctionReturnType(
+    const clang::FunctionDecl *clangDecl, clang::QualType resultType,
+    bool allowNSUIntegerAsInt) {
+ // CF function results can be managed if they are audited or
   // the ownership convention is explicitly declared.
   bool isAuditedResult =
     (clangDecl &&
@@ -1360,13 +1352,25 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
   }
 
   // Import the result type.
-  auto swiftResultTy = importType(resultType,
-                                  (isAuditedResult
-                                    ? ImportTypeKind::AuditedResult
-                                    : ImportTypeKind::Result),
-                                  allowNSUIntegerAsInt,
-                                  /*isFullyBridgeable*/true,
-                                  OptionalityOfReturn);
+  return importType(resultType, (isAuditedResult ? ImportTypeKind::AuditedResult
+                                                 : ImportTypeKind::Result),
+                    allowNSUIntegerAsInt,
+                    /*isFullyBridgeable*/ true, OptionalityOfReturn);
+}
+
+Type ClangImporter::Implementation::
+importFunctionType(const clang::FunctionDecl *clangDecl,
+                   clang::QualType resultType,
+                   ArrayRef<const clang::ParmVarDecl *> params,
+                   bool isVariadic, bool isNoReturn,
+                   bool isFromSystemModule, bool hasCustomName,
+                   ParameterList *&parameterList, DeclName &name) {
+
+  bool allowNSUIntegerAsInt =
+      shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
+
+  auto swiftResultTy =
+      importFunctionReturnType(clangDecl, resultType, allowNSUIntegerAsInt);
   if (!swiftResultTy)
     return Type();
 

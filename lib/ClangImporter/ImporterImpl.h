@@ -1193,6 +1193,20 @@ public:
                           ParameterList *&parameterList,
                           DeclName &name);
 
+  /// \brief Import the given function return type.
+  ///
+  /// \param clangDecl The underlying declaration, if any; should only be
+  ///   considered for any attributes it might carry.
+  /// \param resultType The result type of the function.
+  /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
+  ///        in certain contexts. If false, it will always be imported as UInt.
+  ///
+  /// \returns the imported function return type, or null if the type cannot be
+  /// imported.
+  Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+                                clang::QualType resultType,
+                                bool allowNSUIntegerAsInt);
+
   /// \brief Import the parameter list for a function
   ///
   /// \param clangDecl The underlying declaration, if any; should only be
