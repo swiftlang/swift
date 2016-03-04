@@ -10,6 +10,7 @@
 // PRINT-NEXT: }
 // PRINT-NEXT: extension Struct1 {
 // PRINT-NEXT:   static var globalVar: Int32
+// PRINT-NEXT:   init(value value: Int32)
 // PRINT-NEXT: }
 
 // RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
@@ -24,3 +25,6 @@ let gVarFail = IAMStruct1GlobalVar
   // expected-error@-1{{use of unresolved identifier 'IAMStruct1GlobalVar'}}
 let gVar = Struct1.globalVar
 
+let iamStructInitFail = IAMStruct1CreateSimple(42)
+  // expected-error@-1{{use of unresolved identifier 'IAMStruct1CreateSimple'}}
+let iamStructInitFail = Struct1(value: 42)

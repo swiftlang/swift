@@ -4050,9 +4050,10 @@ void ClangImporter::Implementation::importGlobalsAsMembers(
   for (auto member : members) {
     if (auto namedDecl = member.dyn_cast<clang::NamedDecl *>()) {
       if (auto funcDecl = dyn_cast<clang::FunctionDecl>(namedDecl)) {
-        // TODO: support functions
-        (void)funcDecl;
-        continue;
+
+        // TODO: support all functions, for now  inits currently work
+        if (importFullName(funcDecl).Imported.getBaseName().str() != "init")
+          continue;
       }
 
       auto swiftMemberDecl = cast_or_null<ValueDecl>(importDeclReal(namedDecl));
