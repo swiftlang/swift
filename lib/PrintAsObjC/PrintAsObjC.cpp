@@ -18,6 +18,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Comment.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/Frontend.h"
@@ -264,7 +265,9 @@ private:
         } else {
           os << customName;
         }
-        os << Elt->getName();
+
+        SmallString<16> scratch;
+        os << camel_case::toSentencecase(Elt->getName().str(), scratch);
       } else {
         os << customEltName
            << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";

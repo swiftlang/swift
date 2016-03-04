@@ -36,10 +36,12 @@ import Foundation
 // CHECK-NEXT:   ObjcEnumNamedA = 0,
 // CHECK-NEXT:   ObjcEnumNamedB = 1,
 // CHECK-NEXT:   ObjcEnumNamedC = 2,
+// CHECK-NEXT:   ObjcEnumNamedD = 3,
+// CHECK-NEXT:   ObjcEnumNamedHelloDolly = 4,
 // CHECK-NEXT: };
 
 @objc(ObjcEnumNamed) enum EnumNamed: Int {
-  case A, B, C
+  case A, B, C, d, helloDolly
 }
 
 // CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, EnumWithNamedConstants) {
