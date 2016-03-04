@@ -1,4 +1,4 @@
-//===--- SILValueProjection.cpp -------------------------------------------===//
+//===--------------- LSBase.cpp -------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,7 +20,6 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 //                              Utility Functions
 //===----------------------------------------------------------------------===//
-
 static void
 removeLSLocations(LSLocationValueMap &Values, LSLocationList &NextLevel) {
   for (auto &X : NextLevel) {
@@ -31,12 +30,6 @@ removeLSLocations(LSLocationValueMap &Values, LSLocationList &NextLevel) {
 //===----------------------------------------------------------------------===//
 //                              SILValue Projection
 //===----------------------------------------------------------------------===//
-
-void SILValueProjection::print(SILModule *Mod) {
-  llvm::outs() << Base;
-  Path.getValue().print(llvm::outs(), *Mod);
-}
-
 void
 LSValue::expand(SILValue Base, SILModule *M, LSValueList &Vals,
                 TypeExpansionAnalysis *TE) {
