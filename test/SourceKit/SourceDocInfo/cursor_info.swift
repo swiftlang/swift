@@ -252,7 +252,6 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 // CHECK18: source.lang.swift.ref.typealias (43:11-43:16)
 // CHECK18: <Declaration>typealias MyInt = <Type usr="s:Si">Int</Type></Declaration>
 // CHECK18: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyInt</decl.name> = <ref.struct usr="s:Si">Int</ref.struct></decl.typealias>
-// FIXME: keyword typealias
 
 // RUN: %sourcekitd-test -req=cursor -pos=46:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK19 %s
 // CHECK19:      source.lang.swift.ref.module ()
