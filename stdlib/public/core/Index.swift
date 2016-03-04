@@ -29,8 +29,6 @@ public protocol _Incrementable : Equatable {
   /// - Precondition: `self` has a well-defined successor.
   @warn_unused_result
   func successor() -> Self // DONE: swift-3-indexing-model - replicated
-
-  mutating func _successorInPlace()
 }
 
 extension _Incrementable {
@@ -50,32 +48,12 @@ public struct _DisabledRangeIndex_ {
 
 //===----------------------------------------------------------------------===//
 
-/// Replace `i` with its `successor()` and return the updated value of
-/// `i`.
-@_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
-  i._successorInPlace()
-  return i
-}
-
-/// Replace `i` with its `successor()` and return the original
-/// value of `i`.
-@_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func ++ <T : _Incrementable> (i: inout T) -> T {
-  let ret = i
-  i._successorInPlace()
-  return ret
-}
-
 /// Represents a discrete value in a series, where a value's
 /// successor, if any, is reachable by applying the value's
 /// `successor()` method.
 
 // TODO: swift-3-indexing-model - will become unavailable once work is completed
-//@available(*, deprecated, message="it will be subsumed by collections implementing Collection in Swift 3")
-
+//@available(*, unavailable, message="subsumed by Collection in Swift 3")
 public protocol ForwardIndex : _Incrementable {
   /// A type that can represent the number of steps between pairs of
   /// `Self` values where one value is reachable from the other.
@@ -87,181 +65,13 @@ public protocol ForwardIndex : _Incrementable {
   // See the implementation of Range for an explanation of this
   // associated type
   associatedtype _DisabledRangeIndex = _DisabledRangeIndex_
-
-  /// Performs a range check in O(1), or a no-op when a range check is not
-  /// implementable in O(1).
-  ///
-  /// The range check, if performed, is equivalent to:
-  ///
-  ///     precondition(bounds.contains(index))
-  ///
-  /// Use this function to perform a cheap range check for QoI purposes when
-  /// memory safety is not a concern.  Do not rely on this range check for
-  /// memory safety.
-  ///
-  /// The default implementation for forward and bidirectional indices is a
-  /// no-op.  The default implementation for random access indices performs a
-  /// range check.
-  ///
-  /// - Complexity: O(1).
-  static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) // DONE: swift-3-indexing-model - replicated
-
-  /// Performs a range check in O(1), or a no-op when a range check is not
-  /// implementable in O(1).
-  ///
-  /// The range check, if performed, is equivalent to:
-  ///
-  ///     precondition(
-  ///       bounds.contains(range.startIndex) ||
-  ///       range.startIndex == bounds.endIndex)
-  ///     precondition(
-  ///       bounds.contains(range.endIndex) ||
-  ///       range.endIndex == bounds.endIndex)
-  ///
-  /// Use this function to perform a cheap range check for QoI purposes when
-  /// memory safety is not a concern.  Do not rely on this range check for
-  /// memory safety.
-  ///
-  /// The default implementation for forward and bidirectional indices is a
-  /// no-op.  The default implementation for random access indices performs a
-  /// range check.
-  ///
-  /// - Complexity: O(1).
-  static func _failEarlyRangeCheck2( // DONE: swift-3-indexing-model - replicated
-    rangeStart rangeStart: Self,
-    rangeEnd: Self,
-    boundsStart: Self,
-    boundsEnd: Self)
-  // FIXME: the suffix `2` in the name, and passing `startIndex` and `endIndex`
-  // separately (rather than as a range) are workarounds for a compiler defect.
-  // <rdar://problem/21855350> Rejects-valid: rejects code that has two Self
-  // types in non-direct-argument-type position
-
-  /// Returns the result of advancing `self` by `n` positions.
-  ///
-  /// - Returns:
-  ///   - If `n > 0`, the result of applying `successor` to `self` `n` times.
-  ///   - If `n < 0`, the result of applying `predecessor` to `self` `-n` times.
-  ///   - Otherwise, `self`.
-  ///
-  /// - Precondition: `n >= 0` if only conforming to `ForwardIndex`
-  /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessIndex`
-  ///   - O(`abs(n)`) otherwise
-  @warn_unused_result
-  func advanced(by n: Distance) -> Self // DONE: swift-3-indexing-model - replicated
-
-  /// Returns the result of advancing `self` by `n` positions, or until it
-  /// equals `limit`.
-  ///
-  /// - Returns:
-  ///   - If `n > 0`, the result of applying `successor` to `self` `n` times
-  ///     but not past `limit`.
-  ///   - If `n < 0`, the result of applying `predecessor` to `self` `-n` times
-  ///     but not past `limit`.
-  ///   - Otherwise, `self`.
-  ///
-  /// - Precondition: `n >= 0` if only conforming to `ForwardIndex`.
-  ///
-  /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessIndex`
-  ///   - O(`abs(n)`) otherwise
-  @warn_unused_result
-  func advanced(by n: Distance, limit: Self) -> Self // DONE: swift-3-indexing-model - replicated
-
-  /// Measure the distance between `self` and `end`.
-  ///
-  /// - Precondition:
-  ///   - `start` and `end` are part of the same sequence when conforming to
-  ///     `RandomAccessSequenceType`.
-  ///   - `end` is reachable from `self` by incrementation otherwise.
-  ///
-  /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessIndex`
-  ///   - O(`n`) otherwise, where `n` is the function's result.
-  @warn_unused_result
-  func distance(to end: Self) -> Distance // DONE: swift-3-indexing-model - replicated
-}
-
-// advance and distance implementations
-
-extension ForwardIndex {
-  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) { // DONE: swift-3-indexing-model - replicated
-    // Can't perform range checks in O(1) on forward indices.
-  }
-
-  public static func _failEarlyRangeCheck2( // DONE: swift-3-indexing-model - replicated
-    rangeStart rangeStart: Self,
-    rangeEnd: Self,
-    boundsStart: Self,
-    boundsEnd: Self
-  ) {
-    // Can't perform range checks in O(1) on forward indices.
-  }
-
-  /// Do not use this method directly; call advanced(by: n) instead.
-  @_transparent
-  @warn_unused_result
-  internal func _advanceForward(n: Distance) -> Self { // DONE: swift-3-indexing-model - replicated
-    _precondition(n >= 0,
-        "Only BidirectionalIndex can be advanced by a negative amount")
-    var p = self
-    var i : Distance = 0
-    while i != n {
-      p._successorInPlace()
-      i += 1
-    }
-    return p
-  }
-
-  /// Do not use this method directly; call advanced(by: n, limit) instead.
-  @_transparent
-  @warn_unused_result
-  internal func _advanceForward(n: Distance, _ limit: Self) -> Self { // DONE: swift-3-indexing-model - replicated
-    _precondition(n >= 0,
-        "Only BidirectionalIndex can be advanced by a negative amount")
-    var p = self
-    var i : Distance = 0
-    while i != n {
-      if p == limit { break }
-      p._successorInPlace()
-      i += 1
-    }
-    return p
-  }
-
-  @warn_unused_result
-  public func advanced(by n: Distance) -> Self { // DONE: swift-3-indexing-model - replicated
-    return self._advanceForward(n)
-  }
-
-  @warn_unused_result
-  public func advanced(by n: Distance, limit: Self) -> Self { // DONE: swift-3-indexing-model - replicated
-    return self._advanceForward(n, limit)
-  }
-
-  @warn_unused_result
-  public func distance(to end: Self) -> Distance { // DONE: swift-3-indexing-model - replicated
-    var p = self
-    var count: Distance = 0
-    while p != end {
-      count += 1
-      p._successorInPlace()
-    }
-    return count
-  }
 }
 
 //===----------------------------------------------------------------------===//
 //===--- BidirectionalIndex -------------------------------------------===//
 
-
-/// An index that can step backwards via application of its
-/// `predecessor()` method.
-
 // TODO: swift-3-indexing-model - will become unavailable once work is completed
-//@available(*, deprecated, message="it will be subsumed by collections implementing BidirectionalCollection in Swift 3")
-
+//@available(*, unavailable, message="subsumed by Collection in Swift 3")
 public protocol BidirectionalIndex : ForwardIndex {
   /// Returns the previous consecutive value in a discrete sequence.
   ///
@@ -282,54 +92,6 @@ extension BidirectionalIndex {
   public mutating func _predecessorInPlace() { // DONE: swift-3-indexing-model - replicated
     self = self.predecessor()
   }
-
-  @warn_unused_result
-  public func advanced(by n: Distance) -> Self { // DONE: swift-3-indexing-model - replicated
-    if n >= 0 {
-      return _advanceForward(n)
-    }
-    var p = self
-    var i: Distance = n
-    while i != 0 {
-      p._predecessorInPlace()
-      i._successorInPlace()
-    }
-    return p
-  }
-
-  @warn_unused_result
-  public func advanced(by n: Distance, limit: Self) -> Self { // DONE: swift-3-indexing-model - replicated
-    if n >= 0 {
-      return _advanceForward(n, limit)
-    }
-    var p = self
-    var i: Distance = n
-    while i != 0 && p != limit {
-      p._predecessorInPlace()
-      i._successorInPlace()
-    }
-    return p
-  }
-}
-
-/// Replace `i` with its `predecessor()` and return the updated value
-/// of `i`.
-@_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
-public prefix func -- <T : BidirectionalIndex> (i: inout T) -> T {
-  i._predecessorInPlace()
-  return i
-}
-
-
-/// Replace `i` with its `predecessor()` and return the original
-/// value of `i`.
-@_transparent
-@available(*, deprecated, message="it will be removed in Swift 3")
-public postfix func -- <T : BidirectionalIndex> (i: inout T) -> T {
-  let ret = i
-  i._predecessorInPlace()
-  return ret
 }
 
 //===----------------------------------------------------------------------===//
@@ -409,6 +171,26 @@ extension RandomAccessIndex {
     }
     return self.advanced(by: n)
   }
+}
+
+@available(*, unavailable, message="Please use your collections prior(Index) function")
+public prefix func -- <T : BidirectionalIndex> (inout i: T) -> T {
+  fatalError("unavailable operator can't be called")
+}
+
+@available(*, unavailable, message="Please use your collections prior(Index) function")
+public postfix func -- <T : BidirectionalIndex> (inout i: T) -> T {
+  fatalError("unavailable operator can't be called")
+}
+
+@available(*, unavailable, message="Please use your collections next(Index) function")
+public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
+  fatalError("unavailable operator can't be called")
+}
+
+@available(*, unavailable, message="Please use your collections next(Index) function")
+public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
+  fatalError("unavailable operator can't be called")
 }
 
 @available(*, unavailable, renamed="ForwardIndex")

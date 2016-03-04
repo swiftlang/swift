@@ -48,12 +48,12 @@ public struct Slice<Base : Indexable> : Collection {
   public let endIndex: Index
 
   public subscript(index: Index) -> Base._Element {
-    Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+    _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
     return _base[index]
   }
 
   public subscript(bounds: Range<Index>) -> Slice {
-    Index._failEarlyRangeCheck2(
+    _failEarlyRangeCheck(
       rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
     return Slice(_base: _base, bounds: bounds)
@@ -92,11 +92,11 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
 
   public subscript(index: Index) -> Base._Element {
     get {
-      Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       return _base[index]
     }
     set {
-      Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       _base[index] = newValue
       // MutableSlice requires that the underlying collection's subscript
       // setter does not invalidate indices, so our `startIndex` and `endIndex`
@@ -106,7 +106,7 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
 
   public subscript(bounds: Range<Index>) -> MutableSlice {
     get {
-      Index._failEarlyRangeCheck2(
+      _failEarlyRangeCheck(
         rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
         boundsStart: startIndex, boundsEnd: endIndex)
       return MutableSlice(_base: _base, bounds: bounds)

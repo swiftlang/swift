@@ -23,7 +23,6 @@ public protocol BidirectionalCollection : Collection {
   @warn_unused_result
   func previous(i: Index) -> Index
   
-  // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   func _previousInPlace(inout i: Index)
 }
 
@@ -31,7 +30,7 @@ public protocol BidirectionalCollection : Collection {
 extension BidirectionalCollection {
 // TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
   public func previous(i: Index) -> Index {
-    fatalError("collections need to implement, this is a temp stub to make things compile")
+    fatalError("FIXME: swift-3-indexing-model")
   }
   
   @inline(__always)
@@ -45,7 +44,7 @@ extension BidirectionalCollection {
       return _advanceForward(i, by: n)
     }
     var i = i
-    for var offset: IndexDistance = n; offset != 0; offset = offset + 1 {
+    for _ in 0..<(-n) {
       _previousInPlace(&i)
     }
     return i
@@ -57,9 +56,11 @@ extension BidirectionalCollection {
       return _advanceForward(i, by: n, limit: limit)
     }
     var i = i
-    for var offset: IndexDistance = n; offset != 0 && i != limit;
-      offset = offset + 1 {
-        _previousInPlace(&i)
+    for _ in 0..<(-n) {
+      if (limit == i) {
+        break;
+      }
+      _previousInPlace(&i)
     }
     return i
   }
@@ -86,3 +87,73 @@ extension BidirectionalCollection {
   //    return count
   //  }
 }
+
+extension BidirectionalCollection where SubSequence == Self {
+  /// If `!self.isEmpty`, remove the last element and return it, otherwise
+  /// return `nil`.
+  ///
+  /// - Complexity: O(1)
+  @warn_unused_result
+  public mutating func popLast() -> Iterator.Element? {
+    guard !isEmpty else { return nil }
+    let element = last!
+    self = self[startIndex..<previous(endIndex)]
+    return element
+  }
+  
+  /// Remove an element from the end.
+  ///
+  /// - Complexity: O(1)
+  /// - Precondition: `!self.isEmpty`
+  public mutating func removeLast() -> Iterator.Element {
+    let element = last!
+    self = self[startIndex..<previous(endIndex)]
+    return element
+  }
+  
+  /// Remove the last `n` elements.
+  ///
+  /// - Complexity:
+  ///   - O(1) if `Index` conforms to `RandomAccessIndex`
+  ///   - O(n) otherwise
+  /// - Precondition: `n >= 0 && self.count >= n`.
+  public mutating func removeLast(n: Int) {
+    if n == 0 { return }
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
+      "can't remove more items from a collection than it contains")
+    self = self[startIndex..<advance(endIndex, by: numericCast(-n))]
+  }
+}
+
+extension BidirectionalCollection {
+  /// Returns a subsequence containing all but the last `n` elements.
+  ///
+  /// - Precondition: `n >= 0`
+  /// - Complexity: O(`n`)
+  @warn_unused_result
+  public func dropLast(n: Int) -> SubSequence {
+    _precondition(
+      n >= 0, "Can't drop a negative number of elements from a collection")
+    let end = advance(endIndex, by: numericCast(-n), limit: startIndex)
+    return self[startIndex..<end]
+  }
+  
+  /// Returns a slice, up to `maxLength` in length, containing the
+  /// final elements of `self`.
+  ///
+  /// If `maxLength` exceeds `s.count`, the result contains all
+  /// the elements of `self`.
+  ///
+  /// - Precondition: `maxLength >= 0`
+  /// - Complexity: O(`maxLength`)
+  @warn_unused_result
+  public func suffix(maxLength: Int) -> SubSequence {
+    _precondition(
+      maxLength >= 0,
+      "Can't take a suffix of negative length from a collection")
+    let start = advance(endIndex, by: numericCast(-maxLength), limit: startIndex)
+    return self[start..<endIndex]
+  }
+}
+
