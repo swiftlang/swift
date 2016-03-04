@@ -574,6 +574,7 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
 static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   switch (context) {
   case PrintNameContext::Normal:
+  case PrintNameContext::Attribute:
     return true;
   case PrintNameContext::Keyword:
     return false;

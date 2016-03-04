@@ -43,6 +43,9 @@ enum class PrintNameContext {
   /// not escaped.
   FunctionParameterExternal,
   FunctionParameterLocal,
+  /// Attributes, which are escaped as 'Normal', but differentiated for
+  /// the purposes of printName* callbacks.
+  Attribute,
 };
 
 /// Describes the kind of structured entity being printed.
@@ -158,6 +161,14 @@ public:
     callPrintNamePre(PrintNameContext::Keyword);
     *this << Name;
     printNamePost(PrintNameContext::Keyword);
+  }
+
+  void printAttrName(StringRef Name, bool needAt = false) {
+    callPrintNamePre(PrintNameContext::Attribute);
+    if (needAt)
+      *this << "@";
+    *this << Name;
+    printNamePost(PrintNameContext::Attribute);
   }
 
   void printName(Identifier Name,

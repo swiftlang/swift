@@ -289,6 +289,8 @@ private:
       return SyntaxKeywordTag;
     case PrintNameContext::GenericParameter:
       return GenericParamNameTag;
+    case PrintNameContext::Attribute:
+      return "syntaxtype.attribute.name";
     default:
       return "";
     }

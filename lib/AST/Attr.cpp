@@ -266,8 +266,27 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
 }
 
-void DeclAttribute::print(ASTPrinter &Printer,
-                          const PrintOptions &Options) const {
+bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) const {
+
+  // Handle any attributes that are not printed at all before we make printer
+  // callbacks.
+  switch (getKind()) {
+  case DAK_ObjC:
+    if (Options.PrintForSIL && isImplicit())
+      return false;
+    break;
+  case DAK_RawDocComment:
+  case DAK_ObjCBridged:
+  case DAK_SynthesizedProtocol:
+    return false;
+  default:
+    break;
+  }
+
+  // Handle any decl-modifiers.
+  // FIXME: Ideally we would handle decl modifiers as a special kind of
+  // attribute, but for now it's simpler to treat them as a keyword in the
+  // printer.
   switch (getKind()) {
     // Handle all of the SIMPLE_DECL_ATTRs.
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
@@ -276,25 +295,41 @@ void DeclAttribute::print(ASTPrinter &Printer,
   case DAK_Accessibility:
   case DAK_Ownership:
   case DAK_Effects:
-    if (!DeclAttribute::isDeclModifier(getKind()))
-      Printer << "@";
-    Printer << getAttrName();
-    break;
+    if (DeclAttribute::isDeclModifier(getKind())) {
+      Printer.printKeyword(getAttrName());
+    } else {
+      Printer.printAttrName(getAttrName(), /*needAt=*/true);
+    }
+    return true;
 
+  case DAK_SetterAccessibility:
+    Printer.printKeyword(getAttrName());
+    Printer << "(set)";
+    return true;
+
+  default:
+    break;
+  }
+
+  switch (getKind()) {
   case DAK_Semantics:
-    Printer << "@_semantics(\"" << cast<SemanticsAttr>(this)->Value << "\")";
+    Printer.printAttrName("@_semantics");
+    Printer << "(\"" << cast<SemanticsAttr>(this)->Value << "\")";
     break;
 
   case DAK_Alignment:
-    Printer << "@_alignment(" << cast<AlignmentAttr>(this)->Value << ")";
+    Printer.printAttrName("@_alignment");
+    Printer << "(" << cast<AlignmentAttr>(this)->Value << ")";
     break;
 
   case DAK_SILGenName:
-    Printer << "@_silgen_name(\"" << cast<SILGenNameAttr>(this)->Name << "\")";
+    Printer.printAttrName("@_silgen_name");
+    Printer << "(\"" << cast<SILGenNameAttr>(this)->Name << "\")";
     break;
 
   case DAK_Available: {
-    Printer << "@available(";
+    Printer.printAttrName("@available");
+    Printer << "(";
     auto Attr = cast<AvailableAttr>(this);
     Printer << Attr->platformString();
 
@@ -326,14 +361,12 @@ void DeclAttribute::print(ASTPrinter &Printer,
     break;
   }
   case DAK_AutoClosure:
-    Printer << "@autoclosure";
+    Printer.printAttrName("@autoclosure");
     if (cast<AutoClosureAttr>(this)->isEscaping())
       Printer << "(escaping)";
     break;
   case DAK_ObjC: {
-    if (Options.PrintForSIL && isImplicit())
-      break;
-    Printer << "@objc";
+    Printer.printAttrName("@objc");
     llvm::SmallString<32> scratch;
     if (auto Name = cast<ObjCAttr>(this)->getName()) {
       if (!cast<ObjCAttr>(this)->isNameImplicit())
@@ -341,29 +374,18 @@ void DeclAttribute::print(ASTPrinter &Printer,
     }
     break;
   }
-
-  case DAK_SetterAccessibility:
-    Printer << getAttrName() << "(set)";
-    break;
     
   case DAK_SwiftNativeObjCRuntimeBase: {
     auto *attr = cast<SwiftNativeObjCRuntimeBaseAttr>(this);
-    Printer << "@_swift_native_objc_runtime_base("
-            << attr->BaseClassName.str() << ")";
+    Printer.printAttrName("@_swift_native_objc_runtime_base");
+    Printer << "(" << attr->BaseClassName.str() << ")";
     break;
   }
 
-  case DAK_RawDocComment:
-    // Not printed.
-    return;
-
-  case DAK_ObjCBridged:
-    // Not printed.
-    return;
-
   case DAK_Swift3Migration: {
     auto attr = cast<Swift3MigrationAttr>(this);
-    Printer << "@swift3_migration(";
+    Printer.printAttrName("@swift3_migration");
+    Printer << "(";
 
     bool printedAny = false;
     auto printSeparator = [&] {
@@ -387,12 +409,8 @@ void DeclAttribute::print(ASTPrinter &Printer,
     break;
   }
 
-  case DAK_SynthesizedProtocol:
-    // Not printed.
-    return;
-
   case DAK_WarnUnusedResult: {
-    Printer << "@warn_unused_result";
+    Printer.printAttrName("@warn_unused_result");
     auto *attr = cast<WarnUnusedResultAttr>(this);
     bool printedParens = false;
     if (!attr->getMessage().empty()) {
@@ -412,9 +430,21 @@ void DeclAttribute::print(ASTPrinter &Printer,
     break;
   }
 
+  default:
+    llvm_unreachable("handled before this switch");
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
   }
+
+  return true;
+}
+
+void DeclAttribute::print(ASTPrinter &Printer,
+                          const PrintOptions &Options) const {
+
+  if (!printImpl(Printer, Options))
+    return; // Nothing printed.
 
   if (isLongAttribute() && Options.PrintLongAttrsOnSeparateLines)
     Printer.printNewline();

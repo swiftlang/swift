@@ -361,6 +361,10 @@ public:
     return getOptions(getKind());
   }
 
+  /// Prints this attribute (if applicable), returning `true` if anything was
+  /// printed.
+  bool printImpl(ASTPrinter &Printer, const PrintOptions &Options) const;
+
 public:
   DeclAttrKind getKind() const {
     return static_cast<DeclAttrKind>(DeclAttrBits.Kind);

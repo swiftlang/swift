@@ -116,6 +116,16 @@ protocol P1 {
 
 func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 
+@objc class C5 {
+  @objc(mmm1)
+  @noreturn
+  func m1() {}
+
+  private(set)
+  public
+  var v1: Int = 1
+}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -278,13 +288,11 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK27 %s
 // CHECK27: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK27: <decl.function.subscript>public <syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>
-// FIXME: keyword 'public'
+// CHECK27: <decl.function.subscript><syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK28 %s
 // CHECK28: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>
-// CHECK28: <decl.function.subscript>public <syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>
-// FIXME: keyword 'public'
+// CHECK28: <decl.function.subscript><syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>
 
 // RUN: %sourcekitd-test -req=cursor -pos=74:3 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK29
 // CHECK29: source.lang.swift.decl.function.destructor (74:3-74:9)
@@ -435,8 +443,7 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=108:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK49
 // CHECK49: source.lang.swift.decl.var.class (108:19-108:21)
-// CHECK49: <decl.var.class>final <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword>
-// FIXME: missing tags on 'final'
+// CHECK49: <decl.var.class><syntaxtype.keyword>final</syntaxtype.keyword> <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword>
 
 // RUN: %sourcekitd-test -req=cursor -pos=109:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK50
 // CHECK50: source.lang.swift.decl.function.method.static (109:15-109:19)
@@ -444,8 +451,7 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=110:20 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK51
 // CHECK51: source.lang.swift.decl.function.method.class (110:20-110:24)
-// CHECK51: <decl.function.method.class>final <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword>
-// FIXME: missing tags on 'final'
+// CHECK51: <decl.function.method.class><syntaxtype.keyword>final</syntaxtype.keyword> <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword>
 
 // RUN: %sourcekitd-test -req=cursor -pos=117:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK52
 // CHECK52: source.lang.swift.decl.function.free (117:6-117:49)
@@ -455,3 +461,15 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 // RUN: %sourcekitd-test -req=cursor -pos=117:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK53
 // CHECK53: source.lang.swift.decl.generic_type_param (117:16-117:17)
 // CHECK53: <decl.generic_type_param><decl.generic_type_param.name>V</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr="{{.*}}">P1</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param>
+
+// RUN: %sourcekitd-test -req=cursor -pos=119:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK54
+// CHECK54: source.lang.swift.decl.class (119:13-119:15)
+// CHECK54: <decl.class><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name> <syntaxtype.keyword>class
+
+// RUN: %sourcekitd-test -req=cursor -pos=122:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK55
+// CHECK55: source.lang.swift.decl.function.method.instance (122:8-122:12)
+// CHECK55: <decl.function.method.instance><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name>(mmm1) <syntaxtype.attribute.name>@noreturn</syntaxtype.attribute.name> <syntaxtype.keyword>func
+
+// RUN: %sourcekitd-test -req=cursor -pos=126:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK56
+// CHECK56: source.lang.swift.decl.var.instance (126:7-126:9)
+// CHECK56: <decl.var.instance><syntaxtype.keyword>private</syntaxtype.keyword>(set) <syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>var

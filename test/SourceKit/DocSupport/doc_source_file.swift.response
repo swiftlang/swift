@@ -2216,7 +2216,7 @@
         key.usr: "s:FC8__main__5SubC28protMethFPS_4Prot_T_",
         key.offset: 1068,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.method.instance>override <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>override</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.inherits: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
@@ -2408,7 +2408,7 @@
         key.usr: "s:FC8__main__3SB13fooFT_T_",
         key.offset: 1553,
         key.length: 56,
-        key.fully_annotated_decl: "<decl.function.method.instance>override <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>override</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>",
         key.inherits: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
