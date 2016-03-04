@@ -2560,9 +2560,6 @@ namespace {
       // TODO: refactor into separate function and share with other kinds of
       // import-as-member
       if (name.getBaseName().str() == "init") {
-        auto ext = cast<ExtensionDecl>(dc);
-        auto nomTypeDecl = ext->getExtendedType()->getAnyNominal();
-
         bool allowNSUIntegerAsInt =
             Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 

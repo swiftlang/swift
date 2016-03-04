@@ -1397,10 +1397,6 @@ public:
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
-
-  /// Import all global-as-member decls on the given type
-  void importGlobalsAsMembers(SwiftLookupTable &table, clang::TypeDecl *type,
-                              VisibleDeclConsumer &consumer);
 };
 
 }
