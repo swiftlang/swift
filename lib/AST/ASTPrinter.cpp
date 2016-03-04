@@ -240,13 +240,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             if(!canPossiblyConvertTo(First, Second, *DC))
               return Result;
             else if (isConvertibleTo(First, Second, *DC))
-              Result.KnownSatisifiedRequirments.push_back(Req.getAsWrittenString());
+              Result.KnownSatisfiedRequirements.push_back(Req.getAsWrittenString());
             break;
           case RequirementReprKind::SameType:
             if (!canPossiblyEqual(First, Second, *DC))
               return Result;
             else if (isEqual(First, Second, *DC))
-              Result.KnownSatisifiedRequirments.push_back(Req.getAsWrittenString());
+              Result.KnownSatisfiedRequirements.push_back(Req.getAsWrittenString());
             break;
         }
       }
@@ -314,7 +314,7 @@ bool SynthesizedExtensionAnalyzer::
 shouldPrintRequirement(ExtensionDecl *ED, StringRef Req) {
   auto Found = Impl.Results->find(ED);
   if (Found != Impl.Results->end()) {
-    std::vector<StringRef> &KnownReqs = Found->getSecond().KnownSatisifiedRequirments;
+    std::vector<StringRef> &KnownReqs = Found->getSecond().KnownSatisfiedRequirements;
     return KnownReqs.end() == std::find(KnownReqs.begin(), KnownReqs.end(), Req);
   }
   return true;
