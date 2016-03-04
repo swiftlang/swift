@@ -1240,7 +1240,7 @@ public:
   ///
   /// \code
   /// class Vector<T> {
-  ///   constructor<R : Range where R.Element == T>(range : R) { }
+  ///   init<R : Range where R.Element == T>(range : R) { }
   /// }
   /// \endcode
   ///
