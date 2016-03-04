@@ -510,10 +510,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       ConstructorDecl::BodyInitKind::Delegating;
   }
 
-  // FIXME: The (potentially partially initialized) value here would need to be
-  // cleaned up on a constructor failure unwinding, if we were to support
-  // failing before total initialization.
-
   // Set up the 'self' argument.  If this class has a superclass, we set up
   // self as a box.  This allows "self reassignment" to happen in super init
   // method chains, which is important for interoperating with Objective-C
