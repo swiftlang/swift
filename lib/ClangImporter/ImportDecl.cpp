@@ -2560,10 +2560,8 @@ namespace {
       // TODO: refactor into separate function and share with other kinds of
       // import-as-member
       if (name.getBaseName().str() == "init") {
-        auto nomTypeDecl = cast<NominalTypeDecl>(dc);
-        auto ext = Impl.getOrCreateExtensionPoint(nomTypeDecl, decl);
-        IterableDeclContext *addMemberTo = ext;
-        dc = ext;
+        auto ext = cast<ExtensionDecl>(dc);
+        auto nomTypeDecl = ext->getExtendedType()->getAnyNominal();
 
         bool allowNSUIntegerAsInt =
             Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
@@ -2613,10 +2611,12 @@ namespace {
             /*GenericParams=*/nullptr, noLoc, dc);
 
         finishFuncDecl(decl, result);
-        if (addMemberTo)
-          addMemberTo->addMember(result);
         return result;
       }
+
+      // FIXME: Cannot import anything into a type context from here on.
+      if (dc->isTypeContext())
+        return nullptr;
 
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
@@ -2750,15 +2750,11 @@ namespace {
       if (!type)
         return nullptr;
 
-      // If we're importing as a member, be sure to add to an extension
-      IterableDeclContext *addMemberTo = nullptr;
+      // If we've imported this variable as a member, it's a static
+      // member.
       bool isStatic = false;
-      if (auto nomTypeDecl = dyn_cast<NominalTypeDecl>(dc)) {
-        auto ext = Impl.getOrCreateExtensionPoint(nomTypeDecl, decl);
-        addMemberTo = ext;
-        dc = ext;
+      if (dc->isTypeContext())
         isStatic = true;
-      }
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
                        isStatic,
@@ -2768,9 +2764,6 @@ namespace {
 
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
-
-      if (addMemberTo)
-        addMemberTo->addMember(result);
 
       return result;
     }
@@ -5665,33 +5658,38 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(
-  const clang::Decl *D,
+  const clang::Decl *decl,
   EffectiveClangContext context)
 {
+  DeclContext *importedDC = nullptr;
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
     auto dc = context.getAsDeclContext();
     if (dc->isTranslationUnit()) {
-      if (auto *M = getClangModuleForDecl(D))
-        return M;
+      if (auto *module = getClangModuleForDecl(decl))
+        return module;
       else
         return nullptr;
     }
 
-    return importDeclContextImpl(dc);
+    // Import the DeclContext.
+    importedDC = importDeclContextImpl(dc);
+    break;
   }
 
   case EffectiveClangContext::TypedefContext: {
     // Import the typedef-name as a declaration.
-    auto decl = importDecl(context.getTypedefName());
-    if (!decl) return nullptr;
+    auto importedDecl = importDecl(context.getTypedefName());
+    if (!importedDecl) return nullptr;
 
-    return dyn_cast_or_null<DeclContext>(decl);
+    importedDC = dyn_cast_or_null<DeclContext>(importedDecl);
+    break;
   }
 
   case EffectiveClangContext::UnresolvedContext: {
-    auto submodule = getClangSubmoduleForDecl(D, 
-                                              /*allowForwardDeclaration=*/false);
+    // FIXME: Resolve through name lookup. This is brittle.
+    auto submodule =
+      getClangSubmoduleForDecl(decl, /*allowForwardDeclaration=*/false);
     if (!submodule) return nullptr;
 
     if (auto lookupTable = findLookupTable(*submodule)) {
@@ -5703,16 +5701,51 @@ ClangImporter::Implementation::importDeclContextOf(
 
         // Look through typealiases.
         if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
-          return typealias->getDeclaredInterfaceType()->getAnyNominal();
-
-        // Map to a nominal type declaration.
-        return dyn_cast<NominalTypeDecl>(decl);
+          importedDC = typealias->getDeclaredInterfaceType()->getAnyNominal();
+        else // Map to a nominal type declaration.
+          importedDC = dyn_cast<NominalTypeDecl>(decl);
+        break;
       }
     }
+  }
+  }
 
-    return nullptr;
-  }
-  }
+  // If we didn't manage to import the declaration context, we're done.
+  if (!importedDC) return nullptr;
+
+  // If the declaration was not global to start with, we're done.
+  bool isGlobal =
+    decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
+    !isa<clang::EnumConstantDecl>(decl);
+  if (!isGlobal) return importedDC;
+
+  // If the resulting declaration context is not a nominal type,
+  // we're done.
+  auto nominal = dyn_cast<NominalTypeDecl>(importedDC);
+  if (!nominal) return importedDC;
+
+  // Look for the extension for the given nominal type within the
+  // Clang submodule of the declaration.
+  const clang::Module *declSubmodule = *getClangSubmoduleForDecl(decl);
+  auto extensionKey = std::make_pair(nominal, declSubmodule);
+  auto knownExtension = extensionPoints.find(extensionKey);
+  if (knownExtension != extensionPoints.end())
+    return knownExtension->second;
+
+  // Create a new extension for this nominal type/Clang submodule pair.
+  auto swiftTyLoc = TypeLoc::withoutLoc(nominal->getDeclaredType());
+  auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), swiftTyLoc, {},
+                                   importDeclContextOf(decl), nullptr);
+  ext->setValidated();
+  ext->setCheckedInheritanceClause();
+  ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
+
+  // Add the extension to the nominal type.
+  nominal->addExtension(ext);
+
+  // Record this extension so we can find it later.
+  extensionPoints[extensionKey] = ext;
+  return ext;
 }
 
 ValueDecl *
@@ -5911,12 +5944,57 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 
 void
-ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused) {
+ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   assert(D);
-  assert(D->hasClangNode());
-  auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
 
-  clang::PrettyStackTraceDecl trace(clangDecl, clang::SourceLocation(),
+  // Check whether we're importing an Objective-C container of some sort.
+  auto objcContainer =
+    dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl());
+
+  // If not, we're importing globals-as-members into an extension.
+  if (!objcContainer) {
+    // We have extension.
+    auto ext = cast<ExtensionDecl>(D);
+    auto nominal = ext->getExtendedType()->getAnyNominal();
+
+    // The submodule of the extension is encoded in the extra data.
+    clang::Module *submodule = reinterpret_cast<clang::Module *>(
+                                 static_cast<uintptr_t>(extra));
+
+    // Find the lookup table.
+    auto topLevelModule = submodule;
+    if (topLevelModule)
+      topLevelModule = topLevelModule->getTopLevelModule();
+    auto table = findLookupTable(topLevelModule);
+    if (!table) return;
+
+    // Dig out the effective Clang context for this nominal type.
+    auto effectiveClangContext = getEffectiveClangContext(nominal);
+    if (!effectiveClangContext) return;
+
+    // Get ready to actually load the members.
+    ImportingEntityRAII Importing(*this);
+
+    // Load the members.
+    for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
+      auto decl = entry.get<clang::NamedDecl *>();
+
+      // Only continue members in the same submodule as this extension.
+      if (decl->getImportedOwningModule() != submodule) continue;
+
+      // Import the member.
+      auto member = importDecl(decl);
+      if (!member) continue;
+
+      // Add the member.
+      ext->addMember(member);
+    }
+
+    return;
+  }
+
+
+  clang::PrettyStackTraceDecl trace(objcContainer, clang::SourceLocation(),
                                     Instance->getSourceManager(),
                                     "loading members for");
 
@@ -5939,12 +6017,12 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused) {
   ImportingEntityRAII Importing(*this);
 
   SmallVector<Decl *, 16> members;
-  converter.importObjCMembers(clangDecl, DC, members);
+  converter.importObjCMembers(objcContainer, DC, members);
 
   protos = takeImportedProtocols(D);
-  if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+  if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
     auto swiftClass = cast<ClassDecl>(D);
-    clangDecl = clangClass = clangClass->getDefinition();
+    objcContainer = clangClass = clangClass->getDefinition();
 
     // Imported inherited initializers.
     if (clangClass->getName() != "Protocol") {
@@ -5952,14 +6030,15 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused) {
                                             members);
     }
 
-  } else if (auto clangProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
-    clangDecl = clangProto->getDefinition();
+  } else if (auto clangProto
+               = dyn_cast<clang::ObjCProtocolDecl>(objcContainer)) {
+    objcContainer = clangProto->getDefinition();
   }
 
   // Import mirrored declarations for protocols to which this category
   // or extension conforms.
   // FIXME: This is supposed to be a short-term hack.
-  converter.importMirroredProtocolMembers(clangDecl, DC,
+  converter.importMirroredProtocolMembers(objcContainer, DC,
                                           protos, members, SwiftContext);
 
   // Add the members now, before ~ImportingEntityRAII does work that might

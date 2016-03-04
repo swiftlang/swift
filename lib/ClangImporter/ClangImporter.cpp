@@ -3232,20 +3232,10 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
 }
 
 void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
-  // Look for values in the bridging header's lookup table.
-  Impl.lookupValue(Impl.BridgingHeaderLookupTable, name, consumer);
-
-  // Collect and sort the set of module names.
-  SmallVector<StringRef, 4> moduleNames;
-  for (const auto &entry : Impl.LookupTables) {
-    moduleNames.push_back(entry.first());
-  }
-  llvm::array_pod_sort(moduleNames.begin(), moduleNames.end());
-
-  // Look for values in the module lookup tables.
-  for (auto moduleName : moduleNames) {
-    Impl.lookupValue(*Impl.LookupTables[moduleName].get(), name, consumer);
-  }
+  Impl.forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+      Impl.lookupValue(table, name, consumer);
+      return false;
+    });
 }
 
 void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
@@ -3401,48 +3391,73 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
   }
 }
 
+/// Determine whether the given Clang entry is visible.
+///
+/// FIXME: this is an elaborate hack to badly reflect Clang's
+/// submodule visibility into Swift.
+static bool isVisibleClangEntry(clang::ASTContext &ctx,
+                                SwiftLookupTable::SingleEntry entry) {
+  if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+    // For a declaration, check whether the declaration is hidden.
+    if (!clangDecl->isHidden()) return true;
+
+    // Is any redeclaration visible?
+    for (auto redecl : clangDecl->redecls()) {
+      if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+    }
+
+    return false;
+  }
+
+  // Check whether the macro is defined.
+  auto clangMacro = entry.get<clang::MacroInfo *>();
+  if (auto moduleID = clangMacro->getOwningModuleID()) {
+    if (auto module = ctx.getExternalSource()->getModule(moduleID)) 
+      return module->NameVisibility == clang::Module::AllVisible;
+  }
+
+  return true;
+}
+
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
                                    unsigned previousGeneration) {
-  auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                     nominal->getClangDecl());
-  if (!objcClass) {
-    if (auto typeResolver = Impl.getTypeResolver())
-      typeResolver->resolveDeclSignature(nominal);
-    if (nominal->isObjC()) {
-      // Map the name. If we can't represent the Swift name in Clang, bail out
-      // now.
-      auto clangName = Impl.exportName(nominal->getName());
-      if (!clangName)
-        return;
+  // Determine the effective Clang context for this Swift nominal type.
+  auto effectiveClangContext = Impl.getEffectiveClangContext(nominal);
+  if (!effectiveClangContext) return;
 
-      auto &sema = Impl.Instance->getSema();
-
-      // Perform name lookup into the global scope.
-      // FIXME: Map source locations over.
-      clang::LookupResult lookupResult(sema, clangName,
-                                       clang::SourceLocation(),
-                                       clang::Sema::LookupOrdinaryName);
-      if (sema.LookupName(lookupResult, /*Scope=*/0)) {
-        // FIXME: Filter based on access path? C++ access control?
-        for (auto clangDecl : lookupResult) {
-          objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl);
-          if (objcClass)
-            break;
-        }
-      }
+  // For an Objective-C class, import all of the visible categories.
+  if (auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                         effectiveClangContext.getAsDeclContext())) {
+    // Simply importing the categories adds them to the list of extensions.
+    for (auto I = objcClass->visible_categories_begin(),
+           E = objcClass->visible_categories_end();
+         I != E; ++I) {
+      Impl.importDeclReal(*I);
     }
   }
 
-  if (!objcClass)
-    return;
+  // Dig through each of the Swift lookup tables, creating extensions
+  // where needed.
+  auto &clangCtx = Impl.getClangASTContext();
+  (void)Impl.forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+      // FIXME: If we already looked at this for this generation,
+      // skip.
 
-  // Import all of the visible categories. Simply loading them adds them to
-  // the list of extensions.
-  for (auto I = objcClass->visible_categories_begin(),
-            E = objcClass->visible_categories_end();
-       I != E; ++I) {
-    Impl.importDeclReal(*I);
-  }
+      for (auto entry : table.lookupGlobalsAsMembers(effectiveClangContext)) {
+        // If the entry is not visible, skip it.
+        if (!isVisibleClangEntry(clangCtx, entry)) continue;
+
+        if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
+          // Import the context of this declaration, which has the
+          // side effect of creating instantiations.
+          (void)Impl.importDeclContextOf(decl, effectiveClangContext);
+        } else {
+          llvm_unreachable("Macros cannoted be imported as members.");
+        }
+      }
+
+      return false;
+    });
 }
 
 void ClangImporter::loadObjCMethods(
@@ -3983,52 +3998,24 @@ SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
   return known->second.get();
 }
 
-/// Determine whether the given Clang entry is visible.
-///
-/// FIXME: this is an elaborate hack to badly reflect Clang's
-/// submodule visibility into Swift.
-static bool isVisibleClangEntry(clang::ASTContext &ctx,
-                                StringRef name,
-                                SwiftLookupTable::SingleEntry entry) {
-  if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-    // For a declaration, check whether the declaration is hidden.
-    if (!clangDecl->isHidden()) return true;
+bool ClangImporter::Implementation::forEachLookupTable(
+       llvm::function_ref<bool(SwiftLookupTable &table)> fn) {
+  // Visit the bridging header's lookup table.
+  if (fn(BridgingHeaderLookupTable)) return true;
 
-    // Is any redeclaration visible?
-    for (auto redecl : clangDecl->redecls()) {
-      if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
-    }
+  // Collect and sort the set of module names.
+  SmallVector<StringRef, 4> moduleNames;
+  for (const auto &entry : LookupTables) {
+    moduleNames.push_back(entry.first());
+  }
+  llvm::array_pod_sort(moduleNames.begin(), moduleNames.end());
 
-    return false;
+  // Visit the lookup tables.
+  for (auto moduleName : moduleNames) {
+    if (fn(*LookupTables[moduleName])) return true;
   }
 
-  // Check whether the macro is defined.
-  auto clangMacro = entry.get<clang::MacroInfo *>();
-  if (auto moduleID = clangMacro->getOwningModuleID()) {
-    if (auto module = ctx.getExternalSource()->getModule(moduleID)) 
-      return module->NameVisibility == clang::Module::AllVisible;
-  }
-
-  return true;
-}
-
-ExtensionDecl *ClangImporter::Implementation::getOrCreateExtensionPoint(
-    NominalTypeDecl *typeToExtend, const clang::Decl *clangDecl) {
-  const clang::Module *submodule = *getClangSubmoduleForDecl(clangDecl);
-  auto key = std::make_pair(typeToExtend, submodule);
-  if (extensionPoints.count(key))
-    return extensionPoints[key];
-
-  SourceLoc noLoc{};
-  auto swiftTyLoc = TypeLoc::withoutLoc(typeToExtend->getDeclaredType());
-  auto ext = ExtensionDecl::create(SwiftContext, noLoc, swiftTyLoc, {},
-                                   importDeclContextOf(clangDecl), nullptr,
-                                   typeToExtend->getClangNode());
-  ext->setValidated();
-  typeToExtend->addExtension(ext);
-
-  extensionPoints[key] = ext;
-  return ext;
+  return false;
 }
 
 void ClangImporter::Implementation::importGlobalsAsMembers(
@@ -4072,11 +4059,10 @@ void ClangImporter::Implementation::lookupValue(
        VisibleDeclConsumer &consumer) {
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
-  auto baseName = name.getBaseName().str();
 
   for (auto entry : table.lookup(name.getBaseName().str(), clangTU)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, baseName, entry)) continue;
+    if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
     ValueDecl *decl;
 
@@ -4140,7 +4126,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
 
   for (auto clangDecl : table.lookupObjCMembers(baseName)) {
     // If the entry is not visible, skip it.
-    if (!isVisibleClangEntry(clangCtx, baseName, clangDecl)) continue;
+    if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
 
     // Import the declaration.
     auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl));
@@ -4173,6 +4159,51 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
+EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
+                        NominalTypeDecl *nominal) {
+  // If we have a Clang declaration, look at it to determine the
+  // effective Clang context.
+  if (auto constClangDecl = nominal->getClangDecl()) {
+    auto clangDecl = const_cast<clang::Decl *>(constClangDecl);
+    if (auto dc = dyn_cast<clang::DeclContext>(clangDecl))
+      return EffectiveClangContext(dc);
+    if (auto typedefName = dyn_cast<clang::TypedefNameDecl>(clangDecl))
+      return EffectiveClangContext(typedefName);
+
+    return EffectiveClangContext();
+  }
+
+  // Resolve the type.
+  if (auto typeResolver = getTypeResolver())
+    typeResolver->resolveDeclSignature(nominal);
+
+  // If it's an @objc entity, go look for it.
+  if (nominal->isObjC()) {
+    // Map the name. If we can't represent the Swift name in Clang.
+    // FIXME: We should be using the Objective-C name here!
+    auto clangName = exportName(nominal->getName());
+    if (!clangName)
+      return EffectiveClangContext();
+
+    // Perform name lookup into the global scope.
+    auto &sema = Instance->getSema();
+    clang::LookupResult lookupResult(sema, clangName,
+                                     clang::SourceLocation(),
+                                     clang::Sema::LookupOrdinaryName);
+    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+      // FIXME: Filter based on access path? C++ access control?
+      for (auto clangDecl : lookupResult) {
+        if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
+          return EffectiveClangContext(objcClass);
+
+        /// FIXME: Other type declarations should also be okay?
+      }
+    }    
+  }
+
+  return EffectiveClangContext();
+}
+
 void ClangImporter::dumpSwiftLookupTables() {
   Impl.dumpSwiftLookupTables();
 }
@@ -4191,7 +4222,6 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
     LookupTables[moduleName]->deserializeAll();
     LookupTables[moduleName]->dump();
   }
-
 
   llvm::errs() << "<<Bridging header lookup table>>\n";
   BridgingHeaderLookupTable.dump();

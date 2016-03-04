@@ -5,9 +5,10 @@ struct __attribute__((swift_name("Struct1"))) IAMStruct1 {
   double x, y, z;
 };
 
-extern int IAMStruct1GlobalVar __attribute__((swift_name("Struct1.globalVar")));
+extern double IAMStruct1GlobalVar
+    __attribute__((swift_name("Struct1.globalVar")));
 
-extern struct IAMStruct1 IAMStruct1CreateSimple(int value)
+extern struct IAMStruct1 IAMStruct1CreateSimple(double value)
     __attribute__((swift_name("Struct1.init(value:)")));
 
 extern double IAMStruct1GetRadius(struct IAMStruct1 s)

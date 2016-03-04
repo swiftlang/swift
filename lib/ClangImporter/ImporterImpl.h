@@ -417,11 +417,6 @@ public:
                                  unsigned &prefixLength,
                                  CtorInitializerKind &kind);
 
-  /// Fetch a single, unique extension declaration for each imported Swift type
-  /// for each Clang submodule.
-  ExtensionDecl *getOrCreateExtensionPoint(NominalTypeDecl *typeToExtend,
-                                           const clang::Decl *clangDecl);
-
 private:
   /// \brief Generation number that is used for crude versioning.
   ///
@@ -1370,6 +1365,15 @@ public:
   /// about the directly-parsed headers.
   SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
 
+  /// Visit each of the lookup tables in some deterministic order.
+  ///
+  /// \param fn Invoke the given visitor for each table. If the
+  /// visitor returns true, stop early.
+  ///
+  /// \returns \c true if the \c visitor ever returns \c true, \c
+  /// false otherwise.
+  bool forEachLookupTable(llvm::function_ref<bool(SwiftLookupTable &table)> fn);
+
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.
   void lookupValue(SwiftLookupTable &table, DeclName name,
@@ -1387,6 +1391,9 @@ public:
   /// Look for all Objective-C members in the given Swift lookup table.
   void lookupAllObjCMembers(SwiftLookupTable &table,
                             VisibleDeclConsumer &consumer);
+
+  /// Determine the effective Clang context for the given Swift nominal type.
+  EffectiveClangContext getEffectiveClangContext(NominalTypeDecl *nominal);
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
