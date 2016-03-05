@@ -1855,15 +1855,25 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 continue
                 ;;
             xctest)
+                XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
-                    xcodebuild -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj -scheme SwiftXCTest SKIP_INSTALL=NO DEPLOYMENT_LOCATION=YES DSTROOT="${build_dir}" INSTALL_PATH="/"
+                    xcodebuild \
+                        -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj \
+                        -scheme SwiftXCTest \
+                        SKIP_INSTALL=NO \
+                        DEPLOYMENT_LOCATION=YES \
+                        DSTROOT="${XCTEST_BUILD_DIR}" \
+                        INSTALL_PATH="/"
                     { set +x; } 2>/dev/null
                 else
                     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
-                    SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
                     set -x
-                    "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}"
+                    # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
+                    #        set) to build either --debug or --release.
+                    "${XCTEST_SOURCE_DIR}"/build_script.py \
+                        --swiftc="${SWIFTC_BIN}" \
+                        --build-dir="${XCTEST_BUILD_DIR}"
                     { set +x; } 2>/dev/null
                 fi
 
@@ -2111,15 +2121,17 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 echo "--- Running tests for ${product} ---"
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
-                    xcodebuild -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj -scheme SwiftXCTestFunctionalTests
+                    xcodebuild \
+                        -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj \
+                        -scheme SwiftXCTestFunctionalTests
                     { set +x; } 2>/dev/null
                 else
                     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
-                    SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
+                    XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                     set -x
-                    # FIXME: This re-builds swift-corelibs-xctest. Instead, 'build_script.py' should take
-                    # a top-level 'test' command that only tests an already built XCTest.
-                    "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}" --arch="${SWIFT_HOST_VARIANT_ARCH}" --test
+                    "${XCTEST_SOURCE_DIR}"/build_script.py test \
+                        --swiftc="${SWIFTC_BIN}" \
+                        "${XCTEST_BUILD_DIR}"
                     { set +x; } 2>/dev/null
                 fi
                 echo "--- Finished tests for ${product} ---"
@@ -2269,31 +2281,38 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 if [[ -z "${INSTALL_XCTEST}" ]] ; then
                     continue
                 fi
-                if [[ $(uname -s) == "Linux" ]]; then
-                    LIB_TARGET="linux"
-                    ARCH_FLAG="--arch=\"${SWIFT_HOST_VARIANT_ARCH}\""
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "error: --install-destdir is required"
+                    exit 1
                 fi
-                if [[ $(uname -s) == "FreeBSD" ]]; then
-                    LIB_TARGET="freebsd"
-                    ARCH_FLAG="--arch=\"${SWIFT_HOST_VARIANT_ARCH}\""
-                fi
-                if [[ $(uname -s) == "CYGWIN_NT-10.0" ]]; then
-                    LIB_TARGET="windows"
-                fi
-                if [[ $(uname -s) == "Darwin" ]]; then
-                    LIB_TARGET="macosx"
-                    ARCH_FLAG=""
-                fi
-                XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"
+                case "$(uname -s)" in
+                    Linux)
+                        LIB_TARGET="linux"
+                        ;;
+                    FreeBSD)
+                        LIB_TARGET="freebsd"
+                        ;;
+                    CYGWIN_NT-10.0)
+                        LIB_TARGET="windows"
+                        ;;
+                    *)
+                        echo "error: --install-xctest is not supported on this platform"
+                        exit 1
+                        ;;
+                esac
+
                 echo "--- Installing ${product} ---"
+                XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+                XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}/${INSTALL_PREFIX}/lib/swift/${LIB_TARGET}"
+                # Note that installing directly to /usr/lib/swift usually
+                # requires root permissions.
                 set -x
-                "${XCTEST_SOURCE_DIR}"/build_script.py --swiftc="${SWIFTC_BIN}" \
-                                    --build-dir="${build_dir}" \
-                                    --library-install-path="${XCTEST_INSTALL_PREFIX}" \
-                                    --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
-                                    --swift-build-dir="${SWIFT_BUILD_PATH}" ${ARCH_FLAG}
+                "${XCTEST_SOURCE_DIR}"/build_script.py install \
+                    --library-install-path="${XCTEST_INSTALL_PREFIX}" \
+                    --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
+                    "${XCTEST_BUILD_DIR}"
                 { set +x; } 2>/dev/null
-                
+
                 # As XCTest installation is self-contained, we break early here.
                 continue
                 ;;
