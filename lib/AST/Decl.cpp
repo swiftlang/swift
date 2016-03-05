@@ -4309,7 +4309,7 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-void EnumElementDecl::computeType() {
+bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
 
   Type resultTy = ED->getDeclaredTypeInContext();
@@ -4326,6 +4326,7 @@ void EnumElementDecl::computeType() {
     resultTy = FunctionType::get(argTy, resultTy);
 
   setType(resultTy);
+  return true;
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {

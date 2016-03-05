@@ -5543,11 +5543,14 @@ public:
       EED->setRecursiveness(ElementRecursiveness::NotRecursive);
     }
 
-    // Now that we have an argument type we can set the element's declared
-    // type.
-    if (!EED->hasType())
-      EED->computeType();
-    EED->setIsBeingTypeChecked(false);
+    {
+      defer { EED->setIsBeingTypeChecked(false); };
+
+      // Now that we have an argument type we can set the element's declared
+      // type.
+      if (!EED->hasType() && !EED->computeType())
+        return;
+    }
 
     // Test for type parameters, as opposed to a generic decl context, in
     // case the enclosing enum type was illegally declared inside of a generic
