@@ -302,12 +302,11 @@ isInSynthesizedExtension(const ValueDecl *VD) {
   return false;
 }
 
-ArrayRef<ExtensionDecl*> SynthesizedExtensionAnalyzer::
-getAllSynthesizedExtensions(std::vector<ExtensionDecl*> &Scratch) {
+void SynthesizedExtensionAnalyzer::
+forEachSynthesizedExtension(llvm::function_ref<void(ExtensionDecl*)> Fn) {
   for (auto It = Impl.Results->begin(); It != Impl.Results->end(); ++ It) {
-    Scratch.push_back(It->first);
+    Fn(It->first);
   }
-  return llvm::makeArrayRef(Scratch);
 }
 
 bool SynthesizedExtensionAnalyzer::

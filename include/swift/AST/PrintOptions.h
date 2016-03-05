@@ -67,8 +67,8 @@ class SynthesizedExtensionAnalyzer {
 public:
   SynthesizedExtensionAnalyzer(NominalTypeDecl *Target);
   ~SynthesizedExtensionAnalyzer();
-  ArrayRef<ExtensionDecl*> getAllSynthesizedExtensions(
-    std::vector<ExtensionDecl*> &Scratch);
+  void forEachSynthesizedExtension(
+    llvm::function_ref<void(ExtensionDecl*)> Fn);
   bool isInSynthesizedExtension(const ValueDecl *VD);
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
 };

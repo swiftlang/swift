@@ -446,17 +446,16 @@ void swift::ide::printSubmoduleInterface(
             continue;
 
           // Print synthesized extensions.
-          std::vector<ExtensionDecl*> scratch;
           SynthesizedExtensionAnalyzer Analyzer(NTD);
           AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
                                                                     &Analyzer);
-          for (auto ET : Analyzer.getAllSynthesizedExtensions(scratch)) {
+          Analyzer.forEachSynthesizedExtension([&](ExtensionDecl *ET){
             if (!shouldPrint(ET, AdjustedOptions))
-              continue;
+              return;
             Printer << "\n";
             ET->print(Printer, AdjustedOptions);
             Printer << "\n";
-          }
+          });
           AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
       }
