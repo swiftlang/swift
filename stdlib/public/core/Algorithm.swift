@@ -164,8 +164,6 @@ public struct EnumerateGenerator<
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     guard let b = base.next() else { return nil }
     defer { count += 1 }

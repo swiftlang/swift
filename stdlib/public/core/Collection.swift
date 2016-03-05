@@ -98,8 +98,6 @@ public struct IndexingGenerator<Elements : Indexable>
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
@@ -773,8 +771,6 @@ public struct PermutationGenerator<
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     return indices.next().map { seq[$0] }
   }
