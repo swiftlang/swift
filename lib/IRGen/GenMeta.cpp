@@ -25,6 +25,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/Runtime/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/DerivedTypes.h"

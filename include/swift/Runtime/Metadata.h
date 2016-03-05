@@ -1773,7 +1773,7 @@ using HeapLocalVariableMetadata
 /// Swift-compiled.
 template <typename Runtime>
 struct TargetObjCClassWrapperMetadata : public TargetMetadata<Runtime> {
-  const TargetClassMetadata<Runtime> *Class;
+  ConstTargetMetadataPointer<Runtime, TargetClassMetadata> Class;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::ObjCClassWrapper;
@@ -2141,19 +2141,27 @@ struct TargetProtocolDescriptorList {
   using StoredPointer = typename Runtime::StoredPointer;
   StoredPointer NumProtocols;
 
-  const TargetProtocolDescriptor<Runtime> **getProtocols() {
-    return reinterpret_cast<const TargetProtocolDescriptor<Runtime> **>(this + 1);
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> *
+  getProtocols() {
+    return reinterpret_cast<
+      ConstTargetMetadataPointer<
+        Runtime, TargetProtocolDescriptor> *>(this + 1);
   }
   
-  const TargetProtocolDescriptor<Runtime> * const *getProtocols() const {
-    return reinterpret_cast<const TargetProtocolDescriptor<Runtime> * const *>(this + 1);
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const *
+  getProtocols() const {
+    return reinterpret_cast<
+      ConstTargetMetadataPointer<
+        Runtime, TargetProtocolDescriptor> const *>(this + 1);
   }
   
-  const TargetProtocolDescriptor<Runtime> *operator[](size_t i) const {
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const &
+  operator[](size_t i) const {
     return getProtocols()[i];
   }
   
-  const TargetProtocolDescriptor<Runtime> *&operator[](size_t i) {
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> &
+  operator[](size_t i) {
     return getProtocols()[i];
   }
 
@@ -2173,9 +2181,11 @@ struct TargetLiteralProtocolDescriptorList
   
   template<typename...DescriptorPointers>
   constexpr TargetLiteralProtocolDescriptorList(DescriptorPointers...elements)
-    : TargetProtocolDescriptorList<Runtime>(NUM_PROTOCOLS), Protocols{elements...}
+    : TargetProtocolDescriptorList<Runtime>(NUM_PROTOCOLS),
+      Protocols{elements...}
   {}
 };
+using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
   
 /// A protocol descriptor. This is not type metadata, but is referenced by
 /// existential type metadata records to describe a protocol constraint.
@@ -2183,19 +2193,24 @@ struct TargetLiteralProtocolDescriptorList
 /// layout.
 template <typename Runtime>
 struct TargetProtocolDescriptor {
+  using StoredPointer = typename Runtime::StoredPointer;
   /// Unused by the Swift runtime.
-  const void *_ObjC_Isa;
+  TargetPointer<Runtime, const void> _ObjC_Isa;
   
   /// The mangled name of the protocol.
-  const char *Name;
+  TargetPointer<Runtime, const char> Name;
   
   /// The list of protocols this protocol refines.
-  const TargetProtocolDescriptorList<Runtime> *InheritedProtocols;
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
+  InheritedProtocols;
   
   /// Unused by the Swift runtime.
-  const void *_ObjC_InstanceMethods, *_ObjC_ClassMethods,
-             *_ObjC_OptionalInstanceMethods, *_ObjC_OptionalClassMethods,
-             *_ObjC_InstanceProperties;
+  TargetPointer<Runtime, const void>
+  _ObjC_InstanceMethods,
+  _ObjC_ClassMethods,
+  _ObjC_OptionalInstanceMethods,
+  _ObjC_OptionalClassMethods,
+  _ObjC_InstanceProperties;
   
   /// Size of the descriptor record.
   uint32_t DescriptorSize;
@@ -2229,8 +2244,8 @@ struct TargetProtocolDescriptor {
   }
 
   constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
-                               const TargetProtocolDescriptorList<Runtime> *Inherited,
-                               ProtocolDescriptorFlags Flags)
+                        const TargetProtocolDescriptorList<Runtime> *Inherited,
+                        ProtocolDescriptorFlags Flags)
     : _ObjC_Isa(nullptr), Name(Name), InheritedProtocols(Inherited),
       _ObjC_InstanceMethods(nullptr), _ObjC_ClassMethods(nullptr),
       _ObjC_OptionalInstanceMethods(nullptr),
@@ -2304,6 +2319,7 @@ enum class ExistentialTypeRepresentation {
 /// The structure of existential type metadata.
 template <typename Runtime>
 struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
   /// The number of witness tables and class-constrained-ness of the type.
   ExistentialTypeFlags Flags;
   /// The protocol constraints.
@@ -2354,6 +2370,10 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Existential;
   }
+
+  static constexpr StoredPointer
+  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(Flags);
+
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;

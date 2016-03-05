@@ -39,6 +39,10 @@ template <typename Runtime>
 using SharedTargetNominalTypeDescriptorRef
   = std::shared_ptr<TargetNominalTypeDescriptor<Runtime>>;
 
+template <typename Runtime>
+using SharedProtocolDescriptorRef
+  = std::shared_ptr<TargetProtocolDescriptor<Runtime>>;
+
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
 using GenericSection = ReflectionSection<const void *>;
@@ -148,8 +152,20 @@ public:
         return _readMetadata<TargetEnumMetadata<Runtime>>(Address);
       case MetadataKind::ErrorObject:
         return _readMetadata<TargetEnumMetadata<Runtime>>(Address);
-      case MetadataKind::Existential:
-        return _readMetadata<TargetExistentialTypeMetadata<Runtime>>(Address);
+      case MetadataKind::Existential: {
+        StoredPointer NumProtocolsAddress = Address +
+          TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
+        StoredPointer NumProtocols;
+        if (!Reader.readInteger(NumProtocolsAddress, &NumProtocols))
+          return nullptr;
+
+        auto TotalSize = sizeof(TargetExistentialTypeMetadata<Runtime>) +
+          NumProtocols *
+            sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
+        
+        return _readMetadata<TargetExistentialTypeMetadata<Runtime>>(Address,
+                                                                     TotalSize);
+      }
       case MetadataKind::ExistentialMetatype:
         return _readMetadata<
           TargetExistentialMetatypeMetadata<Runtime>>(Address);
@@ -214,6 +230,22 @@ public:
                                             [](void *NTD){
                                               free(NTD);
                                             });
+  }
+
+  SharedProtocolDescriptorRef<Runtime>
+  readProtocolDescriptor(StoredPointer Address) {
+    auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
+    auto Buffer = (uint8_t *)malloc(Size);
+    if (!Reader.readBytes(Address, Buffer, Size)) {
+      free(Buffer);
+      return nullptr;
+    }
+    auto Casted
+      = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
+    return SharedProtocolDescriptorRef<Runtime>(Casted,
+                                                      [](void *PD){
+                                                        free(PD);
+                                                      });
   }
 
   TypeRefVector
@@ -360,7 +392,21 @@ public:
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta.get());
       TypeRefVector Protocols;
-      llvm_unreachable("todo");
+      for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
+        auto ProtocolAddress = Exist->Protocols[i];
+        auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
+        if (!ProtocolDescriptor)
+          return nullptr;
+        auto MangledName = Reader.readString(ProtocolDescriptor->Name);
+        if (MangledName.empty())
+          return nullptr;
+        auto Demangled = Demangle::demangleSymbolAsNode(MangledName);
+        auto Protocol = TypeRef::fromDemangleNode(Demangled);
+        if (!llvm::isa<ProtocolTypeRef>(Protocol.get()))
+          return nullptr;
+
+        Protocols.push_back(Protocol);
+      }
       return ProtocolCompositionTypeRef::create(Protocols);
     }
     case MetadataKind::Metatype: {
