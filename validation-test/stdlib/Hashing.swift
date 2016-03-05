@@ -131,8 +131,8 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
 HashingTestSuite.test("String/hashValue/topBitsSet") {
 #if _runtime(_ObjC)
 #if arch(x86_64) || arch(arm64)
-  // Make sure that we don't accidently throw away bits by storing the result of
-  // NSString.hash into an int in the runtime.
+  // Make sure that we don't accidentally throw away bits by storing the result
+  // of NSString.hash into an int in the runtime.
 
   // This is the bit pattern that we xor to NSString's hash value.
   let hashOffset = UInt(bitPattern: 0x429b_1266_0000_0000)
