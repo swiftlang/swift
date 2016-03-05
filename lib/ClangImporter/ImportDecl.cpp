@@ -5770,7 +5770,7 @@ ClangImporter::Implementation::importDeclContextOf(
   // Create a new extension for this nominal type/Clang submodule pair.
   auto swiftTyLoc = TypeLoc::withoutLoc(nominal->getDeclaredType());
   auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), swiftTyLoc, {},
-                                   importDeclContextOf(decl), nullptr);
+                                   getClangModuleForDecl(decl), nullptr);
   ext->setValidated();
   ext->setCheckedInheritanceClause();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));

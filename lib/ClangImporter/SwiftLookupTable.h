@@ -351,6 +351,10 @@ public:
   SmallVector<SingleEntry, 4>
   lookupGlobalsAsMembers(EffectiveClangContext context);
 
+  /// Retrieve the set of global declarations that are going to be
+  /// imported as members.
+  SmallVector<SingleEntry, 4> allGlobalsAsMembers();
+
   /// Deserialize all entries.
   void deserializeAll();
 

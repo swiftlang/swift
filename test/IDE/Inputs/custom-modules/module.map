@@ -5,7 +5,10 @@ module OmitNeedlessWords {
 
 module ImportAsMember {
   export *
-  header "ImportAsMember.h"
+
+  module A {
+    header "ImportAsMember.h"
+  }
 
   module B {
     header "ImportAsMemberB.h"

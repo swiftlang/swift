@@ -357,6 +357,31 @@ SwiftLookupTable::lookupGlobalsAsMembers(EffectiveClangContext context) {
 }
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
+SwiftLookupTable::allGlobalsAsMembers() {
+  // If we have a reader, deserialize all of the globals-as-members data.
+  if (Reader) {
+    for (auto context : Reader->getGlobalsAsMembersContexts()) {
+      (void)lookupGlobalsAsMembers(context);
+    }
+  }
+
+  // Collect all of the keys and sort them.
+  SmallVector<StoredContext, 8> contexts;
+  for (const auto &globalAsMember : GlobalsAsMembers) {
+    contexts.push_back(globalAsMember.first);
+  }
+  llvm::array_pod_sort(contexts.begin(), contexts.end());
+
+  // Collect all of the results in order.
+  SmallVector<SwiftLookupTable::SingleEntry, 4> results;
+  for (const auto &context : contexts) {
+    for (auto &entry : GlobalsAsMembers[context])
+      results.push_back(mapStored(entry));
+  }
+  return results;
+}
+
+SmallVector<SwiftLookupTable::SingleEntry, 4>
 SwiftLookupTable::lookup(StringRef baseName,
                          EffectiveClangContext searchContext) {
   // Translate context.

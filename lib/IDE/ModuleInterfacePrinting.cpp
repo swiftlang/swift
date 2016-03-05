@@ -201,6 +201,30 @@ swift::ide::collectModuleGroups(Module *M, std::vector<StringRef> &Scratch) {
   return llvm::makeArrayRef(Scratch);
 }
 
+/// Determine whether the given extension has a Clang node that
+/// created it (vs. being a Swift extension).
+static bool extensionHasClangNode(ExtensionDecl *ext) {
+  // If it has a Clang node (directly), 
+  if (ext->hasClangNode()) return true;
+
+  // If it has a global imported as a member.
+  auto members = ext->getMembers();
+  if (members.empty()) return false;
+  return members.front()->hasClangNode();
+}
+
+/// Retrieve the Clang node for the given extension, if it has one.
+/// created it (vs. being a Swift extension).
+static ClangNode extensionGetClangNode(ExtensionDecl *ext) {
+  // If it has a Clang node (directly), 
+  if (ext->hasClangNode()) return ext->getClangNode();
+
+  // If it has a global imported as a member.
+  auto members = ext->getMembers();
+  if (members.empty()) return ClangNode();
+  return members.front()->getClangNode();
+}
+
 void swift::ide::printSubmoduleInterface(
        Module *M,
        ArrayRef<StringRef> FullModuleName,
@@ -329,9 +353,8 @@ void swift::ide::printSubmoduleInterface(
       continue;
     }
 
-    auto addToClangDecls = [&](Decl *D) {
-      assert(D->hasClangNode());
-      auto CN = D->getClangNode();
+    auto addToClangDecls = [&](Decl *D, ClangNode CN) {
+      assert(CN && "No Clang node here");
       clang::SourceLocation Loc = CN.getLocation();
 
       auto *OwningModule = Importer.getClangOwningModule(CN);
@@ -342,9 +365,19 @@ void swift::ide::printSubmoduleInterface(
     };
 
     if (D->hasClangNode()) {
-      addToClangDecls(D);
+      addToClangDecls(D, D->getClangNode());
       continue;
     }
+
+    // If we have an extension containing globals imported as members,
+    // use the first member as the Clang node.
+    if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+      if (extensionHasClangNode(Ext)) {
+        addToClangDecls(Ext, extensionGetClangNode(Ext));
+        continue;
+      }
+    }
+
     if (FullModuleName.empty()) {
       // If group name is given and the decl does not belong to the group, skip it.
       if (!GroupNames.empty()){
@@ -428,7 +461,7 @@ void swift::ide::printSubmoduleInterface(
       // Clang extensions (categories) are always printed in source order.
       // Swift extensions are printed with their associated type unless it's
       // a cross-module extension.
-      if (!Ext->hasClangNode()) {
+      if (!extensionHasClangNode(Ext)) {
         auto ExtendedNominal = Ext->getExtendedType()->getAnyNominal();
         if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
           return false;
@@ -455,7 +488,7 @@ void swift::ide::printSubmoduleInterface(
               Printer.callAvoidPrintDeclPost(Ext);
               continue;
             }
-            if (Ext->hasClangNode())
+            if (extensionHasClangNode(Ext))
               continue; // will be printed in its source location, see above.
             Printer << "\n";
             Ext->print(Printer, AdjustedOptions);

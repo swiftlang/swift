@@ -3286,7 +3286,8 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   DarwinBlacklistDeclConsumer blacklistConsumer(filterConsumer,
                                                 getClangASTContext());
 
-  const clang::Module *topLevelModule = clangModule->getTopLevelModule();
+  const clang::Module *topLevelModule =
+    clangModule ? clangModule->getTopLevelModule() : nullptr;
 
   swift::VisibleDeclConsumer *actualConsumer = &filterConsumer;
   if (DarwinBlacklistDeclConsumer::needsBlacklist(topLevelModule))
@@ -3304,14 +3305,22 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
         results.push_back(extension);
     }
 
-    // Add any extensions created during this import
-    for (auto mapItr : owner.Impl.extensionPoints) {
-      // TODO: Any other entry points where we need to add these? Is there any
-      // way to to instead marshal the extension through the consumer more
-      // directly?
-      results.push_back(mapItr.getSecond());
-    }
+    // Retrieve all of the globals that will be mapped to members.
 
+    // FIXME: Since we don't represent Clang submodules as Swift
+    // modules, we're getting everything.
+    llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
+    for (auto entry : lookupTable->allGlobalsAsMembers()) {
+      auto decl = entry.get<clang::NamedDecl *>();
+      auto importedDecl = owner.Impl.importDecl(decl);
+      if (!importedDecl) continue;
+
+      auto ext = dyn_cast<ExtensionDecl>(importedDecl->getDeclContext());
+      if (!ext) continue;
+
+      if (knownExtensions.insert(ext).second)
+        results.push_back(ext);
+    }
   }
 }
 
