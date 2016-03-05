@@ -851,9 +851,10 @@ public:
     if (!shouldPrint(D, true))
       return false;
 
-    bool Synthesize = Options.TransformContext &&
-                    Options.TransformContext->isPrintingSynthesizedExtension() &&
-                      D->getKind() == DeclKind::Extension;
+    bool Synthesize =
+        Options.TransformContext &&
+        Options.TransformContext->isPrintingSynthesizedExtension() &&
+        D->getKind() == DeclKind::Extension;
     if (Synthesize)
       Printer.setSynthesizedTarget(Options.TransformContext->getNominal());
 
@@ -877,8 +878,8 @@ public:
     ASTVisitor::visit(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(nullptr);
-      Printer.printSynthesizedExtensionPost(cast<ExtensionDecl>(D),
-                                            Options.TransformContext->getNominal());
+      Printer.printSynthesizedExtensionPost(
+          cast<ExtensionDecl>(D), Options.TransformContext->getNominal());
     } else {
       Printer.callPrintDeclPost(D);
     }
