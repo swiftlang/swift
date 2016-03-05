@@ -202,12 +202,12 @@ public:
 
 static std::string getReflectionSectionName(IRGenModule &IGM,
                                             std::string Base) {
-  assert(Base.size() <= 7
-         && "Mach-O section name length must be <= 16 characters");
   SmallString<50> SectionName;
   llvm::raw_svector_ostream OS(SectionName);
   switch (IGM.TargetInfo.OutputObjectFormat) {
     case llvm::Triple::MachO:
+      assert(Base.size() <= 7
+             && "Mach-O section name length must be <= 16 characters");
       OS << "__DATA, __swift3_" << Base << ", regular, no_dead_strip";
       break;
     case llvm::Triple::ELF:
