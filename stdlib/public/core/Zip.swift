@@ -102,4 +102,3 @@ public struct ZipGenerator2<
 public struct Zip2<
   Sequence1 : SequenceType, Sequence2 : SequenceType
 > {}
-

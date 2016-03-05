@@ -109,4 +109,3 @@ public func expectEqual<V: Comparable>(
     actual.byType,
     message(), stackTrace: stackTrace) { $0 <=> $1 }
 }
-

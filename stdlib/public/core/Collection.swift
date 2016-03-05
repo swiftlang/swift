@@ -826,4 +826,3 @@ public func suffix<
 
 @available(*, unavailable, renamed="CollectionType")
 public struct Sliceable {}
-

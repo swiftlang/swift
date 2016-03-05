@@ -56,4 +56,3 @@ public struct Repeat<Element> : CollectionType {
   /// The value of every element in this collection.
   public let repeatedValue: Element
 }
-

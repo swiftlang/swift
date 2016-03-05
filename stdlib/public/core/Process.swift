@@ -72,4 +72,3 @@ func _didEnterMain(
   Process._argc = CInt(argc)
   Process._unsafeArgv = UnsafeMutablePointer(argv)
 }
-

@@ -95,4 +95,3 @@ public func withArrayOfCStrings<R>(
     return body(cStrings)
   }
 }
-

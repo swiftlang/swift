@@ -234,4 +234,3 @@ public func ~= <I : ForwardIndexType where I : Comparable> (
 ) -> Bool {
   return pattern.contains(value)
 }
-

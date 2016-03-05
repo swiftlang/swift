@@ -1244,4 +1244,3 @@ self.test("\(testNamePrefix).suffix/semantics") {
 //===----------------------------------------------------------------------===//
   } // addRandomAccessCollectionTests
 }
-

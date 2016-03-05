@@ -125,4 +125,3 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollectionType {
   internal var _startIndex: Index
   internal var _endIndex: Index
 }
-

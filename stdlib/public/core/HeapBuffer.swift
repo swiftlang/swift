@@ -230,4 +230,3 @@ func == <Value, Element> (
   rhs: _HeapBuffer<Value, Element>) -> Bool {
   return lhs._nativeObject == rhs._nativeObject
 }
-

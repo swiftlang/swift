@@ -955,4 +955,3 @@ extension UTF16 {
     return (count, isAscii)
   }
 }
-

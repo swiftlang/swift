@@ -76,4 +76,3 @@ public struct EmptyCollection<Element> : CollectionType {
     return 0
   }
 }
-
