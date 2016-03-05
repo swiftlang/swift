@@ -84,10 +84,7 @@ class ReflectionContext {
     }
 
     auto Casted = reinterpret_cast<TargetMetadata<Runtime> *>(Buffer);
-    return SharedTargetMetadataRef<Runtime>(Casted,
-                                            [](void *Meta){
-                                              free((void*)Meta);
-                                            });
+    return SharedTargetMetadataRef<Runtime>(Casted, free);
   }
   
 
@@ -226,10 +223,7 @@ public:
 
     auto Casted
       = reinterpret_cast<TargetNominalTypeDescriptor<Runtime> *>(Buffer);
-    return SharedTargetNominalTypeDescriptorRef<Runtime>(Casted,
-                                            [](void *NTD){
-                                              free(NTD);
-                                            });
+    return SharedTargetNominalTypeDescriptorRef<Runtime>(Casted, free);
   }
 
   SharedProtocolDescriptorRef<Runtime>
@@ -242,10 +236,7 @@ public:
     }
     auto Casted
       = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
-    return SharedProtocolDescriptorRef<Runtime>(Casted,
-                                                      [](void *PD){
-                                                        free(PD);
-                                                      });
+    return SharedProtocolDescriptorRef<Runtime>(Casted, free);
   }
 
   TypeRefVector
