@@ -5893,6 +5893,15 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     }
     return true;
   }
+          
+  case FixKind::OptionalChaining: {
+    auto type = solution.simplifyType(TC, affected->getType())
+                ->getRValueObjectType();
+    auto diag = TC.diagnose(affected->getLoc(),
+                            diag::missing_unwrap_optional, type);
+    diag.fixItInsertAfter(affected->getEndLoc(), "?");
+    return true;
+  }
 
   case FixKind::ForceDowncast: {
     auto fromType = solution.simplifyType(TC, affected->getType())

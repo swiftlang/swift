@@ -2837,6 +2837,15 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // UnresolvedType and we'll deal with it.
   if (!convertType || options.contains(TCC_AllowUnresolvedTypeVariables))
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+  
+  // If we're not passing down contextual type information this time, but the
+  // original failure had type info that wasn't an optional type,
+  // then set the flag to prefer fixits with force unwrapping.
+  if (!convertType) {
+    auto previousType = CS->getContextualType();
+    if (previousType && previousType->getOptionalObjectType().isNull())
+      TCEOptions |= TypeCheckExprFlags::PreferForceUnwrapToOptional;
+  }
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
                                              convertTypePurpose, TCEOptions,
