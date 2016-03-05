@@ -52,11 +52,8 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
                                     const Substitution &Sub,
                                     const TypeDecl *TD) -> bool {
 
-        Type Subst = Sub.getReplacement();
-        if (auto InterfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
-            Conformance->getDeclContext(), Subst)) {
-          Subst = InterfaceTy;
-        }
+        auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
+            Conformance->getDeclContext(), Sub.getReplacement());
 
         AssociatedTypes.push_back({
           AssocTy->getNameStr(),
