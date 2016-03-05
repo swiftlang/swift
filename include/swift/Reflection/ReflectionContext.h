@@ -387,6 +387,8 @@ public:
       }
 
       auto Result = getTypeRef(Function->ResultType);
+      if (!Result)
+        return nullptr;
       return FunctionTypeRef::create(Arguments, Result);
     }
     case MetadataKind::Existential: {
