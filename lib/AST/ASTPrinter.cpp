@@ -1699,8 +1699,8 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
              [&] { Printer << "."; });
 }
 
-void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
-                           PrintOptions Options) {
+static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
+                                  PrintOptions Options) {
   auto Nominal = ExtendedType->getAnyNominal();
   assert(Nominal && "extension of non-nominal type");
   if (auto ct = ExtendedType->getAs<ClassType>()) {
