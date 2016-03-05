@@ -622,10 +622,14 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       llvm_unreachable("missing witness reference for kind with accessors");
     }
   }
-  
-  // If the requirement is for a nonmutating member, then the witness may not
-  // mutate self.
-  return !requirement->isMutating() && witnessMutating;
+
+  // Requirements in class-bound protocols never 'mutate' self.
+  auto *proto = cast<ProtocolDecl>(requirement->getDeclContext());
+  bool requirementMutating = (requirement->isMutating() &&
+                              !proto->requiresClass());
+
+  // The witness must not be more mutating than the requirement.
+  return !requirementMutating && witnessMutating;
 }
 
 /// Check that the Objective-C method(s) provided by the witness have
