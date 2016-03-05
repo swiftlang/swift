@@ -1,4 +1,4 @@
-#===--- protocol_graph.py -------------------------*- coding: utf-8 -*----===#
+# ===--- protocol_graph.py ----------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -8,7 +8,7 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===//
 #
 # Create a graph of the protocol refinement relationships, associated
 # types, operator requirements, and defaulted generic operators.
@@ -20,7 +20,8 @@
 #   (ccomps -zX#$N -o /tmp/protocols.dot /tmp/p0.dot || true) \
 #   && dot -Tsvg /tmp/protocols.dot > /tmp/protocols.svg \
 #   && open /tmp/protocols.svg
-#===----------------------------------------------------------------------===#
+#
+# ===----------------------------------------------------------------------===//
 
 from __future__ import print_function
 
