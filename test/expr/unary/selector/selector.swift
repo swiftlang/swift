@@ -26,6 +26,14 @@ class C1 {
     _ = testUnqualifiedSelector // suppress unused warning
   }
 
+  @objc func testParam(testParam: A) { // expected-note{{'testParam' declared here}}
+    _ = #selector(testParam) // expected-error{{argument of '#selector' cannot refer to a parameter}}
+  }
+
+  @objc func testVariable() {
+    let testVariable = 1 // expected-note{{'testVariable' declared here}}
+    _ = #selector(testVariable) // expected-error{{argument of '#selector' cannot refer to a variable}}
+  }
 }
 
 @objc protocol P1 {
