@@ -9,7 +9,7 @@ public class C<T>
     // CHECK: %T = load %swift.type*, %swift.type**
     // CHECK-SAME: !dbg ![[LOC:[0-9]+]], !invariant.load
     // CHECK: ![[LOC]] = !DILocation(line: 0,
-    var x = i
+    var x = [i]
   }
 }
 
