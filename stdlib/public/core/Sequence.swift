@@ -647,4 +647,3 @@ public struct GeneratorSequence<
 
   internal var _base: Base
 }
-

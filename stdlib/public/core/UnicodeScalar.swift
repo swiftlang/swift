@@ -330,4 +330,3 @@ func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
 }
-

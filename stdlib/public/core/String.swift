@@ -988,4 +988,3 @@ extension String.Index {
     return String.UnicodeScalarView.Index(self, within: unicodeScalars)
   }
 }
-

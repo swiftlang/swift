@@ -63,4 +63,3 @@ internal struct _CollectionOf<
 
 @available(*, unavailable, message="SinkOf has been removed. Use (T) -> () closures directly instead.")
 public struct SinkOf<T> {}
-

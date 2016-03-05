@@ -437,4 +437,3 @@ internal struct _TeeStream<
   mutating func _lock() { left._lock(); right._lock() }
   mutating func _unlock() { left._unlock(); right._unlock() }
 }
-

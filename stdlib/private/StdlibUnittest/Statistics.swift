@@ -47,5 +47,3 @@ public func chiSquaredUniform2(
   }
   return true
 }
-
-

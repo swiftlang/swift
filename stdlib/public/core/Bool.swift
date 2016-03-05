@@ -99,4 +99,3 @@ public prefix func !(a: Bool) -> Bool {
 public func ==(lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
 }
-

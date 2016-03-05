@@ -73,4 +73,3 @@ public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
   body()
 #endif
 }
-

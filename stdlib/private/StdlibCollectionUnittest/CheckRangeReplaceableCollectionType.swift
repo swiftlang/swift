@@ -1286,4 +1286,3 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     // No extra checks for collections with random access traversal so far.
   } // addRandomAccessRangeReplaceableCollectionTests
 }
-

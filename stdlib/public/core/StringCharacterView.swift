@@ -311,4 +311,3 @@ extension String.CharacterView {
       String(_core).unicodeScalars[unicodeScalarRange]._core)
   }
 }
-

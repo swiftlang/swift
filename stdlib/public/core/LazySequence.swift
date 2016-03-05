@@ -211,4 +211,3 @@ extension LazySequenceType {
 public func lazy<Base : SequenceType>(s: Base) -> LazySequence<Base> {
   fatalError("unavailable")
 }
-
