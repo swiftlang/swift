@@ -1699,6 +1699,32 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
              [&] { Printer << "."; });
 }
 
+void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
+                           PrintOptions Options) {
+  auto Nominal = ExtendedType->getAnyNominal();
+  assert(Nominal && "extension of non-nominal type");
+  if (auto ct = ExtendedType->getAs<ClassType>()) {
+    if (auto ParentType = ct->getParent()) {
+      ParentType.print(Printer, Options);
+      Printer << ".";
+    }
+  }
+  if (auto st = ExtendedType->getAs<StructType>()) {
+    if (auto ParentType = st->getParent()) {
+      ParentType.print(Printer, Options);
+      Printer << ".";
+    }
+  }
+
+  // Respect alias type.
+  if (ExtendedType->getKind() == TypeKind::NameAlias) {
+    ExtendedType.print(Printer, Options);
+    return;
+  }
+
+  Printer.printTypeRef(Nominal, Nominal->getName());
+}
+
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   Printer << "/// Synthesized extension from " <<
@@ -1706,7 +1732,8 @@ printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   printDocumentationComment(ExtDecl);
   printAttributes(ExtDecl);
   Printer << tok::kw_extension << " ";
-  Printer << Decl->getName().str();
+
+  printExtendedTypeName(Decl->getDeclaredType(), Printer, Options);
   printInherited(ExtDecl);
 
   if (auto *GPs = ExtDecl->getGenericParams()) {
@@ -1737,28 +1764,7 @@ void PrintAST::printExtension(ExtensionDecl* decl) {
       printTypeLoc(decl->getExtendedTypeLoc());
       return;
     }
-    assert(nominal && "extension of non-nominal type");
-
-    if (auto ct = decl->getExtendedType()->getAs<ClassType>()) {
-      if (auto ParentType = ct->getParent()) {
-        ParentType.print(Printer, Options);
-        Printer << ".";
-      }
-    }
-    if (auto st = decl->getExtendedType()->getAs<StructType>()) {
-      if (auto ParentType = st->getParent()) {
-        ParentType.print(Printer, Options);
-        Printer << ".";
-      }
-    }
-
-    // Respect alias type.
-    if (extendedType->getKind() == TypeKind::NameAlias) {
-      extendedType.print(Printer, Options);
-      return;
-    }
-
-    Printer.printTypeRef(nominal, nominal->getName());
+    printExtendedTypeName(extendedType, Printer, Options);
   });
   printInherited(decl);
   if (auto *GPs = decl->getGenericParams()) {

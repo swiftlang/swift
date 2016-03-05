@@ -5,6 +5,8 @@
 // RUN: FileCheck %s -check-prefix=CHECK-SYN2 < %t.syn.txt
 // RUN: FileCheck %s -check-prefix=CHECK-SYN3 < %t.syn.txt
 // RUN: FileCheck %s -check-prefix=CHECK-SYN4 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK-SYN5 < %t.syn.txt
+// RUN: FileCheck %s -check-prefix=CHECK-SYN6 < %t.syn.txt
 
 public protocol P1{
   associatedtype T1
@@ -93,15 +95,30 @@ public struct S6<T> : P1  {
     return t
   }
 }
+public extension S6 {
+  public func f3() {}
+}
+public struct S7 {
+  public struct S8 : P1  {
+    public typealias T1 = S5
+    public typealias T2 = S5
+    public func f1(t : T1) -> T1 {
+      return t
+    }
+    public func f2(t : T2) -> T2 {
+      return t
+    }
+  }
+}
 
 // CHECK-SYN1: <synthesized>/// Synthesized extension from P1
-// CHECK-SYN1: extension S1 where T : P2 {
+// CHECK-SYN1: extension <ref:Struct>S1</ref> where T : P2 {
 // CHECK-SYN1:     <decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
 // CHECK-SYN1:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK-SYN1: }</synthesized>
 
 // CHECK-SYN2: <synthesized>/// Synthesized extension from P2
-// CHECK-SYN2: extension S1 where T : P2 {
+// CHECK-SYN2: extension <ref:Struct>S1</ref> where T : P2 {
 // CHECK-SYN2:     <decl:Func>public func <loc>p2member()</loc></decl>
 // CHECK-SYN2: }</synthesized>
 
@@ -112,11 +129,21 @@ public struct S6<T> : P1  {
 // CHECK-SYN1-NOT: extension S3 where
 
 // CHECK-SYN3: <synthesized>/// Synthesized extension from P1
-// CHECK-SYN3: extension S4 {
+// CHECK-SYN3: extension <ref:Struct>S4</ref> {
 // CHECK-SYN3:   <decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK-SYN3: }</synthesized>
 
 // CHECK-SYN4: <synthesized>/// Synthesized extension from P1
-// CHECK-SYN4: extension S6 {
+// CHECK-SYN4: extension <ref:Struct>S6</ref> {
 // CHECK-SYN4:   <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK-SYN4: }</synthesized>
+
+// CHECK-SYN5: <synthesized>/// Synthesized extension from P1
+// CHECK-SYN5: extension <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S7</ref>.<ref:Struct>S8</ref> {
+// CHECK-SYN5:     <decl:Func>public func <loc>ef5(<decl:Param>t: <ref:Struct>S5</ref></decl>)</loc></decl>
+// CHECK-SYN5: }</synthesized>
+
+// CHECK-SYN6: <synthesized>/// Synthesized extension from P1
+// CHECK-SYN6: extension <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S7</ref>.<ref:Struct>S8</ref> {
+// CHECK-SYN6:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
+// CHECK-SYN6: }</synthesized>
