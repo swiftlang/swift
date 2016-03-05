@@ -206,7 +206,7 @@ public:
 };
 
 struct SynthesizedExtensionAnalyzer::Implementation {
-  typedef llvm::SmallDenseMap<ExtensionDecl*, SynthesizedExtensionInfo> ExtMap;
+  typedef llvm::MapVector<ExtensionDecl*, SynthesizedExtensionInfo> ExtMap;
   NominalTypeDecl *Target;
   Type BaseType;
   DeclContext *DC;
@@ -314,7 +314,7 @@ bool SynthesizedExtensionAnalyzer::
 shouldPrintRequirement(ExtensionDecl *ED, StringRef Req) {
   auto Found = Impl.Results->find(ED);
   if (Found != Impl.Results->end()) {
-    std::vector<StringRef> &KnownReqs = Found->getSecond().KnownSatisfiedRequirements;
+    std::vector<StringRef> &KnownReqs = Found->second.KnownSatisfiedRequirements;
     return KnownReqs.end() == std::find(KnownReqs.begin(), KnownReqs.end(), Req);
   }
   return true;
