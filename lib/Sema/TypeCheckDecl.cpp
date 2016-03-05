@@ -1489,11 +1489,11 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::FileUnit:
       D->setAccessibility(Accessibility::Internal);
       break;
-    case DeclContextKind::NominalTypeDecl: {
-      auto nominal = cast<NominalTypeDecl>(DC);
-      validateAccessibility(nominal);
-      Accessibility access = nominal->getFormalAccess();
-      if (!isa<ProtocolDecl>(nominal))
+    case DeclContextKind::GenericTypeDecl: {
+      auto generic = cast<GenericTypeDecl>(DC);
+      validateAccessibility(generic);
+      Accessibility access = generic->getFormalAccess();
+      if (!isa<ProtocolDecl>(generic))
         access = std::min(access, Accessibility::Internal);
       D->setAccessibility(access);
       break;
@@ -6234,8 +6234,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::SubscriptDecl:
       llvm_unreachable("cannot have type params");
 
-    case DeclContextKind::NominalTypeDecl: {
-      auto nominal = cast<NominalTypeDecl>(DC);
+    case DeclContextKind::GenericTypeDecl: {
+      auto nominal = cast<GenericTypeDecl>(DC);
       typeCheckDecl(nominal, true);
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
         if (!assocType->hasType())

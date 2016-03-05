@@ -190,8 +190,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
   case DeclContextKind::AbstractClosureExpr:
     // FIXME: What about default functions?
     llvm_unreachable("shouldn't serialize decls from anonymous closures");
-  case DeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(DC);
+  case DeclContextKind::GenericTypeDecl:
+    return cast<GenericTypeDecl>(DC);
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC);
   case DeclContextKind::TopLevelCodeDecl:
@@ -1337,13 +1337,13 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
                            addModuleRef(cast<Module>(DC)), pathLen);
     break;
 
-  case DeclContextKind::NominalTypeDecl: {
+  case DeclContextKind::GenericTypeDecl: {
     writeCrossReference(DC->getParent(), pathLen + 1);
 
-    auto nominal = cast<NominalTypeDecl>(DC);
+    auto generic = cast<GenericTypeDecl>(DC);
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addIdentifierRef(nominal->getName()),
+                                        addIdentifierRef(generic->getName()),
                                         false);
     break;
   }
@@ -1810,7 +1810,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
     declOrDeclContextID = addDeclRef(getDeclForContext(DC));
     isDecl = true;

@@ -1076,8 +1076,8 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     break;
   }
 
-  case DeclContextKind::NominalTypeDecl:
-    printName(os, cast<NominalTypeDecl>(dc)->getName());
+  case DeclContextKind::GenericTypeDecl:
+    printName(os, cast<GenericTypeDecl>(dc)->getName());
     break;
 
   case DeclContextKind::ExtensionDecl:

@@ -2794,8 +2794,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       // FIXME: print closures somehow.
       return;
 
-    case DeclContextKind::NominalTypeDecl:
-      visit(cast<NominalTypeDecl>(DC)->getType());
+    case DeclContextKind::GenericTypeDecl:
+      visit(cast<GenericTypeDecl>(DC)->getType());
       return;
 
     case DeclContextKind::ExtensionDecl:

@@ -1056,8 +1056,8 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
     return Accessibility::Internal;
-  case DeclContextKind::NominalTypeDecl: {
-    auto Nominal = cast<NominalTypeDecl>(DC);
+  case DeclContextKind::GenericTypeDecl: {
+    auto Nominal = cast<GenericTypeDecl>(DC);
     Accessibility Access = inferAccessibility(Nominal);
     if (!isa<ProtocolDecl>(Nominal))
       Access = std::min(Access, Accessibility::Internal);

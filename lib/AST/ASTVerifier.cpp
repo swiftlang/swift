@@ -520,8 +520,8 @@ struct ASTNodeBase {};
       case DeclContextKind::AbstractFunctionDecl:
         return cast<AbstractFunctionDecl>(dc)->getGenericParams();
 
-      case DeclContextKind::NominalTypeDecl:
-        return cast<NominalTypeDecl>(dc)->getGenericParams();
+      case DeclContextKind::GenericTypeDecl:
+        return cast<GenericTypeDecl>(dc)->getGenericParams();
 
       case DeclContextKind::ExtensionDecl:
         return cast<ExtensionDecl>(dc)->getGenericParams();
@@ -1598,7 +1598,7 @@ struct ASTNodeBase {};
         return false;
 
       case DeclContextKind::Initializer:
-      case DeclContextKind::NominalTypeDecl:
+      case DeclContextKind::GenericTypeDecl:
       case DeclContextKind::ExtensionDecl:
       case DeclContextKind::SubscriptDecl:
         return hasEnclosingFunctionContext(dc->getParent());
