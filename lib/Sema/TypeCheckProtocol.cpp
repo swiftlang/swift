@@ -4190,8 +4190,11 @@ void DefaultWitnessChecker::recordWitness(ValueDecl *requirement,
                                           const RequirementMatch &match) {
   Proto->setDefaultWitness(requirement, match.getWitness(TC.Context));
 
-  // FIXME: Synthesize accessors (or really, just materializeForSet) if this
-  // is a computed property?
+  // Synthesize accessors for the protocol witness table to use.
+  if (auto storage = dyn_cast<AbstractStorageDecl>(match.Witness))
+    TC.synthesizeWitnessAccessorsForStorage(
+                                        cast<AbstractStorageDecl>(requirement),
+                                        storage);
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
