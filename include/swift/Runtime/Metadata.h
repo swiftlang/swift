@@ -2206,11 +2206,11 @@ struct TargetProtocolDescriptor {
   
   /// Unused by the Swift runtime.
   TargetPointer<Runtime, const void>
-  _ObjC_InstanceMethods,
-  _ObjC_ClassMethods,
-  _ObjC_OptionalInstanceMethods,
-  _ObjC_OptionalClassMethods,
-  _ObjC_InstanceProperties;
+    _ObjC_InstanceMethods,
+    _ObjC_ClassMethods,
+    _ObjC_OptionalInstanceMethods,
+    _ObjC_OptionalClassMethods,
+    _ObjC_InstanceProperties;
   
   /// Size of the descriptor record.
   uint32_t DescriptorSize;
