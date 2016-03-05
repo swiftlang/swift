@@ -119,10 +119,10 @@ public struct UTF8 : UnicodeCodecType {
           if let codeUnit = next.next() {
             if codeUnit & 0x80 == 0 {
               return .Result(UnicodeScalar(_unchecked: UInt32(codeUnit)))
-            } else { // Non-ASCII, switch to buffering mode.
-              _decodeBuffer = UInt32(codeUnit)
-              _bitsInBuffer = 8
             }
+            // Non-ASCII, proceed to buffering mode.
+            _decodeBuffer = UInt32(codeUnit)
+            _bitsInBuffer = 8
           } else {
             _didExhaustGenerator = true
             return .EmptyInput
