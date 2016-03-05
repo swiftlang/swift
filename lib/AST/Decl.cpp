@@ -4311,8 +4311,13 @@ SourceRange EnumElementDecl::getSourceRange() const {
 
 bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
-
   Type resultTy = ED->getDeclaredTypeInContext();
+
+  if (resultTy->is<ErrorType>()) {
+    setType(resultTy);
+    return false;
+  }
+
   Type argTy = MetatypeType::get(resultTy);
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
