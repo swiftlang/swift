@@ -51,22 +51,27 @@ def main_preset():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""Builds Swift using a preset.""")
-    parser.add_argument("--preset-file",
+    parser.add_argument(
+        "--preset-file",
         help="load presets from the specified file",
         metavar="PATH",
         action="append",
         dest="preset_file_names",
         default=[])
-    parser.add_argument("--preset",
+    parser.add_argument(
+        "--preset",
         help="use the specified option preset",
         metavar="NAME")
-    parser.add_argument("--show-presets",
+    parser.add_argument(
+        "--show-presets",
         help="list all presets and exit",
         action="store_true")
-    parser.add_argument("--distcc",
+    parser.add_argument(
+        "--distcc",
         help="use distcc",
         action="store_true")
-    parser.add_argument("preset_substitutions_raw",
+    parser.add_argument(
+        "preset_substitutions_raw",
         help="'name=value' pairs that are substituted in the preset",
         nargs="*",
         metavar="SUBSTITUTION")
@@ -305,46 +310,56 @@ details of the setups of other systems or automated environments.""")
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
-    projects_group.add_argument("-l", "--lldb",
+    projects_group.add_argument(
+        "-l", "--lldb",
         help="build LLDB",
         action="store_true",
         dest="build_lldb")
-    projects_group.add_argument("-b", "--llbuild",
+    projects_group.add_argument(
+        "-b", "--llbuild",
         help="build llbuild",
         action="store_true",
         dest="build_llbuild")
-    projects_group.add_argument("-p", "--swiftpm",
+    projects_group.add_argument(
+        "-p", "--swiftpm",
         help="build swiftpm",
         action="store_true",
         dest="build_swiftpm")
-    projects_group.add_argument("--xctest",
+    projects_group.add_argument(
+        "--xctest",
         help="build xctest",
         action="store_true",
         dest="build_xctest")
-    projects_group.add_argument("--foundation",
+    projects_group.add_argument(
+        "--foundation",
         help="build foundation",
         action="store_true",
         dest="build_foundation")
-    projects_group.add_argument("--libdispatch",
+    projects_group.add_argument(
+        "--libdispatch",
         help="build libdispatch",
         action="store_true",
         dest="build_libdispatch")
 
     extra_actions_group = parser.add_argument_group(
         title="Extra actions to perform before or in addition to building")
-    extra_actions_group.add_argument("-c", "--clean",
+    extra_actions_group.add_argument(
+        "-c", "--clean",
         help="do a clean build",
         action="store_true")
-    extra_actions_group.add_argument("--export-compile-commands",
+    extra_actions_group.add_argument(
+        "--export-compile-commands",
         help="generate compilation databases in addition to building",
         action="store_true")
-    extra_actions_group.add_argument("--symbols-package",
+    extra_actions_group.add_argument(
+        "--symbols-package",
         metavar="PATH",
         help="if provided, an archive of the symbols directory will be "
-             "generated at this path")
+        "generated at this path")
 
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
-    build_variant_group.add_argument("-d", "--debug",
+    build_variant_group.add_argument(
+        "-d", "--debug",
         help="""
 build the Debug variant of everything (LLVM, Clang, Swift host tools, target
 Swift standard libraries, LLDB (if enabled)
@@ -352,13 +367,15 @@ Swift standard libraries, LLDB (if enabled)
         action="store_const",
         const="Debug",
         dest="build_variant")
-    build_variant_group.add_argument("-r", "--release-debuginfo",
+    build_variant_group.add_argument(
+        "-r", "--release-debuginfo",
         help="""
 build the RelWithDebInfo variant of everything (default is Debug)""",
         action="store_const",
         const="RelWithDebInfo",
         dest="build_variant")
-    build_variant_group.add_argument("-R", "--release",
+    build_variant_group.add_argument(
+        "-R", "--release",
         help="build the Release variant of everything (default is Debug)",
         action="store_const",
         const="Release",
@@ -366,50 +383,59 @@ build the RelWithDebInfo variant of everything (default is Debug)""",
 
     build_variant_override_group = parser.add_argument_group(
         title="Override build variant for a specific project")
-    build_variant_override_group.add_argument("--debug-llvm",
+    build_variant_override_group.add_argument(
+        "--debug-llvm",
         help="build the Debug variant of LLVM",
         action="store_const",
         const="Debug",
         dest="llvm_build_variant")
-    build_variant_override_group.add_argument("--debug-swift",
+    build_variant_override_group.add_argument(
+        "--debug-swift",
         help="build the Debug variant of Swift host tools",
         action="store_const",
         const="Debug",
         dest="swift_build_variant")
-    build_variant_override_group.add_argument("--debug-swift-stdlib",
+    build_variant_override_group.add_argument(
+        "--debug-swift-stdlib",
         help="""
 build the Debug variant of the Swift standard library and SDK overlay""",
         action="store_const",
         const="Debug",
         dest="swift_stdlib_build_variant")
-    build_variant_override_group.add_argument("--debug-lldb",
+    build_variant_override_group.add_argument(
+        "--debug-lldb",
         help="build the Debug variant of LLDB",
         action="store_const",
         const="Debug",
         dest="lldb_build_variant")
-    build_variant_override_group.add_argument("--debug-cmark",
+    build_variant_override_group.add_argument(
+        "--debug-cmark",
         help="build the Debug variant of CommonMark",
         action="store_const",
         const="Debug",
         dest="cmark_build_variant")
-    build_variant_override_group.add_argument("--debug-foundation",
+    build_variant_override_group.add_argument(
+        "--debug-foundation",
         help="build the Debug variant of Foundation",
         action="store_const",
         const="Debug",
         dest="foundation_build_variant")
-    build_variant_override_group.add_argument("--debug-libdispatch",
+    build_variant_override_group.add_argument(
+        "--debug-libdispatch",
         help="build the Debug variant of libdispatch",
         action="store_const",
         const="Debug",
         dest="libdispatch_build_variant")
 
     assertions_group = parser.add_mutually_exclusive_group(required=False)
-    assertions_group.add_argument("--assertions",
+    assertions_group.add_argument(
+        "--assertions",
         help="enable assertions in all projects",
         action="store_const",
         const=True,
         dest="assertions")
-    assertions_group.add_argument("--no-assertions",
+    assertions_group.add_argument(
+        "--no-assertions",
         help="disable assertions in all projects",
         action="store_const",
         const=False,
@@ -417,47 +443,56 @@ build the Debug variant of the Swift standard library and SDK overlay""",
 
     assertions_override_group = parser.add_argument_group(
         title="Control assertions in a specific project")
-    assertions_override_group.add_argument("--cmark-assertions",
+    assertions_override_group.add_argument(
+        "--cmark-assertions",
         help="enable assertions in CommonMark",
         action="store_const",
         const=True,
         dest="cmark_assertions")
-    assertions_override_group.add_argument("--llvm-assertions",
+    assertions_override_group.add_argument(
+        "--llvm-assertions",
         help="enable assertions in LLVM",
         action="store_const",
         const=True,
         dest="llvm_assertions")
-    assertions_override_group.add_argument("--no-llvm-assertions",
+    assertions_override_group.add_argument(
+        "--no-llvm-assertions",
         help="disable assertions in LLVM",
         action="store_const",
         const=False,
         dest="llvm_assertions")
-    assertions_override_group.add_argument("--swift-assertions",
+    assertions_override_group.add_argument(
+        "--swift-assertions",
         help="enable assertions in Swift",
         action="store_const",
         const=True,
         dest="swift_assertions")
-    assertions_override_group.add_argument("--no-swift-assertions",
+    assertions_override_group.add_argument(
+        "--no-swift-assertions",
         help="disable assertions in Swift",
         action="store_const",
         const=False,
         dest="swift_assertions")
-    assertions_override_group.add_argument("--swift-stdlib-assertions",
+    assertions_override_group.add_argument(
+        "--swift-stdlib-assertions",
         help="enable assertions in the Swift standard library",
         action="store_const",
         const=True,
         dest="swift_stdlib_assertions")
-    assertions_override_group.add_argument("--no-swift-stdlib-assertions",
+    assertions_override_group.add_argument(
+        "--no-swift-stdlib-assertions",
         help="disable assertions in the Swift standard library",
         action="store_const",
         const=False,
         dest="swift_stdlib_assertions")
-    assertions_override_group.add_argument("--lldb-assertions",
+    assertions_override_group.add_argument(
+        "--lldb-assertions",
         help="enable assertions in LLDB",
         action="store_const",
         const=True,
         dest="lldb_assertions")
-    assertions_override_group.add_argument("--no-lldb-assertions",
+    assertions_override_group.add_argument(
+        "--no-lldb-assertions",
         help="disable assertions in LLDB",
         action="store_const",
         const=False,
@@ -465,22 +500,26 @@ build the Debug variant of the Swift standard library and SDK overlay""",
 
     cmake_generator_group = parser.add_argument_group(
         title="Select the CMake generator")
-    cmake_generator_group.add_argument("-x", "--xcode",
+    cmake_generator_group.add_argument(
+        "-x", "--xcode",
         help="use CMake's Xcode generator (default is Ninja)",
         action="store_const",
         const="Xcode",
         dest="cmake_generator")
-    cmake_generator_group.add_argument("-X", "--xcode-ide-only",
+    cmake_generator_group.add_argument(
+        "-X", "--xcode-ide-only",
         help="use CMake's Xcode generator, with only IDE support (no build)",
         action="store_const",
         const="XcodeIDEOnly",
         dest="cmake_generator")
-    cmake_generator_group.add_argument("-m", "--make",
+    cmake_generator_group.add_argument(
+        "-m", "--make",
         help="use CMake's Makefile generator (default is Ninja)",
         action="store_const",
         const="Unix Makefiles",
         dest="cmake_generator")
-    cmake_generator_group.add_argument("-e", "--eclipse",
+    cmake_generator_group.add_argument(
+        "-e", "--eclipse",
         help="use CMake's Eclipse generator (default is Ninja)",
         action="store_const",
         const="Eclipse CDT4 - Ninja",
@@ -488,147 +527,182 @@ build the Debug variant of the Swift standard library and SDK overlay""",
 
     run_tests_group = parser.add_argument_group(
         title="Run tests")
-    run_tests_group.add_argument("-t", "--test",
+    run_tests_group.add_argument(
+        "-t", "--test",
         help="test Swift after building",
         action="store_true")
-    run_tests_group.add_argument("-T", "--validation-test",
+    run_tests_group.add_argument(
+        "-T", "--validation-test",
         help="run the validation test suite (implies --test)",
         action="store_true")
-    run_tests_group.add_argument("--host-test",
+    run_tests_group.add_argument(
+        "--host-test",
         help="run executable tests on host devices (such as iOS or tvOS)",
         action="store_true")
-    run_tests_group.add_argument("-B", "--benchmark",
+    run_tests_group.add_argument(
+        "-B", "--benchmark",
         help="run the Swift Benchmark Suite after building",
         action="store_true")
-    run_tests_group.add_argument("--skip-test-linux",
+    run_tests_group.add_argument(
+        "--skip-test-linux",
         help="skip testing Swift stdlibs for Linux",
         action="store_true")
-    run_tests_group.add_argument("--skip-test-freebsd",
+    run_tests_group.add_argument(
+        "--skip-test-freebsd",
         help="skip testing Swift stdlibs for FreeBSD",
         action="store_true")
-    run_tests_group.add_argument("--skip-test-cygwin",
+    run_tests_group.add_argument(
+        "--skip-test-cygwin",
         help="skip testing Swift stdlibs for Cygwin",
         action="store_true")
 
-    parser.add_argument("-o", "--test-optimized",
+    parser.add_argument(
+        "-o", "--test-optimized",
         help="run the test suite in optimized mode too (implies --test)",
         action="store_true")
 
     run_build_group = parser.add_argument_group(
         title="Run build")
-    run_build_group.add_argument("-S", "--skip-build",
+    run_build_group.add_argument(
+        "-S", "--skip-build",
         help="generate build directory only without building",
         action="store_true")
-    run_build_group.add_argument("--skip-build-linux",
+    run_build_group.add_argument(
+        "--skip-build-linux",
         help="skip building Swift stdlibs for Linux",
         action="store_true")
-    run_build_group.add_argument("--skip-build-freebsd",
+    run_build_group.add_argument(
+        "--skip-build-freebsd",
         help="skip building Swift stdlibs for FreeBSD",
         action="store_true")
-    run_build_group.add_argument("--skip-build-cygwin",
+    run_build_group.add_argument(
+        "--skip-build-cygwin",
         help="skip building Swift stdlibs for Cygwin",
         action="store_true")
 
-    run_build_group.add_argument("--skip-build-benchmarks",
+    run_build_group.add_argument(
+        "--skip-build-benchmarks",
         help="skip building Swift Benchmark Suite",
         action="store_true")
 
     skip_test_group = parser.add_argument_group(
         title="Skip testing specified targets")
-    skip_test_group.add_argument("--skip-test-ios",
+    skip_test_group.add_argument(
+        "--skip-test-ios",
         help="skip testing all iOS targets. Equivalent to specifying both "
-             "--skip-test-ios-simulator and --skip-test-ios-host",
+        "--skip-test-ios-simulator and --skip-test-ios-host",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-ios-simulator",
+    skip_test_group.add_argument(
+        "--skip-test-ios-simulator",
         help="skip testing iOS simulator targets",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-ios-host",
+    skip_test_group.add_argument(
+        "--skip-test-ios-host",
         help="skip testing iOS device targets on the host machine (the phone "
-              "itself)",
+        "itself)",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-tvos",
+    skip_test_group.add_argument(
+        "--skip-test-tvos",
         help="skip testing all tvOS targets. Equivalent to specifying both "
-             "--skip-test-tvos-simulator and --skip-test-tvos-host",
+        "--skip-test-tvos-simulator and --skip-test-tvos-host",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-tvos-simulator",
+    skip_test_group.add_argument(
+        "--skip-test-tvos-simulator",
         help="skip testing tvOS simulator targets",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-tvos-host",
+    skip_test_group.add_argument(
+        "--skip-test-tvos-host",
         help="skip testing tvOS device targets on the host machine (the TV "
-             "itself)",
+        "itself)",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-watchos",
+    skip_test_group.add_argument(
+        "--skip-test-watchos",
         help="skip testing all tvOS targets. Equivalent to specifying both "
-             "--skip-test-watchos-simulator and --skip-test-watchos-host",
+        "--skip-test-watchos-simulator and --skip-test-watchos-host",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-watchos-simulator",
+    skip_test_group.add_argument(
+        "--skip-test-watchos-simulator",
         help="skip testing watchOS simulator targets",
         action="store_true")
-    skip_test_group.add_argument("--skip-test-watchos-host",
+    skip_test_group.add_argument(
+        "--skip-test-watchos-host",
         help="skip testing watchOS device targets on the host machine (the "
-             "watch itself)",
+        "watch itself)",
         action="store_true")
 
-    parser.add_argument("-i", "--ios",
+    parser.add_argument(
+        "-i", "--ios",
         help="""
 also build for iOS, but disallow tests that require an iOS device""",
         action="store_true")
 
-    parser.add_argument("--tvos",
+    parser.add_argument(
+        "--tvos",
         help="""
 also build for tvOS, but disallow tests that require a tvos device""",
         action="store_true")
 
-    parser.add_argument("--watchos",
+    parser.add_argument(
+        "--watchos",
         help="""
-also build for Apple watchos, but disallow tests that require an watchOS device""",
+also build for Apple watchOS, but disallow tests that require an watchOS device""",
         action="store_true")
 
-    parser.add_argument("--swift-analyze-code-coverage",
+    parser.add_argument(
+        "--swift-analyze-code-coverage",
         help="""enable code coverage analysis in Swift (false, not-merged,
         merged).""",
         choices=["false", "not-merged", "merged"],
         default="false",  # so CMake can see the inert mode as a false value
         dest="swift_analyze_code_coverage")
 
-    parser.add_argument("--build-subdir",
+    parser.add_argument(
+        "--build-subdir",
         help="""
 name of the directory under $SWIFT_BUILD_ROOT where the build products will be
 placed""",
         metavar="PATH")
-    parser.add_argument("--install-prefix",
+    parser.add_argument(
+        "--install-prefix",
         help="The installation prefix. This is where built Swift products "
-             "(like bin, lib, and include) will be installed.",
+        "(like bin, lib, and include) will be installed.",
         metavar="PATH",
         default=swift_build_support.targets.install_prefix())
-    parser.add_argument("--install-symroot",
+    parser.add_argument(
+        "--install-symroot",
         help="the path to install debug symbols into",
         metavar="PATH")
 
-    parser.add_argument("-j", "--jobs",
+    parser.add_argument(
+        "-j", "--jobs",
         help="""
 the number of parallel build jobs to use""",
         type=int,
         dest="build_jobs",
         default=multiprocessing.cpu_count())
 
-    parser.add_argument("--darwin-xcrun-toolchain",
-                        help="the name of the toolchain to use on Darwin",
-                        default="default")
-    parser.add_argument("--cmake",
-                        help="the path to a CMake executable that will be "
-                             "used to build Swift")
-    parser.add_argument("--show-sdks",
-                        help="print installed Xcode and SDK versions",
-                        action="store_true")
+    parser.add_argument(
+        "--darwin-xcrun-toolchain",
+        help="the name of the toolchain to use on Darwin",
+        default="default")
+    parser.add_argument(
+        "--cmake",
+        help="the path to a CMake executable that will be "
+        "used to build Swift")
+    parser.add_argument(
+        "--show-sdks",
+        help="print installed Xcode and SDK versions",
+        action="store_true")
 
-    parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
+    parser.add_argument(
+        "--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
     be called multiple times to add multiple such module_regexp flag pairs. All semicolons
     in flags must be escaped with a '\'"""),
-                        action="append", dest="extra_swift_args", default=[])
+        action="append", dest="extra_swift_args", default=[])
 
-    parser.add_argument("build_script_impl_args",
+    parser.add_argument(
+        "build_script_impl_args",
         help="",
         nargs="*")
 
@@ -658,12 +732,14 @@ the number of parallel build jobs to use""",
 
     if args.symbols_package:
         if not os.path.isabs(args.symbols_package):
-            print('--symbols-package must be an absolute path '
-                  '(was \'{}\')'.format(args.symbols_package))
+            print(
+                '--symbols-package must be an absolute path '
+                '(was \'{}\')'.format(args.symbols_package))
             return 1
         if not args.install_symroot:
-            print_with_argv0("--install-symroot is required when specifying "
-                             "--symbols-package.")
+            print_with_argv0(
+                "--install-symroot is required when specifying "
+                "--symbols-package.")
             return 1
 
     # Build cmark if any cmark-related options were specified.
@@ -885,7 +961,8 @@ the number of parallel build jobs to use""",
     if platform.system() == 'Darwin':
         build_script_impl_inferred_args += [
             "--toolchain-prefix",
-            swift_build_support.targets.darwin_toolchain_prefix(args.install_prefix),
+            swift_build_support.targets.darwin_toolchain_prefix(
+                args.install_prefix),
         ]
 
     if args.build_subdir is None:
@@ -913,7 +990,8 @@ the number of parallel build jobs to use""",
         if (llvm_build_dir_label == swift_build_dir_label and
                 llvm_build_dir_label == swift_stdlib_build_dir_label and
                 llvm_build_dir_label == cmark_build_dir_label):
-            # Use a simple directory name if all projects use the same build type.
+            # Use a simple directory name if all projects use the same build
+            # type.
             args.build_subdir += "-" + llvm_build_dir_label
         elif (llvm_build_dir_label != swift_build_dir_label and
                 llvm_build_dir_label == swift_stdlib_build_dir_label and
@@ -976,8 +1054,10 @@ the number of parallel build jobs to use""",
         "--lldb-build-type", args.lldb_build_variant,
         "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
         "--swift-enable-assertions", str(args.swift_assertions).lower(),
-        "--swift-stdlib-enable-assertions", str(args.swift_stdlib_assertions).lower(),
-        "--swift-analyze-code-coverage", str(args.swift_analyze_code_coverage).lower(),
+        "--swift-stdlib-enable-assertions", str(
+            args.swift_stdlib_assertions).lower(),
+        "--swift-analyze-code-coverage", str(
+            args.swift_analyze_code_coverage).lower(),
         "--cmake-generator", args.cmake_generator,
         "--build-jobs", str(args.build_jobs),
         "--workspace", SWIFT_SOURCE_ROOT
@@ -1022,7 +1102,9 @@ the number of parallel build jobs to use""",
     # If we have extra_swift_args, combine all of them together and then add
     # them as one command.
     if args.extra_swift_args:
-        build_script_impl_args += ["--extra-swift-args", ";".join(args.extra_swift_args)]
+        build_script_impl_args += [
+            "--extra-swift-args",
+            ";".join(args.extra_swift_args)]
 
     build_script_impl_args += args.build_script_impl_args
 
@@ -1062,12 +1144,14 @@ the number of parallel build jobs to use""",
 
 def main():
     if not SWIFT_SOURCE_ROOT:
-        print_with_argv0("Could not infer source root directory.  " +
+        print_with_argv0(
+            "Could not infer source root directory.  " +
             "Forgot to set $SWIFT_SOURCE_ROOT environment variable?")
         return 1
 
     if not os.path.isdir(SWIFT_SOURCE_ROOT):
-        print_with_argv0("Source root directory \'" + SWIFT_SOURCE_ROOT +
+        print_with_argv0(
+            "Source root directory \'" + SWIFT_SOURCE_ROOT +
             "\' does not exist.  " +
             "Forgot to set $SWIFT_SOURCE_ROOT environment variable?")
         return 1

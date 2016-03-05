@@ -277,6 +277,7 @@ sys.path.pop(0)
 # Monkeypatch pygments.lexers.get_lexer_by_name to return our lexers
 from pygments.lexers import get_lexer_by_name as original_get_lexer_by_name
 
+
 def swift_get_lexer_by_name(_alias, *args, **kw):
     if _alias == 'swift':
         return swift_pygments_lexers.SwiftLexer()

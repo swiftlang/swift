@@ -23,6 +23,7 @@ import subprocess
 
 line_pattern = re.compile(r'^// ###setline ([0-9]+) "([^"]+)"\s*')
 
+
 def _make_line_map(filename, stream=None):
     """
     >>> from StringIO import StringIO
@@ -47,6 +48,7 @@ def _make_line_map(filename, stream=None):
 
 _line_maps = {}
 
+
 def fline_map(filename):
     map = _line_maps.get(filename)
     if map is None:
@@ -54,12 +56,14 @@ def fline_map(filename):
         _line_maps[filename] = map
     return map
 
+
 def map_line(filename, line_num):
     assert(line_num > 0)
     map = fline_map(filename)
     index = bisect.bisect_left(map, (line_num, '', 0))
     base = map[index - 1]
     return base[1], base[2] + (line_num - base[0] - 1)
+
 
 def run():
     if len(sys.argv) <= 1:

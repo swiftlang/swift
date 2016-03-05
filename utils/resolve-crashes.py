@@ -8,12 +8,14 @@ import re
 import sys
 import os
 
+
 def execute_cmd(cmd):
     print(cmd)
     os.system(cmd)
 
 # The regular expression we use to match compiler-crasher lines.
-regex = re.compile('.*Swift :: (compiler_crashers|compiler_crashers_2|IDE/crashers)/(.*\.swift).*')
+regex = re.compile(
+    '.*Swift :: (compiler_crashers|compiler_crashers_2|IDE/crashers)/(.*\.swift).*')
 
 # Take the output of lit as standard input.
 for line in sys.stdin:
@@ -29,11 +31,13 @@ for line in sys.stdin:
         execute_cmd(git_mv_cmd)
 
         # Replace "not --crash" with "not", and remove XFAIL lines.
-        sed_replace_not_cmd = 'sed -e "s/not --crash/not/" -i "" %s' % (to_filename)
+        sed_replace_not_cmd = 'sed -e "s/not --crash/not/" -i "" %s' % (
+            to_filename)
         execute_cmd(sed_replace_not_cmd)
 
         # Remove "// XFAIL: whatever" lines.
-        sed_remove_xfail_cmd = 'sed -e "s/^\\/\\/.*XFAIL.*$//g" -i "" %s' % (to_filename)
+        sed_remove_xfail_cmd = 'sed -e "s/^\\/\\/.*XFAIL.*$//g" -i "" %s' % (
+            to_filename)
         execute_cmd(sed_remove_xfail_cmd)
 
         # "git add" the result.

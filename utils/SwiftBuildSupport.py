@@ -87,7 +87,8 @@ def check_call(args, print_command=False, verbose=False):
         sys.stdout.flush()
         sys.exit(1)
     except OSError as e:
-        print_with_argv0("could not execute '" + quote_shell_command(args) +
+        print_with_argv0(
+            "could not execute '" + quote_shell_command(args) +
             "': " + e.strerror)
         sys.stdout.flush()
         sys.exit(1)
@@ -108,7 +109,8 @@ def check_output(args, print_command=False, verbose=False):
         sys.stdout.flush()
         sys.exit(1)
     except OSError as e:
-        print_with_argv0("could not execute '" + quote_shell_command(args) +
+        print_with_argv0(
+            "could not execute '" + quote_shell_command(args) +
             "': " + e.strerror)
         sys.stdout.flush()
         sys.exit(1)
@@ -124,6 +126,7 @@ def _load_preset_files_impl(preset_file_names, substitutions={}):
 
 
 _PRESET_PREFIX = "preset: "
+
 
 def _get_preset_options_impl(config, substitutions, preset_name):
     section_name = _PRESET_PREFIX + preset_name
@@ -204,6 +207,7 @@ def get_all_preset_names(preset_file_names):
 #     with WorkingDirectory('/tmp'):
 #         ... do work in /tmp...
 class WorkingDirectory(object):
+
     def __init__(self, new_cwd):
         self.new_cwd = new_cwd
 

@@ -14,6 +14,7 @@ import sys
 import re
 import getopt
 
+
 def usage():
     sys.stderr.write(__doc__.strip() + "\n")
     sys.exit(1)

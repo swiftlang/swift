@@ -33,8 +33,9 @@ import sys
 import tempfile
 import subprocess
 
+
 def help():
-  print("""\
+    print("""\
 Usage:
 
 viewcfg [output-suffix] < file
@@ -42,6 +43,7 @@ viewcfg [output-suffix] < file
 By default all CFGs are opened in the same window.
 Use the a unique output-suffix to open a CFG in a new window.
 """)
+
 
 class Block:
 
@@ -80,6 +82,7 @@ class Block:
                     self.succs.append(match.group(1))
 
         return self.succs
+
 
 def main():
     suffix = ""
@@ -150,16 +153,19 @@ def main():
         out_file.write('digraph "CFG" {\n')
         for name, block in blocks.iteritems():
             if block.content is not None:
-                out_file.write("\tNode" + str(block.index) +
+                out_file.write(
+                    "\tNode" + str(block.index) +
                     " [shape=record,label=\"{" + block.content + "}\"];\n")
             else:
-                out_file.write("\tNode" + str(block.index) +
+                out_file.write(
+                    "\tNode" + str(block.index) +
                     " [shape=record,color=gray,fontcolor=gray,label=\"{" +
                     block.name + "}\"];\n")
 
             for succ_name in block.get_succs():
                 succ_block = blocks[succ_name]
-                out_file.write("\tNode" + str(block.index) + " -> Node" +
+                out_file.write(
+                    "\tNode" + str(block.index) + " -> Node" +
                     str(succ_block.index) + ";\n")
 
         out_file.write("}\n")
