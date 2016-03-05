@@ -541,7 +541,7 @@ public:
     getScopeInfo().addToScope(D, *this);
   }
 
-  ValueDecl *lookupInScope(Identifier Name) {
+  ValueDecl *lookupInScope(DeclName Name) {
     return getScopeInfo().lookupValueName(Name);
   }
 

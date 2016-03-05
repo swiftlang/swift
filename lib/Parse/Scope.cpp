@@ -112,7 +112,7 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
 
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  ScopedHTTy::iterator EntryI = HT.begin(CurScope->HTScope, D->getName());
+  ScopedHTTy::iterator EntryI = HT.begin(CurScope->HTScope, D->getFullName());
 
   // A redefinition is a hit in the scoped table at the same depth.
   if (EntryI != HT.end() && EntryI->first == CurScope->getDepth()) {
@@ -135,6 +135,6 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
   }
 
   HT.insertIntoScope(CurScope->HTScope,
-                     D->getName(),
+                     D->getFullName(),
                      std::make_pair(CurScope->getDepth(), D));
 }

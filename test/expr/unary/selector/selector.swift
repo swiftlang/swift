@@ -18,6 +18,14 @@ class C1 {
   @objc var a: A = A() // expected-note{{'a' declared here}}
 
   @objc func getC1() -> AnyObject { return self }
+
+  @objc func testUnqualifiedSelector(a: A, b: B) {
+    _ = #selector(testUnqualifiedSelector(_:b:))
+    let testUnqualifiedSelector = 1
+    _ = #selector(testUnqualifiedSelector(_:b:))
+    _ = testUnqualifiedSelector // suppress unused warning
+  }
+
 }
 
 @objc protocol P1 {

@@ -1587,7 +1587,7 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = lookupInScope(name.getBaseName());
+  ValueDecl *D = lookupInScope(name);
   // FIXME: We want this to work: "var x = { x() }", but for now it's better
   // to disallow it than to crash.
   if (D) {
