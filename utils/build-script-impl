@@ -2109,7 +2109,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 fi
                 echo "--- Running tests for ${product} ---"
                 set -x
-                "${swiftpm_bootstrap_command[@]}" --build-tests test
+                "${swiftpm_bootstrap_command[@]}" test
                 { set +x; } 2>/dev/null
                 # As swiftpm tests itself, we break early here.
                 continue
