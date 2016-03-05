@@ -22,8 +22,14 @@ public protocol BidirectionalCollection : Collection {
   /// - Precondition: `i` has a well-defined predecessor.
   @warn_unused_result
   func previous(i: Index) -> Index
-  
-  func _previousInPlace(inout i: Index)
+
+  func _previousInPlace(i: inout Index)
+
+  // FIXME(compiler limitation):
+  // associatedtype SubSequence : BidirectionalCollection
+
+  // FIXME(compiler limitation):
+  // associatedtype Indices : BidirectionalCollection
 }
 
 /// Default implementation for bidirectional collections.
@@ -32,30 +38,34 @@ extension BidirectionalCollection {
   public func previous(i: Index) -> Index {
     fatalError("FIXME: swift-3-indexing-model")
   }
-  
+
   @inline(__always)
-  public func _previousInPlace(inout i: Index) {
+  public func _previousInPlace(i: inout Index) {
     i = previous(i)
   }
-  
+
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
     var i = i
+    // FIXME: swift-3-indexing-model: There's a corner case here, -IntXX.min is
+    // not representable.
     for _ in 0..<(-n) {
       _previousInPlace(&i)
     }
     return i
   }
-  
+
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limit: limit)
     }
     var i = i
+    // FIXME: swift-3-indexing-model: There's a corner case here, -IntXX.min is
+    // not representable.
     for _ in 0..<(-n) {
       if (limit == i) {
         break;
@@ -64,7 +74,7 @@ extension BidirectionalCollection {
     }
     return i
   }
-  
+
 // TODO: swift-3-indexing-model - once Index is Comparable something like following is possible, right?
   //  @warn_unused_result
   //  public func distance(from start: Index, to end: Index) -> IndexDistance {
@@ -100,7 +110,7 @@ extension BidirectionalCollection where SubSequence == Self {
     self = self[startIndex..<previous(endIndex)]
     return element
   }
-  
+
   /// Remove an element from the end.
   ///
   /// - Complexity: O(1)
@@ -110,7 +120,7 @@ extension BidirectionalCollection where SubSequence == Self {
     self = self[startIndex..<previous(endIndex)]
     return element
   }
-  
+
   /// Remove the last `n` elements.
   ///
   /// - Complexity:
@@ -138,7 +148,7 @@ extension BidirectionalCollection {
     let end = advance(endIndex, by: numericCast(-n), limit: startIndex)
     return self[startIndex..<end]
   }
-  
+
   /// Returns a slice, up to `maxLength` in length, containing the
   /// final elements of `self`.
   ///

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-public func ==(
+public func == (
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
 ) -> Bool {
@@ -19,7 +19,7 @@ public func ==(
 }
 
 @warn_unused_result
-public func <(
+public func < (
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
 ) -> Bool {
@@ -29,7 +29,11 @@ public func <(
 extension String {
   /// A collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value) that
   /// encodes a `String` value.
-  public struct UnicodeScalarView : Collection, CustomStringConvertible, CustomDebugStringConvertible {
+  public struct UnicodeScalarView :
+    BidirectionalCollection,
+    CustomStringConvertible,
+    CustomDebugStringConvertible
+  {
     internal init(_ _core: _StringCore) {
       self._core = _core
     }
@@ -51,7 +55,7 @@ extension String {
     }
 
     /// A position in a `String.UnicodeScalarView`.
-    public struct Index : BidirectionalIndex, Comparable {
+    public struct Index : Comparable {
       public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
         self._core = _core

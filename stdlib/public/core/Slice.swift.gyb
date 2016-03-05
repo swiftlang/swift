@@ -59,6 +59,19 @@ public struct Slice<Base : Indexable> : Collection {
     return Slice(_base: _base, bounds: bounds)
   }
 
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    fatalError("implement")
+  }
+
+  public func _nextInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    fatalError("implement")
+  }
+
+  // FIXME: swift-3-indexing-model: forward advance() and distance().
+
   /// Create a view into collection `base` that allows access within `bounds`.
   ///
   /// - Complexity: O(1).
@@ -115,6 +128,19 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
+
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    fatalError("implement")
+  }
+
+  public func _nextInPlace(i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    fatalError("implement")
+  }
+
+  // FIXME: swift-3-indexing-model: forward advance() and distance().
 
   public // @testable
   init(_base: Base, bounds: Range<Index>) {

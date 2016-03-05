@@ -286,22 +286,26 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public
-  var startIndex: Int
+  public var startIndex: Int
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
-  public
-  var endIndex: Int {
+  public var endIndex: Int {
     get {
       return Int(endIndexAndFlags >> 1)
     }
     set {
       endIndexAndFlags = (UInt(newValue) << 1) | (_hasNativeBuffer ? 1 : 0)
     }
+  }
+
+  public typealias Indices = RangeOfStrideable<Int>
+
+  public var indices: RangeOfStrideable<Int> {
+    return startIndex..<endIndex
   }
 
   //===--- misc -----------------------------------------------------------===//

@@ -112,19 +112,31 @@ extension LazySequenceProtocol
   }
 }
 
+%{
+def collectionForTraversal(traversal):
+    if traversal == 'Forward':
+        return 'Collection'
+    if traversal == 'Bidirectional':
+        return 'BidirectionalCollection'
+    if traversal == 'RandomAccess':
+        return 'RandomAccessCollection'
+    assert False, "unknown traversal"
+}%
+
 % for traversal in ('Forward', 'Bidirectional'):
 %   t = '' if traversal == 'Forward' else traversal
 %   Collection = 'Flatten%sCollection' % t
-%   constraints = '%(Base)sIterator.Element : Collection'
+%   if traversal == 'Forward':
+%     constraints = '%(Base)sIterator.Element : Collection'
 %   if traversal == 'Bidirectional':
-%     constraints += ''',
-%   %(Base)sIndex : BidirectionalIndex, 
-%   %(Base)sIterator.Element.Index : BidirectionalIndex'''
+%     constraints = '%(Base)sIterator.Element : BidirectionalCollection'
 %   Index = Collection + 'Index'
 /// A position in a `${Collection}`.
 public struct ${Index}<
-  BaseElements: Collection where ${constraints % {'Base': 'BaseElements.'}}
-> : ${traversal}Index {
+  BaseElements : ${collectionForTraversal(traversal)}
+  where
+  ${constraints % {'Base': 'BaseElements.'}}
+> {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Precondition: The next value is representable.
@@ -240,8 +252,10 @@ public func == <BaseElements> (
 ///
 /// - See also: `FlattenSequence`
 public struct ${Collection}<
-  Base: Collection where ${constraints % {'Base': 'Base.'}}
-> : Collection {
+  Base : ${collectionForTraversal(traversal)}
+  where
+  ${constraints % {'Base': 'Base.'}}
+> : ${collectionForTraversal(traversal)} {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

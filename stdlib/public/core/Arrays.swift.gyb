@@ -170,7 +170,13 @@ if True:
 
 ${SelfDocComment}
 public struct ${Self}<Element>
-  : Collection, MutableCollection, _DestructorSafeContainer {
+  : RandomAccessCollection,
+  MutableCollection,
+  _DestructorSafeContainer
+{
+
+  public typealias Index = Int
+  public typealias Iterator = IndexingIterator<${Self}>
 
 %if Self == 'ArraySlice':
   /// The position of the first element in a non-empty collection.
@@ -195,6 +201,12 @@ public struct ${Self}<Element>
 %else:
     return _getCount()
 %end
+  }
+
+  public typealias Indices = RangeOfStrideable<Int>
+
+  public var indices: RangeOfStrideable<Int> {
+    return startIndex..<endIndex
   }
 
 #if _runtime(_ObjC)
@@ -330,7 +342,7 @@ public struct ${Self}<Element>
     let newBuffer = _ContiguousArrayBuffer<Element>(
       uninitializedCount: buffer.count, minimumCapacity: buffer.count)
     buffer._copyContents(
-      subRange: buffer.indices,
+      subRange: Range(buffer.indices),
       initializing: newBuffer.firstElementAddress)
     buffer = _Buffer(newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
@@ -631,7 +643,7 @@ extension ${Self} : _ArrayProtocol {
         uninitializedCount: count, minimumCapacity: minimumCapacity)
 
       _buffer._copyContents(
-        subRange: _buffer.indices,
+        subRange: Range(_buffer.indices),
         initializing: newBuffer.firstElementAddress)
       _buffer = _Buffer(newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
@@ -759,7 +771,7 @@ extension ${Self} : _ArrayProtocol {
       _buffer = _Buffer()
     }
     else {
-      self.replaceSubrange(self.indices, with: EmptyCollection())
+      self.replaceSubrange(Range(self.indices), with: EmptyCollection())
     }
   }
 
@@ -907,7 +919,7 @@ internal struct _InitializeMemoryFromCollection<
     var q = newValues.startIndex
     for _ in 0..<count {
       p.initialize(with: newValues[q])
-      q = q.successor()
+      newValues._nextInPlace(&q)
       p += 1
     }
     _expectEnd(q, newValues)

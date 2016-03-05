@@ -13,7 +13,9 @@
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View
-    : Collection, CustomStringConvertible, CustomDebugStringConvertible {
+    : BidirectionalCollection,
+    CustomStringConvertible,
+    CustomDebugStringConvertible {
 
     /// A position in a string's collection of UTF-16 code units.
     public struct Index {
@@ -172,17 +174,19 @@ extension String {
 
 // Conformance to RandomAccessIndex intentionally only appears
 // when Foundation is loaded
-extension String.UTF16View.Index : BidirectionalIndex {
+extension String.UTF16View.Index {
   public typealias Distance = Int
 
   @warn_unused_result
   public func successor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: _offset.successor())
+    return String.UTF16View.Index(
+      _offset: _unsafePlus(_offset, 1))
   }
 
   @warn_unused_result
   public func predecessor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: _offset.predecessor())
+    return String.UTF16View.Index(
+      _offset: _unsafeMinus(_offset, 1))
   }
 }
 

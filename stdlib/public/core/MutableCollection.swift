@@ -17,21 +17,21 @@ public protocol MutableIndexable {
   // library; it is used to deduce things like the `SubSequence` and
   // `Iterator` type from a minimal collection, but it is also used in
   // exposed places like as a constraint on `IndexingIterator`.
-  
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   // TODO: swift-3-indexing-model - Index only needs to be comparable or must be comparable..?
-  associatedtype Index : ForwardIndex //Comparable
-  
+  associatedtype Index : Comparable
+
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(1)
   var startIndex: Index { get }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -40,7 +40,7 @@ public protocol MutableIndexable {
   ///
   /// - Complexity: O(1)
   var endIndex: Index { get }
-  
+
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
   // need something other than a Collection.Iterator.Element that can
@@ -50,12 +50,12 @@ public protocol MutableIndexable {
   // as Collection.Iterator.Element (see below), but we have no way of
   // expressing it today.
   associatedtype _Element
-  
+
   /// Returns the element at the given `position`.
   ///
   /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get set }
-  
+
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///
@@ -73,7 +73,7 @@ public protocol MutableIndexable {
   ///
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(index: Index, bounds: Range<Index>)
-  
+
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///
@@ -102,15 +102,15 @@ public protocol MutableIndexable {
     boundsEnd: Index)
   // TODO: swift-3-indexing-model - can we change the above to the following? (possible compiler issue)
   //  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
-  
+
   /// Returns the next consecutive `Index` in a discrete sequence of
   /// `Index` values.
   ///
   /// - Precondition: `i` has a well-defined successor.
   @warn_unused_result
   func next(i: Index) -> Index
-  
-  func _nextInPlace(inout i: Index)
+
+  func _nextInPlace(i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - review the following
@@ -199,7 +199,7 @@ internal func _writeBackMutableSlice<
   where
   C._Element == Slice_.Iterator.Element,
   C.Index == Slice_.Index
->(inout self_: C, bounds: Range<C.Index>, slice: Slice_) {
+>(self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
   fatalError("FIXME: swift-3-indexing-model")
   /*
   C._failEarlyRangeCheck(

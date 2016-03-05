@@ -70,14 +70,14 @@ extension String {
 }
 
 /// `String.CharacterView` is a collection of `Character`.
-extension String.CharacterView : Collection {
+extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core)
   }
   
   /// A character position.
-  public struct Index : BidirectionalIndex, Comparable, CustomPlaygroundQuickLookable {
+  public struct Index : Comparable, CustomPlaygroundQuickLookable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base

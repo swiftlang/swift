@@ -193,7 +193,7 @@ extension _ArrayBuffer {
       // Could be sped up, e.g. by using
       // enumerateObjectsAtIndexes:options:usingBlock: in the
       // non-native case.
-      for i in subRange {
+      for i in RangeOfStrideable(subRange) {
         _typeCheckSlowPath(i)
       }
     }
@@ -224,7 +224,7 @@ extension _ArrayBuffer {
     
     // Make another pass to retain the copied objects
     var result = target
-    for _ in bounds {
+    for _ in RangeOfStrideable(bounds) {
       result.initialize(with: result.pointee)
       result += 1
     }
@@ -244,7 +244,8 @@ extension _ArrayBuffer {
       // Look for contiguous storage in the NSArray
       let nonNative = self._nonNative
       let cocoa = _CocoaArrayWrapper(nonNative)
-      let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
+      let cocoaStorageBaseAddress =
+        cocoa.contiguousStorage(Range(self.indices))
 
       if cocoaStorageBaseAddress != nil {
         return _SliceBuffer(
@@ -465,6 +466,12 @@ extension _ArrayBuffer {
   /// `successor()`.
   public var endIndex: Int {
     return count
+  }
+
+  public typealias Indices = RangeOfStrideable<Int>
+
+  public var indices: RangeOfStrideable<Int> {
+    return startIndex..<endIndex
   }
 
   //===--- private --------------------------------------------------------===//

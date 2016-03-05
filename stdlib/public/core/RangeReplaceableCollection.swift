@@ -74,7 +74,7 @@ public protocol RangeReplaceableCollection : Collection {
   /// linear data structures like `Array`.  Conforming types may
   /// reserve more than `n`, exactly `n`, less than `n` elements of
   /// storage, or even ignore the request completely.
-  mutating func reserveCapacity(n: Index.Distance)
+  mutating func reserveCapacity(n: IndexDistance)
 
   //===--- Derivable Requirements -----------------------------------------===//
 
@@ -266,7 +266,7 @@ extension RangeReplaceableCollection {
     }
   }
 
-  public mutating func reserveCapacity(n: Index.Distance) {}
+  public mutating func reserveCapacity(n: IndexDistance) {}
 }
 
 extension RangeReplaceableCollection where SubSequence == Self {

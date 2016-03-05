@@ -10,51 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// An index that traverses the same positions as an underlying index, 
+/// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
-public protocol ReverseIndexProtocol : BidirectionalIndex {
-  associatedtype Base : BidirectionalIndex
-
-  /// A type that can represent the number of steps between pairs of
-  /// `ReverseIndex` values where one value is reachable from the other.
-  associatedtype Distance : _SignedInteger = Base.Distance
-
-  /// The successor position in the underlying (un-reversed)
-  /// collection.
-  ///
-  /// If `self` is `advance(c.reverse.startIndex, n)`, then:
-  /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
-  ///   equivalent to `[self.base.predecessor()]`.
-  var base: Base { get }
-
-  init(_ base: Base)
-}
-
-extension BidirectionalIndex where Self : ReverseIndexProtocol {
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  public func successor() -> Self {
-    return Self(base.predecessor())
-  }
-
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// - Precondition: The previous value is representable.
-  public func predecessor() -> Self {
-    return Self(base.successor())
-  }
-}
-
-/// A wrapper for a `BidirectionalIndex` that reverses its
-/// direction of traversal.
-public struct ReverseIndex<Base : BidirectionalIndex>
-: BidirectionalIndex, ReverseIndexProtocol {
-  public typealias Distance = Base.Distance
-  
+public struct ReverseIndex<Base> : Comparable {
   public init(_ base: Base) { self.base = base }
-  
+
   /// The successor position in the underlying (un-reversed)
   /// collection.
   ///
@@ -69,58 +29,17 @@ public struct ReverseIndex<Base : BidirectionalIndex>
 public func == <Base> (
   lhs: ReverseIndex<Base>, rhs: ReverseIndex<Base>
 ) -> Bool {
-  return lhs.base == rhs.base
+  fatalError("FIXME: swift-3-indexing-model")
 }
 
-/// A wrapper for a `RandomAccessIndex` that reverses its
-/// direction of traversal.
-public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
-  : RandomAccessIndex, ReverseIndexProtocol {
-
-  public typealias Distance = Base.Distance
-  
-  public init(_ base: Base) { self.base = base }
-  
-  /// The successor position in the underlying (un-reversed)
-  /// collection.
-  ///
-  /// If `self` is `advance(c.reverse.startIndex, n)`, then:
-  /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
-  ///   equivalent to `[self.base.predecessor()]`.
-  public let base: Base
-
-  public func distance(to other: ReverseRandomAccessIndex) -> Distance {
-    return other.base.distance(to: base)
-  }
-
-  public func advanced(by n: Distance) -> ReverseRandomAccessIndex {
-    return ReverseRandomAccessIndex(base.advanced(by: -n))
-  }
+@warn_unused_result
+public func < <Base> (
+  lhs: ReverseIndex<Base>, rhs: ReverseIndex<Base>
+) -> Bool {
+  fatalError("FIXME: swift-3-indexing-model")
 }
-
-public protocol _ReverseCollection : Collection {
-  associatedtype Index : ReverseIndexProtocol
-  associatedtype Base : Collection
-  var _base: Base { get }
-}
-
-extension Collection
-  where Self : _ReverseCollection, Self.Base.Index : RandomAccessIndex {
-  public var startIndex : ReverseRandomAccessIndex<Self.Base.Index> {
-    return ReverseRandomAccessIndex(_base.endIndex)
-  }
-}
-
-extension _ReverseCollection
-  where Self : Collection, Self.Index.Base == Self.Base.Index
-{
-  public var startIndex : Index { return Self.Index(_base.endIndex) }
-  public var endIndex : Index { return Self.Index(_base.startIndex) }
-  public subscript(position: Index) -> Self.Base.Iterator.Element {
-    return _base[position.base.predecessor()]
-  }
-}
+// FIXME: swift-3-indexing-model: forward all operations from Comparable
+// for performance.
 
 /// A Collection that presents the elements of its `Base` collection
 /// in reverse order.
@@ -139,8 +58,8 @@ extension _ReverseCollection
 ///
 /// - See also: `ReverseRandomAccessCollection`
 public struct ReverseCollection<
-  Base : Collection where Base.Index : BidirectionalIndex
-> : Collection, _ReverseCollection {
+  Base : BidirectionalCollection
+> : BidirectionalCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -155,10 +74,54 @@ public struct ReverseCollection<
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ReverseIndex<Base.Index>
 
+  public typealias IndexDistance = Base.IndexDistance
+
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   public typealias Iterator = IndexingIterator<ReverseCollection>
-  
+
+  public var startIndex: Index {
+    return _base.startIndex
+  }
+
+  public var endIndex: Index {
+    return _base.endIndex
+  }
+
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    return Index(_base.previous(i.base))
+  }
+
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    return Index(_base.next(i.base))
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
+    return Index(_base.advance(i.base, by: -n))
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
+    //return Index(_base.advance(i.base, by: -n, limit: ???)
+    fatalError("FIXME: swift-3-indexing-model")
+  }
+
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    //return
+    fatalError("FIXME: swift-3-indexing-model")
+  }
+
+  public typealias _Element = Base.Iterator.Element
+  public subscript(position: Index) -> Base.Iterator.Element {
+    return _base[_base.previous(position).base]
+  }
+
   public let _base: Base
 }
 
@@ -169,8 +132,8 @@ public struct ReverseCollection<
 ///   collection having random access indices.
 /// - See also: `ReverseCollection`
 public struct ReverseRandomAccessCollection<
-  Base : Collection where Base.Index : RandomAccessIndex
-> : _ReverseCollection {
+  Base : RandomAccessCollection
+> : RandomAccessCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -183,18 +146,66 @@ public struct ReverseRandomAccessCollection<
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = ReverseRandomAccessIndex<Base.Index>
-  
+  public typealias Index = ReverseIndex<Base.Index>
+
+  public typealias IndexDistance = Base.IndexDistance
+
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   public typealias Iterator = IndexingIterator<
     ReverseRandomAccessCollection
   >
 
+  public var startIndex: Index {
+    return _base.startIndex
+  }
+
+  public var endIndex: Index {
+    return _base.endIndex
+  }
+
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    return Index(_base.previous(i.base))
+  }
+
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    return Index(_base.next(i.base))
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
+    return Index(_base.advance(i.base, by: -n))
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
+    //return Index(_base.advance(i.base, by: -n, limit: ???)
+    fatalError("FIXME: swift-3-indexing-model")
+  }
+
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    //return
+    fatalError("FIXME: swift-3-indexing-model")
+  }
+
+  public typealias _Element = Base.Iterator.Element
+  // FIXME(compiler limitation): this typealias should be inferred.
+
+  public subscript(position: Index) -> Base.Iterator.Element {
+    return _base[_base.previous(position).base]
+  }
+
+  // FIXME: swift-3-indexing-model: the rest of methods.
+
   public let _base: Base
 }
 
-extension Collection where Index : BidirectionalIndex {
+extension BidirectionalCollection {
   /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
@@ -204,7 +215,7 @@ extension Collection where Index : BidirectionalIndex {
   }
 }
 
-extension Collection where Index : RandomAccessIndex {
+extension RandomAccessCollection {
   /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
@@ -215,8 +226,9 @@ extension Collection where Index : RandomAccessIndex {
 }
 
 extension LazyCollectionProtocol
-  where Index : BidirectionalIndex,
-  Elements.Index : BidirectionalIndex {
+  where
+  Self : BidirectionalCollection,
+  Elements : BidirectionalCollection {
 
   /// Returns the elements of `self` in reverse order.
   ///
@@ -230,8 +242,9 @@ extension LazyCollectionProtocol
 }
 
 extension LazyCollectionProtocol
-  where Index : RandomAccessIndex,
-  Elements.Index : RandomAccessIndex {
+  where
+  Self : RandomAccessCollection,
+  Elements : RandomAccessCollection {
 
   /// Returns the elements of `self` in reverse order.
   ///
@@ -258,14 +271,14 @@ extension ReverseRandomAccessCollection {
   }
 }
 
-extension Collection where Index : BidirectionalIndex {
+extension BidirectionalCollection {
   @available(*, unavailable, renamed="reversed")
   public func reverse() -> ReverseCollection<Self> {
     fatalError("unavailable function can't be called")
   }
 }
 
-extension Collection where Index : RandomAccessIndex {
+extension RandomAccessCollection {
   @available(*, unavailable, renamed="reversed")
   public func reverse() -> ReverseRandomAccessCollection<Self> {
     fatalError("unavailable function can't be called")
@@ -273,7 +286,11 @@ extension Collection where Index : RandomAccessIndex {
 }
 
 extension LazyCollectionProtocol
-where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
+  where
+  Self : BidirectionalCollection,
+  Elements : BidirectionalCollection
+{
+
   @available(*, unavailable, renamed="reversed")
   public func reverse() -> LazyCollection<
     ReverseCollection<Elements>
@@ -283,7 +300,10 @@ where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
 }
 
 extension LazyCollectionProtocol
-where Index : RandomAccessIndex, Elements.Index : RandomAccessIndex {
+  where
+  Self : RandomAccessCollection,
+  Elements : RandomAccessCollection
+{
   @available(*, unavailable, renamed="reversed")
   public func reverse() -> LazyCollection<
     ReverseRandomAccessCollection<Elements>

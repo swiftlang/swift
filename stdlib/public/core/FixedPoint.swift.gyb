@@ -60,7 +60,19 @@ public protocol _Integer
 }
 
 /// A set of common requirements for Swift's integer types.
-public protocol Integer : _Integer, RandomAccessIndex {
+public protocol Integer : _Integer, Strideable {}
+extension Integer {
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func distance(to other: Self) -> Int {
+    return numericCast((numericCast(other) as IntMax) - numericCast(self))
+  }
+
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func advanced(by n: Int) -> Self {
+    return numericCast((numericCast(self) as IntMax) + numericCast(n))
+  }
 }
 
 /// This protocol is an implementation detail of `SignedInteger`;
@@ -191,10 +203,6 @@ public struct ${Self}
   // FIXME: this declaration should be inferred.
   // <rdar://problem/18379938> Type checker refuses to use the default for
   // Int.Distance associated type
-
-  /// A type that can represent the number of steps between pairs of
-  /// values.
-  public typealias Distance = Int
 
   /// Create an instance initialized to zero.
   @_transparent public
@@ -355,47 +363,6 @@ extension ${Self} : CustomStringConvertible {
 % else:
     return _uint64ToString(self.toUIntMax())
 % end
-  }
-}
-
-// When ${Self} is used as an index, there are always bounds---more
-// restrictive than the full range of ${Self}---against which we're
-// not able to check.  Overflows are not useful indicators of
-// precondition violations in this context.  Therefore, we use masked
-// arithmetic in this conformance, and we need to be sure that
-// generic implementations of the arithmetic operators for
-// RandomAccessIndex's are all shadowed by more-specific
-// implementations that *do* check for overflows.
-@_transparent
-extension ${Self} : RandomAccessIndex {
-  // HACK: Disable indexing and slicing Ranges of Integer types
-  // outside of a generic context.  See the implementation of Range
-  // for details of how this works.
-  public typealias _DisabledRangeIndex = ${Self}
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  @_transparent public
-  func successor() -> ${Self} {
-    return self &+ 1
-  }
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// - Precondition: The previous value is representable.
-  @_transparent public
-  func predecessor() -> ${Self} {
-    return self &- 1
-  }
-
-  @_transparent public
-  func distance(to other: ${Self}) -> ${Self}.Distance {
-    return numericCast((numericCast(other) as IntMax) &- numericCast(self))
-  }
-
-  @_transparent public
-  func advanced(by n: ${Self}.Distance) -> ${Self} {
-    return numericCast((numericCast(self) as IntMax) &+ numericCast(n))
   }
 }
 
@@ -667,6 +634,23 @@ public func _leadingZeros(x: Builtin.Int${bits}) -> Builtin.Int${bits} {
 % end
 
 //===--- End loop over all integer types ----------------------------------===//
+
+internal func _unsafePlus(lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs + rhs
+#else
+  return lhs &+ rhs
+#endif
+}
+
+internal func _unsafeMinus(lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs - rhs
+#else
+  return lhs &- rhs
+#endif
+}
+
 
 @available(*, unavailable, renamed="Integer")
 public typealias IntegerType = Integer

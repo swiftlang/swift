@@ -43,10 +43,12 @@ extension Collection where ${IElement} : Equatable {
       return result
     }
 
-    for i in self.indices {
+    var i = self.startIndex
+    while i != self.endIndex {
       if self[i] == element {
         return i
       }
+      self._nextInPlace(&i)
     }
     return nil
   }
@@ -61,27 +63,14 @@ extension Collection {
   public func index(
     @noescape where predicate: (${IElement}) throws -> Bool
   ) rethrows -> Index? {
-    for i in self.indices {
+    var i = self.startIndex
+    while i != self.endIndex {
       if try predicate(self[i]) {
         return i
       }
+      self._nextInPlace(&i)
     }
     return nil
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// indices
-//===----------------------------------------------------------------------===//
-
-extension Collection {
-  /// Returns the range of valid index values.
-  ///
-  /// The result's `endIndex` is the same as that of `self`.  Because
-  /// `Range` is half-open, iterating the values of the result produces
-  /// all valid subscript arguments for `self`, omitting its `endIndex`.
-  public var indices: Range<Index> {
-    return Range(_start: startIndex, end: endIndex)
   }
 }
 
@@ -122,7 +111,7 @@ orderingRequirementForComparable = """\
 % for preds in [ True, False ]:
 
 %   if preds:
-extension MutableCollection where Index : RandomAccessIndex {
+extension MutableCollection where Self : RandomAccessCollection {
 
 ${partitionDocComment}
   ///
@@ -136,7 +125,7 @@ ${orderingRequirementForPredicate}
 %   else:
 
 extension MutableCollection
-  where Index : RandomAccessIndex, ${IElement} : Comparable {
+  where Self : RandomAccessCollection, ${IElement} : Comparable {
 
 ${partitionDocComment}
   ///
@@ -168,9 +157,11 @@ ${orderingRequirementForComparable}
     var escapableIsOrderedBefore =
       unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
     return _partition(
-      &self, subRange: indices, isOrderedBefore: &escapableIsOrderedBefore)
+      &self,
+      subRange: startIndex..<endIndex,
+      isOrderedBefore: &escapableIsOrderedBefore)
 %   else:
-    return _partition(&self, subRange: indices)
+    return _partition(&self, subRange: startIndex..<endIndex)
 %   end
   }
 }
@@ -243,7 +234,7 @@ ${orderingRequirementForPredicate}
 
 extension MutableCollection
   where
-  Self.Index : RandomAccessIndex,
+  Self : RandomAccessCollection,
   Self.Iterator.Element : Comparable {
 
 ${sortDocCommentForComparable}
@@ -266,7 +257,7 @@ ${orderingRequirementForComparable}
   }
 }
 
-extension MutableCollection where Self.Index : RandomAccessIndex {
+extension MutableCollection where Self : RandomAccessCollection {
 ${sortDocCommentForPredicate}
   ///
 ${sortIsUnstableForPredicate}
@@ -298,8 +289,7 @@ ${orderingRequirementForPredicate}
   }
 }
 
-extension MutableCollection
-  where Index : RandomAccessIndex {
+extension MutableCollection where Self : RandomAccessCollection {
 
   @available(*, unavailable, message="slice the collection using the range, and call partition(isOrderedBefore:)")
   public mutating func partition(
@@ -311,7 +301,7 @@ extension MutableCollection
 }
 
 extension MutableCollection
-  where Index : RandomAccessIndex, ${IElement} : Comparable {
+  where Self : RandomAccessCollection, ${IElement} : Comparable {
 
   @available(*, unavailable, message="slice the collection using the range, and call partition()")
   public mutating func partition(range: Range<Index>) -> Index {
@@ -337,7 +327,7 @@ extension ${Self} where Self.Iterator.Element : Comparable {
 
 extension MutableCollection
   where
-  Self.Index : RandomAccessIndex,
+  Self : RandomAccessCollection,
   Self.Iterator.Element : Comparable {
 
   @available(*, unavailable, renamed="sort")
@@ -346,7 +336,7 @@ extension MutableCollection
   }
 }
 
-extension MutableCollection where Self.Index : RandomAccessIndex {
+extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, renamed="sort(isOrderedBefore:)")
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool

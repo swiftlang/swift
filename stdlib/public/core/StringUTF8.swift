@@ -16,7 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 extension _StringCore {
   /// An integral type that holds a sequence of UTF-8 code units, starting in
   /// its low byte.
@@ -109,7 +108,7 @@ extension String {
     }
 
     /// A position in a `String.UTF8View`.
-    public struct Index : ForwardIndex {
+    public struct Index : Comparable {
       internal typealias Buffer = _StringCore._UTF8Chunk
 
       init(_ _core: _StringCore, _ _coreIndex: Int,
@@ -318,6 +317,14 @@ public func == (
   while true
 }
 
+@warn_unused_result
+public func < (
+  lhs: String.UTF8View.Index,
+  rhs: String.UTF8View.Index
+) -> Bool {
+  fatalError("FIXME: swift-3-indexing-model")
+}
+
 // Index conversions
 extension String.UTF8View.Index {
   internal init(_ core: _StringCore, _utf16Offset: Int) {
@@ -421,3 +428,4 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
     return .text(description)
   }
 }
+

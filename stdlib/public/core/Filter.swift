@@ -100,8 +100,8 @@ public struct LazyFilterSequence<Base : Sequence>
 ///   and may not offer the usual performance given by models of
 ///   `ForwardIndex`.
 public struct LazyFilterIndex<
-  BaseElements: Collection
-> : ForwardIndex {
+  BaseElements : Collection
+> {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Precondition: The next value is representable.
