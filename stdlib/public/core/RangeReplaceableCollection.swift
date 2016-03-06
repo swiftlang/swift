@@ -232,7 +232,7 @@ extension RangeReplaceableCollection {
   public mutating func remove(at index: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
-    replaceSubrange(index...index, with: EmptyCollection())
+    replaceSubrange(index..<next(index), with: EmptyCollection())
     return result
   }
 
@@ -262,7 +262,7 @@ extension RangeReplaceableCollection {
       self = Self()
     }
     else {
-      replaceSubrange(indices, with: EmptyCollection())
+      replaceSubrange(startIndex..<endIndex, with: EmptyCollection())
     }
   }
 
@@ -277,7 +277,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
-    self = self[startIndex.successor()..<endIndex]
+    self = self[next(startIndex)..<endIndex]
     return element
   }
 

@@ -143,7 +143,7 @@ extension LazyCollection : Collection {
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
-  public var count: Index.Distance {
+  public var count: Base.IndexDistance {
     return _base.count
   }
   

@@ -150,7 +150,7 @@ extension String.CharacterView : BidirectionalCollection {
 
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[start].value)
-      start._successorInPlace()
+      unicodeScalars._nextInPlace(&start)
 
       while start != end {
         // FIXME(performance): consider removing this "fast path".  A branch
@@ -165,7 +165,7 @@ extension String.CharacterView : BidirectionalCollection {
           break
         }
         gcb0 = gcb1
-        start._successorInPlace()
+        unicodeScalars._nextInPlace(&start)
       }
 
       return start._position - startIndexUTF16
@@ -191,14 +191,14 @@ extension String.CharacterView : BidirectionalCollection {
 
       var graphemeClusterStart = end
 
-      graphemeClusterStart._predecessorInPlace()
+      unicodeScalars._previousInPlace(&graphemeClusterStart)
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[graphemeClusterStart].value)
 
       var graphemeClusterStartUTF16 = graphemeClusterStart._position
 
       while graphemeClusterStart != start {
-        graphemeClusterStart._predecessorInPlace()
+        unicodeScalars._previousInPlace(&graphemeClusterStart)
         let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
             unicodeScalars[graphemeClusterStart].value)
         if segmenter.isBoundary(gcb1, gcb0) {
@@ -257,7 +257,8 @@ extension String.CharacterView : RangeReplaceableCollection {
   >(
     bounds: Range<Index>, with newElements: C
   ) {
-    let rawSubRange = bounds.startIndex._base._position
+    let rawSubRange: Range<Int> =
+      bounds.startIndex._base._position
       ..< bounds.endIndex._base._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)

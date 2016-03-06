@@ -144,7 +144,8 @@ ${orderingRequirementForComparable}
         isOrderedBefore: isOrderedBefore
 %   end
         )
-      return startIndex.advanced(
+      return advance(
+        startIndex,
         by: numericCast(unsafeBufferPivot - bufferPointer.startIndex))
     }
     if let result = maybeResult {
@@ -252,7 +253,7 @@ ${orderingRequirementForComparable}
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: self.indices)
+      _introSort(&self, subRange: startIndex..<endIndex)
     }
   }
 }
@@ -283,7 +284,7 @@ ${orderingRequirementForPredicate}
     if didSortUnsafeBuffer == nil {
       _introSort(
         &self,
-        subRange: self.indices,
+        subRange: startIndex..<endIndex,
         isOrderedBefore: escapableIsOrderedBefore)
     }
   }
