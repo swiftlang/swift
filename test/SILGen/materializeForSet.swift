@@ -52,7 +52,7 @@ class Base {
 class Derived : Base {}
 
 protocol Abstractable {
-  typealias Result
+  associatedtype Result
   var storedFunction: () -> Result { get set }
   var finalStoredFunction: () -> Result { get set }
   var computedFunction: () -> Result { get set }
@@ -134,7 +134,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return
 
 protocol ClassAbstractable : class {
-  typealias Result
+  associatedtype Result
   var storedFunction: () -> Result { get set }
   var finalStoredFunction: () -> Result { get set }
   var computedFunction: () -> Result { get set }
@@ -142,7 +142,7 @@ protocol ClassAbstractable : class {
 extension Derived : ClassAbstractable {}
 
 protocol Signatures {
-  typealias Result
+  associatedtype Result
   var computedFunction: () -> Result { get set }
 }
 protocol Implementations {}
@@ -162,9 +162,6 @@ class HasDidSet : Base {
   override var stored: Int {
     didSet {}
   }
-
-// Checking this after silgen, but before mandatory inlining, lets us
-// test the intent much better.
 
 // CHECK-LABEL: sil hidden [transparent] @_TFC17materializeForSet9HasDidSetm6storedSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasDidSet, @thick HasDidSet.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
@@ -299,14 +296,8 @@ struct Bill : Totalled {
 // CHECK:    [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])
 // CHECK:    return [[T1]] :
 
-// CHECK: sil_witness_table hidden Bill: Totalled module materializeForSet {
-// CHECK:   method #Totalled.total!getter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_g5totalSi
-// CHECK:   method #Totalled.total!setter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_s5totalSi
-// CHECK:   method #Totalled.total!materializeForSet.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi
-// CHECK: }
-
 protocol AddressOnlySubscript {
-  typealias Index
+  associatedtype Index
   subscript(i: Index) -> Index { get set }
 }
 
@@ -340,3 +331,66 @@ struct Wine<Color> : Beverage {
     set { }
   }
 }
+
+// Test for materializeForSet when Self is re-abstracted.
+//
+// We have to open-code the materializeForSelf witness, and not screw up
+// the re-abstraction.
+
+protocol Panda {
+  var x: Self -> Self { get set }
+}
+
+func id<T>(t: T) -> T { return t }
+
+extension Panda {
+  var x: Self -> Self {
+    get { return id }
+    set { }
+  }
+}
+
+struct TuxedoPanda : Panda { }
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV17materializeForSet11TuxedoPandaS_5PandaS_FS1_m1xFxx
+
+// Call the getter:
+
+  // CHECK: function_ref @_TFE17materializeForSetPS_5Pandag1xFxx : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_owned (@in τ_0_0) -> @out τ_0_0
+
+// Result of calling the getter is re-abstracted to the maximally substituted type
+// by SILGenFunction::emitApply():
+
+  // CHECK: function_ref @_TTRXFo_iV17materializeForSet11TuxedoPanda_iS0__XFo_dS0__dS0__ : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
+
+// ... then we re-abstract to the requirement signature:
+// FIXME: Peephole this away with the previous one since there's actually no
+// abstraction change in this case.
+
+  // CHECK: function_ref @_TTRXFo_dV17materializeForSet11TuxedoPanda_dS0__XFo_iS0__iS0__ : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
+
+// The callback:
+
+  // CHECK: function_ref @_TTWV17materializeForSet11TuxedoPandaS_5PandaS_FFES_S1_m1xFxxU_XfTBpRBBRQPS1_XMTS2__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+
+// CHECK: }
+
+// CHECK-LABEL: sil hidden [transparent] @_TTWV17materializeForSet11TuxedoPandaS_5PandaS_FFES_S1_m1xFxxU_XfTBpRBBRQPS1_XMTS2__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+
+  // FIXME: Useless re-abstractions
+
+  // CHECK: function_ref @_TTRXFo_iV17materializeForSet11TuxedoPanda_iS0__XFo_dS0__dS0__ : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
+
+  // CHECK: function_ref @_TFE17materializeForSetPS_5Pandas1xFxx : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_owned (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
+
+  // CHECK: function_ref @_TTRXFo_dV17materializeForSet11TuxedoPanda_dS0__XFo_iS0__iS0__ : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
+
+// CHECK: }
+
+
+// CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
+// CHECK:   method #Totalled.total!getter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_g5totalSi
+// CHECK:   method #Totalled.total!setter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_s5totalSi
+// CHECK:   method #Totalled.total!materializeForSet.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi
+// CHECK: }
+
