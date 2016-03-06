@@ -25,7 +25,7 @@ func unavailable_bad_platform() {}
 func availabilityUnknownPlatform() {}
 
 // <rdar://problem/17669805> Availability can't appear on a typealias
-@available(*, unavailable, message="oh no you dont")
+@available(*, unavailable, message="oh no you don't")
 typealias int = Int // expected-note {{'int' has been explicitly marked unavailable here}}
 
 @available(*, unavailable, renamed="Float")
@@ -42,7 +42,7 @@ extension MyCollection {
   func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
 }
 
-var x : int // expected-error {{'int' is unavailable: oh no you dont}}
+var x : int // expected-error {{'int' is unavailable: oh no you don't}}
 var y : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
 
 // Encoded message

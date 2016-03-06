@@ -732,7 +732,7 @@ void DSEContext::invalidateLSLocationBase(SILInstruction *I, DSEKind Kind) {
 }
 
 void DSEContext::processReadForDSE(BlockState *S, unsigned bit) {
-  // Remove any may/must-aliasing stores to the LSLocation, as they cant be
+  // Remove any may/must-aliasing stores to the LSLocation, as they can't be
   // used to kill any upward visible stores due to the interfering load.
   LSLocation &R = LocationVault[bit];
   for (unsigned i = 0; i < S->LocationNum; ++i) {
@@ -788,7 +788,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
     L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
-  // If we cant figure out the Base or Projection Path for the read instruction,
+  // If we can't figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
   if (!L.isValid()) {
     processUnknownReadInst(I, Kind);
@@ -873,7 +873,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
-  // If we cant figure out the Base or Projection Path for the store
+  // If we can't figure out the Base or Projection Path for the store
   // instruction, simply ignore it.
   if (!L.isValid())
     return;
