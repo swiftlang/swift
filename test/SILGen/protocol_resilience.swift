@@ -114,7 +114,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStorages26mutablePropertyWithDefaultSi
 // CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientStorages26mutablePropertyWithDefaultSi
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStoragem26mutablePropertyWithDefaultSi
-// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem26mutablePropertyWithDefaultSiU_XfTBpRBBRQPS0_XMTS1__T_
+// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem26mutablePropertyWithDefaultSiU_T_
   public var mutablePropertyWithDefault: Int {
     get { return 0 }
     set { }
@@ -130,7 +130,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStorages33mutableGenericPropertyWithDefaultwx1T
 // CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientStorages33mutableGenericPropertyWithDefaultwx1T
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStoragem33mutableGenericPropertyWithDefaultwx1T
-// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem33mutableGenericPropertyWithDefaultwx1TU_XfTBpRBBRQPS0_XMTS2__T_
+// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem33mutableGenericPropertyWithDefaultwx1TU_T_
   public var mutableGenericPropertyWithDefault: T {
     get {
       return T(default: ())
@@ -143,7 +143,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStorages9subscriptFwx1TwxS1_
 // CHECK-LABEL: sil @_TFE19protocol_resiliencePS_16ResilientStorages9subscriptFwx1TwxS1_
 // CHECK-LABEL: sil [transparent] [thunk] @_TFP19protocol_resilience16ResilientStoragem9subscriptFwx1TwxS1_
-// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem9subscriptFwx1TwxS1_U_XfTBpRBBRQPS0_XMTS2__T_
+// CHECK-LABEL: sil [transparent] @_TFFP19protocol_resilience16ResilientStoragem9subscriptFwx1TwxS1_U_T_
   public subscript(x: T) -> T {
     get {
       return x
