@@ -490,7 +490,7 @@ ERROR(sil_member_decl_not_found,none,
 ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
-      "substitution conformances dont match archetype", ())
+      "substitution conformances don't match archetype", ())
 ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,

@@ -314,7 +314,7 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
   SILValue UO = getUnderlyingObject(Mem);
   LSLocation L(UO, ProjectionPath::getProjectionPath(UO, Mem));
 
-  // If we cant figure out the Base or Projection Path for the memory location,
+  // If we can't figure out the Base or Projection Path for the memory location,
   // simply ignore it for now.
   if (!L.isValid())
     return;
