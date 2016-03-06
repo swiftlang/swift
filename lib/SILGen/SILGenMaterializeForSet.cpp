@@ -37,55 +37,19 @@ using namespace Lowering;
 
 namespace {
 
-static Type getSelfTypeForCallbackDeclaration(FuncDecl *witness) {
-  // We're intentionally using non-interface types here: we want
-  // something specified in terms of the witness's archetypes, because
-  // we're going to build the closure as if it were contextually
-  // within the witness.
-  auto type = witness->getType()->castTo<AnyFunctionType>()->getInput();
-  if (auto tuple = type->getAs<TupleType>()) {
-    assert(tuple->getNumElements() == 1);
-    type = tuple->getElementType(0);
-  }
-  return type->getLValueOrInOutObjectType();
-}
-
-static FunctionType *getMaterializeForSetCallbackType(ASTContext &ctx,
-                                                      Type selfType) {
-  //       (inout storage: Builtin.ValueBuffer,
-  //        inout self: Self,
-  //        @thick selfType: Self.Type) -> ()
-  TupleTypeElt params[] = {
-    ctx.TheRawPointerType,
-    InOutType::get(ctx.TheUnsafeValueBufferType),
-    InOutType::get(selfType),
-    MetatypeType::get(selfType, MetatypeRepresentation::Thick)
-  };
-  Type input = TupleType::get(params, ctx);
-  Type result = TupleType::getEmpty(ctx);
-  FunctionType::ExtInfo extInfo = FunctionType::ExtInfo()
-                     .withRepresentation(FunctionType::Representation::Thin);
-
-  return FunctionType::get(input, result, extInfo);
-}
-
 static std::string
 getMaterializeForSetCallbackName(ProtocolConformance *conformance,
-                                 FuncDecl *requirement,
-                                 FuncDecl *witness) {
+                                 FuncDecl *requirement) {
 
-  auto &ctx = witness->getASTContext();
-
-  DeclContext *dc = (conformance ? witness : requirement);
+  DeclContext *dc = requirement;
   ClosureExpr closure(/*patterns*/ nullptr,
                       /*throws*/ SourceLoc(),
                       /*arrow*/ SourceLoc(),
                       /*in*/ SourceLoc(),
                       /*result*/ TypeLoc(),
                       /*discriminator*/ 0,
-                      /*context*/ dc);
-  closure.setType(getMaterializeForSetCallbackType(ctx,
-                               getSelfTypeForCallbackDeclaration(witness)));
+                      /*context*/ requirement);
+  closure.setType(TupleType::getEmpty(dc->getASTContext()));
   closure.getCaptureInfo().setGenericParamCaptures(true);
 
   Mangle::Mangler mangler;
@@ -93,7 +57,7 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
     // Concrete witness thunk for a conformance:
     //
     // Mangle this as if it were a conformance thunk for a closure
-    // within the witness.
+    // within the requirement.
     mangler.append("_TTW");
     mangler.mangleProtocolConformance(conformance);
   } else {
@@ -233,7 +197,7 @@ public:
                  .getObjectType();
 
     emitter.CallbackName = getMaterializeForSetCallbackName(
-        conformance, requirement, witness);
+        conformance, requirement);
     return emitter;
   }
 
@@ -275,7 +239,7 @@ public:
       emitter.TheAccessSemantics = AccessSemantics::DirectToAccessor;
 
     emitter.CallbackName = getMaterializeForSetCallbackName(
-        /*conformance=*/nullptr, witness, witness);
+        /*conformance=*/nullptr, witness);
     return emitter;
   }
 
