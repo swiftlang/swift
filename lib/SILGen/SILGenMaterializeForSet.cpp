@@ -141,7 +141,7 @@ struct MaterializeForSetEmitter {
   // nominal types) and allow "partial specialization" extensions,
   // this will break, and we'll have to do inout-translation in
   // the callback buffer.
-  Type SelfInterfaceType;
+  CanType SelfInterfaceType;
   CanType SubstSelfType;
   CanType SubstStorageType;
 
@@ -585,44 +585,15 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
 }
 
 SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorFn generator) {
-  auto &ctx = SGM.getASTContext();
-
-  // Get lowered formal types for callback parameters.
-  Type selfType = SelfInterfaceType;
-  Type selfMetatypeType = MetatypeType::get(SelfInterfaceType,
-                                            MetatypeRepresentation::Thick);
-
-  {
-    GenericContextScope scope(SGM.Types, GenericSig);
-
-    // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
-    // selfMetatypeType.
-    if (auto metatype = selfType->getAs<MetatypeType>()) {
-      if (!metatype->hasRepresentation())
-        selfType = SGM.getLoweredType(metatype).getSwiftRValueType();
-    }
-  }
-
-  // Create the SILFunctionType for the callback.
-  SILParameterInfo params[] = {
-    { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
-    { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { selfType->getCanonicalType(), ParameterConvention::Indirect_Inout },
-    { selfMetatypeType->getCanonicalType(), ParameterConvention::Direct_Unowned },
-  };
-  ArrayRef<SILResultInfo> results = {};
-  auto extInfo = 
-    SILFunctionType::ExtInfo()
-      .withRepresentation(SILFunctionTypeRepresentation::Thin);
-
-  auto callbackType = SILFunctionType::get(GenericSig, extInfo,
-                                /*callee*/ ParameterConvention::Direct_Unowned,
-                                           params, results, None, ctx);
+  auto callbackType =
+      SGM.Types.getMaterializeForSetCallbackType(WitnessStorage,
+                                                 GenericSig,
+                                                 SelfInterfaceType);
   auto callback =
-    SGM.M.getOrCreateFunction(Witness, CallbackName, Linkage, callbackType,
-                              IsBare,
-                              F.isTransparent(),
-                              F.isFragile());
+      SGM.M.getOrCreateFunction(Witness, CallbackName, Linkage,
+                                callbackType, IsBare,
+                                F.isTransparent(),
+                                F.isFragile());
 
   callback->setContextGenericParams(GenericParams);
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
@@ -632,7 +603,8 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorF
     SILGenFunction gen(SGM, *callback);
 
     auto makeParam = [&](unsigned index) -> SILArgument* {
-      SILType type = gen.F.mapTypeIntoContext(params[index].getSILType());
+      SILType type = gen.F.mapTypeIntoContext(
+          callbackType->getParameters()[index].getSILType());
       return new (SGM.M) SILArgument(gen.F.begin(), type);
     };
 
