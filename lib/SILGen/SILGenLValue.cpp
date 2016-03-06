@@ -892,7 +892,7 @@ namespace {
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, ManagedValue temporary,
                    ArrayRef<SILValue> extraInfo, bool isFinal) override {
-      // If we don't have otherInfo, we don't have to conditionalize
+      // If we don't have extraInfo, we don't have to conditionalize
       // the writeback.
       if (extraInfo.empty()) {
         LogicalPathComponent::writeback(gen, loc, base, temporary, extraInfo,
