@@ -149,54 +149,10 @@ public struct UnicodeScalar :
     return value <= 127
   }
 
-  // FIXME: Locales make this interesting
-  @warn_unused_result
-  func _isAlpha() -> Bool {
-    return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
-  }
-
   // FIXME: Is there a similar term of art in Unicode?
   @warn_unused_result
   public func _isASCIIDigit() -> Bool {
     return self >= "0" && self <= "9"
-  }
-
-  // FIXME: Unicode makes this interesting
-  @warn_unused_result
-  func _isDigit() -> Bool {
-    return _isASCIIDigit()
-  }
-
-  // FIXME: Unicode and locales make this interesting
-  var _uppercase: UnicodeScalar {
-    if self >= "a" && self <= "z" {
-      return UnicodeScalar(UInt32(self) &- 32)
-    } else if self >= "à" && self <= "þ" && self != "÷" {
-      return UnicodeScalar(UInt32(self) &- 32)
-    }
-    return self
-  }
-
-  // FIXME: Unicode and locales make this interesting
-  var _lowercase: UnicodeScalar {
-    if self >= "A" && self <= "Z" {
-      return UnicodeScalar(UInt32(self) &+ 32)
-    } else if self >= "À" && self <= "Þ" && self != "×" {
-      return UnicodeScalar(UInt32(self) &+ 32)
-    }
-    return self
-  }
-
-  // FIXME: Unicode makes this interesting.
-  @warn_unused_result
-  public // @testable
-  func _isSpace() -> Bool {
-    // FIXME: The constraint-based type checker goes painfully exponential
-    // when we turn this into one large expression. Break it up for now,
-    // until we can optimize the constraint solver better.
-    if self == " "  || self == "\t" { return true }
-    if self == "\n" || self == "\r" { return true }
-    return self == "\u{0B}" || self == "\u{0C}"
   }
 
   // FIXME: Unicode makes this interesting.
