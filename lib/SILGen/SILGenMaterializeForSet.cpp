@@ -271,19 +271,25 @@ struct MaterializeForSetEmitter {
     lv.addMemberComponent(gen, loc, WitnessStorage, WitnessSubs, IsSuper,
                           accessKind, TheAccessSemantics, strategy,
                           SubstStorageType, std::move(indices));
-    assert(lv.getTypeOfRValue().getObjectType() == WitnessStorageType);
+
+    SILType expectedTy = SGM.Types.getLoweredType(
+        lv.getOrigFormalType(),
+        lv.getSubstFormalType()).getObjectType();
+    SILType actualTy = lv.getTypeOfRValue().getObjectType();
+    assert(expectedTy == actualTy);
 
     // Reabstract back to the requirement pattern.
-    if (Conformance && RequirementStorageType != WitnessStorageType) {
-      SILType substTy = SGM.getLoweredType(SubstStorageType).getObjectType();
+    if (Conformance && actualTy != RequirementStorageType) {
+      SILType substTy = SGM.getLoweredType(SubstStorageType);
 
       // FIXME: we can do transforms between two abstraction patterns now
 
-      // Translate to the formal type...
-      if (WitnessStorageType != substTy)
+      // Translate to the fully-substituted formal type...
+      if (actualTy != substTy)
         lv.addOrigToSubstComponent(substTy);
 
-      // ...then back to the requirement type.
+      // ...then back to the requirement type using the abstraction pattern
+      // of the requirement..
       if (substTy != RequirementStorageType)
         lv.addSubstToOrigComponent(RequirementStoragePattern,
                                    RequirementStorageType);
