@@ -117,7 +117,7 @@ struct External {
   using FarRelativeDirectPointer = StoredPointer;
   
   template <typename T, bool Nullable = true>
-  using RelativeDirectPointer = std::make_signed<StoredPointer>;
+  using RelativeDirectPointer = int32_t;
 };
 
 /// Template for branching on native pointer types versus external ones
