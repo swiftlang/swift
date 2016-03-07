@@ -139,7 +139,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void addDecl(const NominalTypeDecl *decl) {
-    auto type = decl->getDeclaredInterfaceType()->getCanonicalType();
+    auto type = decl->getDeclaredType()->getCanonicalType();
     addTypeRef(decl->getModuleContext(), type);
 
     switch (decl->getKind()) {
