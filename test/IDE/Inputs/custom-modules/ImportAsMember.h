@@ -12,11 +12,14 @@ extern struct IAMStruct1 IAMStruct1CreateSimple(double value)
     __attribute__((swift_name("Struct1.init(value:)")));
 
 extern struct IAMStruct1 IAMStruct1Invert(struct IAMStruct1 s)
+    __attribute__((swift_name("Struct1.inverted(self:)")));
+
+extern void IAMStruct1InvertInPlace(struct IAMStruct1 *s)
     __attribute__((swift_name("Struct1.invert(self:)")));
 
-extern struct IAMStruct1 IAMStruct1Rotate(struct IAMStruct1 s, double radians)
+extern struct IAMStruct1 IAMStruct1Rotate(const struct IAMStruct1 *s,
+                                          double radians)
     __attribute__((swift_name("Struct1.translate(self:radians:)")));
-
 
 extern double IAMStruct1GetRadius(struct IAMStruct1 s)
     __attribute__((swift_name("getter:Struct1.radius(self:)")));
@@ -24,6 +27,14 @@ extern double IAMStruct1GetRadius(struct IAMStruct1 s)
 extern void IAMStruct1SetRadius(struct IAMStruct1 s, double radius)
     __attribute__((swift_name("setter:Struct1.radius(self:_:)")));
 
+extern double IAMStruct1GetAltitude(struct IAMStruct1 s)
+    __attribute__((swift_name("getter:Struct1.altitude(self:)")));
+
+extern void IAMStruct1SetAltitude(struct IAMStruct1 *s, double altitude)
+    __attribute__((swift_name("setter:Struct1.altitude(self:_:)")));
+
+extern double IAMStruct1GetMagnitude(struct IAMStruct1 s)
+    __attribute__((swift_name("getter:Struct1.magnitude(self:)")));
 
 extern void IAMStruct1SelfComesLast(double x, struct IAMStruct1 s)
     __attribute__((swift_name("Struct1.selfComesLast(x:self:)")));

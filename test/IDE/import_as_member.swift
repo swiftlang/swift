@@ -19,8 +19,12 @@
 // PRINT:      extension Struct1 {
 // PRINT-NEXT:   static var globalVar: Double
 // PRINT-NEXT:   init(value value: Double)
-// PRINT-NEXT:   func invert() -> Struct1
+// PRINT-NEXT:   func inverted() -> Struct1
+// PRINT-NEXT:   mutating func invert()
 // PRINT-NEXT:   func translate(radians radians: Double) -> Struct1
+// PRINT-NEXT:   var radius: Double { get nonmutating set }
+// PRINT-NEXT:   var altitude: Double{{$}}
+// PRINT-NEXT:   var magnitude: Double { get }
 // PRINT-NEXT:   func selfComesLast(x x: Double)
 // PRINT-NEXT:   func selfComesThird(a a: Int32, b b: Float, x x: Double)
 // PRINT-NEXT: }
@@ -35,17 +39,21 @@
 // PRINTB:        static var static1: Double
 // PRINTB-NEXT:   static var static2: Float
 // PRINTB-NEXT:   init(float value: Float)
+// PRINTB-NEXT:   static var zero: Struct1 { get }
 // PRINTB-NEXT: }
+
+// PRINTB: var currentStruct1: Struct1
 
 // PRINTB-NOT: static var globalVar: Double
 
 // RUN: %target-swift-frontend %s -parse -I %S/Inputs/custom-modules -verify
 
 import ImportAsMember
+import ImportAsMember.B
 
 let iamStructFail = IAMStruct1CreateSimple()
   // expected-error@-1{{use of unresolved identifier 'IAMStruct1CreateSimple'}}
-let iamStruct = Struct1(x: 1.0, y: 1.0, z: 1.0)
+var iamStruct = Struct1(x: 1.0, y: 1.0, z: 1.0)
 
 let gVarFail = IAMStruct1GlobalVar
   // expected-error@-1{{use of unresolved identifier 'IAMStruct1GlobalVar'}}
@@ -57,3 +65,13 @@ let iamStructInitFail = IAMStruct1CreateSimple(42)
 let iamStructInitFail = Struct1(value: 42)
 
 let gVar2 = Struct1.static2
+
+// Instance properties
+iamStruct.radius += 1.5
+_ = iamStruct.magnitude
+
+// Static properties
+iamStruct = Struct1.zero
+
+// Global properties
+currentStruct1.x += 1.5

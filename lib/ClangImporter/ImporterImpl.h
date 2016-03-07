@@ -470,6 +470,10 @@ public:
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
 
+  /// Keeps track of the Clang functions that have been turned into
+  /// properties.
+  llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
+
   /// Retrieve the key to use when looking for enum information.
   StringRef getEnumInfoKey(const clang::EnumDecl *decl,
                            SmallVectorImpl<char> &scratch) {
@@ -891,14 +895,6 @@ public:
         return true;
       }
     }
-
-    bool isImportAsInstanceMember() const {
-      return ImportAsMember && SelfIndex;
-    }
-    bool isImportAsMethod() const {
-      return isImportAsInstanceMember() && !isPropertyAccessor();
-    }
-
   };
 
   /// Flags that control the import of names in importFullName.
@@ -924,6 +920,11 @@ public:
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
                              const clang::MacroInfo *macro,
                              clang::ASTContext &clangCtx);
+
+  /// Retrieve the property type as determined by the given accessor.
+  static clang::QualType
+  getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
+                          Optional<unsigned> selfIndex);
 
   /// \brief Import the given Clang identifier into Swift.
   ///
