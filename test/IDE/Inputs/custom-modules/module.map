@@ -19,3 +19,8 @@ module ImportAsMember {
     header "ImportAsMemberC.h"
   }
 }
+
+module InferImportAsMember {
+  export *
+  header "InferImportAsMember.h"
+}

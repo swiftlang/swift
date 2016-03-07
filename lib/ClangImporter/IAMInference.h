@@ -94,6 +94,14 @@ struct IAMResult {
     return accessorKind != IAMAccessorKind::None;
   }
 
+  bool isGetter() const {
+    return accessorKind == IAMAccessorKind::Getter;
+  }
+
+  bool isSetter() const {
+    return accessorKind == IAMAccessorKind::Setter;
+  }
+
   bool isInit() const {
     return isStaticMember() && name.getBaseName().str() == "init";
   }

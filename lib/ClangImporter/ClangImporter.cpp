@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "IAMInference.h"
 #include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Subsystems.h"
@@ -2093,6 +2094,25 @@ auto ClangImporter::Implementation::importFullName(
                                                isInitializer,
                                                /*hasCustomName=*/true);
       }
+
+      return result;
+    }
+  } else if (InferImportAsMember) {
+    auto inference = IAMResult::infer(SwiftContext, clangSema, D);
+    if (inference.isImportAsMember()) {
+      result.ImportAsMember = true;
+      result.Imported = inference.name;
+      result.EffectiveContext = inference.effectiveDC;
+
+      // Instance or static
+      if (inference.selfIndex)
+        result.SelfIndex = inference.selfIndex;
+
+      // Property
+      if (inference.isGetter())
+        result.AccessorKind = ImportedAccessorKind::PropertyGetter;
+      else if (inference.isSetter())
+        result.AccessorKind = ImportedAccessorKind::PropertySetter;
 
       return result;
     }
