@@ -199,6 +199,10 @@ enum class TypeCheckExprFlags {
   /// If set, this expression is being re-type checked as part of diagnostics,
   /// and so we should not visit bodies of non-single expression closures.
   SkipMultiStmtClosures = 0x40,
+
+  /// Set if the client prefers fixits to be in the form of force unwrapping
+  /// or optional chaining to return an optional.
+  PreferForceUnwrapToOptional = 0x80,
 };
 
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;

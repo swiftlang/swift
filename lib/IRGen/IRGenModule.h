@@ -88,7 +88,6 @@ namespace swift {
   class IRGenOptions;
   class NormalProtocolConformance;
   class ProtocolConformance;
-  class TypeMetadataRecord;
   class ProtocolCompositionType;
   class ProtocolDecl;
   struct SILDeclRef;

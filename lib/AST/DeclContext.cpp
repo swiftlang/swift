@@ -68,8 +68,8 @@ DeclContext::getAsNominalTypeOrNominalTypeExtensionContext() const {
     return nullptr;
   }
 
-  case DeclContextKind::NominalTypeDecl:
-    return const_cast<NominalTypeDecl *>(cast<NominalTypeDecl>(this));
+  case DeclContextKind::GenericTypeDecl:
+    return const_cast<NominalTypeDecl*>(dyn_cast<NominalTypeDecl>(this));
   }
 }
 
@@ -133,8 +133,8 @@ Type DeclContext::getDeclaredTypeOfContext() const {
     return Type();
   }
 
-  case DeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(this)->getDeclaredType();
+  case DeclContextKind::GenericTypeDecl:
+    return cast<GenericTypeDecl>(this)->getDeclaredType();
   }
   llvm_unreachable("bad DeclContextKind");
 }
@@ -168,8 +168,10 @@ Type DeclContext::getDeclaredTypeInContext() const {
     return type;
   }
 
-  case DeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(this)->getDeclaredTypeInContext();
+  case DeclContextKind::GenericTypeDecl:
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
+      return NTD->getDeclaredTypeInContext();
+    return Type();
   }
   llvm_unreachable("bad DeclContextKind");
 }
@@ -204,9 +206,9 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
       continue;
     }
 
-    case DeclContextKind::NominalTypeDecl: {
-      auto NTD = cast<NominalTypeDecl>(dc);
-      if (auto GP = NTD->getGenericParams())
+    case DeclContextKind::GenericTypeDecl: {
+      auto GTD = cast<GenericTypeDecl>(dc);
+      if (auto GP = GTD->getGenericParams())
         return GP;
       continue;
     }
@@ -245,9 +247,9 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
       continue;
     }
 
-    case DeclContextKind::NominalTypeDecl: {
-      auto NTD = cast<NominalTypeDecl>(dc);
-      if (auto genericSig = NTD->getGenericSignature())
+    case DeclContextKind::GenericTypeDecl: {
+      auto GTD = cast<GenericTypeDecl>(dc);
+      if (auto genericSig = GTD->getGenericSignature())
         return genericSig;
       continue;
     }
@@ -296,7 +298,7 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
     case DeclContextKind::ExtensionDecl:
     case DeclContextKind::FileUnit:
     case DeclContextKind::Module:
-    case DeclContextKind::NominalTypeDecl:
+    case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::SubscriptDecl:
       // Not in a method context.
@@ -323,7 +325,7 @@ DeclContext *DeclContext::getInnermostTypeContext() {
       return nullptr;
 
     case DeclContextKind::ExtensionDecl:
-    case DeclContextKind::NominalTypeDecl:
+    case DeclContextKind::GenericTypeDecl:
       return Result;
     }
   }
@@ -349,8 +351,8 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
     case DeclContextKind::SubscriptDecl:
       return cast<SubscriptDecl>(DC);
         
-    case DeclContextKind::NominalTypeDecl:
-      return cast<NominalTypeDecl>(DC);
+    case DeclContextKind::GenericTypeDecl:
+      return cast<GenericTypeDecl>(DC);
 
     case DeclContextKind::ExtensionDecl:
       return cast<ExtensionDecl>(DC);
@@ -411,8 +413,8 @@ bool DeclContext::isGenericContext() const {
         return true;
       continue;
 
-    case DeclContextKind::NominalTypeDecl:
-      if (cast<NominalTypeDecl>(dc)->getGenericParams())
+    case DeclContextKind::GenericTypeDecl:
+      if (cast<GenericTypeDecl>(dc)->getGenericParams())
         return true;
       continue;
 
@@ -463,8 +465,8 @@ bool DeclContext::isInnermostContextGeneric() const {
     return (cast<AbstractFunctionDecl>(this)->getGenericParams() != nullptr);
   case DeclContextKind::ExtensionDecl:
     return (cast<ExtensionDecl>(this)->getGenericParams() != nullptr);
-  case DeclContextKind::NominalTypeDecl:
-    return (cast<NominalTypeDecl>(this)->getGenericParams() != nullptr);
+  case DeclContextKind::GenericTypeDecl:
+    return (cast<GenericTypeDecl>(this)->getGenericParams() != nullptr);
   default:
     return false;
   }
@@ -512,8 +514,8 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   case DeclContextKind::FileUnit:
     return true;
 
-  case DeclContextKind::NominalTypeDecl: {
-    auto *nominal = cast<NominalTypeDecl>(this);
+  case DeclContextKind::GenericTypeDecl: {
+    auto *nominal = cast<GenericTypeDecl>(this);
     if (nominal->hasAccessibility())
       return nominal->getFormalAccess() > Accessibility::Private;
     break;
@@ -547,8 +549,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<FileUnit>(this)->walk(Walker);
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->walk(Walker);
-  case DeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(this)->walk(Walker);
+  case DeclContextKind::GenericTypeDecl:
+    return cast<GenericTypeDecl>(this)->walk(Walker);
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->walk(Walker);
   case DeclContextKind::TopLevelCodeDecl:
@@ -615,8 +617,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::AbstractClosureExpr:
     Kind = "AbstractClosureExpr";
     break;
-  case DeclContextKind::NominalTypeDecl:
-    switch (cast<NominalTypeDecl>(this)->getKind()) {
+  case DeclContextKind::GenericTypeDecl:
+    switch (cast<GenericTypeDecl>(this)->getKind()) {
 #define NOMINAL_TYPE_DECL(ID, PARENT) \
     case DeclKind::ID: Kind = #ID "Decl"; break;
 #define DECL(ID, PARENT) \
@@ -659,8 +661,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     OS << " line=" << getLineNumber(cast<AbstractClosureExpr>(this));
     OS << " : " << cast<AbstractClosureExpr>(this)->getType();
     break;
-  case DeclContextKind::NominalTypeDecl:
-    OS << " name=" << cast<NominalTypeDecl>(this)->getName();
+  case DeclContextKind::GenericTypeDecl:
+    OS << " name=" << cast<GenericTypeDecl>(this)->getName();
     break;
   case DeclContextKind::ExtensionDecl:
     OS << " line=" << getLineNumber(cast<ExtensionDecl>(this));

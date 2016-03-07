@@ -935,4 +935,3 @@ extension UTF16 {
     fatalError("unavailable function can't be called")
   }
 }
-

@@ -169,10 +169,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     Buffer << "<serialized local context>";
     return;
 
-  case DeclContextKind::NominalTypeDecl: {
-    const NominalTypeDecl *Nominal = cast<NominalTypeDecl>(Context);
-    printFullContext(Nominal->getDeclContext(), Buffer);
-    Buffer << Nominal->getName() << ".";
+  case DeclContextKind::GenericTypeDecl: {
+    auto *generic = cast<GenericTypeDecl>(Context);
+    printFullContext(generic->getDeclContext(), Buffer);
+    Buffer << generic->getName() << ".";
     return;
   }
 
@@ -968,6 +968,17 @@ public:
     }
     
     *this << getIDAndType(MU->getOperand());
+  }
+  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
+    *this << "mark_uninitialized_behavior "
+          << getID(MU->getInitStorageFunc());
+    printSubstitutions(MU->getInitStorageSubstitutions());
+    *this << '(' << getID(MU->getStorage()) << ") : "
+          << MU->getInitStorageFunc()->getType() << ", "
+          << getID(MU->getSetterFunc());
+    printSubstitutions(MU->getSetterSubstitutions());
+    *this << '(' << getID(MU->getSelf()) << ") : "
+          << MU->getSetterFunc()->getType();
   }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     *this << "mark_function_escape ";

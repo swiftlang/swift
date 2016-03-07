@@ -3208,7 +3208,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   return CS.solveSingle().hasValue();
 }
 
-bool canPossiblySatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind) {
+bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
+                bool AllowFreeVariables) {
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
@@ -3230,13 +3231,19 @@ bool canPossiblySatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind) 
   CS.addConstraint(Constraint::create(CS, Kind, T1, T2, DeclName(),
                                       CS.getConstraintLocator(nullptr)));
   SmallVector<Solution, 4> Solutions;
-  return !CS.solve(Solutions, FreeTypeVariableBinding::Allow);
+  return AllowFreeVariables ?
+          !CS.solve(Solutions, FreeTypeVariableBinding::Allow) :
+          CS.solveSingle().hasValue();
 }
 
 bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canPossiblySatisfy(T1, T2, DC, ConstraintKind::Equal);
+  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, true);
 }
 
 bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
-  return canPossiblySatisfy(T1, T2, DC, ConstraintKind::Conversion);
+  return canSatisfy(T1, T2, DC, ConstraintKind::Conversion, true);
+}
+
+bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
+  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, false);
 }

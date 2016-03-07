@@ -106,9 +106,9 @@ def instrument_test(driver_path, test, num_samples):
                                        float(len(test_outputs))))
     avg_test_output[num_samples_index] = num_samples
     avg_test_output[min_index] = min(test_outputs,
-                                     key=lambda x: x[min_index])[min_index]
+                                     key=lambda x: int(x[min_index]))[min_index]
     avg_test_output[max_index] = max(test_outputs,
-                                     key=lambda x: x[max_index])[max_index]
+                                     key=lambda x: int(x[max_index]))[max_index]
     avg_test_output = map(str, avg_test_output)
 
     return avg_test_output

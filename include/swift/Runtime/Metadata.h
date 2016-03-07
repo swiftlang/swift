@@ -120,8 +120,7 @@ struct External {
   using RelativeDirectPointer = std::make_signed<StoredPointer>;
 };
 
-/// Template template for branching on native pointer types versus
-/// external ones
+/// Template for branching on native pointer types versus external ones
 template <typename Runtime, template <typename> class Pointee>
 using TargetMetadataPointer
   = typename Runtime::template Pointer<Pointee<Runtime>>;
@@ -1223,9 +1222,9 @@ public:
     case MetadataKind::Class: {
       const auto cls = static_cast<const TargetClassMetadata<Runtime> *>(this);
       if (!cls->isTypeMetadata())
-        return nullptr;
+        return 0;
       if (cls->isArtificialSubclass())
-        return nullptr;
+        return 0;
       return cls->getDescription();
     }
     case MetadataKind::Struct:
@@ -1243,7 +1242,7 @@ public:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
-      return nullptr;
+      return 0;
     }
   }
   
@@ -1380,7 +1379,7 @@ struct EnumTypeDescriptor;
 template <typename Runtime>
 struct TargetNominalTypeDescriptor {
   using StoredPointer = typename Runtime::StoredPointer;
-  /// The mangled name of the nominal type, with no generic parameters.
+  /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
   
   /// The following fields are kind-dependent.
@@ -1629,11 +1628,11 @@ public:
   /// created for various dynamic purposes like KVO?
   bool isArtificialSubclass() const {
     assert(isTypeMetadata());
-    return Description == nullptr;
+    return Description == 0;
   }
   void setArtificialSubclass() {
     assert(isTypeMetadata());
-    Description = nullptr;
+    Description = 0;
   }
 
   ClassFlags getFlags() const {
@@ -1774,7 +1773,7 @@ using HeapLocalVariableMetadata
 /// Swift-compiled.
 template <typename Runtime>
 struct TargetObjCClassWrapperMetadata : public TargetMetadata<Runtime> {
-  const TargetClassMetadata<Runtime> *Class;
+  ConstTargetMetadataPointer<Runtime, TargetClassMetadata> Class;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::ObjCClassWrapper;
@@ -1915,6 +1914,7 @@ using ForeignClassMetadata = TargetForeignClassMetadata<InProcess>;
 /// The common structure of metadata for structs and enums.
 template <typename Runtime>
 struct TargetValueMetadata : public TargetMetadata<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
   TargetValueMetadata(MetadataKind Kind,
     ConstTargetMetadataPointer<Runtime, TargetNominalTypeDescriptor>
                       description,
@@ -1949,6 +1949,12 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this);
     return (asWords + Description->GenericParams.Offset);
   }
+
+  StoredPointer offsetToDescriptorOffset() const {
+    auto DescriptionAddress = (uint8_t *)&this->Description;
+    auto ThisAddress = (uint8_t *)this;
+    return DescriptionAddress - ThisAddress;
+  }
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 
@@ -1974,12 +1980,6 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
       return nullptr;
     
     return getter(this);
-  }
-
-  StoredPointer offsetToDescriptorOffset() const {
-    auto DescriptionAddress = (uint8_t *)&this->Description;
-    auto ThisAddress = (uint8_t *)this;
-    return DescriptionAddress - ThisAddress;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -2019,12 +2019,6 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
     return *asWords;
   }
 
-  StoredPointer offsetToDescriptorOffset() const {
-    auto DescriptionAddress = (uint8_t *)&this->Description;
-    auto ThisAddress = (uint8_t *)this;
-    return DescriptionAddress - ThisAddress;
-  }
-
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Enum
       || metadata->getKind() == MetadataKind::Optional;
@@ -2036,19 +2030,21 @@ using EnumMetadata = TargetEnumMetadata<InProcess>;
 template <typename Runtime>
 struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
+
+  // TODO: Make this target agnostic
   using Argument = FlaggedPointer<const TargetMetadata<Runtime> *, 0>;
 
-  FunctionTypeFlags Flags;
+  TargetFunctionTypeFlags<Runtime> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, TargetMetadata> ResultType;
 
-  Argument *getArguments() {
-    return reinterpret_cast<Argument *>(this + 1);
+  TargetPointer<Runtime, Argument> getArguments() {
+    return reinterpret_cast<TargetPointer<Runtime, Argument>>(this + 1);
   }
 
-  const Argument *getArguments() const {
-    return reinterpret_cast<const Argument *>(this + 1);
+  TargetPointer<Runtime, const Argument> getArguments() const {
+    return reinterpret_cast<TargetPointer<Runtime, const Argument>>(this + 1);
   }
   
   StoredSize getNumArguments() const {
@@ -2058,6 +2054,8 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getConvention();
   }
   bool throws() const { return Flags.throws(); }
+
+  static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Function;
@@ -2107,11 +2105,11 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     }
   };
 
-  Element *getElements() {
+  TargetPointer<Runtime, Element> getElements() {
     return reinterpret_cast<TargetPointer<Runtime, Element>>(this + 1);
   }
 
-  const Element *getElements() const {
+  TargetPointer<Runtime, const Element> getElements() const {
     return reinterpret_cast<TargetPointer<Runtime, const Element>>(this + 1);
   }
 
@@ -2122,6 +2120,8 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   Element &getElement(unsigned i) {
     return getElements()[i];
   }
+
+  static constexpr StoredSize OffsetToNumElements = sizeof(TargetMetadata<Runtime>);
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Tuple;
@@ -2141,19 +2141,27 @@ struct TargetProtocolDescriptorList {
   using StoredPointer = typename Runtime::StoredPointer;
   StoredPointer NumProtocols;
 
-  const TargetProtocolDescriptor<Runtime> **getProtocols() {
-    return reinterpret_cast<const TargetProtocolDescriptor<Runtime> **>(this + 1);
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> *
+  getProtocols() {
+    return reinterpret_cast<
+      ConstTargetMetadataPointer<
+        Runtime, TargetProtocolDescriptor> *>(this + 1);
   }
   
-  const TargetProtocolDescriptor<Runtime> * const *getProtocols() const {
-    return reinterpret_cast<const TargetProtocolDescriptor<Runtime> * const *>(this + 1);
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const *
+  getProtocols() const {
+    return reinterpret_cast<
+      ConstTargetMetadataPointer<
+        Runtime, TargetProtocolDescriptor> const *>(this + 1);
   }
   
-  const TargetProtocolDescriptor<Runtime> *operator[](size_t i) const {
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const &
+  operator[](size_t i) const {
     return getProtocols()[i];
   }
   
-  const TargetProtocolDescriptor<Runtime> *&operator[](size_t i) {
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> &
+  operator[](size_t i) {
     return getProtocols()[i];
   }
 
@@ -2173,9 +2181,11 @@ struct TargetLiteralProtocolDescriptorList
   
   template<typename...DescriptorPointers>
   constexpr TargetLiteralProtocolDescriptorList(DescriptorPointers...elements)
-    : TargetProtocolDescriptorList<Runtime>(NUM_PROTOCOLS), Protocols{elements...}
+    : TargetProtocolDescriptorList<Runtime>(NUM_PROTOCOLS),
+      Protocols{elements...}
   {}
 };
+using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
   
 /// A protocol descriptor. This is not type metadata, but is referenced by
 /// existential type metadata records to describe a protocol constraint.
@@ -2183,19 +2193,24 @@ struct TargetLiteralProtocolDescriptorList
 /// layout.
 template <typename Runtime>
 struct TargetProtocolDescriptor {
+  using StoredPointer = typename Runtime::StoredPointer;
   /// Unused by the Swift runtime.
-  const void *_ObjC_Isa;
+  TargetPointer<Runtime, const void> _ObjC_Isa;
   
   /// The mangled name of the protocol.
-  const char *Name;
+  TargetPointer<Runtime, const char> Name;
   
   /// The list of protocols this protocol refines.
-  const TargetProtocolDescriptorList<Runtime> *InheritedProtocols;
+  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
+  InheritedProtocols;
   
   /// Unused by the Swift runtime.
-  const void *_ObjC_InstanceMethods, *_ObjC_ClassMethods,
-             *_ObjC_OptionalInstanceMethods, *_ObjC_OptionalClassMethods,
-             *_ObjC_InstanceProperties;
+  TargetPointer<Runtime, const void>
+  _ObjC_InstanceMethods,
+  _ObjC_ClassMethods,
+  _ObjC_OptionalInstanceMethods,
+  _ObjC_OptionalClassMethods,
+  _ObjC_InstanceProperties;
   
   /// Size of the descriptor record.
   uint32_t DescriptorSize;
@@ -2229,8 +2244,8 @@ struct TargetProtocolDescriptor {
   }
 
   constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
-                               const TargetProtocolDescriptorList<Runtime> *Inherited,
-                               ProtocolDescriptorFlags Flags)
+                        const TargetProtocolDescriptorList<Runtime> *Inherited,
+                        ProtocolDescriptorFlags Flags)
     : _ObjC_Isa(nullptr), Name(Name), InheritedProtocols(Inherited),
       _ObjC_InstanceMethods(nullptr), _ObjC_ClassMethods(nullptr),
       _ObjC_OptionalInstanceMethods(nullptr),
@@ -2304,6 +2319,7 @@ enum class ExistentialTypeRepresentation {
 /// The structure of existential type metadata.
 template <typename Runtime>
 struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
   /// The number of witness tables and class-constrained-ness of the type.
   ExistentialTypeFlags Flags;
   /// The protocol constraints.
@@ -2354,6 +2370,10 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Existential;
   }
+
+  static constexpr StoredPointer
+  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(Flags);
+
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;

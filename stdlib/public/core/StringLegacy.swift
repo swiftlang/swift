@@ -53,19 +53,6 @@ extension String {
   public init(_ _c: UnicodeScalar) {
     self = String(repeating: _c, count: 1)
   }
-
-  @warn_unused_result
-  internal func _isAll(@noescape predicate: (UnicodeScalar) -> Bool) -> Bool {
-    for c in unicodeScalars { if !predicate(c) { return false } }
-
-    return true
-  }
-
-  internal var _isAlpha: Bool { return _isAll({ $0._isAlpha }) }
-
-  internal var _isDigit: Bool { return _isAll({ $0._isDigit }) }
-
-  internal var _isSpace: Bool { return _isAll({ $0._isSpace }) }
 }
 
 #if _runtime(_ObjC)
@@ -139,17 +126,6 @@ extension String {
 }
 
 extension String {
-  /// Produce a substring of the given string from the given character
-  /// index to the end of the string.
-  func _substr(from start: Int) -> String {
-    let rng = unicodeScalars
-    var startIndex = rng.startIndex
-    for _ in 0..<start {
-      startIndex._successorInPlace()
-    }
-    return String(rng[startIndex..<rng.endIndex])
-  }
-
   /// Split the given string at the given delimiter character, returning the
   /// strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
@@ -184,14 +160,6 @@ extension String {
       }
     }
     return (self, "🎃", String(), false)
-  }
-
-  /// Split the given string at each occurrence of a character for which
-  /// the given predicate evaluates true, returning an array of strings that
-  /// before/between/after those delimiters.
-  func _splitIf(predicate: (UnicodeScalar) -> Bool) -> [String] {
-    let scalarSlices = unicodeScalars.split(isSeparator: predicate)
-    return scalarSlices.map { String($0) }
   }
 }
 

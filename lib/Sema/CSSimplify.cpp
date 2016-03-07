@@ -3120,8 +3120,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (constraint.getKind() == ConstraintKind::TypeMember) {
     // If the base type was an optional, try to look through it.
     if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
+      // Determine whether or not we want to provide an optional chaining fixit or
+      // a force unwrap fixit.
+      bool optionalChain;
+      if (!contextualType)
+        optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
+      else
+        optionalChain = !contextualType->getOptionalObjectType().isNull();
+      auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
+
       // Note the fix.
-      if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
+      if (recordFix(fixKind, constraint.getLocator()))
         return SolutionKind::Error;
       
       // Look through one level of optional.
@@ -3144,8 +3153,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
     
+    // Determine whether or not we want to provide an optional chaining fixit or
+    // a force unwrap fixit.
+    bool optionalChain;
+    if (!contextualType)
+      optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
+    else
+      optionalChain = !contextualType->getOptionalObjectType().isNull();
+    auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
+
     // Note the fix.
-    if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
+    if (recordFix(fixKind, constraint.getLocator()))
       return SolutionKind::Error;
     
     // Look through one level of optional.
@@ -4142,6 +4160,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     return matchTypes(type1, type2, matchKind, subFlags, locator);
 
   case FixKind::ForceOptional:
+  case FixKind::OptionalChaining:
     // Assume that '!' was applied to the first type.
     return matchTypes(type1->getRValueObjectType()->getOptionalObjectType(),
                       type2, matchKind, subFlags, locator);

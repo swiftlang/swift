@@ -15,7 +15,7 @@ import TestsUtils
 @inline(never)
 public func run_UTF8Decode(N: Int) {
   // 1-byte sequences
-  // This test case is the longest as it's the most perfomance sensitive.
+  // This test case is the longest as it's the most performance sensitive.
   let ascii = "Swift is a multi-paradigm, compiled programming language created for iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is designed to work with Apple's Cocoa and Cocoa Touch frameworks and the large body of existing Objective-C code written for Apple products. Swift is intended to be more resilient to erroneous code (\"safer\") than Objective-C and also more concise. It is built with the LLVM compiler framework included in Xcode 6 and later and uses the Objective-C runtime, which allows C, Objective-C, C++ and Swift code to run within a single program."
   // 2-byte sequences
   let russian = "Ру́сский язы́к один из восточнославянских языков, национальный язык русского народа."

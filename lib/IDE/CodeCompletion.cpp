@@ -820,7 +820,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (Ty.getCanonicalTypeOrNull() == ExpectedTy.getCanonicalTypeOrNull())
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
-  if (isConvertibleTo(Ty, ExpectedTy, DC))
+  if (isConvertibleTo(Ty, ExpectedTy, *DC))
     return CodeCompletionResult::ExpectedTypeRelation::Convertible;
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
     if (FT->getResult()->isVoid())
@@ -3444,7 +3444,7 @@ public:
     for (unsigned I = 0; I < ExprTypes.size(); ++ I) {
       auto Ty = ExprTypes[I];
       if (Ty && !Ty->is<ErrorType>()) {
-        if (!isConvertibleTo(Ty, TupleEles[I], DC)) {
+        if (!isConvertibleTo(Ty, TupleEles[I], *DC)) {
           return false;
         }
       }

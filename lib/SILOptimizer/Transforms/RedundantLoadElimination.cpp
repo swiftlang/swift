@@ -804,7 +804,7 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
     L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
-  // If we cant figure out the Base or Projection Path for the write,
+  // If we can't figure out the Base or Projection Path for the write,
   // process it as an unknown memory instruction.
   if (!L.isValid()) {
     // we can ignore unknown store instructions if we are computing the
@@ -861,7 +861,7 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
     L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
-  // If we cant figure out the Base or Projection Path for the read, simply
+  // If we can't figure out the Base or Projection Path for the read, simply
   // ignore it for now.
   if (!L.isValid())
     return;

@@ -35,6 +35,10 @@ typedef struct MemoryReaderImpl {
   /// Get the size in bytes of the target's size type.
   uint8_t (*getSizeSize)();
 
+  // FIXME: -Wdocumentation complains about \param and \returns on function pointers.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdocumentation"
+
   /// Read a sequence of bytes at an address in the target.
   ///
   /// \param address the address in the target address space
@@ -60,6 +64,9 @@ typedef struct MemoryReaderImpl {
   /// \param address the address in the target address space
   /// \returns The length of the string or 0 if the scan was unsuccessful.
   uint64_t (*getStringLength)(addr_t address);
+
+#pragma clang diagnostic pop
+
 } MemoryReaderImpl;
 
 #ifdef __cplusplus

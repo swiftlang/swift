@@ -474,8 +474,10 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
     break;
   }
 
-  case DeclContextKind::NominalTypeDecl: {
-    auto nominal = cast<NominalTypeDecl>(container);
+  case DeclContextKind::GenericTypeDecl: {
+    auto nominal = dyn_cast<NominalTypeDecl>(container);
+    if (!nominal) break;
+    
     auto lookupResults = nominal->lookupDirect(name);
 
     // Filter out declarations from other modules.

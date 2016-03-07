@@ -37,7 +37,9 @@ namespace swift {
   /// \brief Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
-  bool isConvertibleTo(Type T1, Type T2, DeclContext *DC);
+  bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
+
+  bool isEqual(Type T1, Type T2, DeclContext &DC);
 
   bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
 

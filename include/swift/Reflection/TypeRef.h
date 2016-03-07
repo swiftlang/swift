@@ -551,13 +551,15 @@ public:
 
   void visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     printHeader("foreign");
-    printField("name", F->getName());
+    if (!F->getName().empty())
+      printField("name", F->getName());
     OS << ')';
   }
 
   void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     printHeader("objective-c-class");
-    printField("name", OC->getName());
+    if (!OC->getName().empty())
+      printField("name", OC->getName());
     OS << ')';
   }
 

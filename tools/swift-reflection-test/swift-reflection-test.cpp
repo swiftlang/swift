@@ -60,7 +60,7 @@ Action(llvm::cl::desc("Mode:"),
          clEnumValN(ActionType::DumpHeapInstance,
                     "dump-heap-instance",
                     "Dump the field layout for a heap instance by running "
-                    "a swift exectuable"),
+                    "a Swift executable"),
          clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -313,6 +313,7 @@ static bool machReadBytes(const addr_t Address, uint8_t *Dest, uint64_t Size) {
   mach_msg_type_number_t SizeRead = 0;
   vm_offset_t Data = 0;
   auto Result = vm_read(childTask, Address, Size, &Data, &SizeRead);
+  guardMachError(Result, "vm_read");
   if (Result == KERN_SUCCESS && SizeRead == Size) {
     memmove(reinterpret_cast<void *>(Dest),
             reinterpret_cast<void *>(Data), Size);
@@ -416,14 +417,13 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
 
       error = mach_port_deallocate(mach_task_self(), childPort);
       guardMachError(error, "mach_port_deallocate");
-      exit(EXIT_SUCCESS);
     }
   }
 
+  kill(pid, SIGTERM);
+
   error = task_set_bootstrap_port(mach_task_self(), bootstrap_port);
   guardMachError(error, "reset task_set_bootstrap_port");
-
-  kill(pid, SIGTERM);
 
   error = mach_port_deallocate(mach_task_self(), childPort);
   guardMachError(error, "mach_port_deallocate");

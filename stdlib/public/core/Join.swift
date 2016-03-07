@@ -197,4 +197,3 @@ extension Sequence where Iterator.Element : Sequence {
     fatalError("unavailable function can't be called")
   }
 }
-

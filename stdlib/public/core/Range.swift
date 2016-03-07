@@ -245,4 +245,3 @@ extension Range {
     fatalError("unavailable function can't be called")
   }
 }
-

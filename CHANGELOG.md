@@ -2,6 +2,17 @@
 Swift 3
 -------
 
+* The @noescape attribute has been extended to be a more general type attribute.
+  You can now declare values of @noescape function type, e.g. in manually
+  curried function signatures.  You can now also declare local variables of
+  @noescape type, and use @noescape in typealiases.  For example, this is now
+  valid code:
+
+    func apply<T, U>(@noescape f: T -> U,
+                     @noescape g: (@noescape T -> U) -> U) -> U {
+      return g(f)
+    }
+
 * Curried function syntax has been removed, and now produces a compile-time
   error.
 

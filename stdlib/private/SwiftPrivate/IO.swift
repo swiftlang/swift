@@ -128,4 +128,3 @@ public struct _FDOutputStream : OutputStream {
     isClosed = true
   }
 }
-

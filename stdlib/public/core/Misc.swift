@@ -164,4 +164,3 @@ func _floorLog2(x: Int64) -> Int {
   // overflow.
   return 63 &- Int(_countLeadingZeros(x))
 }
-

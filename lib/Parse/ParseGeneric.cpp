@@ -38,7 +38,8 @@ ParserResult<GenericParamList> Parser::parseGenericParameters() {
   return parseGenericParameters(consumeStartingLess());
 }
 
-ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLoc) {
+ParserResult<GenericParamList>
+Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the generic parameter list.
   SmallVector<GenericTypeParamDecl *, 4> GenericParams;
   bool Invalid = false;
@@ -109,7 +110,8 @@ ParserResult<GenericParamList> Parser::parseGenericParameters(SourceLoc LAngleLo
   SmallVector<RequirementRepr, 4> Requirements;
   bool FirstTypeInComplete;
   if (Tok.is(tok::kw_where) &&
-      parseGenericWhereClause(WhereLoc, Requirements, FirstTypeInComplete).isError()) {
+      parseGenericWhereClause(WhereLoc, Requirements,
+                              FirstTypeInComplete).isError()) {
     Invalid = true;
   }
   

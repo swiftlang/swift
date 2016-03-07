@@ -2216,7 +2216,7 @@
         key.usr: "s:FC8__main__5SubC28protMethFPS_4Prot_T_",
         key.offset: 1068,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.method.instance>override <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>override</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>protMeth</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.inherits: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
@@ -2408,7 +2408,7 @@
         key.usr: "s:FC8__main__3SB13fooFT_T_",
         key.offset: 1553,
         key.length: 56,
-        key.fully_annotated_decl: "<decl.function.method.instance>override <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>override</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>",
         key.inherits: [
           {
             key.kind: source.lang.swift.ref.function.method.instance,
@@ -2574,7 +2574,7 @@
     ],
     key.offset: 1868,
     key.length: 53,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;T : <decl.function.returntype><ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.function.returntype><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param>.<ref.associatedtype usr=\"s:P8__main__5Prot27Element\">Element</ref.associatedtype></decl.function.returntype> == <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype>&gt;(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\"><decl.generic_type_param.name>T</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param>.<ref.associatedtype usr=\"s:P8__main__5Prot27Element\">Element</ref.associatedtype> == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement>&gt;(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,

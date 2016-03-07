@@ -427,6 +427,8 @@ StringRef Fix::getName(FixKind kind) {
     return "prevent fixes";
   case FixKind::ForceOptional:
     return "fix: force optional";
+  case FixKind::OptionalChaining:
+    return "fix: optional chaining";
   case FixKind::ForceDowncast:
     return "fix: force downcast";
   case FixKind::AddressOf:

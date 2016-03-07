@@ -490,7 +490,7 @@ ERROR(sil_member_decl_not_found,none,
 ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
-      "substitution conformances dont match archetype", ())
+      "substitution conformances don't match archetype", ())
 ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,
@@ -551,10 +551,6 @@ ERROR(sil_witness_assoc_not_found,none,
       "sil associated type decl not found %0", (Identifier))
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
-
-// SIL Default Witness Table
-ERROR(sil_invalid_minimum_witness_table_size,none,
-      "minimum witness table size must be an integer", ())
 
 // SIL Coverage Map
 ERROR(sil_coverage_func_not_found, none,

@@ -812,4 +812,3 @@ extension Mirror : CustomReflectable {
 
 @available(*, unavailable, renamed="MirrorPath")
 public typealias MirrorPathType = MirrorPath
-

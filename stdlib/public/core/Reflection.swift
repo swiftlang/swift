@@ -584,4 +584,3 @@ extension ObjectIdentifier {
     fatalError("unavailable function can't be called")
   }
 }
-

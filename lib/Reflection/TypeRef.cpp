@@ -1,4 +1,4 @@
-//===--- TypeRef.h - Swift Type References for Reflection -------*- C++ -*-===//
+//===--- TypeRef.cpp - Swift Type References for Reflection ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -35,7 +35,7 @@ void TypeRef::dump() const {
 
 void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeRef(OS, Indent).visit(this);
-  OS << "\n";
+  OS << std::endl;
 }
 
 TypeRefPointer TypeRef::substituteGenerics(ConstTypeRefVector &Substitutions) {
@@ -45,6 +45,10 @@ TypeRefPointer TypeRef::substituteGenerics(ConstTypeRefVector &Substitutions) {
 TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
   using NodeKind = Demangle::Node::Kind;
   switch (Node->getKind()) {
+    case NodeKind::Global:
+      return fromDemangleNode(Node->getChild(0));
+    case NodeKind::TypeMangling:
+      return fromDemangleNode(Node->getChild(0));
     case NodeKind::Type:
       return fromDemangleNode(Node->getChild(0));
     case NodeKind::BoundGenericClass:
@@ -75,6 +79,20 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     case NodeKind::Metatype: {
       auto instance = fromDemangleNode(Node->getChild(0));
       return MetatypeTypeRef::create(instance);
+    }
+    case NodeKind::ProtocolList: {
+      TypeRefVector Protocols;
+      auto TypeList = Node->getChild(0);
+      for (auto Type : *TypeList) {
+        if (auto Protocol = fromDemangleNode(Type))
+          Protocols.push_back(Protocol);
+        else
+          return nullptr;
+      }
+      if (Protocols.size() == 1)
+        return Protocols.front();
+      else
+        return ProtocolCompositionTypeRef::create(Protocols);
     }
     case NodeKind::Protocol: {
       auto moduleName = Node->getChild(0)->getText();

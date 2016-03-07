@@ -128,6 +128,24 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
   checkRange((UInt.max-10)..<(UInt.max-1))
 }
 
+HashingTestSuite.test("String/hashValue/topBitsSet") {
+#if _runtime(_ObjC)
+#if arch(x86_64) || arch(arm64)
+  // Make sure that we don't accidentally throw away bits by storing the result
+  // of NSString.hash into an int in the runtime.
+
+  // This is the bit pattern that we xor to NSString's hash value.
+  let hashOffset = UInt(bitPattern: 0x429b_1266_0000_0000)
+  let hash = "efghijkl".hashValue
+  // When we are not equal to the top bit of the xor'ed hashOffset pattern
+  // there where some bits set.
+  let topHashBits = UInt(bitPattern: hash) & 0xffff_ffff_0000_0000
+  expectTrue(hash > 0)
+  expectTrue(topHashBits != hashOffset)
+#endif
+#endif
+}
+
 HashingTestSuite.test("overridePerExecutionHashSeed/overflow") {
   // Test that we don't use checked arithmetic on the seed.
   _HashingDetail.fixedSeedOverride = UInt64.max

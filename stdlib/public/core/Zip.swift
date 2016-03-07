@@ -96,4 +96,3 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
   internal let _sequence1: Sequence1
   internal let _sequence2: Sequence2
 }
-

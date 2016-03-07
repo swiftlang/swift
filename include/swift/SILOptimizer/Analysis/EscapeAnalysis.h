@@ -575,7 +575,7 @@ public:
     /// program, displaying the connection graph. This depends on there being a
     /// dot graph viewer program, like 'graphviz', in your path.
     ///
-    /// Defer-edges are grey, points-to edges are black.
+    /// Defer-edges are gray, points-to edges are black.
     /// Content nodes are rounded rectangles, argument/return nodes are bold.
     /// Global escaping nodes are red, argument escaping nodes are blue.
     void viewCG() const;

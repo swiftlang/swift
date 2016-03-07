@@ -497,4 +497,3 @@ extension Sequence where Iterator.Element : Comparable {
     fatalError("unavailable function can't be called")
   }
 }
-

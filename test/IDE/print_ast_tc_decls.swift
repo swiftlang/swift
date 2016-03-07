@@ -422,6 +422,26 @@ class d0120_TestClassBase {
     return 0
   }
 // PASS_COMMON-NEXT: {{^}}  subscript(i: Int) -> Int { get }{{$}}
+
+  class var baseClassVar1: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  class var baseClassVar1: Int { get }{{$}}
+
+  // FIXME: final class var not allowed to have storage, but static is?
+  // final class var baseClassVar2: Int = 0
+
+  final class var baseClassVar3: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  final class var baseClassVar3: Int { get }{{$}}
+  static var baseClassVar4: Int = 0
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar4: Int{{$}}
+  static var baseClassVar5: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar5: Int { get }{{$}}
+
+  class func baseClassFunc1() {}
+// PASS_COMMON-NEXT: {{^}}  class func baseClassFunc1(){{$}}
+  final class func baseClassFunc2() {}
+// PASS_COMMON-NEXT: {{^}}  final class func baseClassFunc2(){{$}}
+  static func baseClassFunc3() {}
+// PASS_COMMON-NEXT: {{^}}  static func baseClassFunc3(){{$}}
 }
 
 class d0121_TestClassDerived : d0120_TestClassBase {

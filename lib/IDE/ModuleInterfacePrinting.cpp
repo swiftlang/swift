@@ -85,11 +85,11 @@ private:
     return OtherPrinter.printSynthesizedExtensionPost(ED, NTD);
   }
 
-  void printParameterPre(PrintParameterKind Kind) override {
-    return OtherPrinter.printParameterPre(Kind);
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePre(Kind, D);
   }
-  void printParameterPost(PrintParameterKind Kind) override {
-    return OtherPrinter.printParameterPost(Kind);
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    return OtherPrinter.printStructurePost(Kind, D);
   }
 
   void printNamePre(PrintNameContext Context) override {
@@ -446,17 +446,16 @@ void swift::ide::printSubmoduleInterface(
             continue;
 
           // Print synthesized extensions.
-          llvm::SmallPtrSet<ExtensionDecl *, 10> ExtensionsFromConformances;
           SynthesizedExtensionAnalyzer Analyzer(NTD);
-          Analyzer.findSynthesizedExtensions(ExtensionsFromConformances);
-          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD);
-          for (auto ET : ExtensionsFromConformances) {
+          AdjustedOptions.initArchetypeTransformerForSynthesizedExtensions(NTD,
+                                                                    &Analyzer);
+          Analyzer.forEachSynthesizedExtension([&](ExtensionDecl *ET){
             if (!shouldPrint(ET, AdjustedOptions))
-              continue;
+              return;
             Printer << "\n";
             ET->print(Printer, AdjustedOptions);
             Printer << "\n";
-          }
+          });
           AdjustedOptions.clearArchetypeTransformerForSynthesizedExtensions();
         }
       }

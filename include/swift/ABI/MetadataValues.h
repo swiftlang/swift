@@ -448,8 +448,9 @@ enum class FunctionMetadataConvention: uint8_t {
 };
 
 /// Flags in a function type metadata record.
-class FunctionTypeFlags {
-  typedef size_t int_type;
+template <typename Runtime>
+class TargetFunctionTypeFlags {
+  using int_type = typename Runtime::StoredSize;
   enum : int_type {
     NumArgumentsMask = 0x00FFFFFFU,
     ConventionMask   = 0x0F000000U,
@@ -458,22 +459,24 @@ class FunctionTypeFlags {
   };
   int_type Data;
   
-  constexpr FunctionTypeFlags(int_type Data) : Data(Data) {}
+  constexpr TargetFunctionTypeFlags(int_type Data) : Data(Data) {}
 public:
-  constexpr FunctionTypeFlags() : Data(0) {}
+  constexpr TargetFunctionTypeFlags() : Data(0) {}
 
-  constexpr FunctionTypeFlags withNumArguments(unsigned numArguments) const {
-    return FunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
+  constexpr TargetFunctionTypeFlags withNumArguments(unsigned numArguments) const {
+    return TargetFunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
   }
   
-  constexpr FunctionTypeFlags withConvention(FunctionMetadataConvention c) const {
-    return FunctionTypeFlags((Data & ~ConventionMask)
+  constexpr TargetFunctionTypeFlags<Runtime>
+  withConvention(FunctionMetadataConvention c) const {
+    return TargetFunctionTypeFlags((Data & ~ConventionMask)
                              | (int_type(c) << ConventionShift));
   }
   
-  constexpr FunctionTypeFlags withThrows(bool throws) const {
-    return FunctionTypeFlags((Data & ~ThrowsMask)
-                             | (throws ? ThrowsMask : 0));
+  constexpr TargetFunctionTypeFlags<Runtime>
+  withThrows(bool throws) const {
+    return TargetFunctionTypeFlags<Runtime>((Data & ~ThrowsMask) |
+                                            (throws ? ThrowsMask : 0));
   }
   
   unsigned getNumArguments() const {
@@ -492,17 +495,18 @@ public:
     return Data;
   }
   
-  static FunctionTypeFlags fromIntValue(int_type Data) {
-    return FunctionTypeFlags(Data);
+  static TargetFunctionTypeFlags<Runtime> fromIntValue(int_type Data) {
+    return TargetFunctionTypeFlags(Data);
   }
   
-  bool operator==(FunctionTypeFlags other) const {
+  bool operator==(TargetFunctionTypeFlags<Runtime> other) const {
     return Data == other.Data;
   }
-  bool operator!=(FunctionTypeFlags other) const {
+  bool operator!=(TargetFunctionTypeFlags<Runtime> other) const {
     return Data != other.Data;
   }
 };
+using FunctionTypeFlags = TargetFunctionTypeFlags<InProcess>;
 
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.

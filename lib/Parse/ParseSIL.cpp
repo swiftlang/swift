@@ -1123,6 +1123,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("load_weak", ValueKind::LoadWeakInst)
     .Case("mark_dependence", ValueKind::MarkDependenceInst)
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
+    .Case("mark_uninitialized_behavior",
+          ValueKind::MarkUninitializedBehaviorInst)
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("objc_existential_metatype_to_object",
@@ -2211,6 +2213,75 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createMarkUninitialized(InstLoc, Val, Kind);
     break;
   }
+  
+  case ValueKind::MarkUninitializedBehaviorInst: {
+    UnresolvedValueName InitStorageFuncName, StorageName,
+                        SetterFuncName, SelfName;
+    SmallVector<ParsedSubstitution, 4> ParsedInitStorageSubs,
+                                       ParsedSetterSubs;
+    GenericParamList *InitStorageParams, *SetterParams;
+    SILType InitStorageTy, SetterTy;
+    
+    // mark_uninitialized_behavior %init<Subs>(%storage) : $T -> U,
+    //                             %set<Subs>(%self) : $V -> W
+    if (parseValueName(InitStorageFuncName)
+        || parseApplySubstitutions(ParsedInitStorageSubs)
+        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
+        || parseValueName(StorageName)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || parseSILType(InitStorageTy, InitStorageParams)
+        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || parseValueName(SetterFuncName)
+        || parseApplySubstitutions(ParsedSetterSubs)
+        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
+        || parseValueName(SelfName)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || parseSILType(SetterTy, SetterParams))
+      return true;
+    
+    // Resolve the types of the operands.
+    SILValue InitStorageFunc = getLocalValue(InitStorageFuncName,
+                                             InitStorageTy, InstLoc, B);
+    SILValue SetterFunc = getLocalValue(SetterFuncName, SetterTy, InstLoc, B);
+    
+    SmallVector<Substitution, 4> InitStorageSubs, SetterSubs;
+    if (getApplySubstitutionsFromParsed(*this, InitStorageParams,
+                                        ParsedInitStorageSubs, InitStorageSubs)
+        || getApplySubstitutionsFromParsed(*this, SetterParams,
+                                           ParsedSetterSubs, SetterSubs))
+      return true;
+    
+    auto SubstInitStorageTy = InitStorageTy.castTo<SILFunctionType>()
+      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
+                         InitStorageSubs);
+    auto SubstSetterTy = SetterTy.castTo<SILFunctionType>()
+      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
+                         SetterSubs);
+    
+    // Derive the storage type from the initStorage method.
+    auto StorageTy = SILType::getPrimitiveAddressType(
+                               SubstInitStorageTy->getSingleResult().getType());
+    auto Storage = getLocalValue(StorageName, StorageTy, InstLoc, B);
+    
+    auto SelfTy = SubstSetterTy->getSelfParameter().getSILType();
+    auto Self = getLocalValue(SelfName, SelfTy, InstLoc, B);
+    
+    auto PropTy = SubstInitStorageTy->getParameters()[0].getSILType()
+      .getAddressType();
+    
+    ResultVal = B.createMarkUninitializedBehavior(InstLoc,
+                                                  InitStorageFunc,
+                                                  InitStorageSubs,
+                                                  Storage,
+                                                  SetterFunc,
+                                                  SetterSubs,
+                                                  Self,
+                                                  PropTy);
+    break;
+  }
+  
   case ValueKind::MarkFunctionEscapeInst: {
     SmallVector<SILValue, 4> OpList;
     do {

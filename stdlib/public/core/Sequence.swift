@@ -688,4 +688,3 @@ extension Sequence where Iterator.Element : Equatable {
 
 @available(*, unavailable, renamed="IteratorSequence")
 public struct GeneratorSequence<Base : IteratorProtocol> {}
-
