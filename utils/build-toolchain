@@ -34,10 +34,10 @@ SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"
 SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
 SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
 
-if [ -e /etc/lsb-release ]; then
-    SWIFT_PACKAGE=buildbot_linux
-else
+if [[ "$(uname -s)" == "Darwin" ]] ; then
     SWIFT_PACKAGE=buildbot_osx_package
+else
+    SWIFT_PACKAGE=buildbot_linux
 fi
 
 ./utils/build-script --preset="${SWIFT_PACKAGE}" install_destdir="${SWIFT_INSTALL_DIR}" installable_package="${SWIFT_INSTALLABLE_PACKAGE}" install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" install_symroot="${SWIFT_INSTALL_SYMROOT}" symbols_package="${SYMBOLS_PACKAGE}" darwin_toolchain_bundle_identifier="${BUNDLE_IDENTIFIER}" darwin_toolchain_display_name="${DISPLAY_NAME}" darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" darwin_toolchain_version="${TOOLCHAIN_VERSION}" darwin_toolchain_alias=Local
