@@ -2342,7 +2342,11 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   /// \c GenericParams. However, we likely want to make \c GenericParams
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
-  //friend class DeclContext;
+
+  /// \brief Whether or not the generic signature of the type declaration is
+  /// currently being validated.
+  // TODO: Merge into GenericSig bits.
+  unsigned ValidatingGenericSignature = false;
 
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
@@ -2380,6 +2384,14 @@ public:
     return GenericSig;
   }
 
+  void setIsValidatingGenericSignature(bool ivgs = true) {
+    ValidatingGenericSignature = ivgs;
+  }
+  
+  bool IsValidatingGenericSignature() {
+    return ValidatingGenericSignature;
+  }
+
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
   using DeclContext::operator new;
@@ -2387,6 +2399,10 @@ public:
 
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::GenericTypeDecl;
+  }
+  static bool classof(const Decl *D) {
+    return D->getKind() >= DeclKind::First_GenericTypeDecl &&
+           D->getKind() <= DeclKind::Last_GenericTypeDecl;
   }
 };
 
@@ -2750,7 +2766,6 @@ protected:
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
-    ValidatingGenericSignature = false;
     SearchedForFailableInits = false;
     HasFailableInits = false;
     HaveConformanceLoader = false;
@@ -2781,14 +2796,6 @@ public:
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
     return IterableDeclContext::isLazy();
-  }
-  
-  void setIsValidatingGenericSignature(bool ivgs = true) {
-    ValidatingGenericSignature = ivgs;
-  }
-  
-  bool IsValidatingGenericSignature() {
-    return ValidatingGenericSignature;
   }
   
   /// \brief Returns true if this decl contains delayed value or protocol
