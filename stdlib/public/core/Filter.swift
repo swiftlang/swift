@@ -108,8 +108,7 @@ public struct LazyFilterIndex<Base : Collection> : Comparable {
 /// Returns `true` iff `lhs` is identical to `rhs`.
 @warn_unused_result
 public func == <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
+  lhs: LazyFilterIndex<Base>, rhs: LazyFilterIndex<Base>
 ) -> Bool {
   return lhs.base == rhs.base
 }
@@ -117,8 +116,7 @@ public func == <Base : Collection>(
 /// Returns `true` iff `lhs` is less than `rhs`.
 @warn_unused_result
 public func < <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
+  lhs: LazyFilterIndex<Base>, rhs: LazyFilterIndex<Base>
 ) -> Bool {
   return lhs.base < rhs.base
 }
@@ -126,8 +124,7 @@ public func < <Base : Collection>(
 /// Returns `true` iff `lhs` is less than or identical to `rhs`.
 @warn_unused_result
 public func <= <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
+  lhs: LazyFilterIndex<Base>, rhs: LazyFilterIndex<Base>
 ) -> Bool {
   return lhs.base <= rhs.base
 }
@@ -135,8 +132,7 @@ public func <= <Base : Collection>(
 /// Returns `true` iff `lhs` is greater than or identical to  `rhs`.
 @warn_unused_result
 public func >= <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
+  lhs: LazyFilterIndex<Base>, rhs: LazyFilterIndex<Base>
 ) -> Bool {
   return lhs.base >= rhs.base
 }
@@ -144,8 +140,7 @@ public func >= <Base : Collection>(
 /// Returns `true` iff `lhs` is greater than `rhs`.
 @warn_unused_result
 public func > <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
+  lhs: LazyFilterIndex<Base>, rhs: LazyFilterIndex<Base>
 ) -> Bool {
   return lhs.base > rhs.base
 }
@@ -168,6 +163,8 @@ public struct LazyFilterCollection<
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = LazyFilterIndex<Base>
+
+  public typealias IndexDistance = Base.IndexDistance
 
   /// Construct an instance containing the elements of `base` that
   /// satisfy `predicate`.
@@ -203,8 +200,20 @@ public struct LazyFilterCollection<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(index: Index) -> Index {
-    return LazyFilterIndex(base: _nextFiltered(index.base))
+  public func next(i: Index) -> Index {
+    return LazyFilterIndex(base: _nextFiltered(i.base))
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    // FIXME: swift-3-indexing-model: next to use _nextFiltered
+    fatalError("FIXME: swift-3-indexing-model")
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    // FIXME: swift-3-indexing-model: next to use _nextFiltered
+    fatalError("FIXME: swift-3-indexing-model")
   }
 
   @inline(__always)
