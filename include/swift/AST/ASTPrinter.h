@@ -43,6 +43,8 @@ enum class PrintNameContext {
   /// not escaped.
   FunctionParameterExternal,
   FunctionParameterLocal,
+  /// Tuple element context, similar to \c FunctionParameterExternal.
+  TupleElement,
   /// Attributes, which are escaped as 'Normal', but differentiated for
   /// the purposes of printName* callbacks.
   Attribute,
@@ -60,7 +62,10 @@ enum class PrintStructureKind {
   GenericParameter,
   GenericRequirement,
   FunctionParameter,
+  FunctionType,
+  FunctionReturnType,
   BuiltinAttribute,
+  TupleElement,
 };
 
 /// An abstract class used to print an AST.

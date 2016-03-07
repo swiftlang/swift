@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -94,6 +95,14 @@ void TypeRepr::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 
 void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
+  // The type part of a NamedTypeRepr will get the callback.
+  if (!isa<NamedTypeRepr>(this))
+    Printer.printTypePre(TypeLoc(const_cast<TypeRepr *>(this)));
+  defer {
+    if (!isa<NamedTypeRepr>(this))
+      Printer.printTypePost(TypeLoc(const_cast<TypeRepr *>(this)));
+  };
+
   switch (getKind()) {
 #define TYPEREPR(CLASS, PARENT) \
   case TypeReprKind::CLASS: { \
@@ -328,11 +337,15 @@ void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
 
 void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
+  Printer.printStructurePre(PrintStructureKind::FunctionType);
   printTypeRepr(ArgsTy, Printer, Opts);
   if (throws())
-    Printer << " throws";
+    Printer << " throws"; // FIXME
   Printer << " -> ";
+  Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeRepr(RetTy, Printer, Opts);
+  Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+  Printer.printStructurePost(PrintStructureKind::FunctionType);
 }
 
 void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
@@ -380,7 +393,9 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     if (i) Printer << ", ";
+    Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
     printTypeRepr(Elements[i], Printer, Opts);
+    Printer.printStructurePost(PrintStructureKind::TupleElement);
 
     if (hasEllipsis() && getEllipsisIndex() == i)
       Printer << "...";
@@ -391,7 +406,7 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 void NamedTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   if (!Id.empty()) {
-    Printer.printName(Id);
+    Printer.printName(Id, PrintNameContext::TupleElement);
     Printer << ": ";
   }
   printTypeRepr(Ty, Printer, Opts);

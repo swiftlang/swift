@@ -562,6 +562,7 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
 
   case PrintNameContext::FunctionParameterExternal:
   case PrintNameContext::FunctionParameterLocal:
+  case PrintNameContext::TupleElement:
     return !canBeArgumentLabel(keyword);
   }
 }
@@ -760,16 +761,11 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printTypeLoc(const TypeLoc &TL) {
     if (Options.TransformContext && TL.getType()) {
       if (auto RT = Options.TransformContext->transform(TL.getType())) {
-        Printer.printTypePre(TypeLoc::withoutLoc(RT));
         PrintOptions FreshOptions;
         RT.print(Printer, FreshOptions);
-        Printer.printTypePost(TypeLoc::withoutLoc(RT));
         return;
       }
     }
-
-    Printer.printTypePre(TL);
-    defer { Printer.printTypePost(TL); };
 
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
@@ -779,6 +775,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
         repr->print(Printer, Options);
       return;
     }
+
     TL.getType().print(Printer, Options);
   }
 
@@ -2321,7 +2318,9 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
         // Use the non-repr external type, but reuse the TypeLoc printing code.
+        Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
         printTypeLoc(TypeLoc::withoutLoc(ResultTy));
+        Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
       }
     }
 
@@ -2383,7 +2382,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
                        /*isAPINameByDefault*/[](unsigned)->bool{return false;});
   });
   Printer << " -> ";
+
+  Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeLoc(decl->getElementTypeLoc());
+  Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
 
   printAccessors(decl);
 }
@@ -2944,6 +2946,9 @@ public:
       : Printer(Printer), Options(PO) {}
   
   void visit(Type T) {
+    Printer.printTypePre(TypeLoc::withoutLoc(T));
+    defer { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
+
     // If we have an alternate name for this type, use it.
     if (Options.AlternativeTypeNames) {
       auto found = Options.AlternativeTypeNames->find(T.getCanonicalTypeOrNull());
@@ -3057,10 +3062,11 @@ public:
       const TupleTypeElt &TD = Fields[i];
       Type EltType = TD.getType();
 
+      Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
+      defer { Printer.printStructurePost(PrintStructureKind::TupleElement); };
 
       if (TD.hasName()) {
-        Printer.printName(TD.getName(),
-                          PrintNameContext::FunctionParameterExternal);
+        Printer.printName(TD.getName(), PrintNameContext::TupleElement);
         Printer << ": ";
       }
       if (TD.isVararg()) {
@@ -3267,6 +3273,9 @@ public:
   }
 
   void visitFunctionType(FunctionType *T) {
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
+    defer { Printer.printStructurePost(PrintStructureKind::FunctionType); };
+
     printFunctionExtInfo(T->getExtInfo());
     printWithParensIfNotSimple(T->getInput());
     
@@ -3274,10 +3283,16 @@ public:
       Printer << " " << tok::kw_throws;
     
     Printer << " -> ";
+
+    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
+    Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
   void visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
+    defer { Printer.printStructurePost(PrintStructureKind::FunctionType); };
+
     printFunctionExtInfo(T->getExtInfo());
     printGenericParams(&T->getGenericParams());
     Printer << " ";
@@ -3287,7 +3302,9 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
+    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
+    Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
   /// If we can't find the depth of a type, return ErrorDepth.
@@ -3427,6 +3444,9 @@ public:
   }
 
   void visitGenericFunctionType(GenericFunctionType *T) {
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
+    defer { Printer.printStructurePost(PrintStructureKind::FunctionType); };
+
     printFunctionExtInfo(T->getExtInfo());
     printGenericSignature(T->getGenericParams(), T->getRequirements());
     Printer << " ";
@@ -3436,7 +3456,9 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
+    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
+    Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
   void printCalleeConvention(ParameterConvention conv) {

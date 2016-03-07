@@ -74,6 +74,12 @@ static StringRef getTagForParameter(PrintStructureKind context) {
   switch (context) {
   case PrintStructureKind::FunctionParameter:
     return "decl.var.parameter";
+  case PrintStructureKind::FunctionReturnType:
+    return "decl.function.returntype";
+  case PrintStructureKind::FunctionType:
+    return "";
+  case PrintStructureKind::TupleElement:
+    return "tuple.element";
   case PrintStructureKind::GenericParameter:
     return "decl.generic_type_param";
   case PrintStructureKind::GenericRequirement:
@@ -111,15 +117,20 @@ class PrintContext {
   const uintptr_t value;
   static constexpr unsigned declTag = 0;
   static constexpr unsigned PrintStructureKindTag = 1;
-  static constexpr unsigned tagMask = 1;
+  static constexpr unsigned typeTag = 2;
+  static constexpr unsigned tagMask = 3;
+  static constexpr unsigned tagShift = 2;
   bool hasTag(unsigned tag) const { return (value & tagMask) == tag; }
 
 public:
   PrintContext(const Decl *D) : value(uintptr_t(D)) {
-    static_assert(llvm::PointerLikeTypeTraits<Decl *>::NumLowBitsAvailable > 0,
+    static_assert(llvm::PointerLikeTypeTraits<Decl *>::NumLowBitsAvailable >=
+                      tagShift,
                   "missing spare bit in Decl *");
   }
-  PrintContext(PrintStructureKind K) : value((uintptr_t(K) << 1) | 1) {}
+  PrintContext(PrintStructureKind K)
+      : value((uintptr_t(K) << tagShift) | PrintStructureKindTag) {}
+  PrintContext(TypeLoc unused) : value(typeTag) {}
 
   /// Get the context as a Decl, or nullptr.
   const Decl *getDecl() const {
@@ -129,13 +140,14 @@ public:
   Optional<PrintStructureKind> getPrintStructureKind() const {
     if (!hasTag(PrintStructureKindTag))
       return None;
-    return PrintStructureKind(value >> 1);
+    return PrintStructureKind(value >> tagShift);
   }
   /// Whether this is a PrintStructureKind context of the given \p kind.
   bool is(PrintStructureKind kind) const {
     auto storedKind = getPrintStructureKind();
     return storedKind && *storedKind == kind;
   }
+  bool isType() const { return hasTag(typeTag); }
 };
 
 /// An ASTPrinter for annotating declarations with XML tags that describe the
@@ -188,18 +200,26 @@ private:
 
   void printTypePre(const TypeLoc &TL) override {
     auto tag = getTypeTagForCurrentContext();
+    contextStack.emplace_back(PrintContext(TL));
     if (!tag.empty())
       openTag(tag);
   }
   void printTypePost(const TypeLoc &TL) override {
+    assert(contextStack.back().isType());
+    contextStack.pop_back();
     auto tag = getTypeTagForCurrentContext();
     if (!tag.empty())
       closeTag(tag);
   }
 
   void printStructurePre(PrintStructureKind kind, const Decl *D) override {
+    if (kind == PrintStructureKind::TupleElement)
+      fixupTupleElement(kind);
+
     contextStack.emplace_back(PrintContext(kind));
     auto tag = getTagForParameter(kind);
+    if (tag.empty())
+      return;
 
     if (D && kind == PrintStructureKind::GenericParameter) {
       assert(isa<ValueDecl>(D) && "unexpected non-value decl for param");
@@ -209,9 +229,19 @@ private:
     }
   }
   void printStructurePost(PrintStructureKind kind, const Decl *D) override {
-    assert(contextStack.back().is(kind) && "unmatched printStructurePre");
-    contextStack.pop_back();
-    closeTag(getTagForParameter(kind));
+    if (kind == PrintStructureKind::TupleElement) {
+      auto prev = contextStack.pop_back_val();
+      (void)prev;
+      fixupTupleElement(kind);
+      assert(prev.is(kind) && "unmatched printStructurePre");
+    } else {
+      assert(contextStack.back().is(kind) && "unmatched printStructurePre");
+      contextStack.pop_back();
+    }
+
+    auto tag = getTagForParameter(kind);
+    if (!tag.empty())
+      closeTag(tag);
   }
 
   void printNamePre(PrintNameContext context) override {
@@ -259,8 +289,12 @@ private:
       return parameterTypeTag;
     if (context.is(PrintStructureKind::GenericParameter))
       return genericParamTypeTag;
+    if (context.is(PrintStructureKind::TupleElement))
+      return "tuple.element.type";
     if (context.is(PrintStructureKind::GenericRequirement) ||
-        context.is(PrintStructureKind::BuiltinAttribute))
+        context.is(PrintStructureKind::BuiltinAttribute) ||
+        context.is(PrintStructureKind::FunctionType) ||
+        context.is(PrintStructureKind::FunctionReturnType) || context.isType())
       return "";
 
     assert(context.getDecl() && "unexpected context kind");
@@ -273,7 +307,6 @@ private:
       return "decl.var.type";
     case DeclKind::Subscript:
     case DeclKind::Func:
-      return "decl.function.returntype";
     default:
       return "";
     }
@@ -283,11 +316,19 @@ private:
     if (insideRef)
       return "";
 
+    bool insideParam =
+        !contextStack.empty() &&
+        contextStack.back().is(PrintStructureKind::FunctionParameter);
+
     switch (context) {
     case PrintNameContext::FunctionParameterExternal:
       return ExternalParamNameTag;
     case PrintNameContext::FunctionParameterLocal:
       return LocalParamNameTag;
+    case PrintNameContext::TupleElement:
+      if (insideParam)
+        return ExternalParamNameTag;
+      return "tuple.element.argument_label";
     case PrintNameContext::Keyword:
       return SyntaxKeywordTag;
     case PrintNameContext::GenericParameter:
@@ -296,6 +337,22 @@ private:
       return "syntaxtype.attribute.name";
     default:
       return "";
+    }
+  }
+
+  /// 'Fix' a tuple element structure kind to be a function parameter if we are
+  /// currently inside a function type. This simplifies functions that need to
+  /// differentiate a tuple from the input part of a function type.
+  void fixupTupleElement(PrintStructureKind &kind) {
+    assert(kind == PrintStructureKind::TupleElement);
+    // Skip over 'type's in the context stack.
+    for (auto I = contextStack.rbegin(), E = contextStack.rend(); I != E; ++I) {
+      if (I->is(PrintStructureKind::FunctionType)) {
+        kind = PrintStructureKind::FunctionParameter;
+        break;
+      } else if (!I->isType()) {
+        break;
+      }
     }
   }
 
