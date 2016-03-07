@@ -170,6 +170,24 @@ extension LazyCollection : Collection {
   public var first: Base.Iterator.Element? {
     return _base.first
   }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: Base.IndexDistance) -> Index {
+    return _base.advance(i, by: n)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: Base.IndexDistance, limit: Index) -> Index {
+    return _base.advance(i, by: n, limit: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+    return _base.distance(from:start, to: end)
+  }
 }
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.

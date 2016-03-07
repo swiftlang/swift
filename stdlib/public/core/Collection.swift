@@ -323,7 +323,7 @@ extension Collection {
   }
 
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
-    // Can't perform range checks in O(1) on non-RandomAccessCollections.
+    // FIXME: swift-3-indexing-model: range check now that indexes are Comparable.
   }
 
   public func _failEarlyRangeCheck(
@@ -332,7 +332,7 @@ extension Collection {
     boundsStart: Index,
     boundsEnd: Index
   ) {
-      // Can't perform range checks in O(1) on non-RandomAccessCollections.
+    // FIXME: swift-3-indexing-model: range check now that indexes are Comparable.
   }
 
   @warn_unused_result
@@ -347,9 +347,9 @@ extension Collection {
 
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // TODO: swift-3-indexing-model - once Index is Comparable the following is possible, right?
-    //    _precondition(start <= end,
-    //      "Only BidirectionalCollections can have end come before start")
+    _precondition(start <= end,
+      "Only BidirectionalCollections can have end come before start")
+
     var start = start
     var count: IndexDistance = 0
     while start != end {
@@ -392,13 +392,50 @@ extension Collection {
   }
 }
 
-/// Supply a default `next()` method for `Collection` models that
-/// use some model of `Strideable` as their `Index`.
+/// Supply optimized defaults for `Collection` models that use some model 
+/// of `Strideable` as their `Index`.
 extension Collection where Index : Strideable {
   @warn_unused_result
   public func next(i: Index) -> Index {
+    _failEarlyRangeCheck(i, bounds:startIndex..<endIndex)
+
     return i.advanced(by: 1)
   }
+
+  /*
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    _precondition(n >= 0,
+      "Only BidirectionalCollections can be advanced by a negative amount")
+    // FIXME: swift-3-indexing-model: range check i
+
+    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
+    return i.advanced(by: n)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    _precondition(n >= 0,
+      "Only BidirectionalCollections can be advanced by a negative amount")
+    // FIXME: swift-3-indexing-model: range check i
+
+    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
+    let i = i.advanced(by: n)
+    if (i >= limit) {
+      return limit
+    }
+    return i
+  }
+
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    _precondition(start <= end,
+      "Only BidirectionalCollections can have end come before start")
+
+    // FIXME: swift-3-indexing-model - error: cannot invoke 'distance' with an argument list of type '(to: Self.Index)'
+    return start.distance(to: end)
+  }
+  */
 }
 
 // TODO: swift-3-indexing-model - review the following
@@ -482,7 +519,6 @@ extension Collection {
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
   public var count: IndexDistance {
-// FIXME: swift-3-indexing-model - Need to fix up Index.Distance to make the following happy
     return distance(from: startIndex, to: endIndex)
   }
 

@@ -102,7 +102,7 @@ public struct LazyFilterSequence<Base : Sequence>
 public struct LazyFilterIndex<Base : Collection> : Comparable {
 
   /// The position corresponding to `self` in the underlying collection.
-  public let baseIndex: Base.Index
+  public let base: Base.Index
 }
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
@@ -111,7 +111,7 @@ public func == <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
 ) -> Bool {
-  return lhs.baseIndex == rhs.baseIndex
+  return lhs.base == rhs.base
 }
 
 /// Returns `true` iff `lhs` is less than `rhs`.
@@ -120,7 +120,34 @@ public func < <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
 ) -> Bool {
-    return lhs.baseIndex < rhs.baseIndex
+    return lhs.base < rhs.base
+}
+
+/// Returns `true` iff `lhs` is less than or identical to `rhs`.
+@warn_unused_result
+public func <= <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base <= rhs.base
+}
+
+/// Returns `true` iff `lhs` is greater than or identical to  `rhs`.
+@warn_unused_result
+public func >= <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base >= rhs.base
+}
+
+/// Returns `true` iff `lhs` is greater than `rhs`.
+@warn_unused_result
+public func > <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base > rhs.base
 }
 
 /// A lazy `Collection` wrapper that includes the elements of an
@@ -160,7 +187,7 @@ public struct LazyFilterCollection<
   /// - Complexity: O(N), where N is the ratio between unfiltered and
   ///   filtered collection counts.
   public var startIndex: Index {
-    return LazyFilterIndex(baseIndex: _filteredNext(_base.startIndex))
+    return LazyFilterIndex(base: _nextFiltered(_base.startIndex))
   }
 
   /// The collection's "past the end" position.
@@ -171,25 +198,25 @@ public struct LazyFilterCollection<
   ///
   /// - Complexity: O(1).
   public var endIndex: Index {
-    return LazyFilterIndex(baseIndex: _base.endIndex)
+    return LazyFilterIndex(base: _base.endIndex)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func next(index: Index) -> Index {
-    return LazyFilterIndex(baseIndex: _filteredNext(index.baseIndex))
+    return LazyFilterIndex(base: _nextFiltered(index.base))
   }
 
   @inline(__always)
-  private func _filteredNext(baseIndex: Base.Index) -> Base.Index {
-    var baseIndex = baseIndex
-    while baseIndex != _base.endIndex {
-      if _predicate(_base[baseIndex]) {
+  internal func _nextFiltered(index: Base.Index) -> Base.Index {
+    var index = index
+    while index != _base.endIndex {
+      if _predicate(_base[index]) {
         break
       }
-      _base._nextInPlace(&baseIndex)
+      _base._nextInPlace(&index)
     }
-    return baseIndex
+    return index
   }
 
   /// Access the element at `position`.
@@ -197,7 +224,7 @@ public struct LazyFilterCollection<
   /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.
   public subscript(position: Index) -> Base.Iterator.Element {
-    return _base[position.baseIndex]
+    return _base[position.base]
   }
 
   /// Returns an iterator over the elements of this sequence.

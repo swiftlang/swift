@@ -58,6 +58,7 @@ public struct CollectionOfOne<Element> : Collection {
   /// Always returns `endIndex`.
   @warn_unused_result
   public func next(i: Int) -> Int {
+    _precondition(i == startIndex)
     return endIndex
   }
 

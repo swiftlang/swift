@@ -31,12 +31,16 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection whose element type is `Element` but that is always empty.
-public struct EmptyCollection<Element> : Collection {
+public struct EmptyCollection<Element> :
+  RandomAccessCollection
+  // FIXME: swift-3-indexing-model - conform to MutableCollection as well
+{
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
+  public typealias IndexDistance = Int
 
   /// Construct an instance.
   public init() {}
@@ -51,10 +55,22 @@ public struct EmptyCollection<Element> : Collection {
     return 0
   }
 
-  /// Always returns `endIndex`.
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
   @warn_unused_result
   public func next(i: Index) -> Index {
-    return endIndex
+    fatalError("EmptyCollection can't advance indices")
+  }
+
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    fatalError("EmptyCollection can't advance indices")
   }
 
   /// Returns an empty iterator.
@@ -75,6 +91,32 @@ public struct EmptyCollection<Element> : Collection {
   public var count: Int {
     return 0
   }
+
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    fatalError("EmptyCollection can't advance indices")
+  }
+
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    fatalError("EmptyCollection can't advance indices")
+  }
+
+  /// The distance between two indexes (always zero).
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return 0
+  }
+
+  // TODO: swift-3-indexing-model - fast fail any others from RandomAccessCollection (and up inheritance)?
 }
 
 @available(*, unavailable, renamed="EmptyIterator")

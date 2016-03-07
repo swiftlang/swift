@@ -48,6 +48,34 @@ extension String {
       return Index(_offset: i._offset.advanced(by: 1))
     }
 
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func previous(i: Index) -> Index {
+      return Index(_offset: i._offset.advanced(by: -1))
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func advance(i: Index, by n: Int) -> Index {
+      return Index(_offset: i._offset.advanced(by: n))
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func advance(i: Index, by n: Int, limit: Index) -> Index {
+      let d = i._offset.distance(to: limit._offset)
+      if d == 0 || (d > 0 ? d <= n : d >= n) {
+        return limit
+      }
+      return Index(_offset: i._offset.advanced(by: n))
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func distance(from start: Index, to end: Index) -> Int {
+      return start._offset.distance(to: end._offset)
+    }
+
     @warn_unused_result
     func _internalIndex(at i: Int) -> Int {
       return _core.startIndex + _offset + i
