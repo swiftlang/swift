@@ -220,6 +220,68 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     pTransform(new ArchetypeSelfTransformer(Target)),
     Results(collectSynthesizedExtensionInfo()) {}
 
+  Type checkElementType(StringRef Text) {
+    assert(Text.find('<') == StringRef::npos && "Not element type.");
+    assert(Text.find(',') == StringRef::npos && "Not element type.");
+    if (auto Result = pTransform->checkMemberTypeInternal(Text)) {
+      return Result;
+    }
+    return lookUpTypeInContext(DC, Text);
+  }
+
+  Type parseComplexTypeString(StringRef Text) {
+    Text = Text.trim();
+    auto ParamStart = Text.find_first_of('<');
+    auto ParamEnd = Text.find_last_of('>');
+    if(StringRef::npos == ParamStart) {
+      return checkElementType(Text);
+    }
+    Type GenericType = checkElementType(StringRef(Text.data(), ParamStart));
+    if (!GenericType)
+      return Type();
+    NominalTypeDecl *NTD = GenericType->getAnyNominal();
+    if (!NTD || NTD->getInnermostGenericParamTypes().empty())
+      return GenericType;
+    StringRef Param = StringRef(Text.data() + ParamStart + 1,
+                                ParamEnd - ParamStart - 1);
+    std::vector<char> Brackets;
+    std::vector<Type> Arguments;
+    unsigned CurrentStart = 0;
+    for (unsigned I = 0; I < Param.size(); ++ I) {
+      char C = Param[I];
+      if (C == '<')
+        Brackets.push_back(C);
+      else if (C == '>')
+        Brackets.pop_back();
+      else if (C == ',' && Brackets.empty()) {
+        StringRef ArgString(Param.data() + CurrentStart, I - CurrentStart);
+        Type Arg = parseComplexTypeString(ArgString);
+        if (Arg.isNull())
+          return GenericType;
+        Arguments.push_back(Arg);
+        CurrentStart = I + 1;
+      }
+    }
+
+    // Add the last argument, or the only argument.
+    StringRef ArgString(Param.data() + CurrentStart,
+                        Param.size() - CurrentStart);
+    Type Arg = parseComplexTypeString(ArgString);
+    if (Arg.isNull())
+      return GenericType;
+    Arguments.push_back(Arg);
+
+    auto GenericParams = NTD->getInnermostGenericParamTypes();
+    assert(Arguments.size() == GenericParams.size());
+    TypeSubstitutionMap Map;
+    for (auto It = GenericParams.begin(); It != GenericParams.end(); ++ It) {
+      auto Index = std::distance(GenericParams.begin(), It);
+      Map[(*It)->getCanonicalType()->castTo<SubstitutableType>()] =
+        Arguments[Index];
+    }
+    return NTD->getDeclaredTypeInContext().subst(DC->getParentModule(), Map, None);
+  }
+
   SynthesizedExtensionInfo isApplicable(ExtensionDecl *Ext) {
     assert(Ext->getGenericParams() && "Have no generic params.");
     SynthesizedExtensionInfo Result;
@@ -232,6 +294,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       RequirementReprKind Kind = std::get<2>(TupleOp.getValue());
       Type First = pTransform->checkMemberTypeInternal(FirstType);
       Type Second = lookUpTypeInContext(DC, SecondType);
+      if (!First)
+        First = parseComplexTypeString(FirstType);
+      if (!Second)
+        Second = parseComplexTypeString(SecondType);
       if (First && Second) {
         First = First->getDesugaredType();
         Second = Second->getDesugaredType();
