@@ -52,3 +52,40 @@
 
 #if swift(>=, 2.0) // expected-error {{expected only one argument to target configuration expression}}
 #endif
+
+protocol P {
+#if swift(>=2.2)
+  associatedtype Index
+#else
+  // There should be no warning here.
+  typealias Index
+
+  // There should be no error here.
+  adsf asdf asdf
+  $#%^*&
+  func foo(sdfsdfdsf adsf adsf asdf adsf adsf)
+#endif
+}
+
+#if swift(>=2.2)
+  func foo() {}
+#else
+  // There should be no error here.
+  func foo(sdfsdfdsf adsf adsf asdf adsf adsf)
+#endif
+
+struct S {
+#if swift(>=2.2)
+  let x: Int
+#else
+  // There should be no error here.
+  let x: @#$()%&*)@#$(%&*
+#endif
+}
+
+#if swift(>=2.2)
+var zzz = "zzz"
+#else
+// There should be no error here.
+var zzz = zzz
+#endif
