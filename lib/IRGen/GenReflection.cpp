@@ -65,9 +65,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       };
 
       auto ModuleContext = Decl->getModuleContext();
-
-      auto ConformingTy = Conformance->getInterfaceType();
-      addTypeRef(ModuleContext, ConformingTy->getCanonicalType());
+      addTypeRef(ModuleContext, Decl->getDeclaredType()->getCanonicalType());
 
       auto ProtoTy = Conformance->getProtocol()->getInterfaceType();
       addTypeRef(ModuleContext, ProtoTy->getCanonicalType());

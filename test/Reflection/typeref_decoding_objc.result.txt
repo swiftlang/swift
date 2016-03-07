@@ -765,7 +765,7 @@ occfs: TypesToReflect.GenericOC<__ObjC.CFString>
 
 ASSOCIATED TYPES:
 =================
-TypesToReflect.Box<A> : Swift.AnyObject.Protocol
+TypesToReflect.Box : Swift.AnyObject.Protocol
 TypesToReflect.C : Swift.AnyObject.Protocol
 __ObjC.NSObject : Swift.AnyObject.Protocol
 __ObjC.NSObject : __ObjC.NSObjectProtocol.Protocol
@@ -774,38 +774,38 @@ __ObjC.NSObject : Swift.Hashable.Protocol
 __ObjC.NSObject : Swift.CVarArgType.Protocol
 __ObjC.NSObject : Swift.CustomStringConvertible.Protocol
 __ObjC.NSObject : Swift.CustomDebugStringConvertible.Protocol
-TypesToReflect.C1<A> : Swift.AnyObject.Protocol
-TypesToReflect.C1<A> : TypesToReflect.ClassBoundP.Protocol
+TypesToReflect.C1 : Swift.AnyObject.Protocol
+TypesToReflect.C1 : TypesToReflect.ClassBoundP.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.C2<A> : Swift.AnyObject.Protocol
-TypesToReflect.C3<A> : Swift.AnyObject.Protocol
-TypesToReflect.C4<A, B> : TypesToReflect.P1.Protocol
+TypesToReflect.C2 : Swift.AnyObject.Protocol
+TypesToReflect.C3 : Swift.AnyObject.Protocol
+TypesToReflect.C4 : TypesToReflect.P1.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.C4<A, B> : TypesToReflect.P2.Protocol
+TypesToReflect.C4 : TypesToReflect.P2.Protocol
 typealias Outer = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.S4<A, B> : TypesToReflect.P1.Protocol
+TypesToReflect.S4 : TypesToReflect.P1.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.S4<A, B> : TypesToReflect.P2.Protocol
+TypesToReflect.S4 : TypesToReflect.P2.Protocol
 typealias Outer = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.E4<A, B> : TypesToReflect.P1.Protocol
+TypesToReflect.E4 : TypesToReflect.P1.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.E4<A, B> : TypesToReflect.P2.Protocol
+TypesToReflect.E4 : TypesToReflect.P2.Protocol
 typealias Outer = B
 (generic-type-parameter index=1 depth=0)
 
-TypesToReflect.E4<A, B> : TypesToReflect.P3.Protocol
+TypesToReflect.E4 : TypesToReflect.P3.Protocol
 typealias First = A
 (generic-type-parameter index=0 depth=0)
 
