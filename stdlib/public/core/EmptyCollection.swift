@@ -113,6 +113,8 @@ public struct EmptyCollection<Element> :
   /// The distance between two indexes (always zero).
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
+    _precondition(start == 0, "From must be startIndex (or endIndex)")
+    _precondition(end == 0, "To must be endIndex (or startIndex)")
     return 0
   }
 

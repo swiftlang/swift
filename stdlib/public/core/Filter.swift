@@ -120,7 +120,7 @@ public func < <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
 ) -> Bool {
-    return lhs.base < rhs.base
+  return lhs.base < rhs.base
 }
 
 /// Returns `true` iff `lhs` is less than or identical to `rhs`.
@@ -128,8 +128,8 @@ public func < <Base : Collection>(
 public func <= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base <= rhs.base
+) -> Bool {
+  return lhs.base <= rhs.base
 }
 
 /// Returns `true` iff `lhs` is greater than or identical to  `rhs`.
@@ -137,8 +137,8 @@ public func <= <Base : Collection>(
 public func >= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base >= rhs.base
+) -> Bool {
+  return lhs.base >= rhs.base
 }
 
 /// Returns `true` iff `lhs` is greater than `rhs`.
@@ -146,8 +146,8 @@ public func >= <Base : Collection>(
 public func > <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base > rhs.base
+) -> Bool {
+  return lhs.base > rhs.base
 }
 
 /// A lazy `Collection` wrapper that includes the elements of an

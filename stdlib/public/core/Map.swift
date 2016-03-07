@@ -115,7 +115,7 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
-    return _base.distance(from:start, to: end)
+    return _base.distance(from: start, to: end)
   }
 
   /// Returns an iterator over the elements of this sequence.
