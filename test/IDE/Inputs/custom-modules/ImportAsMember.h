@@ -36,6 +36,9 @@ extern void IAMStruct1SetAltitude(struct IAMStruct1 *s, double altitude)
 extern double IAMStruct1GetMagnitude(struct IAMStruct1 s)
     __attribute__((swift_name("getter:Struct1.magnitude(self:)")));
 
+extern int IAMStruct1StaticMethod()
+    __attribute__((swift_name("Struct1.staticMethod()")));
+
 extern void IAMStruct1SelfComesLast(double x, struct IAMStruct1 s)
     __attribute__((swift_name("Struct1.selfComesLast(x:self:)")));
 extern void IAMStruct1SelfComesThird(int a, float b, struct IAMStruct1 s, double x)

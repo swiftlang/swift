@@ -37,7 +37,12 @@ extern void IAMStruct1SelfComesThird(int a, float b, struct IAMStruct1 s,
                                      double x);
 
 
-typedef __attribute__((objc_bridge(id))) void *IAMClassRef;
+
+// typedef __attribute__((objc_bridge(id))) void *IAMClassRef;
+struct IAMClass {
+	int x, y, z;
+};
+typedef struct IAMClass *IAMClassRef;
 
 extern unsigned IAMClassGetTypeID();
 

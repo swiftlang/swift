@@ -2548,8 +2548,12 @@ namespace {
         const clang::FunctionDecl *decl, Optional<unsigned> selfIdx,
         ArrayRef<Identifier> argNames, bool allowNSUIntegerAsInt,
         bool isAccessor) {
-      assert(((decl->getNumParams() == argNames.size() + 1) || isAccessor) &&
-             (!selfIdx || *selfIdx < decl->getNumParams()) && "where's self?");
+      if (bool(selfIdx)) {
+        assert(((decl->getNumParams() == argNames.size() + 1) || isAccessor) &&
+               (*selfIdx < decl->getNumParams()) && "where's self?");
+      } else {
+        assert(decl->getNumParams() == argNames.size() || isAccessor);
+      }
 
       SmallVector<const clang::ParmVarDecl *, 4> nonSelfParams;
       for (unsigned i = 0; i < decl->getNumParams(); ++i) {
@@ -2647,6 +2651,9 @@ namespace {
       result->setAccessibility(Accessibility::Public);
       if (selfIsInOut)
         result->setMutating();
+
+      if (!selfIdx)
+        result->setStatic();
 
       if (dc->getAsClassOrClassExtensionContext())
         // FIXME: only if the class itself is not marked final

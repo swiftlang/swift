@@ -25,6 +25,7 @@
 // PRINT-NEXT:   var radius: Double { get nonmutating set }
 // PRINT-NEXT:   var altitude: Double{{$}}
 // PRINT-NEXT:   var magnitude: Double { get }
+// PRINT-NEXT:   static func staticMethod() -> Int32
 // PRINT-NEXT:   func selfComesLast(x x: Double)
 // PRINT-NEXT:   func selfComesThird(a a: Int32, b b: Float, x x: Double)
 // PRINT-NEXT: }
