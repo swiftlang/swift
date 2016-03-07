@@ -763,6 +763,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.Swift3Migration |= Args.hasArg(OPT_swift3_migration);
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
   Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
+  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
   Opts.StripNSPrefix = Args.hasArg(OPT_enable_strip_ns_prefix);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
@@ -875,6 +876,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   }
 
   Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
+  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
   Opts.InferDefaultArguments |= Args.hasArg(OPT_enable_infer_default_arguments);
   Opts.UseSwiftLookupTables |= Args.hasArg(OPT_enable_swift_name_lookup_tables);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);

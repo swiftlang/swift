@@ -228,6 +228,10 @@ def enable_omit_needless_words :
   Flag<["-"], "enable-omit-needless-words">,
   HelpText<"Omit needless words when importing Objective-C names">;
 
+def enable_infer_import_as_member :
+  Flag<["-"], "enable-infer-import-as-member">,
+  HelpText<"Infer when a global could be imported as a member">;
+
 def enable_strip_ns_prefix :
   Flag<["-"], "enable-strip-ns-prefix">,
   HelpText<"Strip 'NS' prefix from Foundation entities">;

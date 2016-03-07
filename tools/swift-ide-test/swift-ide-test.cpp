@@ -309,6 +309,11 @@ OmitNeedlessWords("enable-omit-needless-words",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+InferImportAsMember("enable-infer-import-as-member",
+                   llvm::cl::desc("Infer when a global could be imported as a member"),
+                   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 StripNSPrefix("enable-strip-ns-prefix",
               llvm::cl::desc("Strip the NS prefix from Foundation et al"),
               llvm::cl::init(false));
@@ -2591,11 +2596,15 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
   InitInvok.getLangOptions().OmitNeedlessWords |=
     options::OmitNeedlessWords;
+  InitInvok.getLangOptions().InferImportAsMember |=
+    options::InferImportAsMember;
   InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().OmitNeedlessWords |=
     options::OmitNeedlessWords;
+  InitInvok.getClangImporterOptions().InferImportAsMember |=
+    options::InferImportAsMember;
   InitInvok.getClangImporterOptions().InferDefaultArguments |=
     options::InferDefaultArguments;
   InitInvok.getClangImporterOptions().UseSwiftLookupTables |=

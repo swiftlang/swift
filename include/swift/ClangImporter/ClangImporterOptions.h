@@ -66,6 +66,13 @@ public:
   /// property.
   bool OmitNeedlessWords = false;
 
+  /// Whether to use the import as member inference system
+  ///
+  /// When importing a global, try to infer whether we can import it as a
+  /// member of some type instead. This includes inits, computed properties,
+  /// and methods.
+  bool InferImportAsMember = false;
+
   // If true, infer default arguments for nullable pointers (nil) and
   // option sets ([]).
   bool InferDefaultArguments = false;

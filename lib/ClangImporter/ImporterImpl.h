@@ -262,6 +262,7 @@ public:
 
   const bool ImportForwardDeclarations;
   const bool OmitNeedlessWords;
+  const bool InferImportAsMember;
   const bool InferDefaultArguments;
   const bool UseSwiftLookupTables;
 

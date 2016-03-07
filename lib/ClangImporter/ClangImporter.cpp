@@ -1114,6 +1114,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   : SwiftContext(ctx),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     OmitNeedlessWords(opts.OmitNeedlessWords),
+    InferImportAsMember(opts.InferImportAsMember),
     InferDefaultArguments(opts.InferDefaultArguments),
     UseSwiftLookupTables(opts.UseSwiftLookupTables),
     BridgingHeaderLookupTable(nullptr)
