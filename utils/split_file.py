@@ -9,10 +9,10 @@ every time an annotation of the form "// BEGIN file1.swift" is encountered. If
 current directory.
 """
 
-import os
-import sys
-import re
 import getopt
+import os
+import re
+import sys
 
 def usage():
     sys.stderr.write(__doc__.strip() + "\n")

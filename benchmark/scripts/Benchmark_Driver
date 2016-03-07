@@ -13,17 +13,17 @@
 #
 # ===----------------------------------------------------------------------===//
 
-import subprocess
-import sys
+import argparse
+import datetime
+import glob
+import json
 import os
 import re
-import json
-import urllib2
-import urllib
-import datetime
-import argparse
+import subprocess
+import sys
 import time
-import glob
+import urllib
+import urllib2
 
 DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 

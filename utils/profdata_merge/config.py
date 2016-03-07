@@ -11,8 +11,8 @@
 # This file contains the data structure that transforms arguments into usable
 # values
 
-import tempfile
 import os
+import tempfile
 
 
 class Config():

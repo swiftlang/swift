@@ -15,10 +15,10 @@ import argparse
 import glob
 import multiprocessing
 import os
+import pipes
 import subprocess
 import sys
 import tempfile
-import pipes
 
 def get_verify_toolchain_modules_commands(toolchain_dir, sil_opt):
     if sil_opt is None:

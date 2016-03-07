@@ -16,10 +16,10 @@
 #
 # ----------------------------------------------------------------------------
 
-import sys
-import re
 import bisect
+import re
 import subprocess
+import sys
 
 line_pattern = re.compile(r'^// ###setline ([0-9]+) "([^"]+)"\s*')
 

@@ -25,10 +25,10 @@
 
 from __future__ import print_function
 
+import cgi
+import os
 import re
 import sys
-import os
-import cgi
 
 # Open 'stdlib.swift' in this directory if no path specified.
 args = list(sys.argv) + [os.path.join(os.path.dirname(__file__), 'stdlib.swift')]

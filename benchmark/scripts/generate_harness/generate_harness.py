@@ -14,10 +14,11 @@
 
 # Generate CMakeLists.txt and utils/main.swift from templates.
 
-import jinja2
-import os
 import glob
+import os
 import re
+
+import jinja2
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 perf_dir = os.path.realpath(os.path.join(script_dir, '../..'))

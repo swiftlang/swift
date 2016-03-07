@@ -12,10 +12,10 @@
 #
 # ===----------------------------------------------------------------------===//
 
-import os
-import sys
 import json
+import os
 import subprocess
+import sys
 
 sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
 

@@ -22,11 +22,11 @@
 from __future__ import print_function
 
 import argparse
+import multiprocessing
 import os
 import re
-import sys
 import subprocess
-import multiprocessing
+import sys
 
 DEFAULT_TARGET_BASED_ON_SDK = {
     'macosx': 'x86_64-apple-macosx10.11',
