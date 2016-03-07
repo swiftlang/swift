@@ -84,7 +84,7 @@ private:
   // typeID
   IAMResult importAsTypeID(const clang::QualType typeIDTy,
                            EffectiveClangContext effectiveDC) {
-    return {context.getIdentifier("typeID"), IAMAccessorKind::Getter,
+    return {formDeclName("typeID"), IAMAccessorKind::Getter,
             effectiveDC};
   }
 
@@ -122,7 +122,7 @@ private:
   // Static stored property
   IAMResult importAsStaticProperty(StringRef name,
                                    EffectiveClangContext effectiveDC) {
-    return {context.getIdentifier(name), effectiveDC};
+    return {formDeclName(name), effectiveDC};
   }
 
   // Static computed property
@@ -208,6 +208,16 @@ private:
     return clangLookupFunction(pairName);
   }
 
+  Identifier getHumbleIdentifier(StringRef name) {
+    // Lower-camel-case the incoming name
+    NameBuffer buf;
+    return {context.getIdentifier(camel_case::toLowercaseWord(name, buf))};
+  }
+
+  DeclName formDeclName(StringRef baseName) {
+    return {getHumbleIdentifier(baseName)};
+  }
+
   DeclName formDeclName(StringRef baseName,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         StringRef firstPrefix = "") {
@@ -219,7 +229,7 @@ private:
       argLabels.push_back(context.getIdentifier(params[i]->getName()));
     }
 
-    return {context, context.getIdentifier(baseName), argLabels};
+    return {context, getHumbleIdentifier(baseName), argLabels};
   }
 
   bool match(StringRef str, StringRef toMatch, NameBuffer &outStr) {
