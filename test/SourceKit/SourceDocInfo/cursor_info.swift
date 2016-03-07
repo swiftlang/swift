@@ -128,7 +128,7 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 
 let tupleVar1: (((Int, Int), y: Int), z: Int)
 let tupleVar2: (f: ()->(), g: (x: Int)->Int)
-let tupleVar3: (f: (x: (Int, Int))->(), Int)
+let tupleVar3: (f: (inout x: (Int, Int)) throws ->(), Int)
 
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
@@ -485,4 +485,4 @@ let tupleVar3: (f: (x: (Int, Int))->(), Int)
 
 // RUN: %sourcekitd-test -req=cursor -pos=131:5 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK59
 // CHECK59: source.lang.swift.decl.var.global (131:5-131:14)
-// CHECK59: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar3</decl.name>: <decl.var.type>(<tuple.element><tuple.element.argument_label>f</tuple.element.argument_label>: <tuple.element.type>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>()</decl.function.returntype></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>
+// CHECK59: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar3</decl.name>: <decl.var.type>(<tuple.element><tuple.element.argument_label>f</tuple.element.argument_label>: <tuple.element.type>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><syntaxtype.keyword>inout</syntaxtype.keyword> (<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword> -&gt; <decl.function.returntype>()</decl.function.returntype></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>

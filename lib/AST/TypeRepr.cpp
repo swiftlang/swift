@@ -339,8 +339,10 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   Printer.printStructurePre(PrintStructureKind::FunctionType);
   printTypeRepr(ArgsTy, Printer, Opts);
-  if (throws())
-    Printer << " throws"; // FIXME
+  if (throws()) {
+    Printer << " ";
+    Printer.printKeyword("throws");
+  }
   Printer << " -> ";
   Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeRepr(RetTy, Printer, Opts);
@@ -450,7 +452,8 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 
 void InOutTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
-  Printer << "inout ";
+  Printer.printKeyword("inout");
+  Printer << " ";
   printTypeRepr(Base, Printer, Opts);
 }
 
