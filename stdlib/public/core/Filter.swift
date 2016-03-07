@@ -189,6 +189,7 @@ public struct LazyFilterCollection<
       }
       _base._nextInPlace(&baseIndex)
     }
+    return baseIndex
   }
 
   /// Access the element at `position`.
