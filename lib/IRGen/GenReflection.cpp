@@ -17,6 +17,7 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Reflection/Records.h"
 
@@ -45,6 +46,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
 
   void addDecl(const NominalTypeDecl *Decl) {
+    PrettyStackTraceDecl DebugStack("emitting associated type metadata", Decl);
     for (auto Conformance : Decl->getAllConformances()) {
       SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
 
@@ -139,6 +141,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void addDecl(const NominalTypeDecl *decl) {
+    PrettyStackTraceDecl DebugStack("emitting field type metadata", decl);
     auto type = decl->getDeclaredType()->getCanonicalType();
     addTypeRef(decl->getModuleContext(), type);
 
