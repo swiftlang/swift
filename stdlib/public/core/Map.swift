@@ -69,6 +69,11 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
 //===--- Collections ------------------------------------------------------===//
 
+// FIXME: swift-3-indexing-model - need to gyb three variants of 
+//        LazyMapCollection now, for forward, bidirectional and random access
+//        traversal, so that the mapped collection preserves the traversal of
+//        the base collection.
+
 /// A `Collection` whose elements consist of those in a `Base`
 /// `Collection` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
@@ -81,7 +86,10 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
-  
+
+  @warn_unused_result
+  public func next(i: Index) -> Index { return _base.next(i) }
+
   /// Access the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
@@ -94,7 +102,21 @@ public struct LazyMapCollection<Base : Collection, Element>
   public var isEmpty: Bool { return _base.isEmpty }
 
   public var first: Element? { return _base.first.map(_transform) }
-  
+
+  @warn_unused_result
+  public func advance(i: Index, by n: Base.IndexDistance) -> Index {
+    return _base.advance(i, by: n)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: Base.IndexDistance, limit: Index) -> Index {
+    return _base.advance(i, by: n, limit: limit)
+  }
+
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+    return _base.distance(from: start, to: end)
+  }
 
   /// Returns an iterator over the elements of this sequence.
   ///

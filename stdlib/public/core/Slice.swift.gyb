@@ -53,9 +53,7 @@ public struct Slice<Base : Indexable> : Collection {
   }
 
   public subscript(bounds: Range<Index>) -> Slice {
-    _failEarlyRangeCheck(
-      rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
-      boundsStart: startIndex, boundsEnd: endIndex)
+    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(_base: _base, bounds: bounds)
   }
 
@@ -119,9 +117,7 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
 
   public subscript(bounds: Range<Index>) -> MutableSlice {
     get {
-      _failEarlyRangeCheck(
-        rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
-        boundsStart: startIndex, boundsEnd: endIndex)
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
       return MutableSlice(_base: _base, bounds: bounds)
     }
     set {

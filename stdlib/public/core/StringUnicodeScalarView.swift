@@ -116,6 +116,18 @@ extension String {
       return Index(_core.endIndex, _core)
     }
 
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func next(i: Index) -> Index {
+      fatalError("FIXME: swift-3-indexing-model implement")
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func previous(i: Index) -> Index {
+      fatalError("FIXME: swift-3-indexing-model implement")
+    }
+
     /// Access the element at `position`.
     ///
     /// - Precondition: `position` is a valid position in `self` and

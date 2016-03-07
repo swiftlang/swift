@@ -54,6 +54,13 @@ public struct CollectionOfOne<Element> : Collection {
   public var endIndex: Int {
     return 1
   }
+  
+  /// Always returns `endIndex`.
+  @warn_unused_result
+  public func next(i: Int) -> Int {
+    _precondition(i == startIndex)
+    return endIndex
+  }
 
   /// Returns an iterator over the elements of this sequence.
   ///

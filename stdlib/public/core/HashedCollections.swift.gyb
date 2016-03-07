@@ -353,6 +353,12 @@ public struct Set<Element : Hashable> :
     return _variantStorage.endIndex
   }
 
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
   // APINAMING: complexity docs are broadly missing in this file.
 
   /// Returns `true` if the set contains a member.
@@ -1033,6 +1039,12 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   `NSDictionary`, O(N) otherwise.
   public var endIndex: Index {
     return _variantStorage.endIndex
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
   }
 
   /// Returns the `Index` for the given key, or `nil` if the key is not

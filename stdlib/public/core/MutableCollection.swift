@@ -95,13 +95,7 @@ public protocol MutableIndexable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  func _failEarlyRangeCheck(
-    rangeStart rangeStart: Index,
-    rangeEnd: Index,
-    boundsStart: Index,
-    boundsEnd: Index)
-  // TODO: swift-3-indexing-model - can we change the above to the following? (possible compiler issue)
-  //  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
+  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
 
   /// Returns the next consecutive `Index` in a discrete sequence of
   /// `Index` values.
@@ -179,11 +173,7 @@ extension MutableCollection {
 
   public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
     get {
-      _failEarlyRangeCheck(
-        rangeStart: bounds.startIndex,
-        rangeEnd: bounds.endIndex,
-        boundsStart: startIndex,
-        boundsEnd: endIndex)
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
       return MutableSlice(_base: self, bounds: bounds)
     }
     set {
@@ -202,11 +192,8 @@ internal func _writeBackMutableSlice<
 >(self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
   fatalError("FIXME: swift-3-indexing-model")
   /*
-  C._failEarlyRangeCheck(
-    rangeStart: bounds.startIndex,
-    rangeEnd: bounds.endIndex,
-    boundsStart: self_.startIndex,
-    boundsEnd: self_.endIndex)
+  C._failEarlyRangeCheck(bounds, self_.startIndex..<self_.endIndex)
+  
   // FIXME(performance): can we use
   // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
   // aliasing violations if the newValue points to the same buffer?

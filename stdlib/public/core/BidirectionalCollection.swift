@@ -34,10 +34,6 @@ public protocol BidirectionalCollection : Collection {
 
 /// Default implementation for bidirectional collections.
 extension BidirectionalCollection {
-// TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
-  public func previous(i: Index) -> Index {
-    fatalError("FIXME: swift-3-indexing-model")
-  }
 
   @inline(__always)
   public func _previousInPlace(i: inout Index) {
@@ -75,27 +71,67 @@ extension BidirectionalCollection {
     return i
   }
 
-// TODO: swift-3-indexing-model - once Index is Comparable something like following is possible, right?
-  //  @warn_unused_result
-  //  public func distance(from start: Index, to end: Index) -> IndexDistance {
-  //    var start = start
-  //    var count: IndexDistance = 0
-  //
-  //    if start < end {
-  //      while start != end {
-  //        count = count + 1
-  //        _nextInPlace(&start)
-  //      }
-  //    }
-  //    else if start > end {
-  //      while start != end {
-  //        count = count - 1
-  //        _previousInPlace(&start)
-  //      }
-  //    }
-  //
-  //    return count
-  //  }
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    var start = start
+    var count: IndexDistance = 0
+
+    if start < end {
+      while start != end {
+        count += 1 as IndexDistance
+        _nextInPlace(&start)
+      }
+    }
+    else if start > end {
+      while start != end {
+        count -= 1 as IndexDistance
+        _previousInPlace(&start)
+      }
+    }
+
+    return count
+  }
+}
+
+/// Supply optimized defaults for `BidirectionalCollection` models that use
+/// some model of `Strideable` as their `Index`.
+extension BidirectionalCollection where Index : Strideable {
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+
+    return i.advanced(by: -1)
+  }
+
+  /*
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    // FIXME: swift-3-indexing-model: range check i
+
+    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
+    return i.advanced(by: n)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check i
+
+    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
+    let i = i.advanced(by: n)
+    if (i >= limit) {
+      return limit
+    }
+    return i
+  }
+
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // FIXME: swift-3-indexing-model: range check supplies start and end?
+
+    // FIXME: swift-3-indexing-model - error: cannot invoke 'distance' with an argument list of type '(to: Self.Index)'
+    return start.distance(to: end)
+  }
+  */
 }
 
 extension BidirectionalCollection where SubSequence == Self {
