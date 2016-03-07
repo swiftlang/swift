@@ -118,6 +118,12 @@ extension LazyCollection : Collection {
     return _base.endIndex
   }
 
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Base.Index) -> Base.Index {
+    return _base.next(i)
+  }
+
   /// Access the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
@@ -143,7 +149,7 @@ extension LazyCollection : Collection {
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
-  public var count: Index.Distance {
+  public var count: Base.IndexDistance {
     return _base.count
   }
   
@@ -163,6 +169,24 @@ extension LazyCollection : Collection {
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   public var first: Base.Iterator.Element? {
     return _base.first
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: Base.IndexDistance) -> Index {
+    return _base.advance(i, by: n)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: Base.IndexDistance, limit: Index) -> Index {
+    return _base.advance(i, by: n, limit: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+    return _base.distance(from:start, to: end)
   }
 }
 

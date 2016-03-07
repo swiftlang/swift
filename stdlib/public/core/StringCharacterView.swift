@@ -70,14 +70,14 @@ extension String {
 }
 
 /// `String.CharacterView` is a collection of `Character`.
-extension String.CharacterView : Collection {
+extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core)
   }
   
   /// A character position.
-  public struct Index : BidirectionalIndex, Comparable, CustomPlaygroundQuickLookable {
+  public struct Index : Comparable, CustomPlaygroundQuickLookable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base
@@ -150,7 +150,7 @@ extension String.CharacterView : Collection {
 
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[start].value)
-      start._successorInPlace()
+      unicodeScalars._nextInPlace(&start)
 
       while start != end {
         // FIXME(performance): consider removing this "fast path".  A branch
@@ -165,7 +165,7 @@ extension String.CharacterView : Collection {
           break
         }
         gcb0 = gcb1
-        start._successorInPlace()
+        unicodeScalars._nextInPlace(&start)
       }
 
       return start._position - startIndexUTF16
@@ -191,14 +191,14 @@ extension String.CharacterView : Collection {
 
       var graphemeClusterStart = end
 
-      graphemeClusterStart._predecessorInPlace()
+      unicodeScalars._previousInPlace(&graphemeClusterStart)
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[graphemeClusterStart].value)
 
       var graphemeClusterStartUTF16 = graphemeClusterStart._position
 
       while graphemeClusterStart != start {
-        graphemeClusterStart._predecessorInPlace()
+        unicodeScalars._previousInPlace(&graphemeClusterStart)
         let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
             unicodeScalars[graphemeClusterStart].value)
         if segmenter.isBoundary(gcb1, gcb0) {
@@ -231,6 +231,18 @@ extension String.CharacterView : Collection {
     return Index(_base: unicodeScalars.endIndex)
   }
 
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
   /// Access the `Character` at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
@@ -257,7 +269,8 @@ extension String.CharacterView : RangeReplaceableCollection {
   >(
     bounds: Range<Index>, with newElements: C
   ) {
-    let rawSubRange = bounds.startIndex._base._position
+    let rawSubRange: Range<Int> =
+      bounds.startIndex._base._position
       ..< bounds.endIndex._base._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)

@@ -10,33 +10,132 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME: swift-3-indexing-model: this whole file.
+
+public struct RangeOfStrideable<
+  Element : Strideable
+> : Equatable, Collection,
+  CustomStringConvertible, CustomDebugStringConvertible {
+
+  /// Construct a copy of `x`.
+  @inline(__always)
+  public init(_ x: RangeOfStrideable<Element>) {
+    // This initializer exists only so that we can have a
+    // debugDescription that actually constructs the right type when
+    // evaluated
+    self = x
+  }
+
+  /// Construct a copy of `x`.
+  @inline(__always)
+  public init(_ x: Range<Element>) {
+    self.startIndex = x.startIndex
+    self.endIndex = x.endIndex
+  }
+
+  /// Construct a range with `startIndex == start` and `endIndex ==
+  /// end`.
+  @inline(__always)
+  internal init(_start: Element, end: Element) {
+    self.startIndex = _start
+    self.endIndex = end
+  }
+
+  /// Access the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
+  public subscript(position: Element) -> Element {
+    _stdlibAssert(position != endIndex, "Index out of range")
+    return position
+  }
+
+  /// Returns an iterator over the elements of this sequence.
+  ///
+  /// - Complexity: O(1).
+  public func makeIterator() -> RangeOfStrideableIterator<Element> {
+    return RangeOfStrideableIterator(_bounds: self)
+  }
+
+  /// The range's lower bound.
+  ///
+  /// Identical to `endIndex` in an empty range.
+  public var startIndex: Element
+
+  /// The range's upper bound.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
+  public var endIndex: Element
+  
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Element) -> Element {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
+  @warn_unused_result
+  public func _customContainsEquatableElement(element: Element) -> Bool? {
+    return element >= self.startIndex && element < self.endIndex
+  }
+
+  /// A textual representation of `self`.
+  public var description: String {
+    return "\(startIndex)..<\(endIndex)"
+  }
+
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return "RangeOfStrideable(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
+  }
+}
+
+extension RangeOfStrideable : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(
+      self,
+      children: ["startIndex": startIndex, "endIndex": endIndex])
+  }
+}
+
+@warn_unused_result
+public func == <Element>(
+  lhs: RangeOfStrideable<Element>,
+  rhs: RangeOfStrideable<Element>
+) -> Bool {
+  return
+    lhs.startIndex == rhs.startIndex &&
+    lhs.endIndex == rhs.endIndex
+}
+
 /// An iterator over the elements of `Range<Element>`.
-public struct RangeIterator<
-  Element : ForwardIndex
+public struct RangeOfStrideableIterator<
+  Element : Strideable
 > : IteratorProtocol, Sequence {
 
   /// Construct an instance that traverses the elements of `bounds`.
-  @_transparent
-  internal init(_bounds: Range<Element>) {
-    self.startIndex = _bounds.startIndex
-    self.endIndex = _bounds.endIndex
+  @inline(__always)
+  internal init(_bounds: RangeOfStrideable<Element>) {
+    self._start = _bounds.startIndex
+    self._end = _bounds.endIndex
   }
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if startIndex == endIndex { return nil }
-    let element = startIndex
-    startIndex._successorInPlace()
-    return element
+    if _start == _end { return nil }
+    let result = _start
+    _start = _start.advanced(by: 1)
+    return result
   }
 
   /// The lower bound of the remaining range.
-  internal var startIndex: Element
+  internal var _start: Element
 
   /// The upper bound of the remaining range; not included in the
   /// generated sequence.
-  internal let endIndex: Element
+  internal let _end: Element
 }
 
 /// A collection of consecutive discrete index values.
@@ -69,12 +168,13 @@ public struct RangeIterator<
 ///     print(brackets(Range<Int>(start: -99, end: 100), 0))
 ///     // Prints "0"
 public struct Range<
-  Element : ForwardIndex
-> : Equatable, Collection,
+  Element : Comparable
+> : Equatable,
     CustomStringConvertible, CustomDebugStringConvertible {
 
   /// Construct a copy of `x`.
-  public init(_ x: Range) {
+  @inline(__always)
+  public init(_ x: Range<Element>) {
     // This initializer exists only so that we can have a
     // debugDescription that actually constructs the right type when
     // evaluated
@@ -83,45 +183,16 @@ public struct Range<
 
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
-  @_transparent
+  @inline(__always)
   internal init(_start: Element, end: Element) {
     self.startIndex = _start
     self.endIndex = end
   }
 
-  /// Access the element at `position`.
-  ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
-  public subscript(position: Element) -> Element {
-    _stdlibAssert(position != endIndex, "Index out of range")
-    return position
-  }
-
-  //===--------------------------------------------------------------------===//
-  // Overloads for subscript that allow us to make subscripting fail
-  // at compile time, outside a generic context, when Element is an Integer
-  // type. The current language design gives us no way to force r[0]
-  // to work "as expected" (return the first element of the range) for
-  // an arbitrary Range<Int>, so instead we make it ambiguous.  Same
-  // goes for slicing.  The error message will be poor but at least it
-  // is a compile-time error.
-  public subscript(_: Element._DisabledRangeIndex) -> Element {
-    _sanityCheckFailure("It shouldn't be possible to call this function'")
-  }
-
-  //===--------------------------------------------------------------------===//
-
-  /// Returns an iterator over the elements of this sequence.
-  ///
-  /// - Complexity: O(1).
-  public func makeIterator() -> RangeIterator<Element> {
-    return RangeIterator(_bounds: self)
-  }
-
   /// The range's lower bound.
   ///
   /// Identical to `endIndex` in an empty range.
+  // FIXME: swift-3-indexing-model: rename to `start`.
   public var startIndex: Element
 
   /// The range's upper bound.
@@ -129,7 +200,19 @@ public struct Range<
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
+  // FIXME: swift-3-indexing-model: rename to `end`.
   public var endIndex: Element
+
+  // FIXME: does not implement a requirement in `Collection`.
+  // We need to implement `_customContainsEquatableElement` instead.
+  @warn_unused_result
+  public func contains(element: Element) -> Bool {
+    return element >= self.startIndex && element < self.endIndex
+  }
+
+  public var isEmpty: Bool {
+    return startIndex == endIndex
+  }
 
   /// A textual representation of `self`.
   public var description: String {
@@ -148,52 +231,34 @@ extension Range : CustomReflectable {
   }
 }
 
-/// O(1) implementation of `contains()` for ranges of comparable elements.
-extension Range where Element : Comparable {
-  @warn_unused_result
-  public func _customContainsEquatableElement(element: Element) -> Bool? {
-    return element >= self.startIndex && element < self.endIndex
+extension Range where Element : Strideable {
+  /// Construct a copy of `x`.
+  @inline(__always)
+  public init(_ x: RangeOfStrideable<Element>) {
+    self.startIndex = x.startIndex
+    self.endIndex = x.endIndex
   }
 
-  // FIXME: copied from SequenceAlgorithms as a workaround for
-  // https://bugs.swift.org/browse/SR-435
-  @warn_unused_result
-  public func contains(element: Element) -> Bool {
-    if let result = _customContainsEquatableElement(element) {
-      return result
-    }
-
-    for e in self {
-      if e == element {
-        return true
-      }
-    }
-    return false
+  public var count: Element.Stride {
+    return startIndex.distance(to: endIndex)
   }
 }
 
 @warn_unused_result
 public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
-  return lhs.startIndex == rhs.startIndex &&
-      lhs.endIndex == rhs.endIndex
+  return
+    lhs.startIndex == rhs.startIndex &&
+    lhs.endIndex == rhs.endIndex
 }
 
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
 @_transparent
 @warn_unused_result
-public func ..< <Pos : ForwardIndex> (minimum: Pos, maximum: Pos)
+public func ..< <Pos : Comparable> (minimum: Pos, maximum: Pos)
   -> Range<Pos> {
+  _precondition(minimum <= maximum, "Can't form Range with end < start")
   return Range(_start: minimum, end: maximum)
-}
-
-/// Forms a closed range that contains both `minimum` and `maximum`.
-@_transparent
-@warn_unused_result
-public func ... <Pos : ForwardIndex> (
-  minimum: Pos, maximum: Pos
-) -> Range<Pos> {
-  return Range(_start: minimum, end: maximum.successor())
 }
 
 //===--- Prefer Ranges to Intervals, and add checking ---------------------===//
@@ -203,36 +268,43 @@ public func ... <Pos : ForwardIndex> (
 /// - Precondition: `start <= end`.
 @_transparent
 @warn_unused_result
-public func ..< <Pos : ForwardIndex where Pos : Comparable> (
+public func ..< <Pos : Strideable> (
   start: Pos, end: Pos
-) -> Range<Pos> {
+) -> RangeOfStrideable<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")
-  return Range(_start: start, end: end)
+  return RangeOfStrideable(_start: start, end: end)
 }
 
 /// Forms a closed range that contains both `start` and `end`.
 /// - Precondition: `start <= end`.
 @_transparent
 @warn_unused_result
-public func ... <Pos : ForwardIndex where Pos : Comparable> (
+public func ... <Pos : Strideable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")
-  _precondition(end.successor() > end, "Range end index has no valid successor")
-  return Range(_start: start, end: end.successor())
+  _precondition(end.advanced(by: 1) > end, "Range end index has no valid successor")
+  return Range(_start: start, end: end.advanced(by: 1))
 }
 
 @warn_unused_result
-public func ~= <I : ForwardIndex where I : Comparable> (
+public func ~= <I : Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {
   return pattern.contains(value)
 }
 
-@available(*, unavailable, renamed="RangeIterator")
-public struct RangeGenerator<Element : ForwardIndex> {}
+@warn_unused_result
+public func ~= <I : Strideable> (
+  pattern: RangeOfStrideable<I>, value: I
+) -> Bool {
+  return pattern.contains(value)
+}
 
-extension RangeIterator {
+@available(*, unavailable, renamed="RangeOfStrideableIterator")
+public struct RangeGenerator<Element> {}
+
+extension RangeOfStrideableIterator {
   @available(*, unavailable, message="use the 'makeIterator()' method on the collection")
   public init(_ bounds: Range<Element>) {
     fatalError("unavailable function can't be called")

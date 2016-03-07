@@ -353,6 +353,12 @@ public struct Set<Element : Hashable> :
     return _variantStorage.endIndex
   }
 
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
   // APINAMING: complexity docs are broadly missing in this file.
 
   /// Returns `true` if the set contains a member.
@@ -1033,6 +1039,12 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   `NSDictionary`, O(N) otherwise.
   public var endIndex: Index {
     return _variantStorage.endIndex
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
   }
 
   /// Returns the `Index` for the given key, or `nil` if the key is not
@@ -3550,7 +3562,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 }
 
 internal struct _Native${Self}Index<${TypeParametersDecl}> :
-  ForwardIndex, Comparable {
+  Comparable {
 
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
   internal typealias NativeIndex = _Native${Self}Index<${TypeParameters}>
@@ -3600,7 +3612,7 @@ internal func < <${TypeParametersDecl}> (
 }
 
 #if _runtime(_ObjC)
-internal struct _Cocoa${Self}Index : ForwardIndex, Comparable {
+internal struct _Cocoa${Self}Index : Comparable {
   // Assumption: we rely on NSDictionary.getObjects when being
   // repeatedly called on the same NSDictionary, returning items in the same
   // order every time.
@@ -3710,7 +3722,7 @@ elif Self == 'Dictionary':
 
 ${SubscriptingWithIndexDoc}
 public struct ${Self}Index<${TypeParametersDecl}> :
-  ForwardIndex, Comparable {
+  Comparable {
   // Index for native storage is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does

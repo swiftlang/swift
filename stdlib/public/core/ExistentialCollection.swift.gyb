@@ -311,7 +311,7 @@ internal protocol _ForwardIndexBoxProtocol : class {
   func equals(other: _ForwardIndexBoxProtocol) -> Bool
 
   @warn_unused_result
-  func _unbox<T : ForwardIndex>() -> T?
+  func _unbox<T>() -> T?
 
   @warn_unused_result
   func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance
@@ -439,11 +439,12 @@ internal final class _RandomAccessIndexBox<
 /// the specific underlying type.
 ///
 /// - SeeAlso: `Any${Traversal}Collection`
-public struct ${Self} : ${Traversal}Index {
+public struct ${Self} {
+  // FIXME: swift-3-indexing-model: move to the collection.
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex : ${Traversal}Index>(_ base: BaseIndex) {
+  public init<BaseIndex>(_ base: BaseIndex) {
     _box = _${Traversal}IndexBox(base)
   }
 
@@ -595,9 +596,13 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   ///
   /// - Complexity: O(1).
   public init<
+%     if SubTraversal == 'Forward':
     C : Collection
+%     else:
+    C : ${SubTraversal}Collection
+%     end
     where
-    C.Index : ${SubTraversal}Index, C.Iterator.Element == Element
+    C.Iterator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,

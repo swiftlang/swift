@@ -13,7 +13,9 @@
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View
-    : Collection, CustomStringConvertible, CustomDebugStringConvertible {
+    : BidirectionalCollection,
+    CustomStringConvertible,
+    CustomDebugStringConvertible {
 
     /// A position in a string's collection of UTF-16 code units.
     public struct Index {
@@ -38,6 +40,40 @@ extension String {
     /// `successor()`.
     public var endIndex: Index {
       return Index(_offset: _length)
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func next(i: Index) -> Index {
+      return Index(_offset: i._offset.advanced(by: 1))
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func previous(i: Index) -> Index {
+      return Index(_offset: i._offset.advanced(by: -1))
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func advance(i: Index, by n: Int) -> Index {
+      return Index(_offset: i._offset.advanced(by: n))
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func advance(i: Index, by n: Int, limit: Index) -> Index {
+      let d = i._offset.distance(to: limit._offset)
+      if d == 0 || (d > 0 ? d <= n : d >= n) {
+        return limit
+      }
+      return Index(_offset: i._offset.advanced(by: n))
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func distance(from start: Index, to end: Index) -> Int {
+      return start._offset.distance(to: end._offset)
     }
 
     @warn_unused_result
@@ -172,17 +208,19 @@ extension String {
 
 // Conformance to RandomAccessIndex intentionally only appears
 // when Foundation is loaded
-extension String.UTF16View.Index : BidirectionalIndex {
+extension String.UTF16View.Index {
   public typealias Distance = Int
 
   @warn_unused_result
   public func successor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: _offset.successor())
+    return String.UTF16View.Index(
+      _offset: _unsafePlus(_offset, 1))
   }
 
   @warn_unused_result
   public func predecessor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: _offset.predecessor())
+    return String.UTF16View.Index(
+      _offset: _unsafeMinus(_offset, 1))
   }
 }
 

@@ -98,40 +98,11 @@ public struct LazyFilterSequence<Base : Sequence>
 /// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
-///   `ForwardIndex`.
-public struct LazyFilterIndex<
-  BaseElements: Collection
-> : ForwardIndex {
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  ///
-  /// - Complexity: Amortized O(M), where M is the average distance in
-  ///   the base collection between elements that satisfy the
-  ///   predicate.
-  ///
-  /// - Note: This operation may not satisfy the expected complexity
-  ///   for models of `ForwardIndex`.
-  public func successor() -> LazyFilterIndex {
-    for p in base.successor()..<_baseElements.endIndex {
-      if _include(_baseElements[p]) {
-        return LazyFilterIndex(
-          _baseElements: _baseElements, base: p, _include: _include)
-      }
-    }
-    return LazyFilterIndex(
-      _baseElements: _baseElements, base: _baseElements.endIndex,
-      _include: _include)
-  }
-
-  internal let _baseElements: BaseElements
+///   `Collection`.
+public struct LazyFilterIndex<Base : Collection> : Comparable {
 
   /// The position corresponding to `self` in the underlying collection.
-  public let base: BaseElements.Index
-
-  /// The predicate used to determine which elements of `base` are
-  /// also elements of `self`.
-  internal let _include: (BaseElements.Iterator.Element) -> Bool
+  public let base: Base.Index
 }
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
@@ -143,15 +114,51 @@ public func == <Base : Collection>(
   return lhs.base == rhs.base
 }
 
+/// Returns `true` iff `lhs` is less than `rhs`.
+@warn_unused_result
+public func < <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base < rhs.base
+}
+
+/// Returns `true` iff `lhs` is less than or identical to `rhs`.
+@warn_unused_result
+public func <= <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base <= rhs.base
+}
+
+/// Returns `true` iff `lhs` is greater than or identical to  `rhs`.
+@warn_unused_result
+public func >= <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base >= rhs.base
+}
+
+/// Returns `true` iff `lhs` is greater than `rhs`.
+@warn_unused_result
+public func > <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base > rhs.base
+}
+
 /// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
 /// - Note: The performance of accessing `startIndex`, `first`, any methods
 ///   that depend on `startIndex`, or of advancing a `LazyFilterIndex` depends
 ///   on how sparsely the filtering predicate is satisfied, and may not offer
-///   the usual performance given by `Collection` or `ForwardIndex`. Be
-///   aware, therefore, that general operations on `LazyFilterCollection`
-///   instances may not have the documented complexity.
+///   the usual performance given by `Collection`. Be aware, therefore, that 
+///   general operations on `LazyFilterCollection` instances may not have the
+///   documented complexity.
 public struct LazyFilterCollection<
   Base : Collection
 > : LazyCollectionProtocol {
@@ -180,15 +187,7 @@ public struct LazyFilterCollection<
   /// - Complexity: O(N), where N is the ratio between unfiltered and
   ///   filtered collection counts.
   public var startIndex: Index {
-    var first = _base.startIndex
-    while first != _base.endIndex {
-      if _predicate(_base[first]) {
-        break
-      }
-      first._successorInPlace()
-    }
-    return LazyFilterIndex(
-      _baseElements: _base, base: first, _include: _predicate)
+    return LazyFilterIndex(base: _nextFiltered(_base.startIndex))
   }
 
   /// The collection's "past the end" position.
@@ -199,8 +198,25 @@ public struct LazyFilterCollection<
   ///
   /// - Complexity: O(1).
   public var endIndex: Index {
-    return LazyFilterIndex(
-      _baseElements: _base, base: _base.endIndex, _include: _predicate)
+    return LazyFilterIndex(base: _base.endIndex)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(index: Index) -> Index {
+    return LazyFilterIndex(base: _nextFiltered(index.base))
+  }
+
+  @inline(__always)
+  internal func _nextFiltered(index: Base.Index) -> Base.Index {
+    var index = index
+    while index != _base.endIndex {
+      if _predicate(_base[index]) {
+        break
+      }
+      _base._nextInPlace(&index)
+    }
+    return index
   }
 
   /// Access the element at `position`.

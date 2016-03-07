@@ -32,8 +32,7 @@
 ///
 /// - Memory is allocated and value is initialized.
 public struct ${Self}<Pointee>
-  : RandomAccessIndex, Hashable,
-    NilLiteralConvertible, _Pointer {
+  : Strideable, Hashable, NilLiteralConvertible, _Pointer {
 
   public typealias Distance = Int
 
