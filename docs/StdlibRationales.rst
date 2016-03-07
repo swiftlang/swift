@@ -166,7 +166,7 @@ result is immediately consumed by for-in, so we don't want to allocate memory
 for it.
 
 Note that neither of the two ``sorted()`` methods (neither one that accepts a
-custom comparator closure, nor one that uses the ``Comparable`` conformace)
+custom comparator closure, nor one that uses the ``Comparable`` conformance)
 can't be lazy, because the lazy version would be less efficient than the eager
 one.
 
