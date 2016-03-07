@@ -167,7 +167,7 @@ for it.
 
 Note that neither of the two ``sorted()`` methods (neither one that accepts a
 custom comparator closure, nor one that uses the ``Comparable`` conformace)
-can't be lazy, becasue the lazy version would be less efficient than the eager
+can't be lazy, because the lazy version would be less efficient than the eager
 one.
 
 A different design that was rejected is to preserve consistency with other
