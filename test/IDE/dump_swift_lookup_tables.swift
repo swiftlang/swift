@@ -14,7 +14,7 @@ import ImportAsMember
 // CHECK-NEXT:     IAMStruct1: IAMStruct1GetRadius, IAMStruct1SetRadius
 
 // CHECK: Globals-as-members mapping:
-// CHECK-NEXT: IAMStruct1CreateSimple, IAMStruct1GetRadius, IAMStruct1SetRadius
+// CHECK-NEXT: IAMStruct1: IAMStruct1GlobalVar, IAMStruct1CreateSimple, IAMStruct1Invert, IAMStruct1InvertInPlace, IAMStruct1Rotate, IAMStruct1GetRadius, IAMStruct1SetRadius, IAMStruct1GetAltitude, IAMStruct1SetAltitude, IAMStruct1GetMagnitude, IAMStruct1SelfComesLast, IAMStruct1SelfComesThird, IAMStruct1StaticVar1, IAMStruct1StaticVar2, IAMStruct1CreateFloat, IAMStruct1GetZeroStruct1
 
 // CHECK-LABEL: <<Bridging header lookup table>>
 // CHECK-NEXT:      Base name -> entry mappings:
