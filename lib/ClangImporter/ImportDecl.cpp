@@ -2652,8 +2652,8 @@ namespace {
       if (selfIsInOut)
         result->setMutating();
 
-      if (!selfIdx)
-        result->setStatic();
+      if (!selfIdx)
+        result->setStatic();
 
       if (dc->getAsClassOrClassExtensionContext())
         // FIXME: only if the class itself is not marked final

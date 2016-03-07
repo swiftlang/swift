@@ -4,14 +4,11 @@ import ImportAsMember
 public func returnGlobalVar() -> Double {
 	return Struct1.globalVar
 }
-// SIL-LABEL: sil {{.*}}returnGlobalVar{{.*}} () -> Int32 {
-// SIL:   %0 = global_addr @IAMStruct1GlobalVar : $*Int32
-// SIL:   %2 = load %0 : $*Int32
-// SIL:   return %2 : $Int32
+// SIL-LABEL: sil {{.*}}returnGlobalVar{{.*}} () -> Double {
+// SIL:   %0 = global_addr @IAMStruct1GlobalVar : $*Double
+// SIL:   %2 = load %0 : $*Double
+// SIL:   return %2 : $Double
 // SIL-NEXT: }
 
 // SIL-LABEL: sil {{.*}}anchor{{.*}} () -> () {
 func anchor() {}
-
-// FIXME: This will now fail until we can SILGen what we can print
-// XFAIL:
