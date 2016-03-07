@@ -11,6 +11,7 @@ handle_gyb_sources(
 add_swift_library(swiftClangImporter
   ClangDiagnosticConsumer.cpp
   ClangImporter.cpp
+  IAMInference.cpp
   ImportDecl.cpp
   ImportEnumInfo.cpp
   ImportMacro.cpp

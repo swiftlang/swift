@@ -182,6 +182,16 @@ namespace swift {
       unsigned getPosition() const {
         return Position;
       }
+
+      /// Retrieve the string up until this iterator
+      StringRef getPriorStr() const {
+        return String.slice(0, Position);
+      }
+
+      /// Retrieve the rest of the string (including this position)
+      StringRef getRestOfStr() const {
+        return String.slice(Position, String.size());
+      }
     };
 
     /// Find the first camelCase word in the given string.
