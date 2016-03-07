@@ -546,8 +546,8 @@ namespace {
       printDeclName(VD);
       if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(VD))
         printGenericParameters(OS, AFD->getGenericParams());
-      if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(VD))
-        printGenericParameters(OS, NTD->getGenericParams());
+      if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
+        printGenericParameters(OS, GTD->getGenericParams());
 
       OS << " type='";
       if (VD->hasType())
