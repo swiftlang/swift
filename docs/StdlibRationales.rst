@@ -165,6 +165,11 @@ the first three functions being lazy is the right default, since usually the
 result is immediately consumed by for-in, so we don't want to allocate memory
 for it.
 
+Note that neither of the two ``sorted()`` methods (neither one that accepts a
+custom comparator closure, nor one that uses the ``Comparable`` conformace)
+can't be lazy, becasue the lazy version would be less efficient than the eager
+one.
+
 A different design that was rejected is to preserve consistency with other
 strict functions by making these methods strict, but then client code needs to
 call an API with a different name, say ``lazyEnumerate()`` to opt into
