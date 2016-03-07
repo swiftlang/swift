@@ -2562,9 +2562,54 @@ namespace {
                                               allowNSUIntegerAsInt, argNames);
     }
 
-    Decl *importAsMethod(const clang::FunctionDecl *decl, DeclName name,
-                         DeclContext *dc, Optional<unsigned> selfIdx,
-                         bool allowNSUIntegerAsInt) {
+    Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
+                                    DeclName name, DeclContext *dc,
+                                    CtorInitializerKind initKind) {
+      bool allowNSUIntegerAsInt =
+        Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
+
+      SourceLoc noLoc{};
+      ArrayRef<Identifier> argNames = name.getArgumentNames();
+      auto parameterList = Impl.importFunctionParameterList(
+          decl, {decl->param_begin(), decl->param_end()},
+          decl->isVariadic(), allowNSUIntegerAsInt, argNames);
+
+      if (!parameterList)
+        return nullptr;
+
+      bool selfIsInOut =
+        !dc->getDeclaredTypeOfContext()->hasReferenceSemantics();
+      auto selfParam = ParamDecl::createSelf(noLoc, dc, /*static=*/false,
+                                             /*inout=*/selfIsInOut);
+
+      OptionalTypeKind initOptionality;
+      auto resultType = Impl.importFunctionReturnType(
+          decl, decl->getReturnType(), allowNSUIntegerAsInt);
+      (void)resultType->getAnyOptionalObjectType(initOptionality);
+
+      auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
+          decl, name, noLoc, initOptionality, noLoc, selfParam,
+          parameterList,
+          /*GenericParams=*/nullptr, noLoc, dc);
+      result->setInitKind(initKind);
+
+      // Set the constructor's type(s).
+      Type argType = parameterList->getType(Impl.SwiftContext);
+      Type fnType = FunctionType::get(argType, resultType);
+      Type selfType = selfParam->getType();
+      result->setInitializerType(FunctionType::get(selfType, fnType));
+      Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
+      result->setType(FunctionType::get(selfMetaType, fnType));
+
+      finishFuncDecl(decl, result);
+      return result;
+    }
+
+    Decl *importGlobalAsMethod(const clang::FunctionDecl *decl, DeclName name,
+                               DeclContext *dc, Optional<unsigned> selfIdx) {
+      bool allowNSUIntegerAsInt =
+        Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
+
       auto &SwiftCtx = Impl.SwiftContext;
       SourceLoc noLoc{};
       SmallVector<ParameterList *, 2> bodyParams;
@@ -2827,42 +2872,13 @@ namespace {
       bool hasCustomName = importedName.HasCustomName;
 
       if (importedName.ImportAsMember) {
-        // Import this function as member
-          bool allowNSUIntegerAsInt =
-              Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
+        // Handle initializers.
+        if (name.getBaseName() == Impl.SwiftContext.Id_init)
+          return importGlobalAsInitializer(decl, name, dc,
+                                           importedName.InitKind);
 
-        // TODO: refactor into separate function and share with other kinds of
-        // import-as-member
-          if (!name.getBaseName().empty() &&
-              name.getBaseName().str() == "init") {
-          SourceLoc noLoc{};
-          ArrayRef<Identifier> argNames = name.getArgumentNames();
-          auto parameterList = Impl.importFunctionParameterList(
-              decl, {decl->param_begin(), decl->param_end()},
-              decl->isVariadic(), allowNSUIntegerAsInt, argNames);
-
-          if (!parameterList)
-            return nullptr;
-
-          auto selfParam = ParamDecl::createSelf(noLoc, dc, false);
-
-          OptionalTypeKind initOptionality;
-          auto swiftResultTy = Impl.importFunctionReturnType(
-              decl, decl->getReturnType(), allowNSUIntegerAsInt);
-          swiftResultTy->getAnyOptionalObjectType(initOptionality);
-
-          auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-              decl, name, noLoc, initOptionality, noLoc, selfParam,
-              parameterList,
-              /*GenericParams=*/nullptr, noLoc, dc);
-
-          finishFuncDecl(decl, result);
-          return result;
-        }
-
-        return importAsMethod(decl, name, dc,
-                              importedName.SelfIndex,
-                              allowNSUIntegerAsInt);
+        // Everything else is a method.
+        return importGlobalAsMethod(decl, name, dc, importedName.SelfIndex);
       }
 
       // Import the function type. If we have parameters, make sure their names
