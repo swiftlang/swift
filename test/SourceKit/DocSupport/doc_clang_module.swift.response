@@ -3261,7 +3261,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@E@FooComparisonResult@FooOrderedAscending",
         key.offset: 653,
         key.length: 21,
-        key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>OrderedAscending</decl.name></decl.enumelement>"
+        key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>OrderedAscending</decl.name> = <syntaxtype.number>-1</syntaxtype.number></decl.enumelement>"
       },
       {
         key.kind: source.lang.swift.decl.enumelement,
@@ -3269,7 +3269,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@E@FooComparisonResult@FooOrderedSame",
         key.offset: 679,
         key.length: 16,
-        key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>OrderedSame</decl.name></decl.enumelement>"
+        key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>OrderedSame</decl.name> = <syntaxtype.number>0</syntaxtype.number></decl.enumelement>"
       },
       {
         key.kind: source.lang.swift.decl.enumelement,
@@ -3277,7 +3277,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@E@FooComparisonResult@FooOrderedDescending",
         key.offset: 700,
         key.length: 22,
-        key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>OrderedDescending</decl.name></decl.enumelement>"
+        key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>OrderedDescending</decl.name> = <syntaxtype.number>1</syntaxtype.number></decl.enumelement>"
       }
     ]
   },

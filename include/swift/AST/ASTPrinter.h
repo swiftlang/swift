@@ -66,6 +66,8 @@ enum class PrintStructureKind {
   FunctionReturnType,
   BuiltinAttribute,
   TupleElement,
+  NumberLiteral,
+  StringLiteral,
 };
 
 /// An abstract class used to print an AST.

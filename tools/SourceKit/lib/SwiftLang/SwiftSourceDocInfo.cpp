@@ -86,6 +86,10 @@ static StringRef getTagForParameter(PrintStructureKind context) {
     return "decl.generic_type_requirement";
   case PrintStructureKind::BuiltinAttribute:
     return "syntaxtype.attribute.builtin";
+  case PrintStructureKind::NumberLiteral:
+    return "syntaxtype.number";
+  case PrintStructureKind::StringLiteral:
+    return "syntaxtype.string";
   }
   llvm_unreachable("unexpected parameter kind");
 }
@@ -291,10 +295,7 @@ private:
       return genericParamTypeTag;
     if (context.is(PrintStructureKind::TupleElement))
       return "tuple.element.type";
-    if (context.is(PrintStructureKind::GenericRequirement) ||
-        context.is(PrintStructureKind::BuiltinAttribute) ||
-        context.is(PrintStructureKind::FunctionType) ||
-        context.is(PrintStructureKind::FunctionReturnType) || context.isType())
+    if (context.getPrintStructureKind().hasValue() || context.isType())
       return "";
 
     assert(context.getDecl() && "unexpected context kind");
