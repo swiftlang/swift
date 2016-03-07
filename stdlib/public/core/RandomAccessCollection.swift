@@ -29,7 +29,7 @@ public protocol RandomAccessCollection : BidirectionalCollection {
 extension RandomAccessCollection {
 
   public func _failEarlyRangeCheck(index: Index, bounds: Range<Index>) {
-    fatalError("implement") // TODO: swift-3-indexing-model - implement
+    fatalError("FIXME: swift-3-indexing-model implement")
 /*
     _precondition(
       bounds.startIndex <= index,
@@ -40,12 +40,8 @@ extension RandomAccessCollection {
 */
   }
 
-  public func _failEarlyRangeCheck(
-    rangeStart rangeStart: Index,
-    rangeEnd: Index,
-    boundsStart: Index,
-    boundsEnd: Index
-  ) {
+  public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
+    fatalError("FIXME: swift-3-indexing-model implement")
 /*
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd
@@ -63,7 +59,6 @@ extension RandomAccessCollection {
       range.endIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
 */
-    fatalError("implement") // TODO: swift-3-indexing-model - implement
   }
 
 // TODO: swift-3-indexing-model - implement optimized version of the following

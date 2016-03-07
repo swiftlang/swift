@@ -96,13 +96,7 @@ public protocol Indexable {
   /// range check.
   ///
   /// - Complexity: O(1).
-  func _failEarlyRangeCheck(
-    rangeStart rangeStart: Index,
-    rangeEnd: Index,
-    boundsStart: Index,
-    boundsEnd: Index)
-// TODO: swift-3-indexing-model - can we change the above to the following? (possible compiler issue)
-//  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
+  func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
 
   /// Returns the next consecutive `Index` in a discrete sequence of
   /// `Index` values.
@@ -326,12 +320,7 @@ extension Collection {
     // FIXME: swift-3-indexing-model: range check now that indexes are Comparable.
   }
 
-  public func _failEarlyRangeCheck(
-    rangeStart rangeStart: Index,
-    rangeEnd: Index,
-    boundsStart: Index,
-    boundsEnd: Index
-  ) {
+  public func _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check now that indexes are Comparable.
   }
 
@@ -454,11 +443,7 @@ extension Collection where Iterator == IndexingIterator<Self> {
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
 extension Collection where SubSequence == Slice<Self> {
   public subscript(bounds: Range<Index>) -> Slice<Self> {
-    _failEarlyRangeCheck(
-      rangeStart: bounds.startIndex,
-      rangeEnd: bounds.endIndex,
-      boundsStart: startIndex,
-      boundsEnd: endIndex)
+    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(_base: self, bounds: bounds)
   }
 }
