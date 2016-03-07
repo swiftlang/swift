@@ -143,6 +143,12 @@ enum E6: Float {
   case B = 1e10
 }
 
+class C6: C4, P1 {
+  typealias T = Int
+}
+
+protocol P2: class, P1 {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -510,3 +516,18 @@ enum E6: Float {
 // CHECK63: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>A</decl.name> = <syntaxtype.number>-0.0</syntaxtype.number></decl.enumelement>
 // RUN: %sourcekitd-test -req=cursor -pos=143:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK64
 // CHECK64: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>B</decl.name> = <syntaxtype.number>1e10</syntaxtype.number></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=146:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK65
+// CHECK65: <decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>C6</decl.name> : C4, <ref.protocol usr="s:P11cursor_info2P1">P1</ref.protocol></decl.class>
+// FIXME: ref.class - rdar://problem/25014968
+
+// RUN: %sourcekitd-test -req=cursor -pos=150:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK66
+// CHECK66: <decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> :  <syntaxtype.keyword>class</syntaxtype.keyword>, <ref.protocol usr="s:P11cursor_info2P1">P1</ref.protocol></decl.protocol>
+
+// RUN: %sourcekitd-test -req=cursor -pos=114:18 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK67
+// CHECK67: source.lang.swift.decl.associatedtype (114:18-114:19)
+// CHECK67-NEXT: T
+// CHECK67-NEXT: s:P11cursor_info2P11T
+// CHECK67-NEXT: T.Type
+// CHECK67-NEXT: <Declaration>associatedtype T</Declaration>
+// CHECK67-NEXT: <decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>T</decl.name></decl.associatedtype>
