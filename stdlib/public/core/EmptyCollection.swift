@@ -51,6 +51,12 @@ public struct EmptyCollection<Element> : Collection {
     return 0
   }
 
+  /// Always returns `endIndex`.
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    return endIndex
+  }
+
   /// Returns an empty iterator.
   ///
   /// - Complexity: O(1).

@@ -118,6 +118,12 @@ extension LazyCollection : Collection {
     return _base.endIndex
   }
 
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Base.Index) -> Base.Index {
+    return _base.next(i)
+  }
+
   /// Access the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and

@@ -68,6 +68,12 @@ public struct RangeOfStrideable<
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   public var endIndex: Element
+  
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Element) -> Element {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
 
   @warn_unused_result
   public func _customContainsEquatableElement(element: Element) -> Bool? {

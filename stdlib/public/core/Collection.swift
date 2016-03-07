@@ -24,7 +24,6 @@ public protocol Indexable {
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-// TODO: swift-3-indexing-model - Index only needs to be comparable or must be comparable..?
   associatedtype Index : Comparable
 
   /// The position of the first element in a non-empty collection.
@@ -318,11 +317,6 @@ public protocol Collection : Indexable, Sequence {
 
 /// Default implementation for forward collections.
 extension Collection {
-  // TODO: swift-3-indexing-model - stub to allow things to compile, remove when we have real implementations
-  public func next(i: Index) -> Index {
-    fatalError("FIXME: swift-3-indexing-model")
-  }
-
   @inline(__always)
   public func _nextInPlace(i: inout Index) {
     i = next(i)
@@ -395,6 +389,15 @@ extension Collection {
       _nextInPlace(&i)
     }
     return i
+  }
+}
+
+/// Supply a default `next()` method for `Collection` models that
+/// use some model of `Strideable` as their `Index`.
+extension Collection where Index : Strideable {
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    return i.advanced(by: 1)
   }
 }
 

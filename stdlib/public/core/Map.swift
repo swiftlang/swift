@@ -81,7 +81,10 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
-  
+
+  @warn_unused_result
+  public func next(i: Index) -> Index { return _base.next(i) }
+
   /// Access the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and

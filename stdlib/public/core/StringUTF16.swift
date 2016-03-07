@@ -42,6 +42,12 @@ extension String {
       return Index(_offset: _length)
     }
 
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func next(i: Index) -> Index {
+      return Index(_offset: i._offset.advanced(by: 1))
+    }
+
     @warn_unused_result
     func _internalIndex(at i: Int) -> Int {
       return _core.startIndex + _offset + i
