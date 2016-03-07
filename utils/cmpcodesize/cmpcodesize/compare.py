@@ -1,4 +1,4 @@
-# cmpcodesize/compare.py - Compare sizes of built products -*- python -*-
+# ====--- compare.py - Compare built products' sizes --*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -41,7 +41,7 @@ prefixes = {
 }
 
 infixes = {
-    #Swift
+    # Swift
     "q_": "Generic Function"
 }
 

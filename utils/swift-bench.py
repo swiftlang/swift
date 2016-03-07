@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-##===--- swift-bench.py -------------------------------*- coding: utf-8 -*-===##
+# ===--- swift-bench.py -------------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
