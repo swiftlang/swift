@@ -1,6 +1,6 @@
 #/bin/bash
 #
-# utils/build-toochain - documents process for building a toolchain
+# utils/build-toolchain - documents process for building a toolchain
 #
 # From: https://lists.swift.org/pipermail/swift-dev/Week-of-Mon-20151207/000212.html
 #
