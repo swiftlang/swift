@@ -126,6 +126,10 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
   var v1: Int = 1
 }
 
+let tupleVar1: (((Int, Int), y: Int), z: Int)
+let tupleVar2: (f: ()->(), g: (x: Int)->Int)
+let tupleVar3: (f: (x: (Int, Int))->(), Int)
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -470,3 +474,15 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 // RUN: %sourcekitd-test -req=cursor -pos=126:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK56
 // CHECK56: source.lang.swift.decl.var.instance (126:7-126:9)
 // CHECK56: <decl.var.instance><syntaxtype.keyword>private</syntaxtype.keyword>(set) <syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>var
+
+// RUN: %sourcekitd-test -req=cursor -pos=129:5 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK57
+// CHECK57: source.lang.swift.decl.var.global (129:5-129:14)
+// CHECK57: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar1</decl.name>: <decl.var.type>(<tuple.element><tuple.element.type>(<tuple.element><tuple.element.type>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>y</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>z</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>
+
+// RUN: %sourcekitd-test -req=cursor -pos=130:5 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK58
+// CHECK58: source.lang.swift.decl.var.global (130:5-130:14)
+// CHECK58: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar2</decl.name>: <decl.var.type>(<tuple.element><tuple.element.argument_label>f</tuple.element.argument_label>: <tuple.element.type>() -&gt; <decl.function.returntype>()</decl.function.returntype></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>g</tuple.element.argument_label>: <tuple.element.type>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>
+
+// RUN: %sourcekitd-test -req=cursor -pos=131:5 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK59
+// CHECK59: source.lang.swift.decl.var.global (131:5-131:14)
+// CHECK59: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar3</decl.name>: <decl.var.type>(<tuple.element><tuple.element.argument_label>f</tuple.element.argument_label>: <tuple.element.type>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>()</decl.function.returntype></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>
