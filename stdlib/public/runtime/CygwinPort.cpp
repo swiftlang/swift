@@ -63,7 +63,7 @@ int swift::_swift_dl_iterate_phdr(int (*Callback)(struct dl_phdr_info *info,
     return 0;
   }
 
-  for (unsigned int i = 0; i < neededSize / sizeof(HMODULE); i++) {
+  for (unsigned i = 0; i < neededSize / sizeof(HMODULE); i++) {
     char modName[MAX_PATH];
 
     if (!GetModuleFileNameExA(procHandle, modules[i], modName,

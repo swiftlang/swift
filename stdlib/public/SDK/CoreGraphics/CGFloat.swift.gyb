@@ -265,26 +265,26 @@ public prefix func + (x: CGFloat) -> CGFloat { return x }
 public prefix func - (x: CGFloat) -> CGFloat { return CGFloat(-x.native) }
 
 @_transparent
-public prefix func ++ (inout x: CGFloat) -> CGFloat {
+public prefix func ++ (x: inout CGFloat) -> CGFloat {
   x.native += 1.0
   return x
 }
 
 @_transparent
-public prefix func -- (inout x: CGFloat) -> CGFloat {
+public prefix func -- (x: inout CGFloat) -> CGFloat {
   x.native -= 1.0
   return x
 }
 
 @_transparent
-public postfix func ++ (inout x: CGFloat) -> CGFloat {
+public postfix func ++ (x: inout CGFloat) -> CGFloat {
   let tmp = x
   x.native += 1.0
   return tmp 
 }
 
 @_transparent
-public postfix func -- (inout x: CGFloat) -> CGFloat {
+public postfix func -- (x: inout CGFloat) -> CGFloat {
   let tmp = x
   x.native -= 1.0
   return tmp 
@@ -323,27 +323,27 @@ public func %(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
 
 // CGFloat assignment operators.
 @_transparent
-public func +=(inout lhs: CGFloat, rhs: CGFloat) {
+public func +=(lhs: inout CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native + rhs.native
 }
 
 @_transparent
-public func -=(inout lhs: CGFloat, rhs: CGFloat) {
+public func -=(lhs: inout CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native - rhs.native
 }
 
 @_transparent
-public func *=(inout lhs: CGFloat, rhs: CGFloat) {
+public func *=(lhs: inout CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native * rhs.native
 }
 
 @_transparent
-public func /=(inout lhs: CGFloat, rhs: CGFloat) {
+public func /=(lhs: inout CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native / rhs.native
 }
 
 @_transparent
-public func %=(inout lhs: CGFloat, rhs: CGFloat) {
+public func %=(lhs: inout CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native % rhs.native
 }
 

@@ -86,6 +86,18 @@ public struct Boo {
   public init(i:Int64) {}
 }
 
+public class Foo2 {
+  internal let x: Int32
+  @inline(never)
+  init(count: Int32) {
+    if count < 2 {
+      x = 5
+    } else {
+      x = 10
+    }
+  }
+}
+
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
@@ -108,7 +120,7 @@ public func testClassLet1(f: Foo1) -> Int32 {
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
-public func testClassLet1(inout f: Foo1) -> Int32 {
+public func testClassLet1(f: inout Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -130,7 +142,7 @@ public func testClassLet(f: Foo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testClassLet(inout f: Foo) -> Int32 {
+public func testClassLet(f: inout Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
@@ -158,7 +170,7 @@ public func testStructLet(b: Boo) -> Int32 {
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
-public func testStructLet(inout b: Boo) -> Int32 {
+public func testStructLet(b: inout Boo) -> Int32 {
   return b.Prop1 + b.Prop1 + b.Prop2 + b.Prop3
 }
 
@@ -169,4 +181,16 @@ public func testStructLet(inout b: Boo) -> Int32 {
 // CHECK-NEXT: return
 public func testStructPublicLet(b: Boo) -> Int32 {
   return b.Prop0
+}
+
+// Check that f.x is not constant folded, because the initializer of Foo2 has multiple
+// assignments to the property x with different values.
+// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
+// bb0
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
+// CHECK: return
+public func testClassLet2(f: Foo2) -> Int32 {
+  return f.x + f.x
 }

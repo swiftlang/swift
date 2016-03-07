@@ -47,6 +47,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::pound_if:
+  case tok::pound_setline:
     return true;
 
   case tok::pound_line:
@@ -255,6 +256,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::pound_else) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) &&
+         Tok.isNot(tok::kw_sil_scope) &&
          Tok.isNot(tok::kw_sil_stage) &&
          Tok.isNot(tok::kw_sil_vtable) &&
          Tok.isNot(tok::kw_sil_global) &&
@@ -290,7 +292,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     PreviousHadSemi = false;
     if (isStartOfDecl()
         && Tok.isNot(tok::pound_if)
-        && Tok.isNot(tok::pound_line)) {
+        && Tok.isNot(tok::pound_setline)) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
       if (Status.isError()) {
@@ -344,7 +346,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
 
     } else if (Tok.is(tok::pound_line)) {
-      ParserStatus Status = parseLineDirective();
+      ParserStatus Status = parseLineDirective(true);
+      BraceItemsStatus |= Status;
+      NeedParseErrorRecovery = Status.isError();
+    } else if (Tok.is(tok::pound_setline)) {
+      ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isError();
     } else if (IsTopLevel) {
@@ -404,22 +410,32 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
     } else {
       SourceLoc StartLoc = Tok.getLoc();
-      ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
-      BraceItemsStatus |= ExprOrStmtStatus;
-      if (ExprOrStmtStatus.isError())
-        NeedParseErrorRecovery = true;
-      diagnoseDiscardedClosure(*this, Result);
-      if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
-        // If this is a normal library, you can't have expressions or statements
-        // outside at the top level.
-        diagnose(StartLoc,
-                 Result.is<Stmt*>() ? diag::illegal_top_level_stmt
-                                    : diag::illegal_top_level_expr);
-        Result = ASTNode();
-      }
+      if (Tok.is(tok::kw_init)) {
+        if (auto CD = dyn_cast<ConstructorDecl>(CurDeclContext)) {
+          // Hint at missing 'self.' or 'super.' then skip this statement.
+          bool isConvenient = CD->isConvenienceInit();
+          diagnose(StartLoc, diag::invalid_nested_init, isConvenient)
+            .fixItInsert(StartLoc, isConvenient ? "self." : "super.");
+          NeedParseErrorRecovery = true;
+        }
+      } else {
+        ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
+        BraceItemsStatus |= ExprOrStmtStatus;
+        if (ExprOrStmtStatus.isError())
+          NeedParseErrorRecovery = true;
+        diagnoseDiscardedClosure(*this, Result);
+        if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
+          // If this is a normal library, you can't have expressions or
+          // statements outside at the top level.
+          diagnose(StartLoc,
+                   Result.is<Stmt*>() ? diag::illegal_top_level_stmt
+                                      : diag::illegal_top_level_expr);
+          Result = ASTNode();
+        }
 
-      if (!Result.isNull())
-        Entries.push_back(Result);
+        if (!Result.isNull())
+          Entries.push_back(Result);
+      }
     }
 
     if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
@@ -557,7 +573,11 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::pound_line:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
-    return parseLineDirective();
+    return parseLineDirective(true);
+  case tok::pound_setline:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseLineDirective(false);
   case tok::kw_while:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtWhile(LabelInfo);
@@ -858,7 +878,8 @@ namespace {
 static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                 ParserStatus &status,
                                 SmallVectorImpl<VarDecl *> &boundDecls,
-                                GuardedPatternContext parsingContext) {
+                                GuardedPatternContext parsingContext,
+                                bool isFirstPattern) {
   ParserResult<Pattern> patternResult;
   auto setErrorResult = [&] () {
     patternResult = makeParserErrorResult(new (P.Context)
@@ -945,14 +966,64 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   status |= patternResult;
   result.ThePattern = patternResult.get();
 
-  // Add variable bindings from the pattern to the case scope.  We have
-  // to do this with a full AST walk, because the freshly parsed pattern
-  // represents tuples and var patterns as tupleexprs and
-  // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
-  patternResult.get()->forEachVariable([&](VarDecl *VD) {
-    if (VD->hasName()) P.addToScope(VD);
-    boundDecls.push_back(VD);
-  });
+  if (isFirstPattern) {
+    // Add variable bindings from the pattern to the case scope.  We have
+    // to do this with a full AST walk, because the freshly parsed pattern
+    // represents tuples and var patterns as tupleexprs and
+    // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
+    patternResult.get()->forEachVariable([&](VarDecl *VD) {
+      if (VD->hasName()) P.addToScope(VD);
+      boundDecls.push_back(VD);
+    });
+  } else {
+    // If boundDecls already contains variables, then we must match the
+    // same number and same names in this pattern as were declared in a
+    // previous pattern (and later we will make sure they have the same
+    // types).
+    SmallVector<VarDecl*, 4> repeatedDecls;
+    patternResult.get()->forEachVariable([&](VarDecl *VD) {
+      if (!VD->hasName())
+        return;
+      
+      for (auto repeat : repeatedDecls)
+        if (repeat->getName() == VD->getName())
+          P.addToScope(VD); // will diagnose a duplicate declaration
+
+      bool found = false;
+      for (auto previous : boundDecls) {
+        if (previous->hasName() && previous->getName() == VD->getName()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        // Diagnose a declaration that doesn't match a previous pattern.
+        P.diagnose(VD->getLoc(), diag::extra_var_in_multiple_pattern_list, VD->getName());
+        status.setIsParseError();
+      }
+      repeatedDecls.push_back(VD);
+    });
+    
+    for (auto previous : boundDecls) {
+      bool found = false;
+      for (auto repeat : repeatedDecls) {
+        if (previous->hasName() && previous->getName() == repeat->getName()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        // Diagnose a previous declaration that is missing in this pattern.
+        P.diagnose(previous->getLoc(), diag::extra_var_in_multiple_pattern_list, previous->getName());
+        status.setIsParseError();
+      }
+    }
+    
+    for (auto VD : repeatedDecls) {
+      VD->setHasNonPatternBindingInit();
+      VD->setImplicit();
+    }
+  }
   
   // Now that we have them, mark them as being initialized without a PBD.
   for (auto VD : boundDecls)
@@ -2004,7 +2075,7 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
   ParserStatus status;
   GuardedPattern pattern;
   parseGuardedPattern(*this, pattern, status, boundDecls,
-                      GuardedPatternContext::Catch);
+                      GuardedPatternContext::Catch, /* isFirst */ true);
   if (status.hasCodeCompletion()) {
     return makeParserCodeCompletionResult<CatchStmt>();
   }
@@ -2509,17 +2580,19 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
                                   SmallVectorImpl<VarDecl *> &BoundDecls,
                                   SourceLoc &ColonLoc) {
   ParserStatus Status;
-
+  bool isFirst = true;
+  
   CaseLoc = P.consumeToken(tok::kw_case);
 
   do {
     GuardedPattern PatternResult;
     parseGuardedPattern(P, PatternResult, Status, BoundDecls,
-                        GuardedPatternContext::Case);
+                        GuardedPatternContext::Case, isFirst);
     LabelItems.push_back(CaseLabelItem(/*IsDefault=*/false,
                                        PatternResult.ThePattern,
                                        PatternResult.WhereLoc,
                                        PatternResult.Guard));
+    isFirst = false;
   } while (P.consumeIf(tok::comma));
 
   ColonLoc = P.Tok.getLoc();
@@ -2585,11 +2658,6 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   }
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
-
-  // Case blocks with multiple patterns cannot bind variables.
-  if (!BoundDecls.empty() && CaseLabelItems.size() > 1)
-    diagnose(BoundDecls[0]->getLoc(),
-             diag::var_binding_with_multiple_case_patterns);
 
   SmallVector<ASTNode, 8> BodyItems;
 

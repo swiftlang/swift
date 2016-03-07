@@ -410,7 +410,7 @@ class PatternMatchEmission {
   llvm::MapVector<CaseStmt*, std::pair<SILBasicBlock*, bool>> SharedCases;
 
   using CompletionHandlerTy =
-    llvm::function_ref<void(PatternMatchEmission &, ClauseRow &)>;
+    llvm::function_ref<void(PatternMatchEmission &, ArgArray, ClauseRow &)>;
   CompletionHandlerTy CompletionHandler;
 public:
   
@@ -442,15 +442,15 @@ private:
                        const FailureHandler &failure);
 
   void bindIrrefutablePatterns(const ClauseRow &row, ArgArray args,
-                               bool forIrrefutableRow);
+                               bool forIrrefutableRow, bool hasMultipleItems);
   void bindIrrefutablePattern(Pattern *pattern, ConsumableManagedValue v,
-                              bool forIrrefutableRow);
+                              bool forIrrefutableRow, bool hasMultipleItems);
   void bindNamedPattern(NamedPattern *pattern, ConsumableManagedValue v,
-                        bool forIrrefutableRow);
+                        bool forIrrefutableRow, bool hasMultipleItems);
 
   void bindVariable(SILLocation loc, VarDecl *var,
                     ConsumableManagedValue value, CanType formalValueType,
-                    bool isIrrefutable);
+                    bool isIrrefutable, bool hasMultipleItems);
 
   void emitSpecializedDispatch(ClauseMatrix &matrix, ArgArray args,
                                unsigned &lastRow, unsigned column,
@@ -1031,16 +1031,22 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   bool hasGuard = guardExpr != nullptr;
   assert(!hasGuard || !clauses[row].isIrrefutable());
 
+  auto stmt = clauses[row].getClientData<CaseStmt>();
+  ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
+  bool hasMultipleItems = labelItems.size() > 1;
+  
   // Bind the rest of the patterns.
-  bindIrrefutablePatterns(clauses[row], args, !hasGuard);
+  bindIrrefutablePatterns(clauses[row], args, !hasGuard, hasMultipleItems);
 
   // Emit the guard branch, if it exists.
   if (guardExpr) {
-    emitGuardBranch(guardExpr, guardExpr, failure);
+    SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), stmt, [&]{
+      this->emitGuardBranch(guardExpr, guardExpr, failure);
+    });
   }
 
   // Enter the row.
-  CompletionHandler(*this, clauses[row]);
+  CompletionHandler(*this, args, clauses[row]);
   assert(!SGF.B.hasValidInsertionPoint());
 }
 
@@ -1098,7 +1104,7 @@ void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
   FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
   bindVariable(pattern, pattern->getMatchVar(), value,
                pattern->getType()->getCanonicalType(),
-               /*isForSuccess*/ false);
+               /*isForSuccess*/ false, /* hasMultipleItems */ false);
   emitGuardBranch(pattern, pattern->getMatchExpr(), failure);
 }
 
@@ -1109,17 +1115,19 @@ void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
 /// because we might have already bound all the refutable parts.
 void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
                                                    ArgArray args,
-                                                   bool forIrrefutableRow) {
+                                                   bool forIrrefutableRow,
+                                                   bool hasMultipleItems) {
   assert(row.columns() == args.size());
   for (unsigned i = 0, e = args.size(); i != e; ++i) {
-    bindIrrefutablePattern(row[i], args[i], forIrrefutableRow);
+    bindIrrefutablePattern(row[i], args[i], forIrrefutableRow, hasMultipleItems);
   }
 }
 
 /// Bind an irrefutable wildcard pattern to a given value.
 void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
                                                   ConsumableManagedValue value,
-                                                  bool forIrrefutableRow) {
+                                                  bool forIrrefutableRow,
+                                                  bool hasMultipleItems) {
   // We use null patterns to mean artificial AnyPatterns.
   if (!pattern) return;
 
@@ -1150,7 +1158,8 @@ void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
     return;
 
   case PatternKind::Named:
-    bindNamedPattern(cast<NamedPattern>(pattern), value, forIrrefutableRow);
+    bindNamedPattern(cast<NamedPattern>(pattern), value,
+                     forIrrefutableRow, hasMultipleItems);
     return;
   }
   llvm_unreachable("bad pattern kind");
@@ -1159,9 +1168,10 @@ void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
 /// Bind a named pattern to a given value.
 void PatternMatchEmission::bindNamedPattern(NamedPattern *pattern,
                                             ConsumableManagedValue value,
-                                            bool forIrrefutableRow) {
+                                            bool forIrrefutableRow,
+                                            bool hasMultipleItems) {
   bindVariable(pattern, pattern->getDecl(), value,
-               pattern->getType()->getCanonicalType(), forIrrefutableRow);
+               pattern->getType()->getCanonicalType(), forIrrefutableRow, hasMultipleItems);
 }
 
 /// Should we take control of the mang
@@ -1178,7 +1188,15 @@ static bool shouldTake(ConsumableManagedValue value, bool isIrrefutable) {
 void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
                                         ConsumableManagedValue value,
                                         CanType formalValueType,
-                                        bool isIrrefutable) {
+                                        bool isIrrefutable,
+                                        bool hasMultipleItems) {
+  // If this binding is one of multiple patterns, each individual binding
+  // will just be let, and then the chosen value will get forwarded into
+  // a var box in the final shared case block.
+  bool forcedLet = hasMultipleItems && !var->isLet();
+  if (forcedLet)
+    var->setLet(true);
+  
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var);
 
@@ -1188,6 +1206,9 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
   } else {
     std::move(rv).copyInto(SGF, loc, init.get());
   }
+  
+  if (forcedLet)
+    var->setLet(false);
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
@@ -2017,9 +2038,6 @@ void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
 /// Retrieve the jump destination for a shared case block.
 JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
                                                       bool hasFallthroughTo) {
-  assert(!caseBlock->hasBoundDecls() &&
-         "getting shared case destination for block with bound vars?");
-
   auto result = SharedCases.insert({caseBlock, {nullptr, hasFallthroughTo}});
 
   // If there's already an entry, use that.
@@ -2032,6 +2050,16 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
     // have needed it.
     block = SGF.createBasicBlock();
     result.first->second.first = block;
+    
+    // Add args for any pattern variables
+    if (caseBlock->hasBoundDecls()) {
+      auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+      pattern->forEachVariable([&](VarDecl *V) {
+        if (!V->hasName())
+          return;
+        block->createBBArg(SGF.VarLocs[V].value->getType(), V);
+      });
+    }
   }
 
   return JumpDest(block, PatternMatchStmtDepth,
@@ -2071,7 +2099,38 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     }
     
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
-    emitCaseBody(caseBlock);
+    
+    // If we have a shared case with bound decls, then the 0th pattern has the
+    // order of variables that are the incoming BB arguments. Setup the VarLocs
+    // to point to the incoming args and setup initialization so any args needing
+    // cleanup will get that as well.
+    if (caseBlock->hasBoundDecls()) {
+      Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
+      auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+      unsigned argIndex = 0;
+      pattern->forEachVariable([&](VarDecl *V) {
+        if (!V->hasName())
+          return;
+        if (V->isLet()) {
+          // Just emit a let with cleanup.
+          SGF.VarLocs[V].value = caseBB->getBBArg(argIndex++);
+          SGF.emitInitializationForVarDecl(V)->finishInitialization(SGF);
+        } else {
+          // The pattern variables were all emitted as lets and one got passed in,
+          // now we finally alloc a box for the var and forward in the chosen value.
+          SGF.VarLocs.erase(V);
+          auto newVar = SGF.emitInitializationForVarDecl(V);
+          auto loc = SGF.CurrentSILLoc;
+          auto value = ManagedValue::forUnmanaged(caseBB->getBBArg(argIndex++));
+          auto formalType = V->getType()->getCanonicalType();
+          RValue(SGF, loc, formalType, value).forwardInto(SGF, loc, newVar.get());
+        }
+      });
+      emitCaseBody(caseBlock);
+    } else {
+      emitCaseBody(caseBlock);
+    }
+    
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
   }
 }
@@ -2122,6 +2181,41 @@ public:
   PatternMatchEmission &Emission;
 };
 
+void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt *stmt,
+                                                      const llvm::function_ref<void(void)> &f) {
+  ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
+  auto expectedPattern = labelItems[0].getPattern();
+  
+  if (labelItems.size() <= 1 || pattern == expectedPattern) {
+    f();
+    return;
+  }
+
+  // Remap vardecls that the case body is expecting to the pattern var locations
+  // for the given pattern, emit whatever, and switch back.
+  SmallVector<VarDecl *, 4> Vars;
+  expectedPattern->collectVariables(Vars);
+  
+  auto variableSwapper = [&] {
+    pattern->forEachVariable([&](VarDecl *VD) {
+      if (!VD->hasName())
+        return;
+      for (auto expected : Vars) {
+        if (expected->hasName() && expected->getName() == VD->getName()) {
+          auto swap = VarLocs[expected];
+          VarLocs[expected] = VarLocs[VD];
+          VarLocs[VD] = swap;
+          return;
+        }
+      }
+    });
+  };
+  
+  variableSwapper();
+  f();
+  variableSwapper();
+}
+
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   DEBUG(llvm::dbgs() << "emitting switch stmt\n";
         S->print(llvm::dbgs());
@@ -2132,6 +2226,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
  
   auto completionHandler = [&](PatternMatchEmission &emission,
+                               ArgArray argArray,
                                ClauseRow &row) {
     auto caseBlock = row.getClientData<CaseStmt>();
     emitProfilerIncrement(caseBlock);
@@ -2145,13 +2240,47 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock,
                                                         row.hasFallthroughTo());
       Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
+    } else if (caseBlock->getCaseLabelItems().size() > 1) {
+      JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock,
+                                                            row.hasFallthroughTo());
+      
+      // Generate the arguments from this row's pattern in the case block's expected order,
+      // and keep those arguments from being cleaned up, as we're passing the +1 along to
+      // the shared case block dest. (The cleanups still happen, as they are threaded through
+      // here messily, but the explicit retains here counteract them, and then the
+      // retain/release pair gets optimized out.)
+      ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
+      SmallVector<SILValue, 4> args;
+      SmallVector<VarDecl *, 4> expectedVarOrder;
+      SmallVector<VarDecl *, 4> Vars;
+      labelItems[0].getPattern()->collectVariables(expectedVarOrder);
+      row.getCasePattern()->collectVariables(Vars);
+      
+      for (auto expected : expectedVarOrder) {
+        if (!expected->hasName())
+        continue;
+        for (auto var : Vars) {
+          if (var->hasName() && var->getName() == expected->getName()) {
+            auto value = VarLocs[var].value;
+            args.push_back(value);
+            
+            for (auto cmv : argArray) {
+              if (cmv.getValue() == value) {
+                if (cmv.hasCleanup())
+                  B.createRetainValue(CurrentSILLoc, value);
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+      Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
     } else {
       // However, if we don't have a fallthrough or a multi-pattern 'case', we
       // can just emit the body inline and save some dead blocks.
       // Emit the statement here.
       emission.emitCaseBody(caseBlock);
-      
-      // If we don't need a shared block and we have
     }
   };
 
@@ -2235,6 +2364,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
                                        ArrayRef<CatchStmt*> clauses,
                                        JumpDest catchFallthroughDest) {
   auto completionHandler = [&](PatternMatchEmission &emission,
+                               ArgArray argArray,
                                ClauseRow &row) {
     auto clause = row.getClientData<CatchStmt>();
     emitProfilerIncrement(clause->getBody());

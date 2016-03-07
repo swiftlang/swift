@@ -199,6 +199,10 @@ enum class TypeCheckExprFlags {
   /// If set, this expression is being re-type checked as part of diagnostics,
   /// and so we should not visit bodies of non-single expression closures.
   SkipMultiStmtClosures = 0x40,
+
+  /// Set if the client prefers fixits to be in the form of force unwrapping
+  /// or optional chaining to return an optional.
+  PreferForceUnwrapToOptional = 0x80,
 };
 
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -895,6 +899,9 @@ public:
   AnyFunctionType::ExtInfo
   applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
 
+  /// Infer default value witnesses for all requirements in the given protocol.
+  void inferDefaultWitnesses(ProtocolDecl *proto);
+
   /// Determine whether the given (potentially constrained) protocol extension
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
@@ -1024,17 +1031,18 @@ public:
   /// Instantiate the storage implementation for a behavior-backed property.
   void completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
-                               FuncDecl *BehaviorInitStorage,
+                               FuncDecl *DefaultInitStorage,
+                               FuncDecl *ParamInitStorage,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs);
   
-  /// Instantiate the initial value implementation for a behavior-backed
+  /// Instantiate the parameter implementation for a behavior-backed
   /// property.
-  void completePropertyBehaviorInitialValue(VarDecl *VD,
-                               VarDecl *BehaviorInitialValue,
+  void completePropertyBehaviorParameter(VarDecl *VD,
+                               FuncDecl *BehaviorParameter,
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs);
@@ -1653,9 +1661,8 @@ public:
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
   bool
-  isAvailabilitySafeForConformance(ValueDecl *witness,
-                                   ValueDecl *requirement,
-                                   NormalProtocolConformance *conformance,
+  isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
+                                   ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
 
   /// Returns an over-approximation of the range of operating system versions

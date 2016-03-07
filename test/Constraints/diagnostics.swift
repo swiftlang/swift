@@ -488,7 +488,7 @@ enum Color {
   static func overload(a a : Int) -> Color {}
   static func overload(b b : Int) -> Color {}
   
-  static func frob(a : Int, inout b : Int) -> Color {}
+  static func frob(a : Int, b : inout Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}} {{51-51=description: }}
@@ -643,7 +643,7 @@ extension Array {
 }
 
 // <rdar://problem/22519983> QoI: Weird error when failing to infer archetype
-func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}
+func safeAssign<T: RawRepresentable>(lhs: inout T) -> Bool {}
 // expected-note @-1 {{in call to function 'safeAssign'}}
 let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
 
@@ -668,7 +668,7 @@ func someFunction() -> () {
 // <rdar://problem/23560128> QoI: trying to mutate an optional dictionary result produces bogus diagnostic
 func r23560128() {
   var a : (Int,Int)?
-  a.0 = 42  // expected-error {{value of optional type '(Int, Int)?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=!}}
+  a.0 = 42  // expected-error {{value of optional type '(Int, Int)?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=?}}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -676,7 +676,7 @@ struct ExampleStruct21890157 {
   var property = "property"
 }
 var example21890157: ExampleStruct21890157?
-example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=!}}
+example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=?}}
 
 
 struct UnaryOp {}
@@ -732,3 +732,15 @@ enum AssocTest {
 
 if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '==' cannot be applied to two 'AssocTest' operands}}
 // expected-note @-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
+
+
+// <rdar://problem/24251022> Swift 2: Bad Diagnostic Message When Adding Different Integer Types
+func r24251022() {
+  var a = 1
+  var b: UInt32 = 2
+  a += a +
+    b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
+}
+
+
+

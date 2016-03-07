@@ -24,7 +24,8 @@ modules, eliminating the need for headers and the code duplication they entail.
 
 To read the documentation, start by installing the
 [Sphinx](http://sphinx-doc.org) documentation generator tool (just run
-`easy_install -U Sphinx` from the command line and you're good to go). Once you
+`easy_install -U Sphinx==1.3.4` (more recent versions are currently not supported) 
+from the command line and you're good to go). Once you
  have that, you can build the Swift documentation by going into `docs` and
 typing `make`. This compiles the `.rst` files in the `docs` directory into
 HTML in the `docs/_build/html` directory.

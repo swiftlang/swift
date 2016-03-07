@@ -23,7 +23,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -55,6 +54,10 @@ using namespace irgen;
 void IRGenFunction::emitObjCStrongRelease(llvm::Value *value) {
   // Get an appropriately-cast function pointer.
   auto fn = IGM.getObjCReleaseFn();
+  auto cc = IGM.C_CC;
+  if (auto fun = dyn_cast<llvm::Function>(fn))
+    cc = fun->getCallingConv();
+
   if (value->getType() != IGM.ObjCPtrTy) {
     auto fnTy = llvm::FunctionType::get(IGM.VoidTy, value->getType(),
                                         false)->getPointerTo();
@@ -62,6 +65,7 @@ void IRGenFunction::emitObjCStrongRelease(llvm::Value *value) {
   }
 
   auto call = Builder.CreateCall(fn, value);
+  call->setCallingConv(cc);
   call->setDoesNotThrow();
 }
 
@@ -92,9 +96,13 @@ void IRGenFunction::emitObjCStrongRetain(llvm::Value *v) {
 llvm::Value *IRGenFunction::emitObjCRetainCall(llvm::Value *value) {
   // Get an appropriately cast function pointer.
   auto fn = IGM.getObjCRetainFn();
+  auto cc = IGM.C_CC;
+  if (auto fun = dyn_cast<llvm::Function>(fn))
+    cc = fun->getCallingConv();
   fn = getCastOfRetainFn(IGM, fn, value->getType());
 
   auto call = Builder.CreateCall(fn, value);
+  call->setCallingConv(cc);
   call->setDoesNotThrow();
   return call;
 }

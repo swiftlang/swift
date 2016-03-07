@@ -227,6 +227,9 @@ public:
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F);
 
+  /// Invalidate a function in SILLoader cache.
+  void invalidateFunctionInSILCache(SILFunction *F);
+
   /// Specialization can cause a function that was erased before by dead function
   /// elimination to become alive again. If this happens we need to remove it
   /// from the list of zombies.
@@ -426,6 +429,13 @@ public:
   /// \return false if the linking failed.
   bool linkFunction(StringRef Name,
                     LinkingMode LinkAll = LinkingMode::LinkNormal);
+
+  /// Check if a given function exists in the module,
+  /// i.e. it can be linked by linkFunction.
+  ///
+  /// \return null if this module has no such function. Otherwise
+  /// the declaration of a function.
+  SILFunction *hasFunction(StringRef Name, SILLinkage Linkage);
 
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();

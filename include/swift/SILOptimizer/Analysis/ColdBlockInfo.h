@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_COLDBLOCKS_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/SIL/SILValue.h"
 
 namespace swift {
 class DominanceAnalysis;
@@ -33,12 +34,33 @@ class ColdBlockInfo {
   ColdBlockInfo(const ColdBlockInfo &) = delete;
   ColdBlockInfo &operator=(const ColdBlockInfo &) = delete;
 
+  /// Tri-value return code for checking branch hints.
+  enum BranchHint : unsigned {
+    None,
+    LikelyTrue,
+    LikelyFalse
+  };
+
+  enum {
+    RecursionDepthLimit = 3
+  };
+
+  BranchHint getBranchHint(SILValue Cond, int recursionDepth);
+
+  bool isSlowPath(const SILBasicBlock *FromBB, const SILBasicBlock *ToBB,
+                  int recursionDepth);
+
+  bool isCold(const SILBasicBlock *BB,
+              int recursionDepth);
+
 public:
   ColdBlockInfo(DominanceAnalysis *DA): DA(DA) {}
 
-  static bool isSlowPath(const SILBasicBlock *FromBB, const SILBasicBlock *ToBB);
+  bool isSlowPath(const SILBasicBlock *FromBB, const SILBasicBlock *ToBB) {
+    return isSlowPath(FromBB, ToBB, 0);
+  }
 
-  bool isCold(const SILBasicBlock *BB);
+  bool isCold(const SILBasicBlock *BB) { return isCold(BB, 0); }
 };
 } // end namespace swift
 

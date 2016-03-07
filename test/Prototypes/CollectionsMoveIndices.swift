@@ -442,7 +442,7 @@ public protocol MyIndexableType {
   @warn_unused_result
   func next(i: Index) -> Index
 
-  func _nextInPlace(inout i: Index)
+  func _nextInPlace(i: inout Index)
 
   func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
 
@@ -451,7 +451,7 @@ public protocol MyIndexableType {
 }
 extension MyIndexableType {
   @inline(__always)
-  public func _nextInPlace(inout i: Index) {
+  public func _nextInPlace(i: inout Index) {
     i = next(i)
   }
 }
@@ -729,12 +729,12 @@ public protocol MyBidirectionalCollectionType : MyForwardCollectionType {
   @warn_unused_result
   func previous(i: Index) -> Index
 
-  func _previousInPlace(inout i: Index)
+  func _previousInPlace(i: inout Index)
 }
 
 extension MyBidirectionalCollectionType {
   @inline(__always)
-  public func _previousInPlace(inout i: Index) {
+  public func _previousInPlace(i: inout Index) {
     i = previous(i)
   }
 

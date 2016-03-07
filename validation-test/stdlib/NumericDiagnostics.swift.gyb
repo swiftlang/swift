@@ -2,7 +2,7 @@
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift -parse -Xfrontend -verify %t/main.swift
 // REQUIRES: executable_test
 
-% from SwiftIntTypes import all_numeric_type_names, numeric_type_names_Macintosh_only,  \
+% from SwiftIntTypes import all_numeric_type_names, numeric_type_names_macintosh_only, \
 %   all_integer_type_names,all_integer_binary_operator_names, all_integer_or_real_binary_operator_names, \
 %   all_arithmetic_comparison_operator_names, all_integer_assignment_operator_names, \
 %   all_integer_or_real_assignment_operator_names
@@ -22,8 +22,8 @@ func testIteratedOperations() {
 // typesToTest: ${typesToTest}, operatorsToTest: ${operatorsToTest}
   % for T1 in typesToTest:
     % for T2 in typesToTest:
-      ${ "\n\n#if arch(i386) || arch(x86_64)\n" if T1 in numeric_type_names_Macintosh_only() 
-        or T2 in numeric_type_names_Macintosh_only() else "" }
+      ${ "\n\n#if arch(i386) || arch(x86_64)\n" if T1 in numeric_type_names_macintosh_only()
+        or T2 in numeric_type_names_macintosh_only() else "" }
       % for op in operatorsToTest:
         % count += 1
         % theDiagnostic = "// expected-error{{of type}} expected-note*{{expected an argument list of type}} expected-note*{{exist with these partially matching parameter lists}} " if (T1 != T2) else \
@@ -36,8 +36,8 @@ func testIteratedOperations() {
       var result = x1_${T1} ${op} x2_${T2}  ${theDiagnostic} 
     }
       %end # op
-      ${ "\n#endif //arch(i386) || arch(x86_64)\n\n" if T1 in numeric_type_names_Macintosh_only() 
-        or T2 in numeric_type_names_Macintosh_only() else "" }
+      ${ "\n#endif //arch(i386) || arch(x86_64)\n\n" if T1 in numeric_type_names_macintosh_only()
+        or T2 in numeric_type_names_macintosh_only() else "" }
     %end # T2
   %end # T1
 %end # typesToTest

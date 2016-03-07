@@ -13,12 +13,16 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
-#include "swift/AST/Attr.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/AST/AttrKind.h"
+#include "swift/AST/Identifier.h"
 #include <vector>
 
 namespace swift {
 class GenericParamList;
 class CanType;
+class Decl;
+class ValueDecl;
 class ExtensionDecl;
 class NominalTypeDecl;
 class TypeBase;
@@ -26,27 +30,47 @@ class DeclContext;
 class Type;
 enum DeclAttrKind : unsigned;
 class PrinterArchetypeTransformer;
+class SynthesizedExtensionAnalyzer;
 
 /// Necessary information for archetype transformation during printing.
 struct ArchetypeTransformContext {
   Type getTypeBase();
   NominalTypeDecl *getNominal();
-  PrinterArchetypeTransformer *getTransformer() { return Transformer.get(); }
+  PrinterArchetypeTransformer *getTransformer();
   bool isPrintingSynthesizedExtension();
   bool isPrintingTypeInterface();
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer);
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
                             Type T);
   ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
-                            NominalTypeDecl *NTD);
+                            NominalTypeDecl *NTD,
+                            SynthesizedExtensionAnalyzer *Analyzer);
   Type transform(Type Input);
   StringRef transform(StringRef Input);
+  bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+  ~ArchetypeTransformContext();
 private:
-  std::shared_ptr<PrinterArchetypeTransformer> Transformer;
+  struct Implementation;
+  Implementation &Impl;
+};
 
-  // When printing a type interface, this is the type to print.
-  // When synthesizing extensions, this is the target nominal.
-  llvm::PointerUnion<TypeBase*, NominalTypeDecl*> TypeBaseOrNominal;
+struct SynthesizedExtensionInfo {
+  ExtensionDecl *Ext = nullptr;
+  std::vector<StringRef> KnownSatisfiedRequirements;
+  operator bool() const { return Ext; }
+};
+
+class SynthesizedExtensionAnalyzer {
+  struct Implementation;
+  Implementation &Impl;
+
+public:
+  SynthesizedExtensionAnalyzer(NominalTypeDecl *Target);
+  ~SynthesizedExtensionAnalyzer();
+  void forEachSynthesizedExtension(
+    llvm::function_ref<void(ExtensionDecl*)> Fn);
+  bool isInSynthesizedExtension(const ValueDecl *VD);
+  bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
 };
 
 /// Options for printing AST nodes.
@@ -82,6 +106,9 @@ struct PrintOptions {
   /// \brief Whether to print a placeholder for default parameters.
   bool PrintDefaultParameterPlaceholder = true;
 
+  /// \brief Whether to print enum raw value expressions.
+  bool EnumRawValues = false;
+
   /// \brief Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
   /// spelling of the type name.
@@ -111,6 +138,13 @@ struct PrintOptions {
   /// \c false.
   bool ExplodePatternBindingDecls = false;
 
+  /// If true, the printer will explode an enum case like this:
+  /// \code
+  ///   case A, B
+  /// \endcode
+  /// into multiple case declarations.
+  bool ExplodeEnumCaseDecls = false;
+
   /// \brief Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
@@ -137,6 +171,10 @@ struct PrintOptions {
 
   /// Whether to skip printing 'import' declarations.
   bool SkipImports = false;
+
+  /// \brief Whether to skip printing overrides and witnesses for
+  /// protocol requirements.
+  bool SkipOverrides = false;
 
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
@@ -273,7 +311,8 @@ struct PrintOptions {
 
   void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
 
-  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
+  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D,
+                                    SynthesizedExtensionAnalyzer *SynAnalyzer);
 
   void clearArchetypeTransformerForSynthesizedExtensions();
 
@@ -338,6 +377,7 @@ struct PrintOptions {
   /// Print in the style of quick help declaration.
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
+    PO.EnumRawValues = true;
     PO.PrintDefaultParameterPlaceholder = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;
@@ -345,6 +385,7 @@ struct PrintOptions {
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.ExcludeAttrList.push_back(DAK_Swift3Migration);
     PO.SkipPrivateStdlibDecls = true;
+    PO.ExplodeEnumCaseDecls = true;
     return PO;
   }
 };

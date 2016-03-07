@@ -21,7 +21,6 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -1277,7 +1276,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
+  if (options.contains(TypeCheckExprFlags::PreferForceUnwrapToOptional))
+    csOptions |= ConstraintSystemFlags::PreferForceUnwrapToOptional;
+  ConstraintSystem cs(*this, dc, csOptions);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
   ExprCleanser cleanup2(expr);
 

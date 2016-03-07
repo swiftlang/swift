@@ -55,7 +55,7 @@ struct RC4 {
   }
 
   mutating
-  func encrypt(inout Data: [UInt8]) {
+  func encrypt(Data: inout [UInt8]) {
     let cnt = Data.count
     for i in 0..<cnt {
       Data[i] = Data[i] ^ next()

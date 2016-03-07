@@ -230,3 +230,66 @@ public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: St
 }
 
 
+
+/// SR-770 - Currying and `noescape`/`rethrows` don't work together anymore
+func curriedFlatMap<A, B>(x: [A]) -> (@noescape (A) -> [B]) -> [B] {
+  return { f in
+    x.flatMap(f)
+  }
+}
+
+func curriedFlatMap2<A, B>(x: [A]) -> (@noescape (A) -> [B]) -> [B] {
+  return { (f : @noescape (A) -> [B]) in
+    x.flatMap(f)
+  }
+}
+
+func bad(a : (Int)-> Int) -> Int { return 42 }
+func escapeNoEscapeResult(x: [Int]) -> (@noescape (Int) -> Int) -> Int {
+  return { f in
+    bad(f)  // expected-error {{invalid conversion from non-escaping function of type '@noescape (Int) -> Int' to potentially escaping function type '(Int) -> Int'}}
+  }
+}
+
+
+// SR-824 - @noescape for Type Aliased Closures
+//
+typealias CompletionHandlerNE = @noescape (success: Bool) -> ()
+typealias CompletionHandler = (success: Bool) -> ()
+var escape : CompletionHandlerNE
+func doThing1(@noescape completion: CompletionHandler) {
+  // expected-error @+2 {{@noescape value 'escape' may only be called}}
+  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
+  escape = completion
+}
+func doThing2(completion: CompletionHandlerNE) {
+  // expected-error @+2 {{@noescape value 'escape' may only be called}}
+  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
+  escape = completion
+}
+
+// <rdar://problem/19997680> @noescape doesn't work on parameters of function type
+func apply<T, U>(@noescape f: T -> U, @noescape g: (@noescape T -> U) -> U) -> U {
+  return g(f)
+}
+
+// <rdar://problem/19997577> @noescape cannot be applied to locals, leading to duplication of code
+enum r19997577Type {
+  case Unit
+  case Function(() -> r19997577Type, () -> r19997577Type)
+  case Sum(() -> r19997577Type, () -> r19997577Type)
+
+  func reduce<Result>(initial: Result, @noescape _ combine: (Result, r19997577Type) -> Result) -> Result {
+    let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) }
+    switch self {
+    case Unit:
+      return combine(initial, self)
+    case let Function(t1, t2):
+      return binary(t1(), t2())
+    case let Sum(t1, t2):
+      return binary(t1(), t2())
+    }
+  }
+}
+
+

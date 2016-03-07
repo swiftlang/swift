@@ -292,7 +292,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithDot(nullptr);
+        CodeCompletion->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<IdentTypeRepr>();

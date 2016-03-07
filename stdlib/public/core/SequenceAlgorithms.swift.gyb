@@ -420,4 +420,3 @@ extension SequenceType {
     return result
   }
 }
-

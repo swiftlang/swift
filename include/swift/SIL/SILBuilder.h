@@ -420,6 +420,21 @@ public:
                                                          SILValue src) {
     return createMarkUninitialized(Loc, src, MarkUninitializedInst::RootSelf);
   }
+  
+  MarkUninitializedBehaviorInst *
+  createMarkUninitializedBehavior(SILLocation Loc,
+                                  SILValue initStorageFunc,
+                                  ArrayRef<Substitution> initStorageSubs,
+                                  SILValue storage,
+                                  SILValue setterFunc,
+                                  ArrayRef<Substitution> setterSubs,
+                                  SILValue self,
+                                  SILType ty) {
+    return insert(MarkUninitializedBehaviorInst::create(F.getModule(),
+         getSILDebugLocation(Loc),
+         initStorageFunc, initStorageSubs, storage,
+         setterFunc, setterSubs, self, ty));
+  }
 
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation Loc,
                                                    ArrayRef<SILValue> vars) {
@@ -1438,10 +1453,10 @@ private:
   }
 };
 
-/// An RAII version of SILBuilder that automatically sets up identical
-/// SILDebugScopes for all instructions.  This is useful for
-/// situations where a single SIL instruction is lowered into a
-/// sequence of SIL instructions.
+/// An wrapper on top of SILBuilder's constructor that automatically sets the
+/// current SILDebugScope based on the specified insertion point. This is useful
+/// for situations where a single SIL instruction is lowered into a sequence of
+/// SIL instructions.
 class SILBuilderWithScope : public SILBuilder {
   void inheritScopeFrom(SILInstruction *I) {
     assert(I->getDebugScope() && "instruction has no debug scope");

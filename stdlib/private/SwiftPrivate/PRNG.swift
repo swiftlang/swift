@@ -61,4 +61,3 @@ public func pickRandom<
   let i = Int(rand32(exclusiveUpperBound: numericCast(c.count)))
   return c[c.startIndex.advancedBy(numericCast(i))]
 }
-

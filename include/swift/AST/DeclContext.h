@@ -73,7 +73,7 @@ enum class DeclContextKind : uint8_t {
 
   Module,
   FileUnit,
-  NominalTypeDecl,
+  GenericTypeDecl,
   ExtensionDecl,
   Last_DeclContextKind = ExtensionDecl
 };
@@ -229,7 +229,7 @@ public:
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
   bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::NominalTypeDecl ||
+    return getContextKind() == DeclContextKind::GenericTypeDecl ||
            getContextKind() == DeclContextKind::ExtensionDecl;
   }
 

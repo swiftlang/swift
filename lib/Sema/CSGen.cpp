@@ -17,7 +17,6 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -75,9 +74,9 @@ namespace {
   /// Internal struct for tracking information about types within a series
   /// of "linked" expressions. (Such as a chain of binary operator invocations.)
   struct LinkedTypeInfo {
-    uint haveIntLiteral : 1;
-    uint haveFloatLiteral : 1;
-    uint haveStringLiteral : 1;
+    unsigned haveIntLiteral : 1;
+    unsigned haveFloatLiteral : 1;
+    unsigned haveStringLiteral : 1;
     
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
 
@@ -244,10 +243,16 @@ namespace {
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
 
-        // If we're analyzing a nested closure, continue to recurse, so we can
-        //make further connections amongst the arguments.
         return { false, expr };
       }
+
+      // Optimize branches of a conditional expression separately.
+      if (auto IE = dyn_cast<IfExpr>(expr)) {
+        CS.optimizeConstraints(IE->getCondExpr());
+        CS.optimizeConstraints(IE->getThenExpr());
+        CS.optimizeConstraints(IE->getElseExpr());
+        return { false, expr };
+      }      
 
       // TODO: The systems that we need to solve for interpolated string expressions
       // require bespoke logic that don't currently work with this approach.
@@ -3201,4 +3206,46 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
 
   // Having a solution implies the extension's requirements have been fulfilled.
   return CS.solveSingle().hasValue();
+}
+
+bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
+                bool ReplaceArchetypeWithVariables,
+                bool AllowFreeVariables) {
+  std::unique_ptr<TypeChecker> CreatedTC;
+  // If the current ast context has no type checker, create one for it.
+  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    TC = CreatedTC.get();
+  }
+  ConstraintSystem CS(*TC, &DC, None);
+  if (ReplaceArchetypeWithVariables) {
+    std::function<Type(Type)> Trans = [&](Type Base) {
+      if (Base->getKind() == TypeKind::Archetype) {
+        return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
+                                    TypeVariableOptions::TVO_CanBindToLValue));
+      }
+      return Base;
+    };
+    T1 = T1.transform(Trans);
+    T2 = T2.transform(Trans);
+  }
+  CS.addConstraint(Constraint::create(CS, Kind, T1, T2, DeclName(),
+                                      CS.getConstraintLocator(nullptr)));
+  SmallVector<Solution, 4> Solutions;
+  return AllowFreeVariables ?
+          !CS.solve(Solutions, FreeTypeVariableBinding::Allow) :
+          CS.solveSingle().hasValue();
+}
+
+bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
+  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, true, true);
+}
+
+bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
+  return canSatisfy(T1, T2, DC, ConstraintKind::Conversion, true, true);
+}
+
+bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
+  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, false, false);
 }

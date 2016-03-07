@@ -44,7 +44,7 @@ var x: Int
 // GROUP1-DAG: Assert
 // GROUP1-DAG: String
 // GROUP1-DAG: Collection
-// GROUP1-DAG: Collection.Lazy Views
+// GROUP1-DAG: Collection/Lazy Views
 // GROUP1-DAG: Bool
 // GROUP1-DAG: Math
 // GROUP1-DAG: Misc

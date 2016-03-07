@@ -328,7 +328,7 @@ public struct ${Self}<Element>
     return Builtin.castToNativeObject(_buffer.owner)
   }
   
-  static internal func _copyBuffer(inout buffer: _Buffer) {
+  static internal func _copyBuffer(buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       count: buffer.count, minimumCapacity: buffer.count)
     buffer._uninitializedCopy(
@@ -926,7 +926,7 @@ internal func _arrayOutOfPlaceReplace<
     where C.Generator.Element == B.Element,
     B.Index == Int
 >(
-  inout source: B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
+  source: inout B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
 ) {
   let growth = insertCount - subRange.count
   let newCount = source.count + growth
@@ -991,7 +991,7 @@ extension ${Self} {
 public func += <
   Element, S : SequenceType
   where S.Generator.Element == Element
->(inout lhs: ${Self}<Element>, rhs: S) {
+>(lhs: inout ${Self}<Element>, rhs: S) {
   let oldCount = lhs.count
   let capacity = lhs.capacity
   let newCount = oldCount + rhs.underestimateCount()
@@ -1007,7 +1007,7 @@ public func += <
 public func += <
   Element, C : CollectionType
   where C.Generator.Element == Element
->(inout lhs: ${Self}<Element>, rhs: C) {
+>(lhs: inout ${Self}<Element>, rhs: C) {
   let rhsCount = numericCast(rhs.count) as Int
 
   let oldCount = lhs.count
@@ -1036,7 +1036,7 @@ public func += <
 ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
 internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
-  inout source: _Buffer, newCount: Int, requiredCapacity: Int
+  source: inout _Buffer, newCount: Int, requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   return _forceCreateUniqueMutableBufferImpl(
     &source, countForBuffer: newCount, minNewCapacity: newCount,
@@ -1052,7 +1052,7 @@ internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 @inline(never)
 internal
 func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
-  inout source: _Buffer,  countForNewBuffer: Int,  minNewCapacity: Int
+  source: inout _Buffer,  countForNewBuffer: Int,  minNewCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   return _forceCreateUniqueMutableBufferImpl(
     &source, countForBuffer: countForNewBuffer, minNewCapacity: minNewCapacity,
@@ -1067,7 +1067,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 ///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
 ///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
 internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
-  inout source: _Buffer,  countForBuffer: Int, minNewCapacity: Int,
+  source: inout _Buffer,  countForBuffer: Int, minNewCapacity: Int,
   requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   _sanityCheck(countForBuffer >= 0)
@@ -1100,8 +1100,8 @@ internal func _arrayOutOfPlaceUpdate<
   where Initializer.Element == _Buffer.Element,
   _Buffer.Index == Int
 >(
-  inout source: _Buffer,
-  inout _ dest: _ContiguousArrayBuffer<_Buffer.Element>?,
+  source: inout _Buffer,
+  _ dest: inout _ContiguousArrayBuffer<_Buffer.Element>?,
   _ headCount: Int, // Count of initial source elements to copy/move
   _ newCount: Int,  // Count of new elements to insert
   _ initializeNewElements: Initializer
@@ -1185,7 +1185,7 @@ internal struct _IgnorePointer<T> : _PointerFunctionType {
 internal func _arrayReserve<
   _Buffer : _ArrayBufferType where _Buffer.Index == Int
 >(
-  inout buffer: _Buffer, _ minimumCapacity: Int
+  buffer: inout _Buffer, _ minimumCapacity: Int
 ) {
   let count = buffer.count
   let requiredCapacity = max(count, minimumCapacity)
@@ -1221,7 +1221,7 @@ internal func _arrayAppendSequence<
   S : SequenceType where S.Generator.Element == Buffer.Element,
   Buffer.Index == Int
 >(
-  inout buffer: Buffer, _ newItems: S
+  buffer: inout Buffer, _ newItems: S
 ) {
   var stream = newItems.generate()
   var nextItem = stream.next()

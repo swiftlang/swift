@@ -173,10 +173,14 @@ To add a new multiple file test:
 The generator script looks for functions prefixed with `run_` in order to
 populate `utils/main.swift`.
 
-Each iteration of work performed in the for-loop below should run in under a
-few milliseconds. The benchmark driver will automatically calculate the
-necessary number of iterations to run each benchmark in approximately one
-second.
+The benchmark driver will measure the time taken for `N = 1` and automatically calculate
+the necessary number of iterations `N` to run each benchmark in approximately one second,
+so the test should ideally run in a few milliseconds for `N = 1`. If the test contains
+any setup code before the loop, ensure the time spent on setup is insignificant compared to
+the time spent inside the loop (for `N = 1`) -- otherwise the automatic calculation of `N` might be
+significantly off and any performance gains/regressions will be masked by the fixed setup time.
+If needed you can multiply N by a fixed amount (e.g. `1...100*N`) to achieve this.
+
 
 **Performance Test Template**
 

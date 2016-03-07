@@ -465,9 +465,9 @@ s.appendContentsOf(["x"])
 //===----------------------------------------------------------------------===//
 
 func takesInt(x: Int) {}
-func takesExplicitInt(inout x: Int) { }
+func takesExplicitInt(x: inout Int) { }
 
-func testInOut(inout arg: Int) {
+func testInOut(arg: inout Int) {
   var x: Int
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
@@ -501,7 +501,7 @@ extension Empty {
   init(_ f: Float) { }
 }
 
-func conversionTest(inout a: Double, inout b: Int) {
+func conversionTest(a: inout Double, b: inout Int) {
   var f: Float
   var d: Double
   a = Double(b)
@@ -550,7 +550,7 @@ _ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expect
 // Unary Operators
 //===----------------------------------------------------------------------===//
 
-func unaryOps(inout i8: Int8, inout i64: Int64) {
+func unaryOps(i8: inout Int8, i64: inout Int64) {
   i8 = ~i8
   i64 += 1
   i8 -= 1
@@ -599,7 +599,7 @@ func magic_literals() {
 
 
 infix operator +-+= {}
-func +-+= (inout x: Int, y: Int) -> Int { return 0}
+func +-+= (x: inout Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {
   var i = 0
@@ -746,7 +746,7 @@ public struct TestPropMethodOverloadGroup {
 
 
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
-func inoutTests(inout arr: Int) {
+func inoutTests(arr: inout Int) {
   var x = 1, y = 2
   (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
   let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
@@ -775,7 +775,7 @@ func inoutTests(inout arr: Int) {
 
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
-func r20802757(inout z: Int = &g20802757) { // expected-error {{'&' can only appear immediately in a call argument list}}
+func r20802757(z: inout Int = &g20802757) { // expected-error {{'&' can only appear immediately in a call argument list}}
   print(z)
 }
 

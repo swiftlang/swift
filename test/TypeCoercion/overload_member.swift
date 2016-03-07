@@ -34,7 +34,7 @@ func test_method_overload(a: A, x: X, y: Y) {
   _ = y1
 }
 
-func test_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
+func test_method_overload_coerce(a: A, x: inout X, y: inout Y, z: Z) {
   var fail = a.g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
   x = a.g(z: z)
   y = a.g(z: z)
@@ -55,7 +55,7 @@ func test_static_method_overload(a: A, x: X, y: Y) {
   _ = y1
 }
 
-func test_static_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
+func test_static_method_overload_coerce(a: A, x: inout X, y: inout Y, z: Z) {
   var fail = A.sg(z: z) // expected-error{{ambiguous use of 'sg(z:)'}}
   x = A.sg(z: z)
   y = A.sg(z: z)
@@ -78,7 +78,7 @@ func test_mixed_overload(a: A, x: X, y: Y) {
   y2 = y
 }
 
-func test_mixed_overload_coerce(a: A, inout x: X, y: Y, z: Z) {
+func test_mixed_overload_coerce(a: A, x: inout X, y: Y, z: Z) {
   a.mixed2(z: z)
   var y1 = A.mixed2(z: z)
   y1 = y
@@ -111,7 +111,7 @@ extension A {
     _ = y2
   }
 
-  func test_method_overload_coerce(inout x x: X, inout y: Y, z: Z) {
+  func test_method_overload_coerce(x x: inout X, y: inout Y, z: Z) {
     var fail = g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
     x = g(z: z)
     y = g(z: z)
@@ -123,7 +123,7 @@ extension A {
     var _ : (A) -> (X) -> X = A.f
   }
 
-  func test_mixed_overload_coerce(inout x x: X, y: Y, z: Z) {
+  func test_mixed_overload_coerce(x x: inout X, y: Y, z: Z) {
     mixed2(z: z)
     x = mixed2(z: z)
   }
@@ -145,7 +145,7 @@ extension A {
     _ = y1
   }
 
-  class func test_method_overload_coerce_static(inout x x: X, inout y: Y, z: Z) {
+  class func test_method_overload_coerce_static(x x: inout X, y: inout Y, z: Z) {
     var fail = sg(z: z) // expected-error{{ambiguous use of 'sg(z:)'}}
     x = sg(z: z)
     y = sg(z: z)

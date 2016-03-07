@@ -126,6 +126,7 @@ extension String.CharacterView : CollectionType {
     /// Returns the length of the first extended grapheme cluster in UTF-16
     /// code units.
     @warn_unused_result
+    @inline(never)
     internal static func _measureExtendedGraphemeClusterForward(
         start: UnicodeScalarView.Index
     ) -> Int {
@@ -167,6 +168,7 @@ extension String.CharacterView : CollectionType {
     /// Returns the length of the previous extended grapheme cluster in UTF-16
     /// code units.
     @warn_unused_result
+    @inline(never)
     internal static func _measureExtendedGraphemeClusterBackward(
         end: UnicodeScalarView.Index
     ) -> Int {
@@ -309,4 +311,3 @@ extension String.CharacterView {
       String(_core).unicodeScalars[unicodeScalarRange]._core)
   }
 }
-

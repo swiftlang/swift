@@ -172,36 +172,25 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.addSwiftArrayOpts();
 }
 
+// Perform classic SSA optimizations.
 void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
-  AddSimplifyCFGSILCombine(PM);
+  // Promote box allocations to stack allocations.
   PM.addAllocBoxToStack();
+
+  // Propagate copies through stack locations.  Should run after
+  // box-to-stack promotion since it is limited to propagating through
+  // stack locations. Should run before aggregate lowering since that
+  // splits up copy_addr.
   PM.addCopyForwarding();
+
+  // Split up opaque operations (copy_addr, retain_value, etc.).
   PM.addLowerAggregateInstrs();
-  PM.addSILCombine();
+
+  // Split up operations on stack-allocated aggregates (struct, tuple).
   PM.addSROA();
+
+  // Promote stack allocations to values.
   PM.addMem2Reg();
-
-  // Perform classic SSA optimizations.
-  PM.addGlobalOpt();
-  PM.addLetPropertiesOpt();
-  PM.addPerformanceConstantPropagation();
-  PM.addDCE();
-  PM.addCSE();
-  PM.addSILCombine();
-  PM.addJumpThreadSimplifyCFG();
-  // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
-  // cond_br).
-  PM.addSILCombine();
-  // Which can expose opportunity for simplifcfg.
-  PM.addSimplifyCFG();
-
-  // Perform retain/release code motion and run the first ARC optimizer.
-  PM.addRedundantLoadElimination();
-  PM.addCSE();
-  PM.addEarlyCodeMotion();
-  PM.addARCSequenceOpts();
-
-  PM.addSILLinker();
 
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
@@ -216,6 +205,8 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     case OptimizationLevelKind::MidLevel:
       // Does inline semantics-functions (except "availability"), but not
       // global-init functions.
+      PM.addGlobalOpt();
+      PM.addLetPropertiesOpt();
       PM.addPerfInliner();
       break;
     case OptimizationLevelKind::LowLevel:
@@ -223,6 +214,33 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
       PM.addLateInliner();
       break;
   }
+
+  // Promote stack allocations to values and eliminate redundant
+  // loads.
+  PM.addMem2Reg();
+  PM.addRedundantLoadElimination();
+  //  Do a round of CFG simplification, followed by peepholes, then
+  //  more CFG simplification.
+  AddSimplifyCFGSILCombine(PM);
+
+  PM.addPerformanceConstantPropagation();
+  PM.addDCE();
+  PM.addCSE();
+  PM.addSILCombine();
+  PM.addJumpThreadSimplifyCFG();
+  // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
+  // cond_br).
+  PM.addSILCombine();
+  // Which can expose opportunity for simplifcfg.
+  PM.addSimplifyCFG();
+
+  // Perform retain/release code motion and run the first ARC optimizer.
+  PM.addCSE();
+  PM.addEarlyCodeMotion();
+  PM.addARCSequenceOpts();
+
+  PM.addSILLinker();
+
   PM.addSimplifyCFG();
   // Only hoist releases very late.
   if (OpLevel == OptimizationLevelKind::LowLevel)
@@ -256,10 +274,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.run();
   PM.resetAndRemoveTransformations();
 
-  // Run two iterations of the high-level SSA passes.
+  // Run an iteration of the high-level SSA passes.
   PM.setStageName("HighLevel");
   AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
-  PM.runOneIteration();
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
@@ -276,10 +293,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
-  // Run two iterations of the mid-level SSA passes.
+  // Run an iteration of the mid-level SSA passes.
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
-  PM.runOneIteration();
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 

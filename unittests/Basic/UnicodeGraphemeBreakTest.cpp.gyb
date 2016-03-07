@@ -17,10 +17,10 @@
 
 %{
 
-from GYBUnicodeDataUtils import get_grapheme_cluster_break_tests_as_UTF8
+from GYBUnicodeDataUtils import get_grapheme_cluster_break_tests_as_utf8
 
 grapheme_cluster_break_tests = \
-    get_grapheme_cluster_break_tests_as_UTF8(unicodeGraphemeBreakTestFile)
+    get_grapheme_cluster_break_tests_as_utf8(unicodeGraphemeBreakTestFile)
 
 }%
 

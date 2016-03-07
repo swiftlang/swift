@@ -140,7 +140,7 @@ func r15998821() {
   func take_closure(x : (inout Int) -> ()) { }
 
   func test1() {
-    take_closure { (inout a : Int) in
+    take_closure { (a : inout Int) in
       a = 42
     }
   }
@@ -173,4 +173,10 @@ func typeCheckMultiStmtClosureCrash() {
     _ = $0
     return 1
   }
+}
+
+// SR-832 - both these should be ok
+func someFunc(foo: (String -> String)?, bar: String -> String) {
+    let _: String -> String = foo != nil ? foo! : bar
+    let _: String -> String = foo ?? bar
 }

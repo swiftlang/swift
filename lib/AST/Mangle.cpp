@@ -17,7 +17,6 @@
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -249,7 +248,9 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     }
   }
 
-  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::GenericTypeDecl:
+    assert(isa<NominalTypeDecl>(ctx) &&
+           "Only nominal types are contexts for mangleable entities");
     mangleNominalType(cast<NominalTypeDecl>(ctx), shouldBind);
     return;
 

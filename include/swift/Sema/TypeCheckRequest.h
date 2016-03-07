@@ -20,7 +20,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include <cassert>

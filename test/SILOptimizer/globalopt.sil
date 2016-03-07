@@ -31,8 +31,7 @@ bb0:
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer // user: %5
   // function_ref globalinit_func0
   %3 = function_ref @globalinit_func0 : $@convention(thin) () -> () // user: %4
-  %4 = thin_to_thick_function %3 : $@convention(thin) () -> () to $@callee_owned () -> () // user: %5
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
   %6 = global_addr @MyConst : $*Int32               // user: %7
   %7 = address_to_pointer %6 : $*Int32 to $Builtin.RawPointer // user: %8
   return %7 : $Builtin.RawPointer                 // id: %8

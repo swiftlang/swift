@@ -1056,8 +1056,8 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
     return Accessibility::Internal;
-  case DeclContextKind::NominalTypeDecl: {
-    auto Nominal = cast<NominalTypeDecl>(DC);
+  case DeclContextKind::GenericTypeDecl: {
+    auto Nominal = cast<GenericTypeDecl>(DC);
     Accessibility Access = inferAccessibility(Nominal);
     if (!isa<ProtocolDecl>(Nominal))
       Access = std::min(Access, Accessibility::Internal);
@@ -1967,7 +1967,7 @@ class FormatWalker: public ide::SourceEntityWalker {
 
         // Function parameters are siblings.
         for (auto P : AFD->getParameterLists()) {
-          for (auto param : *P) {
+          for (ParamDecl* param : *P) {
            if (!param->isSelfParameter())
               addPair(param->getEndLoc(), FindAlignLoc(param->getStartLoc()),
                       tok::comma);
@@ -2444,7 +2444,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 }
 
 ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
-    unsigned int Offset, unsigned int Length, llvm::MemoryBuffer *Buf,
+    unsigned Offset, unsigned Length, llvm::MemoryBuffer *Buf,
     bool ProvideSemanticInfo) {
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);

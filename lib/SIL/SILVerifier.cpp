@@ -862,6 +862,7 @@ public:
     require(resultInfo->getNumAllResults() == substTy->getNumAllResults(),
             "applied results do not agree in count with function type");
     for (unsigned i = 0, size = resultInfo->getNumAllResults(); i < size; ++i) {
+      auto originalResult = resultInfo->getAllResults()[i];
       auto expectedResult = substTy->getAllResults()[i];
 
       // The "returns inner pointer" convention doesn't survive through a
@@ -871,12 +872,24 @@ public:
             == ResultConvention::UnownedInnerPointer) {
         expectedResult = SILResultInfo(expectedResult.getType(),
                                        ResultConvention::Unowned);
-        require(resultInfo->getAllResults()[i] == expectedResult,
+        require(originalResult == expectedResult,
                 "result type of result function type for partially applied "
                 "@unowned_inner_pointer function should have @unowned"
                 "convention");
+
+      // The "autoreleased" convention doesn't survive through a
+      // partial application, since the thunk takes responsibility for
+      // retaining the return value.
+      } else if (expectedResult.getConvention()
+            == ResultConvention::Autoreleased) {
+        expectedResult = SILResultInfo(expectedResult.getType(),
+                                       ResultConvention::Owned);
+        require(originalResult == expectedResult,
+                "result type of result function type for partially applied "
+                "@autoreleased function should have @owned convention");
+
       } else {
-        require(resultInfo->getAllResults()[i] == expectedResult,
+        require(originalResult == expectedResult,
                 "result type of result function type does not match original "
                 "function");
       }
@@ -1051,6 +1064,71 @@ public:
             "mark_uninitialized must be an address or class");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
   }
+  
+  void checkMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
+    require(MU->getModule().getStage() == SILStage::Raw,
+            "mark_uninitialized instruction can only exist in raw SIL");
+    auto InitStorage = MU->getInitStorageFunc();
+    auto InitStorageTy = InitStorage->getType().getAs<SILFunctionType>();
+    require(InitStorageTy,
+            "mark_uninitialized initializer must be a function");
+    if (auto sig = InitStorageTy->getGenericSignature()) {
+      require(sig->getGenericParams().size()
+              == MU->getInitStorageSubstitutions().size(),
+              "mark_uninitialized initializer must be given right number "
+              "of substitutions");
+    } else {
+      require(MU->getInitStorageSubstitutions().size() == 0,
+              "mark_uninitialized initializer must be given right number "
+              "of substitutions");
+    }
+    auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
+                                             F.getModule().getSwiftModule(),
+                                             MU->getInitStorageSubstitutions());
+    // FIXME: Destructured value or results?
+    require(SubstInitStorageTy->getAllResults().size() == 1,
+            "mark_uninitialized initializer must have one result");
+    auto StorageTy = SILType::getPrimitiveAddressType(
+                              SubstInitStorageTy->getSingleResult().getType());
+    requireSameType(StorageTy, MU->getStorage()->getType(),
+                    "storage must be address of initializer's result type");
+    
+    auto Setter = MU->getSetterFunc();
+    auto SetterTy = Setter->getType().getAs<SILFunctionType>();
+    require(SetterTy,
+            "mark_uninitialized setter must be a function");
+    if (auto sig = SetterTy->getGenericSignature()) {
+      require(sig->getGenericParams().size()
+              == MU->getSetterSubstitutions().size(),
+              "mark_uninitialized initializer must be given right number "
+              "of substitutions");
+    } else {
+      require(MU->getSetterSubstitutions().size() == 0,
+              "mark_uninitialized initializer must be given right number "
+              "of substitutions");
+    }
+    auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
+                                               F.getModule().getSwiftModule(),
+                                               MU->getSetterSubstitutions());
+    require(SubstSetterTy->getParameters().size() == 2,
+            "mark_uninitialized setter must have a value and self param");
+    auto SelfTy = SubstSetterTy->getSelfParameter().getSILType();
+    requireSameType(SelfTy, MU->getSelf()->getType(),
+                    "self type must match setter's self parameter type");
+    
+    auto ValueTy = SubstInitStorageTy->getParameters()[0].getType();
+    requireSameType(SILType::getPrimitiveAddressType(ValueTy),
+                    SILType::getPrimitiveAddressType(
+                      SubstSetterTy->getParameters()[0].getType()),
+                    "value parameter type must match between initializer "
+                    "and setter");
+    
+    auto ValueAddrTy = SILType::getPrimitiveAddressType(ValueTy);
+    requireSameType(ValueAddrTy, MU->getType(),
+                    "result of mark_uninitialized_behavior should be address "
+                    "of value parameter to setter and initializer");
+  }
+  
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     require(MFE->getModule().getStage() == SILStage::Raw,
             "mark_function_escape instruction can only exist in raw SIL");
@@ -3149,6 +3227,9 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
   // witness tables should not reference SILFunctions without
   // public/public_external linkage.
   for (const Entry &E : getEntries()) {
+    if (!E.isValid())
+      continue;
+
     SILFunction *F = E.getWitness();
     assert(!isLessVisibleThan(F->getLinkage(), SILLinkage::Public) &&
            "Default witness tables should not reference internal "

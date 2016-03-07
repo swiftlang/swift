@@ -134,7 +134,7 @@ func test3(c: SB1, s: S2) {
   s.sfoo()
 }
 
-func test4(inout a: Int) {}
+func test4(a: inout Int) {}
 
 protocol Prot2 {
   associatedtype Element

@@ -281,6 +281,15 @@ func brokenSwitch(x: Int) -> Int {
   }
 }
 
+func switchWithVarsNotMatchingTypes(x: Int, y: Int, z: String) -> Int {
+  switch (x,y,z) {
+  case (let a, 0, _), (0, let a, _): // OK
+    return a
+  case (let a, _, _), (_, _, let a): // expected-error {{pattern variable bound to type 'String', expected type 'Int'}}
+    return a
+  }
+}
+
 func breakContinue(x : Int) -> Int {
 
 Outer:
@@ -462,8 +471,8 @@ func f21080671() {
 // <rdar://problem/24467411> QoI: Using "&& #available" should fixit to comma
 // https://twitter.com/radexp/status/694561060230184960
 func f(x : Int, y : Int) {
-  if x == y && #available(iOS 9, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
-  if #available(iOS 9, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{27-29=,}}
+  if x == y && #available(iOS 52, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}
+  if #available(iOS 52, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{28-30=,}}
 
   // https://twitter.com/radexp/status/694790631881883648
   if x == y && let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{13-15=,}}

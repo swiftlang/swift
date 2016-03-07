@@ -40,9 +40,9 @@
 
 // REQUIRES: X86
 
-// FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux
+// FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux/freebsd
 // rdar://problem/19692770
-// XFAIL: linux
+// XFAIL: freebsd, linux
 
 // CHECK: swift
 // CHECK: -o [[OBJECTFILE:.*]]

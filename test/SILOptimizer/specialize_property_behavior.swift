@@ -12,7 +12,7 @@ extension lazzy {
 }
 
 struct Foo {
-  var [lazzy] x: Int
+  var x: Int __behavior lazzy
 
   init() {}
 }

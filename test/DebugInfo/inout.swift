@@ -24,7 +24,7 @@ typealias MyFloat = Float
 // PROMO-CHECK: ![[EMPTY_EXPR]] = !DIExpression()
 // PROMO-CHECK: ![[A1]] = !DILocalVariable(name: "a", arg: 1
 // PROMO-CHECK-SAME:                       type: !"_TtVs5Int64"
-func modifyFooHeap(inout a: Int64,
+func modifyFooHeap(a: inout Int64,
 // CHECK-DAG: ![[A]] = !DILocalVariable(name: "a", arg: 1{{.*}} line: [[@LINE-1]],{{.*}} type: !"_TtRVs5Int64"
                    _ b: MyFloat)
 {
@@ -42,7 +42,7 @@ func modifyFooHeap(inout a: Int64,
 // FOO-CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64** %
 // FOO-CHECK-SAME:          metadata ![[U:[0-9]+]], metadata ![[EMPTY_EXPR:.*]])
 // FOO-CHECK: ![[EMPTY_EXPR]] = !DIExpression()
-func modifyFoo(inout u: Int64,
+func modifyFoo(u: inout Int64,
 // FOO-CHECK-DAG: !DILocalVariable(name: "v", arg: 2{{.*}} line: [[@LINE+2]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
 // FOO-CHECK-DAG: [[U]] = !DILocalVariable(name: "u", arg: 1{{.*}} line: [[@LINE-2]],{{.*}} type: !"_TtRVs5Int64"
                _ v: MyFloat)

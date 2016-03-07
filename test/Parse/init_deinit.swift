@@ -100,3 +100,14 @@ func barFunc() {
   } ()
 }
 
+// SR-852
+class Aaron {
+  init(x: Int) {}
+  convenience init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}}
+}
+
+class Theodosia: Aaron {
+  init() {
+    init(x: 2) // expected-error {{missing 'super.' at initializer invocation}}
+  }
+}

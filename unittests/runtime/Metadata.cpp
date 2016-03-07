@@ -219,16 +219,23 @@ TEST(Concurrent, ConcurrentList) {
 TEST(Concurrent, ConcurrentMap) {
   const int numElem = 100;
 
-  ConcurrentMap<size_t, int> Map;
+  struct Entry {
+    size_t Key;
+    Entry(size_t key) : Key(key) {}
+    int compareWithKey(size_t key) const {
+      return (key == Key ? 0 : (key < Key ? -1 : 1));
+    }
+    static size_t getExtraAllocationSize(size_t key) { return 0; }
+  };
+
+  ConcurrentMap<Entry> Map;
 
   // Add a bunch of numbers to the map concurrently.
    auto results = RaceTest<int*>(
     [&]() -> int* {
       for (int i = 0; i < numElem; i++) {
         size_t hash = (i * 123512) % 0xFFFF ;
-        while(!Map.tryToAllocateNewNode(hash, i)) {
-          hash++;
-        }
+        Map.getOrInsert(hash);
       }
       return nullptr;
     }
@@ -237,7 +244,7 @@ TEST(Concurrent, ConcurrentMap) {
   // Check that all of the values that we inserted are in the map.
   for (int i=0; i < numElem; i++) {
     size_t hash = (i * 123512) % 0xFFFF ;
-    EXPECT_TRUE(Map.findValueByKey(hash));
+    EXPECT_TRUE(Map.find(hash));
   }
 }
 

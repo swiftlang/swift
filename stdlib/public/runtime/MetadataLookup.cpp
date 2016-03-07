@@ -73,17 +73,20 @@ namespace {
 
   public:
     TypeMetadataCacheEntry(const llvm::StringRef name,
-                           const struct Metadata *metadata) {
-      Name = name.str();
-      Metadata = metadata;
-    }
+                           const ::Metadata *metadata)
+      : Name(name.str()), Metadata(metadata) {}
 
-    bool matches(llvm::StringRef aName) {
-      return aName.equals(Name);
-    }
-
-    const struct Metadata *getMetadata(void) {
+    const ::Metadata *getMetadata(void) {
       return Metadata;
+    }
+
+    int compareWithKey(llvm::StringRef aName) const {
+      return aName.compare(Name);
+    }
+
+    template <class... T>
+    static size_t getExtraAllocationSize(T &&... ignored) {
+      return 0;
     }
   };
 }
@@ -91,7 +94,7 @@ namespace {
 static void _initializeCallbacksToInspectDylib();
 
 struct TypeMetadataState {
-  ConcurrentMap<size_t, TypeMetadataCacheEntry> Cache;
+  ConcurrentMap<TypeMetadataCacheEntry> Cache;
   std::vector<TypeMetadataSection> SectionsToScan;
   pthread_mutex_t SectionsToScanLock;
 
@@ -227,6 +230,7 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 }
 
 // copied from ProtocolConformanceRecord::getCanonicalTypeMetadata()
+template<>
 const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
   case TypeMetadataRecordKind::UniqueDirectType:
@@ -235,7 +239,7 @@ const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
     return swift_getForeignTypeMetadata((ForeignTypeMetadata *)getDirectType());
   case TypeMetadataRecordKind::UniqueDirectClass:
     if (auto *ClassMetadata =
-          static_cast<const struct ClassMetadata *>(getDirectType()))
+          static_cast<const ::ClassMetadata *>(getDirectType()))
       return swift_getObjCClassMetadata(ClassMetadata);
     else
       return nullptr;
@@ -260,7 +264,7 @@ swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
   // Instantiate resilient types.
   if (metadata == nullptr &&
       ntd->getGenericMetadataPattern() &&
-      !ntd->GenericParams.hasGenericParams()) {
+      !ntd->GenericParams.isGeneric()) {
     return swift_getResilientMetadata(ntd->getGenericMetadataPattern());
   }
 
@@ -295,19 +299,11 @@ static const Metadata *
 _typeByMangledName(const llvm::StringRef typeName) {
   const Metadata *foundMetadata = nullptr;
   auto &T = TypeMetadataRecords.get();
-  size_t hash = llvm::HashString(typeName);
-
-
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
-  while (TypeMetadataCacheEntry *Value = T.Cache.findValueByKey(hash)) {
-    if (Value->matches(typeName))
-      return Value->getMetadata();
-    // Implement a closed hash table. If we have a hash collision increase
-    // the hash value by one and try again.
-    hash++;
-  }
+  if (auto Value = T.Cache.find(typeName))
+    return Value->getMetadata();
 
   // Check type metadata records
   pthread_mutex_lock(&T.SectionsToScanLock);
@@ -319,18 +315,9 @@ _typeByMangledName(const llvm::StringRef typeName) {
   if (!foundMetadata)
     foundMetadata = _searchConformancesByMangledTypeName(typeName);
 
-
   if (foundMetadata) {
-    auto E = TypeMetadataCacheEntry(typeName, foundMetadata);
-
-    // Some other thread may have setup the value we are about to construct
-    // while we were asleep so do a search before constructing a new value.
-    while (!T.Cache.tryToAllocateNewNode(hash, E)) {
-      // Implement a closed hash table. If we have a hash collision increase
-      // the hash value by one and try again.
-      hash++;
-    }
- }
+    T.Cache.getOrInsert(typeName, foundMetadata);
+  }
 
 #if SWIFT_OBJC_INTEROP
   // Check for ObjC class

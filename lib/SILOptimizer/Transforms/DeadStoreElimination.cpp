@@ -448,7 +448,7 @@ public:
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
-  ProcessKind getProcessFunctionKind();
+  ProcessKind getProcessFunctionKind(unsigned StoreCount);
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
@@ -516,7 +516,15 @@ unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
   return Iter->second;
 }
 
-DSEContext::ProcessKind DSEContext::getProcessFunctionKind() {
+DSEContext::ProcessKind DSEContext::getProcessFunctionKind(unsigned StoreCount) {
+  // Don't optimize function that are marked as 'no.optimize'.
+  if (!F->shouldOptimize())
+    return ProcessKind::ProcessNone;
+
+  // Really no point optimizing here as there is no dead stores.
+  if (StoreCount < 1)
+    return ProcessKind::ProcessNone;
+
   bool RunOneIteration = true;
   unsigned BBCount = 0;
   unsigned LocationCount = LocationVault.size();
@@ -724,7 +732,7 @@ void DSEContext::invalidateLSLocationBase(SILInstruction *I, DSEKind Kind) {
 }
 
 void DSEContext::processReadForDSE(BlockState *S, unsigned bit) {
-  // Remove any may/must-aliasing stores to the LSLocation, as they cant be
+  // Remove any may/must-aliasing stores to the LSLocation, as they can't be
   // used to kill any upward visible stores due to the interfering load.
   LSLocation &R = LocationVault[bit];
   for (unsigned i = 0; i < S->LocationNum; ++i) {
@@ -780,7 +788,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
     L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
-  // If we cant figure out the Base or Projection Path for the read instruction,
+  // If we can't figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
   if (!L.isValid()) {
     processUnknownReadInst(I, Kind);
@@ -865,7 +873,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     L = LSLocation(UO, ProjectionPath::getProjectionPath(UO, Mem));
   }
 
-  // If we cant figure out the Base or Projection Path for the store
+  // If we can't figure out the Base or Projection Path for the store
   // instruction, simply ignore it.
   if (!L.isValid())
     return;
@@ -1123,13 +1131,15 @@ bool DSEContext::run() {
   // Is this a one iteration function.
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
 
+  std::pair<int, int> LSCount = std::make_pair(0, 0);
   // Walk over the function and find all the locations accessed by
   // this function.
-  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex,
-                                   BaseToLocIndex, TE);
+  LSLocation::enumerateLSLocations(*F, LocationVault,
+                                   LocToBitIndex,
+                                   BaseToLocIndex, TE, LSCount);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind();
+  ProcessKind Kind = getProcessFunctionKind(LSCount.second);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)

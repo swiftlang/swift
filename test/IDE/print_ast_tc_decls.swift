@@ -123,8 +123,8 @@ struct d0100_FooStruct {
   func instanceFunc1(a: Int) {}
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc1(a: Int){{$}}
 
-  func instanceFunc2(a: Int, inout b: Double) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, inout b: Double){{$}}
+  func instanceFunc2(a: Int, b: inout Double) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, b: inout Double){{$}}
 
   func instanceFunc3(a: Int, let b: Double) { var a = a; a = 1; _ = a }
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
@@ -422,6 +422,26 @@ class d0120_TestClassBase {
     return 0
   }
 // PASS_COMMON-NEXT: {{^}}  subscript(i: Int) -> Int { get }{{$}}
+
+  class var baseClassVar1: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  class var baseClassVar1: Int { get }{{$}}
+
+  // FIXME: final class var not allowed to have storage, but static is?
+  // final class var baseClassVar2: Int = 0
+
+  final class var baseClassVar3: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  final class var baseClassVar3: Int { get }{{$}}
+  static var baseClassVar4: Int = 0
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar4: Int{{$}}
+  static var baseClassVar5: Int { return 0 }
+// PASS_COMMON-NEXT: {{^}}  static var baseClassVar5: Int { get }{{$}}
+
+  class func baseClassFunc1() {}
+// PASS_COMMON-NEXT: {{^}}  class func baseClassFunc1(){{$}}
+  final class func baseClassFunc2() {}
+// PASS_COMMON-NEXT: {{^}}  final class func baseClassFunc2(){{$}}
+  static func baseClassFunc3() {}
+// PASS_COMMON-NEXT: {{^}}  static func baseClassFunc3(){{$}}
 }
 
 class d0121_TestClassDerived : d0120_TestClassBase {
@@ -926,9 +946,15 @@ class d0700_InClassSubscript1 {
     }
   }
   subscript(index i: Float) -> Int { return 42 }
+  class `class` {}
+  subscript(x: Float) -> `class` { return `class`() }
 // PASS_COMMON: {{^}}  subscript(i: Int) -> Int { get }{{$}}
 // PASS_COMMON: {{^}}  subscript(index i: Float) -> Int { get }{{$}}
+// PASS_COMMON: {{^}}  subscript(x: Float) -> {{.*}} { get }{{$}}
 // PASS_COMMON-NOT: subscript
+
+// PASS_ONE_LINE_TYPE: {{^}}  subscript(x: Float) -> d0700_InClassSubscript1.`class` { get }{{$}}
+// PASS_ONE_LINE_TYPEREPR: {{^}}  subscript(x: Float) -> `class` { get }{{$}}
 }
 // PASS_COMMON: {{^}}}{{$}}
 
@@ -1088,14 +1114,14 @@ protocol d2600_ProtocolWithOperator1 {
 
 struct d2601_TestAssignment {}
 infix operator %%% { }
-func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
+func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
 // PASS_2500-LABEL: {{^}}infix operator %%% {
 // PASS_2500-NOT: associativity
 // PASS_2500-NOT: precedence
 // PASS_2500-NOT: assignment
-// PASS_2500: {{^}}func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
+// PASS_2500: {{^}}func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 infix operator %%< {
 // PASS_2500-LABEL: {{^}}infix operator %%< {{{$}}
@@ -1313,3 +1339,12 @@ protocol ProtocolToExtend {
 
 extension ProtocolToExtend where Self.Assoc == Int {}
 // PREFER_TYPE_REPR_PRINTING: extension ProtocolToExtend where Self.Assoc == Int {
+
+#if true
+#elseif false
+#else
+#endif
+// PASS_PRINT_AST: #if
+// PASS_PRINT_AST: #elseif
+// PASS_PRINT_AST: #else
+// PASS_PRINT_AST: #endif

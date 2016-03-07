@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Reflection/Records.h"
 
 #include "ConstantBuilder.h"
 #include "IRGenModule.h"
@@ -120,10 +121,15 @@ public:
 
 class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
-  const uint32_t fieldRecordSize = 8;
+  const uint32_t fieldRecordSize = 12;
   ArrayRef<const NominalTypeDecl *> NominalTypeDecls;
 
   void addFieldDecl(const ValueDecl *value) {
+    swift::reflection::FieldRecordFlags Flags;
+    Flags.setIsObjC(value->isObjC());
+
+    addConstantInt32(Flags.getRawValue());
+
     auto type = value->getInterfaceType()->getCanonicalType();
     addTypeRef(value->getModuleContext(), type);
 

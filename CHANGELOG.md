@@ -2,6 +2,17 @@
 Swift 3
 -------
 
+* The @noescape attribute has been extended to be a more general type attribute.
+  You can now declare values of @noescape function type, e.g. in manually
+  curried function signatures.  You can now also declare local variables of
+  @noescape type, and use @noescape in typealiases.  For example, this is now
+  valid code:
+
+    func apply<T, U>(@noescape f: T -> U,
+                     @noescape g: (@noescape T -> U) -> U) -> U {
+      return g(f)
+    }
+
 * Curried function syntax has been removed, and now produces a compile-time
   error.
 
@@ -16,6 +27,18 @@ Swift 3
   These objects allow for the deletion of swift.ld and the use of non-BFD linkers.
   A new argument to swiftc is provided to select the linker used, and the gold linker
   is set as the default for arm-based platforms.
+
+* Catch blocks in `rethrows` functions may now `throw` errors. For example:
+
+    ```swift
+    func process(f: () throws -> Int) rethrows -> Int {
+        do {
+            return try f()
+        } catch is SomeError {
+            throw OtherError()
+        }
+    }
+    ```
 
 Swift 2.2
 ---------

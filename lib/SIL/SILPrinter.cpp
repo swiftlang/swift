@@ -169,10 +169,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     Buffer << "<serialized local context>";
     return;
 
-  case DeclContextKind::NominalTypeDecl: {
-    const NominalTypeDecl *Nominal = cast<NominalTypeDecl>(Context);
-    printFullContext(Nominal->getDeclContext(), Buffer);
-    Buffer << Nominal->getName() << ".";
+  case DeclContextKind::GenericTypeDecl: {
+    auto *generic = cast<GenericTypeDecl>(Context);
+    printFullContext(generic->getDeclContext(), Buffer);
+    Buffer << generic->getName() << ".";
     return;
   }
 
@@ -389,9 +389,10 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   unsigned LastBufferID;
 
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
+  llvm::DenseMap<const ValueBase *, unsigned> ValueToIDMap;
+  SILFunction::ScopeSlotTracker *ScopeSlots;
+  std::unique_ptr<SILFunction::ScopeSlotTracker> ManagedScopeSlotTracker;
 
-  llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
-  
   // Printers for the underlying stream.
 #define SIMPLE_PRINTER(TYPE) \
   SILPrinter &operator<<(TYPE value) { \
@@ -426,11 +427,21 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   }
   
 public:
-  SILPrinter(raw_ostream &OS, bool V = false, bool SortedSIL = false,
-             llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
-    : PrintState{{OS}, PrintOptions::printSIL()},
-      Verbose(V), SortedSIL(SortedSIL), LastBufferID(0) {
+  SILPrinter(
+    raw_ostream &OS,
+      bool V = false, bool SortedSIL = false,
+      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr,
+      SILFunction::ScopeSlotTracker *ScopeTracker = nullptr)
+      : PrintState{{OS}, PrintOptions::printSIL()}, Verbose(V),
+        SortedSIL(SortedSIL), LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
+    if (ScopeTracker)
+      ScopeSlots = ScopeTracker;
+    else {
+      ManagedScopeSlotTracker =
+          llvm::make_unique<SILFunction::ScopeSlotTracker>();
+      ScopeSlots = ManagedScopeSlotTracker.get();
+    }
   }
 
   ID getID(const SILBasicBlock *B);
@@ -558,6 +569,50 @@ public:
     return true;
   }
 
+  void printDebugLocRef(SILLocation Loc, const SourceManager &SM,
+                        bool PrintComma = true) {
+    auto DL = Loc.decodeDebugLoc(SM);
+    if (DL.Filename) {
+      if (PrintComma)
+        *this << ", ";
+      *this << "loc " << QuotedString(DL.Filename) << ':' << DL.Line << ':'
+            << DL.Column;
+    }
+  }
+
+  void printDebugScope(const SILDebugScope *DS, const SourceManager &SM) {
+    if (!DS)
+      return;
+
+    if (!ScopeSlots->ScopeToIDMap.count(DS)) {
+      printDebugScope(DS->Parent.dyn_cast<const SILDebugScope *>(), SM);
+      printDebugScope(DS->InlinedCallSite, SM);
+      unsigned ID = ++(ScopeSlots->ScopeIndex);
+      ScopeSlots->ScopeToIDMap.insert({DS, ID});
+      *this << "sil_scope " << ID << " { ";
+      printDebugLocRef(DS->Loc, SM, false);
+      *this << " parent ";
+      if (auto *F = DS->Parent.dyn_cast<SILFunction *>())
+        *this << "@" << F->getName() << " : $" << F->getLoweredFunctionType();
+      else {
+        auto *PS = DS->Parent.get<const SILDebugScope *>();
+        *this << ScopeSlots->ScopeToIDMap[PS];
+      }
+      if (auto *CS = DS->InlinedCallSite)
+        *this << " inlined_at " << ScopeSlots->ScopeToIDMap[CS];
+      *this << " }\n";
+    }
+  }
+
+  void printDebugScopeRef(const SILDebugScope *DS, const SourceManager &SM,
+                          bool PrintComma = true) {
+    if (DS) {
+      if (PrintComma)
+        *this << ", ";
+      *this << "scope " << ScopeSlots->ScopeToIDMap[DS];
+    }
+  }
+
   void printSILLocation(SILLocation L, SILModule &M, const SILDebugScope *DS,
                         bool printedSlashes) {
     if (!L.isNull()) {
@@ -643,7 +698,14 @@ public:
     }
   }
 
-  void print(SILValue V) {
+  void print(SILValue V, bool PrintScopes = false) {
+    // Lazily print any debug locations used in this value.
+    if (PrintScopes)
+      if (auto *I = dyn_cast<SILInstruction>(V)) {
+        auto &SM = I->getModule().getASTContext().SourceMgr;
+        printDebugScope(I->getDebugScope(), SM);
+      }
+
     if (auto *FRI = dyn_cast<FunctionRefInst>(V))
       *this << "  // function_ref "
             << demangleSymbol(FRI->getReferencedFunction()->getName())
@@ -659,6 +721,12 @@ public:
 
     // Print the value.
     visit(V);
+
+    if (auto *I = dyn_cast<SILInstruction>(V)) {
+      auto &SM = I->getModule().getASTContext().SourceMgr;
+      printDebugLocRef(I->getLoc(), SM);
+      printDebugScopeRef(I->getDebugScope(), SM);
+    }
 
     // Print users, or id for valueless instructions.
     bool printedSlashes = printUsersOfSILValue(V);
@@ -900,6 +968,17 @@ public:
     }
     
     *this << getIDAndType(MU->getOperand());
+  }
+  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
+    *this << "mark_uninitialized_behavior "
+          << getID(MU->getInitStorageFunc());
+    printSubstitutions(MU->getInitStorageSubstitutions());
+    *this << '(' << getID(MU->getStorage()) << ") : "
+          << MU->getInitStorageFunc()->getType() << ", "
+          << getID(MU->getSetterFunc());
+    printSubstitutions(MU->getSetterSubstitutions());
+    *this << '(' << getID(MU->getSelf()) << ") : "
+          << MU->getSetterFunc()->getType();
   }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     *this << "mark_function_escape ";
@@ -1587,8 +1666,17 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 }
 
 /// Pretty-print the SILFunction to the designated stream.
-void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
+void SILFunction::print(llvm::raw_ostream &OS,
+                        SILFunction::ScopeSlotTracker &MDT, bool Verbose,
                         bool SortedSIL) const {
+  auto &SM = getModule().getASTContext().SourceMgr;
+  for (auto &BB : *this)
+    for (auto &I : BB) {
+      SILPrinter P(OS, Verbose, SortedSIL, nullptr, &MDT);
+      P.printDebugScope(I.getDebugScope(), SM);
+    }
+  OS << "\n";
+  
   OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
@@ -1667,9 +1755,10 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
   
   if (!isExternalDeclaration()) {
     OS << " {\n";
-    
-    SILPrinter(OS, Verbose, SortedSIL, (Aliases.empty() ? nullptr : &Aliases))
-      .print(this);
+
+    SILPrinter(OS, Verbose, SortedSIL, (Aliases.empty() ? nullptr : &Aliases),
+               &MDT)
+        .print(this);
     OS << "}";
   }
   
@@ -1749,12 +1838,13 @@ static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,
     g->print(OS, Verbose);
 }
 
-static void printSILFunctions(llvm::raw_ostream &OS, bool Verbose,
-                              bool ShouldSort,
+static void printSILFunctions(llvm::raw_ostream &OS,
+                              bool Verbose, bool ShouldSort,
                               const SILModule::FunctionListType &Functions) {
+  SILFunction::ScopeSlotTracker Tracker;
   if (!ShouldSort) {
     for (const SILFunction &f : Functions)
-      f.print(OS, Verbose);
+      f.print(OS, Tracker, Verbose, false);
     return;
   }
 
@@ -1768,7 +1858,7 @@ static void printSILFunctions(llvm::raw_ostream &OS, bool Verbose,
     }
   );
   for (const SILFunction *f : functions)
-    f->print(OS, Verbose, true);
+    f->print(OS, Tracker, Verbose, true);
 }
 
 static void printSILVTables(llvm::raw_ostream &OS, bool Verbose,
@@ -2025,10 +2115,14 @@ void SILWitnessTable::dump() const {
 void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   // sil_default_witness_table <Protocol> <MinSize>
   OS << "sil_default_witness_table"
-     << " " << getProtocol()->getName()
-     << " " << getMinimumWitnessTableSize() << " {\n";
+     << " " << getProtocol()->getName() << " {\n";
   
   for (auto &witness : getEntries()) {
+    if (!witness.isValid()) {
+      OS << " no_default\n";
+      continue;
+    }
+
     // method #declref: @function
     OS << "  method ";
     witness.getRequirement().print(OS);

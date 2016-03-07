@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILLinkage.h"
 #include <memory>
 #include <vector>
 
@@ -81,7 +82,9 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee);
   SILFunction *lookupSILFunction(SILDeclRef Decl);
-  SILFunction *lookupSILFunction(StringRef Name);
+  SILFunction *
+  lookupSILFunction(StringRef Name, bool declarationOnly = false,
+                    SILLinkage linkage = SILLinkage::Private);
   SILVTable *lookupVTable(Identifier Name);
   SILVTable *lookupVTable(const ClassDecl *C) {
     return lookupVTable(C->getName());
@@ -90,6 +93,8 @@ public:
 
   /// Invalidate the cached entries for deserialized SILFunctions.
   void invalidateCaches();
+
+  bool invalidateFunction(SILFunction *F);
 
   /// Deserialize all SILFunctions, VTables, and WitnessTables in all
   /// SILModules.

@@ -5,6 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class A{
-struct S<>:A var e=A.e
-class A:e{typealias e=s
+func<{struct c<T{enum S<T{struct A:a protocol a{typealias e}struct S<T:A.e

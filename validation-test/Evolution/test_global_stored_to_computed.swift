@@ -17,7 +17,7 @@ var GlobalStoredToComputed = TestSuite("GlobalStoredToComputed")
 
 GlobalStoredToComputed.test("ChangeStoredToComputed") {
   do {
-    @inline(never) func increment(inout x: Int) {
+    @inline(never) func increment(x: inout Int) {
       x += 1
     }
 

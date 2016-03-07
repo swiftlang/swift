@@ -451,13 +451,12 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     genericArgTypes.push_back(genericArg.getType());
   }
-
-  // Form the bound generic type
-  BoundGenericType *BGT = BoundGenericType::get(unbound->getDecl(),
-                                                unbound->getParent(),
-                                                genericArgTypes);
+  
+  // Form the bound generic type.
+  auto *BGT = BoundGenericType::get(cast<NominalTypeDecl>(unbound->getDecl()),
+                                    unbound->getParent(), genericArgTypes);
   // Check protocol conformance.
-  if (!BGT->hasTypeParameter()) {
+  if (!BGT->hasTypeParameter() && !BGT->hasTypeVariable()) {
     SourceLoc noteLoc = unbound->getDecl()->getLoc();
     if (noteLoc.isInvalid())
       noteLoc = loc;
@@ -719,8 +718,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TR_GenericSignature)) {
     GenericParamList *genericParams;
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(DC)) {
-      genericParams = nominal->getGenericParams();
+    if (auto *generic = dyn_cast<GenericTypeDecl>(DC)) {
+      genericParams = generic->getGenericParams();
     } else if (auto *ext = dyn_cast<ExtensionDecl>(DC)) {
       genericParams = ext->getGenericParams();
     } else {

@@ -304,6 +304,17 @@ func test_properties() {
  lvalue.weird_property = 1    // ok
 }
 
+protocol OpaqueBase {}
+extension OpaqueBase {
+  var x: Int { get { return 0 } set { } } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
+}
+
+protocol OpaqueRefinement : class, OpaqueBase {
+  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'}}
+}
+
+class SetterMutatingConflict : OpaqueRefinement {} // expected-error {{type 'SetterMutatingConflict' does not conform to protocol 'OpaqueRefinement'}}
+
 struct DuplicateMutating {
   mutating mutating func f() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
 }
@@ -332,11 +343,12 @@ func testSelectorStyleArguments2(let x: Int,
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
+// expected-warning@-1 {{'inout' before a parameter name is deprecated, place it before the parameter type instead}}
 }
 
 
 
-func updateInt(inout x : Int) {}
+func updateInt(x : inout Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {

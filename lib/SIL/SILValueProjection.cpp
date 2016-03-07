@@ -314,7 +314,7 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
   SILValue UO = getUnderlyingObject(Mem);
   LSLocation L(UO, ProjectionPath::getProjectionPath(UO, Mem));
 
-  // If we cant figure out the Base or Projection Path for the memory location,
+  // If we can't figure out the Base or Projection Path for the memory location,
   // simply ignore it for now.
   if (!L.isValid())
     return;
@@ -335,22 +335,27 @@ void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
 
 }
 
-void LSLocation::enumerateLSLocations(SILFunction &F,
-                                      std::vector<LSLocation> &Locations,
-                                      LSLocationIndexMap &IndexMap,
-                                     LSLocationBaseMap &BaseMap,
-                                      TypeExpansionAnalysis *TypeCache) {
+void
+LSLocation::
+enumerateLSLocations(SILFunction &F,
+                     std::vector<LSLocation> &Locations,
+                     LSLocationIndexMap &IndexMap,
+                     LSLocationBaseMap &BaseMap,
+                     TypeExpansionAnalysis *TypeCache,
+                     std::pair<int, int> &LSCount) {
   // Enumerate all locations accessed by the loads or stores.
   for (auto &B : F) {
     for (auto &I : B) {
       if (auto *LI = dyn_cast<LoadInst>(&I)) {
         enumerateLSLocation(&I.getModule(), LI->getOperand(), Locations,
                             IndexMap, BaseMap, TypeCache);
+        ++LSCount.first;
         continue;
       }
       if (auto *SI = dyn_cast<StoreInst>(&I)) {
         enumerateLSLocation(&I.getModule(), SI->getDest(), Locations,
                             IndexMap, BaseMap, TypeCache);
+        ++LSCount.second;
         continue;
       }
     }

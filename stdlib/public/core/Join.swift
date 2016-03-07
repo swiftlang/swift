@@ -184,4 +184,3 @@ public func join<
 ) -> C {
   fatalError("unavailable function can't be called")
 }
-

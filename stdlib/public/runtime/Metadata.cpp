@@ -266,9 +266,11 @@ swift::swift_getResilientMetadata(GenericMetadata *pattern) {
 }
 
 /// The primary entrypoint.
+SWIFT_RT_ENTRY_VISIBILITY
 const Metadata *
 swift::swift_getGenericMetadata(GenericMetadata *pattern,
-                                const void *arguments) {
+                                const void *arguments)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumKeyArguments;
 
@@ -1475,7 +1477,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
                                         bool copyFieldOffsetVectors) {
 #if SWIFT_OBJC_INTEROP
   // If the class is generic, we need to give it a name for Objective-C.
-  if (theClass->getDescription()->GenericParams.NumParams > 0)
+  if (theClass->getDescription()->GenericParams.isGeneric())
     _swift_initGenericClassObjCName(theClass);
 #endif
 
@@ -1483,25 +1485,31 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
   if (theSuperclass == nullptr)
     return;
 
-  // If any ancestors had generic parameters or field offset vectors,
-  // inherit them.
+  // If any ancestor classes have generic parameters or field offset
+  // vectors, inherit them.
   auto ancestor = theSuperclass;
   auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
   auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
   while (ancestor && ancestor->isTypeMetadata()) {
     auto description = ancestor->getDescription();
     auto &genericParams = description->GenericParams;
-    if (genericParams.hasGenericParams()) {
-      unsigned numParamWords = 0;
-      for (unsigned i = 0; i < genericParams.NumParams; ++i) {
-        // 1 word for the type metadata, and 1 for every protocol witness
-        numParamWords +=
-            1 + genericParams.Parameters[i].NumWitnessTables;
-      }
+
+    // Copy the parent type.
+    if (genericParams.Flags.hasParent()) {
+      memcpy(classWords + genericParams.Offset - 1,
+             superWords + genericParams.Offset - 1,
+             sizeof(uintptr_t));
+    }
+
+    // Copy the generic requirements.
+    if (genericParams.hasGenericRequirements()) {
+      unsigned numParamWords = genericParams.NumGenericRequirements;
       memcpy(classWords + genericParams.Offset,
              superWords + genericParams.Offset,
              numParamWords * sizeof(uintptr_t));
     }
+
+    // Copy the field offsets.
     if (copyFieldOffsetVectors &&
         description->Class.hasFieldOffsetVector()) {
       unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;
@@ -2063,7 +2071,7 @@ getExistentialValueWitnesses(ExistentialTypeState &E,
   }
 }
 
-ExistentialTypeRepresentation
+template<> ExistentialTypeRepresentation
 ExistentialTypeMetadata::getRepresentation() const {
   // Some existentials use special containers.
   switch (Flags.getSpecialProtocol()) {
@@ -2080,7 +2088,7 @@ ExistentialTypeMetadata::getRepresentation() const {
   return ExistentialTypeRepresentation::Opaque;
 }
 
-bool
+template<> bool
 ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   // Owning a reference to a class existential is equivalent to owning a
@@ -2104,7 +2112,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   }
 }
 
-void
+template<> void
 ExistentialTypeMetadata::deinitExistentialContainer(OpaqueValue *container)
 const {
   switch (getRepresentation()) {
@@ -2127,7 +2135,7 @@ const {
   }
 }
 
-const OpaqueValue *
+template<> const OpaqueValue *
 ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
@@ -2153,7 +2161,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   }
 }
 
-const Metadata *
+template<> const Metadata *
 ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   switch (getRepresentation()) {
   case ExistentialTypeRepresentation::Class: {
@@ -2175,7 +2183,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   }
 }
 
-const WitnessTable *
+template<> const WitnessTable *
 ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
                                          unsigned i) const {
   assert(i < Flags.getNumWitnessTables());
@@ -2215,9 +2223,11 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
+SWIFT_RT_ENTRY_VISIBILITY
 const ExistentialTypeMetadata *
 swift::swift_getExistentialTypeMetadata(size_t numProtocols,
-                                        const ProtocolDescriptor **protocols) {
+                                        const ProtocolDescriptor **protocols)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   // Sort the protocol set.
   std::sort(protocols, protocols + numProtocols);
 
@@ -2378,37 +2388,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 
 /*** Other metadata routines ***********************************************/
 
-const NominalTypeDescriptor *
-Metadata::getNominalTypeDescriptor() const {
-  switch (getKind()) {
-  case MetadataKind::Class: {
-    const ClassMetadata *cls = static_cast<const ClassMetadata *>(this);
-    if (!cls->isTypeMetadata())
-      return nullptr;
-    if (cls->isArtificialSubclass())
-      return nullptr;
-    return cls->getDescription();
-  }
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-    return static_cast<const StructMetadata *>(this)->Description;
-  case MetadataKind::ForeignClass:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-    return nullptr;
-  }
-}
-
-const GenericMetadata *
+template<> const GenericMetadata *
 Metadata::getGenericPattern() const {
   auto ntd = getNominalTypeDescriptor();
   if (!ntd)
@@ -2416,7 +2396,7 @@ Metadata::getGenericPattern() const {
   return ntd->getGenericMetadataPattern();
 }
 
-const ClassMetadata *
+template<> const ClassMetadata *
 Metadata::getClassObject() const {
   switch (getKind()) {
   case MetadataKind::Class: {
@@ -2615,11 +2595,12 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
   return entry;
 }
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_RT_ENTRY_VISIBILITY
 extern "C" const WitnessTable *
 swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                                     const Metadata *type,
-                                    void * const *instantiationArgs) {
+                                    void * const *instantiationArgs)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (doesNotRequireInstantiation(genericTable)) {
     return genericTable->Pattern;
   }

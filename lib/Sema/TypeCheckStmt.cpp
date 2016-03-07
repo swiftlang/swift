@@ -19,7 +19,6 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
@@ -835,6 +834,31 @@ public:
             });
           }
           labelItem.setPattern(pattern);
+          
+          // For each variable in the pattern, make sure its type is identical to what it
+          // was in the first label item's pattern.
+          auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+          if (pattern != firstPattern) {
+            SmallVector<VarDecl *, 4> Vars;
+            firstPattern->collectVariables(Vars);
+            pattern->forEachVariable([&](VarDecl *VD) {
+              if (!VD->hasName())
+                return;
+              for (auto expected : Vars) {
+                if (expected->hasName() && expected->getName() == VD->getName()) {
+                  if (!VD->getType()->isEqual(expected->getType())) {
+                    TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
+                                VD->getType(), expected->getType());
+                    VD->overwriteType(ErrorType::get(TC.Context));
+                    VD->setInvalid();
+                    expected->overwriteType(ErrorType::get(TC.Context));
+                    expected->setInvalid();
+                  }
+                  return;
+                }
+              }
+            });
+          }
         }
 
         // Check the guard expression, if present.

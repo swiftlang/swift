@@ -164,7 +164,7 @@ struct RecOuter {
     unsafeMutableAddress { return nil }
   }
 }
-func test_rec(inout outer: RecOuter) -> Int {
+func test_rec(outer: inout RecOuter) -> Int {
   return outer.inner[0]
 }
 // This uses the immutable addressor.
@@ -182,7 +182,7 @@ struct Rec2Outer {
     unsafeMutableAddress { return nil }
   }
 }
-func test_rec2(inout outer: Rec2Outer) -> Int {
+func test_rec2(outer: inout Rec2Outer) -> Int {
   return outer.inner[0]
 }
 // This uses the mutable addressor.

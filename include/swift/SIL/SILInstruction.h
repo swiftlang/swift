@@ -290,14 +290,12 @@ combineMemoryBehavior(SILInstruction::MemoryBehavior B1,
   return Result;
 }
 
-#ifndef NDEBUG
 /// Pretty-print the MemoryBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               SILInstruction::MemoryBehavior B);
 /// Pretty-print the ReleasingBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               SILInstruction::ReleasingBehavior B);
-#endif
 
 /// A template base class for instructions that take a single SILValue operand
 /// and has no result or a single value result.
@@ -1340,7 +1338,9 @@ public:
   }
 };
 
-/// MarkUninitializedInst - Indicates that a memory location is uninitialized at
+/// Abstract base class for instructions that mark storage as uninitialized.
+
+/// Indicates that a memory location is uninitialized at
 /// this point and needs to be initialized by the end of the function and before
 /// any escape point for this instruction.  This is only valid in Raw SIL.
 class MarkUninitializedInst
@@ -1390,6 +1390,86 @@ public:
   }
   bool isDelegatingSelf() const {
     return ThisKind == DelegatingSelf;
+  }
+};
+
+/// MarkUninitializedBehaviorInst - Indicates that a logical property
+/// is uninitialized at this point and needs to be initialized by the end of the
+/// function and before any escape point for this instruction. Assignments
+/// to the property trigger the behavior's `init` or `set` logic based on
+/// the logical initialization state of the property.
+///
+/// This is only valid in Raw SIL.
+class MarkUninitializedBehaviorInst final : public SILInstruction,
+      private llvm::TrailingObjects<MarkUninitializedBehaviorInst, Substitution>
+{
+  friend class SILBuilder;
+  friend class TrailingObjects;
+
+  FixedOperandList<4> Operands;
+  unsigned NumInitStorageSubstitutions, NumSetterSubstitutions;
+  
+  enum {
+    // The initialization function for the storage.
+    InitStorageFunc,
+    // Address of the behavior storage being initialized.
+    Storage,
+    // The setter function for the behavior property.
+    SetterFunc,
+    // The address or reference to the parent `self` being initialized.
+    Self,
+  };
+  
+  size_t numTrailingObjects(OverloadToken<Substitution>) {
+    return NumInitStorageSubstitutions + NumSetterSubstitutions;
+  }
+  
+  MarkUninitializedBehaviorInst(SILDebugLocation DebugLoc,
+                                SILValue InitStorage,
+                                ArrayRef<Substitution> InitStorageSubs,
+                                SILValue Storage,
+                                SILValue Setter,
+                                ArrayRef<Substitution> SetterSubs,
+                                SILValue Self,
+                                SILType Ty);
+  
+  static MarkUninitializedBehaviorInst *create(SILModule &M,
+                                         SILDebugLocation DebugLoc,
+                                         SILValue InitStorage,
+                                         ArrayRef<Substitution> InitStorageSubs,
+                                         SILValue Storage,
+                                         SILValue Setter,
+                                         ArrayRef<Substitution> SetterSubs,
+                                         SILValue Self,
+                                         SILType Ty);
+
+public:
+  SILValue getInitStorageFunc() const {
+    return Operands[InitStorageFunc].get();
+  }
+  ArrayRef<Substitution> getInitStorageSubstitutions() const {
+    return {getTrailingObjects<Substitution>(), NumInitStorageSubstitutions};
+  }
+  SILValue getStorage() const {
+    return Operands[Storage].get();
+  }
+
+  SILValue getSetterFunc() const {
+    return Operands[SetterFunc].get();
+  }
+  ArrayRef<Substitution> getSetterSubstitutions() const {
+    return {getTrailingObjects<Substitution>() + NumInitStorageSubstitutions,
+            NumSetterSubstitutions};
+  }
+  SILValue getSelf() const {
+    return Operands[Self].get();
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::MarkUninitializedBehaviorInst;
   }
 };
 

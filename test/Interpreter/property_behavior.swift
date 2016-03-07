@@ -3,6 +3,7 @@
 // RUN: %target-build-swift -Xfrontend -enable-experimental-property-behaviors %s -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+// REQUIRES: rdar24874073
 
 import StdlibUnittest
 
@@ -37,7 +38,7 @@ extension delayedImmutable {
 protocol lazy {
   associatedtype Value
   var storage: Value? { get set }
-  static var initialValue: Value { get }
+  func parameter() -> Value
 }
 extension lazy {
   var value: Value {
@@ -45,7 +46,7 @@ extension lazy {
       if let existing = storage {
         return existing
       }
-      let value = Self.initialValue
+      let value = parameter()
       storage = value
       return value
     }
@@ -67,8 +68,8 @@ func evaluateLazy() -> Int {
 }
 
 class Foo {
-  var [delayedImmutable] x: Int
-  var [lazy] y = evaluateLazy()
+  var x: Int __behavior delayedImmutable
+  var y: Int __behavior lazy { evaluateLazy() }
 }
 
 var DelayedImmutable = TestSuite("DelayedImmutable")

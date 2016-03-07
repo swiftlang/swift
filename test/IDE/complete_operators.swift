@@ -38,10 +38,12 @@
 // RUN: FileCheck %s -check-prefix=S4_EXT_INFIX_NEG < %t.ext_infix_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_3 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_4 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_1| FileCheck %s -check-prefix=ASSIGN_TUPLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_2| FileCheck %s -check-prefix=ASSIGN_TUPLE_2
 
 struct S {}
 postfix operator ++ {}
-postfix func ++(inout x: S) -> S { return x }
+postfix func ++(x: inout S) -> S { return x }
 
 func testPostfix1(x: S) {
   x#^POSTFIX_1^#
@@ -131,7 +133,7 @@ infix operator **= {
 }
 func +(x: S2, y: S2) -> S2 { return x }
 func **(x: S2, y: Int) -> S2 { return x }
-func **=(inout x: S2, y: Int) -> Void { return x }
+func **=(x: inout S2, y: Int) -> Void { return x }
 
 func testInfix1(x: S2) {
   x#^INFIX_1^#
@@ -146,6 +148,7 @@ func testInfix1(x: S2) {
 // S2_INFIX-DAG-NOT: ??
 // S2_INFIX-DAG-NOT: ~=
 // S2_INFIX-DAG-NOT: ~>
+// S2_INFIX-DAG-NOT: = {#
 // S2_INFIX: End completions
 
 func testInfix2(var x: S2) {
@@ -156,6 +159,7 @@ func testInfix2(var x: S2) {
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   **= {#Int#}[#Void#]
+// S2_INFIX_LVALUE-DAG: Pattern/None:                             = {#S2#}[#Void#]
 // S2_INFIX_LVALUE-DAG-NOT: +=
 // S2_INFIX_LVALUE-DAG-NOT: *
 // S2_INFIX_LVALUE-DAG-NOT: ??
@@ -163,7 +167,7 @@ func testInfix2(var x: S2) {
 // S2_INFIX_LVALUE-DAG-NOT: ~>
 // S2_INFIX_LVALUE: End completions
 
-func testInfix3(inout x: S2) {
+func testInfix3(x: inout S2) {
   x#^INFIX_3^#
 }
 
@@ -320,3 +324,15 @@ func testExtInfix3(x: S4) {
 func testExtInfix4(x: S4) {
    1 + 1.0 + x#^EXT_INFIX_4^#
 }
+
+func testAssignTuple1() {
+  ()#^ASSIGN_TUPLE_1^#
+}
+// ASSIGN_TUPLE_1: Pattern/None:                        = {#()#}[#Void#];
+
+func testAssignTuple2() {
+  var x: S2
+  var y: S2
+  (x, y)#^ASSIGN_TUPLE_2^#
+}
+// ASSIGN_TUPLE_2: Pattern/None:                        = {#(S2, S2)#}[#Void#];

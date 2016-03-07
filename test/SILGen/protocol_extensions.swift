@@ -93,7 +93,7 @@ struct GenericMetaHolder<T> {
   var g: G<T>.Type = G<T>.self
 }
 
-func inout_func(inout n: Int) {}
+func inout_func(n: inout Int) {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions5testDFTVS_10MetaHolder2ddMCS_1D1dS1__T_ : $@convention(thin) (MetaHolder, @thick D.Type, @owned D) -> ()
 // CHECK: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):

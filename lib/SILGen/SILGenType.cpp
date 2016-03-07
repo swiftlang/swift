@@ -91,7 +91,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
       M.getOrCreateFunction(SILLinkage::Private, name, overrideInfo.SILFnType,
                             derivedDecl->getGenericParams(), loc, IsBare,
                             IsNotTransparent, IsNotFragile);
-  thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
+  thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, basePattern,
@@ -511,54 +511,4 @@ public:
 
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
-}
-
-namespace {
-
-/// Emit a default witness table for a resilient protocol definition.
-struct SILGenDefaultWitnessTable
-    : public SILWitnessVisitor<SILGenDefaultWitnessTable> {
-
-  unsigned MinimumWitnessCount;
-  SmallVector<SILDefaultWitnessTable::Entry, 8> DefaultWitnesses;
-
-  SILGenDefaultWitnessTable() : MinimumWitnessCount(0) {}
-
-  void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
-    MinimumWitnessCount++;
-  }
-
-  void addMethod(FuncDecl *func) {
-    MinimumWitnessCount++;
-  }
-
-  void addConstructor(ConstructorDecl *ctor) {
-    MinimumWitnessCount++;
-  }
-
-  void addAssociatedType(AssociatedTypeDecl *ty,
-                         ArrayRef<ProtocolDecl *> protos) {
-    MinimumWitnessCount++;
-
-    for (auto *protocol : protos) {
-      // Only reference the witness if the protocol requires it.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
-
-      MinimumWitnessCount++;
-    }
-  }
-};
-
-}
-
-void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
-  SILDefaultWitnessTable *defaultWitnesses =
-      M.createDefaultWitnessTableDeclaration(protocol);
-
-  SILGenDefaultWitnessTable builder;
-  builder.visitProtocolDecl(protocol);
-
-  defaultWitnesses->convertToDefinition(builder.MinimumWitnessCount,
-                                        builder.DefaultWitnesses);
 }

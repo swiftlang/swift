@@ -28,5 +28,8 @@ TYPEREF(ExistentialMetatype, TypeRef)
 TYPEREF(GenericTypeParameter, TypeRef)
 TYPEREF(DependentMember, TypeRef)
 TYPEREF(Associated, TypeRef)
+TYPEREF(ForeignClass, TypeRef)
+TYPEREF(ObjCClass, TypeRef)
+TYPEREF(Opaque, TypeRef)
 
 #undef TYPEREF

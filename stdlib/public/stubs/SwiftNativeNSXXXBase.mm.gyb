@@ -119,7 +119,7 @@ extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
 swift_stdlib_NSStringNFDHashValue(NSString *NS_RELEASES_ARGUMENT str) {
-  int Result = str.decomposedStringWithCanonicalMapping.hash;
+  size_t Result = str.decomposedStringWithCanonicalMapping.hash;
   swift_unknownRelease(str);
   return Result;
 }
@@ -128,7 +128,7 @@ swift_stdlib_NSStringNFDHashValue(NSString *NS_RELEASES_ARGUMENT str) {
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
 swift_stdlib_NSStringASCIIHashValue(NSString *NS_RELEASES_ARGUMENT str) {
-  int Result = str.hash;
+  size_t Result = str.hash;
   swift_unknownRelease(str);
   return Result;
 }

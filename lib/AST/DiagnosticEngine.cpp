@@ -622,8 +622,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
               ppDecl = cast<ExtensionDecl>(dc);
               break;
 
-            case DeclContextKind::NominalTypeDecl:
-              ppDecl = cast<NominalTypeDecl>(dc);
+            case DeclContextKind::GenericTypeDecl:
+              ppDecl = cast<GenericTypeDecl>(dc);
               break;
 
             case DeclContextKind::SerializedLocal:

@@ -102,14 +102,29 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy,
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
-                             const TypeInfo &Info)
+                             const TypeInfo &Info, bool Unwrap)
   : DeclOrContext(Decl) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  if (Decl->getType().getCanonicalTypeOrNull() == Ty.getCanonicalTypeOrNull())
-    Type = Decl->getType().getPointer();
+  CanType DeclType = Decl->getType()->getCanonicalType();
+  CanType RealType = Ty.getCanonicalTypeOrNull();
+  if (Unwrap) {
+    DeclType = DeclType.getLValueOrInOutObjectType();
+    RealType = RealType.getLValueOrInOutObjectType();
+  }
+
+  // Desugar for comparison.
+  DeclType = DeclType->getDesugaredType()->getCanonicalType();
+  // DynamicSelfType is also sugar as far as debug info is concerned.
+  if (auto DynSelfTy = dyn_cast<DynamicSelfType>(DeclType))
+    DeclType = DynSelfTy->getSelfType()->getCanonicalType();
+  RealType = RealType->getDesugaredType()->getCanonicalType();
+
+  if ((DeclType == RealType) || isa<AnyFunctionType>(DeclType))
+    Type = Unwrap ? Decl->getType()->getLValueOrInOutObjectType().getPointer()
+                  : Decl->getType().getPointer();
   else
-    Type = Ty.getPointer();
+    Type = RealType.getPointer();
 
   initFromTypeInfo(size, align, StorageType, Info);
 }

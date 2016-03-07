@@ -126,7 +126,6 @@ func testCallACHandled() throws {
   try callAC(raise())
 }
 
-
 func testForward1(fn: () throws -> Int) rethrows {
   try call(fn)
 }
@@ -335,6 +334,72 @@ func testUnrelatedThrowsInRethrows(fn: () throws -> Void) rethrows {
   raise() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
   try raise() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
   throw SomeError.Badness // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+func testThrowsInCatchInRethrows(fn: () throws -> Void) rethrows {
+  do {
+    try fn()
+  } catch {
+    // this catch can only be entered if our `fn` parameter throws
+    throw error // okay
+  }
+
+  do {
+    try fn()
+  } catch let error as SomeError {
+    throw error // okay
+  }
+
+  do {
+    try fn()
+    try raise()
+  } catch {
+    // this catch can be entered regardless of whether our `fn` parameter throws
+    throw error // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
+  }
+
+  do {
+    throw SomeError.Badness
+  } catch {
+    // this catch can be entered regardless of whether our `fn` parameter throws
+    throw error // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
+  }
+
+  do {
+    try fn()
+    try raise() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+  } catch is SomeError {}
+
+  do {
+    try raise()
+  } catch {
+    try fn() // okay
+  }
+
+  do {
+    // don't throw anything; equivalent to throwing in an #if
+  } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+    throw error
+  }
+}
+
+// Sanity-check that throwing in catch blocks behaves as expected outside of
+// rethrows functions
+
+func testThrowsInCatch(fn: () throws -> Void) {
+  do {
+    try fn()
+  } catch {
+    throw error // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
+  }
+}
+
+func testThrowsInCatchInThrows() throws {
+  do {
+    try raise()
+  } catch {
+    throw error // okay
+  }
 }
 
 // <rdar://problem/24221830> Bogus "no calls to throwing functions" warning in derived throwing init

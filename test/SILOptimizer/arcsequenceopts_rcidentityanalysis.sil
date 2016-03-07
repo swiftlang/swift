@@ -45,11 +45,26 @@ class C {
   var w : FakeOptional<Builtin.NativeObject>
 }
 
+struct SContainer {
+  var c : Cls
+  var z : Builtin.Int32
+  init()
+}
+
+struct SContainer2 {
+  var b : Cls
+  var c : Cls
+  init()
+}
+
 class RetainUser { }
 
 sil @rawpointer_use: $@convention(thin) (Builtin.RawPointer) -> ()
 
 sil @fakeoptional_user : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> ()
+
+sil @cls_use : $@convention(thin) (@owned Cls) -> ()
+
 
 enum Either<LTy, RTy> {
   case Left(LTy)
@@ -592,3 +607,88 @@ bb0(%0 : $Builtin.BridgeObject, %5 : $C):
   return %3 : $()
 }
 
+// CHECK-LABEL: sil @retain_release_struct_with_single_nontrivial_retain_outer
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: return
+sil @retain_release_struct_with_single_nontrivial_retain_outer : $@convention(thin) (SContainer) -> () {
+bb0(%0 : $SContainer):
+  retain_value %0 : $SContainer
+  %1 = struct_extract %0 : $SContainer, #SContainer.c
+  strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @retain_release_struct_with_single_nontrivial_retain_inner
+// CHECK-NOT: retain_value 
+// CHECK-NOT: release_value 
+// CHECK: return
+sil @retain_release_struct_with_single_nontrivial_retain_inner : $@convention(thin) (SContainer) -> () {
+bb0(%0 : $SContainer):
+  %1 = struct_extract %0 : $SContainer, #SContainer.c
+  retain_value %1 : $Cls
+  release_value %0 : $SContainer
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @retain_release_struct_with_multiple_nontrivials_retain_outer
+// CHECK: retain_value 
+// CHECK: strong_release 
+// CHECK: return
+sil @retain_release_struct_with_multiple_nontrivials_retain_outer : $@convention(thin) (SContainer2) -> () {
+bb0(%0 : $SContainer2):
+  retain_value %0 : $SContainer2
+  %1 = struct_extract %0 : $SContainer2, #SContainer2.c
+  strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @retain_release_struct_with_multiple_nontrivials_retain_inner
+// CHECK: retain_value 
+// CHECK: release_value 
+// CHECK: return
+sil @retain_release_struct_with_multiple_nontrivials_retain_inner : $@convention(thin) (SContainer2) -> () {
+bb0(%0 : $SContainer2):
+  %1 = struct_extract %0 : $SContainer2, #SContainer2.c
+  retain_value %1 : $Cls
+  release_value %0 : $SContainer2
+  %r = tuple()
+  return %r : $()
+}
+
+// Make sure the RR pair is not removed here as a result of the decrement and use.
+//
+// CHECK-LABEL: sil @retain_release_struct_with_single_nontrivial_with_use_and_decrement_retain_outer
+// CHECK: retain_value
+// CHECK: release_value
+sil @retain_release_struct_with_single_nontrivial_with_use_and_decrement_retain_outer : $@convention(thin) (SContainer) -> () {
+bb0(%0 : $SContainer):
+  retain_value %0 : $SContainer
+  %1 = struct_extract %0 : $SContainer, #SContainer.c
+  %2 = function_ref @cls_use : $@convention(thin) (@owned Cls) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Cls) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Cls) -> ()
+  release_value %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+// Make sure the RR pair is not removed here as a result of the decrement and use.
+//
+// CHECK-LABEL: sil @retain_release_struct_with_single_nontrivial_with_use_and_decrement_retain_inner
+// CHECK: retain_value
+// CHECK: release_value
+sil @retain_release_struct_with_single_nontrivial_with_use_and_decrement_retain_inner : $@convention(thin) (SContainer) -> () {
+bb0(%0 : $SContainer):
+  %1 = struct_extract %0 : $SContainer, #SContainer.c
+  retain_value %1 : $Cls
+  %2 = function_ref @cls_use : $@convention(thin) (@owned Cls) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Cls) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Cls) -> ()
+  release_value %0 : $SContainer
+  %r = tuple()
+  return %r : $()
+}

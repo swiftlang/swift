@@ -249,7 +249,7 @@ public:
 namespace {
 struct ClosureInfo {
   SILInstruction *Closure;
-  ValueLifetime Lifetime;
+  ValueLifetimeAnalysis::Frontier LifetimeFrontier;
   llvm::SmallVector<CallSiteDescriptor, 8> CallSites;
 
   ClosureInfo(SILInstruction *Closure): Closure(Closure) {}
@@ -404,15 +404,14 @@ std::string CallSiteDescriptor::createName() const {
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
-  assert(!CInfo->Lifetime.getLastUsers().empty() &&
+  assert(!CInfo->LifetimeFrontier.empty() &&
          "Need a post-dominating release(s)");
 
   // Extend the lifetime of a captured argument to cover the callee.
   SILBuilderWithScope Builder(getClosure());
   Builder.createRetainValue(getClosure()->getLoc(), Arg);
-  for (auto *I : CInfo->Lifetime.getLastUsers()) {
-    auto It = SILBasicBlock::iterator(*I);
-    Builder.setInsertionPoint(++It);
+  for (auto *I : CInfo->LifetimeFrontier) {
+    Builder.setInsertionPoint(I);
     Builder.createReleaseValue(getClosure()->getLoc(), Arg);
   }
 }
@@ -537,8 +536,14 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
     NewParameterInfoList.push_back(NewPInfo);
   }
 
+  // The specialized function is always a thin function. This is important
+  // because we may add additional parameters after the Self parameter of
+  // witness methods. In this case the new function is not a method anymore.
+  auto ExtInfo = ClosureUserFunTy->getExtInfo();
+  ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getGenericSignature(), ClosureUserFunTy->getExtInfo(),
+      ClosureUserFunTy->getGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getAllResults(),
       ClosureUserFunTy->getOptionalErrorResult(),
@@ -800,7 +805,8 @@ void ClosureSpecializer::gatherCallSites(
         if (!CInfo) {
           CInfo = new ClosureInfo(&II);
           ValueLifetimeAnalysis VLA(CInfo->Closure);
-          CInfo->Lifetime = VLA.computeFromDirectUses();
+          VLA.computeFrontier(CInfo->LifetimeFrontier,
+                              ValueLifetimeAnalysis::AllowToModifyCFG);
         }
 
         // Now we know that CSDesc is profitable to specialize. Add it to our

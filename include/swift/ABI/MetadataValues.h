@@ -26,19 +26,27 @@
 
 namespace swift {
 
-struct Metadata;
+struct InProcess;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
 
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
-enum class MetadataKind : uintptr_t {
+enum class MetadataKind : uint32_t {
 #define METADATAKIND(name, value) name = value,
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
 };
 
+template <typename StoredPointer>
+bool metadataKindIsClass(StoredPointer Kind) {
+  return Kind > static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_End) ||
+      Kind < static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_Start);
+}
+
 /// Kinds of Swift nominal type descriptor records.
-enum class NominalTypeKind : uintptr_t {
+enum class NominalTypeKind : uint32_t {
 #define NOMINALTYPEMETADATAKIND(name, value) name = value,
 #include "MetadataKind.def"
 };
@@ -237,6 +245,63 @@ enum class ProtocolDispatchStrategy: uint8_t {
   Empty = 2,
 };
 
+/// Flags in a generic nominal type descriptor.
+class GenericParameterDescriptorFlags {
+  typedef uint32_t int_type;
+  enum : int_type {
+    HasParent        = 0x01,
+    HasGenericParent = 0x02,
+  };
+  int_type Data;
+  
+  constexpr GenericParameterDescriptorFlags(int_type data) : Data(data) {}
+public:
+  constexpr GenericParameterDescriptorFlags() : Data(0) {}
+
+  constexpr GenericParameterDescriptorFlags withHasParent(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasParent)
+                                             : (Data & ~HasParent));
+  }
+
+  constexpr GenericParameterDescriptorFlags withHasGenericParent(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasGenericParent)
+                                             : (Data & ~HasGenericParent));
+  }
+
+  /// Does this type have a lexical parent type?
+  ///
+  /// For class metadata, if this is true, the storage for the parent type
+  /// appears immediately prior to the first generic argument.  Other
+  /// metadata always have a slot for their parent type.
+  bool hasParent() const {
+    return Data & HasParent;
+  }
+
+  /// Given that this type has a parent type, is that type generic?  If so,
+  /// it forms part of the key distinguishing this metadata from other
+  /// metadata, and the parent metadata will be the first argument to
+  /// the generic metadata access function.
+  bool hasGenericParent() const {
+    return Data & HasGenericParent;
+  }
+
+  int_type getIntValue() const {
+    return Data;
+  }
+  
+  static GenericParameterDescriptorFlags fromIntValue(int_type Data) {
+    return GenericParameterDescriptorFlags(Data);
+  }
+  
+  bool operator==(GenericParameterDescriptorFlags other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(GenericParameterDescriptorFlags other) const {
+    return Data != other.Data;
+  }
+};
+
+
 /// Flags for protocol descriptors.
 class ProtocolDescriptorFlags {
   typedef uint32_t int_type;
@@ -383,8 +448,9 @@ enum class FunctionMetadataConvention: uint8_t {
 };
 
 /// Flags in a function type metadata record.
-class FunctionTypeFlags {
-  typedef size_t int_type;
+template <typename Runtime>
+class TargetFunctionTypeFlags {
+  using int_type = typename Runtime::StoredSize;
   enum : int_type {
     NumArgumentsMask = 0x00FFFFFFU,
     ConventionMask   = 0x0F000000U,
@@ -393,22 +459,24 @@ class FunctionTypeFlags {
   };
   int_type Data;
   
-  constexpr FunctionTypeFlags(int_type Data) : Data(Data) {}
+  constexpr TargetFunctionTypeFlags(int_type Data) : Data(Data) {}
 public:
-  constexpr FunctionTypeFlags() : Data(0) {}
+  constexpr TargetFunctionTypeFlags() : Data(0) {}
 
-  constexpr FunctionTypeFlags withNumArguments(unsigned numArguments) const {
-    return FunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
+  constexpr TargetFunctionTypeFlags withNumArguments(unsigned numArguments) const {
+    return TargetFunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
   }
   
-  constexpr FunctionTypeFlags withConvention(FunctionMetadataConvention c) const {
-    return FunctionTypeFlags((Data & ~ConventionMask)
+  constexpr TargetFunctionTypeFlags<Runtime>
+  withConvention(FunctionMetadataConvention c) const {
+    return TargetFunctionTypeFlags((Data & ~ConventionMask)
                              | (int_type(c) << ConventionShift));
   }
   
-  constexpr FunctionTypeFlags withThrows(bool throws) const {
-    return FunctionTypeFlags((Data & ~ThrowsMask)
-                             | (throws ? ThrowsMask : 0));
+  constexpr TargetFunctionTypeFlags<Runtime>
+  withThrows(bool throws) const {
+    return TargetFunctionTypeFlags<Runtime>((Data & ~ThrowsMask) |
+                                            (throws ? ThrowsMask : 0));
   }
   
   unsigned getNumArguments() const {
@@ -427,17 +495,18 @@ public:
     return Data;
   }
   
-  static FunctionTypeFlags fromIntValue(int_type Data) {
-    return FunctionTypeFlags(Data);
+  static TargetFunctionTypeFlags<Runtime> fromIntValue(int_type Data) {
+    return TargetFunctionTypeFlags(Data);
   }
   
-  bool operator==(FunctionTypeFlags other) const {
+  bool operator==(TargetFunctionTypeFlags<Runtime> other) const {
     return Data == other.Data;
   }
-  bool operator!=(FunctionTypeFlags other) const {
+  bool operator!=(TargetFunctionTypeFlags<Runtime> other) const {
     return Data != other.Data;
   }
 };
+using FunctionTypeFlags = TargetFunctionTypeFlags<InProcess>;
 
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.

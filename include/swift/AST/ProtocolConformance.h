@@ -193,6 +193,11 @@ public:
   ConcreteDeclRef getWitness(ValueDecl *requirement, 
                              LazyResolver *resolver) const;
 
+private:
+  /// Determine whether we have a witness for the given requirement.
+  bool hasWitness(ValueDecl *requirement) const;
+
+public:
   /// Apply the given function object to each value witness within this
   /// protocol conformance.
   ///
@@ -213,6 +218,10 @@ public:
       if (auto *FD = dyn_cast<FuncDecl>(valueReq))
         if (FD->isAccessor())
           continue;
+
+      // If we don't have and cannot resolve witnesses, skip it.
+      if (!resolver && !hasWitness(valueReq))
+        continue;
 
       f(valueReq, getWitness(valueReq, resolver));
     }
@@ -405,6 +414,11 @@ public:
   void setInvalid() {
     ContextAndInvalid.setInt(true);
   }
+
+  /// Determine whether this conformance is lazily resolved.
+  ///
+  /// This only matters to the AST verifier.
+  bool isLazilyResolved() const { return Resolver != nullptr; }
 
   /// True if the conformance describes a property behavior.
   bool isBehaviorConformance() const {
@@ -717,6 +731,10 @@ public:
 
 inline bool ProtocolConformance::isInvalid() const {
   return getRootNormalConformance()->isInvalid();
+}
+
+inline bool ProtocolConformance::hasWitness(ValueDecl *requirement) const {
+  return getRootNormalConformance()->hasWitness(requirement);
 }
 
 } // end namespace swift
