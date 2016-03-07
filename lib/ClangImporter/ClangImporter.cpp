@@ -2069,7 +2069,7 @@ auto ClangImporter::Implementation::importFullName(
         result.ImportAsMember = true;
 
         if (parsedName.BaseName == "init")
-          result.InitKind = CtorInitializerKind::ConvenienceFactory;
+          result.InitKind = CtorInitializerKind::Factory;
       }
 
       // Map property getters/setters.

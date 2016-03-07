@@ -13,4 +13,9 @@ module ImportAsMember {
   module B {
     header "ImportAsMemberB.h"
   }
+
+  module C {
+    requires objc
+    header "ImportAsMemberC.h"
+  }
 }
