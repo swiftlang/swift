@@ -2466,6 +2466,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   ParserResult<Expr> Where;
   if (consumeIf(tok::kw_where)) {
     Where = parseExprBasic(diag::expected_foreach_where_expr);
+    if (Where.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Stmt>();
     if (Where.isNull())
       Where = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
     Status |= Where;

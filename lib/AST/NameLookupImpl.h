@@ -188,8 +188,7 @@ private:
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
     visit(S->getBody());
-    if (!isReferencePointInRange(S->getSequence()->getSourceRange()))
-      checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
+    checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
   }
 
   void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false) {
