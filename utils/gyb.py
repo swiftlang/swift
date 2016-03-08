@@ -561,13 +561,13 @@ class ASTNode(object):
     """Abstract base class for template AST nodes"""
 
     def __init__(self):
-        raise NotImplemented
+        raise NotImplementedError("ASTNode.__init__ is not implemented.")
 
     def execute(self, context):
-        raise NotImplemented
+        raise NotImplementedError("ASTNode.execute is not implemented.")
 
     def __str__(self, indent=''):
-        raise NotImplemented
+        raise NotImplementedError("ASTNode.__str__ is not implemented.")
 
     def format_children(self, indent):
         if not self.children:
