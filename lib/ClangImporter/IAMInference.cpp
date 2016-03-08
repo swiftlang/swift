@@ -16,16 +16,35 @@
 //===----------------------------------------------------------------------===//
 #include "IAMInference.h"
 
+#include "swift/AST/ASTContext.h"
+#include "swift/Basic/StringExtras.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/Lookup.h"
-
-#include "swift/AST/ASTContext.h"
-#include "swift/Basic/StringExtras.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
 
 #include <array>
 #include <tuple>
+
+#define DEBUG_TYPE "Infer import as member"
+
+// Statistics for failure to infer
+STATISTIC(FailInferVar, "# of variables unable to infer");
+STATISTIC(FailInferFunction, "# of functions unable to infer");
+
+// Success statistics
+STATISTIC(SuccessImportAsTypeID, "# imported as typeID");
+STATISTIC(SuccessImportAsConstructor, "# imported as init()");
+STATISTIC(SuccessImportAsInstanceComputedProperty,
+          "# imported as instance computed property");
+STATISTIC(SuccessImportAsStaticProperty,
+          "# imported as static (stored) property");
+STATISTIC(SuccessImportAsStaticComputedProperty,
+          "# imported as static computed property");
+STATISTIC(SuccessImportAsStaticMethod, "# imported as static method");
+STATISTIC(SuccessImportAsInstanceMethod, "# imported as instance method");
 
 using namespace swift;
 
@@ -96,6 +115,7 @@ private:
   // typeID
   IAMResult importAsTypeID(const clang::QualType typeIDTy,
                            EffectiveClangContext effectiveDC) {
+    ++SuccessImportAsTypeID;
     return {formDeclName("typeID"), IAMAccessorKind::Getter, effectiveDC};
   }
 
@@ -103,6 +123,7 @@ private:
   IAMResult importAsConstructor(StringRef name, StringRef initSpecifier,
                                 ArrayRef<const clang::ParmVarDecl *> params,
                                 EffectiveClangContext effectiveDC) {
+    ++SuccessImportAsConstructor;
     NameBuffer buf;
     if (name != initSpecifier) {
       assert(name.size() > initSpecifier.size() &&
@@ -120,6 +141,7 @@ private:
                            ArrayRef<const clang::ParmVarDecl *> nonSelfParams,
                            const clang::FunctionDecl *pairedAccessor,
                            EffectiveClangContext effectiveDC) {
+    ++SuccessImportAsInstanceComputedProperty;
     IAMAccessorKind kind =
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
     assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
@@ -132,12 +154,14 @@ private:
   importAsInstanceMethod(StringRef name, unsigned selfIdx,
                          ArrayRef<const clang::ParmVarDecl *> nonSelfParams,
                          EffectiveClangContext effectiveDC) {
+    ++SuccessImportAsInstanceMethod;
     return {formDeclName(name, nonSelfParams), selfIdx, effectiveDC};
   }
 
   // Static stored property
   IAMResult importAsStaticProperty(StringRef name,
                                    EffectiveClangContext effectiveDC) {
+    ++SuccessImportAsStaticProperty;
     return {formDeclName(name), effectiveDC};
   }
 
@@ -147,6 +171,7 @@ private:
                          ArrayRef<const clang::ParmVarDecl *> nonSelfParams,
                          const clang::FunctionDecl *pairedAccessor,
                          EffectiveClangContext effectiveDC) {
+    ++SuccessImportAsStaticComputedProperty;
     IAMAccessorKind kind =
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
     assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
@@ -159,6 +184,7 @@ private:
   importAsStaticMethod(StringRef name,
                        ArrayRef<const clang::ParmVarDecl *> nonSelfParams,
                        EffectiveClangContext effectiveDC) {
+    ++SuccessImportAsStaticMethod;
     return {formDeclName(name, nonSelfParams), effectiveDC};
   }
 
@@ -184,6 +210,8 @@ private:
                                           NameBuffer &outStr) {
     // FIXME: drop mutable...
 
+    // TODO: should we try some form of fuzzy or fuzzier matching?
+
     // Longest-prefix matching, alternate with checking for a trailing "Ref"
     // suffix and the prefix itself. We iterate from the back to the beginning.
     auto words = camel_case::getWords(workingName);
@@ -206,6 +234,18 @@ private:
     }
 
     return nullptr;
+  }
+
+  bool validToImportAsProperty(const clang::FunctionDecl *originalDecl,
+                               StringRef propSpec, Optional<unsigned> selfIndex,
+                               const clang::FunctionDecl *&pairedAccessor) {
+    bool isGet = propSpec == "Get";
+    pairedAccessor = findPairedAccessor(originalDecl->getName(), propSpec);
+    if (!pairedAccessor)
+      return propSpec == "Get";
+
+    // FIXME: need to instead check parameter number and types
+    return true;
   }
 
   const clang::FunctionDecl *findPairedAccessor(StringRef name,
@@ -353,24 +393,51 @@ static bool hasWord(StringRef s, StringRef matchWord) {
 
 IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   if (auto varDecl = dyn_cast<clang::VarDecl>(clangDecl)) {
+    auto fail = [varDecl]() -> IAMResult {
+      DEBUG(llvm::dbgs() << "failed to infer variable: ");
+      DEBUG(varDecl->print(llvm::dbgs()));
+      DEBUG(llvm::dbgs() << "\n");
+      ++FailInferVar;
+      return {};
+    };
+
     // Try to find a type to add this as a static property to
     StringRef workingName = varDecl->getName();
+    if (workingName.empty())
+      return fail();
+
+    // Special pattern: constants of the form "kFooBarBaz", extend "FooBar" with
+    // property "Baz"
+    if (*camel_case::getWords(workingName).begin() == "k") {
+      workingName = workingName.drop_front(1);
+    }
+
     NameBuffer remainingName;
     const clang::TypeDecl *tyDecl =
         findTypeAndMatch(workingName, remainingName);
     if (tyDecl)
       return importAsStaticProperty(remainingName, getEffectiveDC(tyDecl));
-    return {};
+    return fail();
   }
 
   // Try to infer a member function
   auto funcDecl = dyn_cast<clang::FunctionDecl>(clangDecl);
-  if (!funcDecl)
+  if (!funcDecl) {
+    // TODO: Do we want to collects stats here? Should it be assert?
     return {};
+  }
+
+  auto fail = [funcDecl]() -> IAMResult {
+    DEBUG(llvm::dbgs() << "failed to infer function: ");
+    DEBUG(funcDecl->print(llvm::dbgs()));
+    DEBUG(llvm::dbgs() << "\n");
+    ++FailInferFunction;
+    return {};
+  };
 
   // Can't really import variadics well
   if (funcDecl->isVariadic())
-    return {};
+    return fail();
 
   // FIXME: drop "Mutable"...
 
@@ -426,14 +493,12 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
         for (auto propSpec : PropertySpecifiers) {
           NameBuffer propName;
           if (match(remainingName, propSpec, propName)) {
-            if (auto pair = findPairedAccessor(workingName, propSpec)) {
+            const clang::FunctionDecl *pairedAccessor;
+            if (validToImportAsProperty(funcDecl, propSpec, selfIdx,
+                                        pairedAccessor))
               return importAsInstanceProperty(propName, propSpec, selfIdx,
-                                              nonSelfParams, pair, effectiveDC);
-            } else if (propSpec == "Get") {
-              return importAsInstanceProperty(propName, propSpec, selfIdx,
-                                              nonSelfParams, nullptr,
+                                              nonSelfParams, pairedAccessor,
                                               effectiveDC);
-            }
           }
         }
 
@@ -458,21 +523,17 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
     for (auto propSpec : PropertySpecifiers) {
       NameBuffer propName;
       if (match(remainingName, propSpec, propName)) {
-        if (auto pair = findPairedAccessor(workingName, propSpec)) {
-          return importAsStaticProperty(propName, propSpec, nonSelfParams, pair,
-                                        effectiveDC);
-        } else if (propSpec == "Get") {
-
+        const clang::FunctionDecl *pairedAccessor;
+        if (validToImportAsProperty(funcDecl, propSpec, None, pairedAccessor))
           return importAsStaticProperty(propName, propSpec, nonSelfParams,
-                                        nullptr, effectiveDC);
-        }
+                                        pairedAccessor, effectiveDC);
       }
     }
 
     return importAsStaticMethod(remainingName, nonSelfParams, effectiveDC);
   }
 
-  return {};
+  return fail();
 }
 
 template <typename DeclType>
