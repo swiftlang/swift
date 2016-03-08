@@ -62,6 +62,8 @@ func test0(ref: A) {
 // CHECK-NEXT: store %0 to [[TEMP2]] : $*A
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick A.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*OrdinarySub to $Builtin.RawPointer
+// CHECK-NEXT: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> () to $Builtin.RawPointer
+// CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> ()
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
 // CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
@@ -117,6 +119,8 @@ func test1(ref: B) {
 // CHECK-NEXT: store %0 to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
+// CHECK-NEXT: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> () to $Builtin.RawPointer
+// CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
 // CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
@@ -140,6 +144,8 @@ func test1(ref: B) {
 // CHECK-NEXT: store %0 to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
+// CHECK-NEXT: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> () to $Builtin.RawPointer
+// CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE2]], [[TEMP2]], [[T0]])
 // CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]

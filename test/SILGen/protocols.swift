@@ -401,6 +401,33 @@ func testExistentialPropertyRead<T: ExistentialProperty>(t: inout T) {
 // CHECK-NOT:  witness_method
 // CHECK:      return
 
+func modify(x: inout Int) {}
+
+// Make sure we call the materializeForSet callback with the correct
+// generic signature.
+
+func modifyProperty<T : PropertyWithGetterSetter>(x: inout T) {
+  modify(&x.b)
+}
+// CHECK-LABEL: sil hidden @_TF9protocols14modifyPropertyuRxS_24PropertyWithGetterSetterrFRxT_
+// CHECK:      [[SELF_BOX:%.*]] = alloc_box $T
+// CHECK:      [[SELF:%.*]] = project_box %1 : $@box T
+// CHECK:      [[MODIFY_FN:%.*]] = function_ref @_TF9protocols6modifyFRSiT_
+// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!materializeForSet.1
+// CHECK:      [[RESULT:%.*]] = apply [[WITNESS_FN]]<T>
+// CHECK:      [[TEMPORARY:%.*]] = tuple_extract [[RESULT]]
+// CHECK:      [[CALLBACK:%.*]] = tuple_extract [[RESULT]]
+// CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to $*Int
+// CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[SELF]] : $*T
+// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ADDR]])
+// CHECK:      switch_enum [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout T, @thick T.Type) -> ()>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+// CHECK:    bb1([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout T, @thick T.Type) -> ()):
+// CHECK:      [[METATYPE:%.*]] = metatype $@thick T.Type
+// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
+// CHECK:      [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK]]
+// CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
+// CHECK:      apply [[CALLBACK]]<T>
+
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi
 // CHECK-NEXT: }
