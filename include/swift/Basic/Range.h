@@ -270,8 +270,8 @@ template <class T> EnumeratorRange<T> enumerate(T Begin, T End) {
 
 /// An adaptor of std::none_of for ranges.
 template <class Range, class Predicate>
-inline bool none_of(const Range &R, Predicate P) {
-  return std::none_of(R.begin(), R.end(), P);
+inline bool none_of(const Range &R, Predicate &&P) {
+  return std::none_of(R.begin(), R.end(), std::forward<Predicate>(P));
 }
 
 /// An adaptor of std::count for ranges.
@@ -290,9 +290,9 @@ inline auto count(const Range &R, Value V)
 /// We use std::result_of on Range::begin since llvm::iterator_range does not
 /// have a public typedef set to what is the underlying iterator.
 template <class Range, class Predicate>
-inline auto count_if(const Range &R, Predicate P)
+inline auto count_if(const Range &R, Predicate &&P)
   -> typename std::iterator_traits<decltype(R.begin())>::difference_type {
-  return std::count_if(R.begin(), R.end(), P);
+  return std::count_if(R.begin(), R.end(), std::forward<Predicate>(P));
 }
 
 } // namespace swift
