@@ -59,6 +59,31 @@
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.6.txt
 // RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.6.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_1 > %t.toplevel-expr.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.1.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.1.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_2 > %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.2.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_3 > %t.toplevel-expr.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.3.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.3.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_4 > %t.toplevel-expr.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.4.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.4.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_2 > %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.2.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_3 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
@@ -270,6 +295,16 @@ if let topLevelVarType5 : [#^TOP_LEVEL_VAR_TYPE_5^#] {}
 func resyncParserA1_5() {}
 
 guard let topLevelVarType6 : [#^TOP_LEVEL_VAR_TYPE_6^#] else {}
+
+func resyncParserA1_6() {}
+
+_ = ("a" as #^TOP_LEVEL_EXPR_TYPE_1^#)
+func resyncParserA1_7() {}
+_ = ("a" as! #^TOP_LEVEL_EXPR_TYPE_2^#)
+func resyncParserA1_8() {}
+_ = ("a" as? #^TOP_LEVEL_EXPR_TYPE_3^#)
+func resyncParserA1_9() {}
+_ = ("a" is #^TOP_LEVEL_EXPR_TYPE_4^#)
 
 func resyncParserA2() {}
 
