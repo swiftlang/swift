@@ -5310,6 +5310,41 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
+static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
+                                TypeChecker &tc) {
+  GenericTypeDecl *FoundDecl = nullptr;
+  
+  // Walk the TypeRepr to find the type in question.
+  if (auto typerepr = loc.getTypeRepr()) {
+    struct FindGenericTypeDecl : public ASTWalker {
+      GenericTypeDecl *&FoundDecl;
+      FindGenericTypeDecl(GenericTypeDecl *&FoundDecl) : FoundDecl(FoundDecl){
+      }
+      
+      bool walkToTypeReprPre(TypeRepr *T) override {
+        // If we already emitted the note, we're done.
+        if (FoundDecl) return false;
+        
+        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T))
+          FoundDecl =dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
+        // Keep walking.
+        return true;
+      }
+    } findGenericTypeDecl(FoundDecl);
+    
+    typerepr->walk(findGenericTypeDecl);
+  }
+  
+  // If we didn't find the type in the TypeRepr, fall back to the type in the
+  // type checked expression.
+  if (!FoundDecl)
+    FoundDecl = loc.getType()->getAnyGeneric();
+  
+  if (FoundDecl)
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype,
+                FoundDecl->getDeclaredType());
+}
+
 
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
@@ -5328,6 +5363,7 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
       .highlight(ECE->getCastTypeLoc().getSourceRange());
 
     // Emit a note specifying where this came from, if we can find it.
+    noteArchetypeSource(ECE->getCastTypeLoc(), archetype, tc);
     if (auto *ND = ECE->getCastTypeLoc().getType()
           ->getNominalOrBoundGenericNominal())
       tc.diagnose(ND, diag::archetype_declared_in_type, archetype,
@@ -5346,9 +5382,8 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
 
 
   if (auto TE = dyn_cast<TypeExpr>(anchor)) {
-    if (auto *ND = TE->getInstanceType()->getNominalOrBoundGenericNominal())
-      tc.diagnose(ND, diag::archetype_declared_in_type, archetype,
-                  ND->getDeclaredType());
+    // Emit a note specifying where this came from, if we can find it.
+    noteArchetypeSource(TE->getTypeLoc(), archetype, tc);
     return;
   }
 

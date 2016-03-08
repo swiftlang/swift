@@ -23,8 +23,6 @@ struct Color2 {
 
 
 
-// FIXME: BAD LOC: expected-note @+2 {{'T1' declared as parameter to type 'MyType'}}
-// FIXME: BAD LOC: expected-note @+1 {{'T3' declared as parameter to type 'MyType'}}
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
@@ -65,11 +63,14 @@ func f() {
 
 
 typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type 'A' declared here}}
-typealias B<T1> = MyType<T1, T1>
+
+typealias B<T1> = MyType<T1, T1>  // expected-note {{'T1' declared as parameter to type 'B'}}
+
 typealias C<T> = MyType<String, T>
 
 // Type aliases with unused generic params.
-typealias D<T1, T2, T3> = MyType<T2, T1>
+typealias D<T1, T2, T3> = MyType<T2, T1>  // expected-note {{'T3' declared as parameter to type 'D'}}
+
 typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 
 typealias F<T1, T2> = T1->T2
@@ -84,12 +85,11 @@ let _ : D = D(a: 1, b: 2)  // expected-error {{cannot convert value of type 'MyT
 
 let _ : D<Int, Int, Float> = D<Int, Int, Float>(a: 1, b: 2)
 
-// BOGUS FIXME: expected-error @+1 {{cannot convert value of type 'MyType<Int, Int>' to specified type 'D'}}
+// expected-error @+1 {{cannot convert value of type 'MyType<Int, Int>' to specified type 'D'}}
 let _ : D = D<Int, Int, Float>(a: 1, b: 2)
 
 
-// FIXME: This produces bad loc info on T3 archetype notes.
-// BOGUS FIXME: expected-error @+1 {{generic parameter 'T3' could not be inferred}}
+// expected-error @+1 {{generic parameter 'T3' could not be inferred}}
 let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 
