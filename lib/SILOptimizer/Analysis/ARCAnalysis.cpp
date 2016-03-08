@@ -465,11 +465,8 @@ void ConsumedResultToEpilogueRetainMatcher::recompute() {
 
   // Find the return BB of F. If we fail, then bail.
   SILFunction::iterator BB = F->findReturnBB();
-  if (BB == F->end()) {
-    HasBlock = false;
+  if (BB == F->end())
     return;
-  }
-  HasBlock = true;
   findMatchingRetains(&*BB);
 }
 
