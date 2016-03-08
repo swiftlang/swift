@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-value-projection"
+#define DEBUG_TYPE "sil-lsbase"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/LSBase.h"
 #include "llvm/Support/Debug.h"
@@ -28,7 +28,7 @@ removeLSLocations(LSLocationValueMap &Values, LSLocationList &NextLevel) {
 }
 
 //===----------------------------------------------------------------------===//
-//                              SILValue Projection
+//                                 LSValue
 //===----------------------------------------------------------------------===//
 void
 LSValue::expand(SILValue Base, SILModule *M, LSValueList &Vals,
@@ -125,6 +125,10 @@ LSValue::reduce(LSLocation &Base, SILModule *M, LSLocationValueMap &Values,
   return Values.begin()->second.materialize(InsertPt);
 }
 
+
+//===----------------------------------------------------------------------===//
+//                               LSLocation
+//===----------------------------------------------------------------------===//
 bool
 LSLocation::isMustAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA) {
   // If the bases are not must-alias, the locations may not alias.
