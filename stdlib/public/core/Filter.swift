@@ -169,6 +169,8 @@ public struct LazyFilterCollection<
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = LazyFilterIndex<Base>
 
+  public typealias IndexDistance = Base.IndexDistance
+
   /// Construct an instance containing the elements of `base` that
   /// satisfy `predicate`.
   public // @testable
@@ -203,8 +205,28 @@ public struct LazyFilterCollection<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func next(index: Index) -> Index {
-    return LazyFilterIndex(base: _nextFiltered(index.base))
+  public func next(i: Index) -> Index {
+    return LazyFilterIndex(base: _nextFiltered(i.base))
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    var index = i.base
+    for _ in 0..<n where index != _base.endIndex {
+      index = _nextFiltered(index)
+    }
+    return LazyFilterIndex(base: index)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    var index = i.base
+    for _ in 0..<n where index != _base.endIndex && index != limit.base {
+      index = _nextFiltered(index)
+    }
+    return LazyFilterIndex(base: index)
   }
 
   @inline(__always)
