@@ -763,6 +763,8 @@ public:
 
   Optional<StringRef> getSourceFileName() const;
 
+  Optional<unsigned> getSourceOrder() const;
+
   /// \returns the brief comment attached to this declaration.
   StringRef getBriefComment() const;
 

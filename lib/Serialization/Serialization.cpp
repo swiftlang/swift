@@ -3420,6 +3420,7 @@ struct DeclCommentTableData {
   StringRef Brief;
   RawComment Raw;
   uint32_t Group;
+  uint32_t Order;
 };
 
 class DeclCommentTableInfo {
@@ -3452,6 +3453,9 @@ public:
 
     // Group Id.
     dataLength += numLen;
+
+    // Source order.
+    dataLength += numLen;
     endian::Writer<little> writer(out);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
@@ -3474,6 +3478,7 @@ public:
       out << C.RawText;
     }
     writer.write<uint32_t>(data.Group);
+    writer.write<uint32_t>(data.Order);
   }
 };
 
@@ -3686,9 +3691,14 @@ static void writeDeclCommentTable(
     llvm::SmallString<512> USRBuffer;
     llvm::OnDiskChainedHashTableGenerator<DeclCommentTableInfo> generator;
     DeclGroupNameContext &GroupContext;
+    unsigned SourceOrder;
 
     DeclCommentTableWriter(DeclGroupNameContext &GroupContext) :
       GroupContext(GroupContext) {}
+
+    void resetSourceOrder() {
+      SourceOrder = 0;
+    }
 
     StringRef copyString(StringRef String) {
       char *Mem = static_cast<char *>(Arena.Allocate(String.size(), 1));
@@ -3716,7 +3726,8 @@ static void writeDeclCommentTable(
 
       generator.insert(copyString(USRBuffer.str()),
                        { VD->getBriefComment(), Raw,
-                         GroupContext.getGroupSequence(VD) });
+                         GroupContext.getGroupSequence(VD),
+                         SourceOrder ++ });
       return true;
     }
   };
@@ -3724,9 +3735,10 @@ static void writeDeclCommentTable(
   DeclCommentTableWriter Writer(GroupContext);
 
   ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
-  for (auto nextFile : files)
+  for (auto nextFile : files) {
+    Writer.resetSourceOrder();
     const_cast<FileUnit *>(nextFile)->walk(Writer);
-
+  }
   SmallVector<uint64_t, 8> scratch;
   llvm::SmallString<32> hashTableBlob;
   uint32_t tableOffset;
