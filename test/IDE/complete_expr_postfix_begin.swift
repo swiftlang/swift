@@ -54,8 +54,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_7 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_8 | FileCheck %s -check-prefix=COMMON
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_BRACE_STMT_1 | FileCheck %s -check-prefix=IN_BRACE_STMT_1
-
 //
 // Test code completion at the beginning of expr-postfix.
 //
@@ -388,19 +386,4 @@ struct TestInInvalid7 {
 func foo() -> Undeclared {
   var fooParam = FooStruct()
   #^IN_INVALID_8^#
-}
-
-func testStmtOrder(arg: Int?) {
-  let before1 = 1
-  guard let before2 = arg else { return }
-  #^IN_BRACE_STMT_1^#
-// IN_BRACE_STMT_1-NOT: Decl[LocalVar]
-// IN_BRACE_STMT_1: Decl[LocalVar]/Local:               before2[#Int#];
-// IN_BRACE_STMT_1-NOT: Decl[LocalVar]
-// IN_BRACE_STMT_1: Decl[LocalVar]/Local:               before1[#Int#];
-// IN_BRACE_STMT_1-NOT: Decl[LocalVar]
-// IN_BRACE_STMT_1: Decl[LocalVar]/Local:               arg[#Int?#];
-// IN_BRACE_STMT_1-NOT: Decl[LocalVar]
-  let after1 = 1
-  guard let after2 = arg else { return }
 }
