@@ -2451,6 +2451,13 @@ bool ArgumentSplitter::createNewArguments() {
 
   Arg->replaceAllUsesWith(Agg);
 
+  // Replace any references to Arg in IncomingValues with Agg. These
+  // references are used in generating new instructions that extract
+  // from the aggregate.
+  for (auto &P : IncomingValues)
+    if (P.second == Arg)
+      P.second = Agg;
+
   // Look at all users of agg and see if we can simplify any of them. This will
   // eliminate struct_extracts/tuple_extracts from the newly created aggregate
   // and have them point directly at the argument.
