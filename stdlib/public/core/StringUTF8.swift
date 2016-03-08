@@ -124,6 +124,8 @@ extension String {
       /// Returns the next consecutive value after `self`.
       ///
       /// - Precondition: The next value is representable.
+      // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.next(Index)
+      /*
       @warn_unused_result
       public func successor() -> Index {
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
@@ -155,6 +157,7 @@ extension String {
           return Index(_core, nextCoreIndex, nextBuffer)
         }
       }
+      */
 
       /// True iff the index is at the end of its view or if the next
       /// byte begins a new UnicodeScalar.
@@ -194,6 +197,8 @@ extension String {
       internal let _buffer: Buffer
     }
 
+    public typealias IndexDistance = Int
+
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
@@ -212,6 +217,30 @@ extension String {
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func next(i: Index) -> Index {
+      // FIXME: swift-3-indexing-model: range check i?
+      fatalError("FIXME: swift-3-indexing-model implement")
+    }
+    
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func advance(i: Index, by n: IndexDistance) -> Index {
+      // FIXME: swift-3-indexing-model: range check i?
+      fatalError("FIXME: swift-3-indexing-model implement")
+    }
+    
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+      _precondition(n >= 0,
+        "Only BidirectionalCollections can be advanced by a negative amount")
+      // FIXME: swift-3-indexing-model: range check i?
+      fatalError("FIXME: swift-3-indexing-model implement")
+    }
+
+    // TODO: swift-3-indexing-model - add docs
+    @warn_unused_result
+    public func distance(from start: Index, to end: Index) -> IndexDistance {
+      // FIXME: swift-3-indexing-model: range check start and end?
       fatalError("FIXME: swift-3-indexing-model implement")
     }
 
@@ -287,6 +316,8 @@ extension String {
   public typealias UTF8Index = UTF8View.Index
 }
 
+// FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
+//        assuming String.UTF8View.Index continues to exist
 @warn_unused_result
 public func == (
   lhs: String.UTF8View.Index,
