@@ -30,6 +30,9 @@ public protocol BidirectionalCollection : Collection {
 
   // FIXME(compiler limitation):
   // associatedtype Indices : BidirectionalCollection
+
+  // TODO: swift-3-indexing-model: tests.
+  var last: Iterator.Element? { get }
 }
 
 /// Default implementation for bidirectional collections.

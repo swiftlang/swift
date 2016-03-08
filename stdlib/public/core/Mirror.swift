@@ -124,7 +124,7 @@ public struct Mirror {
   ///          print(b[i])
   ///       }
   ///     }
-  public typealias Children = AnyForwardCollection<Child>
+  public typealias Children = AnyCollection<Child>
 
   /// A suggestion of how a `Mirror`'s is to be interpreted.
   ///
