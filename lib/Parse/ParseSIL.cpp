@@ -2287,7 +2287,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     do {
       if (parseTypedValueRef(Val, B)) return true;
       OpList.push_back(Val);
-    } while (P.consumeIf(tok::comma));
+    } while (!peekSILDebugLocation(P) && P.consumeIf(tok::comma));
 
     if (parseSILDebugLocation(InstLoc, B))
       return true;
