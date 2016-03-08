@@ -732,7 +732,7 @@ the number of parallel build jobs to use""",
 
     # XCTest has a dependency on Foundation.
     # On OS X, Foundation is built automatically using xcodebuild.
-    # On Linux, we must build ensure that it is built manually.
+    # On Linux, we must ensure that it is built manually.
     if args.build_xctest and platform.system() != "Darwin":
         args.build_foundation = True
 
