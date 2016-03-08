@@ -337,14 +337,14 @@ void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
 
 void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
-  Printer.printStructurePre(PrintStructureKind::FunctionType);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
   printTypeRepr(ArgsTy, Printer, Opts);
   if (throws()) {
     Printer << " ";
     Printer.printKeyword("throws");
   }
   Printer << " -> ";
-  Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeRepr(RetTy, Printer, Opts);
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   Printer.printStructurePost(PrintStructureKind::FunctionType);

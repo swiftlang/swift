@@ -2384,7 +2384,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
         // Use the non-repr external type, but reuse the TypeLoc printing code.
-        Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+        Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
         printTypeLoc(TypeLoc::withoutLoc(ResultTy));
         Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
       }
@@ -2475,7 +2475,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   });
   Printer << " -> ";
 
-  Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeLoc(decl->getElementTypeLoc());
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
 
@@ -3376,7 +3376,7 @@ public:
     
     Printer << " -> ";
 
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
@@ -3394,7 +3394,7 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
@@ -3548,7 +3548,7 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
