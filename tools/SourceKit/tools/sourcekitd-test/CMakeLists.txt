@@ -13,7 +13,7 @@ add_sourcekit_executable(sourcekitd-test
   TestOptions.cpp
   DEPENDS ${SOURCEKITD_TEST_DEPEND}
     clangRewrite clangLex clangBasic
-  COMPONENT_DEPENDS support option
+  COMPONENT_DEPENDS core support option
 )
 
 add_dependencies(sourcekitd-test sourcekitdTestOptionsTableGen)
