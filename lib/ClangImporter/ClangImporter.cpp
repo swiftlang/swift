@@ -2097,7 +2097,9 @@ auto ClangImporter::Implementation::importFullName(
 
       return result;
     }
-  } else if (InferImportAsMember) {
+  } else if (InferImportAsMember &&
+             (isa<clang::VarDecl>(D) || isa<clang::FunctionDecl>(D)) &&
+             dc->isTranslationUnit()) {
     auto inference = IAMResult::infer(SwiftContext, clangSema, D);
     if (inference.isImportAsMember()) {
       result.ImportAsMember = true;

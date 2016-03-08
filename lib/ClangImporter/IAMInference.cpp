@@ -84,8 +84,7 @@ private:
   // typeID
   IAMResult importAsTypeID(const clang::QualType typeIDTy,
                            EffectiveClangContext effectiveDC) {
-    return {formDeclName("typeID"), IAMAccessorKind::Getter,
-            effectiveDC};
+    return {formDeclName("typeID"), IAMAccessorKind::Getter, effectiveDC};
   }
 
   // Init
@@ -108,7 +107,7 @@ private:
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
     assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
 
-    return {formDeclName(name, nonSelfParams), kind, selfIdx, effectiveDC};
+    return {formDeclName(name), kind, selfIdx, effectiveDC};
   }
 
   // Instance method
@@ -135,7 +134,7 @@ private:
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
     assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
 
-    return {formDeclName(name, nonSelfParams), kind, effectiveDC};
+    return {formDeclName(name), kind, effectiveDC};
   }
 
   // Static method
@@ -150,17 +149,22 @@ private:
   inline DeclType *clangLookup(StringRef name,
                                clang::Sema::LookupNameKind kind);
 
-  clang::TypedefNameDecl *clangLookupTypedef(StringRef name) {
-    return clangLookup<clang::TypedefNameDecl>(
-        name, clang::Sema::LookupNameKind::LookupOrdinaryName);
+  clang::TypeDecl *clangLookupTypeDecl(StringRef name) {
+    if (auto ty = clangLookup<clang::TypedefNameDecl>(
+            name, clang::Sema::LookupNameKind::LookupOrdinaryName))
+      return ty;
+
+    return clangLookup<clang::TagDecl>(
+        name, clang::Sema::LookupNameKind::LookupTagName);
   }
+
   clang::FunctionDecl *clangLookupFunction(StringRef name) {
     return clangLookup<clang::FunctionDecl>(
         name, clang::Sema::LookupNameKind::LookupOrdinaryName);
   }
 
-  const clang::TypedefNameDecl *findTypeAndMatch(StringRef workingName,
-                                                 NameBuffer &outStr) {
+  const clang::TypeDecl *findTypeAndMatch(StringRef workingName,
+                                          NameBuffer &outStr) {
     // FIXME: drop mutable...
 
     // Longest-prefix matching, alternate with checking for a trailing "Ref"
@@ -170,16 +174,15 @@ private:
          rWordsIter != rWordsEnd; ++rWordsIter) {
       NameBuffer nameAttempt;
       nameAttempt.append(rWordsIter.base().getPriorStr());
-      nameAttempt.append(*rWordsIter);
       StringRef prefix = nameAttempt;
       nameAttempt.append("Ref");
       StringRef prefixWithRef = nameAttempt;
 
-      if (auto tyDecl = clangLookupTypedef(prefixWithRef)) {
+      if (auto tyDecl = clangLookupTypeDecl(prefixWithRef)) {
         outStr.append(workingName.drop_front(prefix.size()));
         return tyDecl;
       }
-      if (auto tyDecl = clangLookupTypedef(prefix)) {
+      if (auto tyDecl = clangLookupTypeDecl(prefix)) {
         outStr.append(workingName.drop_front(prefix.size()));
         return tyDecl;
       }
@@ -272,15 +275,13 @@ static bool isStructType(clang::QualType qt) {
   return qt->getUnqualifiedDesugaredType()->isStructureType();
 }
 
-static StringRef getStructTypeName(clang::QualType qt) {
-  // We only reason about imported struct types
-  if (!isStructType(qt))
-    return {};
-
+static StringRef getTypeName(clang::QualType qt) {
   if (auto typedefTy = qt->getAs<clang::TypedefType>()) {
     // Use the sugar-ed, but un-ref-ed name
     auto name = typedefTy->getDecl()->getName();
-    if (name.endswith("Ref") && isCFTypeName(name))
+    if (name.endswith("Ref") &&
+        (isCFTypeName(name) ||
+         typedefTy->getDecl()->hasAttr<clang::ObjCBridgeAttr>()))
       return name.drop_back(3);
   }
 
@@ -318,8 +319,8 @@ static EffectiveClangContext getEffectiveDC(const clang::TypeDecl *tyDecl) {
   auto typeDecl = const_cast<clang::TypeDecl *>(tyDecl);
   if (auto typedefName = dyn_cast<clang::TypedefNameDecl>(typeDecl))
     return {typedefName->getCanonicalDecl()};
-  if (auto rDecl = dyn_cast<clang::RecordDecl>(typeDecl))
-    return {rDecl->getCanonicalDecl()};
+  if (auto tagDecl = dyn_cast<clang::TagDecl>(typeDecl))
+    return {tagDecl->getCanonicalDecl()};
 
   assert("expected valid Clang context");
   return {};
@@ -349,6 +350,10 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   if (!funcDecl)
     return {};
 
+  // Can't really import variadics well
+  if (funcDecl->isVariadic())
+    return {};
+
   // FIXME: drop "Mutable"...
 
   StringRef workingName = funcDecl->getName();
@@ -358,17 +363,22 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   // 0) Special cases are specially handled: *GetTypeID()
   //
   StringRef getTypeID = "GetTypeID";
-  if (numParams == 0 && workingName.endswith(getTypeID))
-    if (auto tyDecl =
-            clangLookupTypedef(workingName.drop_back(getTypeID.size())))
-      return importAsTypeID(retTy, tyDecl);
+  if (numParams == 0 && workingName.endswith(getTypeID)) {
+    NameBuffer remainingName;
+    if (auto tyDecl = findTypeAndMatch(workingName.drop_back(getTypeID.size()),
+                                       remainingName)) {
+      // We shouldn't have anything else left in our name for typeID
+      if (remainingName.empty())
+        return importAsTypeID(retTy, getEffectiveDC(tyDecl));
+    }
+  }
 
   // 1) If we find an init specifier and our name matches the return type, we
   //    import as some kind of constructor
   //
   if (!retTy->isVoidType()) {
     NameBuffer remainingName;
-    StringRef typeName = getStructTypeName(retTy);
+    StringRef typeName = getTypeName(retTy);
     if (typeName != StringRef())
       if (match(workingName, typeName, remainingName))
         for (auto initSpec : InitSpecifiers)
@@ -388,7 +398,7 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
        paramI != paramE; ++paramI, ++selfIdx) {
     auto param = *paramI;
     NameBuffer remainingName;
-    StringRef typeName = getStructTypeName(param->getType());
+    StringRef typeName = getTypeName(param->getType());
     if (typeName != StringRef()) {
       if (match(workingName, typeName, remainingName)) {
         auto effectiveDC = getEffectiveDC(param->getType());
@@ -408,6 +418,9 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
       }
     }
   }
+
+  // No self, must be static
+  nonSelfParams = {funcDecl->param_begin(), funcDecl->param_end()};
 
   // 3) Finally, try to find a class to put this on as a static function
   NameBuffer remainingName;
@@ -440,7 +453,10 @@ DeclType *IAMInference::clangLookup(StringRef name,
                                    clang::SourceLocation(), kind);
   if (!clangSema.LookupName(lookupResult, clangSema.TUScope))
     return nullptr;
-  return lookupResult.getAsSingle<DeclType>()->getCanonicalDecl();
+  auto res = lookupResult.getAsSingle<DeclType>();
+  if (!res)
+    return nullptr;
+  return res->getCanonicalDecl();
 }
 
 IAMResult IAMResult::infer(ASTContext &ctx, clang::Sema &clangSema,

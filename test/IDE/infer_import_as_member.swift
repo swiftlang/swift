@@ -15,10 +15,8 @@ import InferImportAsMember
 // PRINT-NEXT:   init(x x: Double, y y: Double, z z: Double)
 // PRINT-NEXT: }
 
-// FIXME: static property
-// PRINT-NEXT: var IAMStruct1GlobalVar: Double
-
 // PRINT-LABEL: extension IAMStruct1 {
+// PRINT-NEXT:   static var globalVar: Double
 
 // FIXME: get/setNonProperty as member method
 
@@ -37,7 +35,8 @@ import InferImportAsMember
 
 // PRINT-NEXT:   func selfComesLast(x x: Double)
 // PRINT-NEXT:   func selfComesThird(a a: Int32, b b: Float, x x: Double)
-// PRINT-NEXT: }
+// PRINT-NEXT:   static func staticMethod() -> Int32
+// PRINT-NEXT: } 
 
 // FIXME: get the class working
 
