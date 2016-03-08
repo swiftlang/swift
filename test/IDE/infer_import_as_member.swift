@@ -20,9 +20,8 @@ import InferImportAsMember
 
 // FIXME: get/setNonProperty as member method
 
-// FIXME: move extra word to argument label
-// PRINT-NEXT:   init(in in: IAMStruct1)
-// PRINT-NEXT:   init(value value: Double)
+// PRINT-NEXT:   init(copyIn in: IAMStruct1)
+// PRINT-NEXT:   init(simpleValue value: Double)
 
 // PRINT-NEXT:   func invert() -> IAMStruct1
 // PRINT-NEXT:   mutating func invertInPlace()

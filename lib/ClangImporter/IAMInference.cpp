@@ -66,6 +66,18 @@ static bool isCFTypeName(StringRef name) {
 
 IAMOptions IAMOptions::getDefault() { return {}; }
 
+static unsigned dropWord(StringRef str, StringRef word, NameBuffer &out) {
+  unsigned numDropped = 0;
+  auto words = camel_case::getWords(str);
+  for (auto wI = words.begin(), wE = words.end(); wI != wE; ++wI)
+    if (*wI == word)
+      ++numDropped;
+    else
+      out.append(*wI);
+
+  return numDropped;
+}
+
 namespace {
 class IAMInference {
   ASTContext &context;
@@ -91,10 +103,15 @@ private:
   IAMResult importAsConstructor(StringRef name, StringRef initSpecifier,
                                 ArrayRef<const clang::ParmVarDecl *> params,
                                 EffectiveClangContext effectiveDC) {
-    if (name != "init") {
-      // TODO: move words onto argument labels, as dictated by options
+    NameBuffer buf;
+    if (name != initSpecifier) {
+      assert(name.size() > initSpecifier.size() &&
+             "should have more words in it");
+      auto didDrop = dropWord(name, initSpecifier, buf);
+      (void)didDrop;
+      assert(didDrop != 0 && "specifier not present?");
     }
-    return {formDeclName("init", params, ""), effectiveDC};
+    return {formDeclName("init", params, buf), effectiveDC};
   }
 
   // Instance computed property
@@ -226,10 +243,17 @@ private:
                         StringRef firstPrefix = "") {
     SmallVector<Identifier, 8> argLabels;
     for (unsigned i = 0; i < params.size(); ++i) {
-      if (firstPrefix != "") {
-        // TODO: move words onto argument labels
+      NameBuffer paramName;
+      if (i == 0 && firstPrefix != "") {
+        camel_case::toLowercaseWord(firstPrefix, paramName);
+        NameBuffer paramBuf;
+        camel_case::toSentencecase(params[i]->getName(), paramBuf);
+        paramName.append(paramBuf);
+      } else {
+        paramName.append(params[i]->getName());
       }
-      argLabels.push_back(context.getIdentifier(params[i]->getName()));
+
+      argLabels.push_back(context.getIdentifier(paramName));
     }
 
     return {context, getHumbleIdentifier(baseName), argLabels};
@@ -267,12 +291,6 @@ private:
     return false;
   }
 };
-}
-
-static bool isStructType(clang::QualType qt) {
-  if (qt->isPointerType())
-    qt = qt->getPointeeType();
-  return qt->getUnqualifiedDesugaredType()->isStructureType();
 }
 
 static StringRef getTypeName(clang::QualType qt) {
