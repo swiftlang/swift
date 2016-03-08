@@ -73,10 +73,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-redundant-load-elim"
+#include "swift/SIL/LSBase.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILValueProjection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"

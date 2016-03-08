@@ -6,6 +6,7 @@ add_swift_library(swiftSIL
   InstructionUtils.cpp
   Linker.cpp
   LoopInfo.cpp
+  LSBase.cpp
   Mangle.cpp
   PrettyStackTrace.cpp
   Projection.cpp
@@ -27,7 +28,6 @@ add_swift_library(swiftSIL
   SILSuccessor.cpp
   SILType.cpp
   SILValue.cpp
-  SILValueProjection.cpp
   SILVerifier.cpp
   SILVTable.cpp
   SILWitnessTable.cpp
