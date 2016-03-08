@@ -1032,11 +1032,8 @@ void IRGenDebugInfo::emitVariableDeclaration(
     if (IsPiece) {
       // Try to get the size from the type if possible.
       auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);
-      // FIXME: The TypeInfo for bound generic enum types reports a
-      // type <{}> (with size 0) but a concrete instance may still
-      // have storage allocated for it. rdar://problem/21470869
-      if (!Dim.SizeInBits || (StorageSize && Dim.SizeInBits > StorageSize))
-        Dim.SizeInBits = StorageSize;
+      assert((Dim.SizeInBits != 0 || StorageSize != 0) &&
+            "zero-sized variable with nonzero storage size");
 
       // FIXME: Occasionally we miss out that the Storage is actually a
       // refcount wrapper. Silently skip these for now.
