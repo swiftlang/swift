@@ -372,13 +372,6 @@ public:
   }
 
   TypeRefPointer
-  resolveDependentMembers(TypeRefPointer Unresolved,
-                          StoredPointer MetadataAddress) {
-    // TODO: Resolve dependent members
-    return Unresolved;
-  }
-
-  TypeRefPointer
   getNominalTypeRef(StoredPointer MetadataAddress) {
     auto Meta = readMetadata(MetadataAddress);
 
