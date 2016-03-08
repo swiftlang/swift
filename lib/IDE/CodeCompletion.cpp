@@ -3246,12 +3246,15 @@ public:
       RequestedCachedResults = RequestedResultsTy::toplevelResults();
 
     // Manually add any expected nominal types from imported modules so that
-    // they get their expected type relation.
+    // they get their expected type relation. Don't include protocols, since
+    // they can't be initialized from the type name.
+    // FIXME: this does not include types that conform to an expected protocol.
     // FIXME: this creates duplicate results.
     for (auto T : ExpectedTypes) {
       if (auto NT = T->getAs<NominalType>()) {
         if (auto NTD = NT->getDecl()) {
-          if (NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
+          if (!isa<ProtocolDecl>(NTD) &&
+              NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
             addNominalTypeRef(NT->getDecl(),
                               DeclVisibilityKind::VisibleAtTopLevel);
           }
