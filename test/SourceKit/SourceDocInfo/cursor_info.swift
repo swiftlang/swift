@@ -126,6 +126,29 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
   var v1: Int = 1
 }
 
+let tupleVar1: (((Int, Int), y: Int), z: Int)
+let tupleVar2: (f: ()->(), g: (x: Int)->Int)
+let tupleVar3: (f: (inout x: (Int, Int)) throws ->(), Int)
+
+enum E4: Int {
+  case A = -1
+  case B = 0
+  case C = 1
+}
+enum E5: Int {
+  case A  // implicit = 0
+}
+enum E6: Float {
+  case A = -0.0
+  case B = 1e10
+}
+
+class C6: C4, P1 {
+  typealias T = Int
+}
+
+protocol P2: class, P1 {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -398,9 +421,8 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 // CHECK42-NEXT: C
 // CHECK42-NEXT: s:FO11cursor_info2E31CFMS0_S0_
 // CHECK42-NEXT: E3.Type -> E3
-// CHECK42-NEXT: <Declaration>case C</Declaration>
-// CHECK42-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name></decl.enumelement>
-// FIXME: Annotate raw value.
+// CHECK42-NEXT: <Declaration>case C = &quot;a&quot;</Declaration>
+// CHECK42-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name> = <syntaxtype.string>&quot;a&quot;</syntaxtype.string></decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=100:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK43
 // CHECK43: source.lang.swift.ref.enumelement (91:8-91:10)
@@ -423,8 +445,8 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 // RUN: %sourcekitd-test -req=cursor -pos=103:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK46
 // CHECK46: source.lang.swift.ref.enumelement (96:8-96:9)
 // CHECK46-NEXT: C
-// CHECK46: <Declaration>case C</Declaration>
-// CHECK46-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name></decl.enumelement>
+// CHECK46: <Declaration>case C = &quot;a&quot;</Declaration>
+// CHECK46-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name> = <syntaxtype.string>&quot;a&quot;</syntaxtype.string></decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=80:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK47
 // CHECK47: source.lang.swift.decl.generic_type_param (80:11-80:12)
@@ -470,3 +492,42 @@ func genReq<U, V: P1 where V.T == U>(u: U, v: V) {}
 // RUN: %sourcekitd-test -req=cursor -pos=126:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK56
 // CHECK56: source.lang.swift.decl.var.instance (126:7-126:9)
 // CHECK56: <decl.var.instance><syntaxtype.keyword>private</syntaxtype.keyword>(set) <syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>var
+
+// RUN: %sourcekitd-test -req=cursor -pos=129:5 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK57
+// CHECK57: source.lang.swift.decl.var.global (129:5-129:14)
+// CHECK57: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar1</decl.name>: <decl.var.type>(<tuple.element><tuple.element.type>(<tuple.element><tuple.element.type>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>y</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>z</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>
+
+// RUN: %sourcekitd-test -req=cursor -pos=130:5 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK58
+// CHECK58: source.lang.swift.decl.var.global (130:5-130:14)
+// CHECK58: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar2</decl.name>: <decl.var.type>(<tuple.element><tuple.element.argument_label>f</tuple.element.argument_label>: <tuple.element.type>() -&gt; <decl.function.returntype>()</decl.function.returntype></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>g</tuple.element.argument_label>: <tuple.element.type>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>
+
+// RUN: %sourcekitd-test -req=cursor -pos=131:5 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK59
+// CHECK59: source.lang.swift.decl.var.global (131:5-131:14)
+// CHECK59: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>tupleVar3</decl.name>: <decl.var.type>(<tuple.element><tuple.element.argument_label>f</tuple.element.argument_label>: <tuple.element.type>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><syntaxtype.keyword>inout</syntaxtype.keyword> (<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword> -&gt; <decl.function.returntype>()</decl.function.returntype></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</decl.var.type></decl.var.global>
+
+// RUN: %sourcekitd-test -req=cursor -pos=134:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK60
+// CHECK60: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>A</decl.name> = <syntaxtype.number>-1</syntaxtype.number></decl.enumelement>
+// RUN: %sourcekitd-test -req=cursor -pos=135:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK61
+// CHECK61: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>B</decl.name> = <syntaxtype.number>0</syntaxtype.number></decl.enumelement>
+// RUN: %sourcekitd-test -req=cursor -pos=136:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK62
+// CHECK62: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name> = <syntaxtype.number>1</syntaxtype.number></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=142:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK63
+// CHECK63: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>A</decl.name> = <syntaxtype.number>-0.0</syntaxtype.number></decl.enumelement>
+// RUN: %sourcekitd-test -req=cursor -pos=143:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK64
+// CHECK64: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>B</decl.name> = <syntaxtype.number>1e10</syntaxtype.number></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=146:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK65
+// CHECK65: <decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>C6</decl.name> : C4, <ref.protocol usr="s:P11cursor_info2P1">P1</ref.protocol></decl.class>
+// FIXME: ref.class - rdar://problem/25014968
+
+// RUN: %sourcekitd-test -req=cursor -pos=150:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK66
+// CHECK66: <decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> :  <syntaxtype.keyword>class</syntaxtype.keyword>, <ref.protocol usr="s:P11cursor_info2P1">P1</ref.protocol></decl.protocol>
+
+// RUN: %sourcekitd-test -req=cursor -pos=114:18 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK67
+// CHECK67: source.lang.swift.decl.associatedtype (114:18-114:19)
+// CHECK67-NEXT: T
+// CHECK67-NEXT: s:P11cursor_info2P11T
+// CHECK67-NEXT: T.Type
+// CHECK67-NEXT: <Declaration>associatedtype T</Declaration>
+// CHECK67-NEXT: <decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>T</decl.name></decl.associatedtype>

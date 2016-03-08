@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-##===--- swift-bench.py -------------------------------*- coding: utf-8 -*-===##
+# ===--- swift-bench.py -------------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -34,12 +34,12 @@
 
 from __future__ import print_function
 
-import subprocess
-import re
-import os
-import sys
 import argparse
 import math
+import os
+import re
+import subprocess
+import sys
 
 
 # Calculate the population standard deviation

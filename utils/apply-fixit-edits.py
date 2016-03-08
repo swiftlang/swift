@@ -11,10 +11,10 @@
 
 from __future__ import print_function
 
-import json
 import argparse
-import sys
+import json
 import os
+import sys
 
 def find_remap_files(path):
     for root, dirs, files in os.walk(path):

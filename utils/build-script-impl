@@ -947,14 +947,16 @@ fi
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
-if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" xctest)
-fi
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
 fi
+# XCTest has a dependency on Foundation, so Foundation must be added to the
+# list of build products first.
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+fi
+if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1343,7 +1345,8 @@ function set_swiftpm_bootstrap_command() {
     
     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
     LLBUILD_BIN="$(build_directory_bin ${deployment_target} llbuild)/swift-build-tool"
-    if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+        FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
         XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
     fi
     if [ ! -e "${LLBUILD_BIN}" ]; then
@@ -1357,8 +1360,8 @@ function set_swiftpm_bootstrap_command() {
     swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --swiftc="${SWIFTC_BIN}")
     swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --sbt="${LLBUILD_BIN}")
     swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --build="${build_dir}")
-    if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
-        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --xctest="${XCTEST_BUILD_DIR}")
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --foundation="${FOUNDATION_BUILD_DIR}/Foundation" --xctest="${XCTEST_BUILD_DIR}")
     fi
 }
 
@@ -1859,7 +1862,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
                     xcodebuild \
-                        -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj \
+                        -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTest \
                         SKIP_INSTALL=NO \
                         DEPLOYMENT_LOCATION=YES \
@@ -1868,12 +1871,14 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     { set +x; } 2>/dev/null
                 else
                     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
+                    FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
                     set -x
                     # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
                     #        set) to build either --debug or --release.
                     "${XCTEST_SOURCE_DIR}"/build_script.py \
                         --swiftc="${SWIFTC_BIN}" \
-                        --build-dir="${XCTEST_BUILD_DIR}"
+                        --build-dir="${XCTEST_BUILD_DIR}" \
+                        --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation"
                     { set +x; } 2>/dev/null
                 fi
 
@@ -1881,7 +1886,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                 continue
                 ;;
             foundation)
-                # the configuration script requires knowing about XCTest's location for building and running the tests
+                # The configuration script requires knowing about XCTest's
+                # location for building and running the tests. Note that XCTest
+                # is not yet built at this point.
                 XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                 SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                 SWIFT_BIN="$(build_directory_bin ${deployment_target} swift)/swift"
@@ -2122,15 +2129,17 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set -x
                     xcodebuild \
-                        -project "${XCTEST_SOURCE_DIR}"/XCTest.xcodeproj \
+                        -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
                         -scheme SwiftXCTestFunctionalTests
                     { set +x; } 2>/dev/null
                 else
                     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
+                    FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
                     XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
                     set -x
                     "${XCTEST_SOURCE_DIR}"/build_script.py test \
                         --swiftc="${SWIFTC_BIN}" \
+                        --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
                         "${XCTEST_BUILD_DIR}"
                     { set +x; } 2>/dev/null
                 fi

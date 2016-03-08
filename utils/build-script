@@ -28,22 +28,23 @@ from SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
     SWIFT_SOURCE_ROOT,
+    WorkingDirectory,
     check_call,
     get_all_preset_names,
     get_preset_options,
     print_with_argv0,
     quote_shell_command,
-    WorkingDirectory,
 )
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
+
 import swift_build_support.clang
 import swift_build_support.cmake
 import swift_build_support.debug
+from swift_build_support.migration import migrate_impl_args
 import swift_build_support.ninja
 import swift_build_support.tar
 import swift_build_support.targets
-from swift_build_support.migration import migrate_impl_args
 
 
 # Main entry point for the preset mode.
@@ -728,6 +729,12 @@ the number of parallel build jobs to use""",
     # --test-optimized implies --test.
     if args.test_optimized:
         args.test = True
+
+    # XCTest has a dependency on Foundation.
+    # On OS X, Foundation is built automatically using xcodebuild.
+    # On Linux, we must ensure that it is built manually.
+    if args.build_xctest and platform.system() != "Darwin":
+        args.build_foundation = True
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if args.skip_test_ios:

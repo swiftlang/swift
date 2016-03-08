@@ -64,7 +64,7 @@ def submit_results_to_server(results_data, submit_url):
     # The result is expected to be a JSON object.
     try:
         return json.loads(result_data)
-    except:
+    except ValueError:
         import traceback
         print("Unable to load result, not a valid JSON object.")
         print()

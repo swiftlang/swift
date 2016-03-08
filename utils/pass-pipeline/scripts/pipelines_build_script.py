@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-import os
-import sys
-import subprocess
 import argparse
+import os
+import subprocess
+import sys
 import textwrap
 
 # Append the src dir

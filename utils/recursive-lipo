@@ -3,9 +3,9 @@
 from __future__ import print_function
 
 import argparse
-import os.path
 import filecmp
 import os
+import os.path
 import shutil
 
 from SwiftBuildSupport import check_call

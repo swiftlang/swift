@@ -106,6 +106,9 @@ struct PrintOptions {
   /// \brief Whether to print a placeholder for default parameters.
   bool PrintDefaultParameterPlaceholder = true;
 
+  /// \brief Whether to print enum raw value expressions.
+  bool EnumRawValues = false;
+
   /// \brief Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
   /// spelling of the type name.
@@ -374,6 +377,7 @@ struct PrintOptions {
   /// Print in the style of quick help declaration.
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
+    PO.EnumRawValues = true;
     PO.PrintDefaultParameterPlaceholder = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;

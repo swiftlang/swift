@@ -220,6 +220,68 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     pTransform(new ArchetypeSelfTransformer(Target)),
     Results(collectSynthesizedExtensionInfo()) {}
 
+  Type checkElementType(StringRef Text) {
+    assert(Text.find('<') == StringRef::npos && "Not element type.");
+    assert(Text.find(',') == StringRef::npos && "Not element type.");
+    if (auto Result = pTransform->checkMemberTypeInternal(Text)) {
+      return Result;
+    }
+    return lookUpTypeInContext(DC, Text);
+  }
+
+  Type parseComplexTypeString(StringRef Text) {
+    Text = Text.trim();
+    auto ParamStart = Text.find_first_of('<');
+    auto ParamEnd = Text.find_last_of('>');
+    if(StringRef::npos == ParamStart) {
+      return checkElementType(Text);
+    }
+    Type GenericType = checkElementType(StringRef(Text.data(), ParamStart));
+    if (!GenericType)
+      return Type();
+    NominalTypeDecl *NTD = GenericType->getAnyNominal();
+    if (!NTD || NTD->getInnermostGenericParamTypes().empty())
+      return GenericType;
+    StringRef Param = StringRef(Text.data() + ParamStart + 1,
+                                ParamEnd - ParamStart - 1);
+    std::vector<char> Brackets;
+    std::vector<Type> Arguments;
+    unsigned CurrentStart = 0;
+    for (unsigned I = 0; I < Param.size(); ++ I) {
+      char C = Param[I];
+      if (C == '<')
+        Brackets.push_back(C);
+      else if (C == '>')
+        Brackets.pop_back();
+      else if (C == ',' && Brackets.empty()) {
+        StringRef ArgString(Param.data() + CurrentStart, I - CurrentStart);
+        Type Arg = parseComplexTypeString(ArgString);
+        if (Arg.isNull())
+          return GenericType;
+        Arguments.push_back(Arg);
+        CurrentStart = I + 1;
+      }
+    }
+
+    // Add the last argument, or the only argument.
+    StringRef ArgString(Param.data() + CurrentStart,
+                        Param.size() - CurrentStart);
+    Type Arg = parseComplexTypeString(ArgString);
+    if (Arg.isNull())
+      return GenericType;
+    Arguments.push_back(Arg);
+
+    auto GenericParams = NTD->getInnermostGenericParamTypes();
+    assert(Arguments.size() == GenericParams.size());
+    TypeSubstitutionMap Map;
+    for (auto It = GenericParams.begin(); It != GenericParams.end(); ++ It) {
+      auto Index = std::distance(GenericParams.begin(), It);
+      Map[(*It)->getCanonicalType()->castTo<SubstitutableType>()] =
+        Arguments[Index];
+    }
+    return NTD->getDeclaredTypeInContext().subst(DC->getParentModule(), Map, None);
+  }
+
   SynthesizedExtensionInfo isApplicable(ExtensionDecl *Ext) {
     assert(Ext->getGenericParams() && "Have no generic params.");
     SynthesizedExtensionInfo Result;
@@ -232,6 +294,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       RequirementReprKind Kind = std::get<2>(TupleOp.getValue());
       Type First = pTransform->checkMemberTypeInternal(FirstType);
       Type Second = lookUpTypeInContext(DC, SecondType);
+      if (!First)
+        First = parseComplexTypeString(FirstType);
+      if (!Second)
+        Second = parseComplexTypeString(SecondType);
       if (First && Second) {
         First = First->getDesugaredType();
         Second = Second->getDesugaredType();
@@ -1028,8 +1094,8 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       } else {
         Printer << ", ";
       }
-      auto NM = Arg->getAnyNominal();
-      assert(NM && "Cannot get nominal type.");
+      auto NM = Arg->getAnyGeneric();
+      assert(NM && "Cannot get generic type.");
       Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, NM);
       Printer << NM->getNameStr(); // FIXME: PrintNameContext::GenericParameter
       Printer.printStructurePost(PrintStructureKind::GenericParameter, NM);
@@ -1849,6 +1915,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
+    }, [&]{ // Signature
+      printGenericParams(decl->getGenericParams());
     });
   bool ShouldPrint = true;
   Type Ty;
@@ -2318,7 +2386,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
         Printer << " -> ";
         // Use the non-repr external type, but reuse the TypeLoc printing code.
-        Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+        Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
         printTypeLoc(TypeLoc::withoutLoc(ResultTy));
         Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
       }
@@ -2343,6 +2411,32 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     Type Ty = elt->getArgumentType();
     if (!Options.SkipPrivateStdlibDecls || !Ty.isPrivateStdlibType())
       Ty.print(Printer, Options);
+  }
+
+  auto *raw = elt->getRawValueExpr();
+  if (!Options.EnumRawValues || !raw || raw->isImplicit())
+    return;
+
+  // Print the explicit raw value expression.
+  Printer << " = ";
+  switch (raw->getKind()) {
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral: {
+    auto *numLiteral = cast<NumberLiteralExpr>(raw);
+    Printer.callPrintStructurePre(PrintStructureKind::NumberLiteral);
+    if (numLiteral->isNegative())
+      Printer << "-";
+    Printer << numLiteral->getDigitsText();
+    Printer.printStructurePost(PrintStructureKind::NumberLiteral);
+    break;
+  }
+  case ExprKind::StringLiteral:
+    Printer.callPrintStructurePre(PrintStructureKind::StringLiteral);
+    Printer << "\"" << cast<StringLiteralExpr>(raw)->getValue() << "\"";
+    Printer.printStructurePost(PrintStructureKind::StringLiteral);
+    break;
+  default:
+    break; // Incorrect raw value; skip it for error recovery.
   }
 }
 
@@ -2383,7 +2477,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   });
   Printer << " -> ";
 
-  Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   printTypeLoc(decl->getElementTypeLoc());
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
 
@@ -2912,11 +3006,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!Options.FullyQualifiedTypesIfAmbiguous)
       return false;
 
-    Decl *D = nullptr;
-    if (auto *NAT = dyn_cast<NameAliasType>(T))
-      D = NAT->getDecl();
-    else
-      D = T->getAnyNominal();
+    Decl *D = T->getAnyGeneric();
 
     // If we cannot find the declaration, be extra careful and print
     // the type qualified.
@@ -3284,7 +3374,7 @@ public:
     
     Printer << " -> ";
 
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
@@ -3302,7 +3392,7 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
@@ -3456,7 +3546,7 @@ public:
       Printer << " " << tok::kw_throws;
 
     Printer << " -> ";
-    Printer.printStructurePre(PrintStructureKind::FunctionReturnType);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }

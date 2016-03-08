@@ -1,4 +1,4 @@
-##===--- SwiftIntTypes.py -----------------------------*- coding: utf-8 -*-===##
+# ===--- SwiftIntTypes.py -----------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #

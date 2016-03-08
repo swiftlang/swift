@@ -1,15 +1,12 @@
 FIELDS:
 =======
-TypesToReflect.Box<A>
-(bound-generic TypesToReflect.Box
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.Box
+------------------
 item: A
 (generic-type-parameter index=0 depth=0)
 
 TypesToReflect.C
-(nominal TypesToReflect.C)
-
+----------------
 aClass: TypesToReflect.C
 (nominal TypesToReflect.C)
 
@@ -39,8 +36,7 @@ aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> 
   (nominal Swift.Int))
 
 TypesToReflect.S
-(nominal TypesToReflect.S)
-
+----------------
 aClass: TypesToReflect.C
 (nominal TypesToReflect.C)
 
@@ -74,8 +70,7 @@ aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> 
   (nominal Swift.Int))
 
 TypesToReflect.E
-(nominal TypesToReflect.E)
-
+----------------
 Class: (TypesToReflect.E.Type) -> (TypesToReflect.C) -> TypesToReflect.E
 (function
   (metatype
@@ -144,8 +139,7 @@ Metatype: (TypesToReflect.E.Type) -> (TypesToReflect.E.Type) -> TypesToReflect.E
     (nominal TypesToReflect.E)))
 
 TypesToReflect.OC
-(nominal TypesToReflect.OC)
-
+-----------------
 aClass: TypesToReflect.C
 (nominal TypesToReflect.C)
 
@@ -183,10 +177,8 @@ nsString: __ObjC.NSString
 cfString: __ObjC.CFString
 (nominal __ObjC.CFString)
 
-TypesToReflect.C1<A>
-(bound-generic TypesToReflect.C1
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.C1
+-----------------
 aClass: TypesToReflect.C1<A>
 (bound-generic TypesToReflect.C1
   (generic-type-parameter index=0 depth=0))
@@ -224,10 +216,8 @@ tuple: (TypesToReflect.C1<A>, TypesToReflect.S1<A>, TypesToReflect.E1<A>, Swift.
 dependentMember: A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.C2<A>
-(bound-generic TypesToReflect.C2
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.C2
+-----------------
 aClass: TypesToReflect.C1<A>
 (bound-generic TypesToReflect.C1
   (generic-type-parameter index=0 depth=0))
@@ -267,13 +257,10 @@ primaryArchetype: A
 
 dependentMember1: A.Inner
 (dependent-member
-  (associated-type name=Inner)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Inner)
 
-TypesToReflect.C3<A>
-(bound-generic TypesToReflect.C3
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.C3
+-----------------
 aClass: TypesToReflect.C3<A>
 (bound-generic TypesToReflect.C3
   (generic-type-parameter index=0 depth=0))
@@ -313,25 +300,17 @@ primaryArchetype: A
 
 dependentMember1: A.Outer
 (dependent-member
-  (associated-type name=Outer)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Outer)
 
 dependentMember2: A.Outer.Inner
 (dependent-member
-  (associated-type name=Inner)
   (dependent-member
-    (associated-type name=Outer)
-    (generic-type-parameter index=0 depth=0)))
+    (generic-type-parameter index=0 depth=0) member=Outer) member=Inner)
 
-TypesToReflect.C4<A, B>
-(bound-generic TypesToReflect.C4
-  (generic-type-parameter index=0 depth=0)
-  (generic-type-parameter index=1 depth=0))
-
-TypesToReflect.S1<A>
-(bound-generic TypesToReflect.S1
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.C4
+-----------------
+TypesToReflect.S1
+-----------------
 aClass: TypesToReflect.C1<A>
 (bound-generic TypesToReflect.C1
   (generic-type-parameter index=0 depth=0))
@@ -373,10 +352,8 @@ tuple: (TypesToReflect.C1<A>, TypesToReflect.Box<TypesToReflect.S1<A>>, TypesToR
 primaryArchetype: A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.S2<A>
-(bound-generic TypesToReflect.S2
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.S2
+-----------------
 aClass: TypesToReflect.C2<A>
 (bound-generic TypesToReflect.C2
   (generic-type-parameter index=0 depth=0))
@@ -420,13 +397,10 @@ primaryArchetype: A
 
 dependentMember1: A.Inner
 (dependent-member
-  (associated-type name=Inner)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Inner)
 
-TypesToReflect.S3<A>
-(bound-generic TypesToReflect.S3
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.S3
+-----------------
 aClass: TypesToReflect.C3<A>
 (bound-generic TypesToReflect.C3
   (generic-type-parameter index=0 depth=0))
@@ -470,25 +444,17 @@ primaryArchetype: A
 
 dependentMember1: A.Outer
 (dependent-member
-  (associated-type name=Outer)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Outer)
 
 dependentMember2: A.Outer.Inner
 (dependent-member
-  (associated-type name=Inner)
   (dependent-member
-    (associated-type name=Outer)
-    (generic-type-parameter index=0 depth=0)))
+    (generic-type-parameter index=0 depth=0) member=Outer) member=Inner)
 
-TypesToReflect.S4<A, B>
-(bound-generic TypesToReflect.S4
-  (generic-type-parameter index=0 depth=0)
-  (generic-type-parameter index=1 depth=0))
-
-TypesToReflect.E1<A>
-(bound-generic TypesToReflect.E1
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.S4
+-----------------
+TypesToReflect.E1
+-----------------
 Class: <A> (TypesToReflect.E1<A>.Type) -> (TypesToReflect.C1<A>) -> TypesToReflect.E1<A>
 (function
   (metatype
@@ -580,10 +546,8 @@ Metatype: <A> (TypesToReflect.E1<A>.Type) -> (A.Type) -> TypesToReflect.E1<A>
     (bound-generic TypesToReflect.E1
       (generic-type-parameter index=0 depth=0))))
 
-TypesToReflect.E2<A>
-(bound-generic TypesToReflect.E2
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.E2
+-----------------
 Class: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) -> (TypesToReflect.C2<A>) -> TypesToReflect.E2<A>
 (function
   (metatype
@@ -662,8 +626,7 @@ DependentMemberInner: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type)
       (generic-type-parameter index=0 depth=0)))
   (function
     (dependent-member
-      (associated-type name=Inner)
-      (generic-type-parameter index=0 depth=0))
+      (generic-type-parameter index=0 depth=0) member=Inner)
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
@@ -678,10 +641,8 @@ ExistentialMetatype: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type) 
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
-TypesToReflect.E3<A>
-(bound-generic TypesToReflect.E3
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.E3
+-----------------
 Class: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type) -> (TypesToReflect.C3<A>) -> TypesToReflect.E3<A>
 (function
   (metatype
@@ -761,8 +722,7 @@ DependentMemberOuter: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type)
       (generic-type-parameter index=0 depth=0)))
   (function
     (dependent-member
-      (associated-type name=Outer)
-      (generic-type-parameter index=0 depth=0))
+      (generic-type-parameter index=0 depth=0) member=Outer)
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
@@ -773,22 +733,15 @@ DependentMemberInner: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type)
       (generic-type-parameter index=0 depth=0)))
   (function
     (dependent-member
-      (associated-type name=Inner)
       (dependent-member
-        (associated-type name=Outer)
-        (generic-type-parameter index=0 depth=0)))
+        (generic-type-parameter index=0 depth=0) member=Outer) member=Inner)
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
-TypesToReflect.E4<A, B>
-(bound-generic TypesToReflect.E4
-  (generic-type-parameter index=0 depth=0)
-  (generic-type-parameter index=1 depth=0))
-
-TypesToReflect.GenericOC<A>
-(bound-generic TypesToReflect.GenericOC
-  (generic-type-parameter index=0 depth=0))
-
+TypesToReflect.E4
+-----------------
+TypesToReflect.GenericOC
+------------------------
 ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
 (bound-generic TypesToReflect.GenericOC
   (nominal __ObjC.NSString))
@@ -800,58 +753,58 @@ occfs: TypesToReflect.GenericOC<__ObjC.CFString>
 
 ASSOCIATED TYPES:
 =================
-TypesToReflect.Box<A> : Swift.AnyObject.Protocol
+TypesToReflect.Box : Swift.AnyObject.Protocol
 TypesToReflect.C : Swift.AnyObject.Protocol
-__ObjC.NSObject : Swift.AnyObject.Protocol
-__ObjC.NSObject : __ObjC.NSObjectProtocol.Protocol
-__ObjC.NSObject : Swift.Equatable.Protocol
-__ObjC.NSObject : Swift.Hashable.Protocol
-__ObjC.NSObject : Swift.CVarArg.Protocol
-__ObjC.NSObject : Swift.CustomStringConvertible.Protocol
-__ObjC.NSObject : Swift.CustomDebugStringConvertible.Protocol
-TypesToReflect.C1<A> : Swift.AnyObject.Protocol
-TypesToReflect.C1<A> : TypesToReflect.ClassBoundP.Protocol
+TypesToReflect.OC : Swift.AnyObject.Protocol
+TypesToReflect.OC : __ObjC.NSObjectProtocol.Protocol
+TypesToReflect.OC : Swift.Equatable.Protocol
+TypesToReflect.OC : Swift.Hashable.Protocol
+TypesToReflect.OC : Swift.CVarArg.Protocol
+TypesToReflect.OC : Swift.CustomStringConvertible.Protocol
+TypesToReflect.OC : Swift.CustomDebugStringConvertible.Protocol
+TypesToReflect.C1 : Swift.AnyObject.Protocol
+TypesToReflect.C1 : TypesToReflect.ClassBoundP.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.C2<A> : Swift.AnyObject.Protocol
-TypesToReflect.C3<A> : Swift.AnyObject.Protocol
-TypesToReflect.C4<A, B> : TypesToReflect.P1.Protocol
+TypesToReflect.C2 : Swift.AnyObject.Protocol
+TypesToReflect.C3 : Swift.AnyObject.Protocol
+TypesToReflect.C4 : TypesToReflect.P1.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.C4<A, B> : TypesToReflect.P2.Protocol
+TypesToReflect.C4 : TypesToReflect.P2.Protocol
 typealias Outer = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.S4<A, B> : TypesToReflect.P1.Protocol
+TypesToReflect.S4 : TypesToReflect.P1.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.S4<A, B> : TypesToReflect.P2.Protocol
+TypesToReflect.S4 : TypesToReflect.P2.Protocol
 typealias Outer = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.E4<A, B> : TypesToReflect.P1.Protocol
+TypesToReflect.E4 : TypesToReflect.P1.Protocol
 typealias Inner = A
 (generic-type-parameter index=0 depth=0)
 
-TypesToReflect.E4<A, B> : TypesToReflect.P2.Protocol
+TypesToReflect.E4 : TypesToReflect.P2.Protocol
 typealias Outer = B
 (generic-type-parameter index=1 depth=0)
 
-TypesToReflect.E4<A, B> : TypesToReflect.P3.Protocol
+TypesToReflect.E4 : TypesToReflect.P3.Protocol
 typealias First = A
 (generic-type-parameter index=0 depth=0)
 
 typealias Second = B
 (generic-type-parameter index=1 depth=0)
 
-__ObjC.NSObject : Swift.AnyObject.Protocol
-__ObjC.NSObject : __ObjC.NSObjectProtocol.Protocol
-__ObjC.NSObject : Swift.Equatable.Protocol
-__ObjC.NSObject : Swift.Hashable.Protocol
-__ObjC.NSObject : Swift.CVarArg.Protocol
-__ObjC.NSObject : Swift.CustomStringConvertible.Protocol
-__ObjC.NSObject : Swift.CustomDebugStringConvertible.Protocol
+TypesToReflect.GenericOC : Swift.AnyObject.Protocol
+TypesToReflect.GenericOC : __ObjC.NSObjectProtocol.Protocol
+TypesToReflect.GenericOC : Swift.Equatable.Protocol
+TypesToReflect.GenericOC : Swift.Hashable.Protocol
+TypesToReflect.GenericOC : Swift.CVarArg.Protocol
+TypesToReflect.GenericOC : Swift.CustomStringConvertible.Protocol
+TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible.Protocol
 

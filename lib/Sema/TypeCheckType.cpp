@@ -452,6 +452,22 @@ Type TypeChecker::applyUnboundGenericArguments(
     genericArgTypes.push_back(genericArg.getType());
   }
   
+  // If we're completing a generic TypeAlias, then we map the types provided
+  // onto the underlying type.
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(unbound->getDecl())) {
+    assert(TAD->getGenericParams()->getAllArchetypes().size()
+             == genericArgs.size() &&
+           "argument arity mismatch");
+
+    SmallVector<Substitution, 4> subs;
+    subs.reserve(genericArgs.size());
+    for (auto t : genericArgs)
+      subs.push_back(Substitution(t.getType(), {}));
+  
+    auto subst = TAD->getGenericParams()->getSubstitutionMap(subs);
+    return TAD->getUnderlyingType().subst(TAD->getParentModule(), subst, None);
+  }
+  
   // Form the bound generic type.
   auto *BGT = BoundGenericType::get(cast<NominalTypeDecl>(unbound->getDecl()),
                                     unbound->getParent(), genericArgTypes);

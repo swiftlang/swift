@@ -76,10 +76,10 @@ void BuiltinUnit::LookupCache::lookupValue(
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
-      TypeAliasDecl *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name,
-                                                   SourceLoc(),
-                                                   TypeLoc::withoutLoc(Ty),
-                                                   const_cast<BuiltinUnit*>(&M));
+      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+                                          TypeLoc::withoutLoc(Ty),
+                                          /*genericparams*/nullptr,
+                                          const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;

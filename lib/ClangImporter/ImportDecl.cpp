@@ -1456,7 +1456,7 @@ namespace {
                               Impl.importSourceLoc(Decl->getLocation()),
                               TypeLoc::withoutLoc(
                                 primary->getDeclaredInterfaceType()),
-                              DC);
+                              /*genericparams*/nullptr, DC);
             aliasRef->computeType();
 
             // Record this as the alternate declaration.
@@ -1504,7 +1504,7 @@ namespace {
                             Impl.importSourceLoc(Decl->getLocation()),
                             TypeLoc::withoutLoc(
                               underlying->getDeclaredInterfaceType()),
-                            DC);
+                            /*genericparams*/nullptr, DC);
               typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -1530,7 +1530,7 @@ namespace {
                             Impl.importSourceLoc(Decl->getLocation()),
                             TypeLoc::withoutLoc(
                               proto->getDeclaredInterfaceType()),
-                            DC);
+                            /*genericparams*/nullptr, DC);
               typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -1591,7 +1591,7 @@ namespace {
                                       Name,
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
-                                      DC);
+                                      /*genericparams*/nullptr, DC);
       Result->computeType();
       return Result;
     }

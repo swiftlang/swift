@@ -129,7 +129,7 @@ class SwiftLexer(RegexLexer):
 
         'import': [
             (_name, Name.Namespace),
-            #('\n', Punctuation, '#pop'),
+            # ('\n', Punctuation, '#pop'),
         ],
 
         'generic-type': [

@@ -38,8 +38,8 @@ ASTContext &DeclContext::getASTContext() const {
   return getParentModule()->getASTContext();
 }
 
-NominalTypeDecl *
-DeclContext::getAsNominalTypeOrNominalTypeExtensionContext() const {
+GenericTypeDecl *
+DeclContext::getAsGenericTypeOrGenericTypeExtensionContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
@@ -69,23 +69,32 @@ DeclContext::getAsNominalTypeOrNominalTypeExtensionContext() const {
   }
 
   case DeclContextKind::GenericTypeDecl:
-    return const_cast<NominalTypeDecl*>(dyn_cast<NominalTypeDecl>(this));
+    return const_cast<GenericTypeDecl*>(cast<GenericTypeDecl>(this));
   }
 }
 
+/// If this DeclContext is a NominalType declaration or an
+/// extension thereof, return the NominalTypeDecl.
+NominalTypeDecl *DeclContext::
+getAsNominalTypeOrNominalTypeExtensionContext() const {
+  auto decl = getAsGenericTypeOrGenericTypeExtensionContext();
+  return dyn_cast_or_null<NominalTypeDecl>(decl);
+}
+
+
 ClassDecl *DeclContext::getAsClassOrClassExtensionContext() const {
   return dyn_cast_or_null<ClassDecl>(
-           getAsNominalTypeOrNominalTypeExtensionContext());
+           getAsGenericTypeOrGenericTypeExtensionContext());
 }
 
 EnumDecl *DeclContext::getAsEnumOrEnumExtensionContext() const {
   return dyn_cast_or_null<EnumDecl>(
-           getAsNominalTypeOrNominalTypeExtensionContext());
+           getAsGenericTypeOrGenericTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
   return dyn_cast_or_null<ProtocolDecl>(
-           getAsNominalTypeOrNominalTypeExtensionContext());
+           getAsGenericTypeOrGenericTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
@@ -93,7 +102,7 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
     return nullptr;
 
   return dyn_cast_or_null<ProtocolDecl>(
-           getAsNominalTypeOrNominalTypeExtensionContext());
+           getAsGenericTypeOrGenericTypeExtensionContext());
 }
 
 GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
@@ -178,7 +187,7 @@ Type DeclContext::getDeclaredTypeInContext() const {
 
 Type DeclContext::getDeclaredInterfaceType() const {
   // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-  if (auto nominal = getAsNominalTypeOrNominalTypeExtensionContext())
+  if (auto nominal = getAsGenericTypeOrGenericTypeExtensionContext())
     return nominal->getDeclaredInterfaceType();
   return Type();
 }
@@ -199,26 +208,20 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
       // can occur in generic contexts.
       continue;
 
-    case DeclContextKind::AbstractFunctionDecl: {
-      auto *AFD = cast<AbstractFunctionDecl>(dc);
-      if (auto GP = AFD->getGenericParams())
+    case DeclContextKind::AbstractFunctionDecl:
+      if (auto GP = cast<AbstractFunctionDecl>(dc)->getGenericParams())
         return GP;
       continue;
-    }
 
-    case DeclContextKind::GenericTypeDecl: {
-      auto GTD = cast<GenericTypeDecl>(dc);
-      if (auto GP = GTD->getGenericParams())
+    case DeclContextKind::GenericTypeDecl:
+      if (auto GP = cast<GenericTypeDecl>(dc)->getGenericParams())
         return GP;
       continue;
-    }
 
-    case DeclContextKind::ExtensionDecl: {
-      auto ED = cast<ExtensionDecl>(dc);
-      if (auto GP = ED->getGenericParams())
+    case DeclContextKind::ExtensionDecl:
+      if (auto GP = cast<ExtensionDecl>(dc)->getGenericParams())
         return GP;
       continue;
-    }
     }
     llvm_unreachable("bad DeclContextKind");
   }
@@ -619,10 +622,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     break;
   case DeclContextKind::GenericTypeDecl:
     switch (cast<GenericTypeDecl>(this)->getKind()) {
-#define NOMINAL_TYPE_DECL(ID, PARENT) \
-    case DeclKind::ID: Kind = #ID "Decl"; break;
 #define DECL(ID, PARENT) \
-    case DeclKind::ID: llvm_unreachable("not a nominal type");
+    case DeclKind::ID: Kind = #ID "Decl"; break;
 #include "swift/AST/DeclNodes.def"
     }
     break;

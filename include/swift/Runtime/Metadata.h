@@ -117,7 +117,7 @@ struct External {
   using FarRelativeDirectPointer = StoredPointer;
   
   template <typename T, bool Nullable = true>
-  using RelativeDirectPointer = std::make_signed<StoredPointer>;
+  using RelativeDirectPointer = int32_t;
 };
 
 /// Template for branching on native pointer types versus external ones
@@ -1492,9 +1492,7 @@ struct TargetNominalTypeDescriptor {
   }
 
   int32_t offsetToNameOffset() const {
-    auto NameAddress = (uint8_t *)&this->Name;
-    auto ThisAddress = (uint8_t *)this;
-    return NameAddress - ThisAddress;
+    return offsetof(TargetNominalTypeDescriptor<Runtime>, Name);
   }
 
   /// The generic parameter descriptor header. This describes how to find and
@@ -1729,10 +1727,8 @@ public:
     return metadataAsWords[theClass->GenericParams.Offset - 1];
   }
 
-  uint32_t offsetToDescriptorOffset() const {
-    auto DescriptionAddress = (uint8_t *)&this->Description;
-    auto ThisAddress = (uint8_t *)this;
-    return DescriptionAddress - ThisAddress;
+  StoredPointer offsetToDescriptorOffset() const {
+    return offsetof(TargetClassMetadata<Runtime>, Description);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1951,9 +1947,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   }
 
   StoredPointer offsetToDescriptorOffset() const {
-    auto DescriptionAddress = (uint8_t *)&this->Description;
-    auto ThisAddress = (uint8_t *)this;
-    return DescriptionAddress - ThisAddress;
+    return offsetof(TargetValueMetadata<Runtime>, Description);
   }
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
@@ -2206,11 +2200,11 @@ struct TargetProtocolDescriptor {
   
   /// Unused by the Swift runtime.
   TargetPointer<Runtime, const void>
-  _ObjC_InstanceMethods,
-  _ObjC_ClassMethods,
-  _ObjC_OptionalInstanceMethods,
-  _ObjC_OptionalClassMethods,
-  _ObjC_InstanceProperties;
+    _ObjC_InstanceMethods,
+    _ObjC_ClassMethods,
+    _ObjC_OptionalInstanceMethods,
+    _ObjC_OptionalClassMethods,
+    _ObjC_InstanceProperties;
   
   /// Size of the descriptor record.
   uint32_t DescriptorSize;

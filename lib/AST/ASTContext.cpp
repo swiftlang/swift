@@ -2461,14 +2461,13 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
 }
 
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
-                                 NominalTypeDecl *TheDecl, Type Parent) {
+                                 GenericTypeDecl *TheDecl, Type Parent) {
   ID.AddPointer(TheDecl);
   ID.AddPointer(Parent.getPointer());
 }
 
-UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
-                                            Type Parent,
-                                            const ASTContext &C) {
+UnboundGenericType *UnboundGenericType::
+get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID ID;
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = 0;

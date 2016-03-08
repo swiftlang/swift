@@ -93,7 +93,7 @@ public:
       return "";
 
     auto NameBuffer = std::unique_ptr<uint8_t>(new uint8_t[NameSize + 1]);
-    if (!readBytes(Address, NameBuffer.get(), NameSize))
+    if (!readBytes(Address, NameBuffer.get(), NameSize + 1))
       return "";
     return std::string(reinterpret_cast<const char *>(NameBuffer.get()));
   }

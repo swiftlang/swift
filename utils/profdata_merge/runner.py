@@ -10,17 +10,21 @@
 
 # This file contains the main subroutines that invoke or stop the merge worker.
 
-import shutil
+import logging
 import os
+import shutil
 import socket
 import sys
-import logging
 
 from multiprocessing import JoinableQueue
-from process import ProfdataMergerProcess
-from server import ProfdataServer
-from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
+
 from config import Config
+
+from main import SERVER_ADDRESS, TESTS_FINISHED_SENTINEL
+
+from process import ProfdataMergerProcess
+
+from server import ProfdataServer
 
 
 def run_server(config):

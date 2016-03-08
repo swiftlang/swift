@@ -537,6 +537,10 @@ public:
     return *this;
   }
 
+  /// Create a path of AddrProjection or ValueProjection with the given VA
+  /// and Path.
+  SILValue createExtract(SILValue VA, SILInstruction *Inst, bool IsVal) const;
+
   /// Create a new projection path from the SILValue Start to End.  Returns
   /// Nothing::None if there is no such path.
   ///
@@ -560,15 +564,6 @@ public:
   /// NOTE: this function returns a single empty projection path if the BaseType
   /// is a leaf node in the type tree.
   static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
-                                                SILModule *Mod,
-                                                ProjectionPathList &P);
-
-  /// Given the SILType Base, expand every intermediate and leaf nodes in the
-  /// type tree.
-  ///
-  /// NOTE: this function returns a single empty projection path if the BaseType
-  /// is a leaf node in the type tree.
-  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
                                                 SILModule *Mod,
                                                 ProjectionPathList &P);
 

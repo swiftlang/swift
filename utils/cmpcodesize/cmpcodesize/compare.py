@@ -1,4 +1,4 @@
-# cmpcodesize/compare.py - Compare sizes of built products -*- python -*-
+# ====--- compare.py - Compare built products' sizes --*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,10 +10,11 @@
 
 from __future__ import print_function
 
-import re
-import os
-import subprocess
 import collections
+import os
+import re
+import subprocess
+
 from operator import itemgetter
 
 prefixes = {
@@ -41,7 +42,7 @@ prefixes = {
 }
 
 infixes = {
-    #Swift
+    # Swift
     "q_": "Generic Function"
 }
 

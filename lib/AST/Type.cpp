@@ -56,6 +56,23 @@ bool CanType::isActuallyCanonicalOrNull() const {
          getPointer()->isCanonical();
 }
 
+NominalTypeDecl *CanType::getAnyNominal() const {
+  return dyn_cast_or_null<NominalTypeDecl>(getAnyGeneric());
+}
+
+GenericTypeDecl *CanType::getAnyGeneric() const {
+  if (auto nominalTy = dyn_cast<NominalType>(*this))
+    return (GenericTypeDecl*)nominalTy->getDecl();
+  
+  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
+    return (GenericTypeDecl*)boundTy->getDecl();
+  
+  if (auto unboundTy = dyn_cast<UnboundGenericType>(*this))
+    return unboundTy->getDecl();
+  return nullptr;
+}
+
+
 //===----------------------------------------------------------------------===//
 // Various Type Methods.
 //===----------------------------------------------------------------------===//
@@ -378,7 +395,7 @@ bool TypeBase::isUnspecializedGeneric() {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-    return false;
+    llvm_unreachable("we're only working with CanType's here");
 
   case TypeKind::Error:
   case TypeKind::Unresolved:
@@ -1293,6 +1310,12 @@ TypeBase *ParenType::getSinglyDesugaredType() {
 }
 
 TypeBase *NameAliasType::getSinglyDesugaredType() {
+  auto *TAD = getDecl();
+
+  // The type for a generic TypeAliasDecl is an UnboundGenericType.
+  if (TAD->getGenericParams())
+    return UnboundGenericType::get(TAD, Type(), TAD->getASTContext());
+
   return getDecl()->getUnderlyingType().getPointer();
 }
 

@@ -37,6 +37,7 @@ class GenericSignature;
 class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
+class GenericTypeDecl;
 class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
@@ -251,7 +252,8 @@ public:
   StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
   EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
-  NominalTypeDecl *getAnyNominal() const; // in Types.h
+  NominalTypeDecl *getAnyNominal() const;
+  GenericTypeDecl *getAnyGeneric() const;
 
   /// \brief Retrieve the most-specific class bound of this type,
   /// which is either a class, a bound-generic class, or a class-bounded

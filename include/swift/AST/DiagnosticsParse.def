@@ -280,6 +280,11 @@ ERROR(expected_equal_in_typealias,PointsToFirstBadToken,
       "expected '=' in typealias declaration", ())
 ERROR(expected_type_in_typealias,PointsToFirstBadToken,
       "expected type in typealias declaration", ())
+ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
+      "associated types may not have a generic parameter list", ())
+ERROR(typealias_generic_list_constraint,PointsToFirstBadToken,
+      "type parameters may not be constrained in typealias argument list", ())
+
 
 // Func
 ERROR(func_decl_nonglobal_operator,none,

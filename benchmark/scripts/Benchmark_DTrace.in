@@ -12,10 +12,10 @@
 #
 # ===----------------------------------------------------------------------===//
 
-import os
-import sys
-import subprocess
 import argparse
+import os
+import subprocess
+import sys
 
 DRIVER_LIBRARY_PATH = "@PATH_TO_DRIVER_LIBRARY@"
 sys.path.append(DRIVER_LIBRARY_PATH)

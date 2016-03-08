@@ -4,15 +4,16 @@
 
 from __future__ import print_function
 
+import os
 import re
 try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-import tokenize
 import textwrap
+import tokenize
+
 from bisect import bisect
-import os
 
 def get_line_starts(s):
     """Return a list containing the start index of each line in s.
@@ -560,13 +561,13 @@ class ASTNode(object):
     """Abstract base class for template AST nodes"""
 
     def __init__(self):
-        raise NotImplemented
+        raise NotImplementedError("ASTNode.__init__ is not implemented.")
 
     def execute(self, context):
-        raise NotImplemented
+        raise NotImplementedError("ASTNode.execute is not implemented.")
 
     def __str__(self, indent=''):
-        raise NotImplemented
+        raise NotImplementedError("ASTNode.__str__ is not implemented.")
 
     def format_children(self, indent):
         if not self.children:

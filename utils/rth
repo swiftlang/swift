@@ -9,13 +9,13 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import sys
-import subprocess
 import argparse
-import shutil
 import os
-import shlex
 import pipes
+import shlex
+import shutil
+import subprocess
+import sys
 
 VERBOSE = True
 
