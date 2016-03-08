@@ -259,7 +259,7 @@ void swift::ide::printSubmoduleInterface(
       NoImportSubModules.insert(*It);
     }
   }
-
+  llvm::StringMap<std::unique_ptr<std::vector<Decl*>>> FileRangedDecls;
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
@@ -328,13 +328,23 @@ void swift::ide::printSubmoduleInterface(
       if (!GroupNames.empty()){
         if (auto Target = D->getGroupName()) {
           if (std::find(GroupNames.begin(), GroupNames.end(),
-                        Target.getValue()) != GroupNames.end())
-             SwiftDecls.push_back(D);
+                        Target.getValue()) != GroupNames.end()) {
+            FileRangedDecls.insert(std::make_pair(D->getSourceFileName().getValue(),
+              llvm::make_unique<std::vector<Decl*>>())).first->getValue()->push_back(D);
+          }
         }
         continue;
       }
       // Add Swift decls if we are printing the top-level module.
       SwiftDecls.push_back(D);
+    }
+  }
+  if (!GroupNames.empty()) {
+    assert(SwiftDecls.empty());
+    for (auto It = FileRangedDecls.begin(); It != FileRangedDecls.end(); ++ It) {
+      for (auto D : *It->getValue()) {
+        SwiftDecls.push_back(D);
+      }
     }
   }
 
