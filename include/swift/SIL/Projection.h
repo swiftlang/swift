@@ -572,7 +572,7 @@ public:
   static bool hasUncoveredNonTrivials(SILType B, SILModule *Mod,
                                       ProjectionPathSet &CPaths);
 
-    /// Returns true if the two paths have a non-empty symmetric
+  /// Returns true if the two paths have a non-empty symmetric
   /// difference.
   ///
   /// This means that the two objects have the same base but access different
