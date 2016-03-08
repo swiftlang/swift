@@ -274,6 +274,17 @@ inline bool none_of(const Range &R, Predicate P) {
   return std::none_of(R.begin(), R.end(), P);
 }
 
+/// An adaptor of std::count for ranges.
+///
+/// We use std::result_of on Range::begin since llvm::iterator_range does not
+/// have a public typedef set to what is the underlying iterator.
+//typename std::iterator_traits<decltype(&Range::begin())>::difference_type
+template <class Range, class Value>
+inline auto count(const Range &R, Value V)
+  -> typename std::iterator_traits<decltype(R.begin())>::difference_type {
+  return std::count(R.begin(), R.end(), V);
+}
+
 /// An adaptor of std::count_if for ranges.
 ///
 /// We use std::result_of on Range::begin since llvm::iterator_range does not
