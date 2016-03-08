@@ -1248,6 +1248,35 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         ConGraph->setNode(I, PointsTo);
       }
       return;
+    case ValueKind::CopyAddrInst: {
+      // Be conservative if the dest may be the final release.
+      if (!cast<CopyAddrInst>(I)->isInitializationOfDest()) {
+        setAllEscaping(I, ConGraph);
+        break;
+      }
+
+      // A copy_addr is like a 'store (load src) to dest'.
+      CGNode *SrcAddrNode = ConGraph->getNode(I->getOperand(CopyAddrInst::Src),
+                                              this);
+      if (!SrcAddrNode) {
+        setAllEscaping(I, ConGraph);
+        break;
+      }
+
+      CGNode *LoadedValue = ConGraph->getContentNode(SrcAddrNode);
+      CGNode *DestAddrNode = ConGraph->getNode(
+        I->getOperand(CopyAddrInst::Dest), this);
+      if (DestAddrNode) {
+        // Create a defer-edge from the loaded to the stored value.
+        CGNode *PointsTo = ConGraph->getContentNode(DestAddrNode);
+        ConGraph->defer(PointsTo, LoadedValue);
+      } else {
+        // A store to an address we don't handle -> be conservative.
+        ConGraph->setEscapesGlobal(LoadedValue);
+      }
+      return;
+    }
+    break;
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
       if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src),

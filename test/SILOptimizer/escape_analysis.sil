@@ -318,6 +318,62 @@ bb0(%0 : $Pointer):
   return %7 : $X
 }
 
+// CHECK-LABEL: CG of copy_addr_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr %1 to [initialization] %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of copy_addr_take_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_take_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr [take] %1 to [initialization] %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of copy_addr_noinit_content
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ:
+// CHECK-NEXT:    Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_noinit_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr [take] %1 to %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of call_copy_addr_content
+// CHECK-NEXT:    Val %0 Esc: %3, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: %3, Succ: %1.1
+// CHECK-NEXT:    Val %1 Esc: %3, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: %3, Succ:
+// CHECK-NEXT:  End
+sil @call_copy_addr_content : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int32
+  %1 = alloc_stack $Int32
+  %2 = function_ref @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
+  %3 = apply %2(%0, %1) : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
+  %4 = tuple()
+  %6 = dealloc_stack %1 : $*Int32
+  %5 = dealloc_stack %0 : $*Int32
+  return %4 : $()
+}
+
 // Test partial_apply. The partial_apply and the boxes do not escape.
 // The X parameter does escape because it is stored in Y and the release
 // of Y's box _could_ capture Y.x in Y's deinit.
