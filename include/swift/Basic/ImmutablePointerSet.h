@@ -134,6 +134,46 @@ public:
     assert(Other->ParentFactory.get() == ParentFactory.get());
     return ParentFactory.get()->merge(this, Other);
   }
+
+  bool hasEmptyIntersection(const ImmutablePointerSet<T> *Other) const {
+    // If we are empty or Other is empty, then there are automatically no
+    // elements that could be in the intersection. Return true.
+    if (empty() || Other->empty())
+      return true;
+
+    // Ok, at this point we know that both self and Other are non-empty. They
+    // can only have a non-empty intersection if they have elements in common.
+    // Sadly it seems the STL does not have such a predicate that is
+    // non-constructive in the algorithm library, so we implement it ourselves.
+    auto LHSI = begin();
+    auto LHSE = end();
+    auto RHSI = Other->begin();
+    auto RHSE = Other->end();
+
+    // Our implementation is to perform a sorted merge like traversal of both
+    // lists, always advancing the iterator with a smaller value. If we ever hit
+    // an equality in between our iterators, we have a non-empty intersection.
+    //
+    // Until either of our iterators hits the end of our target arrays...
+    while (LHSI != LHSE && RHSI != RHSE) {
+      // If LHSI is equivalent to RHSI, then we have a non-empty intersection...
+      // Early exit.
+      if (*LHSI == *RHSI)
+        return false;
+
+      // Otherwise, if *LHSI is less than *RHSI, advance LHSI.
+      if (*LHSI < *RHSI) {
+        ++LHSI;
+        continue;
+      }
+
+      // Otherwise, We know that *RHSI < *LHSI. Advance RHSI.
+      ++RHSI;
+    }
+
+    // We did not have any overlapping intersection.
+    return true;
+  }
 };
 
 template <typename T> class ImmutablePointerSetFactory {
