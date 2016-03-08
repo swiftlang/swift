@@ -70,7 +70,7 @@ public:
   template <typename Runtime>
   TypeRefPointer
   substituteGenerics(ReflectionContext<Runtime> &RC,
-                     typename Runtime::StoredPointer MetadatAddress);
+                     typename Runtime::StoredPointer MetadataAddress);
   static TypeRefPointer fromDemangleNode(Demangle::NodePointer Node);
 };
 
