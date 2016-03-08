@@ -41,7 +41,7 @@ class GuardMallocBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
     def process_input(self, data):
         test_name = '({},{})'.format(data['opt'], data['test_name'])
-        print "Running {}...".format(test_name)
+        print("Running {}...".format(test_name))
         sys.stdout.flush()
         status = subprocess.call([data['path'], data['test_name'], '--num-iters=2'],
             env=data['env'], stderr=open('/dev/null', 'w'),

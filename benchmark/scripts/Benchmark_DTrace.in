@@ -74,7 +74,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
     def process_input(self, data):
         test_name = '({}_{})'.format(data['opt'], data['test_name'])
-        print "Running {}...".format(test_name)
+        print("Running {}...".format(test_name))
         sys.stdout.flush()
 
         def get_results_with_iters(iters):

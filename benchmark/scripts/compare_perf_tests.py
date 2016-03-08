@@ -50,7 +50,7 @@ def get_scores(fname):
     try:
         for line in f:
             if VERBOSE:
-                print "Parsing", line,
+                print("Parsing", line,)
             m = SCORERE.match(line)
             is_total = False
             if not m:
@@ -60,7 +60,7 @@ def get_scores(fname):
                 continue
 
             if VERBOSE:
-                print "  match", m.group(KEYGROUP), m.group(BESTGROUP)
+                print("  match", m.group(KEYGROUP), m.group(BESTGROUP))
 
             if not m.group(KEYGROUP) in scores:
                 scores[m.group(KEYGROUP)] = []
@@ -81,8 +81,8 @@ def is_max_score(newscore, maxscore, invert):
     return not maxscore or (newscore > maxscore if not invert else newscore < maxscore)
 
 def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
-    print num.rjust(3),
-    print key.ljust(25),
+    print(num.rjust(3),)
+    print(key.ljust(25),)
     bestscore1 = None
     bestscore2 = None
     worstscore1 = None
@@ -130,32 +130,32 @@ def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
                 Num, Den = Den, Num
             print ("%.2fx" % (Num / Den)).rjust(9),
     else:
-        print "*".rjust(9),
+        print("*".rjust(9),)
         if ShowSpeedup:
-            print "*".rjust(9),
+            print("*".rjust(9),)
     # check if the worst->best interval for each configuration overlap.
     if minbest:
         if (bestscore1 < bestscore2 and bestscore2 < worstscore1) \
            or (bestscore2 < bestscore1 and bestscore1 < worstscore2):
-            print "(?)",
+            print("(?)",)
     else:
         if (worstscore1 < worstscore2 and worstscore2 < bestscore1) \
            or (worstscore2 < worstscore1 and worstscore1 < bestscore2):
-            print "(?)",
-    print
+            print("(?)",)
+    print()
 
 def print_best_scores(key, scores):
-    print key,
+    print(key,)
     bestscore = None
     minbest = IsTime
     for score in scores:
         if is_max_score(newscore=score, maxscore=bestscore, invert=minbest):
             bestscore = score
-    print ", %d" % bestscore
+    print(", %d" % bestscore)
 
 def usage():
-    print "repeat.sh <n> Benchmark_O[none|unchecked] > file.times"
-    print "compare_perf_tests.py <file.times> [<file2.times>]"
+    print("repeat.sh <n> Benchmark_O[none|unchecked] > file.times")
+    print("compare_perf_tests.py <file.times> [<file2.times>]")
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -182,35 +182,35 @@ if __name__ == '__main__':
         runs = runs2
 
     if VERBOSE:
-        print scores1
-        print scores2
+        print(scores1)
+        print(scores2)
 
     keys = list(set(scores1.keys() + scores2.keys()))
     keys.sort()
     if VERBOSE:
-        print "comparing ", file1, "vs", file2, "=",
+        print("comparing ", file1, "vs", file2, "=",)
         if IsTime:
-            print file1, "/", file2
+            print(file1, "/", file2)
         else:
-            print file2, "/", file1
+            print(file2, "/", file1)
 
-    print "#".rjust(3),
-    print "TEST".ljust(25),
+    print("#".rjust(3),)
+    print("TEST".ljust(25),)
     if PrintAllScores:
         for i in range(0, runs):
-            print ("OLD_RUN%d" % i).rjust(9),
+            print(("OLD_RUN%d" % i).rjust(9),)
         for i in range(0, runs):
-            print ("NEW_RUN%d" % i).rjust(9),
+            print(("NEW_RUN%d" % i).rjust(9),)
     else:
-        print "BEST_OLD_MIN(μs)".rjust(17),
-        print "BEST_NEW_MIN(μs)".rjust(17),
-    print 'DELTA'.rjust(9), '%DELTA'.rjust(9), 'SPEEDUP'.rjust(9)
+        print("BEST_OLD_MIN(μs)".rjust(17),)
+        print("BEST_NEW_MIN(μs)".rjust(17),)
+    print('DELTA'.rjust(9), '%DELTA'.rjust(9), 'SPEEDUP'.rjust(9))
 
     for key in keys:
         if key not in scores1:
-            print key, "not in", file1
+            print(key, "not in", file1)
             continue
         if key not in scores2:
-            print key, "not in", file2
+            print(key, "not in", file2)
             continue
         compare_scores(key, scores1[key], worstscores1[key], scores2[key], worstscores2[key], runs, nums[key])
