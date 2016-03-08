@@ -282,8 +282,6 @@ ERROR(expected_type_in_typealias,PointsToFirstBadToken,
       "expected type in typealias declaration", ())
 ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
       "associated types may not have a generic parameter list", ())
-ERROR(typealias_generic_list_where,PointsToFirstBadToken,
-      "generic argument list for typealias may not have a where clause", ())
 ERROR(typealias_generic_list_constraint,PointsToFirstBadToken,
       "type parameters may not be constrained in typealias argument list", ())
 
