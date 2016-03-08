@@ -7,6 +7,10 @@ add_subdirectory(sil-extract)
 add_subdirectory(swift-llvm-opt)
 add_subdirectory(swift-reflection-test)
 
+if(SWIFT_ANALYZE_CODE_COVERAGE)
+  add_subdirectory(cov-compare)
+endif()
+
 if(SWIFT_BUILD_SOURCEKIT)
   add_subdirectory(SourceKit)
 endif()

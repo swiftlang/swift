@@ -1,0 +1,30 @@
+#!/usr/bin/env python
+
+# utils/changedfiles.py - Show changed files between the current HEAD and
+# master -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+from SwiftBuildSupport import check_output
+import os
+
+current_branch = check_output(["git", "rev-parse",
+                               "--abbrev-ref", "HEAD"]).strip()
+merge_base = check_output(["git", "merge-base",
+                           current_branch, "master"]).strip()
+
+files = check_output(["git", "--no-pager", "diff", "--name-only",
+                    merge_base, "HEAD"]).splitlines()
+
+
+source_file_exts = {".swift", ".cpp", ".m", ".mm", ".h", ".hpp"}
+source_files = [os.path.basename(f) for f in files
+                if os.path.splitext(f)[1] in source_file_exts]
+
+print(" ".join(source_files))
