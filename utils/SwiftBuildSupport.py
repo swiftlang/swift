@@ -78,12 +78,9 @@ def check_call(args, print_command=False, verbose=False):
     try:
         return subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
-        if verbose:
-            print_with_argv0(e.strerror)
-        else:
-            print_with_argv0(
-                "command terminated with a non-zero exit status " +
-                str(e.returncode) + ", aborting")
+        print_with_argv0(
+            "command terminated with a non-zero exit status " +
+            str(e.returncode) + ", aborting")
         sys.stdout.flush()
         sys.exit(1)
     except OSError as e:
@@ -99,12 +96,9 @@ def check_output(args, print_command=False, verbose=False):
     try:
         return subprocess.check_output(args)
     except subprocess.CalledProcessError as e:
-        if verbose:
-            print_with_argv0(e.strerror)
-        else:
-            print_with_argv0(
-                "command terminated with a non-zero exit status " +
-                str(e.returncode) + ", aborting")
+        print_with_argv0(
+            "command terminated with a non-zero exit status " +
+            str(e.returncode) + ", aborting")
         sys.stdout.flush()
         sys.exit(1)
     except OSError as e:
