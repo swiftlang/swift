@@ -206,6 +206,8 @@ private:
     }
     for (auto elem : S->getElements()) {
       if (Decl *D = elem.dyn_cast<Decl*>()) {
+        if (SM.isBeforeInBuffer(Loc, D->getStartLoc()))
+          continue; // Don't surface definitions from after Loc.
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
       }
