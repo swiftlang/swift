@@ -128,7 +128,7 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
     """
     try:
         branch = get_current_git_branch(swift_repo)
-    except:
+    except (OSError, subprocess.CalledProcessError):
         branch = None
     timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
     if branch:
@@ -138,7 +138,7 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
     driver_name = os.path.basename(driver)
     try:
         os.makedirs(output_directory)
-    except:
+    except OSError:
         pass
     log_file = os.path.join(output_directory,
                             driver_name + '-' + timestamp + '.log')
