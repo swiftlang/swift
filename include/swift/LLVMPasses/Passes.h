@@ -22,8 +22,7 @@ namespace swift {
   struct SwiftAAResult : llvm::AAResultBase<SwiftAAResult> {
     friend llvm::AAResultBase<SwiftAAResult>;
 
-    explicit SwiftAAResult(const llvm::TargetLibraryInfo &TLI)
-        : AAResultBase(TLI) {}
+    explicit SwiftAAResult() : AAResultBase() {}
     SwiftAAResult(SwiftAAResult &&Arg)
         : AAResultBase(std::move(Arg)) {}
 
