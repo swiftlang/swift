@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME: swift-3-indexing-model: this whole file.  HalfOpenInterval should
+// likely disappear, since Range plays the same role.
+
 /// An interval over a `Comparable` type.
 public protocol Interval {
   /// The type of the `Interval`'s endpoints.
@@ -174,6 +177,9 @@ extension Interval {
   }
 }
 
+// FIXME: swift-3-indexing-model: this operator conflicts with the new Range
+// ..< operator.
+/*
 /// Returns a half-open interval from `start` to `end`.
 @warn_unused_result
 public func ..< <Bound : Comparable>(
@@ -181,6 +187,7 @@ public func ..< <Bound : Comparable>(
 ) -> HalfOpenInterval<Bound> {
   return HalfOpenInterval(_start: start, end: end)
 }
+*/
 
 /// Returns a closed interval from `start` through `end`.
 @warn_unused_result

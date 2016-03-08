@@ -295,7 +295,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   >(
     bounds: Range<Index>, with newElements: C
   ) {
-    let rawSubRange: Range<Int> =
+    let rawSubRange =
       bounds.startIndex._position
       ..< bounds.endIndex._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
