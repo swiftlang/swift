@@ -407,10 +407,16 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
         // See if it's a property
         for (auto propSpec : PropertySpecifiers) {
           NameBuffer propName;
-          if (match(remainingName, propSpec, propName))
-            if (auto pair = findPairedAccessor(workingName, propSpec))
+          if (match(remainingName, propSpec, propName)) {
+            if (auto pair = findPairedAccessor(workingName, propSpec)) {
               return importAsInstanceProperty(propName, propSpec, selfIdx,
                                               nonSelfParams, pair, effectiveDC);
+            } else if (propSpec == "Get") {
+              return importAsInstanceProperty(propName, propSpec, selfIdx,
+                                              nonSelfParams, nullptr,
+                                              effectiveDC);
+            }
+          }
         }
 
         return importAsInstanceMethod(remainingName, selfIdx, nonSelfParams,
@@ -433,10 +439,16 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
     // See if it's a property
     for (auto propSpec : PropertySpecifiers) {
       NameBuffer propName;
-      if (match(remainingName, propSpec, propName))
-        if (auto pair = findPairedAccessor(workingName, propSpec))
+      if (match(remainingName, propSpec, propName)) {
+        if (auto pair = findPairedAccessor(workingName, propSpec)) {
           return importAsStaticProperty(propName, propSpec, nonSelfParams, pair,
                                         effectiveDC);
+        } else if (propSpec == "Get") {
+
+          return importAsStaticProperty(propName, propSpec, nonSelfParams,
+                                        nullptr, effectiveDC);
+        }
+      }
     }
 
     return importAsStaticMethod(remainingName, nonSelfParams, effectiveDC);

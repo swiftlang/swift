@@ -35,6 +35,11 @@ extern void IAMStruct1SelfComesThird(int a, float b, struct IAMStruct1 s,
 // Static method
 extern int IAMStruct1StaticMethod();
 
+// Static computed properties
+extern int IAMStruct1StaticGetProperty();
+extern int IAMStruct1StaticSetProperty(int i);
+extern int IAMStruct1StaticGetOnlyProperty();
+
 // typedef __attribute__((objc_bridge(id))) void *IAMClassRef;
 struct IAMClass {
   int x, y, z;

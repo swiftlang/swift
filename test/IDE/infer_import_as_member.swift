@@ -29,13 +29,13 @@ import InferImportAsMember
 // PRINT-NEXT:   func rotate(radians radians: Double) -> IAMStruct1
 // PRINT-NEXT:   var radius: Double { get nonmutating set }
 // PRINT-NEXT:   var altitude: Double
-
-// FIXME: property
-// PRINT-NEXT:   func getMagnitude() -> Double
+// PRINT-NEXT:   var magnitude: Double
 
 // PRINT-NEXT:   func selfComesLast(x x: Double)
 // PRINT-NEXT:   func selfComesThird(a a: Int32, b b: Float, x x: Double)
 // PRINT-NEXT:   static func staticMethod() -> Int32
+// PRINT-NEXT:   static var staticProperty: Int32
+// PRINT-NEXT:   static var staticOnlyProperty: Int32 { get }
 // PRINT-NEXT: } 
 
 // FIXME: get the class working

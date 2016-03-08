@@ -2743,7 +2743,8 @@ namespace {
         return nullptr;
       }
 
-      assert(foundAccessor && "Didn't find the original accessor?");
+      assert(foundAccessor && "Didn't find the original accessor? "
+                              "Try clearing your module cache");
 
       // If there is no getter, there's nothing we can do.
       if (!getter) return nullptr;

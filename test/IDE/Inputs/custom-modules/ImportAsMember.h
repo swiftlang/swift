@@ -38,6 +38,12 @@ extern double IAMStruct1GetMagnitude(struct IAMStruct1 s)
 
 extern int IAMStruct1StaticMethod()
     __attribute__((swift_name("Struct1.staticMethod()")));
+extern int IAMStruct1StaticGetProperty()
+    __attribute__((swift_name("getter:Struct1.property()")));
+extern int IAMStruct1StaticSetProperty(int i)
+    __attribute__((swift_name("setter:Struct1.property(i:)")));
+extern int IAMStruct1StaticGetOnlyProperty()
+    __attribute__((swift_name("getter:Struct1.getOnlyProperty()")));
 
 extern void IAMStruct1SelfComesLast(double x, struct IAMStruct1 s)
     __attribute__((swift_name("Struct1.selfComesLast(x:self:)")));
