@@ -2026,6 +2026,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     assocType->getName(),
                                                     SourceLoc(),
                                                     TypeLoc::withoutLoc(type),
+                                                    /*genericparams*/nullptr, 
                                                     DC);
     Type metaType = MetatypeType::get(type);
     aliasDecl->computeType();

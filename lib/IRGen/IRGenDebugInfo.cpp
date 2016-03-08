@@ -842,7 +842,7 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
     MetadataTypeDecl = new (IGM.Context) TypeAliasDecl(
         SourceLoc(), IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
         TypeLoc::withoutLoc(IGM.Context.TheRawPointerType),
-        IGM.Context.TheBuiltinModule);
+        /*genericparams*/nullptr, IGM.Context.TheBuiltinModule);
     MetadataTypeDecl->computeType();
   }
   return MetadataTypeDecl;

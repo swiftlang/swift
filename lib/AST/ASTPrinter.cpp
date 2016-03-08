@@ -1094,8 +1094,8 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       } else {
         Printer << ", ";
       }
-      auto NM = Arg->getAnyNominal();
-      assert(NM && "Cannot get nominal type.");
+      auto NM = Arg->getAnyGeneric();
+      assert(NM && "Cannot get generic type.");
       Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, NM);
       Printer << NM->getNameStr(); // FIXME: PrintNameContext::GenericParameter
       Printer.printStructurePost(PrintStructureKind::GenericParameter, NM);
@@ -3004,11 +3004,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!Options.FullyQualifiedTypesIfAmbiguous)
       return false;
 
-    Decl *D = nullptr;
-    if (auto *NAT = dyn_cast<NameAliasType>(T))
-      D = NAT->getDecl();
-    else
-      D = T->getAnyNominal();
+    Decl *D = T->getAnyGeneric();
 
     // If we cannot find the declaration, be extra careful and print
     // the type qualified.

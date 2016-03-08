@@ -2,6 +2,9 @@
 Swift 3
 -------
 
+* Generic typealiases are now supported, e.g.:
+    typealias StringDictionary<T> = Dictionary<String, T>
+
 * The @noescape attribute has been extended to be a more general type attribute.
   You can now declare values of @noescape function type, e.g. in manually
   curried function signatures.  You can now also declare local variables of

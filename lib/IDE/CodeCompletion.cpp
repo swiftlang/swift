@@ -3712,14 +3712,9 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
-    Accessibility AccessibilityOfContext;
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(CurrDeclContext))
-      AccessibilityOfContext = NTD->getFormalAccess();
-    else
-      AccessibilityOfContext = cast<ExtensionDecl>(CurrDeclContext)
-                                   ->getExtendedType()
-                                   ->getAnyNominal()
-                                   ->getFormalAccess();
+    Accessibility AccessibilityOfContext =
+      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+        ->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
@@ -3825,10 +3820,7 @@ public:
   void addDesignatedInitializers(Type CurrTy) {
     if (!CurrTy)
       return;
-    const auto *NTD = CurrTy->getAnyNominal();
-    if (!NTD)
-      return;
-    const auto *CD = dyn_cast<ClassDecl>(NTD);
+    const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
     if (!CD->getSuperclass())
@@ -4743,16 +4735,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::GenericParams: {
-    if (auto NM = ParsedTypeLoc.getType()->getAnyNominal()) {
-      if (auto Params = NM->getGenericParams()) {
+  case CompletionKind::GenericParams:
+    if (auto GT = ParsedTypeLoc.getType()->getAnyGeneric()) {
+      if (auto Params = GT->getGenericParams()) {
         for (auto GP : Params->getParams()) {
-          Lookup.addGenericTypeParamRef(GP, DeclVisibilityKind::GenericParameter);
+          Lookup.addGenericTypeParamRef(GP,
+                                        DeclVisibilityKind::GenericParameter);
         }
       }
     }
     break;
-  }
   }
 
   if (Lookup.RequestedCachedResults) {

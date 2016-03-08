@@ -729,13 +729,12 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
-static void markInvalidGenericSignature(ValueDecl *VD,
-                                        TypeChecker &TC) {
+static void markInvalidGenericSignature(ValueDecl *VD, TypeChecker &TC) {
   GenericParamList *genericParams;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
     genericParams = AFD->getGenericParams();
   else
-    genericParams = cast<NominalTypeDecl>(VD)->getGenericParams();
+    genericParams = cast<GenericTypeDecl>(VD)->getGenericParams();
   
   // If there aren't any generic parameters at this level, we're done.
   if (genericParams == nullptr)
@@ -764,8 +763,7 @@ static void markInvalidGenericSignature(ValueDecl *VD,
 /// the generic parameters.
 static void finalizeGenericParamList(ArchetypeBuilder &builder,
                                      GenericParamList *genericParams,
-                                     DeclContext *dc,
-                                     TypeChecker &TC) {
+                                     DeclContext *dc, TypeChecker &TC) {
   Accessibility access;
   if (auto *fd = dyn_cast<FuncDecl>(dc))
     access = fd->getFormalAccess();
@@ -3461,26 +3459,12 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (TAD->isBeingTypeChecked()) {
-      
-      if (!TAD->hasUnderlyingType()) {
-        TAD->setInvalid();
-        TAD->overwriteType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        
-        TC.diagnose(TAD->getLoc(), diag::circular_type_alias, TAD->getName());
-      }
-      return;
-    }
-    
-    TAD->setIsBeingTypeChecked();
-    
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
       if (!TAD->hasType())
-        TAD->computeType();
-
+        TC.validateDecl(TAD);
+      
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
@@ -3511,8 +3495,6 @@ public:
       checkAccessibility(TC, TAD);
 
     TC.checkDeclAttributes(TAD);
-    
-    TAD->setIsBeingTypeChecked(false);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
@@ -3560,7 +3542,9 @@ public:
                       NTD->getName(),
                       DC->getDeclaredTypeOfContext());
         return true;
-      } else if (DC->isLocalContext() && DC->isGenericContext()) {
+      }
+      
+      if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           TC.diagnose(NTD->getLoc(),
@@ -6182,27 +6166,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
   case DeclKind::Module:
     return;
-
-  case DeclKind::TypeAlias: {
-    // Type aliases may not have an underlying type yet.
-    auto typeAlias = cast<TypeAliasDecl>(D);
-
-    if (typeAlias->getDeclContext()->isModuleScopeContext()) {
-      IterativeTypeChecker ITC(*this);
-      ITC.satisfy(requestResolveTypeDecl(typeAlias));
-    } else {
-      // Compute the declared type.
-      if (!typeAlias->hasType())
-        typeAlias->computeType();
-
-      if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
-          !typeAlias->getUnderlyingTypeLoc().wasValidated())
-        typeCheckDecl(typeAlias, true);
-    }
-
-    break;
-  }
-
+      
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType: {
     auto typeParam = cast<AbstractTypeParamDecl>(D);
@@ -6269,6 +6233,54 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     break;
   }
   
+
+  case DeclKind::TypeAlias: {
+    // Type aliases may not have an underlying type yet.
+    auto typeAlias = cast<TypeAliasDecl>(D);
+    
+    // Compute the declared type.
+    if (typeAlias->hasType()) {
+      
+      // If we have are recursing into validation and already have a type set...
+      // but also don't have the underlying type computed, then we are are
+      // recursing into interface validation while checking the body of the
+      // type.  Reject this with a circularity diagnostic.
+      if (!typeAlias->hasUnderlyingType()) {
+        diagnose(typeAlias->getLoc(), diag::circular_type_alias,
+                 typeAlias->getName());
+        typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
+        typeAlias->setInvalid();
+        typeAlias->overwriteType(ErrorType::get(Context));
+      }
+      return;
+    }
+    typeAlias->computeType();
+
+    // Check generic parameters, if needed.
+    if (auto gp = typeAlias->getGenericParams()) {
+      // Validate the generic type parameters.
+      if (validateGenericTypeSignature(typeAlias)) {
+        markInvalidGenericSignature(typeAlias, *this);
+        return;
+      }
+      
+      // If we're already validating the type declaration's generic signature,
+      // avoid a potential infinite loop by not re-validating the generic
+      // parameter list.
+      if (!typeAlias->IsValidatingGenericSignature()) {
+        revertGenericParamList(gp);
+        
+        auto builder = createArchetypeBuilder(typeAlias->getModuleContext());
+        checkGenericParamList(&builder, gp, nullptr/*parentSig*/);
+        finalizeGenericParamList(builder, gp, typeAlias, *this);
+      }
+    }
+    
+    // Otherwise, perform the heavy lifting now.
+    typeCheckDecl(typeAlias, true);
+    break;
+  }
+
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
@@ -6655,7 +6667,7 @@ static Type checkExtensionGenericParams(
   NominalTypeDecl *nominal;
   if (auto unbound = type->getAs<UnboundGenericType>()) {
     parentType = unbound->getParent();
-    nominal = unbound->getDecl();
+    nominal = cast<NominalTypeDecl>(unbound->getDecl());
   } else if (auto bound = type->getAs<BoundGenericType>()) {
     parentType = bound->getParent();
     nominal = bound->getDecl();

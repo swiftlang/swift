@@ -1264,9 +1264,8 @@ public:
     if (WhereLoc.isInvalid())
       return SourceRange();
 
-    return SourceRange(WhereLoc,
-                       Requirements[FirstTrailingWhereArg-1].getSecondTypeLoc()
-                         .getSourceRange().End);
+    auto endLoc = Requirements[FirstTrailingWhereArg-1].getSourceRange().End;
+    return SourceRange(WhereLoc, endLoc);
   }
 
   /// Retrieve the source range covering the trailing where clause.
@@ -2383,7 +2382,7 @@ public:
   GenericSignature *getGenericSignature() const {
     return GenericSig;
   }
-
+  
   void setIsValidatingGenericSignature(bool ivgs = true) {
     ValidatingGenericSignature = ivgs;
   }
@@ -2391,7 +2390,7 @@ public:
   bool IsValidatingGenericSignature() {
     return ValidatingGenericSignature;
   }
-
+  
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
   using DeclContext::operator new;
@@ -2414,7 +2413,7 @@ public:
 ///
 /// TypeAliasDecl's always have 'MetatypeType' type.
 ///
-class TypeAliasDecl : public TypeDecl {
+class TypeAliasDecl : public GenericTypeDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
 
@@ -2423,7 +2422,8 @@ class TypeAliasDecl : public TypeDecl {
 
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                SourceLoc NameLoc, TypeLoc UnderlyingTy, DeclContext *DC);
+                SourceLoc NameLoc, TypeLoc UnderlyingTy,
+                GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceRange getSourceRange() const;
@@ -2677,11 +2677,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   ExtensionDecl *LastExtension = nullptr;
 
   /// \brief The generation at which we last loaded extensions.
-  unsigned ExtensionGeneration: 28;
-                          
-  /// \brief Whether or not the generic signature of the type declaration is
-  /// currently being validated.
-  unsigned ValidatingGenericSignature: 1;
+  unsigned ExtensionGeneration: 29;
   
   /// \brief Whether or not this declaration has a failable initializer member,
   /// and whether or not we've actually searched for one.
