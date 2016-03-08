@@ -3514,11 +3514,7 @@ class YamlGroupInputParser {
         if (auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry)) {
           llvm::SmallString<16> FileNameStorage;
           StringRef FileName = FileEntry->getValue(FileNameStorage);
-          llvm::SmallString<32> GroupNameAndFileName;
-          GroupNameAndFileName.append(CombinedName);
-          GroupNameAndFileName.append(Separator);
-          GroupNameAndFileName.append(llvm::sys::path::stem(FileName));
-          Map[FileName] = GroupNameAndFileName.str();
+          Map[FileName] = CombinedName;
         } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
           if(parseRoot(Map, &Entry, *pCombined))
             return true;

@@ -761,8 +761,6 @@ public:
 
   Optional<StringRef> getGroupName() const;
 
-  Optional<StringRef> getSourceFileName() const;
-
   /// \returns the brief comment attached to this declaration.
   StringRef getBriefComment() const;
 
