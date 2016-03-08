@@ -229,8 +229,7 @@ extension CollectionType where SubSequence == Self {
   /// - Complexity: O(1)
   @warn_unused_result
   public mutating func popFirst() -> Generator.Element? {
-    guard !isEmpty else { return nil }
-    let element = first!
+    guard let element = first where !isEmpty else { return nil }
     self = self[startIndex.successor()..<endIndex]
     return element
   }
