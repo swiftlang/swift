@@ -2411,10 +2411,9 @@ bool ArgumentSplitter::createNewArguments() {
 
   // We do not want to split arguments that have less than 2 non-trivial
   // projections.
-  if (std::count_if(Projections.begin(), Projections.end(),
-                    [&](const Projection &P) {
-                      return !P.getType(Ty, Mod).isTrivial(Mod);
-                    }) < 2)
+  if (count_if(Projections, [&](const Projection &P) {
+        return !P.getType(Ty, Mod).isTrivial(Mod);
+      }) < 2)
     return false;
 
   // We subtract one since this will be the number of the first new argument
