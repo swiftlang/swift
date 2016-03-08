@@ -44,6 +44,56 @@ bb0(%0 : $foo):
   return %3 : $()
 }
 
+// CHECK-LABEL: START: sil @single_release_foo_with_epilogue_retain
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_epilogue_retain
+sil @single_release_foo_with_epilogue_retain : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  strong_release %0 : $foo
+  strong_retain %0 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_unknown_release
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_unknown_release
+sil @single_release_foo_with_unknown_release : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_release %0 : $foo
+  %5 = load %1 : $*foo
+  strong_release %5 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_unknown_retain
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_unknown_retain
+sil @single_release_foo_with_unknown_retain : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_release %0 : $foo
+  %5 = load %1 : $*foo
+  strong_retain %5 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_destroy_addr
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_destroy_addr
+sil @single_release_foo_with_destroy_addr : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_release %0 : $foo
+  destroy_addr %1 : $*foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
 // CHECK-LABEL: START: sil @single_release_bar
 // CHECK: [[IN1:%.*]] = argument of bb0 : $bar
 // CHECK: strong_release [[IN1]] : $bar
@@ -86,7 +136,8 @@ bb0(%0 : $baz):
 //
 // CHECK-LABEL: START: sil @exploded_release_with_interfering_uses
 // CHECK: [[IN1:%.*]] = argument of bb0 : $baz
-// CHECK-NOT: strong_release
+// CHECK: strong_release
+// CHECK: strong_release
 // CHECK: END: sil @exploded_release_with_interfering_uses
 sil @exploded_release_with_interfering_uses : $@convention(thin) (@owned baz) -> () {
 bb0(%0 : $baz):
@@ -132,7 +183,7 @@ bb0(%0 : $foo, %1 : $bar):
 
 // CHECK-LABEL: START: sil @single_release_on_multiple_args_with_interfering_uses
 // CHECK: [[IN1:%.*]] = argument of bb0 : $foo
-// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK: strong_release [[IN1]] : $foo
 // CHECK: [[IN2:%.*]] = argument of bb0 : $bar
 // CHECK: strong_release [[IN2]] : $bar
 // CHECK: END: sil @single_release_on_multiple_args_with_interfering_uses
