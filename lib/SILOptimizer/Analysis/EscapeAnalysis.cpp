@@ -1150,6 +1150,25 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                           ConGraph->getContentNode(SelfNode));
         }
         return;
+      case ArrayCallKind::kWithUnsafeMutableBufferPointer:
+        // Model this like an escape of the elements of the array and a capture
+        // of anything captured by the closure.
+        // Self is passed inout.
+        if (CGNode *AddrArrayStruct = ConGraph->getNode(ASC.getSelf(), this)) {
+          CGNode *ArrayStructValueNode =
+              ConGraph->getContentNode(AddrArrayStruct);
+          // One content node for going from the array buffer pointer to
+          // the element address (like ref_element_addr).
+          CGNode *RefElement = ConGraph->getContentNode(ArrayStructValueNode);
+          // Another content node to actually load the element.
+          CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
+          ConGraph->setEscapesGlobal(ArrayContent);
+          // The first non indirect result is the closure.
+          auto Args = FAS.getArgumentsWithoutIndirectResults();
+          setEscapesGlobal(ConGraph, Args[0]);
+          return;
+        }
+        break;
       default:
         break;
     }

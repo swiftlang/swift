@@ -33,6 +33,7 @@ enum class ArrayCallKind {
   kGetElementAddress,
   kMakeMutable,
   kMutateUnknown,
+  kWithUnsafeMutableBufferPointer,
   // The following two semantic function kinds return the result @owned
   // instead of operating on self passed as parameter.
   kArrayInit,

@@ -866,6 +866,7 @@ extension ${Self} {
   ///   that is the target of this method) during the execution of
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `UnsafeMutableBufferPointer` argument to `body`.
+  @_semantics("array.withUnsafeMutableBufferPointer")
   public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -874,6 +875,13 @@ extension ${Self} {
 
     // Ensure that body can't invalidate the storage or its bounds by
     // moving self into a temporary working array.
+    // NOTE: The stack promotion optimization that keys of the
+    // "array.withUnsafeMutableBufferPointer" semantics annotation relies on the
+    // array buffer not being able to escape in the closure. It can do this
+    // because we swap the array buffer in self with an empty buffer here. Any
+    // escape via the address of self in the closure will therefore escape the
+    // empty array.
+
     var work = ${Self}()
     swap(&work, &self)
 
