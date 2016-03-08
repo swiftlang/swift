@@ -257,8 +257,7 @@ primaryArchetype: A
 
 dependentMember1: A.Inner
 (dependent-member
-  (associated-type name=Inner)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Inner)
 
 TypesToReflect.C3
 -----------------
@@ -301,15 +300,12 @@ primaryArchetype: A
 
 dependentMember1: A.Outer
 (dependent-member
-  (associated-type name=Outer)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Outer)
 
 dependentMember2: A.Outer.Inner
 (dependent-member
-  (associated-type name=Inner)
   (dependent-member
-    (associated-type name=Outer)
-    (generic-type-parameter index=0 depth=0)))
+    (generic-type-parameter index=0 depth=0) member=Outer) member=Inner)
 
 TypesToReflect.C4
 -----------------
@@ -401,8 +397,7 @@ primaryArchetype: A
 
 dependentMember1: A.Inner
 (dependent-member
-  (associated-type name=Inner)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Inner)
 
 TypesToReflect.S3
 -----------------
@@ -449,15 +444,12 @@ primaryArchetype: A
 
 dependentMember1: A.Outer
 (dependent-member
-  (associated-type name=Outer)
-  (generic-type-parameter index=0 depth=0))
+  (generic-type-parameter index=0 depth=0) member=Outer)
 
 dependentMember2: A.Outer.Inner
 (dependent-member
-  (associated-type name=Inner)
   (dependent-member
-    (associated-type name=Outer)
-    (generic-type-parameter index=0 depth=0)))
+    (generic-type-parameter index=0 depth=0) member=Outer) member=Inner)
 
 TypesToReflect.S4
 -----------------
@@ -634,8 +626,7 @@ DependentMemberInner: <A where A: TypesToReflect.P1> (TypesToReflect.E2<A>.Type)
       (generic-type-parameter index=0 depth=0)))
   (function
     (dependent-member
-      (associated-type name=Inner)
-      (generic-type-parameter index=0 depth=0))
+      (generic-type-parameter index=0 depth=0) member=Inner)
     (bound-generic TypesToReflect.E2
       (generic-type-parameter index=0 depth=0))))
 
@@ -731,8 +722,7 @@ DependentMemberOuter: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type)
       (generic-type-parameter index=0 depth=0)))
   (function
     (dependent-member
-      (associated-type name=Outer)
-      (generic-type-parameter index=0 depth=0))
+      (generic-type-parameter index=0 depth=0) member=Outer)
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
@@ -743,10 +733,8 @@ DependentMemberInner: <A where A: TypesToReflect.P2> (TypesToReflect.E3<A>.Type)
       (generic-type-parameter index=0 depth=0)))
   (function
     (dependent-member
-      (associated-type name=Inner)
       (dependent-member
-        (associated-type name=Outer)
-        (generic-type-parameter index=0 depth=0)))
+        (generic-type-parameter index=0 depth=0) member=Outer) member=Inner)
     (bound-generic TypesToReflect.E3
       (generic-type-parameter index=0 depth=0))))
 
@@ -767,13 +755,13 @@ ASSOCIATED TYPES:
 =================
 TypesToReflect.Box : Swift.AnyObject.Protocol
 TypesToReflect.C : Swift.AnyObject.Protocol
-__ObjC.NSObject : Swift.AnyObject.Protocol
-__ObjC.NSObject : __ObjC.NSObjectProtocol.Protocol
-__ObjC.NSObject : Swift.Equatable.Protocol
-__ObjC.NSObject : Swift.Hashable.Protocol
-__ObjC.NSObject : Swift.CVarArgType.Protocol
-__ObjC.NSObject : Swift.CustomStringConvertible.Protocol
-__ObjC.NSObject : Swift.CustomDebugStringConvertible.Protocol
+TypesToReflect.OC : Swift.AnyObject.Protocol
+TypesToReflect.OC : __ObjC.NSObjectProtocol.Protocol
+TypesToReflect.OC : Swift.Equatable.Protocol
+TypesToReflect.OC : Swift.Hashable.Protocol
+TypesToReflect.OC : Swift.CVarArgType.Protocol
+TypesToReflect.OC : Swift.CustomStringConvertible.Protocol
+TypesToReflect.OC : Swift.CustomDebugStringConvertible.Protocol
 TypesToReflect.C1 : Swift.AnyObject.Protocol
 TypesToReflect.C1 : TypesToReflect.ClassBoundP.Protocol
 typealias Inner = A
@@ -812,11 +800,11 @@ typealias First = A
 typealias Second = B
 (generic-type-parameter index=1 depth=0)
 
-__ObjC.NSObject : Swift.AnyObject.Protocol
-__ObjC.NSObject : __ObjC.NSObjectProtocol.Protocol
-__ObjC.NSObject : Swift.Equatable.Protocol
-__ObjC.NSObject : Swift.Hashable.Protocol
-__ObjC.NSObject : Swift.CVarArgType.Protocol
-__ObjC.NSObject : Swift.CustomStringConvertible.Protocol
-__ObjC.NSObject : Swift.CustomDebugStringConvertible.Protocol
+TypesToReflect.GenericOC : Swift.AnyObject.Protocol
+TypesToReflect.GenericOC : __ObjC.NSObjectProtocol.Protocol
+TypesToReflect.GenericOC : Swift.Equatable.Protocol
+TypesToReflect.GenericOC : Swift.Hashable.Protocol
+TypesToReflect.GenericOC : Swift.CVarArgType.Protocol
+TypesToReflect.GenericOC : Swift.CustomStringConvertible.Protocol
+TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible.Protocol
 

@@ -406,6 +406,14 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       auto TR = RC.getTypeRef(isa);
       TR->dump();
 
+      auto Fields = RC.getFieldTypeRefs(isa);
+      for (auto &Field : Fields) {
+        std::cout << Field.first << ":\n";
+        Field.second->dump();
+        // TODO: Print field layout here.
+        std::cout << std::endl;
+      }
+
       vm_offset_t address;
       mach_msg_type_number_t size_read;
       error = vm_read(childTask, isa, 256, &address, &size_read);

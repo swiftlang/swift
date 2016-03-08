@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
 
 using namespace swift;
@@ -134,13 +135,7 @@ public:
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
     printHeader("dependent-member");
     printRec(DM->getBase().get());
-    printRec(DM->getMember().get());
-    OS << ')';
-  }
-
-  void visitAssociatedTypeRef(const AssociatedTypeRef *AT) {
-    printHeader("associated-type");
-    printField("name", AT->getName());
+    printField("member", DM->getMember());
     OS << ')';
   }
 
@@ -164,108 +159,81 @@ public:
   }
 };
 
-class TypeRefSubstitution
-: public TypeRefVisitor<TypeRefSubstitution, TypeRefPointer> {
-  ConstTypeRefVector &Substitutions;
-public:
-  TypeRefSubstitution(ConstTypeRefVector &Substitutions)
-  : Substitutions(Substitutions) {}
-
-  TypeRefPointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
-    return std::make_shared<BuiltinTypeRef>(*B);
+struct TypeRefIsConcrete
+  : public TypeRefVisitor<TypeRefIsConcrete, bool> {
+  bool visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return true;
   }
 
-  TypeRefPointer visitNominalTypeRef(const NominalTypeRef *N) {
-    return std::make_shared<NominalTypeRef>(*N);
+  bool visitNominalTypeRef(const NominalTypeRef *N) {
+    return true;
   }
 
-  TypeRefPointer visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+  bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     TypeRefVector GenericParams;
     for (auto Param : BG->getGenericParams())
-      if (auto Substituted = visit(Param.get()))
-        GenericParams.push_back(Substituted);
-      else return nullptr;
-    return std::make_shared<BoundGenericTypeRef>(BG->getMangledName(),
-                                                 GenericParams);
+      if (!visit(Param.get()))
+        return false;
+    return true;
   }
 
-  TypeRefPointer visitTupleTypeRef(const TupleTypeRef *T) {
-    TypeRefVector Elements;
+  bool visitTupleTypeRef(const TupleTypeRef *T) {
     for (auto Element : T->getElements()) {
-      if (auto SubstitutedElement = visit(Element.get()))
-        Elements.push_back(SubstitutedElement);
-      else
-        return nullptr;
+      if (!visit(Element.get()))
+        return false;
     }
-    return std::make_shared<TupleTypeRef>(Elements);
+    return true;
   }
 
-  TypeRefPointer visitFunctionTypeRef(const FunctionTypeRef *F) {
+  bool visitFunctionTypeRef(const FunctionTypeRef *F) {
     TypeRefVector SubstitutedArguments;
     for (auto Argument : F->getArguments())
-      if (auto SubstitutedArgument = visit(Argument.get()))
-        SubstitutedArguments.push_back(SubstitutedArgument);
-      else
-        return nullptr;
-
-    auto SubstitutedResult = visit(F->getResult().get());
-    if (!SubstitutedResult)
-      return nullptr;
-
-    return std::make_shared<FunctionTypeRef>(SubstitutedArguments,
-                                             SubstitutedResult);
+      if (!visit(Argument.get()))
+        return false;
+    return visit(F->getResult().get());
   }
 
-  TypeRefPointer visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    return std::make_shared<ProtocolTypeRef>(*P);
+  bool visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return true;
   }
 
-  TypeRefPointer
+  bool
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
-    return std::make_shared<ProtocolCompositionTypeRef>(*PC);
+    for (auto Protocol : PC->getProtocols())
+      if (!visit(Protocol.get()))
+        return false;
+    return true;
   }
 
-  TypeRefPointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    if (auto SubstitutedInstance = visit(M->getInstanceType().get()))
-      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
-    else
-      return nullptr;
+  bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return visit(M->getInstanceType().get());
   }
 
-  TypeRefPointer
+  bool
   visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
-    if (auto SubstitutedInstance = visit(EM->getInstanceType().get()))
-      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
-    else
-      return nullptr;
+    return visit(EM->getInstanceType().get());
   }
 
-  TypeRefPointer
+  bool
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
-    if (GTP->getIndex() < Substitutions.size())
-      return Substitutions[GTP->getIndex()];
-    return nullptr;
+    return false;
   }
 
-  TypeRefPointer
+  bool
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    return std::make_shared<DependentMemberTypeRef>(*DM);
+    return visit(DM->getBase().get());
   }
 
-  TypeRefPointer visitAssociatedTypeRef(const AssociatedTypeRef *AT) {
-    return std::make_shared<AssociatedTypeRef>(*AT);
+  bool visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return true;
   }
 
-  TypeRefPointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
-    return std::make_shared<ForeignClassTypeRef>(*F);
+  bool visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return true;
   }
-
-  TypeRefPointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
-    return std::make_shared<ObjCClassTypeRef>(*OC);
-  }
-
-  TypeRefPointer visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
-    return std::make_shared<OpaqueTypeRef>(*Op);
+  
+  bool visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+    return true;
   }
 };
 
@@ -285,10 +253,6 @@ void TypeRef::dump() const {
 void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeRef(OS, Indent).visit(this);
   OS << std::endl;
-}
-
-TypeRefPointer TypeRef::substituteGenerics(ConstTypeRefVector &Substitutions) {
-  return TypeRefSubstitution(Substitutions).visit(this);
 }
 
 TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
@@ -379,13 +343,15 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
       return fromDemangleNode(Node->getChild(1));
     }
     case NodeKind::DependentMemberType: {
-      auto member = fromDemangleNode(Node->getChild(0));
-      auto base = fromDemangleNode(Node->getChild(1));
+      auto base = fromDemangleNode(Node->getChild(0));
+      auto member = Node->getChild(1)->getText();
       return DependentMemberTypeRef::create(member, base);
     }
-    case NodeKind::DependentAssociatedTypeRef:
-      return AssociatedTypeRef::create(Node->getText());
     default:
       return nullptr;
   }
+}
+
+bool TypeRef::isConcrete() const {
+  return TypeRefIsConcrete().visit(this);
 }

@@ -28,6 +28,11 @@ class NodePointer;
 namespace swift {
 namespace reflection {
 
+template <typename Runtime>
+class ReflectionContext;
+
+struct ReflectionInfo;
+
 using llvm::cast;
 using llvm::dyn_cast;
 
@@ -56,7 +61,12 @@ public:
   void dump() const;
   void dump(std::ostream &OS, unsigned Indent = 0) const;
 
-  TypeRefPointer substituteGenerics(ConstTypeRefVector &Substitutions);
+  bool isConcrete() const;
+
+  template <typename Runtime>
+  TypeRefPointer
+  substituteGenerics(ReflectionContext<Runtime> &RC,
+                     typename Runtime::StoredPointer MetadatAddress);
   static TypeRefPointer fromDemangleNode(Demangle::NodePointer Node);
 };
 
@@ -316,22 +326,18 @@ public:
 };
 
 class DependentMemberTypeRef final : public TypeRef {
-  TypeRefPointer Member;
+  std::string Member;
   TypeRefPointer Base;
 
 public:
-  DependentMemberTypeRef(TypeRefPointer Member, TypeRefPointer Base)
+  DependentMemberTypeRef(std::string Member, TypeRefPointer Base)
     : TypeRef(TypeRefKind::DependentMember), Member(Member), Base(Base) {}
   static std::shared_ptr<DependentMemberTypeRef>
-  create(TypeRefPointer Member, TypeRefPointer Base) {
+  create(std::string Member, TypeRefPointer Base) {
     return std::make_shared<DependentMemberTypeRef>(Member, Base);
   }
 
-  TypeRefPointer getMember() {
-    return Member;
-  }
-
-  ConstTypeRefPointer getMember() const {
+  const std::string &getMember() const {
     return Member;
   }
 
@@ -345,26 +351,6 @@ public:
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::DependentMember;
-  }
-};
-
-class AssociatedTypeRef final : public TypeRef {
-  std::string Name;
-
-public:
-  AssociatedTypeRef(std::string Name)
-    : TypeRef(TypeRefKind::Associated), Name(Name) {}
-
-  static std::shared_ptr<AssociatedTypeRef> create(std::string Name) {
-    return std::make_shared<AssociatedTypeRef>(Name);
-  }
-
-  std::string getName() const {
-    return Name;
-  }
-
-  static bool classof(const TypeRef *TR) {
-    return TR->getKind() == TypeRefKind::Associated;
   }
 };
 
@@ -424,6 +410,148 @@ public:
     }
   }
 };
+
+template <typename Runtime>
+class TypeRefSubstitution
+  : public TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRefPointer> {
+  using StoredPointer = typename Runtime::StoredPointer;
+  ReflectionContext<Runtime> &RC;
+  ConstTypeRefVector Substitutions;
+  StoredPointer MetadataAddress;
+public:
+  using TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRefPointer>::visit;
+  TypeRefSubstitution(ReflectionContext<Runtime> &RC,
+                      StoredPointer MetadataAddress)
+  : RC(RC), Substitutions(RC.getGenericArguments(MetadataAddress)),
+    MetadataAddress(MetadataAddress) {}
+
+  TypeRefPointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return std::make_shared<BuiltinTypeRef>(*B);
+  }
+
+  TypeRefPointer visitNominalTypeRef(const NominalTypeRef *N) {
+    return std::make_shared<NominalTypeRef>(*N);
+  }
+
+  TypeRefPointer visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    TypeRefVector GenericParams;
+    for (auto Param : BG->getGenericParams())
+      if (auto Substituted = visit(Param.get()))
+        GenericParams.push_back(Substituted);
+      else return nullptr;
+    return std::make_shared<BoundGenericTypeRef>(BG->getMangledName(),
+                                                 GenericParams);
+  }
+
+  TypeRefPointer visitTupleTypeRef(const TupleTypeRef *T) {
+    TypeRefVector Elements;
+    for (auto Element : T->getElements()) {
+      if (auto SubstitutedElement = visit(Element.get()))
+        Elements.push_back(SubstitutedElement);
+      else
+        return nullptr;
+    }
+    return std::make_shared<TupleTypeRef>(Elements);
+  }
+
+  TypeRefPointer visitFunctionTypeRef(const FunctionTypeRef *F) {
+    TypeRefVector SubstitutedArguments;
+    for (auto Argument : F->getArguments())
+      if (auto SubstitutedArgument = visit(Argument.get()))
+        SubstitutedArguments.push_back(SubstitutedArgument);
+      else
+        return nullptr;
+
+    auto SubstitutedResult = visit(F->getResult().get());
+    if (!SubstitutedResult)
+      return nullptr;
+
+    return std::make_shared<FunctionTypeRef>(SubstitutedArguments,
+                                             SubstitutedResult);
+  }
+
+  TypeRefPointer visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return std::make_shared<ProtocolTypeRef>(*P);
+  }
+
+  TypeRefPointer
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return std::make_shared<ProtocolCompositionTypeRef>(*PC);
+  }
+
+  TypeRefPointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    if (auto SubstitutedInstance = visit(M->getInstanceType().get()))
+      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
+    else
+      return nullptr;
+  }
+
+  TypeRefPointer
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    if (auto SubstitutedInstance = visit(EM->getInstanceType().get()))
+      return std::make_shared<MetatypeTypeRef>(SubstitutedInstance);
+    else
+      return nullptr;
+  }
+
+  TypeRefPointer
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
+    // FIXME: Substitution lookups should be (Index, Depth) -> TypeRef
+    if (GTP->getIndex() < Substitutions.size())
+      return Substitutions[GTP->getIndex()];
+    return nullptr;
+  }
+
+  TypeRefPointer
+  visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    auto SubstBase = visit(DM->getBase().get());
+    if (!SubstBase || !SubstBase->isConcrete())
+      return nullptr;
+
+    TypeRefPointer TypeWitness;
+
+    switch (SubstBase->getKind()) {
+    case TypeRefKind::Nominal: {
+      auto Nominal = cast<NominalTypeRef>(SubstBase.get());
+      TypeWitness = RC.getDependentMemberTypeRef(MetadataAddress,
+                                                 Nominal->getMangledName(),
+                                                 DM->getMember());
+      break;
+    }
+    case TypeRefKind::BoundGeneric: {
+      auto BG = cast<BoundGenericTypeRef>(SubstBase.get());
+      TypeWitness = RC.getDependentMemberTypeRef(MetadataAddress,
+                                                 BG->getMangledName(),
+                                                 DM->getMember());
+      break;
+    }
+    default:
+      return nullptr;
+    }
+    if (!TypeWitness)
+      return nullptr;
+
+    return visit(TypeWitness.get());
+  }
+
+  TypeRefPointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return std::make_shared<ForeignClassTypeRef>(*F);
+  }
+
+  TypeRefPointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return std::make_shared<ObjCClassTypeRef>(*OC);
+  }
+  
+  TypeRefPointer visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+    return std::make_shared<OpaqueTypeRef>(*Op);
+  }
+};
+
+template <typename Runtime>
+TypeRefPointer TypeRef::substituteGenerics(ReflectionContext<Runtime> &RC,
+                                           typename Runtime::StoredPointer MetadataAddress) {
+  return TypeRefSubstitution<Runtime>(RC, MetadataAddress).visit(this);
+}
 
 } // end namespace reflection
 } // end namespace swift

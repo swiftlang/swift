@@ -64,6 +64,8 @@ class ReflectionContext {
   std::unordered_map<StoredPointer, TypeRefPointer> TypeRefCache;
   std::unordered_map<StoredPointer, SharedTargetMetadataRef<Runtime>>
   MetadataCache;
+  std::unordered_map<StoredPointer, const AssociatedTypeDescriptor *>
+  AssociatedTypeCache;
 
   std::unordered_map<StoredPointer,
                      std::pair<SharedTargetNominalTypeDescriptorRef<Runtime>,
@@ -95,6 +97,28 @@ class ReflectionContext {
     auto Meta = SharedTargetMetadataRef<Runtime>(Casted, free);
     MetadataCache.insert({Address, Meta});
     return Meta;
+  }
+
+  const AssociatedTypeDescriptor *
+  lookupAssociatedTypes(const StoredPointer MetadataAddress,
+                        const std::string &MangledTypeName) {
+    auto AssocTys = AssociatedTypeCache.find(MetadataAddress);
+    if (AssocTys != AssociatedTypeCache.end())
+      return AssocTys->second;
+
+    // Cache missed - we need to look through all of the assocty sections
+    // for all images that we've been notified about.
+    for (auto &Info : ReflectionInfos) {
+      for (const auto &AssocTyDescriptor : Info.assocty) {
+        std::string ConformingTypeName(AssocTyDescriptor.ConformingTypeName);
+        if (ConformingTypeName.compare(MangledTypeName) != 0)
+          continue;
+
+        AssociatedTypeCache.insert({MetadataAddress, &AssocTyDescriptor});
+        return &AssocTyDescriptor;
+      }
+    }
+    return nullptr;
   }
 
 public:
@@ -146,6 +170,25 @@ public:
     OS << std::endl;
     dumpAssociatedTypeSection(OS);
     OS << std::endl;
+  }
+
+  TypeRefPointer
+  getDependentMemberTypeRef(const StoredPointer MetadataAddress,
+                            const std::string &MangledTypeName,
+                            const std::string &Member) {
+
+    if (auto AssocTys = lookupAssociatedTypes(MetadataAddress,
+                                              MangledTypeName)) {
+      for (auto &AssocTy : *AssocTys) {
+        if (Member.compare(AssocTy.getName()) != 0)
+          continue;
+
+        auto SubstitutedTypeName = AssocTy.getMangledSubstitutedTypeName();
+        auto Demangled = Demangle::demangleTypeAsNode(SubstitutedTypeName);
+        return TypeRef::fromDemangleNode(Demangled);
+      }
+    }
+    return nullptr;
   }
 
   SharedTargetMetadataRef<Runtime> readMetadata(StoredPointer Address) {
@@ -476,8 +519,9 @@ public:
     }
   }
 
-  TypeRefVector getFieldTypeRefs(StoredPointer MetadataAddress) {
-    TypeRefVector Fields;
+  std::vector<std::pair<std::string, ConstTypeRefPointer>>
+  getFieldTypeRefs(StoredPointer MetadataAddress) {
+    std::vector<std::pair<std::string, ConstTypeRefPointer>> Fields;
 
     auto Meta = readMetadata(MetadataAddress);
     if (!Meta)
@@ -497,8 +541,6 @@ public:
     if (MangledName.empty())
       return {};
 
-    auto ThisTypeRef = getTypeRef(MetadataAddress);
-
     for (auto Info : ReflectionInfos) {
       for (auto &FieldDescriptor : Info.fieldmd) {
         auto CandidateMangledName = FieldDescriptor.MangledTypeName.get();
@@ -511,8 +553,9 @@ public:
           if (!Unsubstituted)
             return {};
           auto Subs = getGenericArguments(MetadataAddress);
-          auto Substituted = Unsubstituted->substituteGenerics(Subs);
-          Fields.push_back(Substituted);
+          auto Substituted = Unsubstituted->substituteGenerics(*this,
+                                                               MetadataAddress);
+          Fields.push_back({Field.getFieldName(), Substituted});
         }
       }
     }
