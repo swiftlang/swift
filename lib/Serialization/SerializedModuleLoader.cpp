@@ -495,6 +495,11 @@ SerializedASTFile::getGroupNameForDecl(const Decl *D) const {
   return File.getGroupNameForDecl(D);
 }
 
+Optional<StringRef>
+SerializedASTFile::getSourceFileNameForDecl(const Decl *D) const {
+  return File.getSourceFileNameForDecl(D);
+}
+
 void
 SerializedASTFile::collectAllGroups(std::vector<StringRef> &Names) const {
   File.collectAllGroups(Names);

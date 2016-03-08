@@ -1539,13 +1539,9 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
-  if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
-    return None;
-  return (*GroupNamesMap)[Id];
-}
+const static std::string Separator = "/";
 
-Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
+const Decl* getGroupDecl(const Decl *D) {
   auto GroupD = D;
 
   // Extensions always exist in the same group with the nominal.
@@ -1553,11 +1549,43 @@ Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
                                                 getInnermostTypeContext())) {
     GroupD = ED->getExtendedType()->getAnyNominal();
   }
+  return GroupD;
+}
+
+Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
+  if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
+    return None;
+  auto Original = (*GroupNamesMap)[Id];
+  return StringRef(Original.data(), Original.find_last_of(Separator));
+}
+
+Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
+  if(!GroupNamesMap || GroupNamesMap->count(Id) == 0)
+    return None;
+  auto Original = (*GroupNamesMap)[Id];
+  auto SepPos = Original.find_last_of(Separator);
+  auto Start = Original.data() + SepPos + 1;
+  auto Len = Original.size() - SepPos - 1;
+  return StringRef(Start, Len);
+}
+
+Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
+  auto GroupD = getGroupDecl(D);
   auto Triple = getCommentForDecl(GroupD);
   if (!Triple.hasValue()) {
     return None;
   }
   return getGroupNameById(Triple.getValue().Group);
+}
+
+Optional<StringRef>
+ModuleFile::getSourceFileNameForDecl(const Decl *D) const {
+  auto GroupD = getGroupDecl(D);
+  auto Triple = getCommentForDecl(GroupD);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return getSourceFileNameById(Triple.getValue().Group);
 }
 
 void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {

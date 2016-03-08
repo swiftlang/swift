@@ -140,6 +140,8 @@ public:
 
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const override;
 
+  Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const override;
+
   void collectAllGroups(std::vector<StringRef> &Names) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
