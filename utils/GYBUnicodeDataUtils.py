@@ -15,19 +15,24 @@ class UnicodeProperty(object):
     """Abstract base class for Unicode properties."""
 
     def __init__(self):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.__init__ is not implemented.")
 
     def get_default_value(self):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.get_default_value is not implemented.")
 
     def get_value(self, cp):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.get_value is not implemented.")
 
     def to_numeric_value(self, value):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.to_numeric_value is not implemented.")
 
     def get_numeric_value(self, cp):
-        raise NotImplemented
+        raise NotImplementedError(
+            "UnicodeProperty.get_numeric_value is not implemented.")
 
 class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     """Grapheme_Cluster_Break property."""
