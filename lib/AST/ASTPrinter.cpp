@@ -1915,6 +1915,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
+    }, [&]{ // Signature
+      printGenericParams(decl->getGenericParams());
     });
   bool ShouldPrint = true;
   Type Ty;

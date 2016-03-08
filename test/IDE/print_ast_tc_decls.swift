@@ -1348,3 +1348,9 @@ extension ProtocolToExtend where Self.Assoc == Int {}
 // PASS_PRINT_AST: #elseif
 // PASS_PRINT_AST: #else
 // PASS_PRINT_AST: #endif
+
+public struct MyPair<A, B> { var a: A, b: B }
+public typealias MyPairI<B> = MyPair<Int, B>
+// PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
+public typealias MyPairAlias<T, U> = MyPair<T, U>
+// PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>
