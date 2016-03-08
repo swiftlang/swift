@@ -5318,7 +5318,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
   if (auto typerepr = loc.getTypeRepr()) {
     struct FindGenericTypeDecl : public ASTWalker {
       GenericTypeDecl *&FoundDecl;
-      FindGenericTypeDecl(GenericTypeDecl *&FoundDecl) : FoundDecl(FoundDecl){
+      FindGenericTypeDecl(GenericTypeDecl *&FoundDecl) : FoundDecl(FoundDecl) {
       }
       
       bool walkToTypeReprPre(TypeRepr *T) override {
@@ -5326,7 +5326,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         if (FoundDecl) return false;
         
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T))
-          FoundDecl =dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
+          FoundDecl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
         // Keep walking.
         return true;
       }
