@@ -22,6 +22,7 @@
 #include "llvm/Support/Casting.h"
 
 #include <iostream>
+#include <map>
 
 class NodePointer;
 
@@ -47,6 +48,9 @@ using TypeRefPointer = std::shared_ptr<TypeRef>;
 using ConstTypeRefPointer = std::shared_ptr<const TypeRef>;
 using TypeRefVector = std::vector<TypeRefPointer>;
 using ConstTypeRefVector = const std::vector<TypeRefPointer>;
+
+using GenericArgumentMap = std::map<std::pair<unsigned, unsigned>,
+                                    TypeRefPointer>;
 
 class TypeRef : public std::enable_shared_from_this<TypeRef> {
   TypeRefKind Kind;
@@ -112,16 +116,16 @@ public:
 
 class BoundGenericTypeRef final : public TypeRef {
   std::string MangledName;
-  TypeRefVector GenericParams;
+  GenericArgumentMap GenericParams;
 
 public:
-  BoundGenericTypeRef(std::string MangledName, TypeRefVector GenericParams)
+  BoundGenericTypeRef(std::string MangledName, GenericArgumentMap GenericParams)
     : TypeRef(TypeRefKind::BoundGeneric),
       MangledName(MangledName),
       GenericParams(GenericParams) {}
 
   static std::shared_ptr<BoundGenericTypeRef>
-  create(std::string MangledName, TypeRefVector GenericParams) {
+  create(std::string MangledName, GenericArgumentMap GenericParams) {
     return std::make_shared<BoundGenericTypeRef>(MangledName, GenericParams);
   }
 
@@ -129,11 +133,7 @@ public:
     return MangledName;
   }
 
-  TypeRefVector getGenericParams() {
-    return GenericParams;
-  }
-
-  ConstTypeRefVector getGenericParams() const {
+  const GenericArgumentMap &getGenericParams() const {
     return GenericParams;
   }
 
@@ -416,7 +416,7 @@ class TypeRefSubstitution
   : public TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRefPointer> {
   using StoredPointer = typename Runtime::StoredPointer;
   ReflectionContext<Runtime> &RC;
-  ConstTypeRefVector Substitutions;
+  GenericArgumentMap Substitutions;
   StoredPointer MetadataAddress;
 public:
   using TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRefPointer>::visit;
@@ -434,10 +434,10 @@ public:
   }
 
   TypeRefPointer visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    TypeRefVector GenericParams;
+    GenericArgumentMap GenericParams;
     for (auto Param : BG->getGenericParams())
-      if (auto Substituted = visit(Param.get()))
-        GenericParams.push_back(Substituted);
+      if (auto Substituted = visit(Param.second.get()))
+        GenericParams.insert({Param.first, Substituted});
       else return nullptr;
     return std::make_shared<BoundGenericTypeRef>(BG->getMangledName(),
                                                  GenericParams);
@@ -496,10 +496,10 @@ public:
 
   TypeRefPointer
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
-    // FIXME: Substitution lookups should be (Index, Depth) -> TypeRef
-    if (GTP->getIndex() < Substitutions.size())
-      return Substitutions[GTP->getIndex()];
-    return nullptr;
+    auto Sub = Substitutions.find({GTP->getIndex(), GTP->getDepth()});
+    if (Sub == Substitutions.end())
+      return nullptr;
+    return Sub->second;
   }
 
   TypeRefPointer

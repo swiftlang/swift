@@ -80,7 +80,7 @@ public:
     auto demangled = Demangle::demangleTypeAsString(BG->getMangledName());
     printField("", demangled);
     for (auto param : BG->getGenericParams())
-      printRec(param.get());
+      printRec(param.second.get());
     OS << ')';
   }
 
@@ -172,7 +172,7 @@ struct TypeRefIsConcrete
   bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     TypeRefVector GenericParams;
     for (auto Param : BG->getGenericParams())
-      if (!visit(Param.get()))
+      if (!visit(Param.second.get()))
         return false;
     return true;
   }
@@ -269,11 +269,23 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     case NodeKind::BoundGenericStructure: {
       auto mangledName = Demangle::mangleNode(Node->getChild(0));
       auto genericArgs = Node->getChild(1);
-      TypeRefVector Params;
+      TypeRefVector Args;
       for (auto genericArg : *genericArgs)
-        Params.push_back(fromDemangleNode(genericArg));
+        if (auto ParamTypeRef = fromDemangleNode(genericArg))
+          Args.push_back(ParamTypeRef);
 
-      return BoundGenericTypeRef::create(mangledName, Params);
+      GenericArgumentMap ArgMap;
+      unsigned Index = 0;
+      for (auto Arg : Args) {
+        if (auto GTP = dyn_cast<GenericTypeParameterTypeRef>(Arg.get())) {
+          ArgMap.insert({{GTP->getIndex(), GTP->getDepth()}, Arg});
+        } else {
+          ArgMap.insert({{Index, 0}, Arg});
+        }
+        ++Index;
+      }
+
+      return BoundGenericTypeRef::create(mangledName, ArgMap);
     }
     case NodeKind::Class:
     case NodeKind::Enum:

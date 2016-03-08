@@ -344,13 +344,13 @@ public:
     return SharedProtocolDescriptorRef<Runtime>(Casted, free);
   }
 
-  TypeRefVector
+  std::map<std::pair<unsigned, unsigned>, TypeRefPointer>
   getGenericArguments(StoredPointer MetadataAddress){
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
       = readNominalTypeDescriptor(MetadataAddress);
-    TypeRefVector GenericArgTypeRefs;
+    std::map<std::pair<unsigned, unsigned>, TypeRefPointer> GenericArgTypeRefs;
     auto NumGenericParams = Descriptor->GenericParams.NumPrimaryParams;
     auto OffsetToGenericArgs
       = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset);
@@ -364,10 +364,11 @@ public:
                                 &GenericArgAddress))
           return {};
       if (auto GenericArg = getTypeRef(GenericArgAddress))
-        GenericArgTypeRefs.push_back(GenericArg);
+        // FIXME: Get depth of generic argument when supported
+        GenericArgTypeRefs.insert({{i, 0}, GenericArg});
       else
         return {};
-      }
+    }
     return GenericArgTypeRefs;
   }
 
