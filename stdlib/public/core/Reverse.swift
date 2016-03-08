@@ -32,6 +32,14 @@ public func == <Base : Collection>(
 }
 
 @warn_unused_result
+public func != <Base : Collection>(
+  lhs: ReverseIndex<Base>,
+  rhs: ReverseIndex<Base>
+) -> Bool {
+  return lhs.base != rhs.base
+}
+
+@warn_unused_result
 public func < <Base : Collection>(
   lhs: ReverseIndex<Base>,
   rhs: ReverseIndex<Base>
@@ -169,7 +177,7 @@ public struct ReverseRandomAccessIndex<
   @warn_unused_result
   public func distance(to other: ReverseRandomAccessIndex) -> Stride {
     // Note ReverseRandomAccessIndex has inverted logic compared to base Base.Index
-    return other.distance(to: base)
+    return other.base.distance(to: base)
   }
 
   @warn_unused_result
@@ -186,6 +194,14 @@ public func == <Base : Collection>(
   rhs: ReverseRandomAccessIndex<Base>
 ) -> Bool {
   return lhs.base == rhs.base
+}
+
+@warn_unused_result
+public func != <Base : Collection>(
+  lhs: ReverseRandomAccessIndex<Base>,
+  rhs: ReverseRandomAccessIndex<Base>
+) -> Bool {
+  return lhs.base != rhs.base
 }
 
 @warn_unused_result
