@@ -4,6 +4,11 @@ Swift 3
 
 * Generic typealiases are now supported, e.g.:
     typealias StringDictionary<T> = Dictionary<String, T>
+    typealias IntFunction<T> = (T) -> Int
+    typealias MatchingTriple<T> = (T, T, T)
+    typealias BackwardTriple<T1,T2,T3> = (T3, T2, T1)
+
+  etc.
 
 * The @noescape attribute has been extended to be a more general type attribute.
   You can now declare values of @noescape function type, e.g. in manually
