@@ -5,6 +5,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_0 | FileCheck %s -check-prefix=BOOL_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_1 | FileCheck %s -check-prefix=BOOL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_2 | FileCheck %s -check-prefix=BOOL_2
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_3 | FileCheck %s -check-prefix=BOOL_3
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_4 | FileCheck %s -check-prefix=BOOL_4
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_0 | FileCheck %s -check-prefix=INT_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_1 | FileCheck %s -check-prefix=INT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_2 | FileCheck %s -check-prefix=INT_2
@@ -23,6 +25,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_2 | FileCheck %s -check-prefix=TUPLE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_0 | FileCheck %s -check-prefix=COLOR_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_1 | FileCheck %s -check-prefix=COLOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_2 | FileCheck %s -check-prefix=COLOR_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_0 | FileCheck %s -check-prefix=IMAGE_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_1 | FileCheck %s -check-prefix=IMAGE_1
 
@@ -103,6 +106,18 @@ func testBool2() {
 }
 // BOOL_2: Literal[Boolean]/None/TypeRelation[Identical]: true[#Bool#];
 // BOOL_2: Literal[Boolean]/None/TypeRelation[Identical]: false[#Bool#];
+
+func testBool3() {
+  let x: Bool? = #^BOOL_3^#
+}
+// BOOL_3: Literal[Boolean]/None/TypeRelation[Convertible]: true[#Bool#];
+// BOOL_3: Literal[Boolean]/None/TypeRelation[Convertible]: false[#Bool#];
+
+func testBool4() {
+  let x: Bool! = #^BOOL_4^#
+}
+// BOOL_4: Literal[Boolean]/None/TypeRelation[Convertible]: true[#Bool#];
+// BOOL_4: Literal[Boolean]/None/TypeRelation[Convertible]: false[#Bool#];
 
 func testInt0() {
   let x: Bool = #^INT_0^#
@@ -197,6 +212,11 @@ func testColor1() {
   let x: MyColor1 = #^COLOR_1^#
 }
 // COLOR_1: Literal[_Color]/None/TypeRelation[Identical]: [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#][#MyColor1#];
+
+func testColor2() {
+  let x: MyColor1? = #^COLOR_2^#
+}
+// COLOR_2: Literal[_Color]/None/TypeRelation[Convertible]: [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#][#MyColor1#];
 
 struct MyImage1: _ImageLiteralConvertible {
   init(imageLiteral: String) {}

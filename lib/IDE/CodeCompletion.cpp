@@ -3117,12 +3117,24 @@ public:
       for (auto T : ExpectedTypes) {
         if (!T)
           continue;
+
+        auto typeRelation = CodeCompletionResult::Identical;
+        // Convert through optional types unless we're looking for a protocol
+        // that Optional itself conforms to.
+        if (kind != CodeCompletionLiteralKind::NilLiteral) {
+          if (auto optionalObjT = T->getAnyOptionalObjectType()) {
+            T = optionalObjT;
+            typeRelation = CodeCompletionResult::Convertible;
+          }
+        }
+
+        // Check for conformance to the literal protocol.
         if (auto *NTD = T->getAnyNominal()) {
           SmallVector<ProtocolConformance *, 2> conformances;
           if (NTD->lookupConformance(module, P, conformances)) {
             foundConformance = true;
             addTypeAnnotation(builder, T);
-            builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
+            builder.setExpectedTypeRelation(typeRelation);
           }
         }
       }
