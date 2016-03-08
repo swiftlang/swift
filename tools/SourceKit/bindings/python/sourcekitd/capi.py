@@ -47,7 +47,7 @@ class CachedProperty(object):
         self.wrapped = wrapped
         try:
             self.__doc__ = wrapped.__doc__
-        except:
+        except AttributeError:
             pass
 
     def __get__(self, instance, instance_type=None):

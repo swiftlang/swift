@@ -38,7 +38,7 @@ PrintAllScores = 0
 def parse_int(word):
     try:
         return int(word)
-    except:
+    except ValueError:
         raise Exception("Expected integer value, not " + word)
 
 def get_scores(fname):
