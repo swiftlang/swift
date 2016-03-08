@@ -24,9 +24,40 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CLOSURE_1 | FileCheck %s -check-prefix=TOP_LEVEL_CLOSURE_1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.1.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.1.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_2 > %t.toplevel.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.2.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.2.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_3 > %t.toplevel.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.3.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.3.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_4 > %t.toplevel.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.4.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.4.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_5 > %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.5.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_5 > %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.5.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_6 > %t.toplevel.6.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.6.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.6.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.6.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
@@ -218,6 +249,27 @@ var topLevelVarType1 : #^TOP_LEVEL_VAR_TYPE_1^#
 // TOP_LEVEL_VAR_TYPE_1: Begin completions
 // TOP_LEVEL_VAR_TYPE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_TYPE_1: End completions
+// TOP_LEVEL_VAR_TYPE_NEGATIVE_1-NOT: Decl[GlobalVar
+// TOP_LEVEL_VAR_TYPE_NEGATIVE_1-NOT: Decl[FreeFunc
+func resyncParserA1_1() {}
+
+var topLevelVarType2 : [#^TOP_LEVEL_VAR_TYPE_2^#]
+
+func resyncParserA1_2() {}
+
+var topLevelVarType3 : [#^TOP_LEVEL_VAR_TYPE_3^#: Int]
+
+func resyncParserA1_3() {}
+
+var topLevelVarType4 : [Int: #^TOP_LEVEL_VAR_TYPE_4^#]
+
+func resyncParserA1_4() {}
+
+if let topLevelVarType5 : [#^TOP_LEVEL_VAR_TYPE_5^#] {}
+
+func resyncParserA1_5() {}
+
+guard let topLevelVarType6 : [#^TOP_LEVEL_VAR_TYPE_6^#] else {}
 
 func resyncParserA2() {}
 
