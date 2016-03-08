@@ -342,7 +342,16 @@ void swift::ide::printSubmoduleInterface(
   if (!GroupNames.empty()) {
     assert(SwiftDecls.empty());
     for (auto It = FileRangedDecls.begin(); It != FileRangedDecls.end(); ++ It) {
-      for (auto D : *It->getValue()) {
+      auto &DeclsInFile = *It->getValue();
+      std::sort(DeclsInFile.begin(), DeclsInFile.end(),
+                [](Decl* LHS, Decl *RHS) {
+                  assert(LHS->getSourceOrder().hasValue());
+                  assert(RHS->getSourceOrder().hasValue());
+                  return LHS->getSourceOrder().getValue() <
+                         RHS->getSourceOrder().getValue();
+                });
+
+      for (auto D : DeclsInFile) {
         SwiftDecls.push_back(D);
       }
     }
