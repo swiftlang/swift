@@ -12,10 +12,10 @@
 #
 # ===----------------------------------------------------------------------===//
 
-import os
-import subprocess
 import multiprocessing
+import os
 import re
+import subprocess
 
 class Result(object):
     def __init__(self, name, status, output, xfail_list):

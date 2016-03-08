@@ -57,9 +57,10 @@
 #     ]
 # }
 
-import sys
 import json
 import re
+import sys
+
 # Parse lines like this
 # #,TEST,SAMPLES,MIN(ms),MAX(ms),MEAN(ms),SD(ms),MEDIAN(ms)
 SCORERE = re.compile(r"(\d+),[ \t]*(\w+),[ \t]*([\d.]+),[ \t]*([\d.]+)")

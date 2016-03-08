@@ -18,8 +18,8 @@
 # repeat.sh 3 mypatch/bin/Benchmark_Driver run -o -O > mypatch.O.times
 # compare_perf_tests.py tot.O.times mypatch.O.times | sort -t, -n -k 6 | column -s, -t
 
-import sys
 import re
+import sys
 
 VERBOSE = 0
 

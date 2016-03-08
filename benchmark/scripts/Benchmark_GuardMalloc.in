@@ -13,8 +13,8 @@
 # ===----------------------------------------------------------------------===//
 
 import os
-import sys
 import subprocess
+import sys
 
 sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
 

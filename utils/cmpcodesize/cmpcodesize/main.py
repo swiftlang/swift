@@ -12,10 +12,10 @@
 from __future__ import print_function
 
 import argparse
-import sys
-import os
-import glob
 import collections
+import glob
+import os
+import sys
 
 from cmpcodesize.compare import \
     compare_function_sizes, compare_sizes_of_file, list_function_sizes, read_sizes

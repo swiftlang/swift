@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 
-import os
-import sys
 import argparse
 import json
+import os
+import sys
 import textwrap
 
 # Append the src dir
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
 import pass_pipeline_library
+
 import passes
 
 normal_pipeline = list(pass_pipeline_library.normal_passpipelines())

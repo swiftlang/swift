@@ -34,12 +34,12 @@
 
 from __future__ import print_function
 
-import subprocess
-import re
-import os
-import sys
 import argparse
 import math
+import os
+import re
+import subprocess
+import sys
 
 
 # Calculate the population standard deviation

@@ -10,10 +10,11 @@
 
 from __future__ import print_function
 
-import re
-import os
-import subprocess
 import collections
+import os
+import re
+import subprocess
+
 from operator import itemgetter
 
 prefixes = {

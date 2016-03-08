@@ -265,7 +265,7 @@ todo_include_todos = True
 #
 
 # Pull in the Swift lexers
-from os.path import dirname, abspath, join as join_paths
+from os.path import abspath, dirname, join as join_paths
 sys.path = [
     join_paths(dirname(dirname(abspath(__file__))), 'utils', 'pygments')
 ] + sys.path

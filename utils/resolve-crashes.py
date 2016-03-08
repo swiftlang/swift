@@ -4,9 +4,9 @@
 # where some compiler crashers have been fixed, and move them into the
 # "fixed" testsuite, removing the "--crash" in the process.
 
+import os
 import re
 import sys
-import os
 
 def execute_cmd(cmd):
     print(cmd)
