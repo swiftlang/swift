@@ -73,7 +73,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-redundant-load-elim"
-#include "swift/SIL/LSBase.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -85,6 +84,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/LSBase.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"

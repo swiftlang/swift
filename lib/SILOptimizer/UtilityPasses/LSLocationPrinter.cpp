@@ -16,13 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memlocation-dumper"
-#include "swift/SIL/LSBase.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/LSBase.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 

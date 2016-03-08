@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "sil-value-projection"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/LSBase.h"
+#include "swift/SILOptimizer/Utils/LSBase.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
