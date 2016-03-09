@@ -842,11 +842,40 @@ SILFunction *SignatureOptimizer::createEmptyFunctionWithOptimizedSig(
   return NewF;
 }
 
-static void addRetainsForConvertedDirectResults(SILBuilder &Builder,
-                                                SILLocation Loc,
-                                                SILValue ReturnValue,
-                                                SILInstruction *AI,
-                                     ArrayRef<ResultDescriptor> DirectResults) {
+static void 
+addReleasesForConvertedOwnedParameter(SILBuilder &Builder,
+                                      SILLocation Loc,
+                                      ArrayRef<SILArgument*> Parameters,
+                                      ArrayRef<ArgumentDescriptor> &ArgDescs) {
+  // If we have any arguments that were consumed but are now guaranteed,
+  // insert a release_value.
+  for (auto &ArgDesc : ArgDescs) {
+    if (ArgDesc.CalleeRelease.empty())
+      continue;
+    Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index]);
+  }
+}
+
+static void 
+addReleasesForConvertedOwnedParameter(SILBuilder &Builder,
+                                      SILLocation Loc,
+                                      OperandValueArrayRef Parameters,
+                                      ArrayRef<ArgumentDescriptor> &ArgDescs) {
+  // If we have any arguments that were consumed but are now guaranteed,
+  // insert a release_value.
+  for (auto &ArgDesc : ArgDescs) {
+    if (ArgDesc.CalleeRelease.empty())
+      continue;
+    Builder.createReleaseValue(Loc, Parameters[ArgDesc.Index]);
+  }
+}
+
+static void
+addRetainsForConvertedDirectResults(SILBuilder &Builder,
+                                    SILLocation Loc,
+                                    SILValue ReturnValue,
+                                    SILInstruction *AI,
+                                    ArrayRef<ResultDescriptor> DirectResults) {
   for (auto I : indices(DirectResults)) {
     auto &RV = DirectResults[I];
     if (RV.CalleeRetain.empty()) continue;
@@ -930,13 +959,9 @@ static void rewriteApplyInstToCallNewFunction(SignatureOptimizer &Optimizer,
                                 TAI->getNormalBB()->begin());
     }
 
-    // If we have any arguments that were consumed but are now guaranteed,
-    // insert a release_value.
-    for (auto &ArgDesc : ArgDescs) {
-      if (ArgDesc.CalleeRelease.empty())
-        continue;
-      Builder.createReleaseValue(Loc, FAS.getArgument(ArgDesc.Index));
-    }
+    // Add releases for the converted @owned to @guaranteed parameter.
+    addReleasesForConvertedOwnedParameter(Builder, Loc, FAS.getArguments(),
+                                          ArgDescs);
 
     // If we have converted the return value from @owned to @guaranteed,
     // insert a retain_value at the callsite.
@@ -1008,13 +1033,9 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
                             ArrayRef<Substitution>(), ThunkArgs, false);
   }
 
-  // If we have any arguments that were consumed but are now guaranteed,
-  // insert a release_value.
-  for (auto &ArgDesc : ArgDescs) {
-    if (ArgDesc.CalleeRelease.empty())
-      continue;
-    Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
-  }
+  // Add releases for the converted @owned to @guaranteed parameter.
+  addReleasesForConvertedOwnedParameter(Builder, Loc, BB->getBBArgs(),
+                                        ArgDescs);
 
   // Handle @owned to @unowned return value conversion.
   addRetainsForConvertedDirectResults(Builder, Loc, ReturnValue, nullptr,
