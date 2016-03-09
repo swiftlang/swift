@@ -61,19 +61,6 @@ public protocol _Integer
 
 /// A set of common requirements for Swift's integer types.
 public protocol Integer : _Integer, Strideable {}
-extension Integer {
-  // FIXME(ABI): using Int as the return value is wrong.
-  @_transparent
-  public func distance(to other: Self) -> Int {
-    return numericCast((numericCast(other) as IntMax) - numericCast(self))
-  }
-
-  // FIXME(ABI): using Int as the return value is wrong.
-  @_transparent
-  public func advanced(by n: Int) -> Self {
-    return numericCast((numericCast(self) as IntMax) + numericCast(n))
-  }
-}
 
 /// This protocol is an implementation detail of `SignedInteger`;
 /// do not use it directly.
@@ -99,6 +86,20 @@ public protocol SignedInteger : _SignedInteger, Integer {
   init(_: IntMax)
 }
 
+extension SignedInteger {
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func distance(to other: Self) -> Int {
+    return numericCast((numericCast(other) as IntMax) - numericCast(self))
+  }
+
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func advanced(by n: Int) -> Self {
+    return numericCast((numericCast(self) as IntMax) + numericCast(n))
+  }
+}
+
 /// This protocol is an implementation detail of `UnsignedInteger`;
 /// do not use it directly.
 public protocol _DisallowMixedSignArithmetic : _Integer {
@@ -120,6 +121,20 @@ public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
   /// Convert from Swift's widest unsigned integer type, trapping on
   /// overflow.
   init(_: UIntMax)
+}
+
+extension UnsignedInteger {
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func distance(to other: Self) -> Int {
+    return numericCast((numericCast(other) as IntMax) - numericCast(self))
+  }
+
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func advanced(by n: Int) -> Self {
+    return numericCast((numericCast(self) as IntMax) + numericCast(n))
+  }
 }
 
 /// Convert `x` to type `U`, trapping on overflow in -Onone and -O
