@@ -833,6 +833,17 @@ static StringRef omitNeedlessWords(StringRef name,
 
 StringRef camel_case::toLowercaseInitialisms(StringRef string,
                                              StringScratchSpace &scratch) {
+  llvm::SmallString<32> scratchStr;
+  StringRef result = toLowercaseInitialisms(string, scratchStr);
+  if (string == result)
+    return string;
+  return scratch.copyString(result);
+}
+
+StringRef
+camel_case::toLowercaseInitialisms(StringRef string,
+                                   SmallVectorImpl<char> &scratch) {
+
   if (string.empty())
     return string;
 
@@ -863,7 +874,8 @@ StringRef camel_case::toLowercaseInitialisms(StringRef string,
     scratchStr.push_back(clang::toLowercase(string[i]));
   }
 
-  return scratch.copyString(scratchStr);
+  scratch = scratchStr;
+  return scratchStr;
 }
 
 /// Determine whether the given word occurring before the given

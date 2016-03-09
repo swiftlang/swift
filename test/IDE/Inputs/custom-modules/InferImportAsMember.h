@@ -18,7 +18,7 @@ extern void IAMStruct1InvertInPlace(struct IAMStruct1 *s);
 extern struct IAMStruct1 IAMStruct1Rotate(const struct IAMStruct1 *s,
                                           double radians);
 extern void IAMStruct1SelfComesLast(double x, struct IAMStruct1 s);
-extern void IAMStruct1SelfComesThird(int a, float b, struct IAMStruct1 s,
+extern void IAMStruct1SelfComesThird(double a, float b, struct IAMStruct1 s,
                                      double x);
 
 /// Properties
@@ -31,7 +31,7 @@ extern void IAMStruct1SetLength(double len, struct IAMStruct1 *s);
 extern double IAMStruct1GetLength(struct IAMStruct1 s);
 
 
-/// Various functions that can't quite be imported as properties.
+/// Various instance functions that can't quite be imported as properties.
 
 // Too many parameters in the setter
 extern float IAMStruct1GetNonPropertyNumParams(struct IAMStruct1 s);
@@ -49,11 +49,12 @@ extern void IAMStruct1SetNonPropertyNoSelf(double x, double y);
 // No set only properties
 extern void IAMStruct1SetNonPropertyNoGet(struct IAMStruct1 s, double x);
 
-// Static versions
-// Too many parameters in the setter
+/// Various static functions that can't quite be imported as properties.
+// Too many parameters
 extern float IAMStruct1StaticGetNonPropertyNumParams();
 extern void IAMStruct1StaticSetNonPropertyNumParams(float a,
                                               float b);
+extern void IAMStruct1StaticGetNonPropertyNumParamsGetter(double d);
 
 // Set type doesn't match get type
 extern float IAMStruct1StaticGetNonPropertyType();
@@ -66,23 +67,29 @@ extern void IAMStruct1StaticSetNonPropertyNoSelf(double x, double y);
 // No set only properties
 extern void IAMStruct1StaticSetNonPropertyNoGet(double x);
 
-
 /// Static method
-extern int IAMStruct1StaticMethod();
+extern double IAMStruct1StaticMethod();
+extern double IAMStruct1TLAThreeLetterAcronym();
 
 /// Static computed properties
-extern int IAMStruct1StaticGetProperty();
-extern int IAMStruct1StaticSetProperty(int i);
-extern int IAMStruct1StaticGetOnlyProperty();
+extern double IAMStruct1StaticGetProperty();
+extern double IAMStruct1StaticSetProperty(double);
+extern double IAMStruct1StaticGetOnlyProperty();
+
+// FIXME: when no parameters, make a () and attach a parameter name
+/// Fuzzy
+extern struct IAMStruct1 IAMFuzzyStruct1Create();
+extern struct IAMStruct1 IAMFuzzyStruct1CreateWithFuzzyName();
+extern struct IAMStruct1 IAMFuzzyStruct1CreateFuzzyName();
 
 // typedef __attribute__((objc_bridge(id))) void *IAMClassRef;
 struct IAMClass {
-  int x, y, z;
+  float x, y, z;
 };
 typedef struct IAMClass *IAMClassRef;
 
 extern unsigned IAMClassGetTypeID();
 
-extern IAMClassRef IAMClassCreate(int i);
+extern IAMClassRef IAMClassCreate(double i);
 
 #endif // INFER_IMPORT_AS_MEMBER_H

@@ -125,7 +125,7 @@ StringRef skipLeadingUnderscores(StringRef str) {
 // Form a humble camel name from a string. Skips leading underscores.
 static void formHumbleCamelName(StringRef str, NameBuffer &out) {
   str = skipLeadingUnderscores(str);
-  auto newStr = camel_case::toLowercaseWord(str, out);
+  auto newStr = camel_case::toLowercaseInitialisms(str, out);
   if (newStr == str)
     out = newStr;
 }
@@ -336,7 +336,8 @@ private:
   Identifier getHumbleIdentifier(StringRef name) {
     // Lower-camel-case the incoming name
     NameBuffer buf;
-    return {context.getIdentifier(camel_case::toLowercaseWord(name, buf))};
+    formHumbleCamelName(name, buf);
+    return {context.getIdentifier(buf)};
   }
 
   DeclName formDeclName(StringRef baseName) {
