@@ -45,7 +45,7 @@ Use the a unique output-suffix to open a CFG in a new window.
 """)
 
 
-class Block:
+class Block(object):
 
     current_index = 0
 

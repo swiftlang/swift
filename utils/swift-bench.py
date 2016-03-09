@@ -47,7 +47,7 @@ def pstdev(l):
     return (sum((x - sum(l) / float(len(l))) ** 2 for x in l) / len(l)) ** 0.5
 
 
-class SwiftBenchHarness:
+class SwiftBenchHarness(object):
     sources = []
     verbose_level = 0
     compiler = ""
@@ -332,7 +332,7 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
             self.tests[t].do_print()
 
 
-class Test:
+class Test(object):
 
     def __init__(self, name, source, processed_source, binary):
         self.name = name
@@ -354,7 +354,7 @@ class Test:
         print("")
 
 
-class TestResults:
+class TestResults(object):
 
     def __init__(self, name, samples):
         self.name = name
