@@ -4031,7 +4031,9 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
 extension ${Self}Iterator : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   public var customMirror: Mirror {
-    return Mirror(self, children: [])
+    return Mirror(
+      self,
+      children: EmptyCollection<(label: String?, value: Any)>())
   }
 }
 
