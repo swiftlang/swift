@@ -53,16 +53,19 @@ IGNORABLE_GLOBAL_OBJC_CLASSES = set([
     '_NSJSONReader'
 ])
 
+
 class LeaksRunnerResult(perf_test_driver.Result):
 
     def __init__(self, name, status):
         perf_test_driver.Result.__init__(self, name, status, "", XFAIL_LIST)
 
+
 class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
     def __init__(self, binary, xfail_list):
-        perf_test_driver.BenchmarkDriver.__init__(self, binary, xfail_list,
-                                                 enable_parallel=True)
+        perf_test_driver.BenchmarkDriver.__init__(
+            self, binary, xfail_list,
+            enable_parallel=True)
 
     def prepare_input(self, name):
         return {}

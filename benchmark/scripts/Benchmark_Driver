@@ -27,6 +27,7 @@ import urllib2
 
 DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 
+
 def parse_results(res, optset):
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
@@ -58,9 +59,11 @@ def parse_results(res, optset):
             mem_test = {}
             mem_test['Data'] = [mem_testresult]
             mem_test['Info'] = {}
-            mem_test['Name'] = "nts.swift/mem_maxrss." + optset + "." + testname + ".mem"
+            mem_test['Name'] = "nts.swift/mem_maxrss." + \
+                optset + "." + testname + ".mem"
             tests.append(mem_test)
     return tests
+
 
 def submit_to_lnt(data, url):
     print "\nSubmitting results to LNT server..."
@@ -74,6 +77,7 @@ def submit_to_lnt(data, url):
         print "Server response:\tError"
         print "Error:\t", response['error']
         sys.exit(1)
+
 
 def instrument_test(driver_path, test, num_samples):
     """Run a test and instrument its peak memory use"""
@@ -113,14 +117,18 @@ def instrument_test(driver_path, test, num_samples):
 
     return avg_test_output
 
+
 def get_tests(driver_path):
     """Return a list of available performance tests"""
     return subprocess.check_output([driver_path, '--list']).split()[2:]
 
+
 def get_current_git_branch(git_repo_path):
     """Return the selected branch for the repo `git_repo_path`"""
-    return subprocess.check_output(['git', '-C', git_repo_path, 'rev-parse',
-        '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
+    return subprocess.check_output(
+        ['git', '-C', git_repo_path, 'rev-parse',
+         '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
+
 
 def log_results(log_directory, driver, formatted_output, swift_repo=None):
     """Log `formatted_output` to a branch specific directory in
@@ -145,6 +153,7 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
     print 'Logging results to: %s' % log_file
     with open(log_file, 'w') as f:
         f.write(formatted_output)
+
 
 def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
                    log_directory=None, swift_repo=None):
@@ -192,6 +201,7 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
         log_results(log_directory, driver, formatted_output, swift_repo)
     return formatted_output
 
+
 def submit(args):
     print "SVN revision:\t", args.revision
     print "Machine name:\t", args.machine
@@ -208,8 +218,9 @@ def submit(args):
         print "Opt level:\t", optset
         file = os.path.join(args.tests, "Benchmark_" + optset)
         try:
-            res = run_benchmarks(file, benchmarks=args.benchmark,
-                    num_samples=args.iterations)
+            res = run_benchmarks(
+                file, benchmarks=args.benchmark,
+                num_samples=args.iterations)
             data['Tests'].extend(parse_results(res, optset))
         except subprocess.CalledProcessError as e:
             print "Execution failed.. Test results are empty."
@@ -227,23 +238,28 @@ def submit(args):
     submit_to_lnt(data, args.lnt_host)
     return 0
 
+
 def run(args):
     optset = args.optimization
     file = os.path.join(args.tests, "Benchmark_" + optset)
-    run_benchmarks(file, benchmarks=args.benchmarks,
-            num_samples=args.iterations, verbose=True,
-            log_directory=args.output_dir,
-            swift_repo=args.swift_repo)
+    run_benchmarks(
+        file, benchmarks=args.benchmarks,
+        num_samples=args.iterations, verbose=True,
+        log_directory=args.output_dir,
+        swift_repo=args.swift_repo)
     return 0
+
 
 def format_name(log_path):
     """Return the filename and directory for a log file"""
     return '/'.join(log_path.split('/')[-2:])
 
+
 def compare_logs(compare_script, new_log, old_log):
     """Return diff of log files at paths `new_log` and `old_log`"""
     print 'Comparing %s %s ...' % (format_name(old_log), format_name(new_log))
     subprocess.call([compare_script, old_log, new_log])
+
 
 def compare(args):
     log_dir = args.log_dir
@@ -263,7 +279,8 @@ def compare(args):
     for branch_dir in [current_branch_dir, master_branch_dir]:
         for opt in ['O', 'Onone']:
             recent_logs[os.path.basename(branch_dir) + '_' + opt] = sorted(
-                glob.glob(os.path.join(branch_dir, 'Benchmark_' + opt + '-*.log')),
+                glob.glob(os.path.join(
+                    branch_dir, 'Benchmark_' + opt + '-*.log')),
                 key=os.path.getctime, reverse=True)
 
     if current_branch == 'master':
@@ -311,65 +328,86 @@ def compare(args):
 
     return 0
 
+
 def positive_int(value):
     ivalue = int(value)
     if not (ivalue > 0):
         raise ValueError
     return ivalue
 
+
 def main():
     parser = argparse.ArgumentParser(description='Swift benchmarks driver')
     subparsers = parser.add_subparsers()
 
-    submit_parser = subparsers.add_parser('submit',
-            help='run benchmarks and submit results to LNT')
-    submit_parser.add_argument('-t', '--tests',
-            help='directory containing Benchmark_O{,none,unchecked} ' +
-                 '(default: DRIVER_DIR)',
-            default=DRIVER_DIR)
-    submit_parser.add_argument('-m', '--machine', required=True,
-            help='LNT machine name')
-    submit_parser.add_argument('-r', '--revision', required=True,
-            help='SVN revision of compiler to identify the LNT run', type=int)
-    submit_parser.add_argument('-l', '--lnt_host', required=True,
-            help='LNT host to submit results to')
-    submit_parser.add_argument('-i', '--iterations',
-            help='number of times to run each test (default: 10)',
-            type=positive_int, default=10)
-    submit_parser.add_argument('-o', '--optimization', nargs='+',
-            help='optimization levels to use (default: O Onone Ounchecked)',
-            default=['O', 'Onone', 'Ounchecked'])
-    submit_parser.add_argument('benchmark',
-            help='benchmark to run (default: all)', nargs='*')
+    submit_parser = subparsers.add_parser(
+        'submit',
+        help='run benchmarks and submit results to LNT')
+    submit_parser.add_argument(
+        '-t', '--tests',
+        help='directory containing Benchmark_O{,none,unchecked} ' +
+        '(default: DRIVER_DIR)',
+        default=DRIVER_DIR)
+    submit_parser.add_argument(
+        '-m', '--machine', required=True,
+        help='LNT machine name')
+    submit_parser.add_argument(
+        '-r', '--revision', required=True,
+        help='SVN revision of compiler to identify the LNT run', type=int)
+    submit_parser.add_argument(
+        '-l', '--lnt_host', required=True,
+        help='LNT host to submit results to')
+    submit_parser.add_argument(
+        '-i', '--iterations',
+        help='number of times to run each test (default: 10)',
+        type=positive_int, default=10)
+    submit_parser.add_argument(
+        '-o', '--optimization', nargs='+',
+        help='optimization levels to use (default: O Onone Ounchecked)',
+        default=['O', 'Onone', 'Ounchecked'])
+    submit_parser.add_argument(
+        'benchmark',
+        help='benchmark to run (default: all)', nargs='*')
     submit_parser.set_defaults(func=submit)
 
-    run_parser = subparsers.add_parser('run',
-            help='run benchmarks and output results to stdout')
-    run_parser.add_argument('-t', '--tests',
-            help='directory containing Benchmark_O{,none,unchecked} ' +
-                 '(default: DRIVER_DIR)',
-            default=DRIVER_DIR)
-    run_parser.add_argument('-i', '--iterations',
-            help='number of times to run each test (default: 1)',
-            type=positive_int, default=1)
-    run_parser.add_argument('-o', '--optimization',
-            help='optimization level to use (default: O)', default='O')
-    run_parser.add_argument('--output-dir',
-            help='log results to directory (default: no logging)')
-    run_parser.add_argument('--swift-repo',
-            help='absolute path to Swift source repo for branch comparison')
-    run_parser.add_argument('benchmarks',
-            help='benchmark to run (default: all)', nargs='*')
+    run_parser = subparsers.add_parser(
+        'run',
+        help='run benchmarks and output results to stdout')
+    run_parser.add_argument(
+        '-t', '--tests',
+        help='directory containing Benchmark_O{,none,unchecked} ' +
+        '(default: DRIVER_DIR)',
+        default=DRIVER_DIR)
+    run_parser.add_argument(
+        '-i', '--iterations',
+        help='number of times to run each test (default: 1)',
+        type=positive_int, default=1)
+    run_parser.add_argument(
+        '-o', '--optimization',
+        help='optimization level to use (default: O)', default='O')
+    run_parser.add_argument(
+        '--output-dir',
+        help='log results to directory (default: no logging)')
+    run_parser.add_argument(
+        '--swift-repo',
+        help='absolute path to Swift source repo for branch comparison')
+    run_parser.add_argument(
+        'benchmarks',
+        help='benchmark to run (default: all)', nargs='*')
     run_parser.set_defaults(func=run)
 
-    compare_parser = subparsers.add_parser('compare',
-            help='compare benchmark results')
-    compare_parser.add_argument('--log-dir', required=True,
-            help='directory containing benchmark logs')
-    compare_parser.add_argument('--swift-repo', required=True,
-            help='absolute path to Swift source repo')
-    compare_parser.add_argument('--compare-script', required=True,
-            help='absolute path to compare script')
+    compare_parser = subparsers.add_parser(
+        'compare',
+        help='compare benchmark results')
+    compare_parser.add_argument(
+        '--log-dir', required=True,
+        help='directory containing benchmark logs')
+    compare_parser.add_argument(
+        '--swift-repo', required=True,
+        help='absolute path to Swift source repo')
+    compare_parser.add_argument(
+        '--compare-script', required=True,
+        help='absolute path to compare script')
     compare_parser.set_defaults(func=compare)
 
     args = parser.parse_args()

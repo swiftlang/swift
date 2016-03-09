@@ -15,6 +15,7 @@ import tokenize
 
 from bisect import bisect
 
+
 def get_line_starts(s):
     """Return a list containing the start index of each line in s.
 
@@ -30,9 +31,11 @@ def get_line_starts(s):
     starts[-1] -= 1
     return starts
 
+
 def strip_trailing_nl(s):
     """If s ends with a newline, drop it; else return s intact"""
     return s[:-1] if s.endswith('\n') else s
+
 
 def split_lines(s):
     """Split s into a list of lines, each of which has a trailing newline
@@ -91,6 +94,7 @@ tokenize_re = re.compile(
 
 gyb_block_close = re.compile('\}%[ \t]*\n?')
 
+
 def token_pos_to_index(token_pos, start, line_starts):
     """Translate a tokenize (line, column) pair into an absolute
     position in source text given the position where we started
@@ -115,6 +119,7 @@ def token_pos_to_index(token_pos, start, line_starts):
         return line_starts[-1]
 
     return line_starts[abs_token_line] + token_col
+
 
 def tokenize_python_to_unmatched_close_curly(source_text, start, line_starts):
     """Apply Python's tokenize to source_text starting at index start
@@ -143,6 +148,7 @@ def tokenize_python_to_unmatched_close_curly(source_text, start, line_starts):
         return token_pos_to_index(error_pos, start, line_starts)
 
     return len(source_text)
+
 
 def tokenize_template(template_text):
     r"""Given the text of a template, returns an iterator over
@@ -224,7 +230,8 @@ def tokenize_template(template_text):
     while pos < end:
         m = tokenize_re.match(template_text, pos, end)
 
-        # pull out the one matched key (ignoring internal patterns starting with _)
+        # pull out the one matched key (ignoring internal patterns starting
+        # with _)
         ((kind, text), ) = (
             (kind, text) for (kind, text) in m.groupdict().items()
             if text is not None and kind[0] != '_')
@@ -255,6 +262,7 @@ def tokenize_template(template_text):
 
     if saved_literal != []:
         yield 'literal', ''.join(saved_literal), literal_first_match
+
 
 def split_gyb_lines(source_lines):
     r"""Return a list of lines at which to split the incoming source
@@ -339,6 +347,7 @@ def split_gyb_lines(source_lines):
 
     return unmatched_indents
 
+
 def code_starts_with_dedent_keyword(source_lines):
     r"""Return True iff the incoming Python source_lines begin with "else",
     "elif", "except", or "finally".
@@ -360,6 +369,7 @@ def code_starts_with_dedent_keyword(source_lines):
             break
 
     return token_text in ('else', 'elif', 'except', 'finally')
+
 
 class ParseContext:
     """State carried through a parse of a template"""
@@ -492,7 +502,8 @@ class ParseContext:
 
             elif kind == 'gybLines':
 
-                self.code_start_line = self.pos_to_line(self.token_match.start('gybLines'))
+                self.code_start_line = self.pos_to_line(
+                    self.token_match.start('gybLines'))
                 indentation = self.token_match.group('_indent')
 
                 # Strip off the leading indentation and %-sign
@@ -527,6 +538,7 @@ class ParseContext:
 
         self.token_kind = None
 
+
 class ExecutionContext:
     """State we pass around during execution of a template"""
 
@@ -544,18 +556,22 @@ class ExecutionContext:
                 # We can only insert the line directive at a line break
                 if len(self.result_text) == 0 \
                    or self.result_text[-1].endswith('\n'):
-                    self.result_text.append('%s %d "%s"\n' % (self.line_directive, line + 1, file))
-                # But if the new text contains any line breaks, we can create one
+                    self.result_text.append('%s %d "%s"\n' % (
+                        self.line_directive, line + 1, file))
+                # But if the new text contains any line breaks, we can create
+                # one
                 elif '\n' in text:
                     i = text.find('\n')
                     self.result_text.append(text[:i + 1])
-                    self.last_file_line = (self.last_file_line[0], self.last_file_line[1] + 1)
+                    self.last_file_line = (
+                        self.last_file_line[0], self.last_file_line[1] + 1)
                     # and try again
                     self.append_text(text[i + 1:], file, line)
                     return
 
         self.result_text.append(text)
         self.last_file_line = (file, line + text.count('\n'))
+
 
 class ASTNode(object):
     """Abstract base class for template AST nodes"""
@@ -601,6 +617,7 @@ class Block(ASTNode):
     def __str__(self, indent=''):
         return indent + 'Block:' + self.format_children(indent)
 
+
 class Literal(ASTNode):
     """An AST node that generates literal text"""
 
@@ -618,6 +635,7 @@ class Literal(ASTNode):
         return '\n'.join(
             [indent + x for x in ['Literal:'] + strip_trailing_nl(self.text).split('\n')])
 
+
 class Code(ASTNode):
     """An AST node that is evaluated as Python"""
 
@@ -633,7 +651,8 @@ class Code(ASTNode):
         def accumulate_code():
             s = source + (context.code_start_line - source_line_count) * '\n' \
                 + textwrap.dedent(context.code_text)
-            line_count = context.code_start_line + context.code_text.count('\n')
+            line_count = context.code_start_line + \
+                context.code_text.count('\n')
             context.next_token()
             return s, line_count
 
@@ -646,7 +665,8 @@ class Code(ASTNode):
         else:
             while context.token_kind == 'gybLinesOpen':
                 source, source_line_count = accumulate_code()
-                source += '    __children__[%d].execute(__context__)\n' % len(self.children)
+                source += '    __children__[%d].execute(__context__)\n' % len(
+                    self.children)
                 source_line_count += 1
 
                 self.children += (Block(context),)
@@ -684,10 +704,12 @@ class Code(ASTNode):
         # If we got a result, the code was an expression, so append
         # its value
         if result is not None and result != '':
-            context.append_text(str(result), self.filename, self.start_line_number)
+            context.append_text(
+                str(result), self.filename, self.start_line_number)
 
     def __str__(self, indent=''):
-        source_lines = re.sub(r'^\n', '', strip_trailing_nl(self.source), flags=re.MULTILINE).split('\n')
+        source_lines = re.sub(r'^\n', '', strip_trailing_nl(
+            self.source), flags=re.MULTILINE).split('\n')
         if len(source_lines) == 1:
             s = indent + 'Code: {' + source_lines[0] + '}'
         else:
@@ -695,6 +717,7 @@ class Code(ASTNode):
                 indent + 4 * ' ' + l for l in source_lines
             ) + '\n' + indent + '}'
         return s + self.format_children(indent)
+
 
 def parse_template(filename, text=None):
     r"""Return an AST corresponding to the given template file.
@@ -942,6 +965,7 @@ def parse_template(filename, text=None):
     """
     return Block(ParseContext(filename, text))
 
+
 def execute_template(ast, line_directive='', **local_bindings):
     r"""Return the text generated by executing the given template AST.
 
@@ -980,9 +1004,11 @@ def execute_template(ast, line_directive='', **local_bindings):
     //#setline 6 "/dummy.file"
     [0, 1, 2]
     """
-    execution_context = ExecutionContext(line_directive=line_directive, **local_bindings)
+    execution_context = ExecutionContext(
+        line_directive=line_directive, **local_bindings)
     ast.execute(execution_context)
     return ''.join(execution_context.result_text)
+
 
 def main():
     import argparse
@@ -1051,16 +1077,30 @@ def main():
           - The End. -
 '''
     )
-    parser.add_argument('-D', action='append', dest='defines', metavar='NAME=VALUE',
-                    default=[],
-                    help='''Bindings to be set in the template's execution context''')
+    parser.add_argument(
+        '-D', action='append', dest='defines', metavar='NAME=VALUE',
+        default=[],
+        help='''Bindings to be set in the template's execution context''')
 
-    parser.add_argument('file', type=argparse.FileType(), help='Path to GYB template file (defaults to stdin)', nargs='?', default=sys.stdin)
-    parser.add_argument('-o', dest='target', type=argparse.FileType('w'), help='Output file (defaults to stdout)', default=sys.stdout)
-    parser.add_argument('--test', action='store_true', default=False, help='Run a self-test')
-    parser.add_argument('--verbose-test', action='store_true', default=False, help='Run a verbose self-test')
-    parser.add_argument('--dump', action='store_true', default=False, help='Dump the parsed template to stdout')
-    parser.add_argument('--line-directive', default='// ###setline', help='Line directive prefix; empty => no line markers')
+    parser.add_argument(
+        'file', type=argparse.FileType(),
+        help='Path to GYB template file (defaults to stdin)', nargs='?',
+        default=sys.stdin)
+    parser.add_argument(
+        '-o', dest='target', type=argparse.FileType('w'),
+        help='Output file (defaults to stdout)', default=sys.stdout)
+    parser.add_argument(
+        '--test', action='store_true',
+        default=False, help='Run a self-test')
+    parser.add_argument(
+        '--verbose-test', action='store_true',
+        default=False, help='Run a verbose self-test')
+    parser.add_argument(
+        '--dump', action='store_true',
+        default=False, help='Dump the parsed template to stdout')
+    parser.add_argument(
+        '--line-directive', default='// ###setline',
+        help='Line directive prefix; empty => no line markers')
 
     args = parser.parse_args(sys.argv[1:])
 

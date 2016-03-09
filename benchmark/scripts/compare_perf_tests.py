@@ -35,11 +35,13 @@ IsTime = 1
 ShowSpeedup = 1
 PrintAllScores = 0
 
+
 def parse_int(word):
     try:
         return int(word)
     except ValueError:
         raise Exception("Expected integer value, not " + word)
+
 
 def get_scores(fname):
     scores = {}
@@ -77,8 +79,10 @@ def get_scores(fname):
         f.close()
     return scores, worstscores, runs, nums
 
+
 def is_max_score(newscore, maxscore, invert):
     return not maxscore or (newscore > maxscore if not invert else newscore < maxscore)
+
 
 def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
     print num.rjust(3),
@@ -144,6 +148,7 @@ def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
             print "(?)",
     print
 
+
 def print_best_scores(key, scores):
     print key,
     bestscore = None
@@ -152,6 +157,7 @@ def print_best_scores(key, scores):
         if is_max_score(newscore=score, maxscore=bestscore, invert=minbest):
             bestscore = score
     print ", %d" % bestscore
+
 
 def usage():
     print "repeat.sh <n> Benchmark_O[none|unchecked] > file.times"

@@ -17,7 +17,9 @@ import os
 import re
 import subprocess
 
+
 class Result(object):
+
     def __init__(self, name, status, output, xfail_list):
         self.name = name
         self.status = status
@@ -56,10 +58,12 @@ class Result(object):
         fmt = '{:<%d}{:}' % (max_test_len + 5)
         print(fmt.format(self.get_name(), self.get_result()))
 
+
 def _unwrap_self(args):
     return type(args[0]).process_input(*args)
 
 BenchmarkDriver_OptLevels = ['Onone', 'O', 'Ounchecked']
+
 
 class BenchmarkDriver(object):
 

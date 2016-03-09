@@ -27,6 +27,7 @@ import perf_test_driver
 XFAIL_LIST = [
 ]
 
+
 class DTraceResult(perf_test_driver.Result):
 
     def __init__(self, name, status, output, csv_output):
@@ -59,11 +60,14 @@ class DTraceResult(perf_test_driver.Result):
 
         print(DTraceResult.data_format(max_test_len).format(*result))
 
+
 class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
+
     def __init__(self, binary, xfail_list, csv_output):
-        perf_test_driver.BenchmarkDriver.__init__(self, binary, xfail_list,
-                                                 enable_parallel=False,
-                                                 opt_levels=['O'])
+        perf_test_driver.BenchmarkDriver.__init__(
+            self, binary, xfail_list,
+            enable_parallel=False,
+            opt_levels=['O'])
         self.csv_output = csv_output
 
     def print_data_header(self, max_test_len):
@@ -93,6 +97,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         return DTraceResult(test_name, 0, results, self.csv_output)
 
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
