@@ -22,6 +22,7 @@
 ///
 /// Its requirements are inherited by `ForwardIndex` and thus must
 /// be satisfied by types conforming to that protocol.
+@_show_in_interface
 public protocol _Incrementable : Equatable {
   /// Returns the next consecutive value in a discrete sequence of
   /// `Self` values.
@@ -329,6 +330,7 @@ public postfix func -- <T : BidirectionalIndex> (i: inout T) -> T {
 
 /// Used to force conformers of RandomAccessIndex to implement
 /// `advanced(by:)` methods and `distance(to:)`.
+@_show_in_interface
 public protocol _RandomAccessAmbiguity {
   associatedtype Distance : _SignedInteger = Int
 }
