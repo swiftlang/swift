@@ -105,7 +105,6 @@ public struct LazyFilterIndex<Base : Collection> : Comparable {
   public let base: Base.Index
 }
 
-/// Returns `true` iff `lhs` is identical to `rhs`.
 @warn_unused_result
 public func == <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
@@ -114,7 +113,14 @@ public func == <Base : Collection>(
   return lhs.base == rhs.base
 }
 
-/// Returns `true` iff `lhs` is less than `rhs`.
+@warn_unused_result
+public func != <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base != rhs.base
+}
+
 @warn_unused_result
 public func < <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
@@ -123,7 +129,6 @@ public func < <Base : Collection>(
   return lhs.base < rhs.base
 }
 
-/// Returns `true` iff `lhs` is less than or identical to `rhs`.
 @warn_unused_result
 public func <= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
@@ -132,7 +137,6 @@ public func <= <Base : Collection>(
   return lhs.base <= rhs.base
 }
 
-/// Returns `true` iff `lhs` is greater than or identical to  `rhs`.
 @warn_unused_result
 public func >= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
@@ -141,7 +145,6 @@ public func >= <Base : Collection>(
   return lhs.base >= rhs.base
 }
 
-/// Returns `true` iff `lhs` is greater than `rhs`.
 @warn_unused_result
 public func > <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
@@ -206,15 +209,20 @@ public struct LazyFilterCollection<
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func next(i: Index) -> Index {
+    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     return LazyFilterIndex(base: _nextFiltered(i.base))
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance) -> Index {
+    _precondition(n >= 0,
+      "Only BidirectionalCollections can be advanced by a negative amount")
+    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
+
     var index = i.base
-    for _ in 0..<n where index != _base.endIndex {
-      index = _nextFiltered(index)
+    for _ in 0..<n {
+      _nextFilteredInPlace(&index)
     }
     return LazyFilterIndex(base: index)
   }
@@ -222,9 +230,13 @@ public struct LazyFilterCollection<
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
   public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    _precondition(n >= 0,
+      "Only BidirectionalCollections can be advanced by a negative amount")
+    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
+
     var index = i.base
-    for _ in 0..<n where index != _base.endIndex && index != limit.base {
-      index = _nextFiltered(index)
+    for _ in 0..<n {
+      _nextFilteredInPlace(&index, limit: limit.base)
     }
     return LazyFilterIndex(base: index)
   }
@@ -232,13 +244,31 @@ public struct LazyFilterCollection<
   @inline(__always)
   internal func _nextFiltered(index: Base.Index) -> Base.Index {
     var index = index
+    _nextFilteredInPlace(&index)
+    return index
+  }
+
+  @inline(__always)
+  internal func _nextFilteredInPlace(index: inout Base.Index) {
     while index != _base.endIndex {
       if _predicate(_base[index]) {
         break
       }
       _base._nextInPlace(&index)
     }
-    return index
+  }
+
+  @inline(__always)
+  internal func _nextFilteredInPlace(
+    index: inout Base.Index,
+    limit: Base.Index
+  ) {
+    while index != _base.endIndex {
+      if index == limit || _predicate(_base[index]) {
+        break
+      }
+      _base._nextInPlace(&index)
+    }
   }
 
   /// Access the element at `position`.

@@ -18,7 +18,7 @@ extension String {
     CustomDebugStringConvertible {
 
     /// A position in a string's collection of UTF-16 code units.
-    public struct Index {
+    public struct Index : Comparable {
       // Foundation needs access to these fields so it can expose
       // random access
       public // SPI(Foundation)
@@ -26,6 +26,8 @@ extension String {
 
       public let _offset: Int
     }
+
+    public typealias IndexDistance = Int
 
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
@@ -45,24 +47,28 @@ extension String {
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func next(i: Index) -> Index {
+      // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: i._offset.advanced(by: 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func previous(i: Index) -> Index {
+      // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: i._offset.advanced(by: -1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func advance(i: Index, by n: Int) -> Index {
+    public func advance(i: Index, by n: IndexDistance) -> Index {
+      // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: i._offset.advanced(by: n))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func advance(i: Index, by n: Int, limit: Index) -> Index {
+    public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+      // FIXME: swift-3-indexing-model: range check i?
       let d = i._offset.distance(to: limit._offset)
       if d == 0 || (d > 0 ? d <= n : d >= n) {
         return limit
@@ -72,7 +78,8 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func distance(from start: Index, to end: Index) -> Int {
+    public func distance(from start: Index, to end: Index) -> IndexDistance {
+      // FIXME: swift-3-indexing-model: range check start and end?
       return start._offset.distance(to: end._offset)
     }
 
@@ -206,24 +213,8 @@ extension String {
   public typealias UTF16Index = UTF16View.Index
 }
 
-// Conformance to RandomAccessIndex intentionally only appears
-// when Foundation is loaded
-extension String.UTF16View.Index {
-  public typealias Distance = Int
-
-  @warn_unused_result
-  public func successor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(
-      _offset: _unsafePlus(_offset, 1))
-  }
-
-  @warn_unused_result
-  public func predecessor() -> String.UTF16View.Index {
-    return String.UTF16View.Index(
-      _offset: _unsafeMinus(_offset, 1))
-  }
-}
-
+// FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
+//        assuming String.UTF8View.Index continues to exist
 @warn_unused_result
 public func == (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
@@ -231,36 +222,11 @@ public func == (
   return lhs._offset == rhs._offset
 }
 
-extension String.UTF16View.Index : Comparable, Equatable {}
-
 @warn_unused_result
 public func < (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
 ) -> Bool {
   return lhs._offset < rhs._offset
-}
-
-// We can do some things more efficiently, even if we don't promise to
-// by conforming to RandomAccessIndex.
-
-extension String.UTF16View.Index {
-  @warn_unused_result
-  public func distance(to end: String.UTF16View.Index)
-    -> String.UTF16View.Index.Distance {
-    return self._offset.distance(to: end._offset)
-  }
-
-  @warn_unused_result
-  public func advanced(by n: Distance) -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: self._offset.advanced(by: n))
-  }
-
-  @warn_unused_result
-  public func advanced(by n: Distance, limit: String.UTF16View.Index)
-    -> String.UTF16View.Index {
-    return String.UTF16View.Index(
-      _offset: self._offset.advanced(by: n, limit: limit._offset))
-  }
 }
 
 // Index conversions
