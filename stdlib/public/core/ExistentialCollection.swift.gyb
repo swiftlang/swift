@@ -597,6 +597,9 @@ public struct Any${collectionForTraversal(Traversal)}<Element>
     C : ${collectionForTraversal(SubTraversal)}
     where
     C.Iterator.Element == Element,
+
+    // FIXME(compiler limitation): these constraints should be applied to
+    // associated types of Collection.
     C.SubSequence : ${collectionForTraversal(SubTraversal)},
     C.SubSequence.Iterator.Element == Element,
     C.SubSequence.SubSequence == C.SubSequence,
