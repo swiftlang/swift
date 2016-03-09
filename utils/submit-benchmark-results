@@ -32,7 +32,7 @@ def capture_with_result(args, include_stderr=False):
         stderr = subprocess.STDOUT
     try:
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr)
-    except OSError, e:
+    except OSError as e:
         if e.errno == errno.ENOENT:
             sys.exit('no such file or directory: %r when running %s.' % (
                 args[0], ' '.join(args)))
