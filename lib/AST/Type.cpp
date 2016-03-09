@@ -1314,9 +1314,7 @@ TypeBase *NameAliasType::getSinglyDesugaredType() {
 
   // The type for a generic TypeAliasDecl is an UnboundGenericType.
   if (TAD->getGenericParams())
-    return UnboundGenericType::get(TAD,
-                           TAD->getDeclContext()->getDeclaredTypeInContext(),
-                                   TAD->getASTContext());
+    return UnboundGenericType::get(TAD, Type(), TAD->getASTContext());
 
   return getDecl()->getUnderlyingType().getPointer();
 }

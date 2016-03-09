@@ -455,25 +455,12 @@ Type TypeChecker::applyUnboundGenericArguments(
   // If we're completing a generic TypeAlias, then we map the types provided
   // onto the underlying type.
   if (auto *TAD = dyn_cast<TypeAliasDecl>(unbound->getDecl())) {
-    auto signature = TAD->getGenericSignature();
     assert(TAD->getGenericParams()->getAllArchetypes().size()
              == genericArgs.size() &&
-           signature->getInnermostGenericParams().size() == genericArgs.size()&&
            "argument arity mismatch");
 
     SmallVector<Substitution, 4> subs;
     subs.reserve(genericArgs.size());
-    
-    // If we have any nested archetypes from an outer type, include them
-    // verbatim.
-    auto outerParams = signature->getGenericParams();
-    outerParams = outerParams.drop_back(genericArgs.size());
-    for (auto param : outerParams) {
-      Type type = resolver->resolveGenericTypeParamType(param);
-
-      subs.push_back(Substitution(type, {}));
-    }
-    
     for (auto t : genericArgs)
       subs.push_back(Substitution(t.getType(), {}));
   

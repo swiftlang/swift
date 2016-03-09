@@ -3481,7 +3481,8 @@ public:
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
       } else if (TAD->getDeclContext()->isGenericContext()) {
         TAD->setInterfaceType(
-          ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getType()));
+          ArchetypeBuilder::mapTypeOutOfContext(TAD->getDeclContext(),
+                                                TAD->getType()));
       }
 
       // We create TypeAliasTypes with invalid underlying types, so we
@@ -6258,9 +6259,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     // Check generic parameters, if needed.
     if (auto gp = typeAlias->getGenericParams()) {
-      gp->setOuterParameters(
-                     typeAlias->getDeclContext()->getGenericParamsOfContext());
-
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(typeAlias)) {
         markInvalidGenericSignature(typeAlias, *this);
@@ -6274,9 +6272,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         revertGenericParamList(gp);
         
         auto builder = createArchetypeBuilder(typeAlias->getModuleContext());
-        auto *parentSig = typeAlias->getDeclContext()->
-           getGenericSignatureOfContext();
-        checkGenericParamList(&builder, gp, parentSig);
+        checkGenericParamList(&builder, gp, nullptr/*parentSig*/);
         finalizeGenericParamList(builder, gp, typeAlias, *this);
       }
     }
