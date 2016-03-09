@@ -635,7 +635,8 @@ public struct Set<Element : Hashable> :
   /// Removes the element at the given index of the set.
   ///
   /// - Parameter position: The index of the member to remove. `position` must
-  ///   be a valid index of the set.
+  ///   be a valid index of the set, and must not be equal to the set's end
+  ///   index.
   /// - Returns: The element that was removed from the set.
   @discardableResult
   public mutating func remove(at position: Index) -> Element {
@@ -1453,10 +1454,182 @@ public func _setBridgeFromObjectiveCConditional<
 
 //===--- APIs unique to Dictionary<Key, Value> ----------------------------===//
 
-/// A mapping from `Key` to `Value`.
+/// A collection whose elements are key-value pairs.
 ///
-/// The order of elements in a dictionary is stable between mutations
-/// but otherwise unpredictable.
+/// A dictionary is a type of hash table, providing fast access to the entries
+/// it contains. Each entry in the table is identified using its key, which is
+/// a hashable type such as a string or number. You use that key to retrieve
+/// the corresponding value, which can be any object. In other languages,
+/// similar data types are known as hashes or associated arrays.
+///
+/// Create a new dictionary by using a dictionary literal. A dictionary literal
+/// is a comma-separated list of key-value pairs, in which a colon separates
+/// each key from its associated value, surrounded by square brackets. You can
+/// assign a dictionary literal to a variable or constant or pass it to a
+/// function that expects a dictionary.
+///
+/// Here's how you would create a dictionary of HTTP response codes and their
+/// related messages:
+///
+///     var responseMessages = [200: "OK",
+///                             403: "Access forbidden",
+///                             404: "File not found",
+///                             500: "Internal server error"]
+///
+/// The `responseMessages` variable is inferred to have type `[Int: String]`.
+/// The `Key` type of the dictionary is `Int`, and the `Value` type of the
+/// dictionary is `String`.
+///
+/// To create a dictionary with no key-value pairs, use an empty dictionary
+/// literal (`[:]`).
+///
+///     var emptyDict: [String: String] = [:]
+///
+/// Any type that conforms to the `Hashable` protocol can be used as a
+/// dictionary's `Key` type, including all of Swift's basic types. You can use
+/// your own custom types as dictionary keys by making them conform to the
+/// `Hashable` protocol.
+///
+/// Getting and Setting Dictionary Values
+/// =====================================
+///
+/// The most common way to access values in a dictionary is to use a key as a
+/// subscript. Subscripting with a key takes the following form:
+///
+///     print(responseMessages[200])
+///     // Prints "Optional("OK")"
+///
+/// Subscripting a dictionary with a key returns an optional value, because a
+/// dictionary might not hold a value for the key that you use in the
+/// subscript.
+///
+/// The next example uses key-based subscripting of the `responseMessages`
+/// dictionary with two keys that exist in the dictionary and one that does
+/// not.
+///
+///     let httpResponseCodes = [200, 403, 301]
+///     for code in httpResponseCodes {
+///         if let message = responseMessages[code] {
+///             print("Response \(code): \(message)")
+///         } else {
+///             print("Unknown response \(code)")
+///         }
+///     }
+///     // Prints "Response 200: OK"
+///     // Prints "Response 403: Access Forbidden"
+///     // Prints "Unknown response 301"
+///
+/// You can also update, modify, or remove keys and values from a dictionary
+/// using the key-based subscript. To add a new key-value pair, assign a value
+/// to a key that isn't yet a part of the dictionary.
+///
+///     responseMessages[301] = "Moved permanently"
+///     print(responseMessages[301])
+///     // Prints "Optional("Moved permanently")"
+///
+/// Update an existing value by assigning a new value to a key that already
+/// exists in the dictionary. If you assign `nil` to an existing key, the key
+/// and its associated value are removed. The following example updates the
+/// value for the `404` code to be simply "Not found" and removes the
+/// key-value pair for the `500` code entirely.
+///
+///     responseMessages[404] = "Not found"
+///     responseMessages[500] = nil
+///     print(responseMessages)
+///     // Prints "[301: "Moved permanently", 200: "OK", 403: "Access forbidden", 404: "Not found"]"
+///
+/// In a mutable `Dictionary` instance, you can modify in place a value that
+/// you've accessed through a keyed subscript. The code sample below declares a
+/// dictionary called `interestingNumbers` with string keys and values that
+/// are integer arrays, then sorts each array in-place in descending order.
+///
+///     var interestingNumbers = ["primes": [2, 3, 5, 7, 11, 13, 15],
+///                               "triangular": [1, 3, 6, 10, 15, 21, 28],
+///                               "hexagonal": [1, 6, 15, 28, 45, 66, 91] ]
+///     for key in interestingNumbers.keys {
+///         interestingNumbers[key]?.sort(isOrderedBefore: >)
+///     }
+///
+///     print(interestingNumbers["primes"]!)
+///     // Prints "[15, 13, 11, 7, 5, 3, 2]"
+///
+/// Iterating Over the Contents of a Dictionary
+/// ===========================================
+///
+/// Every dictionary is an unordered collection of key-value pairs. You can
+/// iterate over a dictionary using a `for`-`in` loop, decomposing each
+/// key-value pair into the elements of a tuple.
+///
+///     let imagePaths = ["star": "/glyphs/star.png",
+///                       "portrait": "/images/content/portrait.jpg",
+///                       "spacer": "/images/shared/spacer.gif"]
+///
+///     for (name, path) in imagePaths {
+///         print("The path to '\(name)' is '\(path)'.")
+///     }
+///     // Prints "The path to 'star' is '/glyphs/star.png'."
+///     // Prints "The path to 'portrait' is '/images/content/portrait.jpg'."
+///     // Prints "The path to 'spacer' is '/images/shared/spacer.gif'."
+///
+/// The order of key-value pairs in a dictionary is stable between mutations
+/// but is otherwise unpredictable. If you need an ordered collection of
+/// key-value pairs and don't need the fast key lookup that `Dictionary`
+/// provides, see the `DictionaryLiteral` type for an alternative.
+///
+/// You can search a dictionary's contents for a particular value using the
+/// `contains(where:)` or `index(where:)` methods supplied by default
+/// implementation. The following example checks to see if `imagePaths` contains
+/// any paths in the `"/glyphs"` directory:
+///
+///     let glyphIndex = imagePaths.index { $0.value.hasPrefix("/glyphs") }
+///     if let index = glyphIndex {
+///         print("The '\(imagesPaths[index].key)' image is a glyph.")
+///     } else {
+///         print("No glyphs found!")
+///     }
+///     // Prints "The 'star' image is a glyph.")
+///
+/// Note that in this example, `imagePaths` is subscripted using a dictionary
+/// index. Unlike the key-based subscript, the index-based subscript returns
+/// the corresponding key-value pair as a non-optional tuple.
+///
+///     print(imagePaths[glyphIndex!])
+///     // Prints "("star", "/glyphs/star.png")"
+///
+/// A dictionary's indices stay valid across additions to the dictionary as
+/// long as the dictionary has enough capacity to store the added values
+/// without allocating more storage. When a dictionary outgrows its storage,
+/// existing indices may be invalidated without any notification.
+///
+/// When you know how many new values you're adding to a dictionary, use the
+/// `init(minimumCapacity:)` initializer to allocate the correct amount of
+/// storage.
+///
+/// Bridging Between Dictionary and NSDictionary
+/// ============================================
+///
+/// You can bridge between `Dictionary` and `NSDictionary` using the `as`
+/// operator. For bridging to be possible, the `Key` and `Value` types of a
+/// dictionary must be classes, `@objc` protocols, or types that bridge to
+/// Foundation types.
+///
+/// Bridging from `Dictionary` to `NSDictionary` always takes O(1) time and
+/// space. When the dictionary's `Key` and `Value` types are neither classes
+/// nor `@objc` protocols, any required bridging of elements occurs at the
+/// first access of each element. For this reason, the first operation that
+/// uses the contents of the dictionary may take O(*n*).
+///
+/// Bridging from `NSDictionary` to `Dictionary` first calls the `copy(with:)`
+/// method (`- copyWithZone:` in Objective-C) on the dictionary to get an
+/// immutable copy and then performs additional Swift bookkeeping work that
+/// takes O(1) time. For instances of `NSDictionary` that are already
+/// immutable, `copy(with:)` usually returns the same dictionary in O(1) time;
+/// otherwise, the copying performance is unspecified. The instances of
+/// `NSDictionary` and `Dictionary` share storage using the same copy-on-write
+/// optimization that is used when two instances of `Dictionary` share
+/// storage.
+///
+/// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
   Collection, DictionaryLiteralConvertible {
@@ -1464,19 +1637,31 @@ public struct Dictionary<Key : Hashable, Value> :
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
   internal typealias _NativeStorage = _NativeDictionaryStorage<Key, Value>
+
+  /// The element type of a dictionary: a tuple containing an individual
+  /// key-value pair.
   public typealias Element = (key: Key, value: Value)
+
+  /// The index type of a dictionary.
   public typealias Index = DictionaryIndex<Key, Value>
 
   internal var _variantStorage: _VariantStorage
 
-  /// Create an empty dictionary.
+  /// Creates an empty dictionary.
   public init() {
     self = Dictionary<Key, Value>(minimumCapacity: 0)
   }
 
-  /// Create a dictionary with at least the given number of
-  /// elements worth of storage.  The actual capacity will be the
-  /// smallest power of 2 that is >= `minimumCapacity`.
+  /// Creates a dictionary with at least the given number of elements worth of
+  /// storage.
+  ///
+  /// Use this initializer to avoid intermediate reallocations when you know
+  /// how many key-value pairs you are adding to a dictionary. The actual
+  /// capacity of the created dictionary is the smallest power of 2 that
+  /// is greater than or equal to `minimumCapacity`.
+  ///
+  /// - Parameter minimumCapacity: The minimum number of key-value pairs to
+  ///   allocate storage for in the new dictionary.
   public init(minimumCapacity: Int) {
     _variantStorage =
       .native(_NativeStorage.Owner(minimumCapacity: minimumCapacity))
@@ -1516,24 +1701,23 @@ public struct Dictionary<Key : Hashable, Value> :
   // additional processing.
   //
 
-  /// The position of the first element in a non-empty dictionary.
+  /// The position of the first element in a nonempty dictionary.
   ///
-  /// Identical to `endIndex` in an empty dictionary.
+  /// If the collection is empty, `startIndex` is equal to `endIndex`.
   ///
-  /// - Complexity: Amortized O(1) if `self` does not wrap a bridged
-  ///   `NSDictionary`, O(N) otherwise.
+  /// - Complexity: Amortized O(1) if the dictionary does not wrap a bridged
+  ///   `NSDictionary`. If the dictionary wraps a bridged `NSDictionary`, the
+  ///   performance is unspecified.
   public var startIndex: Index {
     return _variantStorage.startIndex
   }
 
-  /// The collection's "past the end" position.
+  /// The dictionary's "past the end" position.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
+  /// If the collection is empty, `endIndex` is equal to `startIndex`.
   ///
-  /// - Complexity: Amortized O(1) if `self` does not wrap a bridged
-  ///   `NSDictionary`, O(N) otherwise.
+  /// - Complexity: Amortized O(1) if the dictionary does not wrap a bridged
+  ///   `NSDictionary`; otherwise, the performance is unspecified.
   public var endIndex: Index {
     return _variantStorage.endIndex
   }
@@ -1544,8 +1728,20 @@ public struct Dictionary<Key : Hashable, Value> :
     return i.successor()
   }
 
-  /// Returns the `Index` for the given key, or `nil` if the key is not
-  /// present in the dictionary.
+  /// Returns the index for the given key.
+  ///
+  /// If the given key is found in the dictionary, this method returns an index
+  /// into the dictionary that corresponds with the key-value pair.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     let index = countryCodes.index(forKey: "JP")
+  ///
+  ///     print("Country code for \(countryCodes[index!].value): '\(countryCodes[index!].key)'.")
+  ///     // Prints "Country code for Japan: 'JP'."
+  ///
+  /// - Parameter key: The key to find in the dictionary.
+  /// - Returns: The index for `key` and its associated value if `key` is in
+  ///   the dictionary; otherwise, `nil`.
   @warn_unused_result
   @inline(__always)
   public func index(forKey key: Key) -> Index? {
@@ -1554,18 +1750,79 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.index(forKey: key)
   }
 
-  /// Returns the key-value pair at `position`.
+  /// Accesses the key-value pair at the specified position.
   ///
-  /// - Complexity: O(1).
+  /// This subscript takes an index into the dictionary, instead of a key, and
+  /// returns the corresponding key-value pair as a tuple. When performing
+  /// collection-based operations that return an index into a dictionary, use
+  /// this subscript with the resulting value.
+  ///
+  /// For example, to find the key for a particular value in a dictionary, use
+  /// the `index(where:)` method.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     if let index = countryCodes.index(where: { $0.value == "Japan" }) {
+  ///         print(countryCodes[index])
+  ///         print("Japan's country code is '\(countryCodes[index].key)'.")
+  ///     } else {
+  ///         print("Didn't find 'Japan' as a value in the dictionary.")
+  ///     }
+  ///     // Prints "("JP", "Japan")"
+  ///     // Prints "Japan's country code is 'JP'."
+  ///
+  /// - Parameter position: The position of the key-value pair to access.
+  ///   `position` must be a valid index of the dictionary and not equal to
+  ///   `endIndex`.
+  /// - Returns: A two-element tuple with the key and value corresponding to
+  ///   `position`.
   public subscript(position: Index) -> Element {
     return _variantStorage.assertingGet(position)
   }
 
-  /// Access the value associated with the given key.
+  /// Accesses the value associated with the given key for reading and writing.
   ///
-  /// Reading a key that is not present in `self` yields `nil`.
-  /// Writing `nil` as the value for a given key erases that key from
-  /// `self`.
+  /// This *key-based* subscript returns the value for the given key if the key
+  /// is found in the dictionary, or `nil` if the key is not found.
+  ///
+  /// The following example creates a new dictionary and prints the value of a
+  /// key found in the dictionary (`"Coral"`) and a key not found in the
+  /// dictionary (`"Cerise"`).
+  ///
+  ///     var hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     print(hues["Coral"])
+  ///     // Prints "Optional(16)"
+  ///     print(hues["Cerise"])
+  ///     // Prints "nil"
+  ///
+  /// When you assign a value for a key and that key already exists, the
+  /// dictionary overwrites the existing value. If the dictionary doesn't
+  /// contain the key, the key and value are added as a new key-value pair.
+  ///
+  /// Here, the value for the key `"Coral"` is updated from `16` to `18` and a
+  /// new key-value pair is added for the key `"Cerise"`.
+  ///
+  ///     hues["Coral"] = 18
+  ///     print(hues["Coral"])
+  ///     // Prints "Optional(18)"
+  ///
+  ///     hues["Cerise"] = 330
+  ///     print(hues["Cerise"])
+  ///     // Prints "Optional(330)"
+  ///
+  /// If you assign `nil` as the value for the given key, the dictionary
+  /// removes that key and its associated value.
+  ///
+  /// In the following example, the key-value pair for the key `"Aquamarine"`
+  /// is removed from the dictionary by assigning `nil` to the key-based
+  /// subscript.
+  ///
+  ///     hues["Aquamarine"] = nil
+  ///     print(hues)
+  ///     // Prints "["Coral": 18, "Heliotrope": 296, "Cerise": 330]"
+  ///
+  /// - Parameter key: The key to find in the dictionary.
+  /// - Returns: The value associated with `key` if `key` is in the dictionary;
+  ///   otherwise, `nil`.
   public subscript(key: Key) -> Value? {
     @inline(__always)
     get {
@@ -1583,11 +1840,39 @@ public struct Dictionary<Key : Hashable, Value> :
     }
   }
 
-  /// Update the value stored in the dictionary for the given key, or, if the
-  /// key does not exist, add a new key-value pair to the dictionary.
+  /// Updates the value stored in the dictionary for the given key, or adds a
+  /// new key-value pair if the key does not exist.
   ///
-  /// Returns the value that was replaced, or `nil` if a new key-value pair
-  /// was added.
+  /// Use this method instead of key-based subscripting when you need to know
+  /// whether the new value supplants the value of an existing key. If the
+  /// value of an existing key is updated, `updateValue(_:forKey:)` returns
+  /// the original value.
+  ///
+  ///     var hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///
+  ///     if let oldValue = hues.updateValue(18, forKey: "Coral") {
+  ///         print("The old value of \(oldValue) was replaced with a new one.")
+  ///     }
+  ///     // Prints "The old value of 16 was replaced with a new one."
+  ///
+  /// If the given key is not present in the dictionary, this method adds the
+  /// key-value pair and returns `nil`.
+  ///
+  ///     if let oldValue = hues.updateValue(330, forKey: "Cerise") {
+  ///         print("The old value of \(oldValue) was replaced with a new one.")
+  ///     } else {
+  ///         print("No value was found in the dictionary for that key.")
+  ///     }
+  ///     // Prints "No value was found in the dictionary for that key."
+  ///
+  /// - Parameters:
+  ///   - value: The new value to add to the dictionary.
+  ///   - key: The key to associate with `value`. If `key` already exists in
+  ///     the dictionary, `value` replaces the existing associated value. If
+  ///     `key` isn't already a key of the dictionary, the `(key, value)` pair
+  ///     is added.
+  /// - Returns: The value that was replaced, or `nil` if a new key-value pair
+  ///   was added.
   @discardableResult
   public mutating func updateValue(
     _ value: Value, forKey key: Key
@@ -1595,36 +1880,68 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.updateValue(value, forKey: key)
   }
 
-  /// Remove and return the key-value pair at `index`.
+  /// Removes and returns the key-value pair at the specified index.
   ///
-  /// Invalidates all indices with respect to `self`.
+  /// Calling this method invalidates any existing indices for use with this
+  /// dictionary.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Parameter index: The position of the key-value pair to remove. `index`
+  ///   must be a valid index of the dictionary, and must not equal the
+  ///   dictionary's end index.
+  /// - Returns: The key-value pair that correspond to `index`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
+  ///   dictionary.
   @discardableResult
   public mutating func remove(at index: Index) -> Element {
     return _variantStorage.remove(at: index)
   }
 
-  /// Remove a given key and the associated value from the dictionary.
-  /// Returns the value that was removed, or `nil` if the key was not present
-  /// in the dictionary.
+  /// Removes the given key and its associated value from the dictionary.
+  ///
+  /// If the key is found in the dictionary, this method returns the key's
+  /// associated value. On removal, this method invalidates all indices with
+  /// respect to the dictionary.
+  ///
+  ///     var hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     if let value = hues.removeValue(forKey: "Coral") {
+  ///         print("The value \(value) was removed.")
+  ///     }
+  ///     // Prints "The value 16 was removed."
+  ///
+  /// If the key isn't found in the dictionary, `removeValue(forKey:)` returns
+  /// `nil`.
+  ///
+  ///     if let value = hues.removeValueForKey("Cerise") {
+  ///         print("The value \(value) was removed.")
+  ///     } else {
+  ///         print("No value found for that key.")
+  ///     }
+  ///     // Prints "No value found for that key.""
+  ///
+  /// - Parameter key: The key to remove along with its associated value.
+  /// - Returns: The value that was removed, or `nil` if the key was not
+  ///   present in the dictionary.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
+  ///   dictionary.
   @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
     return _variantStorage.removeValue(forKey: key)
   }
 
-  /// Removes all elements.
+  /// Removes all key-value pairs from the dictionary.
   ///
-  /// - Postcondition: `capacity == 0` if `keepingCapacity` is
-  /// `false`, otherwise the capacity will not be decreased.
+  /// Calling this method invalidates all indices with respect to the
+  /// dictionary.
   ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - parameter keepCapacity: If `true`, the operation preserves the
+  /// - Parameter keepCapacity: Whether the dictionary should keep its
+  ///   underlying storage. If you pass `true`, the operation preserves the
   ///   storage capacity that the collection has, otherwise the underlying
   ///   storage is released.  The default is `false`.
   ///
-  /// Complexity: O(`self.count`).
+  /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
+  ///   dictionary.
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
@@ -1632,7 +1949,7 @@ public struct Dictionary<Key : Hashable, Value> :
     _variantStorage.removeAll(keepingCapacity: keepCapacity)
   }
 
-  /// The number of entries in the dictionary.
+  /// The number of key-value pairs in the dictionary.
   ///
   /// - Complexity: O(1).
   public var count: Int {
@@ -1643,9 +1960,23 @@ public struct Dictionary<Key : Hashable, Value> :
   // `Sequence` conformance
   //
 
-  /// Returns an iterator over the `(Key, Value)` pairs.
+  /// Returns an iterator over the dictionary's key-value pairs.
   ///
-  /// - Complexity: O(1).
+  /// Iterating over a dictionary yields the key-value pairs as two-element
+  /// tuples. You can decompose the tuple in a `for`-`in` loop, which calls
+  /// `makeIterator()` behind the scenes, or when calling the iterator's
+  /// `next()` method directly.
+  ///
+  ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     for (name, hueValue) in hues {
+  ///         print("The hue of \(name) is \(hueValue).")
+  ///     }
+  ///     // Prints "The hue of Heliotrope is 296."
+  ///     // Prints "The hue of Coral is 16."
+  ///     // Prints "The hue of Aquamarine is 156."
+  ///
+  /// - Returns: An iterator over the dictionary with elements of type
+  ///   `(key: Key, value: Value)`.
   @inline(__always)
   public func makeIterator() -> DictionaryIterator<Key, Value> {
     return _variantStorage.makeIterator()
@@ -1655,7 +1986,24 @@ public struct Dictionary<Key : Hashable, Value> :
   // DictionaryLiteralConvertible conformance
   //
 
-  /// Create an instance initialized with `elements`.
+  /// Creates a dictionary initialized with a dictionary literal.
+  ///
+  /// Don't directly call this initializer, which is called by the compiler to
+  /// handle dictionary literals. To use a dictionary literal as the initial
+  /// value of a dictionary, enclose a comma-separated list of key-value pairs
+  /// in square brackets.
+  ///
+  /// For example, the code sample below creates a dictionary with string keys
+  /// and values.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///
+  /// - Parameter elements: The key-value pairs that will make up the new
+  ///   dictionary. Each key in `elements` must be unique.
+  ///
+  /// - SeeAlso: `DictionaryLiteralConvertible`
   @effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeStorage: _NativeDictionaryStorage.fromArray(elements))
@@ -1671,19 +2019,37 @@ public struct Dictionary<Key : Hashable, Value> :
   // API itself.
   //
 
-  /// A collection containing just the keys of `self`.
+  /// A collection containing just the keys of the dictionary.
   ///
-  /// Keys appear in the same order as they occur as the `.key` member
-  /// of key-value pairs in `self`.  Each key in the result has a
-  /// unique value.
+  /// When iterated over, keys appear in this collection in the same order as they
+  /// occur in the dictionary's key-value pairs. Each key in the keys
+  /// collection has a unique value.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     for k in countryCodes.keys {
+  ///         print(k)
+  ///     }
+  ///     // Prints "BR"
+  ///     // Prints "JP"
+  ///     // Prints "GH"
   public var keys: LazyMapCollection<Dictionary, Key> {
     return self.lazy.map { $0.key }
   }
 
-  /// A collection containing just the values of `self`.
+  /// A collection containing just the values of the dictionary.
   ///
-  /// Values appear in the same order as they occur as the `.value` member
-  /// of key-value pairs in `self`.
+  /// When iterated over, values appear in this collection in the same order as they
+  /// occur in the dictionary's key-value pairs.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///     for v in countryCodes.values {
+  ///         print(v)
+  ///     }
+  ///     // Prints "Brazil"
+  ///     // Prints "Japan"
+  ///     // Prints "Ghana"
   public var values: LazyMapCollection<Dictionary, Value> {
     return self.lazy.map { $0.value }
   }
@@ -1692,7 +2058,15 @@ public struct Dictionary<Key : Hashable, Value> :
   // Collection conformance
   //
 
-  /// `true` iff `count == 0`.
+  /// A Boolean value that indicates whether the dictionary is empty. (read
+  /// only)
+  ///
+  /// Dictionaries are empty when created with an initializer or an empty
+  /// dictionary literal.
+  ///
+  ///     var frequencies: [String: Int] = [:]
+  ///     print(frequencies.isEmpty)
+  ///     // Prints "true"
   public var isEmpty: Bool {
     return count == 0
   }
@@ -1811,12 +2185,13 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
     return result
   }
 
-  /// A textual representation of `self`.
+  /// A string that represents the contents of the dictionary.
   public var description: String {
     return _makeDescription()
   }
 
-  /// A textual representation of `self`, suitable for debugging.
+  /// A string that represents the contents of the dictionary, suitable for
+  /// debugging.
   public var debugDescription: String {
     return _makeDescription()
   }
@@ -4796,10 +5171,16 @@ extension ${Self} {
   ///
   /// - Returns: A member of the set. If the set is empty, returns `nil`.
 %elif Self == 'Dictionary':
-  /// Removes and returns the first element of the dictionary, if the
-  /// dictionary is not empty.
+  /// Removes and returns the first key-value pair of the dictionary if the
+  /// dictionary isn't empty.
   ///
-  /// - Complexity: Amortized O(1)
+  /// The first element of the dictionary is not necessarily the first element
+  /// added. Don't expect any particular ordering of key-value pairs.
+  ///
+  /// - Returns: The first key-value pair of the dictionary if the dictionary
+  ///   is not empty; otherwise, `nil`.
+  ///
+  /// - Complexity: Averages to O(1) over many calls to `popFirst()`.
 %end
   @warn_unused_result
   public mutating func popFirst() -> Element? {
