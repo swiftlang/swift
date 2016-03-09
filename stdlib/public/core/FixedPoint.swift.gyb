@@ -546,16 +546,27 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 %end
 
 // Bitwise negate
+/// Returns the inverse of the bits set in the argument.
+///
+/// - SeeAlso: `BitwiseOperations`
 @_transparent
 public prefix func ~(rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs._value, mask._value))
 }
 
-% for op, name in (
-%  ('==','eq'), ('!=','ne'),
-%  ('<', sign + 'lt'), ('<=', sign + 'le'),
-%  ('>', sign + 'gt'), ('>=', sign + 'ge')):
+% for op, name, comment in (
+%   ('==', 'eq', 'the two arguments have equal values'),
+%   ('!=', 'ne', 'the two arguments have unequal values'),
+%   ('<', sign + 'lt', 'the first argument is less than the second argument'),
+%   ('<=', sign + 'le', 'the first argument is less than or equal to the second argument'),
+%   ('>', sign + 'gt', 'the first argument is greater than the second argument'),
+%   ('>=', sign + 'ge', 'the first argument is greater than or equal to the second argument'),
+% ):
+/// Returns a Boolean value that indicates whether
+/// ${comment}.
+///
+/// - SeeAlso: `Equatable`, `Comparable`
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs._value, rhs._value))
@@ -576,22 +587,38 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 % end
 
-% for op, name in (('&','and'), ('^','xor'), ('|','or')):
+% for op, name, comment in (
+%   ('&', 'and', 'intersection of bits set in'),
+%   ('^', 'xor', 'bits that are set in exactly one of'),
+%   ('|', 'or', 'union of bits set in'),
+% ):
+/// Returns the ${comment} the two arguments.
+///
+/// - SeeAlso: `BitwiseOperations`
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs._value, rhs._value))
+}
+
+/// Calculates the ${comment} the two arguments
+/// and stores the result in the first argument.
+///
+/// - SeeAlso: `BitwiseOperations`
+@_transparent
+public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
+  lhs = lhs ${op} rhs
 }
 % end
 
 // Bitwise operations
 @_transparent
 extension ${Self} : BitwiseOperations {
-  /// The empty bitset of type ${Self}.
+  /// The empty bitset of type `${Self}`.
   public static var allZeros: ${Self} { return 0 }
 }
 
 // Compound assignments
-% for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
+% for op in '+', '-', '*', '<<', '>>':
 @_transparent
 public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs

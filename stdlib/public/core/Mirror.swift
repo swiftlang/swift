@@ -736,27 +736,74 @@ public protocol _DefaultCustomPlaygroundQuickLookable {
 //===--- General Utilities ------------------------------------------------===//
 // This component could stand alone, but is used in Mirror's public interface.
 
-/// Represent the ability to pass a dictionary literal in function
-/// signatures.
+/// A lightweight collection of key-value pairs.
 ///
-/// A function with a `DictionaryLiteral` parameter can be passed a
-/// Swift dictionary literal without causing a `Dictionary` to be
-/// created.  This capability can be especially important when the
-/// order of elements in the literal is significant.
+/// Use a `DictionaryLiteral` instance when you need an ordered collection of
+/// key-value pairs and don't require the fast key lookup that the
+/// `Dictionary` type provides. Unlike key-value pairs in a true dictionary,
+/// neither the key nor the value of a `DictionaryLiteral` instance must
+/// conform to the `Hashable` protocol.
 ///
-/// For example:
+/// You initialize a `DictionaryLiteral` instance using a Swift dictionary
+/// literal. Besides maintaining the order of the original dictionary literal,
+/// `DictionaryLiteral` also allows duplicates keys. For example:
+///
+///     let recordTimes: DictionaryLiteral = ["Florence Griffith-Joyner": 10.49,
+///                                           "Evelyn Ashford": 10.76,
+///                                           "Evelyn Ashford": 10.79,
+///                                           "Marlies Gohr": 10.81]
+///     print(recordTimes.first!)
+///     // Prints "("Florence Griffith-Joyner", 10.49)"
+///
+/// Some operations that are efficient on a dictionary are slower when using
+/// `DictionaryLiteral`. In particular, to find the value matching a key, you
+/// must search through every element of the collection. The call to
+/// `index(where:)` in the following example must traverse the whole
+/// collection to make sure that no element matches the given predicate:
+///
+///     let runner = "Marlies Gohr"
+///     if let index = recordTimes.index(where: { $0.0 == runner }) {
+///         let time = recordTimes[index].1
+///         print("\(runner) set a 100m record of \(time) seconds.")
+///     } else {
+///         print("\(runner) couldn't be found in the records.")
+///     }
+///     // Prints "Marlies Gohr set a 100m record of 10.81 seconds."
+///
+/// Dictionary Literals as Function Parameters
+/// ------------------------------------------
+///
+/// When calling a function with a `DictionaryLiteral` parameter, you can pass
+/// a Swift dictionary literal without causing a `Dictionary` to be created.
+/// This capability can be especially important when the order of elements in
+/// the literal is significant.
+///
+/// For example, you could create an `IntPairs` structure that holds a list of
+/// two-integer tuples and use an initializer that accepts a
+/// `DictionaryLiteral` instance.
 ///
 ///     struct IntPairs {
-///       var elements: [(Int, Int)]
-///       init(_ pairs: DictionaryLiteral<Int, Int>) {
-///         elements = Array(pairs)
-///       }
+///         var elements: [(Int, Int)]
+///
+///         init(_ elements: DictionaryLiteral<Int, Int>) {
+///             self.elements = Array(elements)
+///         }
 ///     }
 ///
-///     let x = IntPairs([1:2, 1:1, 3:4, 2:1])
-///     print(x.elements)  // [(1, 2), (1, 1), (3, 4), (2, 1)]
+/// When you're ready to create a new `IntPairs` instance, use a dictionary
+/// literal as the parameter to the `IntPairs` initializer. The
+/// `DictionaryLiteral` instance preserves the order of the elements as
+/// passed.
+///
+///     let pairs = IntPairs([1: 2, 1: 1, 3: 4, 2: 1])
+///     print(pairs.elements)
+///     // Prints "[(1, 2), (1, 1), (3, 4), (2, 1)]"
 public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
-  /// Store `elements`.
+  /// Creates a new `DictionaryLiteral` instance from the given dictionary
+  /// literal.
+  ///
+  /// The order of the key-value pairs is kept intact in the resulting
+  /// `DictionaryLiteral` instance.
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self._elements = elements
   }
@@ -768,30 +815,30 @@ public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
 extension DictionaryLiteral : RandomAccessCollection {
   public typealias Indices = CountableRange<Int>
   
-  /// The position of the first element in a non-empty `DictionaryLiteral`.
+  /// The position of the first element in a nonempty collection.
   ///
-  /// Identical to `endIndex` in an empty `DictionaryLiteral`.
-  ///
-  /// - Complexity: O(1).
+  /// If the `DictionaryLiteral` instance is empty, `startIndex` is equal to
+  /// `endIndex`.
   public var startIndex: Int { return 0 }
 
-  /// The `DictionaryLiteral`'s "past the end" position.
+  /// The collection's "past the end" position, or one
+  /// greater than the last valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
-  ///
-  /// - Complexity: O(1).
+  /// If the `DictionaryLiteral` instance is empty, `endIndex` is equal to
+  /// `startIndex`.
   public var endIndex: Int { return _elements.endIndex }
 
   // FIXME: a typealias is needed to prevent <rdar://20248032>
+  /// The element type of a `DictionaryLiteral`: a tuple containing an
+  /// individual key-value pair.
   public typealias Element = (key: Key, value: Value)
 
-  /// Access the element indicated by `position`.
+  /// Accesses the element at the specified position.
   ///
-  /// - Precondition: `position >= 0 && position < endIndex`.
-  ///
-  /// - complexity: O(1).
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
+  /// - Returns: The key-value pair at position `position`.
   public subscript(position: Int) -> Element {
     return _elements[position]
   }
