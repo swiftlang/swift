@@ -43,7 +43,7 @@ func foo2(var a : [S1]) {
 // CHECK-REPLACEMENT2: <Declaration>mutating func append(newElement: <Type usr="s:Si">Int</Type>)</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
-// CHECK-REPLACEMENT3: <Group>Collection</Group>
+// CHECK-REPLACEMENT3: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT3: func sort(@noescape isOrderedBefore: @noescape (<Type usr="s:V13cursor_stdlib2S1">S1</Type>
 // CHECK-REPLACEMENT3: sort() -&gt; [S1]</RelatedName>
 // CHECK-REPLACEMENT3: sort() -&gt; [S1]</RelatedName>

@@ -65,7 +65,8 @@ class SynthesizedExtensionAnalyzer {
   Implementation &Impl;
 
 public:
-  SynthesizedExtensionAnalyzer(NominalTypeDecl *Target);
+  SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
+                               bool IncludeUnconditional = true);
   ~SynthesizedExtensionAnalyzer();
   void forEachSynthesizedExtension(
     llvm::function_ref<void(ExtensionDecl*)> Fn);
