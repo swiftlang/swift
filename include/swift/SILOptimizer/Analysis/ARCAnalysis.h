@@ -247,13 +247,13 @@ public:
   void recompute();
 
   bool isSingleReleaseMatchedToArgument(SILInstruction *Inst) {
-    auto Pred = [&Inst](std::pair<SILArgument *,
-                                  ReleaseList> &P) -> bool {
+    auto Pred = [&Inst](const std::pair<SILArgument *,
+                                        ReleaseList> &P) -> bool {
       if (P.second.size() > 1)
         return false;
       return *P.second.begin() == Inst;
     };
-    return std::count_if(ArgInstMap.begin(), ArgInstMap.end(), Pred);
+    return count_if(ArgInstMap, Pred);
   }
 
   using iterator = decltype(ArgInstMap)::iterator;

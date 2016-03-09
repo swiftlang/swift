@@ -57,7 +57,7 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   // If the type references the type variable, don't permit the binding.
   SmallVector<TypeVariableType *, 4> referencedTypeVars;
   type->getTypeVariables(referencedTypeVars);
-  if (std::count(referencedTypeVars.begin(), referencedTypeVars.end(), typeVar))
+  if (count(referencedTypeVars, typeVar))
     return None;
 
   // If the type is a type variable itself, don't permit the binding.
