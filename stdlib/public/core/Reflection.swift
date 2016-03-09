@@ -276,7 +276,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
     }
 
     let (name, child) = mirror.children[currentIndex]
-    mirror._nextInPlace(&currentIndex)
+    mirror.children._nextInPlace(&currentIndex)
     _dump_unlocked(
       child,
       to: &target,
@@ -342,7 +342,7 @@ internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
     }
 
     let (name, child) = mirror.children[currentIndex]
-    mirror._nextInPlace(&currentIndex)
+    mirror.children._nextInPlace(&currentIndex)
     _dump_unlocked(
       child,
       to: &target,
