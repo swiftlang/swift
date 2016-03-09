@@ -279,6 +279,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   case DAK_RawDocComment:
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
+  case DAK_ShowInInterface:
     return false;
   default:
     break;
