@@ -204,7 +204,7 @@ private:
   }
 
 public:
-  enum class Type {
+  enum class LookupKind {
     SwiftModule,
     Crawler,
     Decl,
@@ -247,7 +247,7 @@ public:
   static DeclsLookupSource
   GetDeclsLookupSource (DeclsLookupSource source, swift::NominalTypeDecl *decl)
   {
-    assert(source._type == Type::SwiftModule);
+    assert(source._type == LookupKind::SwiftModule);
     assert(source._module);
     assert(decl);
     return DeclsLookupSource(source._module, decl);
@@ -258,7 +258,7 @@ public:
                        swift::LazyResolver *typeResolver,
                        ValueDecls &result)
   {
-    if (_type == Type::Crawler)
+    if (_type == LookupKind::Crawler)
     {
       swift::ASTContext *ast_ctx = _crawler._ast;
       if (ast_ctx)
@@ -281,7 +281,7 @@ public:
         }
       }
     }
-    else if (_type == Type::SwiftModule)
+    else if (_type == LookupKind::SwiftModule)
       lookupQualified(_module, name, options, typeResolver, result);
     return;
   }
@@ -291,7 +291,7 @@ public:
                    swift::NLKind kind,
                    ValueDecls &result)
   {
-    if (_type == Type::Crawler)
+    if (_type == LookupKind::Crawler)
     {
       swift::ASTContext *ast_ctx = _crawler._ast;
       if (ast_ctx)
@@ -314,7 +314,7 @@ public:
         }
       }
     }
-    else if (_type == Type::SwiftModule)
+    else if (_type == LookupKind::SwiftModule)
       _module->lookupValue(path, name, kind, result);
     return;
   }
@@ -323,11 +323,11 @@ public:
                      swift::Identifier priv_decl_id,
                      ValueDecls &result)
   {
-    if (_type == Type::Decl)
+    if (_type == LookupKind::Decl)
       return lookupMember(_decl, id, priv_decl_id, result);
-    if (_type == Type::SwiftModule)
+    if (_type == LookupKind::SwiftModule)
       return lookupMember(_module, id, priv_decl_id, result);
-    if (_type == Type::Extension)
+    if (_type == LookupKind::Extension)
       return lookupMember(_extension._decl, id, priv_decl_id, result);
     return;
   }
@@ -338,11 +338,11 @@ public:
                 swift::Identifier priv_decl_id,
                 ValueDecls &result)
   {
-    if (_type == Type::Decl)
+    if (_type == LookupKind::Decl)
       _decl->getModuleContext()->lookupMember(result, decl_ctx, id, priv_decl_id);
-    else if (_type == Type::SwiftModule)
+    else if (_type == LookupKind::SwiftModule)
       _module->lookupMember(result, decl_ctx, id, priv_decl_id);
-    else if (_type == Type::Extension)
+    else if (_type == LookupKind::Extension)
       _extension._module->lookupMember(result, decl_ctx, id, priv_decl_id);
     return;
   }
@@ -352,15 +352,15 @@ public:
   {
     switch (_type)
     {
-      case Type::SwiftModule:
+      case LookupKind::SwiftModule:
         return _module->lookupLocalType(key);
-      case Type::Decl:
+      case LookupKind::Decl:
         return _decl->getModuleContext()->lookupLocalType(key);
-      case Type::Extension:
+      case LookupKind::Extension:
         return _extension._module->lookupLocalType(key);
-      case Type::Invalid:
+      case LookupKind::Invalid:
         return nullptr;
-      case Type::Crawler:
+      case LookupKind::Crawler:
         return nullptr;
     }
   }
@@ -370,15 +370,15 @@ public:
   {
     switch(_type)
     {
-      case Type::Invalid:
+      case LookupKind::Invalid:
         return ConstString("Invalid");
-      case Type::Crawler:
+      case LookupKind::Crawler:
         return ConstString("Crawler");
-      case Type::SwiftModule:
+      case LookupKind::SwiftModule:
         return ConstString(_module->getName().get());
-      case Type::Decl:
+      case LookupKind::Decl:
         return ConstString(_decl->getName().get());
-      case Type::Extension:
+      case LookupKind::Extension:
         llvm::SmallString<64> builder;
         builder.append("ext ");
         builder.append(_extension._decl->getNameStr());
@@ -396,20 +396,20 @@ public:
   {
     switch (_type)
     {
-      case Type::Invalid:
+      case LookupKind::Invalid:
         break;
-      case Type::Crawler:
+      case LookupKind::Crawler:
         _crawler._ast = rhs._crawler._ast;
         break;
-      case Type::SwiftModule:
+      case LookupKind::SwiftModule:
         _module = rhs._module;
         break;
-      case Type::Decl:
+      case LookupKind::Decl:
         _decl = rhs._decl;
         _extension._decl = rhs._extension._decl;
         _extension._module = rhs._extension._module;
         break;
-      case Type::Extension:
+      case LookupKind::Extension:
         _extension._decl = rhs._extension._decl;
         _extension._module = rhs._extension._module;
         break;
@@ -424,20 +424,20 @@ public:
       _type = rhs._type;
       switch (_type)
       {
-        case Type::Invalid:
+        case LookupKind::Invalid:
           break;
-        case Type::Crawler:
+        case LookupKind::Crawler:
           _crawler._ast = rhs._crawler._ast;
           break;
-        case Type::SwiftModule:
+        case LookupKind::SwiftModule:
           _module = rhs._module;
           break;
-        case Type::Decl:
+        case LookupKind::Decl:
           _decl = rhs._decl;
           _extension._decl = rhs._extension._decl;
           _extension._module = rhs._extension._module;
           break;
-        case Type::Extension:
+        case LookupKind::Extension:
           _extension._decl = rhs._extension._decl;
           _extension._module = rhs._extension._module;
           break;
@@ -450,11 +450,11 @@ public:
   Clear ()
   {
     // no need to explicitly clean either pointer
-    _type = Type::Invalid;
+    _type = LookupKind::Invalid;
   }
 
   DeclsLookupSource () :
-  _type(Type::Invalid),
+  _type(LookupKind::Invalid),
   _module(nullptr)
   {}
 
@@ -462,15 +462,15 @@ public:
   {
     switch (_type)
     {
-      case Type::Invalid:
+      case LookupKind::Invalid:
         return false;
-      case Type::Crawler:
+      case LookupKind::Crawler:
         return _crawler._ast != nullptr;
-      case Type::SwiftModule:
+      case LookupKind::SwiftModule:
         return _module != nullptr;
-      case Type::Decl:
+      case LookupKind::Decl:
         return _decl != nullptr;
-      case Type::Extension:
+      case LookupKind::Extension:
         return (_extension._decl != nullptr) && (_extension._module != nullptr);
     }
   }
@@ -478,7 +478,7 @@ public:
   bool
   IsExtension ()
   {
-    return (this->operator bool()) && (_type == Type::Extension);
+    return (this->operator bool()) && (_type == LookupKind::Extension);
   }
 
     swift::Type
@@ -489,7 +489,7 @@ public:
         {
             switch (_type)
             {
-                case Type::Extension:
+                case LookupKind::Extension:
                 {
                     swift::TypeBase *type_ptr = _extension._decl->getType().getPointer();
                     if (swift::MetatypeType *metatype_ptr = type_ptr->getAs<swift::MetatypeType>())
@@ -506,7 +506,7 @@ public:
     }
     
 private:
-  Type _type;
+  LookupKind _type;
 
   union {
     swift::ModuleDecl *_module;
@@ -525,10 +525,10 @@ private:
     if (_m)
     {
       _module = _m;
-      _type = Type::SwiftModule;
+      _type = LookupKind::SwiftModule;
     }
     else
-      _type = Type::Invalid;
+      _type = LookupKind::Invalid;
   }
 
   DeclsLookupSource(swift::ASTContext* _a,
@@ -538,10 +538,10 @@ private:
     if (_a)
     {
       _crawler._ast = _a;
-      _type = Type::Crawler;
+      _type = LookupKind::Crawler;
     }
     else
-      _type = Type::Invalid;
+      _type = LookupKind::Invalid;
   }
 
   DeclsLookupSource (swift::NominalTypeDecl * _d)
@@ -549,10 +549,10 @@ private:
     if (_d)
     {
       _decl = _d;
-      _type = Type::Decl;
+      _type = LookupKind::Decl;
     }
     else
-      _type = Type::Invalid;
+      _type = LookupKind::Invalid;
   }
 
   DeclsLookupSource (swift::ModuleDecl *_m,
@@ -562,10 +562,10 @@ private:
     {
       _extension._decl = _d;
       _extension._module = _m;
-      _type = Type::Extension;
+      _type = LookupKind::Extension;
     }
     else
-      _type = Type::Invalid;
+      _type = LookupKind::Invalid;
   }
 };
 
