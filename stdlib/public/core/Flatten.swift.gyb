@@ -113,13 +113,24 @@ extension LazySequenceProtocol
 }
 
 %{
-def collectionForTraversal(traversal):
+def baseCollectionForTraversal(traversal):
     if traversal == 'Forward':
         return 'Collection'
     if traversal == 'Bidirectional':
         return 'BidirectionalCollection'
     if traversal == 'RandomAccess':
         return 'RandomAccessCollection'
+    assert False, "unknown traversal"
+}%
+
+%{
+def indexConfromsToForTraversal(traversal):
+    if traversal == 'Forward':
+        return 'Comparable'
+    if traversal == 'Bidirectional':
+        return 'Comparable'
+    if traversal == 'RandomAccess':
+        return 'Strideable'
     assert False, "unknown traversal"
 }%
 
@@ -133,13 +144,14 @@ def collectionForTraversal(traversal):
 %   Index = Collection + 'Index'
 /// A position in a `${Collection}`.
 public struct ${Index}<
-  BaseElements : ${collectionForTraversal(traversal)}
+  BaseElements : ${baseCollectionForTraversal(traversal)}
   where
   ${constraints % {'Base': 'BaseElements.'}}
-> {
+> : ${indexConfromsToForTraversal(traversal)} {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Precondition: The next value is representable.
+  /*
   public func successor() -> ${Index} {
     let nextInner = _inner!.successor()
     if _fastPath(nextInner != _innerCollection!.endIndex) {
@@ -154,11 +166,12 @@ public struct ${Index}<
     }
     return ${Index}(_endIndexOfFlattened: _base)
   }
-  
-% if traversal == 'Bidirectional':
+  */
+
   /// Returns the previous consecutive value before `self`.
   ///
   /// - Precondition: The previous value is representable.
+  /*
   public func predecessor() -> ${Index} {
     var prevOuter = _outer
     var prevInnerCollection : BaseElements.Iterator.Element
@@ -179,7 +192,7 @@ public struct ${Index}<
     return ${Index}(
       _base, prevOuter, prevInner.predecessor(), prevInnerCollection)
   }
-% end
+  */
 
   /// Construct the `startIndex` for a flattened view of `base`.
   internal init(_startIndexOfFlattened base: BaseElements) {
@@ -229,6 +242,14 @@ public func == <BaseElements> (
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
 }
 
+@warn_unused_result
+public func < <BaseElements> (
+  lhs: ${Index}<BaseElements>, 
+  rhs: ${Index}<BaseElements>
+) -> Bool {
+  fatalError("FIXME: swift-3-indexing-model implement")
+}
+
 /// A flattened view of a base collection-of-collections.
 ///
 /// The elements of this view are a concatenation of the elements of
@@ -252,15 +273,17 @@ public func == <BaseElements> (
 ///
 /// - See also: `FlattenSequence`
 public struct ${Collection}<
-  Base : ${collectionForTraversal(traversal)}
+  Base : ${baseCollectionForTraversal(traversal)}
   where
   ${constraints % {'Base': 'Base.'}}
-> : ${collectionForTraversal(traversal)} {
+> : ${baseCollectionForTraversal(traversal)} {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<Base>
+
+  public typealias IndexDistance = Base.IndexDistance
   
   /// Creates a flattened view of `base`.
   public init(_ base: Base) {
@@ -288,6 +311,38 @@ public struct ${Collection}<
   /// `successor()`.
   public var endIndex: Index {
     return ${Index}(_endIndexOfFlattened: _base)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
+% if traversal == 'Bidirectional':
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+% end
+  
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+  
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model implement")
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    fatalError("FIXME: swift-3-indexing-model implement")
   }
 
   /// Access the element at `position`.
@@ -318,7 +373,8 @@ public struct ${Collection}<
   internal var _base: Base
 }
 
-extension Collection where ${constraints % {'Base': ''}} {
+extension ${baseCollectionForTraversal(traversal)}
+  where ${constraints % {'Base': ''}} {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
   public func flatten() -> ${Collection}<Self> {
