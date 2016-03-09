@@ -98,21 +98,64 @@ static bool isCFTypeName(StringRef name) {
 
 IAMOptions IAMOptions::getDefault() { return {}; }
 
-// Drop consecutive unique words, ignoring case
-static unsigned uniq(StringRef str, NameBuffer &out) {
-  unsigned numDropped = 0;
-  auto words = camel_case::getWords(str);
-  StringRef priorWord = "";
-  for (auto wI = words.begin(), wE = words.end(); wI != wE; ++wI) {
-    if (camel_case::sameWordIgnoreFirstCase(*wI, priorWord)) {
-      ++numDropped;
-      continue;
-    }
-    priorWord = *wI;
-    out.append(*wI);
+// As append, but skip a repeated word at the boundary. Case sensitive.
+// Example: appendUniq("FooBar", "BarBaz") ==> "FooBarBaz"
+void appendUniq(NameBuffer &src, StringRef toAppend) {
+  if (src.empty()) {
+    src = toAppend;
+    return;
   }
 
-  return numDropped;
+  auto appendWords = camel_case::getWords(toAppend);
+  StringRef lastWord = *camel_case::getWords(src).rbegin();
+  auto wI = appendWords.begin();
+  while (wI != appendWords.end() && *wI == lastWord)
+    ++wI;
+  src.append(wI.getRestOfStr());
+}
+
+StringRef skipLeadingUnderscores(StringRef str) {
+  unsigned numToDrop = 0;
+  for (/*empty*/; numToDrop < str.size(); ++numToDrop)
+    if (str[numToDrop] != '_')
+      break;
+  return str.drop_front(numToDrop);
+}
+
+// Form a humble camel name from a string. Skips leading underscores.
+static void formHumbleCamelName(StringRef str, NameBuffer &out) {
+  str = skipLeadingUnderscores(str);
+  auto newStr = camel_case::toLowercaseWord(str, out);
+  if (newStr == str)
+    out = newStr;
+}
+
+// Form a humble camel by appending the two strings and adjusting case as
+// needed. Skips leading underscores in either name, and skips a repeated word
+// at the boundary. Example: formHumbleCamelName("__FooBar", "barBaz") ==>
+// "fooBarBaz".
+static void formHumbleCamelName(StringRef left, StringRef right,
+                                NameBuffer &out) {
+  left = skipLeadingUnderscores(left);
+  if (left == "") {
+    formHumbleCamelName(right, out);
+    return;
+  }
+  right = skipLeadingUnderscores(right);
+  if (right == "") {
+    formHumbleCamelName(left, out);
+    return;
+  }
+
+  StringRef lastWord = *camel_case::getWords(left).rbegin();
+  auto rightWords = camel_case::getWords(right);
+  auto wI = rightWords.begin();
+  while (wI != rightWords.end() &&
+         camel_case::sameWordIgnoreFirstCase(*wI, lastWord))
+    ++wI;
+
+  formHumbleCamelName(left, out);
+  camel_case::appendSentenceCase(out, wI.getRestOfStr());
 }
 
 static unsigned dropWord(StringRef str, StringRef word, NameBuffer &out) {
@@ -297,12 +340,7 @@ private:
   }
 
   DeclName formDeclName(StringRef baseName) {
-    NameBuffer baseNameBuf;
-
-    // FIXME: instead, have fuzzy append be append_uniq
-    uniq(baseName, baseNameBuf);
-
-    return {getHumbleIdentifier(baseNameBuf)};
+    return {getHumbleIdentifier(baseName)};
   }
 
   DeclName formDeclName(StringRef baseName,
@@ -313,7 +351,7 @@ private:
     if (params.empty() && firstPrefix != "") {
       // We need to form an argument label, despite there being no argument
       NameBuffer paramName;
-      camel_case::toLowercaseWord(firstPrefix, paramName);
+      formHumbleCamelName(firstPrefix, paramName);
 
       // FIXME: enable this when we have ImportDecl support.
       // argLabels.push_back(context.getIdentifier(paramName));
@@ -322,27 +360,16 @@ private:
     for (unsigned i = 0; i < params.size(); ++i) {
       NameBuffer paramName;
       if (i == 0 && firstPrefix != "") {
-        NameBuffer prefixBuf;
-        camel_case::toLowercaseWord(firstPrefix, prefixBuf);
-        NameBuffer paramBuf;
-        camel_case::toSentencecase(params[i]->getName(), paramBuf);
-
-        // FIXME: appendUniq would be more clear than a free-form uniq
-        prefixBuf.append(paramBuf);
-        uniq(prefixBuf, paramName);
+        formHumbleCamelName(firstPrefix, params[i]->getName(), paramName);
       } else {
-        paramName.append(params[i]->getName());
+        // TODO: strip leading underscores
+        formHumbleCamelName(params[i]->getName(), paramName);
       }
 
       argLabels.push_back(context.getIdentifier(paramName));
     }
 
-
-    // FIXME: instead, have fuzzy append be append_uniq
-    NameBuffer baseNameBuf;
-    uniq(baseName, baseNameBuf);
-
-    return {context, getHumbleIdentifier(baseNameBuf), argLabels};
+    return {context, getHumbleIdentifier(baseName), argLabels};
   }
 
   bool match(StringRef str, StringRef toMatch, NameBuffer &outStr) {
@@ -360,7 +387,7 @@ private:
     while (strIter != strWords.end()) {
       if (matchIter == matchWords.end()) {
         // We matched them all!
-        outStr.append(strIter.getRestOfStr());
+        appendUniq(outStr, strIter.getRestOfStr());
         return true;
       }
       if (*strIter == *matchIter) {
@@ -370,7 +397,7 @@ private:
         continue;
       }
       // Move on to the next one
-      outStr.append(*strIter);
+      appendUniq(outStr, *strIter);
       ++strIter;
     }
 
