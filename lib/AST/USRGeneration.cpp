@@ -68,10 +68,6 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
 
   // FIXME: mangling 'self' in destructors crashes in mangler.
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
-      return true;
-
-  // FIXME: mangling generic parameters of a typealias asserts in the mangler.
-  if (isa<TypeAliasDecl>(VD->getDeclContext()))
     return true;
 
   OS << getUSRSpacePrefix();
