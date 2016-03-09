@@ -359,6 +359,22 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT_ARCH="armv7"
                     )
                     ;;
+                iphoneos-armv7s)
+                    xcrun_sdk_name="iphoneos"
+                    llvm_host_triple="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="ARM"
+                    cmake_osx_deployment_target=""
+                    cmark_cmake_options=(
+                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${deployment_target})"
+                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${deployment_target})"
+                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                    )
+                    swift_cmake_options=(
+                        -DSWIFT_HOST_VARIANT="iphoneos"
+                        -DSWIFT_HOST_VARIANT_SDK="IOS"
+                        -DSWIFT_HOST_VARIANT_ARCH="armv7s"
+                    )
+                    ;;
                 iphoneos-arm64)
                     xcrun_sdk_name="iphoneos"
                     llvm_host_triple="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
@@ -787,7 +803,7 @@ CROSS_TOOLS_DEPLOYMENT_TARGETS=()
 for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
     case ${t} in
         iphonesimulator-i386 | iphonesimulator-x86_64 | \
-        iphoneos-arm64 | iphoneos-armv7 | \
+        iphoneos-arm64 | iphoneos-armv7 | iphoneos-armv7s | \
         appletvos-arm64 | appletvsimulator-x86_64 | \
         watchos-armv7k | watchsimulator-i386)
             CROSS_TOOLS_DEPLOYMENT_TARGETS=(
@@ -1258,6 +1274,9 @@ function common_cross_c_flags() {
             ;;
         iphoneos-armv7)
             echo "-arch armv7 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+            ;;
+        iphoneos-armv7s)
+            echo "-arch armv7s -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
         iphoneos-arm64)
             echo "-arch arm64 -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
