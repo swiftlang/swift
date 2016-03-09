@@ -224,14 +224,37 @@ function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
 }
 
+function system_memory_in_bytes() {
+    case "$(uname -s -m)" in
+        Darwin\ x86_64)
+            sysctl hw.memsize | cut -f 2 -d " "
+            ;;
+        *)
+            echo "Unknown operating system"
+            exit 1
+            ;;
+    esac
+}
+
+function float_min() {
+    local LHS=$1
+    local RHS=$2
+    if (( $(echo "${LHS} < ${RHS}" | bc -l) )); then
+        echo ${LHS}
+    else
+        echo ${RHS}
+    fi
+}
+
 function num_llvm_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
             # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
             # the formula GB Memory/3.5GB to get the number of parallel link
             # threads we can support.
-            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000.0/3.5 | bc
-        ;;
+            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000.0/3.5 | bc)
+            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
+            ;;
         *)
             echo "Unknown operating system"
             exit 1
@@ -245,15 +268,15 @@ function num_swift_parallel_lto_link_jobs() {
             # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
             # the formula GB Memory/6GB to get the number of parallel link
             # threads we can support.
-            echo $(sysctl hw.memsize | cut -f 2 -d " ")/1000000000/6.0 | bc
-        ;;
+            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000/6.0 | bc)
+            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
+            ;;
         *)
             echo "Unknown operating system"
             exit 1
             ;;
     esac
 }
-
 
 function set_deployment_target_based_options() {
     llvm_cmake_options=()
