@@ -2574,15 +2574,25 @@ namespace {
 
       SourceLoc noLoc{};
       ArrayRef<Identifier> argNames = name.getArgumentNames();
-      auto parameterList = Impl.importFunctionParameterList(
-          decl, {decl->param_begin(), decl->param_end()},
-          decl->isVariadic(), allowNSUIntegerAsInt, argNames);
 
+      ParameterList *parameterList = nullptr;
+      if (argNames.size() == 1 && decl->getNumParams() == 0) {
+        // Special case: We need to create an empty first parameter for our
+        // argument label
+        parameterList =
+            ParameterList::createWithoutLoc(new (Impl.SwiftContext) ParamDecl(
+                /*IsLet=*/true, noLoc, noLoc, argNames.front(), noLoc,
+                argNames.front(), Impl.SwiftContext.TheEmptyTupleType, dc));
+      } else {
+        parameterList = Impl.importFunctionParameterList(
+            decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
+            allowNSUIntegerAsInt, argNames);
+      }
       if (!parameterList)
         return nullptr;
 
       bool selfIsInOut =
-        !dc->getDeclaredTypeOfContext()->hasReferenceSemantics();
+          !dc->getDeclaredTypeOfContext()->hasReferenceSemantics();
       auto selfParam = ParamDecl::createSelf(noLoc, dc, /*static=*/false,
                                              /*inout=*/selfIsInOut);
 

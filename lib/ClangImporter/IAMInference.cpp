@@ -353,9 +353,7 @@ private:
       // We need to form an argument label, despite there being no argument
       NameBuffer paramName;
       formHumbleCamelName(firstPrefix, paramName);
-
-      // FIXME: enable this when we have ImportDecl support.
-      // argLabels.push_back(context.getIdentifier(paramName));
+      argLabels.push_back(context.getIdentifier(paramName));
     }
 
     for (unsigned i = 0; i < params.size(); ++i) {

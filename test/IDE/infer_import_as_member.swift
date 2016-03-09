@@ -53,9 +53,7 @@ import InferImportAsMember
 // PRINT-NEXT:   static func staticGetNonPropertyNoSelf() -> Float
 // PRINT-NEXT:   static func staticSetNonPropertyNoSelf(x x: Double, y y: Double)
 // PRINT-NEXT:   static func staticSetNonPropertyNoGet(x x: Double)
-
-
-
+//
 // PRINT-LABEL:  /// Static method
 // PRINT-NEXT:   static func staticMethod() -> Double
 // PRINT-NEXT:   static func tlaThreeLetterAcronym() -> Double
