@@ -22,9 +22,11 @@
 #include <cstdio>
 #include <mutex> // std::once
 
+using namespace swift;
+
 typedef const std::string ConstString;
 typedef void Log;
-typedef swift::ASTContext SwiftASTContext;
+typedef ASTContext SwiftASTContext;
 
 static std::string stringWithFormat(const std::string fmt_str, ...) {
   int final_n, n = ((int)fmt_str.size()) * 2;
@@ -45,26 +47,26 @@ static std::string stringWithFormat(const std::string fmt_str, ...) {
   return std::string(formatted.get());
 }
 
-static swift::TypeBase*
-GetTemplateArgument (swift::TypeBase* type,
+static TypeBase*
+GetTemplateArgument (TypeBase* type,
                      size_t arg_idx)
 {
     if (type)
     {
-        swift::CanType swift_can_type = type->getDesugaredType()->getCanonicalType();
+        CanType swift_can_type = type->getDesugaredType()->getCanonicalType();
         
-        const swift::TypeKind type_kind = swift_can_type->getKind();
+        const TypeKind type_kind = swift_can_type->getKind();
         switch (type_kind)
         {
-            case swift::TypeKind::UnboundGeneric:
+            case TypeKind::UnboundGeneric:
             {
-                swift::UnboundGenericType *unbound_generic_type = swift_can_type->getAs<swift::UnboundGenericType>();
+                UnboundGenericType *unbound_generic_type = swift_can_type->getAs<UnboundGenericType>();
                 if (!unbound_generic_type)
                     break;
                 auto *nominal_type_decl = unbound_generic_type->getDecl();
                 if (!nominal_type_decl)
                     break;
-                swift::GenericParamList *generic_param_list = nominal_type_decl->getGenericParams();
+                GenericParamList *generic_param_list = nominal_type_decl->getGenericParams();
                 if (!generic_param_list)
                     break;
                 if (arg_idx >= generic_param_list->getAllArchetypes().size())
@@ -72,22 +74,22 @@ GetTemplateArgument (swift::TypeBase* type,
                 return generic_param_list->getAllArchetypes()[arg_idx];
             }
                 break;
-            case swift::TypeKind::BoundGenericClass:
-            case swift::TypeKind::BoundGenericStruct:
-            case swift::TypeKind::BoundGenericEnum:
+            case TypeKind::BoundGenericClass:
+            case TypeKind::BoundGenericStruct:
+            case TypeKind::BoundGenericEnum:
             {
-                swift::BoundGenericType *bound_generic_type = swift_can_type->getAs<swift::BoundGenericType>();
+                BoundGenericType *bound_generic_type = swift_can_type->getAs<BoundGenericType>();
                 if (!bound_generic_type)
                     break;
-                const llvm::ArrayRef<swift::Substitution>& substitutions = bound_generic_type->getSubstitutions(nullptr,nullptr);
+                const llvm::ArrayRef<Substitution>& substitutions = bound_generic_type->getSubstitutions(nullptr,nullptr);
                 if (arg_idx >= substitutions.size())
                     break;
-                const swift::Substitution& substitution = substitutions[arg_idx];
+                const Substitution& substitution = substitutions[arg_idx];
                 return substitution.getReplacement().getPointer();
             }
-            case swift::TypeKind::PolymorphicFunction:
+            case TypeKind::PolymorphicFunction:
             {
-                swift::PolymorphicFunctionType *polymorphic_func_type = swift_can_type->getAs<swift::PolymorphicFunctionType>();
+                PolymorphicFunctionType *polymorphic_func_type = swift_can_type->getAs<PolymorphicFunctionType>();
                 if (!polymorphic_func_type)
                     break;
                 if (arg_idx >= polymorphic_func_type->getGenericParameters().size())
@@ -110,7 +112,7 @@ enum class MemberType : uint32_t {
 };
 
 struct MemberInfo {
-  swift::Type clang_type;
+  Type clang_type;
   const std::string name;
   uint64_t byte_size;
   uint32_t byte_offset;
@@ -129,7 +131,7 @@ struct MemberInfo {
 };
 
 struct EnumElementInfo {
-  swift::Type clang_type;
+  Type clang_type;
   ConstString name;
   uint64_t byte_size;
   uint32_t value;         // The value for this enumeration element
@@ -149,14 +151,14 @@ struct EnumElementInfo {
 
 class DeclsLookupSource {
 public:
-  typedef llvm::SmallVectorImpl<swift::ValueDecl *> ValueDecls;
+  typedef llvm::SmallVectorImpl<ValueDecl *> ValueDecls;
 
 private:
-  class VisibleDeclsConsumer : public swift::VisibleDeclConsumer {
+  class VisibleDeclsConsumer : public VisibleDeclConsumer {
   private:
-    std::vector<swift::ValueDecl *> m_decls;
+    std::vector<ValueDecl *> m_decls;
   public:
-    virtual void foundDecl(swift::ValueDecl *VD, swift::DeclVisibilityKind Reason)
+    virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason)
     {
       m_decls.push_back(VD);
     }
@@ -178,23 +180,23 @@ private:
   };
 
   bool
-  lookupQualified (swift::ModuleDecl* entry,
-                   swift::Identifier name,
+  lookupQualified (ModuleDecl* entry,
+                   Identifier name,
                    unsigned options,
-                   swift::LazyResolver *typeResolver,
+                   LazyResolver *typeResolver,
                    ValueDecls& decls) {
     if (!entry)
       return false;
     size_t decls_size = decls.size();
-    entry->lookupQualified(swift::ModuleType::get(entry), name, options, typeResolver, decls);
+    entry->lookupQualified(ModuleType::get(entry), name, options, typeResolver, decls);
     return decls.size() > decls_size;
   }
 
   bool
-  lookupValue (swift::ModuleDecl* entry,
-               swift::Identifier name,
-               swift::Module::AccessPathTy accessPath,
-               swift::NLKind lookupKind,
+  lookupValue (ModuleDecl* entry,
+               Identifier name,
+               Module::AccessPathTy accessPath,
+               NLKind lookupKind,
                ValueDecls &decls) {
     if (!entry)
       return false;
@@ -215,21 +217,21 @@ public:
   typedef llvm::Optional<std::string> PrivateDeclIdentifier;
 
   static DeclsLookupSource
-  GetDeclsLookupSource (swift::ASTContext& ast,
+  GetDeclsLookupSource (ASTContext& ast,
                         ConstString module_name,
                         bool allow_crawler = true)
   {
     assert(!module_name.empty());
-    static ConstString g_ObjectiveCModule(swift::MANGLING_MODULE_OBJC);
+    static ConstString g_ObjectiveCModule(MANGLING_MODULE_OBJC);
     static ConstString g_BuiltinModule("Builtin");
-    static ConstString g_CModule(swift::MANGLING_MODULE_C);
+    static ConstString g_CModule(MANGLING_MODULE_C);
     if (allow_crawler)
     {
       if (module_name == g_ObjectiveCModule || module_name == g_CModule)
         return DeclsLookupSource(&ast, module_name);
     }
 
-    swift::ModuleDecl * module = module_name == g_BuiltinModule ?
+    ModuleDecl * module = module_name == g_BuiltinModule ?
                                     ast.TheBuiltinModule :
                                     ast.getModuleByName(module_name);
     if (module == nullptr)
@@ -238,14 +240,14 @@ public:
   }
 
   static DeclsLookupSource
-  GetDeclsLookupSource (swift::NominalTypeDecl *decl)
+  GetDeclsLookupSource (NominalTypeDecl *decl)
   {
     assert(decl);
     return DeclsLookupSource(decl);
   }
 
   static DeclsLookupSource
-  GetDeclsLookupSource (DeclsLookupSource source, swift::NominalTypeDecl *decl)
+  GetDeclsLookupSource (DeclsLookupSource source, NominalTypeDecl *decl)
   {
     assert(source._type == LookupKind::SwiftModule);
     assert(source._module);
@@ -253,18 +255,18 @@ public:
     return DeclsLookupSource(source._module, decl);
   }
 
-  void lookupQualified(swift::Identifier name,
+  void lookupQualified(Identifier name,
                        unsigned options,
-                       swift::LazyResolver *typeResolver,
+                       LazyResolver *typeResolver,
                        ValueDecls &result)
   {
     if (_type == LookupKind::Crawler)
     {
-      swift::ASTContext *ast_ctx = _crawler._ast;
+      ASTContext *ast_ctx = _crawler._ast;
       if (ast_ctx)
       {
         VisibleDeclsConsumer consumer;
-        swift::ClangImporter *swift_clang_importer = (swift::ClangImporter *)
+        ClangImporter *swift_clang_importer = (ClangImporter *)
           ast_ctx->getClangModuleLoader();
         if (!swift_clang_importer)
           return;
@@ -286,18 +288,18 @@ public:
     return;
   }
 
-  void lookupValue(swift::Module::AccessPathTy path,
-                   swift::Identifier name,
-                   swift::NLKind kind,
+  void lookupValue(Module::AccessPathTy path,
+                   Identifier name,
+                   NLKind kind,
                    ValueDecls &result)
   {
     if (_type == LookupKind::Crawler)
     {
-      swift::ASTContext *ast_ctx = _crawler._ast;
+      ASTContext *ast_ctx = _crawler._ast;
       if (ast_ctx)
       {
         VisibleDeclsConsumer consumer;
-        swift::ClangImporter *swift_clang_importer = (swift::ClangImporter *)
+        ClangImporter *swift_clang_importer = (ClangImporter *)
           ast_ctx->getClangModuleLoader();
         if (!swift_clang_importer)
           return;
@@ -319,8 +321,8 @@ public:
     return;
   }
 
-  void lookupMember (swift::DeclName id,
-                     swift::Identifier priv_decl_id,
+  void lookupMember (DeclName id,
+                     Identifier priv_decl_id,
                      ValueDecls &result)
   {
     if (_type == LookupKind::Decl)
@@ -333,9 +335,9 @@ public:
   }
 
   void
-  lookupMember (swift::DeclContext *decl_ctx,
-                swift::DeclName id,
-                swift::Identifier priv_decl_id,
+  lookupMember (DeclContext *decl_ctx,
+                DeclName id,
+                Identifier priv_decl_id,
                 ValueDecls &result)
   {
     if (_type == LookupKind::Decl)
@@ -347,7 +349,7 @@ public:
     return;
   }
 
-  swift::TypeDecl *
+  TypeDecl *
   lookupLocalType (llvm::StringRef key)
   {
     switch (_type)
@@ -481,9 +483,9 @@ public:
     return (this->operator bool()) && (_type == LookupKind::Extension);
   }
 
-    swift::Type
+    Type
     GetQualifiedArchetype (size_t index,
-                           swift::ASTContext* ast)
+                           ASTContext* ast)
     {
         if (this->operator bool() && ast)
         {
@@ -491,36 +493,36 @@ public:
             {
                 case LookupKind::Extension:
                 {
-                    swift::TypeBase *type_ptr = _extension._decl->getType().getPointer();
-                    if (swift::MetatypeType *metatype_ptr = type_ptr->getAs<swift::MetatypeType>())
+                    TypeBase *type_ptr = _extension._decl->getType().getPointer();
+                    if (MetatypeType *metatype_ptr = type_ptr->getAs<MetatypeType>())
                         type_ptr = metatype_ptr->getInstanceType().getPointer();
-                    swift::TypeBase *archetype = GetTemplateArgument(type_ptr, index);
-                    return swift::Type(archetype);
+                    TypeBase *archetype = GetTemplateArgument(type_ptr, index);
+                    return Type(archetype);
                 }
                     break;
                 default:
                     break;
             }
         }
-        return swift::Type();
+        return Type();
     }
     
 private:
   LookupKind _type;
 
   union {
-    swift::ModuleDecl *_module;
+    ModuleDecl *_module;
     struct {
-      swift::ASTContext* _ast;
+      ASTContext* _ast;
     } _crawler;
-    swift::NominalTypeDecl *_decl;
+    NominalTypeDecl *_decl;
     struct {
-      swift::ModuleDecl *_module; // extension in this module
-      swift::NominalTypeDecl *_decl; // for this type
+      ModuleDecl *_module; // extension in this module
+      NominalTypeDecl *_decl; // for this type
     } _extension;
   };
 
-  DeclsLookupSource(swift::ModuleDecl* _m)
+  DeclsLookupSource(ModuleDecl* _m)
   {
     if (_m)
     {
@@ -531,7 +533,7 @@ private:
       _type = LookupKind::Invalid;
   }
 
-  DeclsLookupSource(swift::ASTContext* _a,
+  DeclsLookupSource(ASTContext* _a,
                     ConstString _m)
   {
     // it is fine for the ASTContext to be null, so don't actually even lldbassert there
@@ -544,7 +546,7 @@ private:
       _type = LookupKind::Invalid;
   }
 
-  DeclsLookupSource (swift::NominalTypeDecl * _d)
+  DeclsLookupSource (NominalTypeDecl * _d)
   {
     if (_d)
     {
@@ -555,8 +557,8 @@ private:
       _type = LookupKind::Invalid;
   }
 
-  DeclsLookupSource (swift::ModuleDecl *_m,
-                     swift::NominalTypeDecl * _d)
+  DeclsLookupSource (ModuleDecl *_m,
+                     NominalTypeDecl * _d)
   {
     if (_m && _d)
     {
@@ -571,9 +573,9 @@ private:
 
 struct VisitNodeResult {
   DeclsLookupSource _module;
-  std::vector<swift::Decl *> _decls;
-  std::vector<swift::Type> _types;
-  swift::TupleTypeElt _tuple_type_element;
+  std::vector<Decl *> _decls;
+  std::vector<Type> _types;
+  TupleTypeElt _tuple_type_element;
   std::string _error;
   VisitNodeResult () :
   _module(),
@@ -590,7 +592,7 @@ struct VisitNodeResult {
     return _types.size() == 1 && _types.front();
   }
 
-  swift::Type
+  Type
   GetFirstType ()
   {
     // Must ensure there is a type prior to calling this
@@ -603,7 +605,7 @@ struct VisitNodeResult {
     _module.Clear();
     _decls.clear();
     _types.clear();
-    _tuple_type_element = swift::TupleTypeElt();
+    _tuple_type_element = TupleTypeElt();
     _error.clear();
   }
 
@@ -620,7 +622,7 @@ struct VisitNodeResult {
   }
 };
 
-static swift::Identifier
+static Identifier
 GetIdentifier (SwiftASTContext *ast,
                const DeclsLookupSource::PrivateDeclIdentifier& priv_decl_id)
 {
@@ -631,46 +633,46 @@ GetIdentifier (SwiftASTContext *ast,
       break;
     return ast->getIdentifier(priv_decl_id.getValue().c_str());
   } while (false);
-  return swift::Identifier();
+  return Identifier();
 }
 
 static bool
 FindFirstNamedDeclWithKind (SwiftASTContext *ast,
                             const llvm::StringRef &name,
-                            swift::DeclKind decl_kind,
+                            DeclKind decl_kind,
                             VisitNodeResult &result,
                             DeclsLookupSource::PrivateDeclIdentifier priv_decl_id = DeclsLookupSource::PrivateDeclIdentifier())
 
 {
   if (!result._decls.empty())
   {
-    swift::Decl *parent_decl = result._decls.back();
+    Decl *parent_decl = result._decls.back();
     if (parent_decl)
     {
-      auto nominal_decl = llvm::dyn_cast<swift::NominalTypeDecl>(parent_decl);
+      auto nominal_decl = llvm::dyn_cast<NominalTypeDecl>(parent_decl);
 
       if (nominal_decl)
       {
         bool check_type_aliases = false;
 
         DeclsLookupSource lookup(DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
-        llvm::SmallVector<swift::ValueDecl *, 4> decls;
+        llvm::SmallVector<ValueDecl *, 4> decls;
         lookup.lookupMember(ast->getIdentifier(name),
                             GetIdentifier(ast,priv_decl_id),
                             decls);
 
         for (auto decl : decls)
         {
-          const swift::DeclKind curr_decl_kind = decl->getKind();
+          const DeclKind curr_decl_kind = decl->getKind();
 
           if (curr_decl_kind == decl_kind)
           {
             result._decls.back() = decl;
-            swift::Type decl_type;
+            Type decl_type;
             if (decl->hasType())
             {
               decl_type = decl->getType();
-              swift::MetatypeType *meta_type = decl_type->getAs<swift::MetatypeType>();
+              MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
               if (meta_type)
                 decl_type = meta_type->getInstanceType();
             }
@@ -679,7 +681,7 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
             else
               result._types.back() = decl_type;
             return true;
-          } else if (curr_decl_kind == swift::DeclKind::TypeAlias)
+          } else if (curr_decl_kind == DeclKind::TypeAlias)
             check_type_aliases = true;
         }
 
@@ -687,16 +689,16 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
         {
           for (auto decl : decls)
           {
-            const swift::DeclKind curr_decl_kind = decl->getKind();
+            const DeclKind curr_decl_kind = decl->getKind();
 
-            if (curr_decl_kind == swift::DeclKind::TypeAlias)
+            if (curr_decl_kind == DeclKind::TypeAlias)
             {
               result._decls.back() = decl;
-              swift::Type decl_type;
+              Type decl_type;
               if (decl->hasType())
               {
                 decl_type = decl->getType();
-                swift::MetatypeType *meta_type = decl_type->getAs<swift::MetatypeType>();
+                MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
                 if (meta_type)
                   decl_type = meta_type->getInstanceType();
               }
@@ -713,9 +715,9 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
   }
   else if (result._module)
   {
-    swift::Module::AccessPathTy access_path;
-    swift::Identifier name_ident(ast->getIdentifier(name));
-    llvm::SmallVector<swift::ValueDecl*, 4> decls;
+    Module::AccessPathTy access_path;
+    Identifier name_ident(ast->getIdentifier(name));
+    llvm::SmallVector<ValueDecl*, 4> decls;
     if (priv_decl_id)
       result._module.lookupMember(name_ident, ast->getIdentifier(priv_decl_id.getValue().c_str()), decls);
     else
@@ -726,23 +728,23 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
       // Look for an exact match first
       for (auto decl : decls)
       {
-        const swift::DeclKind curr_decl_kind = decl->getKind();
+        const DeclKind curr_decl_kind = decl->getKind();
         if (curr_decl_kind == decl_kind)
         {
           result._decls.assign(1, decl);
           if (decl->hasType())
           {
             result._types.assign(1, decl->getType());
-            swift::MetatypeType *meta_type = result._types.back()->getAs<swift::MetatypeType>();
+            MetatypeType *meta_type = result._types.back()->getAs<MetatypeType>();
             if (meta_type)
               result._types.back() = meta_type->getInstanceType();
           }
           else
           {
-            result._types.assign(1, swift::Type());
+            result._types.assign(1, Type());
           }
           return true;
-        } else if (curr_decl_kind == swift::DeclKind::TypeAlias)
+        } else if (curr_decl_kind == DeclKind::TypeAlias)
           check_type_aliases = true;
       }
       // If we didn't find any exact matches, accept any type aliases
@@ -750,19 +752,19 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
       {
         for (auto decl : decls)
         {
-          if (decl->getKind() == swift::DeclKind::TypeAlias)
+          if (decl->getKind() == DeclKind::TypeAlias)
           {
             result._decls.assign(1, decl);
             if (decl->hasType())
             {
               result._types.assign(1, decl->getType());
-              swift::MetatypeType *meta_type = result._types.back()->getAs<swift::MetatypeType>();
+              MetatypeType *meta_type = result._types.back()->getAs<MetatypeType>();
               if (meta_type)
                 result._types.back() = meta_type->getInstanceType();
             }
             else
             {
-              result._types.assign(1, swift::Type());
+              result._types.assign(1, Type());
             }
             return true;
           }
@@ -783,17 +785,17 @@ FindNamedDecls (SwiftASTContext *ast,
 {
   if (!result._decls.empty())
   {
-    swift::Decl *parent_decl = result._decls.back();
+    Decl *parent_decl = result._decls.back();
     result._decls.clear();
     result._types.clear();
     if (parent_decl)
     {
-      auto nominal_decl = llvm::dyn_cast<swift::NominalTypeDecl>(parent_decl);
+      auto nominal_decl = llvm::dyn_cast<NominalTypeDecl>(parent_decl);
 
       if (nominal_decl)
       {
         DeclsLookupSource lookup(DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
-        llvm::SmallVector<swift::ValueDecl *, 4> decls;
+        llvm::SmallVector<ValueDecl *, 4> decls;
         lookup.lookupMember(ast->getIdentifier(name),
                             GetIdentifier(ast,priv_decl_id),
                             decls);
@@ -806,16 +808,16 @@ FindNamedDecls (SwiftASTContext *ast,
         }
         else
         {
-          for (swift::ValueDecl *decl : decls)
+          for (ValueDecl *decl : decls)
           {
             if (decl->hasType())
             {
               result._decls.push_back(decl);
-              swift::Type decl_type;
+              Type decl_type;
               if (decl->hasType())
               {
                 decl_type = decl->getType();
-                swift::MetatypeType *meta_type = decl_type->getAs<swift::MetatypeType>();
+                MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
                 if (meta_type)
                   decl_type = meta_type->getInstanceType();
               }
@@ -835,14 +837,14 @@ FindNamedDecls (SwiftASTContext *ast,
   }
   else if (result._module)
   {
-    swift::Module::AccessPathTy access_path;
-    llvm::SmallVector<swift::ValueDecl*, 4> decls;
+    Module::AccessPathTy access_path;
+    llvm::SmallVector<ValueDecl*, 4> decls;
     if (priv_decl_id)
       result._module.lookupMember(ast->getIdentifier(name),
                                   ast->getIdentifier(priv_decl_id.getValue().c_str()),
                                   decls);
     else
-      result._module.lookupValue(access_path, ast->getIdentifier(name), swift::NLKind::QualifiedLookup, decls);
+      result._module.lookupValue(access_path, ast->getIdentifier(name), NLKind::QualifiedLookup, decls);
     if (decls.empty())
     {
       result._error = stringWithFormat("no decl named '%s' found in module '%s'",
@@ -859,13 +861,13 @@ FindNamedDecls (SwiftASTContext *ast,
           if (decl->hasType())
           {
             result._types.push_back(decl->getType());
-            swift::MetatypeType *meta_type = result._types.back()->getAs<swift::MetatypeType>();
+            MetatypeType *meta_type = result._types.back()->getAs<MetatypeType>();
             if (meta_type)
               result._types.back() = meta_type->getInstanceType();
           }
           else
           {
-            result._types.push_back(swift::Type());
+            result._types.push_back(Type());
           }
         }
       }
@@ -878,38 +880,38 @@ FindNamedDecls (SwiftASTContext *ast,
 }
 
 static const char *
-SwiftDemangleNodeKindToCString(const swift::Demangle::Node::Kind node_kind)
+SwiftDemangleNodeKindToCString(const Demangle::Node::Kind node_kind)
 {
-#define NODE(e) case swift::Demangle::Node::Kind::e: return #e;
+#define NODE(e) case Demangle::Node::Kind::e: return #e;
 
   switch (node_kind)
   {
 #include "swift/Basic/DemangleNodes.def"
   }
-  return "swift::Demangle::Node::Kind::???";
+  return "Demangle::Node::Kind::???";
 #undef NODE
 }
 
 static
-swift::DeclKind
-GetKindAsDeclKind (swift::Demangle::Node::Kind node_kind)
+DeclKind
+GetKindAsDeclKind (Demangle::Node::Kind node_kind)
 {
   switch (node_kind)
   {
-    case swift::Demangle::Node::Kind::TypeAlias:
-      return swift::DeclKind::TypeAlias;
-    case swift::Demangle::Node::Kind::Structure:
-      return swift::DeclKind::Struct;
-    case swift::Demangle::Node::Kind::Class:
-      return swift::DeclKind::Class;
-    case swift::Demangle::Node::Kind::Allocator:
-      return swift::DeclKind::Constructor;
-    case swift::Demangle::Node::Kind::Function:
-      return swift::DeclKind::Func;
-    case swift::Demangle::Node::Kind::Enum:
-      return swift::DeclKind::Enum;
-    case swift::Demangle::Node::Kind::Protocol:
-      return swift::DeclKind::Protocol;
+    case Demangle::Node::Kind::TypeAlias:
+      return DeclKind::TypeAlias;
+    case Demangle::Node::Kind::Structure:
+      return DeclKind::Struct;
+    case Demangle::Node::Kind::Class:
+      return DeclKind::Class;
+    case Demangle::Node::Kind::Allocator:
+      return DeclKind::Constructor;
+    case Demangle::Node::Kind::Function:
+      return DeclKind::Func;
+    case Demangle::Node::Kind::Enum:
+      return DeclKind::Enum;
+    case Demangle::Node::Kind::Protocol:
+      return DeclKind::Protocol;
     default:
       printf ("Missing alias for %s.\n", SwiftDemangleNodeKindToCString(node_kind));
       assert (0);
@@ -925,20 +927,20 @@ GetKindAsDeclKind (swift::Demangle::Node::Kind node_kind)
 // FIXME: we don't currently distinguish between Method & Witness.  These types don't actually get used
 // to make Calling Convention choices - originally we were leaving them all at Normal...  But if we ever
 // need to set it for that purpose we will have to fix that here.
-static swift::TypeBase *
-FixCallingConv (swift::Decl *in_decl, swift::TypeBase *in_type)
+static TypeBase *
+FixCallingConv (Decl *in_decl, TypeBase *in_type)
 {
   if (!in_decl)
     return in_type;
 
-  swift::AnyFunctionType *func_type = llvm::dyn_cast<swift::AnyFunctionType>(in_type);
+  AnyFunctionType *func_type = llvm::dyn_cast<AnyFunctionType>(in_type);
   if (func_type)
   {
-    swift::DeclContext *decl_context = in_decl->getDeclContext();
+    DeclContext *decl_context = in_decl->getDeclContext();
     if (decl_context && decl_context->isTypeContext())
     {
       // Add the ExtInfo:
-      swift::AnyFunctionType::ExtInfo new_info(func_type->getExtInfo().withSILRepresentation(swift::SILFunctionTypeRepresentation::Method));
+      AnyFunctionType::ExtInfo new_info(func_type->getExtInfo().withSILRepresentation(SILFunctionTypeRepresentation::Method));
       return func_type->withExtInfo(new_info);
     }
   }
@@ -947,7 +949,7 @@ FixCallingConv (swift::Decl *in_decl, swift::TypeBase *in_type)
 
 static void
 VisitNode (SwiftASTContext *ast,
-           std::vector<swift::Demangle::NodePointer> &nodes,
+           std::vector<Demangle::NodePointer> &nodes,
            VisitNodeResult &result,
            const VisitNodeResult &generic_context, // set by GenericType case
            Log *log);
@@ -955,43 +957,43 @@ VisitNode (SwiftASTContext *ast,
 
 static void
 VisitNodeAddressor (SwiftASTContext *ast,
-                    std::vector<swift::Demangle::NodePointer> &nodes,
-                    swift::Demangle::NodePointer& cur_node,
+                    std::vector<Demangle::NodePointer> &nodes,
+                    Demangle::NodePointer& cur_node,
                     VisitNodeResult &result,
                     const VisitNodeResult &generic_context, // set by GenericType case
                     Log *log)
 {
   // Addressors are apparently SIL-level functions of the form () -> RawPointer and they bear no connection to their original variable at the interface level
-  swift::CanFunctionType swift_can_func_type = swift::CanFunctionType::get(ast->TheEmptyTupleType, ast->TheRawPointerType);
+  CanFunctionType swift_can_func_type = CanFunctionType::get(ast->TheEmptyTupleType, ast->TheRawPointerType);
   result._types.push_back(swift_can_func_type.getPointer());
 }
 
 static void
 VisitNodeGenerics (SwiftASTContext *ast,
-                   std::vector<swift::Demangle::NodePointer> &nodes,
-                   swift::Demangle::NodePointer& cur_node,
+                   std::vector<Demangle::NodePointer> &nodes,
+                   Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
                    const VisitNodeResult &generic_context, // set by GenericType case
                    Log *log)
 {
-  llvm::SmallVector<swift::Type, 4> nested_types;
+  llvm::SmallVector<Type, 4> nested_types;
   VisitNodeResult associated_type_result;
   VisitNodeResult archetype_ref_result;
   VisitNodeResult archetype_type_result;
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
+  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::ArchetypeRef:
+      case Demangle::Node::Kind::ArchetypeRef:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, archetype_ref_result, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::Archetype:
+      case Demangle::Node::Kind::Archetype:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, archetype_type_result, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::AssociatedType:
+      case Demangle::Node::Kind::AssociatedType:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, associated_type_result, generic_context, log);
         if (associated_type_result.HasSingleType())
@@ -1012,20 +1014,20 @@ VisitNodeGenerics (SwiftASTContext *ast,
 
 static void
 VisitNodeArchetype(SwiftASTContext *ast,
-                   std::vector<swift::Demangle::NodePointer> &nodes,
-                   swift::Demangle::NodePointer& cur_node,
+                   std::vector<Demangle::NodePointer> &nodes,
+                   Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
                    const VisitNodeResult &generic_context, // set by GenericType case
                    Log *log)
 {
   const llvm::StringRef& archetype_name(cur_node->getText());
   VisitNodeResult protocol_list;
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
+  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::ProtocolList:
+      case Demangle::Node::Kind::ProtocolList:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, protocol_list, generic_context, log);
         break;
@@ -1036,17 +1038,17 @@ VisitNodeArchetype(SwiftASTContext *ast,
     }
   }
 
-  llvm::SmallVector<swift::Type, 1> conforms_to;
+  llvm::SmallVector<Type, 1> conforms_to;
   if (protocol_list.HasSingleType())
     conforms_to.push_back(protocol_list.GetFirstType());
 
   if (ast)
   {
-    result._types.push_back(swift::ArchetypeType::getNew(*ast,
+    result._types.push_back(ArchetypeType::getNew(*ast,
                                                          nullptr,
-                                                         (swift::AssociatedTypeDecl *)nullptr,
+                                                         (AssociatedTypeDecl *)nullptr,
                                                          ast->getIdentifier(archetype_name),
-                                                         conforms_to, swift::Type()));
+                                                         conforms_to, Type()));
   }
   else
   {
@@ -1057,17 +1059,17 @@ VisitNodeArchetype(SwiftASTContext *ast,
 
 static void
 VisitNodeArchetypeRef(SwiftASTContext *ast,
-                      std::vector<swift::Demangle::NodePointer> &nodes,
-                      swift::Demangle::NodePointer& cur_node,
+                      std::vector<Demangle::NodePointer> &nodes,
+                      Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
                       const VisitNodeResult &generic_context, // set by GenericType case
                       Log *log)
 {
   const llvm::StringRef& archetype_name(cur_node->getText());
-  swift::Type result_type;
-  for (const swift::Type &archetype : generic_context._types)
+  Type result_type;
+  for (const Type &archetype : generic_context._types)
   {
-    const swift::ArchetypeType *cast_archetype = llvm::dyn_cast<swift::ArchetypeType>(archetype.getPointer());
+    const ArchetypeType *cast_archetype = llvm::dyn_cast<ArchetypeType>(archetype.getPointer());
 
     if (cast_archetype && !cast_archetype->getName().str().compare(archetype_name))
     {
@@ -1082,11 +1084,11 @@ VisitNodeArchetypeRef(SwiftASTContext *ast,
   {
     if (ast)
     {
-      result._types.push_back(swift::ArchetypeType::getNew(*ast,
+      result._types.push_back(ArchetypeType::getNew(*ast,
                                                            nullptr,
-                                                           (swift::AssociatedTypeDecl *)nullptr,
+                                                           (AssociatedTypeDecl *)nullptr,
                                                            ast->getIdentifier(archetype_name),
-                                                           llvm::ArrayRef<swift::Type>(), swift::Type()));
+                                                           llvm::ArrayRef<Type>(), Type()));
     }
     else
     {
@@ -1097,14 +1099,14 @@ VisitNodeArchetypeRef(SwiftASTContext *ast,
 
 static void
 VisitNodeAssociatedTypeRef (SwiftASTContext *ast,
-                            std::vector<swift::Demangle::NodePointer> &nodes,
-                            swift::Demangle::NodePointer& cur_node,
+                            std::vector<Demangle::NodePointer> &nodes,
+                            Demangle::NodePointer& cur_node,
                             VisitNodeResult &result,
                             const VisitNodeResult &generic_context, // set by GenericType case
                             Log *log)
 {
-  swift::Demangle::NodePointer root = cur_node->getChild(0);
-  swift::Demangle::NodePointer ident = cur_node->getChild(1);
+  Demangle::NodePointer root = cur_node->getChild(0);
+  Demangle::NodePointer ident = cur_node->getChild(1);
   if (!root || !ident)
     return;
   nodes.push_back(root);
@@ -1112,16 +1114,16 @@ VisitNodeAssociatedTypeRef (SwiftASTContext *ast,
   VisitNode (ast, nodes, type_result, generic_context, log);
   if (type_result._types.size() == 1)
   {
-    swift::TypeBase* type = type_result._types[0].getPointer();
+    TypeBase* type = type_result._types[0].getPointer();
     if (type)
     {
-      swift::ArchetypeType* archetype = type->getAs<swift::ArchetypeType>();
+      ArchetypeType* archetype = type->getAs<ArchetypeType>();
       if (archetype)
       {
-        swift::Identifier identifier = ast->getIdentifier(ident->getText());
+        Identifier identifier = ast->getIdentifier(ident->getText());
         if (archetype->hasNestedType(identifier))
         {
-          swift::Type nested = archetype->getNestedTypeValue(identifier);
+          Type nested = archetype->getNestedTypeValue(identifier);
           if (nested)
           {
             result._types.push_back(nested);
@@ -1138,8 +1140,8 @@ VisitNodeAssociatedTypeRef (SwiftASTContext *ast,
 
 static void
 VisitNodeBoundGeneric (SwiftASTContext *ast,
-                       std::vector<swift::Demangle::NodePointer> &nodes,
-                       swift::Demangle::NodePointer& cur_node,
+                       std::vector<Demangle::NodePointer> &nodes,
+                       Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
                        const VisitNodeResult &generic_context, // set by GenericType case
                        Log *log)
@@ -1149,18 +1151,18 @@ VisitNodeBoundGeneric (SwiftASTContext *ast,
     VisitNodeResult generic_type_result;
     VisitNodeResult template_types_result;
 
-    swift::Demangle::Node::iterator end = cur_node->end();
-    for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+    Demangle::Node::iterator end = cur_node->end();
+    for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
     {
-      const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+      const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
       switch (child_node_kind)
       {
-        case swift::Demangle::Node::Kind::Type:
-        case swift::Demangle::Node::Kind::Metatype:
+        case Demangle::Node::Kind::Type:
+        case Demangle::Node::Kind::Metatype:
           nodes.push_back(*pos);
           VisitNode (ast, nodes, generic_type_result, generic_context, log);
           break;
-        case swift::Demangle::Node::Kind::TypeList:
+        case Demangle::Node::Kind::TypeList:
           nodes.push_back(*pos);
           VisitNode (ast, nodes, template_types_result, generic_context, log);
           break;
@@ -1171,12 +1173,12 @@ VisitNodeBoundGeneric (SwiftASTContext *ast,
 
     if (generic_type_result._types.size() == 1 && !template_types_result._types.empty())
     {
-      swift::NominalTypeDecl *nominal_type_decl = llvm::dyn_cast<swift::NominalTypeDecl>(generic_type_result._decls.front());
-      swift::DeclContext * parent_decl = nominal_type_decl->getParent();
-      swift::Type parent_type;
+      NominalTypeDecl *nominal_type_decl = llvm::dyn_cast<NominalTypeDecl>(generic_type_result._decls.front());
+      DeclContext * parent_decl = nominal_type_decl->getParent();
+      Type parent_type;
       if (parent_decl->isTypeContext())
         parent_type = parent_decl->getDeclaredTypeOfContext();
-      result._types.push_back(swift::Type(swift::BoundGenericType::get(nominal_type_decl,
+      result._types.push_back(Type(BoundGenericType::get(nominal_type_decl,
                                                                        parent_type,
                                                                        template_types_result._types)));
 
@@ -1186,8 +1188,8 @@ VisitNodeBoundGeneric (SwiftASTContext *ast,
 
 static void
 VisitNodeBuiltinTypeName (SwiftASTContext *ast,
-                          std::vector<swift::Demangle::NodePointer> &nodes,
-                          swift::Demangle::NodePointer& cur_node,
+                          std::vector<Demangle::NodePointer> &nodes,
+                          Demangle::NodePointer& cur_node,
                           VisitNodeResult &result,
                           const VisitNodeResult &generic_context, // set by GenericType case
                           Log *log)
@@ -1199,7 +1201,7 @@ VisitNodeBuiltinTypeName (SwiftASTContext *ast,
   if (builtin_name_ref.startswith("Builtin."))
   {
     llvm::StringRef stripped_name_ref = builtin_name_ref.drop_front(strlen("Builtin."));
-    llvm::SmallVector<swift::ValueDecl *, 1> builtin_decls;
+    llvm::SmallVector<ValueDecl *, 1> builtin_decls;
 
     result._module = DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString("Builtin"));
 
@@ -1219,8 +1221,8 @@ VisitNodeBuiltinTypeName (SwiftASTContext *ast,
 
 static void
 VisitNodeConstructor (SwiftASTContext *ast,
-                      std::vector<swift::Demangle::NodePointer> &nodes,
-                      swift::Demangle::NodePointer& cur_node,
+                      std::vector<Demangle::NodePointer> &nodes,
+                      Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
                       const VisitNodeResult &generic_context, // set by GenericType case
                       Log *log)
@@ -1228,19 +1230,19 @@ VisitNodeConstructor (SwiftASTContext *ast,
   VisitNodeResult kind_type_result;
   VisitNodeResult type_result;
 
-  swift::Demangle::Node::iterator end = cur_node->end();
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::Enum:
-      case swift::Demangle::Node::Kind::Class:
-      case swift::Demangle::Node::Kind::Structure:
+      case Demangle::Node::Kind::Enum:
+      case Demangle::Node::Kind::Class:
+      case Demangle::Node::Kind::Structure:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, kind_type_result, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::Type:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, type_result, generic_context, log);
         break;
@@ -1272,12 +1274,12 @@ VisitNodeConstructor (SwiftASTContext *ast,
           {
             default:
               break;
-            case swift::TypeKind::Function:
+            case TypeKind::Function:
             {
-              const swift::AnyFunctionType* identifier_func = identifier_type->getAs<swift::AnyFunctionType>();
-              const swift::AnyFunctionType* type_func = type_result._types.front()->getAs<swift::AnyFunctionType>();
-              if (swift::CanType(identifier_func->getResult()->getDesugaredType()->getCanonicalType()) == swift::CanType(type_func->getResult()->getDesugaredType()->getCanonicalType()) &&
-                  swift::CanType(identifier_func->getInput()->getDesugaredType()->getCanonicalType()) == swift::CanType(type_func->getInput()->getDesugaredType()->getCanonicalType()))
+              const AnyFunctionType* identifier_func = identifier_type->getAs<AnyFunctionType>();
+              const AnyFunctionType* type_func = type_result._types.front()->getAs<AnyFunctionType>();
+              if (CanType(identifier_func->getResult()->getDesugaredType()->getCanonicalType()) == CanType(type_func->getResult()->getDesugaredType()->getCanonicalType()) &&
+                  CanType(identifier_func->getInput()->getDesugaredType()->getCanonicalType()) == CanType(type_func->getInput()->getDesugaredType()->getCanonicalType()))
               {
                 result._module = kind_type_result._module;
                 result._decls.push_back(kind_type_result._decls[i]);
@@ -1299,23 +1301,23 @@ VisitNodeConstructor (SwiftASTContext *ast,
 
 static void
 VisitNodeDestructor (SwiftASTContext *ast,
-                     std::vector<swift::Demangle::NodePointer> &nodes,
-                     swift::Demangle::NodePointer& cur_node,
+                     std::vector<Demangle::NodePointer> &nodes,
+                     Demangle::NodePointer& cur_node,
                      VisitNodeResult &result,
                      const VisitNodeResult &generic_context, // set by GenericType case
                      Log *log)
 {
   VisitNodeResult kind_type_result;
 
-  swift::Demangle::Node::iterator end = cur_node->end();
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::Enum:
-      case swift::Demangle::Node::Kind::Class:
-      case swift::Demangle::Node::Kind::Structure:
+      case Demangle::Node::Kind::Enum:
+      case Demangle::Node::Kind::Class:
+      case Demangle::Node::Kind::Structure:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, kind_type_result, generic_context, log);
         break;
@@ -1349,7 +1351,7 @@ VisitNodeDestructor (SwiftASTContext *ast,
           {
             default:
               break;
-            case swift::TypeKind::Function:
+            case TypeKind::Function:
             {
               result._module = kind_type_result._module;
               result._decls.push_back(kind_type_result._decls[i]);
@@ -1367,8 +1369,8 @@ VisitNodeDestructor (SwiftASTContext *ast,
 
 static void
 VisitNodeDeclContext (SwiftASTContext *ast,
-                      std::vector<swift::Demangle::NodePointer> &nodes,
-                      swift::Demangle::NodePointer& cur_node,
+                      std::vector<Demangle::NodePointer> &nodes,
+                      Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
                       const VisitNodeResult &generic_context, // set by GenericType case
                       Log *log)
@@ -1391,28 +1393,28 @@ VisitNodeDeclContext (SwiftASTContext *ast,
       // function type: decl-ctx + type
       // FIXME: we should just be able to demangle the DeclCtx and resolve the function
       // this is fragile and will easily break
-      swift::Demangle::NodePointer path = cur_node->getFirstChild();
+      Demangle::NodePointer path = cur_node->getFirstChild();
       nodes.push_back(path);
       VisitNodeResult found_decls;
       VisitNode (ast, nodes, found_decls, generic_context, log);
-      swift::Demangle::NodePointer generics = cur_node->getChild(1);
+      Demangle::NodePointer generics = cur_node->getChild(1);
       if (generics->getChild(0) == nullptr)
         break;
       generics = generics->getFirstChild();
-      if (generics->getKind() != swift::Demangle::Node::Kind::GenericType)
+      if (generics->getKind() != Demangle::Node::Kind::GenericType)
         break;
       if (generics->getChild(0) == nullptr)
         break;
       generics = generics->getFirstChild();
-      //                        if (generics->getKind() != swift::Demangle::Node::Kind::ArchetypeList)
+      //                        if (generics->getKind() != Demangle::Node::Kind::ArchetypeList)
       //                            break;
-      swift::AbstractFunctionDecl *func_decl = nullptr;
-      for (swift::Decl* decl : found_decls._decls)
+      AbstractFunctionDecl *func_decl = nullptr;
+      for (Decl* decl : found_decls._decls)
       {
-        func_decl = llvm::dyn_cast<swift::AbstractFunctionDecl>(decl);
+        func_decl = llvm::dyn_cast<AbstractFunctionDecl>(decl);
         if (!func_decl)
           continue;
-        swift::GenericParamList *gen_params = func_decl->getGenericParams();
+        GenericParamList *gen_params = func_decl->getGenericParams();
         if (!gen_params)
           continue;
       }
@@ -1430,8 +1432,8 @@ VisitNodeDeclContext (SwiftASTContext *ast,
 
 static void
 VisitNodeExplicitClosure (SwiftASTContext *ast,
-                          std::vector<swift::Demangle::NodePointer> &nodes,
-                          swift::Demangle::NodePointer& cur_node,
+                          std::vector<Demangle::NodePointer> &nodes,
+                          Demangle::NodePointer& cur_node,
                           VisitNodeResult &result,
                           const VisitNodeResult &generic_context, // set by GenericType case
                           Log *log)
@@ -1443,28 +1445,28 @@ VisitNodeExplicitClosure (SwiftASTContext *ast,
   uint64_t index = UINT64_MAX;
   VisitNodeResult closure_type_result;
   VisitNodeResult module_result;
-  swift::Demangle::Node::iterator end = cur_node->end();
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
       default:
         result._error = stringWithFormat("%s encountered in ExplicitClosure children",
                                          SwiftDemangleNodeKindToCString(child_node_kind));
         break;
-      case swift::Demangle::Node::Kind::Module:
+      case Demangle::Node::Kind::Module:
         nodes.push_back((*pos));
         VisitNode (ast, nodes, module_result, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::Function:
+      case Demangle::Node::Kind::Function:
         nodes.push_back((*pos));
         VisitNode (ast, nodes, function_result, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::Number:
+      case Demangle::Node::Kind::Number:
         index = (*pos)->getIndex();
         break;
-      case swift::Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::Type:
         nodes.push_back((*pos));
         VisitNode (ast, nodes, closure_type_result, generic_context, log);
         break;
@@ -1484,8 +1486,8 @@ VisitNodeExplicitClosure (SwiftASTContext *ast,
 
 static void
 VisitNodeExtension (SwiftASTContext *ast,
-                    std::vector<swift::Demangle::NodePointer> &nodes,
-                    swift::Demangle::NodePointer& cur_node,
+                    std::vector<Demangle::NodePointer> &nodes,
+                    Demangle::NodePointer& cur_node,
                     VisitNodeResult &result,
                     const VisitNodeResult &generic_context, // set by GenericType case
                     Log *log)
@@ -1493,24 +1495,24 @@ VisitNodeExtension (SwiftASTContext *ast,
   VisitNodeResult module_result;
   VisitNodeResult type_result;
   std::string error;
-  swift::Demangle::Node::iterator end = cur_node->end();
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
       default:
         result._error = stringWithFormat("%s encountered in extension children", SwiftDemangleNodeKindToCString(child_node_kind));
         break;
 
-      case swift::Demangle::Node::Kind::Module:
+      case Demangle::Node::Kind::Module:
         nodes.push_back((*pos));
         VisitNode(ast, nodes, module_result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Class:
-      case swift::Demangle::Node::Kind::Enum:
-      case swift::Demangle::Node::Kind::Structure:
+      case Demangle::Node::Kind::Class:
+      case Demangle::Node::Kind::Enum:
+      case Demangle::Node::Kind::Structure:
         nodes.push_back((*pos));
         VisitNode(ast, nodes, type_result, generic_context, log);
         break;
@@ -1521,8 +1523,8 @@ VisitNodeExtension (SwiftASTContext *ast,
   {
     if (type_result._decls.size() == 1)
     {
-      swift::Decl *decl = type_result._decls[0];
-      swift::NominalTypeDecl *nominal_decl = llvm::dyn_cast_or_null<swift::NominalTypeDecl>(decl);
+      Decl *decl = type_result._decls[0];
+      NominalTypeDecl *nominal_decl = llvm::dyn_cast_or_null<NominalTypeDecl>(decl);
       if (nominal_decl)
       {
         result._module = DeclsLookupSource::GetDeclsLookupSource(module_result._module, nominal_decl);
@@ -1538,22 +1540,22 @@ VisitNodeExtension (SwiftASTContext *ast,
 }
 
 static bool
-AreBothFunctionTypes (swift::TypeKind a,
-                      swift::TypeKind b)
+AreBothFunctionTypes (TypeKind a,
+                      TypeKind b)
 {
   bool is_first = false, is_second = false;
-  if (a >= swift::TypeKind::First_AnyFunctionType &&
-      a <= swift::TypeKind::Last_AnyFunctionType)
+  if (a >= TypeKind::First_AnyFunctionType &&
+      a <= TypeKind::Last_AnyFunctionType)
     is_first = true;
-  if (b >= swift::TypeKind::First_AnyFunctionType &&
-      b <= swift::TypeKind::Last_AnyFunctionType)
+  if (b >= TypeKind::First_AnyFunctionType &&
+      b <= TypeKind::Last_AnyFunctionType)
     is_second = true;
   return (is_first && is_second);
 }
 
 static bool
-CompareFunctionTypes (const swift::AnyFunctionType *f,
-                      const swift::AnyFunctionType *g,
+CompareFunctionTypes (const AnyFunctionType *f,
+                      const AnyFunctionType *g,
                       bool *input_matches = nullptr,
                       bool *output_matches = nullptr)
 {
@@ -1589,8 +1591,8 @@ CompareFunctionTypes (const swift::AnyFunctionType *f,
 // VisitNodeFunction gets used for Function, Variable and Allocator:
 static void
 VisitNodeFunction (SwiftASTContext *ast,
-                   std::vector<swift::Demangle::NodePointer> &nodes,
-                   swift::Demangle::NodePointer& cur_node,
+                   std::vector<Demangle::NodePointer> &nodes,
+                   Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
                    const VisitNodeResult &generic_context, // set by GenericType case
                    Log *log)
@@ -1598,13 +1600,13 @@ VisitNodeFunction (SwiftASTContext *ast,
   VisitNodeResult identifier_result;
   VisitNodeResult type_result;
   VisitNodeResult decl_scope_result;
-  swift::Demangle::Node::iterator end = cur_node->end();
+  Demangle::Node::iterator end = cur_node->end();
   bool found_univocous = false;
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
   {
     if (found_univocous)
       break;
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
       default:
@@ -1613,18 +1615,18 @@ VisitNodeFunction (SwiftASTContext *ast,
         break;
 
         // TODO: any other possible containers?
-      case swift::Demangle::Node::Kind::Class:
-      case swift::Demangle::Node::Kind::Enum:
-      case swift::Demangle::Node::Kind::Module:
-      case swift::Demangle::Node::Kind::Structure:
+      case Demangle::Node::Kind::Class:
+      case Demangle::Node::Kind::Enum:
+      case Demangle::Node::Kind::Module:
+      case Demangle::Node::Kind::Structure:
         nodes.push_back((*pos));
         VisitNode (ast, nodes, decl_scope_result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Identifier:
-      case swift::Demangle::Node::Kind::InfixOperator:
-      case swift::Demangle::Node::Kind::PrefixOperator:
-      case swift::Demangle::Node::Kind::PostfixOperator:
+      case Demangle::Node::Kind::Identifier:
+      case Demangle::Node::Kind::InfixOperator:
+      case Demangle::Node::Kind::PrefixOperator:
+      case Demangle::Node::Kind::PostfixOperator:
         FindNamedDecls(ast, (*pos)->getText(), decl_scope_result);
         if (decl_scope_result._decls.size() == 0)
         {
@@ -1643,14 +1645,14 @@ VisitNodeFunction (SwiftASTContext *ast,
           found_univocous = true;
         break;
 
-      case swift::Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::Type:
         nodes.push_back((*pos));
         VisitNode (ast, nodes, type_result, generic_context, log);
         break;
     }
   }
 
-  //                    if (node_kind == swift::Demangle::Node::Kind::Allocator)
+  //                    if (node_kind == Demangle::Node::Kind::Allocator)
   //                    {
   //                        // For allocators we don't have an identifier for the name, we will
   //                        // need to extract it from the class or struct in "identifier_result"
@@ -1660,7 +1662,7 @@ VisitNodeFunction (SwiftASTContext *ast,
   //                            // This contains the class or struct
   //                            llvm::StringRef init_name("init");
   //
-  //                            if (FindFirstNamedDeclWithKind(ast, init_name, swift::DeclKind::Constructor, identifier_result))
+  //                            if (FindFirstNamedDeclWithKind(ast, init_name, DeclKind::Constructor, identifier_result))
   //                            {
   //                            }
   //                        }
@@ -1683,8 +1685,8 @@ VisitNodeFunction (SwiftASTContext *ast,
         continue;
       if (AreBothFunctionTypes(identifier_type->getKind(), type_result._types.front()->getKind()))
       {
-        const swift::AnyFunctionType* identifier_func = identifier_type->getAs<swift::AnyFunctionType>();
-        const swift::AnyFunctionType* type_func = type_result._types.front()->getAs<swift::AnyFunctionType>();
+        const AnyFunctionType* identifier_func = identifier_type->getAs<AnyFunctionType>();
+        const AnyFunctionType* type_func = type_result._types.front()->getAs<AnyFunctionType>();
         if (CompareFunctionTypes(identifier_func, type_func))
         {
           result._module = identifier_result._module;
@@ -1702,23 +1704,23 @@ VisitNodeFunction (SwiftASTContext *ast,
 
 static void
 VisitNodeFunctionType (SwiftASTContext *ast,
-                       std::vector<swift::Demangle::NodePointer> &nodes,
-                       swift::Demangle::NodePointer& cur_node,
+                       std::vector<Demangle::NodePointer> &nodes,
+                       Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
                        const VisitNodeResult &generic_context, // set by GenericType case
                        Log *log)
 {
   VisitNodeResult arg_type_result;
   VisitNodeResult return_type_result;
-  swift::Demangle::Node::iterator end = cur_node->end();
+  Demangle::Node::iterator end = cur_node->end();
   bool is_in_class = false;
   bool throws = false;
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::Class:
+      case Demangle::Node::Kind::Class:
       {
         is_in_class = true;
         VisitNodeResult class_type_result;
@@ -1726,24 +1728,24 @@ VisitNodeFunctionType (SwiftASTContext *ast,
         VisitNode (ast, nodes, class_type_result, generic_context, log);
       }
         break;
-      case swift::Demangle::Node::Kind::Structure:
+      case Demangle::Node::Kind::Structure:
       {
         VisitNodeResult class_type_result;
         nodes.push_back(*pos);
         VisitNode (ast, nodes, class_type_result, generic_context, log);
       }
         break;
-      case swift::Demangle::Node::Kind::ArgumentTuple:
-      case swift::Demangle::Node::Kind::Metatype:
+      case Demangle::Node::Kind::ArgumentTuple:
+      case Demangle::Node::Kind::Metatype:
       {
         nodes.push_back(*pos);
         VisitNode (ast, nodes, arg_type_result, generic_context, log);
       }
         break;
-      case swift::Demangle::Node::Kind::ThrowsAnnotation:
+      case Demangle::Node::Kind::ThrowsAnnotation:
         throws = true;
         break;
-      case swift::Demangle::Node::Kind::ReturnType:
+      case Demangle::Node::Kind::ReturnType:
       {
         nodes.push_back(*pos);
         VisitNode (ast, nodes, return_type_result, generic_context, log);
@@ -1753,13 +1755,13 @@ VisitNodeFunctionType (SwiftASTContext *ast,
         break;
     }
   }
-  swift::Type arg_clang_type;
-  swift::Type return_clang_type;
+  Type arg_clang_type;
+  Type return_clang_type;
 
   switch (arg_type_result._types.size())
   {
     case 0:
-      arg_clang_type = swift::TupleType::getEmpty(*ast);
+      arg_clang_type = TupleType::getEmpty(*ast);
       break;
     case 1:
       arg_clang_type = arg_type_result._types.front().getPointer();
@@ -1772,7 +1774,7 @@ VisitNodeFunctionType (SwiftASTContext *ast,
   switch (return_type_result._types.size())
   {
     case 0:
-      return_clang_type = swift::TupleType::getEmpty(*ast);
+      return_clang_type = TupleType::getEmpty(*ast);
       break;
     case 1:
       return_clang_type = return_type_result._types.front().getPointer();
@@ -1784,33 +1786,33 @@ VisitNodeFunctionType (SwiftASTContext *ast,
 
   if (arg_clang_type && return_clang_type)
   {
-    result._types.push_back(swift::FunctionType::get(arg_clang_type,
+    result._types.push_back(FunctionType::get(arg_clang_type,
                                                      return_clang_type,
-                                                     swift::FunctionType::ExtInfo().
+                                                     FunctionType::ExtInfo().
                                                        withThrows(throws)));
   }
 }
 
 static void
 VisitNodeGenericType (SwiftASTContext *ast,
-                      std::vector<swift::Demangle::NodePointer> &nodes,
-                      swift::Demangle::NodePointer& cur_node,
+                      std::vector<Demangle::NodePointer> &nodes,
+                      Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
                       const VisitNodeResult &generic_context, // set by GenericType case
                       Log *log)
 {
   VisitNodeResult new_generic_context;
   std::copy(generic_context._types.begin(), generic_context._types.end(), back_inserter(new_generic_context._types));
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
+  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::Generics:
+      case Demangle::Node::Kind::Generics:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, new_generic_context, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::Type:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, result, new_generic_context, log);
         break;
@@ -1823,8 +1825,8 @@ VisitNodeGenericType (SwiftASTContext *ast,
 
 static void
 VisitNodeSetterGetter (SwiftASTContext *ast,
-                       std::vector<swift::Demangle::NodePointer> &nodes,
-                       swift::Demangle::NodePointer& cur_node,
+                       std::vector<Demangle::NodePointer> &nodes,
+                       Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
                        const VisitNodeResult &generic_context, // set by GenericType case
                        Log *log)
@@ -1832,23 +1834,23 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
   VisitNodeResult decl_ctx_result;
   std::string identifier;
   VisitNodeResult type_result;
-  swift::Demangle::Node::Kind node_kind = cur_node->getKind();
+  Demangle::Node::Kind node_kind = cur_node->getKind();
 
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
+  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::Class:
-      case swift::Demangle::Node::Kind::Module:
-      case swift::Demangle::Node::Kind::Structure:
+      case Demangle::Node::Kind::Class:
+      case Demangle::Node::Kind::Module:
+      case Demangle::Node::Kind::Structure:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, decl_ctx_result, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::Identifier:
+      case Demangle::Node::Kind::Identifier:
         identifier.assign((*pos)->getText());
         break;
-      case swift::Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::Type:
         nodes.push_back(*pos);
         VisitNode (ast, nodes, type_result, generic_context, log);
         break;
@@ -1873,32 +1875,32 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
       return;
     }
 
-    swift::SubscriptDecl *subscript_decl;
-    const swift::AnyFunctionType* type_func = type_result._types.front()->getAs<swift::AnyFunctionType>();
+    SubscriptDecl *subscript_decl;
+    const AnyFunctionType* type_func = type_result._types.front()->getAs<AnyFunctionType>();
 
-    swift::CanType type_result_type(type_func->getResult()->getDesugaredType()->getCanonicalType());
-    swift::CanType type_input_type(type_func->getInput()->getDesugaredType()->getCanonicalType());
+    CanType type_result_type(type_func->getResult()->getDesugaredType()->getCanonicalType());
+    CanType type_input_type(type_func->getInput()->getDesugaredType()->getCanonicalType());
 
 
-    swift::FuncDecl *identifier_func = nullptr;
+    FuncDecl *identifier_func = nullptr;
 
     for (size_t i = 0; i < num_decls; i++)
     {
-      subscript_decl = llvm::dyn_cast_or_null<swift::SubscriptDecl>(decl_ctx_result._decls[i]);
+      subscript_decl = llvm::dyn_cast_or_null<SubscriptDecl>(decl_ctx_result._decls[i]);
       if (subscript_decl)
       {
         switch (node_kind)
         {
-          case swift::Demangle::Node::Kind::Getter:
+          case Demangle::Node::Kind::Getter:
             identifier_func = subscript_decl->getGetter();
             break;
-          case swift::Demangle::Node::Kind::Setter:
+          case Demangle::Node::Kind::Setter:
             identifier_func = subscript_decl->getGetter();
             break;
-          case swift::Demangle::Node::Kind::DidSet:
+          case Demangle::Node::Kind::DidSet:
             identifier_func = subscript_decl->getDidSetFunc();
             break;
-          case swift::Demangle::Node::Kind::WillSet:
+          case Demangle::Node::Kind::WillSet:
             identifier_func = subscript_decl->getWillSetFunc();
             break;
           default:
@@ -1908,17 +1910,17 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
 
         if (identifier_func && identifier_func->getType())
         {
-          const swift::AnyFunctionType *identifier_func_type = identifier_func->getType()->getAs<swift::AnyFunctionType>();
+          const AnyFunctionType *identifier_func_type = identifier_func->getType()->getAs<AnyFunctionType>();
           if (identifier_func_type)
           {
             // Swift function types are formally functions that take the class and return the method,
             // we have to strip off the first level of function call to compare against the type
             // from the demangled name.
-            const swift::AnyFunctionType *identifier_uncurried_result = identifier_func_type->getResult()->getAs<swift::AnyFunctionType>();
+            const AnyFunctionType *identifier_uncurried_result = identifier_func_type->getResult()->getAs<AnyFunctionType>();
             if (identifier_uncurried_result)
             {
-              swift::CanType identifier_result_type(identifier_uncurried_result->getResult()->getDesugaredType()->getCanonicalType());
-              swift::CanType identifier_input_type(identifier_uncurried_result->getInput()->getDesugaredType()->getCanonicalType());
+              CanType identifier_result_type(identifier_uncurried_result->getResult()->getDesugaredType()->getCanonicalType());
+              CanType identifier_input_type(identifier_uncurried_result->getInput()->getDesugaredType()->getCanonicalType());
               if (identifier_result_type == type_result_type &&
                   identifier_input_type == type_input_type)
               {
@@ -1945,13 +1947,13 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
   {
     // Otherwise this is a getter/setter/etc for a variable.  Currently you can't write a getter/setter that
     // takes a different type from the type of the variable.  So there is only one possible function.
-    swift::AbstractStorageDecl *var_decl = nullptr;
+    AbstractStorageDecl *var_decl = nullptr;
 
-    FindFirstNamedDeclWithKind(ast, identifier, swift::DeclKind::Var, decl_ctx_result);
+    FindFirstNamedDeclWithKind(ast, identifier, DeclKind::Var, decl_ctx_result);
 
     if (decl_ctx_result._decls.size() == 1)
     {
-      var_decl = llvm::dyn_cast_or_null<swift::VarDecl>(decl_ctx_result._decls[0]);
+      var_decl = llvm::dyn_cast_or_null<VarDecl>(decl_ctx_result._decls[0]);
     }
     else if (decl_ctx_result._decls.size() > 0)
     {
@@ -1967,21 +1969,21 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
 
     if (var_decl)
     {
-      swift::FuncDecl *decl = nullptr;
+      FuncDecl *decl = nullptr;
 
-      if (node_kind == swift::Demangle::Node::Kind::DidSet && var_decl->getDidSetFunc())
+      if (node_kind == Demangle::Node::Kind::DidSet && var_decl->getDidSetFunc())
       {
         decl = var_decl->getDidSetFunc();
       }
-      else if (node_kind == swift::Demangle::Node::Kind::Getter && var_decl->getGetter())
+      else if (node_kind == Demangle::Node::Kind::Getter && var_decl->getGetter())
       {
         decl = var_decl->getGetter();
       }
-      else if (node_kind == swift::Demangle::Node::Kind::Setter && var_decl->getSetter())
+      else if (node_kind == Demangle::Node::Kind::Setter && var_decl->getSetter())
       {
         decl = var_decl->getSetter();
       }
-      else if (node_kind == swift::Demangle::Node::Kind::WillSet && var_decl->getWillSetFunc())
+      else if (node_kind == Demangle::Node::Kind::WillSet && var_decl->getWillSetFunc())
       {
         decl = var_decl->getWillSetFunc();
       }
@@ -2010,14 +2012,14 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
 
 static void
 VisitNodeIdentifier (SwiftASTContext *ast,
-                     std::vector<swift::Demangle::NodePointer> &nodes,
-                     swift::Demangle::NodePointer& cur_node,
+                     std::vector<Demangle::NodePointer> &nodes,
+                     Demangle::NodePointer& cur_node,
                      VisitNodeResult &result,
                      const VisitNodeResult &generic_context, // set by GenericType case
                      Log *log)
 {
-  swift::Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
-  swift::DeclKind decl_kind = GetKindAsDeclKind (parent_node->getKind());
+  Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
+  DeclKind decl_kind = GetKindAsDeclKind (parent_node->getKind());
 
   if (!FindFirstNamedDeclWithKind (ast, cur_node->getText(), decl_kind, result))
   {
@@ -2028,15 +2030,15 @@ VisitNodeIdentifier (SwiftASTContext *ast,
 
 static void
 VisitNodeLocalDeclName (SwiftASTContext *ast,
-                        std::vector<swift::Demangle::NodePointer> &nodes,
-                        swift::Demangle::NodePointer& cur_node,
+                        std::vector<Demangle::NodePointer> &nodes,
+                        Demangle::NodePointer& cur_node,
                         VisitNodeResult &result,
                         const VisitNodeResult &generic_context, // set by GenericType case
                         Log *log)
 {
-  swift::Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
-  std::string remangledNode = swift::Demangle::mangleNode(parent_node);
-  swift::TypeDecl *decl = result._module.lookupLocalType(remangledNode);
+  Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
+  std::string remangledNode = Demangle::mangleNode(parent_node);
+  TypeDecl *decl = result._module.lookupLocalType(remangledNode);
   if (!decl)
     result._error = stringWithFormat("unable to lookup local type %s",
                                      remangledNode.c_str());
@@ -2050,7 +2052,7 @@ VisitNodeLocalDeclName (SwiftASTContext *ast,
 
     result._decls.push_back(decl);
     auto type = decl->getType();
-    if (swift::MetatypeType *metatype = llvm::dyn_cast_or_null<swift::MetatypeType>(type.getPointer()))
+    if (MetatypeType *metatype = llvm::dyn_cast_or_null<MetatypeType>(type.getPointer()))
       type = metatype->getInstanceType();
     result._types.push_back(type);
   }
@@ -2058,14 +2060,14 @@ VisitNodeLocalDeclName (SwiftASTContext *ast,
 
 static void
 VisitNodePrivateDeclName (SwiftASTContext *ast,
-                          std::vector<swift::Demangle::NodePointer> &nodes,
-                          swift::Demangle::NodePointer& cur_node,
+                          std::vector<Demangle::NodePointer> &nodes,
+                          Demangle::NodePointer& cur_node,
                           VisitNodeResult &result,
                           const VisitNodeResult &generic_context, // set by GenericType case
                           Log *log)
 {
-  swift::Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
-  swift::DeclKind decl_kind = GetKindAsDeclKind (parent_node->getKind());
+  Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
+  DeclKind decl_kind = GetKindAsDeclKind (parent_node->getKind());
 
   if (cur_node->getNumChildren() != 2)
   {
@@ -2074,8 +2076,8 @@ VisitNodePrivateDeclName (SwiftASTContext *ast,
     return;
   }
 
-  swift::Demangle::NodePointer priv_decl_id_node (cur_node->getChild(0));
-  swift::Demangle::NodePointer id_node (cur_node->getChild(1));
+  Demangle::NodePointer priv_decl_id_node (cur_node->getChild(0));
+  Demangle::NodePointer id_node (cur_node->getChild(1));
 
   if (!priv_decl_id_node->hasText() || !id_node->hasText())
   {
@@ -2093,8 +2095,8 @@ VisitNodePrivateDeclName (SwiftASTContext *ast,
 
 static void
 VisitNodeInOut (SwiftASTContext *ast,
-                std::vector<swift::Demangle::NodePointer> &nodes,
-                swift::Demangle::NodePointer& cur_node,
+                std::vector<Demangle::NodePointer> &nodes,
+                Demangle::NodePointer& cur_node,
                 VisitNodeResult &result,
                 const VisitNodeResult &generic_context, // set by GenericType case
                 Log *log)
@@ -2104,7 +2106,7 @@ VisitNodeInOut (SwiftASTContext *ast,
   VisitNode (ast, nodes, type_result, generic_context, log);
   if (type_result._types.size() == 1 && type_result._types[0])
   {
-    result._types.push_back(swift::Type(swift::LValueType::get(type_result._types[0])));
+    result._types.push_back(Type(LValueType::get(type_result._types[0])));
   }
   else
   {
@@ -2114,8 +2116,8 @@ VisitNodeInOut (SwiftASTContext *ast,
 
 static void
 VisitNodeMetatype (SwiftASTContext *ast,
-                   std::vector<swift::Demangle::NodePointer> &nodes,
-                   swift::Demangle::NodePointer& cur_node,
+                   std::vector<Demangle::NodePointer> &nodes,
+                   Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
                    const VisitNodeResult &generic_context, // set by GenericType case
                    Log *log)
@@ -2123,24 +2125,24 @@ VisitNodeMetatype (SwiftASTContext *ast,
   auto iter = cur_node->begin();
   auto end = cur_node->end();
 
-  llvm::Optional<swift::MetatypeRepresentation> metatype_repr;
+  llvm::Optional<MetatypeRepresentation> metatype_repr;
   VisitNodeResult type_result;
 
   for (; iter != end; ++iter)
   {
     switch ((*iter)->getKind())
     {
-      case swift::Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::Type:
         nodes.push_back(*iter);
         VisitNode(ast, nodes, type_result, generic_context, log);
         break;
-      case swift::Demangle::Node::Kind::MetatypeRepresentation:
+      case Demangle::Node::Kind::MetatypeRepresentation:
         if ( (*iter)->getText() == "@thick" )
-          metatype_repr = swift::MetatypeRepresentation::Thick;
+          metatype_repr = MetatypeRepresentation::Thick;
         else if ( (*iter)->getText() == "@thin" )
-          metatype_repr = swift::MetatypeRepresentation::Thin;
+          metatype_repr = MetatypeRepresentation::Thin;
         else if ( (*iter)->getText() == "@objc" )
-          metatype_repr = swift::MetatypeRepresentation::ObjC;
+          metatype_repr = MetatypeRepresentation::ObjC;
         else
           ; // leave it alone if we don't understand the representation
         break;
@@ -2152,7 +2154,7 @@ VisitNodeMetatype (SwiftASTContext *ast,
 
   if (type_result.HasSingleType())
   {
-    result._types.push_back(swift::MetatypeType::get(type_result._types[0], metatype_repr));
+    result._types.push_back(MetatypeType::get(type_result._types[0], metatype_repr));
   }
   else
   {
@@ -2164,8 +2166,8 @@ VisitNodeMetatype (SwiftASTContext *ast,
 
 static void
 VisitNodeModule (SwiftASTContext *ast,
-                 std::vector<swift::Demangle::NodePointer> &nodes,
-                 swift::Demangle::NodePointer& cur_node,
+                 std::vector<Demangle::NodePointer> &nodes,
+                 Demangle::NodePointer& cur_node,
                  VisitNodeResult &result,
                  const VisitNodeResult &generic_context, // set by GenericType case
                  Log *log)
@@ -2188,8 +2190,8 @@ VisitNodeModule (SwiftASTContext *ast,
 
 static void
 VisitNodeNonVariadicTuple (SwiftASTContext *ast,
-                           std::vector<swift::Demangle::NodePointer> &nodes,
-                           swift::Demangle::NodePointer& cur_node,
+                           std::vector<Demangle::NodePointer> &nodes,
+                           Demangle::NodePointer& cur_node,
                            VisitNodeResult &result,
                            const VisitNodeResult &generic_context, // set by GenericType case
                            Log *log)
@@ -2200,7 +2202,7 @@ VisitNodeNonVariadicTuple (SwiftASTContext *ast,
 
     if (ast)
     {
-      result._types.push_back(swift::TupleType::getEmpty(*ast));
+      result._types.push_back(TupleType::getEmpty(*ast));
     }
     else
     {
@@ -2209,9 +2211,9 @@ VisitNodeNonVariadicTuple (SwiftASTContext *ast,
   }
   else
   {
-    std::vector<swift::TupleTypeElt> tuple_fields;
-    swift::Demangle::Node::iterator end = cur_node->end();
-    for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+    std::vector<TupleTypeElt> tuple_fields;
+    Demangle::Node::iterator end = cur_node->end();
+    for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
     {
       nodes.push_back(*pos);
       VisitNodeResult tuple_element_result;
@@ -2229,7 +2231,7 @@ VisitNodeNonVariadicTuple (SwiftASTContext *ast,
     {
       if (ast)
       {
-        result._types.push_back(swift::TupleType::get(tuple_fields, *ast));
+        result._types.push_back(TupleType::get(tuple_fields, *ast));
       }
       else
       {
@@ -2241,8 +2243,8 @@ VisitNodeNonVariadicTuple (SwiftASTContext *ast,
 
 static void
 VisitNodeProtocolList (SwiftASTContext *ast,
-                       std::vector<swift::Demangle::NodePointer> &nodes,
-                       swift::Demangle::NodePointer& cur_node,
+                       std::vector<Demangle::NodePointer> &nodes,
+                       Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
                        const VisitNodeResult &generic_context, // set by GenericType case
                        Log *log)
@@ -2256,7 +2258,7 @@ VisitNodeProtocolList (SwiftASTContext *ast,
     {
       if (ast)
       {
-        result._types.push_back(swift::ProtocolCompositionType::get(*ast, protocol_types_result._types));
+        result._types.push_back(ProtocolCompositionType::get(*ast, protocol_types_result._types));
       }
       else
       {
@@ -2268,25 +2270,25 @@ VisitNodeProtocolList (SwiftASTContext *ast,
 
 static void
 VisitNodeQualifiedArchetype (SwiftASTContext *ast,
-                             std::vector<swift::Demangle::NodePointer> &nodes,
-                             swift::Demangle::NodePointer& cur_node,
+                             std::vector<Demangle::NodePointer> &nodes,
+                             Demangle::NodePointer& cur_node,
                              VisitNodeResult &result,
                              const VisitNodeResult &generic_context, // set by GenericType case
                              Log *log)
 {
     if (cur_node->begin() != cur_node->end())
     {
-        swift::Demangle::Node::iterator end = cur_node->end();
+        Demangle::Node::iterator end = cur_node->end();
         VisitNodeResult type_result;
         uint64_t index = 0xFFFFFFFFFFFFFFFF;
-        for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+        for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
         {
             switch (pos->get()->getKind())
             {
-                case swift::Demangle::Node::Kind::Number:
+                case Demangle::Node::Kind::Number:
                     index = pos->get()->getIndex();
                     break;
-                case swift::Demangle::Node::Kind::DeclContext:
+                case Demangle::Node::Kind::DeclContext:
                     nodes.push_back(*pos);
                     VisitNode (ast, nodes, type_result, generic_context, log);
                     break;
@@ -2307,26 +2309,26 @@ VisitNodeQualifiedArchetype (SwiftASTContext *ast,
                 // TODO: this might be a generally useful operation, but it requires a Decl as well as a type
                 // to be reliably performed, and as such we cannot just put it in CompilerType as of now
                 // (consider, func foo (@inout StructType) -> (Int) -> () vs struct StructType {func foo(Int) -> ()} to see why)
-                swift::TypeBase *type_ptr = type_result._types[0].getPointer();
-                swift::Decl* decl_ptr = type_result._decls[0];
+                TypeBase *type_ptr = type_result._types[0].getPointer();
+                Decl* decl_ptr = type_result._decls[0];
                 // if this is a function...
-                if (type_ptr && type_ptr->is<swift::AnyFunctionType>())
+                if (type_ptr && type_ptr->is<AnyFunctionType>())
                 {
                     // if this is defined in a type...
                     if (decl_ptr->getDeclContext()->isTypeContext())
                     {
                         // if I can get the function type from it
-                        if (auto func_type = llvm::dyn_cast_or_null<swift::AnyFunctionType>(type_ptr))
+                        if (auto func_type = llvm::dyn_cast_or_null<AnyFunctionType>(type_ptr))
                         {
                             // and it has a return type which is itself a function
-                            auto return_func_type = llvm::dyn_cast_or_null<swift::AnyFunctionType>(func_type->getResult().getPointer());
+                            auto return_func_type = llvm::dyn_cast_or_null<AnyFunctionType>(func_type->getResult().getPointer());
                             if (return_func_type)
                                 type_ptr = return_func_type; // then use IT as our source of archetypes
                         }
                     }
                 }
-                swift::TypeBase *arg_type = GetTemplateArgument(type_ptr, index);
-                result._types.push_back(swift::Type(arg_type));
+                TypeBase *arg_type = GetTemplateArgument(type_ptr, index);
+                result._types.push_back(Type(arg_type));
             }
             else if (type_result._module.IsExtension())
             {
@@ -2338,8 +2340,8 @@ VisitNodeQualifiedArchetype (SwiftASTContext *ast,
 
 static void
 VisitNodeSelfTypeRef (SwiftASTContext *ast,
-                      std::vector<swift::Demangle::NodePointer> &nodes,
-                      swift::Demangle::NodePointer& cur_node,
+                      std::vector<Demangle::NodePointer> &nodes,
+                      Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
                       const VisitNodeResult &generic_context, // set by GenericType case
                       Log *log)
@@ -2349,23 +2351,23 @@ VisitNodeSelfTypeRef (SwiftASTContext *ast,
   VisitNode (ast, nodes, type_result, generic_context, log);
   if (type_result.HasSingleType())
   {
-    swift::Type supposed_protocol_type(type_result.GetFirstType());
-    swift::ProtocolType *protocol_type = supposed_protocol_type->getAs<swift::ProtocolType>();
-    swift::ProtocolDecl *protocol_decl = protocol_type ? protocol_type->getDecl() : nullptr;
+    Type supposed_protocol_type(type_result.GetFirstType());
+    ProtocolType *protocol_type = supposed_protocol_type->getAs<ProtocolType>();
+    ProtocolDecl *protocol_decl = protocol_type ? protocol_type->getDecl() : nullptr;
     if (protocol_decl)
     {
-      swift::ArchetypeType::AssocTypeOrProtocolType assoc_protocol_type(protocol_decl);
+      ArchetypeType::AssocTypeOrProtocolType assoc_protocol_type(protocol_decl);
       if (ast)
       {
-        swift::CanTypeWrapper<swift::ArchetypeType> self_type = swift::ArchetypeType::getNew(*ast,
+        CanTypeWrapper<ArchetypeType> self_type = ArchetypeType::getNew(*ast,
                                                                                              nullptr,
                                                                                              assoc_protocol_type,
                                                                                              ast->getIdentifier("Self"),
                                                                                              {supposed_protocol_type},
-                                                                                             swift::Type(),
+                                                                                             Type(),
                                                                                              false);
         if (self_type.getPointer())
-          result._types.push_back(swift::Type(self_type));
+          result._types.push_back(Type(self_type));
         else
           result._error = "referent type cannot be made into an archetype";
       }
@@ -2387,24 +2389,24 @@ VisitNodeSelfTypeRef (SwiftASTContext *ast,
 
 static void
 VisitNodeTupleElement (SwiftASTContext *ast,
-                       std::vector<swift::Demangle::NodePointer> &nodes,
-                       swift::Demangle::NodePointer& cur_node,
+                       std::vector<Demangle::NodePointer> &nodes,
+                       Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
                        const VisitNodeResult &generic_context, // set by GenericType case
                        Log *log)
 {
   const char *tuple_name = NULL;
   VisitNodeResult tuple_type_result;
-  swift::Demangle::Node::iterator end = cur_node->end();
-  for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
   {
-    const swift::Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind)
     {
-      case swift::Demangle::Node::Kind::TupleElementName:
+      case Demangle::Node::Kind::TupleElementName:
         tuple_name = (*pos)->getText().c_str();
         break;
-      case swift::Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::Type:
         nodes.push_back((*pos)->getFirstChild());
         VisitNode (ast, nodes, tuple_type_result, generic_context, log);
         break;
@@ -2416,25 +2418,25 @@ VisitNodeTupleElement (SwiftASTContext *ast,
   if (tuple_type_result._error.empty() && tuple_type_result._types.size() == 1)
   {
     if (tuple_name)
-      result._tuple_type_element = swift::TupleTypeElt(tuple_type_result._types.front().getPointer(),
+      result._tuple_type_element = TupleTypeElt(tuple_type_result._types.front().getPointer(),
                                                        ast->getIdentifier(tuple_name));
     else
-      result._tuple_type_element = swift::TupleTypeElt(tuple_type_result._types.front().getPointer());
+      result._tuple_type_element = TupleTypeElt(tuple_type_result._types.front().getPointer());
   }
 }
 
 static void
 VisitNodeTypeList (SwiftASTContext *ast,
-                   std::vector<swift::Demangle::NodePointer> &nodes,
-                   swift::Demangle::NodePointer& cur_node,
+                   std::vector<Demangle::NodePointer> &nodes,
+                   Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
                    const VisitNodeResult &generic_context, // set by GenericType case
                    Log *log)
 {
   if (cur_node->begin() != cur_node->end())
   {
-    swift::Demangle::Node::iterator end = cur_node->end();
-    for (swift::Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
+    Demangle::Node::iterator end = cur_node->end();
+    for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos)
     {
       nodes.push_back(*pos);
       VisitNodeResult type_result;
@@ -2467,8 +2469,8 @@ VisitNodeTypeList (SwiftASTContext *ast,
 
 static void
 VisitNodeUnowned (SwiftASTContext *ast,
-                  std::vector<swift::Demangle::NodePointer> &nodes,
-                  swift::Demangle::NodePointer& cur_node,
+                  std::vector<Demangle::NodePointer> &nodes,
+                  Demangle::NodePointer& cur_node,
                   VisitNodeResult &result,
                   const VisitNodeResult &generic_context, // set by GenericType case
                   Log *log)
@@ -2480,7 +2482,7 @@ VisitNodeUnowned (SwiftASTContext *ast,
   {
     if (ast)
     {
-      result._types.push_back(swift::Type(swift::UnownedStorageType::get(type_result._types[0],
+      result._types.push_back(Type(UnownedStorageType::get(type_result._types[0],
                                                                          *ast)));
     }
     else
@@ -2496,8 +2498,8 @@ VisitNodeUnowned (SwiftASTContext *ast,
 
 static void
 VisitNodeWeak (SwiftASTContext *ast,
-               std::vector<swift::Demangle::NodePointer> &nodes,
-               swift::Demangle::NodePointer& cur_node,
+               std::vector<Demangle::NodePointer> &nodes,
+               Demangle::NodePointer& cur_node,
                VisitNodeResult &result,
                const VisitNodeResult &generic_context, // set by GenericType case
                Log *log)
@@ -2509,7 +2511,7 @@ VisitNodeWeak (SwiftASTContext *ast,
   {
     if (ast)
     {
-      result._types.push_back(swift::Type(swift::WeakStorageType::get(type_result._types[0],
+      result._types.push_back(Type(WeakStorageType::get(type_result._types[0],
                                                                       *ast)));
     }
     else
@@ -2525,8 +2527,8 @@ VisitNodeWeak (SwiftASTContext *ast,
 
 static void
 VisitFirstChildNode (SwiftASTContext *ast,
-                     std::vector<swift::Demangle::NodePointer> &nodes,
-                     swift::Demangle::NodePointer& cur_node,
+                     std::vector<Demangle::NodePointer> &nodes,
+                     Demangle::NodePointer& cur_node,
                      VisitNodeResult &result,
                      const VisitNodeResult &generic_context, // set by GenericType case
                      Log *log)
@@ -2540,14 +2542,14 @@ VisitFirstChildNode (SwiftASTContext *ast,
 
 static void
 VisitAllChildNodes (SwiftASTContext *ast,
-                    std::vector<swift::Demangle::NodePointer> &nodes,
-                    swift::Demangle::NodePointer& cur_node,
+                    std::vector<Demangle::NodePointer> &nodes,
+                    Demangle::NodePointer& cur_node,
                     VisitNodeResult &result,
                     const VisitNodeResult &generic_context, // set by GenericType case
                     Log *log)
 {
-  swift::Demangle::Node::iterator child_end = cur_node->end();
-  for (swift::Demangle::Node::iterator child_pos = cur_node->begin(); child_pos != child_end; ++child_pos)
+  Demangle::Node::iterator child_end = cur_node->end();
+  for (Demangle::Node::iterator child_pos = cur_node->begin(); child_pos != child_end; ++child_pos)
   {
     nodes.push_back(*child_pos);
     VisitNode (ast, nodes, result, generic_context, log);
@@ -2556,7 +2558,7 @@ VisitAllChildNodes (SwiftASTContext *ast,
 
 static void
 VisitNode (SwiftASTContext *ast,
-           std::vector<swift::Demangle::NodePointer> &nodes,
+           std::vector<Demangle::NodePointer> &nodes,
            VisitNodeResult &result,
            const VisitNodeResult &generic_context, // set by GenericType case
            Log *log)
@@ -2570,160 +2572,160 @@ VisitNode (SwiftASTContext *ast,
 
   if (result._error.empty())
   {
-    swift::Demangle::NodePointer node = nodes.back();
-    const swift::Demangle::Node::Kind node_kind = node->getKind();
+    Demangle::NodePointer node = nodes.back();
+    const Demangle::Node::Kind node_kind = node->getKind();
 
     switch (node_kind)
     {
-      case swift::Demangle::Node::Kind::OwningAddressor:
-      case swift::Demangle::Node::Kind::OwningMutableAddressor:
-      case swift::Demangle::Node::Kind::UnsafeAddressor:
-      case swift::Demangle::Node::Kind::UnsafeMutableAddressor:
+      case Demangle::Node::Kind::OwningAddressor:
+      case Demangle::Node::Kind::OwningMutableAddressor:
+      case Demangle::Node::Kind::UnsafeAddressor:
+      case Demangle::Node::Kind::UnsafeMutableAddressor:
         VisitNodeAddressor (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Generics:
+      case Demangle::Node::Kind::Generics:
         VisitNodeGenerics (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::ArchetypeRef:
+      case Demangle::Node::Kind::ArchetypeRef:
         VisitNodeArchetypeRef (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Archetype:
+      case Demangle::Node::Kind::Archetype:
         VisitNodeArchetype (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::ArgumentTuple:
+      case Demangle::Node::Kind::ArgumentTuple:
         VisitFirstChildNode (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::AssociatedTypeRef:
+      case Demangle::Node::Kind::AssociatedTypeRef:
         VisitNodeAssociatedTypeRef (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::BoundGenericClass:
-      case swift::Demangle::Node::Kind::BoundGenericStructure:
-      case swift::Demangle::Node::Kind::BoundGenericEnum:
+      case Demangle::Node::Kind::BoundGenericClass:
+      case Demangle::Node::Kind::BoundGenericStructure:
+      case Demangle::Node::Kind::BoundGenericEnum:
         VisitNodeBoundGeneric (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::BuiltinTypeName:
+      case Demangle::Node::Kind::BuiltinTypeName:
         VisitNodeBuiltinTypeName (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Structure:
-      case swift::Demangle::Node::Kind::Class:
-      case swift::Demangle::Node::Kind::Enum:
-      case swift::Demangle::Node::Kind::Global:
-      case swift::Demangle::Node::Kind::Static:
-      case swift::Demangle::Node::Kind::TypeAlias:
-      case swift::Demangle::Node::Kind::Type:
-      case swift::Demangle::Node::Kind::TypeMangling:
-      case swift::Demangle::Node::Kind::ReturnType:
-      case swift::Demangle::Node::Kind::Protocol:
+      case Demangle::Node::Kind::Structure:
+      case Demangle::Node::Kind::Class:
+      case Demangle::Node::Kind::Enum:
+      case Demangle::Node::Kind::Global:
+      case Demangle::Node::Kind::Static:
+      case Demangle::Node::Kind::TypeAlias:
+      case Demangle::Node::Kind::Type:
+      case Demangle::Node::Kind::TypeMangling:
+      case Demangle::Node::Kind::ReturnType:
+      case Demangle::Node::Kind::Protocol:
         VisitAllChildNodes (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Constructor:
+      case Demangle::Node::Kind::Constructor:
         VisitNodeConstructor (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Destructor:
+      case Demangle::Node::Kind::Destructor:
         VisitNodeDestructor (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::DeclContext:
+      case Demangle::Node::Kind::DeclContext:
         VisitNodeDeclContext (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::ErrorType:
+      case Demangle::Node::Kind::ErrorType:
         result._error = "error type encountered while demangling name";
         break;
 
-      case swift::Demangle::Node::Kind::Extension:
+      case Demangle::Node::Kind::Extension:
         VisitNodeExtension(ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::ExplicitClosure:
+      case Demangle::Node::Kind::ExplicitClosure:
         VisitNodeExplicitClosure (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Function:
-      case swift::Demangle::Node::Kind::Allocator:
-      case swift::Demangle::Node::Kind::Variable:    // Out of order on purpose
+      case Demangle::Node::Kind::Function:
+      case Demangle::Node::Kind::Allocator:
+      case Demangle::Node::Kind::Variable:    // Out of order on purpose
         VisitNodeFunction (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::FunctionType:
-      case swift::Demangle::Node::Kind::UncurriedFunctionType:      // Out of order on purpose.
+      case Demangle::Node::Kind::FunctionType:
+      case Demangle::Node::Kind::UncurriedFunctionType:      // Out of order on purpose.
         VisitNodeFunctionType (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::GenericType:
+      case Demangle::Node::Kind::GenericType:
         VisitNodeGenericType (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::DidSet:
-      case swift::Demangle::Node::Kind::Getter:
-      case swift::Demangle::Node::Kind::Setter:
-      case swift::Demangle::Node::Kind::WillSet: // out of order on purpose
+      case Demangle::Node::Kind::DidSet:
+      case Demangle::Node::Kind::Getter:
+      case Demangle::Node::Kind::Setter:
+      case Demangle::Node::Kind::WillSet: // out of order on purpose
         VisitNodeSetterGetter (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::LocalDeclName:
+      case Demangle::Node::Kind::LocalDeclName:
         VisitNodeLocalDeclName(ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Identifier:
+      case Demangle::Node::Kind::Identifier:
         VisitNodeIdentifier (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::InOut:
+      case Demangle::Node::Kind::InOut:
         VisitNodeInOut (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Metatype:
+      case Demangle::Node::Kind::Metatype:
         VisitNodeMetatype (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Module:
+      case Demangle::Node::Kind::Module:
         VisitNodeModule (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::NonVariadicTuple:
+      case Demangle::Node::Kind::NonVariadicTuple:
         VisitNodeNonVariadicTuple (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::PrivateDeclName:
+      case Demangle::Node::Kind::PrivateDeclName:
         VisitNodePrivateDeclName(ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::ProtocolList:
+      case Demangle::Node::Kind::ProtocolList:
         VisitNodeProtocolList (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::QualifiedArchetype:
+      case Demangle::Node::Kind::QualifiedArchetype:
         VisitNodeQualifiedArchetype (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::SelfTypeRef:
+      case Demangle::Node::Kind::SelfTypeRef:
         VisitNodeSelfTypeRef (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::TupleElement:
+      case Demangle::Node::Kind::TupleElement:
         VisitNodeTupleElement (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::TypeList:
+      case Demangle::Node::Kind::TypeList:
         VisitNodeTypeList (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Unowned:
+      case Demangle::Node::Kind::Unowned:
         VisitNodeUnowned (ast, nodes, node, result, generic_context, log);
         break;
 
-      case swift::Demangle::Node::Kind::Weak:
+      case Demangle::Node::Kind::Weak:
         VisitNodeWeak (ast, nodes, node, result, generic_context, log);
         break;
       default:
@@ -2733,13 +2735,13 @@ VisitNode (SwiftASTContext *ast,
   nodes.pop_back();
 }
 
-swift::Type swift::ide::getTypeFromMangledTypename(swift::ASTContext &Ctx,
+Type ide::getTypeFromMangledTypename(ASTContext &Ctx,
                                                    const char *mangled_typename,
                                                    std::string &error)
 {
   ConstString mangled_name (mangled_typename);
-  std::vector<swift::Demangle::NodePointer> nodes;
-  nodes.push_back(swift::Demangle::demangleTypeAsNode(mangled_typename,
+  std::vector<Demangle::NodePointer> nodes;
+  nodes.push_back(Demangle::demangleTypeAsNode(mangled_typename,
                                                       mangled_name.length()));
   VisitNodeResult empty_generic_context;
   VisitNodeResult result;
@@ -2753,18 +2755,18 @@ swift::Type swift::ide::getTypeFromMangledTypename(swift::ASTContext &Ctx,
   else
   {
     error = stringWithFormat("type for typename '%s' was not found",mangled_typename);
-    return swift::Type();
+    return Type();
   }
-  return swift::Type();
+  return Type();
 }
 
-swift::Type swift::ide::getTypeFromMangledSymbolname(swift::ASTContext &Ctx,
+Type ide::getTypeFromMangledSymbolname(ASTContext &Ctx,
                                                      const char *mangled_typename,
                                                      std::string &error)
 {
   ConstString mangled_name (mangled_typename);
-  std::vector<swift::Demangle::NodePointer> nodes;
-  nodes.push_back(swift::Demangle::demangleSymbolAsNode(mangled_typename,
+  std::vector<Demangle::NodePointer> nodes;
+  nodes.push_back(Demangle::demangleSymbolAsNode(mangled_typename,
                                                         mangled_name.length()));
   VisitNodeResult empty_generic_context;
   VisitNodeResult result;
@@ -2778,7 +2780,7 @@ swift::Type swift::ide::getTypeFromMangledSymbolname(swift::ASTContext &Ctx,
   else
   {
     error = stringWithFormat("type for symbolname '%s' was not found",mangled_typename);
-    return swift::Type();
+    return Type();
   }
-  return swift::Type();
+  return Type();
 }
