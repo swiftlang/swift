@@ -7,8 +7,8 @@
 protocol A{
 class A:a{
 }
-typealias e:a
+associatedtype e:a
 protocol a{
-typealias r
+associatedtype r
 }
-typealias e:A
+associatedtype e:A

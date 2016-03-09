@@ -51,7 +51,7 @@ func useEmAll(model: CCMagnetismModel) {
 
 // Ensure that accessors are emitted for fields used as protocol witnesses.
 protocol Impedance {
-  typealias Component
+  associatedtype Component
   var real: Component { get }
   var imag: Component { get }
 }

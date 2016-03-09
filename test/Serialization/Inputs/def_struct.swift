@@ -70,7 +70,7 @@ public typealias Cacheable = protocol<Resettable, Computable>
 public protocol SpecialResettable : Resettable, Computable {}
 
 public protocol HasAssociatedType {
-  typealias ComputableType : Computable
+  associatedtype ComputableType : Computable
 }
 
 public struct ComputableWrapper<T : Computable> : HasAssociatedType {
@@ -79,7 +79,7 @@ public struct ComputableWrapper<T : Computable> : HasAssociatedType {
 }
 
 public protocol AnotherAssociated {
-  typealias ResettableType : Resettable
+  associatedtype ResettableType : Resettable
 }
 
 public struct ResettableWrapper<T : Resettable> : AnotherAssociated {

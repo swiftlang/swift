@@ -37,7 +37,7 @@ public func different2<T where T : Equatable>(a a: T, b: T) -> Bool {
 public func selectorFunc1(a a: Int, b x: Int) {}
 
 public protocol Wrapped {
-  typealias Value : Equatable
+  associatedtype Value : Equatable
   
   //var value : Value
   func getValue() -> Value

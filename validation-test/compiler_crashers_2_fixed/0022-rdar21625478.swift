@@ -42,13 +42,13 @@ public class TypeIndexed<Value> : Resettable {
 //===----------------------------------------------------------------------===//
 
 public protocol Wrapper {
-  typealias Base
+  associatedtype Base
   init(_: Base)
   var base: Base {get set}
 }
 
 public protocol LoggingType : Wrapper {
-  typealias Log : AnyObject
+  associatedtype Log : AnyObject
 }
 
 extension LoggingType {
@@ -104,9 +104,9 @@ public class SequenceLog {
 }
 
 public protocol LoggingSequenceType  : Sequence, LoggingType {
-  typealias Base : Sequence
-  typealias Log : AnyObject = SequenceLog
-  typealias Iterator : IteratorProtocol = LoggingIterator<Base.Iterator>
+  associatedtype Base : Sequence
+  associatedtype Log : AnyObject = SequenceLog
+  associatedtype Iterator : IteratorProtocol = LoggingIterator<Base.Iterator>
 }
 
 extension LoggingSequenceType {
@@ -201,8 +201,8 @@ public class CollectionLog : SequenceLog {
 }
 
 public protocol LoggingCollectionType : LoggingSequenceType, Collection {
-  typealias Base : Collection
-  typealias Index : ForwardIndex = Base.Index
+  associatedtype Base : Collection
+  associatedtype Index : ForwardIndex = Base.Index
 }
 
 extension LoggingCollectionType

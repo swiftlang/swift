@@ -5,4 +5,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class B<T{func a{{func g:A}protocol A{typealias e=c<T>struct c<a]typealias d:e
+class B<T{func a{{func g:A}protocol A{associatedtype e=c<T>struct c<a]associatedtype d:e

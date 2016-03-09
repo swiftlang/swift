@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{class A:a protocol a{typealias e:A}class A:A.e
+{class A:a protocol a{associatedtype e:A}class A:A.e

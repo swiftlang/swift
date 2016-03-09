@@ -28,12 +28,12 @@ public protocol _BuiltinFloatLiteralConvertible {
 }
 
 public protocol IntegerLiteralConvertible {
-  typealias IntegerLiteralType : _BuiltinIntegerLiteralConvertible
+  associatedtype IntegerLiteralType : _BuiltinIntegerLiteralConvertible
   init(integerLiteral value: IntegerLiteralType)
 }
 
 public protocol FloatLiteralConvertible {
-  typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
+  associatedtype FloatLiteralType : _BuiltinFloatLiteralConvertible
   init(floatLiteral value: FloatLiteralType)
 }
 

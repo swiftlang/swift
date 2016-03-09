@@ -126,7 +126,7 @@ func autoClosureOverloadCalls() {
 protocol AssocReqt {}
 
 protocol HasAssocType {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 // CHECK-LABEL: sil hidden @_TF8mangling4fooAuRxS_12HasAssocTyperFxT_ : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()

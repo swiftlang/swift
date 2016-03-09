@@ -4,7 +4,7 @@ struct S {}
 struct R {}
 
 protocol ReturnsMetatype {
-  typealias Assoc
+  associatedtype Assoc
   mutating
   func getAssocMetatype() -> Assoc.Type
 }
@@ -19,8 +19,8 @@ struct ConformsToReturnsMetatype : ReturnsMetatype {
 }
 
 protocol ReturnsFunction {
-  typealias Arg
-  typealias Result
+  associatedtype Arg
+  associatedtype Result
   func getFunc() -> Arg -> Result
 }
 
@@ -33,7 +33,7 @@ struct ConformsToReturnsFunction : ReturnsFunction {
 }
 
 protocol ReturnsAssoc {
-  typealias Assoc
+  associatedtype Assoc
   mutating
   func getAssoc() -> Assoc
 }

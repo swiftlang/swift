@@ -6,7 +6,7 @@ public struct DefaultFoo<T> {
 }
 
 public protocol P {
-  typealias Foo
+  associatedtype Foo
 }
 
 public extension P where Foo == DefaultFoo<Self> {

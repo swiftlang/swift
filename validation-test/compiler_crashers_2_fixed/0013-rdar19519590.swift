@@ -1,9 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-ir
 
 protocol SourceTargetTransformable {
-    typealias Source
-    typealias Target
-    typealias Transformer = Source -> Target
+    associatedtype Source
+    associatedtype Target
+  
+    // FIXME: should really be a typealias once we support that
+    associatedtype Transformer = Source -> Target
 }
 
 

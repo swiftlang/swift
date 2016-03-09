@@ -11,7 +11,7 @@ protocol b : a {
 protocol c : a {
 }
 protocol d {
-    typealias e = a
+    associatedtype e = a
 }
 struct e : d {
     typealias e = b

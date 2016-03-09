@@ -5,7 +5,7 @@ protocol Fooable {
 }
 
 protocol Barrable {
-  typealias Bar
+  associatedtype Bar
   func foo(x: Bar) -> Bar?
 }
 
