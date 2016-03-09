@@ -915,10 +915,9 @@ GetKindAsDeclKind (Demangle::Node::Kind node_kind)
     case Demangle::Node::Kind::Protocol:
       return DeclKind::Protocol;
     default:
-      printf ("Missing alias for %s.\n", SwiftDemangleNodeKindToCString(node_kind));
-      assert (0);
+      llvm_unreachable("Missing alias");
+      // FIXME: can we 'log' SwiftDemangleNodeKindToCString(node_kind))
   }
-  llvm_unreachable("Invalid case");
 }
 
 // This should be called with a function type & its associated Decl.  If the type is not a function type,
