@@ -10,52 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-// C++ Includes
-#include <mutex> // std::once
-#include <queue>
-#include <set>
-
-#include "clang/Basic/TargetInfo.h"
-#include "clang/Basic/TargetOptions.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Process.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetSubtargetInfo.h"
-#include "llvm/Target/TargetOptions.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclObjC.h"
-#include "swift/AST/ASTContext.h"
+#include "swift/IDE/Utils.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DebuggerClient.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/SearchPathOptions.h"
-#include "swift/AST/Type.h"
-#include "swift/AST/Types.h"
-#include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Basic/Demangle.h"
-#include "swift/Basic/LangOptions.h"
-#include "swift/Basic/Platform.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
-#include "swift/Driver/Util.h"
-#include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 
-#include "swift/IDE/Utils.h"
-
 #include <cstdio>
+#include <mutex> // std::once
 
 typedef const std::string ConstString;
 typedef void Log;
