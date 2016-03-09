@@ -645,22 +645,20 @@ public func transcode<
 
   var inputDecoder = inputEncoding.init()
   var hadError = false
-  var scalar = inputDecoder.decode(&input)
-  while !scalar.isEmptyInput() {
-    switch scalar {
+  loop:
+  while true {
+    switch inputDecoder.decode(&input) {
     case .Result(let us):
       OutputEncoding.encode(us, output: output)
     case .EmptyInput:
-      _sanityCheckFailure("should not enter the loop when input becomes empty")
+      break loop
     case .Error:
+      hadError = true
       if stopOnError {
-        return (hadError: true)
-      } else {
-        OutputEncoding.encode("\u{fffd}", output: output)
-        hadError = true
+        break loop
       }
+      OutputEncoding.encode("\u{fffd}", output: output)
     }
-    scalar = inputDecoder.decode(&input)
   }
   return hadError
 }
