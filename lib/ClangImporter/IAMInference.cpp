@@ -46,6 +46,19 @@ STATISTIC(SuccessImportAsStaticComputedProperty,
 STATISTIC(SuccessImportAsStaticMethod, "# imported as static method");
 STATISTIC(SuccessImportAsInstanceMethod, "# imported as instance method");
 
+// Statistics for why we couldn't infer in more specific ways, and fell back to
+// methods
+STATISTIC(InvalidPropertyStaticNumParams,
+          "couldn't infer as static property: invalid number of parameters");
+STATISTIC(InvalidPropertyInstanceNumParams,
+          "couldn't infer as instance property: invalid number of parameters");
+STATISTIC(InvalidPropertyStaticGetterSetterType,
+          "couldn't infer as static property: getter/setter type mismatch");
+STATISTIC(InvalidPropertyInstanceGetterSetterType,
+          "couldn't infer as instance property: getter/setter type mismatch");
+STATISTIC(InvalidPropertyInstanceNoSelf,
+          "couldn't infer as instance property: couldn't find self");
+
 using namespace swift;
 
 using NameBuffer = SmallString<32>;
@@ -238,15 +251,7 @@ private:
 
   bool validToImportAsProperty(const clang::FunctionDecl *originalDecl,
                                StringRef propSpec, Optional<unsigned> selfIndex,
-                               const clang::FunctionDecl *&pairedAccessor) {
-    bool isGet = propSpec == "Get";
-    pairedAccessor = findPairedAccessor(originalDecl->getName(), propSpec);
-    if (!pairedAccessor)
-      return propSpec == "Get";
-
-    // FIXME: need to instead check parameter number and types
-    return true;
-  }
+                               const clang::FunctionDecl *&pairedAccessor);
 
   const clang::FunctionDecl *findPairedAccessor(StringRef name,
                                                 StringRef propSpec) {
@@ -331,6 +336,76 @@ private:
     return false;
   }
 };
+}
+
+// A loose type equality check that disregards all sugar, qualification, looks
+// through pointers, etc.
+static bool rouglyEqual(clang::QualType left, clang::QualType right) {
+  auto leftPointee = left->getPointeeType();
+  if (leftPointee != clang::QualType())
+    left = leftPointee;
+  auto rightPointee = right->getPointeeType();
+  if (rightPointee != clang::QualType())
+    right = rightPointee;
+  return left->getUnqualifiedDesugaredType() ==
+         right->getUnqualifiedDesugaredType();
+}
+
+bool IAMInference::validToImportAsProperty(
+    const clang::FunctionDecl *originalDecl, StringRef propSpec,
+    Optional<unsigned> selfIndex, const clang::FunctionDecl *&pairedAccessor) {
+  bool isGet = propSpec == "Get";
+  pairedAccessor = findPairedAccessor(originalDecl->getName(), propSpec);
+  if (!pairedAccessor)
+    return isGet;
+
+  auto getterDecl = isGet ? originalDecl : pairedAccessor;
+  auto setterDecl = isGet ? pairedAccessor : originalDecl;
+  auto getterTy = getterDecl->getReturnType();
+
+  // See if this is a static property
+  if (!selfIndex) {
+    // Getter has none, setter has one arg
+    if (getterDecl->getNumParams() != 0 || setterDecl->getNumParams() != 1) {
+      ++InvalidPropertyStaticNumParams;
+      return false;
+    }
+
+    // Setter's arg type should be same as getter's return type
+    if (!rouglyEqual(getterTy, setterDecl->getParamDecl(0)->getType())) {
+      ++InvalidPropertyStaticGetterSetterType;
+      return false;
+    }
+
+    return true;
+  }
+
+  // Instance property, look beyond self
+  if (getterDecl->getNumParams() != 1 || setterDecl->getNumParams() != 2) {
+    ++InvalidPropertyInstanceNumParams;
+    return false;
+  }
+  auto selfTy = getterDecl->getParamDecl(0)->getType();
+
+  clang::QualType setterTy = {};
+  auto setterParam0Ty = setterDecl->getParamDecl(0)->getType();
+  auto setterParam1Ty = setterDecl->getParamDecl(1)->getType();
+
+  if (rouglyEqual(setterParam0Ty, selfTy)) {
+    setterTy = setterParam1Ty;
+  } else if (rouglyEqual(setterParam1Ty, selfTy)) {
+    setterTy = setterParam0Ty;
+  } else {
+    ++InvalidPropertyInstanceNoSelf;
+    return false;
+  }
+
+  if (!rouglyEqual(setterTy, getterTy)) {
+    ++InvalidPropertyInstanceGetterSetterType;
+    return false;
+  }
+
+  return true;
 }
 
 static StringRef getTypeName(clang::QualType qt) {
