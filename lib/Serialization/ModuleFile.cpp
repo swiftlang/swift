@@ -1542,7 +1542,7 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
 
 const static std::string Separator = "/";
 
-const Decl* getGroupDecl(const Decl *D) {
+static const Decl* getGroupDecl(const Decl *D) {
   auto GroupD = D;
 
   // Extensions always exist in the same group with the nominal.
