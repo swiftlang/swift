@@ -1183,6 +1183,28 @@ bb0(%0 : $Array<X>):
   return %r : $()
 }
 
+// CHECK-LABEL: CG of arraysemantics_withUnsafeMutableBufferPointer
+// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:   Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:   Con %0.3 Esc: G, Succ:
+// CHECK-NEXT:   Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:   Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %3 Esc: %4, Succ:
+// CHECK-NEXT: End
+sil @arraysemantics_withUnsafeMutableBufferPointer : $@convention(thin) (@inout Array<X>, @owned @callee_owned (@inout X) -> (@out (), @error ErrorType)) -> () {
+bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error ErrorType)):
+
+  %2 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
+  %3 = alloc_stack $()
+  %4 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
+  dealloc_stack %3 : $*()
+
+  %r = tuple()
+  return %r : $()
+}
+
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
 sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()
