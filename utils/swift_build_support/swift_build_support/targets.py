@@ -13,8 +13,7 @@ import platform
 
 
 def host_target():
-    """
-    Return the build target for the current host machine, if it is one of the
+    """Return the build target for the current host machine, if it is one of the
     recognized targets. Otherwise, return None.
     """
     system = platform.system()
@@ -52,8 +51,7 @@ def host_target():
 
 
 def install_prefix():
-    """
-    Returns the default path at which built Swift products (like bin, lib,
+    """Returns the default path at which built Swift products (like bin, lib,
     and include) will be installed, based on the host machine's operating
     system.
     """
@@ -64,8 +62,7 @@ def install_prefix():
 
 
 def darwin_toolchain_prefix(darwin_install_prefix):
-    """
-    Given the install prefix for a Darwin system, and assuming that that path
+    """Given the install prefix for a Darwin system, and assuming that that path
     is to a .xctoolchain directory, return the path to the .xctoolchain
     directory.
     """

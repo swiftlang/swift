@@ -20,8 +20,7 @@ import subprocess
 
 
 def which(cmd):
-    """
-    Return the path to an executable which would be run if
+    """Return the path to an executable which would be run if
     the given cmd was called. If no cmd would be called, return None.
 
     Python 3.3+ provides this behavior via the shutil.which() function;

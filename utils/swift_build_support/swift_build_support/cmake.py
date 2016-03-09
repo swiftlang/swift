@@ -21,8 +21,7 @@ from .which import which
 
 
 def host_cmake(xcrun_toolchain):
-    """
-    Return the path to `cmake`, using tools provided by the host platform.
+    """Return the path to `cmake`, using tools provided by the host platform.
     If `cmake` cannot be found on OS X, return None.
     If `cmake` cannot be found on Linux, return a probable path.
     """

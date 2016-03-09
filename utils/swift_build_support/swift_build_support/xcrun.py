@@ -18,8 +18,7 @@ import subprocess
 
 
 def find(toolchain, tool):
-    """
-    Return the path for the given tool, according to `xcrun --find`, using
+    """Return the path for the given tool, according to `xcrun --find`, using
     the given toolchain. If `xcrun --find` cannot find the tool, return None.
     """
     try:
