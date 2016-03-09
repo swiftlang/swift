@@ -62,7 +62,7 @@ struct S: Fooable {
     // CHECK-NOT:     release_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Ss5prop2Si : $@convention(method) (Int, @inout S) -> ()
-    // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop2Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
+    // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop2Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
     set { }
   }
 
@@ -74,7 +74,7 @@ struct S: Fooable {
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1Ss5prop3Si : $@convention(method) (Int, @guaranteed S) -> ()
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
     // CHECK-NOT:     release_value [[SELF]]
-    // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop3Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed S) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
+    // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop3Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
     // CHECK-NOT:     release_value [[SELF]]
     nonmutating set { }
@@ -92,7 +92,7 @@ struct S: Fooable {
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
   // materializeForSet for prop1
-  // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop1Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
+  // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self1Sm5prop1Si : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
   // CHECK-NOT:     load [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
@@ -141,7 +141,7 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop1 materializeForSet
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop1Si : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop1Si : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -162,7 +162,7 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop2 materializeForSet
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop2Si : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop2Si : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -189,7 +189,7 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 nonmutating materializeForSet
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop3Si : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop3Si : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
 // CHECK:         retain_value [[SELF]]
@@ -241,7 +241,7 @@ struct AO<T>: Fooable {
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AOs5prop3Si : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
     // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-    // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self2AOm5prop3Si : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed AO<T>) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout AO<T>, @thick AO<T>.Type) -> ()>)
+    // CHECK-LABEL: sil hidden [transparent] @_TFV15guaranteed_self2AOm5prop3Si : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed AO<T>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
     // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
     // CHECK:       }

@@ -457,23 +457,12 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
   // Form the callback.
   SILValue callback;
   if (callbackFn) {
-    // Make a reference to the function.
+    // Make a reference to the callback.
     callback = gen.B.createFunctionRef(loc, callbackFn);
-
-    // If it's polymorphic, cast to RawPointer and then back to the
-    // right monomorphic type.  The safety of this cast relies on some
-    // assumptions about what exactly IRGen can reconstruct from the
-    // callback's thick type argument.
-    if (callbackFn->getLoweredFunctionType()->isPolymorphic()) {
-      callback = gen.B.createThinFunctionToPointer(loc, callback, rawPointerTy);
-
-      OptionalTypeKind optKind;
-      auto callbackTy = optCallbackTy.getAnyOptionalObjectType(SGM.M, optKind);
-      callback = gen.B.createPointerToThinFunction(loc, callback, callbackTy);
-    }
-
+    callback = gen.B.createThinFunctionToPointer(loc, callback, rawPointerTy);
     callback = gen.B.createOptionalSome(loc, callback, optCallbackTy);
   } else {
+    // There is no callback.
     callback = gen.B.createOptionalNone(loc, optCallbackTy);
   }
 
@@ -548,7 +537,8 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
   return result;
 }
 
-SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F, GeneratorFn generator) {
+SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
+                                                      GeneratorFn generator) {
   auto callbackType =
       SGM.Types.getMaterializeForSetCallbackType(WitnessStorage,
                                                  GenericSig,
