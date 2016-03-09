@@ -555,7 +555,7 @@ def register_functions(lib, ignore_errors):
     map(register, functionList)
 
 
-class Config:
+class Config(object):
     library_path = None
     library_file = None
     loaded = False

@@ -371,7 +371,7 @@ def code_starts_with_dedent_keyword(source_lines):
     return token_text in ('else', 'elif', 'except', 'finally')
 
 
-class ParseContext:
+class ParseContext(object):
     """State carried through a parse of a template"""
 
     filename = ''
@@ -539,7 +539,7 @@ class ParseContext:
         self.token_kind = None
 
 
-class ExecutionContext:
+class ExecutionContext(object):
     """State we pass around during execution of a template"""
 
     def __init__(self, line_directive='// ###setline', **local_bindings):
