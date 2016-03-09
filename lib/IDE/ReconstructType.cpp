@@ -20,11 +20,8 @@
 #include "swift/Strings.h"
 
 #include <cstdio>
+#include <cstdarg>
 #include <mutex> // std::once
-
-#if defined(__FreeBSD__)
-#include <stdarg.h>
-#endif
 
 using namespace swift;
 
