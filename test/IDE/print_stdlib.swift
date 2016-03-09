@@ -44,8 +44,8 @@
 
 // CHECK-MUTATING-ATTR: mutating func
 
-func foo(x: _NSFastEnumerationType) {} // Checks that this protocol actually exists.
-// CHECK-NOT: _NSFastEnumerationType
+func foo(x: _PointerType) {} // Checks that this protocol actually exists.
+// CHECK-NOT: _PointerType
 
 // NO-FIXMES-NOT: FIXME
 // RUN: %target-swift-ide-test -print-module-groups -module-to-print=Swift -source-filename %s -print-interface > %t-group.txt
