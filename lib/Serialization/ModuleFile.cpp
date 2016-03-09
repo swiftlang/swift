@@ -1540,7 +1540,7 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-const static std::string Separator = "/";
+const static StringRef Separator = "/";
 
 static const Decl* getGroupDecl(const Decl *D) {
   auto GroupD = D;
@@ -1559,7 +1559,9 @@ Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
   auto Original = (*GroupNamesMap)[Id];
   if (Original.empty())
     return None;
-  return StringRef(Original.data(), Original.find_last_of(Separator));
+  auto SepPos = Original.find_last_of(Separator);
+  assert(SepPos != StringRef::npos && "Cannot find Separator.");
+  return StringRef(Original.data(), SepPos);
 }
 
 Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
@@ -1569,6 +1571,7 @@ Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
   if (Original.empty())
     return None;
   auto SepPos = Original.find_last_of(Separator);
+  assert(SepPos != StringRef::npos && "Cannot find Separator.");
   auto Start = Original.data() + SepPos + 1;
   auto Len = Original.size() - SepPos - 1;
   return StringRef(Start, Len);

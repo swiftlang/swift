@@ -259,7 +259,7 @@ void swift::ide::printSubmoduleInterface(
       NoImportSubModules.insert(*It);
     }
   }
-  llvm::StringMap<std::unique_ptr<std::vector<Decl*>>> FileRangedDecls;
+  llvm::StringMap<std::vector<Decl*>> FileRangedDecls;
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
@@ -330,7 +330,7 @@ void swift::ide::printSubmoduleInterface(
           if (std::find(GroupNames.begin(), GroupNames.end(),
                         Target.getValue()) != GroupNames.end()) {
             FileRangedDecls.insert(std::make_pair(D->getSourceFileName().getValue(),
-              llvm::make_unique<std::vector<Decl*>>())).first->getValue()->push_back(D);
+              std::vector<Decl*>())).first->getValue().push_back(D);
           }
         }
         continue;
@@ -343,8 +343,8 @@ void swift::ide::printSubmoduleInterface(
   llvm::SetVector<Decl*> PrintLineAfter;
   if (!GroupNames.empty()) {
     assert(SwiftDecls.empty());
-    for (auto It = FileRangedDecls.begin(); It != FileRangedDecls.end(); ++ It) {
-      auto &DeclsInFile = *It->getValue();
+    for (auto &Entry : FileRangedDecls) {
+      auto &DeclsInFile = Entry.getValue();
       std::sort(DeclsInFile.begin(), DeclsInFile.end(),
                 [](Decl* LHS, Decl *RHS) {
                   assert(LHS->getSourceOrder().hasValue());
