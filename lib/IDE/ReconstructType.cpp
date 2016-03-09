@@ -22,6 +22,10 @@
 #include <cstdio>
 #include <mutex> // std::once
 
+#if defined(__FreeBSD__)
+#include <stdarg.h>
+#endif
+
 using namespace swift;
 
 // FIXME: replace with std::string and StringRef as appropriate to each case.
