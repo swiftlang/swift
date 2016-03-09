@@ -2,8 +2,6 @@
 #
 # utils/build-toolchain - documents process for building a toolchain
 #
-# From: https://lists.swift.org/pipermail/swift-dev/Week-of-Mon-20151207/000212.html
-#
 # This source file is part of the Swift.org open source project
 #
 # Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
@@ -19,7 +17,6 @@ YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
 TOOLCHAIN_VERSION="swift-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
-ARCHIVE_DIR="${TOOLCHAIN_VERSION}-${BUILD_NUMBER}"
 ARCHIVE="${TOOLCHAIN_VERSION}-osx.tar.gz"
 SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
 BUNDLE_IDENTIFIER="org.swift.${YEAR}${MONTH}${DAY}"
@@ -40,4 +37,14 @@ else
     SWIFT_PACKAGE=buildbot_linux
 fi
 
-./utils/build-script --preset="${SWIFT_PACKAGE}" install_destdir="${SWIFT_INSTALL_DIR}" installable_package="${SWIFT_INSTALLABLE_PACKAGE}" install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" install_symroot="${SWIFT_INSTALL_SYMROOT}" symbols_package="${SYMBOLS_PACKAGE}" darwin_toolchain_bundle_identifier="${BUNDLE_IDENTIFIER}" darwin_toolchain_display_name="${DISPLAY_NAME}" darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" darwin_toolchain_version="${TOOLCHAIN_VERSION}" darwin_toolchain_alias=Local
+./utils/build-script --preset="${SWIFT_PACKAGE}" \
+        install_destdir="${SWIFT_INSTALL_DIR}" \
+        installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
+        install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
+        install_symroot="${SWIFT_INSTALL_SYMROOT}" \
+        symbols_package="${SYMBOLS_PACKAGE}" \
+        darwin_toolchain_bundle_identifier="${BUNDLE_IDENTIFIER}" \
+        darwin_toolchain_display_name="${DISPLAY_NAME}" \
+        darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
+        darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
+        darwin_toolchain_alias="Local"
