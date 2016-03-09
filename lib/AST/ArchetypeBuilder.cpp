@@ -979,12 +979,33 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
 
   // If T already has a superclass, make sure it's related.
   if (T->Superclass) {
-    if (T->Superclass->isSuperclassOf(Superclass, nullptr)) {
+    // TODO: In principle, this could be isBindableToSuperclassOf instead of
+    // isExactSubclassOf. If you had:
+    //
+    //   class Foo<T>
+    //   class Bar: Foo<Int>
+    //
+    //   func foo<T, U where U: Foo<T>, U: Bar>(...) { ... }
+    //
+    // then the second constraint should be allowed, constraining U to Bar
+    // and secondarily imposing a T == Int constraint.
+    if (T->Superclass->isExactSuperclassOf(Superclass, nullptr)) {
       T->Superclass = Superclass;
 
       // We've strengthened the bound, so update superclass conformances.
       updateSuperclassConformances();
-    } else if (!Superclass->isSuperclassOf(T->Superclass, nullptr)) {
+    // TODO: Similar to the above, a more general isBindableToSuperclassOf
+    // base class constraint could potentially introduce secondary constraints.
+    // If you had:
+    //
+    //   class Foo<T>
+    //   class Bar: Foo<Int>
+    //
+    //   func foo<T, U where U: Bar, U: Foo<T>>(...) { ... }
+    //
+    // then the second `U: Foo<T>` constraint introduces a `T == Int`
+    // constraint.
+    } else if (!Superclass->isExactSuperclassOf(T->Superclass, nullptr)) {
       Diags.diagnose(Source.getLoc(),
                      diag::requires_superclass_conflict, T->getName(),
                      T->Superclass, Superclass)

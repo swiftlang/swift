@@ -641,10 +641,10 @@ static SILBasicBlock *getTakenBlock(TermInst *term,
     if (SILInstruction *def = constTracker.getDefInCaller(CCB->getOperand())) {
       if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
         SILType castType = UCI->getOperand()->getType();
-        if (CCB->getCastType().isSuperclassOf(castType)) {
+        if (CCB->getCastType().isExactSuperclassOf(castType)) {
           return CCB->getSuccessBB();
         }
-        if (!castType.isSuperclassOf(CCB->getCastType())) {
+        if (!castType.isBindableToSuperclassOf(CCB->getCastType())) {
           return CCB->getFailureBB();
         }
       }

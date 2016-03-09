@@ -1652,7 +1652,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   return superclassTy.subst(module, substitutions, None);
 }
 
-bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
+bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
   // For there to be a superclass relationship, we must be a superclass, and
   // the potential subtype must be a class or superclass-bounded archetype.
   if (!getClassOrBoundGenericClass() || !ty->mayHaveSuperclass())
@@ -1660,6 +1660,189 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
 
   do {
     if (ty->isEqual(this))
+      return true;
+    if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
+      return false;
+  } while ((ty = ty->getSuperclass(resolver)));
+  return false;
+}
+
+/// Returns true if type `a` has archetypes that can be bound to form `b`.
+static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
+  class IsBindableVisitor : public TypeVisitor<IsBindableVisitor, bool, CanType>
+  {
+    llvm::DenseMap<ArchetypeType *, CanType> Bindings;
+    LazyResolver *Resolver;
+  public:
+    IsBindableVisitor(LazyResolver *Resolver)
+      : Resolver(Resolver) {}
+  
+    bool visitArchetypeType(ArchetypeType *orig, CanType subst) {
+      // If we already bound this archetype, make sure the new binding candidate
+      // is the same type.
+      auto bound = Bindings.find(orig);
+      if (bound != Bindings.end()) {
+        return bound->second->isEqual(subst);
+      }
+      // Check that the archetype isn't constrained in a way that makes the
+      // binding impossible.
+      // For instance, if the archetype is class-constrained, and the binding
+      // is not a class, it can never be bound.
+      if (orig->requiresClass() && !subst->mayHaveSuperclass())
+        return false;
+      
+      // TODO: If the archetype has a superclass constraint, check that the
+      // substitution is a subclass.
+      
+      // TODO: For private types or protocols, we might be able to definitively
+      // deny bindings.
+      
+      // Otherwise, there may be an external retroactive conformance that
+      // allows the binding.
+      
+      // Remember the binding, and succeed.
+      Bindings.insert({orig, subst});
+      return true;
+    }
+    
+    bool visitType(TypeBase *orig, CanType subst) {
+      llvm_unreachable("not a valid canonical type substitution");
+    }
+    
+    bool visitNominalType(NominalType *nom, CanType subst) {
+      if (auto substNom = dyn_cast<NominalType>(subst)) {
+        if (nom->getDecl() != substNom->getDecl())
+          return false;
+        
+        if (nom->getDecl()->isInvalid())
+          return false;
+        
+        // Same decl should always either have or not have a parent.
+        assert((bool)nom->getParent() == (bool)substNom->getParent());
+        
+        if (nom->getParent())
+          return visit(nom->getParent()->getCanonicalType(),
+                       substNom->getParent()->getCanonicalType());
+        return true;
+      }
+      return false;
+    }
+    
+    bool visitAnyMetatypeType(AnyMetatypeType *meta, CanType subst) {
+      if (auto substMeta = dyn_cast<AnyMetatypeType>(subst)) {
+        if (substMeta->getKind() != meta->getKind())
+          return false;
+        return visit(meta->getInstanceType()->getCanonicalType(),
+                     substMeta->getInstanceType()->getCanonicalType());
+      }
+      return false;
+    }
+    
+    bool visitTupleType(TupleType *tuple, CanType subst) {
+      if (auto substTuple = dyn_cast<TupleType>(subst)) {
+        // Tuple elements must match.
+        if (tuple->getNumElements() != substTuple->getNumElements())
+          return false;
+        // TODO: Label reordering?
+        for (unsigned i : indices(tuple->getElements())) {
+          auto elt = tuple->getElements()[i],
+               substElt = substTuple->getElements()[i];
+          if (elt.getName() != substElt.getName())
+            return false;
+          if (!visit(elt.getType(), substElt.getType()->getCanonicalType()))
+            return false;
+        }
+        return true;
+      }
+      return false;
+    }
+    
+    bool visitDependentMemberType(DependentMemberType *dt, CanType subst) {
+      llvm_unreachable("can't visit dependent types");
+    }
+    bool visitGenericTypeParamType(GenericTypeParamType *dt, CanType subst) {
+      llvm_unreachable("can't visit dependent types");
+    }
+    
+    bool visitFunctionType(FunctionType *func, CanType subst) {
+      if (auto substFunc = dyn_cast<FunctionType>(subst)) {
+        if (func->getExtInfo() != substFunc->getExtInfo())
+          return false;
+        
+        if (!visit(func->getInput()->getCanonicalType(),
+                   substFunc->getInput()->getCanonicalType()))
+          return false;
+        
+        return visit(func->getResult()->getCanonicalType(),
+                     substFunc->getResult()->getCanonicalType());
+      }
+      return false;
+    }
+    
+    bool visitBoundGenericType(BoundGenericType *bgt, CanType subst) {
+      if (auto substBGT = dyn_cast<BoundGenericType>(subst)) {
+        if (bgt->getDecl() != substBGT->getDecl())
+          return false;
+        
+        if (bgt->getDecl()->isInvalid())
+          return false;
+        
+        auto origSubs = bgt->getSubstitutions(bgt->getDecl()->getParentModule(),
+                                              Resolver);
+        auto substSubs = substBGT->getSubstitutions(
+                                              bgt->getDecl()->getParentModule(),
+                                              Resolver);
+        assert(origSubs.size() == substSubs.size());
+        for (unsigned subi : indices(origSubs)) {
+          if (!visit(origSubs[subi].getReplacement()->getCanonicalType(),
+                     substSubs[subi].getReplacement()->getCanonicalType()))
+            return false;
+          assert(origSubs[subi].getConformances().size()
+                 == substSubs[subi].getConformances().size());
+          for (unsigned conformancei :
+                 indices(origSubs[subi].getConformances())) {
+            if (origSubs[subi].getConformances()[conformancei]
+                  != substSubs[subi].getConformances()[conformancei])
+              return false;
+          }
+        }
+        
+        // Same decl should always either have or not have a parent.
+        assert((bool)bgt->getParent() == (bool)substBGT->getParent());
+        if (bgt->getParent())
+          return visit(bgt->getParent()->getCanonicalType(),
+                       substBGT->getParent()->getCanonicalType());
+        return true;
+      }
+      return false;
+    }
+  };
+  
+  return IsBindableVisitor(resolver).visit(a->getCanonicalType(),
+                                           b->getCanonicalType());
+}
+
+bool TypeBase::isBindableToSuperclassOf(Type ty, LazyResolver *resolver) {
+  // Do an exact match if no archetypes are involved.
+  if (!hasArchetype())
+    return isExactSuperclassOf(ty, resolver);
+  
+  // For there to be a superclass relationship,
+  // the potential subtype must be a class or superclass-bounded archetype.
+  if (!ty->mayHaveSuperclass())
+    return false;
+
+  // If the type is itself an archetype, we could always potentially bind it
+  // to the superclass (via external retroactive conformance, even if the
+  // type isn't statically known to conform).
+  //
+  // We could theoretically reject cases where the set of conformances is known
+  // (say the protocol or classes are private or internal).
+  if (is<ArchetypeType>())
+    return true;
+  
+  do {
+    if (isBindableTo(this, ty, resolver))
       return true;
     if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
       return false;
@@ -1829,7 +2012,7 @@ static bool canOverride(CanType t1, CanType t2,
   }
 
   // Class-to-class.
-  return t2->isSuperclassOf(t1, resolver);
+  return t2->isExactSuperclassOf(t1, resolver);
 }
 
 bool TypeBase::canOverride(Type other, bool allowUnsafeParameterOverride,
