@@ -5,7 +5,7 @@
 // RUN: %target-llvm-profdata show %t/default.profdata -function=main | FileCheck %s --check-prefix=CHECK-PROF
 // RUN: %target-llvm-cov show %t/main -instr-profile=%t/default.profdata | FileCheck %s --check-prefix=CHECK-COV
 // RUN: rm -rf %t
-// REQUIRES: profile
+// REQUIRES: profile_runtime
 
 func main() {
 // CHECK-PROF: Counters: 2
