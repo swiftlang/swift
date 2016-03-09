@@ -867,11 +867,16 @@ extension ${Self} {
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `UnsafeMutableBufferPointer` argument to `body`.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @inline(__always) // Performance: This method should get inlined into the
+  // caller such that we can combine the partial apply with the apply in this
+  // function saving on allocating a closure context. This becomes unnecessary
+  // once we allocate noescape closures on the stack.
   public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
+    let count = self.count
     // Ensure unique storage
-    _arrayReserve(&_buffer, 0)
+    _outlinedMakeUniqueBuffer(&_buffer, bufferCount: count)
 
     // Ensure that body can't invalidate the storage or its bounds by
     // moving self into a temporary working array.
@@ -887,7 +892,6 @@ extension ${Self} {
 
     // Create an UnsafeBufferPointer over work that we can pass to body
     let pointer = work._buffer.firstElementAddress
-    let count = work.count
     var inoutBufferPointer = UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
@@ -1188,6 +1192,23 @@ internal struct _IgnorePointer<T> : _PointerFunctionType {
   internal func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
   }
+}
+
+@inline(never)
+internal func _outlinedMakeUniqueBuffer<
+  _Buffer : _ArrayBufferType where _Buffer.Index == Int
+>(
+  buffer: inout _Buffer, bufferCount: Int
+) {
+  if _fastPath(
+      buffer.requestUniqueMutableBackingBuffer(bufferCount) != nil) {
+    return
+  }
+
+  var newBuffer = Optional(
+    _forceCreateUniqueMutableBuffer(
+      &buffer, newCount: bufferCount, requiredCapacity: bufferCount))
+  _arrayOutOfPlaceUpdate(&buffer, &newBuffer, bufferCount, 0, _IgnorePointer())
 }
 
 internal func _arrayReserve<
