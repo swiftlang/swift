@@ -24,9 +24,11 @@
 
 using namespace swift;
 
+// FIXME: replace with std::string and StringRef as appropriate to each case.
 typedef const std::string ConstString;
+
+// FIXME: remove log parameters or replace with something useful.
 typedef void Log;
-typedef ASTContext SwiftASTContext;
 
 static std::string stringWithFormat(const std::string fmt_str, ...) {
   int final_n, n = ((int)fmt_str.size()) * 2;
@@ -623,7 +625,7 @@ struct VisitNodeResult {
 };
 
 static Identifier
-GetIdentifier (SwiftASTContext *ast,
+GetIdentifier (ASTContext *ast,
                const DeclsLookupSource::PrivateDeclIdentifier& priv_decl_id)
 {
   do {
@@ -637,7 +639,7 @@ GetIdentifier (SwiftASTContext *ast,
 }
 
 static bool
-FindFirstNamedDeclWithKind (SwiftASTContext *ast,
+FindFirstNamedDeclWithKind (ASTContext *ast,
                             const StringRef &name,
                             DeclKind decl_kind,
                             VisitNodeResult &result,
@@ -778,7 +780,7 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
 }
 
 static size_t
-FindNamedDecls (SwiftASTContext *ast,
+FindNamedDecls (ASTContext *ast,
                 const StringRef &name,
                 VisitNodeResult &result,
                 DeclsLookupSource::PrivateDeclIdentifier priv_decl_id = DeclsLookupSource::PrivateDeclIdentifier())
@@ -948,7 +950,7 @@ FixCallingConv (Decl *in_decl, TypeBase *in_type)
 }
 
 static void
-VisitNode (SwiftASTContext *ast,
+VisitNode (ASTContext *ast,
            std::vector<Demangle::NodePointer> &nodes,
            VisitNodeResult &result,
            const VisitNodeResult &generic_context, // set by GenericType case
@@ -956,7 +958,7 @@ VisitNode (SwiftASTContext *ast,
 
 
 static void
-VisitNodeAddressor (SwiftASTContext *ast,
+VisitNodeAddressor (ASTContext *ast,
                     std::vector<Demangle::NodePointer> &nodes,
                     Demangle::NodePointer& cur_node,
                     VisitNodeResult &result,
@@ -969,7 +971,7 @@ VisitNodeAddressor (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeGenerics (SwiftASTContext *ast,
+VisitNodeGenerics (ASTContext *ast,
                    std::vector<Demangle::NodePointer> &nodes,
                    Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
@@ -1013,7 +1015,7 @@ VisitNodeGenerics (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeArchetype(SwiftASTContext *ast,
+VisitNodeArchetype(ASTContext *ast,
                    std::vector<Demangle::NodePointer> &nodes,
                    Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
@@ -1058,7 +1060,7 @@ VisitNodeArchetype(SwiftASTContext *ast,
 
 
 static void
-VisitNodeArchetypeRef(SwiftASTContext *ast,
+VisitNodeArchetypeRef(ASTContext *ast,
                       std::vector<Demangle::NodePointer> &nodes,
                       Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
@@ -1098,7 +1100,7 @@ VisitNodeArchetypeRef(SwiftASTContext *ast,
 }
 
 static void
-VisitNodeAssociatedTypeRef (SwiftASTContext *ast,
+VisitNodeAssociatedTypeRef (ASTContext *ast,
                             std::vector<Demangle::NodePointer> &nodes,
                             Demangle::NodePointer& cur_node,
                             VisitNodeResult &result,
@@ -1139,7 +1141,7 @@ VisitNodeAssociatedTypeRef (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeBoundGeneric (SwiftASTContext *ast,
+VisitNodeBoundGeneric (ASTContext *ast,
                        std::vector<Demangle::NodePointer> &nodes,
                        Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
@@ -1187,7 +1189,7 @@ VisitNodeBoundGeneric (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeBuiltinTypeName (SwiftASTContext *ast,
+VisitNodeBuiltinTypeName (ASTContext *ast,
                           std::vector<Demangle::NodePointer> &nodes,
                           Demangle::NodePointer& cur_node,
                           VisitNodeResult &result,
@@ -1220,7 +1222,7 @@ VisitNodeBuiltinTypeName (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeConstructor (SwiftASTContext *ast,
+VisitNodeConstructor (ASTContext *ast,
                       std::vector<Demangle::NodePointer> &nodes,
                       Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
@@ -1300,7 +1302,7 @@ VisitNodeConstructor (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeDestructor (SwiftASTContext *ast,
+VisitNodeDestructor (ASTContext *ast,
                      std::vector<Demangle::NodePointer> &nodes,
                      Demangle::NodePointer& cur_node,
                      VisitNodeResult &result,
@@ -1368,7 +1370,7 @@ VisitNodeDestructor (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeDeclContext (SwiftASTContext *ast,
+VisitNodeDeclContext (ASTContext *ast,
                       std::vector<Demangle::NodePointer> &nodes,
                       Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
@@ -1431,7 +1433,7 @@ VisitNodeDeclContext (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeExplicitClosure (SwiftASTContext *ast,
+VisitNodeExplicitClosure (ASTContext *ast,
                           std::vector<Demangle::NodePointer> &nodes,
                           Demangle::NodePointer& cur_node,
                           VisitNodeResult &result,
@@ -1485,7 +1487,7 @@ VisitNodeExplicitClosure (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeExtension (SwiftASTContext *ast,
+VisitNodeExtension (ASTContext *ast,
                     std::vector<Demangle::NodePointer> &nodes,
                     Demangle::NodePointer& cur_node,
                     VisitNodeResult &result,
@@ -1590,7 +1592,7 @@ CompareFunctionTypes (const AnyFunctionType *f,
 
 // VisitNodeFunction gets used for Function, Variable and Allocator:
 static void
-VisitNodeFunction (SwiftASTContext *ast,
+VisitNodeFunction (ASTContext *ast,
                    std::vector<Demangle::NodePointer> &nodes,
                    Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
@@ -1703,7 +1705,7 @@ VisitNodeFunction (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeFunctionType (SwiftASTContext *ast,
+VisitNodeFunctionType (ASTContext *ast,
                        std::vector<Demangle::NodePointer> &nodes,
                        Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
@@ -1794,7 +1796,7 @@ VisitNodeFunctionType (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeGenericType (SwiftASTContext *ast,
+VisitNodeGenericType (ASTContext *ast,
                       std::vector<Demangle::NodePointer> &nodes,
                       Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
@@ -1824,7 +1826,7 @@ VisitNodeGenericType (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeSetterGetter (SwiftASTContext *ast,
+VisitNodeSetterGetter (ASTContext *ast,
                        std::vector<Demangle::NodePointer> &nodes,
                        Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
@@ -2011,7 +2013,7 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeIdentifier (SwiftASTContext *ast,
+VisitNodeIdentifier (ASTContext *ast,
                      std::vector<Demangle::NodePointer> &nodes,
                      Demangle::NodePointer& cur_node,
                      VisitNodeResult &result,
@@ -2029,7 +2031,7 @@ VisitNodeIdentifier (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeLocalDeclName (SwiftASTContext *ast,
+VisitNodeLocalDeclName (ASTContext *ast,
                         std::vector<Demangle::NodePointer> &nodes,
                         Demangle::NodePointer& cur_node,
                         VisitNodeResult &result,
@@ -2059,7 +2061,7 @@ VisitNodeLocalDeclName (SwiftASTContext *ast,
 }
 
 static void
-VisitNodePrivateDeclName (SwiftASTContext *ast,
+VisitNodePrivateDeclName (ASTContext *ast,
                           std::vector<Demangle::NodePointer> &nodes,
                           Demangle::NodePointer& cur_node,
                           VisitNodeResult &result,
@@ -2094,7 +2096,7 @@ VisitNodePrivateDeclName (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeInOut (SwiftASTContext *ast,
+VisitNodeInOut (ASTContext *ast,
                 std::vector<Demangle::NodePointer> &nodes,
                 Demangle::NodePointer& cur_node,
                 VisitNodeResult &result,
@@ -2115,7 +2117,7 @@ VisitNodeInOut (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeMetatype (SwiftASTContext *ast,
+VisitNodeMetatype (ASTContext *ast,
                    std::vector<Demangle::NodePointer> &nodes,
                    Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
@@ -2165,7 +2167,7 @@ VisitNodeMetatype (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeModule (SwiftASTContext *ast,
+VisitNodeModule (ASTContext *ast,
                  std::vector<Demangle::NodePointer> &nodes,
                  Demangle::NodePointer& cur_node,
                  VisitNodeResult &result,
@@ -2189,7 +2191,7 @@ VisitNodeModule (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeNonVariadicTuple (SwiftASTContext *ast,
+VisitNodeNonVariadicTuple (ASTContext *ast,
                            std::vector<Demangle::NodePointer> &nodes,
                            Demangle::NodePointer& cur_node,
                            VisitNodeResult &result,
@@ -2242,7 +2244,7 @@ VisitNodeNonVariadicTuple (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeProtocolList (SwiftASTContext *ast,
+VisitNodeProtocolList (ASTContext *ast,
                        std::vector<Demangle::NodePointer> &nodes,
                        Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
@@ -2269,7 +2271,7 @@ VisitNodeProtocolList (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeQualifiedArchetype (SwiftASTContext *ast,
+VisitNodeQualifiedArchetype (ASTContext *ast,
                              std::vector<Demangle::NodePointer> &nodes,
                              Demangle::NodePointer& cur_node,
                              VisitNodeResult &result,
@@ -2339,7 +2341,7 @@ VisitNodeQualifiedArchetype (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeSelfTypeRef (SwiftASTContext *ast,
+VisitNodeSelfTypeRef (ASTContext *ast,
                       std::vector<Demangle::NodePointer> &nodes,
                       Demangle::NodePointer& cur_node,
                       VisitNodeResult &result,
@@ -2388,7 +2390,7 @@ VisitNodeSelfTypeRef (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeTupleElement (SwiftASTContext *ast,
+VisitNodeTupleElement (ASTContext *ast,
                        std::vector<Demangle::NodePointer> &nodes,
                        Demangle::NodePointer& cur_node,
                        VisitNodeResult &result,
@@ -2426,7 +2428,7 @@ VisitNodeTupleElement (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeTypeList (SwiftASTContext *ast,
+VisitNodeTypeList (ASTContext *ast,
                    std::vector<Demangle::NodePointer> &nodes,
                    Demangle::NodePointer& cur_node,
                    VisitNodeResult &result,
@@ -2468,7 +2470,7 @@ VisitNodeTypeList (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeUnowned (SwiftASTContext *ast,
+VisitNodeUnowned (ASTContext *ast,
                   std::vector<Demangle::NodePointer> &nodes,
                   Demangle::NodePointer& cur_node,
                   VisitNodeResult &result,
@@ -2497,7 +2499,7 @@ VisitNodeUnowned (SwiftASTContext *ast,
 }
 
 static void
-VisitNodeWeak (SwiftASTContext *ast,
+VisitNodeWeak (ASTContext *ast,
                std::vector<Demangle::NodePointer> &nodes,
                Demangle::NodePointer& cur_node,
                VisitNodeResult &result,
@@ -2526,7 +2528,7 @@ VisitNodeWeak (SwiftASTContext *ast,
 }
 
 static void
-VisitFirstChildNode (SwiftASTContext *ast,
+VisitFirstChildNode (ASTContext *ast,
                      std::vector<Demangle::NodePointer> &nodes,
                      Demangle::NodePointer& cur_node,
                      VisitNodeResult &result,
@@ -2541,7 +2543,7 @@ VisitFirstChildNode (SwiftASTContext *ast,
 }
 
 static void
-VisitAllChildNodes (SwiftASTContext *ast,
+VisitAllChildNodes (ASTContext *ast,
                     std::vector<Demangle::NodePointer> &nodes,
                     Demangle::NodePointer& cur_node,
                     VisitNodeResult &result,
@@ -2557,7 +2559,7 @@ VisitAllChildNodes (SwiftASTContext *ast,
 }
 
 static void
-VisitNode (SwiftASTContext *ast,
+VisitNode (ASTContext *ast,
            std::vector<Demangle::NodePointer> &nodes,
            VisitNodeResult &result,
            const VisitNodeResult &generic_context, // set by GenericType case
