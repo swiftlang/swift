@@ -48,14 +48,14 @@ extension String {
     @warn_unused_result
     public func next(i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      return Index(_offset: i._offset.advanced(by: 1))
+      return Index(_offset: _unsafePlus(i._offset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
     public func previous(i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      return Index(_offset: i._offset.advanced(by: -1))
+      return Index(_offset: _unsafeMinus(i._offset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs

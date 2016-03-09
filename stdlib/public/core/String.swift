@@ -538,7 +538,8 @@ extension String {
 
 extension String {
   public typealias Index = CharacterView.Index
-  
+  public typealias IndexDistance = CharacterView.IndexDistance
+
   /// The position of the first `Character` in `self.characters` if
   /// `self` is non-empty; identical to `endIndex` otherwise.
   public var startIndex: Index { return characters.startIndex }
@@ -549,6 +550,32 @@ extension String {
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   public var endIndex: Index { return characters.endIndex }
+
+    // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func next(i: Index) -> Index { return characters.next(i) }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func previous(i: Index) -> Index { return characters.previous(i) }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance) -> Index {
+    return characters.advance(i, by: n)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func advance(i: Index, by n: IndexDistance, limit: Index) -> Index {
+    return characters.advance(i, by: n, limit: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return characters.distance(from: start, to: end)
+  }
 
   /// Access the `Character` at `position`.
   ///

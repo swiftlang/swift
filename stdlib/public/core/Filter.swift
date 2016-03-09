@@ -222,7 +222,9 @@ public struct LazyFilterCollection<
 
     var index = i.base
     for _ in 0..<n {
-      _nextFilteredInPlace(&index)
+      if _nextFilteredInPlace(&index) {
+        break
+      }
     }
     return LazyFilterIndex(base: index)
   }
@@ -236,11 +238,15 @@ public struct LazyFilterCollection<
 
     var index = i.base
     for _ in 0..<n {
-      _nextFilteredInPlace(&index, limit: limit.base)
+      if _nextFilteredInPlace(&index, limit: limit.base) {
+        break
+      }
     }
     return LazyFilterIndex(base: index)
   }
 
+  /// Returns the next `index` of an element that `self._predicate` matches
+  /// otherwise `self._base.endIndex`
   @inline(__always)
   internal func _nextFiltered(index: Base.Index) -> Base.Index {
     var index = index
@@ -248,27 +254,38 @@ public struct LazyFilterCollection<
     return index
   }
 
+  /// Advances `index` until one of the following:
+  ///   `self._predicate` matches on related element
+  ///   `index` equals `self._base.endIndex`
+  /// Returns `true` iff at `self._base.endIndex`
   @inline(__always)
-  internal func _nextFilteredInPlace(index: inout Base.Index) {
+  internal func _nextFilteredInPlace(index: inout Base.Index) -> Bool {
     while index != _base.endIndex {
       if _predicate(_base[index]) {
-        break
+        return false
       }
       _base._nextInPlace(&index)
     }
+    return true
   }
 
+  /// Advances `index` until one of the following:
+  ///   `self._predicate` matches on related element
+  ///   `index` equals `self._base.endIndex`
+  ///   `index` equals `limit`
+  /// Returns `true` iff at `self._base.endIndex` or `limit`
   @inline(__always)
   internal func _nextFilteredInPlace(
     index: inout Base.Index,
     limit: Base.Index
-  ) {
-    while index != _base.endIndex {
-      if index == limit || _predicate(_base[index]) {
-        break
+  ) -> Bool {
+    while index != limit && index != _base.endIndex {
+      if _predicate(_base[index]) {
+        return false
       }
       _base._nextInPlace(&index)
     }
+    return true
   }
 
   /// Access the element at `position`.
