@@ -186,7 +186,7 @@ Optional<unsigned> Decl::getSourceOrder() const {
   // We can only get source orders from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
-    return  Unit->getSourceOrderForDecl(this);
+    return Unit->getSourceOrderForDecl(this);
   }
   return None;
 }
