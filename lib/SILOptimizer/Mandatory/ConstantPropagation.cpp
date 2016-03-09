@@ -866,8 +866,10 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       [&](SILInstruction *I) { /* EraseAction */
         auto *TI = dyn_cast<TermInst>(I);
 
-        if (TI && TI->isBranch()) {
-          // Invalidate analysis information related to branches.
+        if (TI) {
+          // Invalidate analysis information related to branches. Replacing
+          // unconditional_check_branch type instructions by a trap will also
+          // invalidate branches/the CFG.
           InvalidateBranches = true;
         }
 

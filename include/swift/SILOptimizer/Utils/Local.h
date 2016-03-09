@@ -467,6 +467,9 @@ class CastOptimizer {
       SILBasicBlock *SuccessBB,
       SILBasicBlock *FailureBB);
 
+  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
+                                          SILInstruction *TrapInst);
+
 public:
   CastOptimizer(std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
                 std::function<void (SILInstruction *)> EraseAction = [](SILInstruction*){},
