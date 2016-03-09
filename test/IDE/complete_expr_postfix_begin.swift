@@ -54,6 +54,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_7 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_8 | FileCheck %s -check-prefix=COMMON
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | FileCheck %s -check-prefix=MY_ALIAS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | FileCheck %s -check-prefix=MY_ALIAS
+
 //
 // Test code completion at the beginning of expr-postfix.
 //
@@ -386,4 +389,21 @@ struct TestInInvalid7 {
 func foo() -> Undeclared {
   var fooParam = FooStruct()
   #^IN_INVALID_8^#
+}
+
+func testGenericTypealias1() {
+  typealias MyAlias<T> = (T, T)
+  let x: MyAlias<Int> = (1, 2)
+  var y: (Int, Int)
+  y = #^GENERIC_TYPEALIAS_1^#
+}
+// FIXME: should we use the alias name in the annotation?
+// MY_ALIAS: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
+// MY_ALIAS: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#(Int, Int)#];
+// MY_ALIAS: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#(Int, Int)#];
+func testGenericTypealias2() {
+  typealias MyAlias<T> = (T, T)
+  let x: (Int, Int) = (1, 2)
+  var y: MyAlias<Int>
+  y = #^GENERIC_TYPEALIAS_2^#
 }
