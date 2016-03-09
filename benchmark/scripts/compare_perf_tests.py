@@ -18,8 +18,10 @@
 # repeat.sh 3 mypatch/bin/Benchmark_Driver run -o -O > mypatch.O.times
 # compare_perf_tests.py tot.O.times mypatch.O.times | sort -t, -n -k 6 | column -s, -t
 
+from __future__ import print_function
 import re
 import sys
+
 
 VERBOSE = 0
 
@@ -52,7 +54,7 @@ def get_scores(fname):
     try:
         for line in f:
             if VERBOSE:
-                print("Parsing", line,)
+                print("Parsing", line, end="")
             m = SCORERE.match(line)
             is_total = False
             if not m:
@@ -85,8 +87,8 @@ def is_max_score(newscore, maxscore, invert):
 
 
 def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
-    print(num.rjust(3),)
-    print(key.ljust(25),)
+    print(num.rjust(3), end="")
+    print(key.ljust(25), end="")
     bestscore1 = None
     bestscore2 = None
     worstscore1 = None
@@ -100,7 +102,7 @@ def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
         if is_max_score(newscore=score, maxscore=worstscore1, invert=minworst):
             worstscore1 = score
         if PrintAllScores:
-            print ("%d" % score).rjust(16),
+            print (("%d" % score).rjust(16), end="")
     for score in worstsample1:
         if is_max_score(newscore=score, maxscore=worstscore1, invert=minworst):
             worstscore1 = score
@@ -110,47 +112,47 @@ def compare_scores(key, score1, worstsample1, score2, worstsample2, runs, num):
         if is_max_score(newscore=score, maxscore=worstscore2, invert=minworst):
             worstscore2 = score
         if PrintAllScores:
-            print ("%d" % score).rjust(16),
+            print (("%d" % score).rjust(16), end="")
         r += 1
     for score in worstsample2:
         if is_max_score(newscore=score, maxscore=worstscore2, invert=minworst):
             worstscore2 = score
     while r < runs:
         if PrintAllScores:
-            print ("0").rjust(9),
+            print ("0".rjust(9), end="")
         r += 1
 
     if not PrintAllScores:
-        print ("%d" % bestscore1).rjust(16),
-        print ("%d" % bestscore2).rjust(16),
+        print (("%d" % bestscore1).rjust(16), end="")
+        print (("%d" % bestscore2).rjust(16), end="")
 
-    print ("%+d" % (bestscore2 - bestscore1)).rjust(9),
+    print (("%+d" % (bestscore2 - bestscore1)).rjust(9), end="")
 
     if bestscore1 != 0 and bestscore2 != 0:
-        print ("%+.1f%%" % (((float(bestscore2) / bestscore1) - 1) * 100)).rjust(9),
+        print (("%+.1f%%" % (((float(bestscore2) / bestscore1) - 1) * 100)).rjust(9), end="")
         if ShowSpeedup:
             Num, Den = float(bestscore2), float(bestscore1)
             if IsTime:
                 Num, Den = Den, Num
-            print ("%.2fx" % (Num / Den)).rjust(9),
+            print (("%.2fx" % (Num / Den)).rjust(9), end="")
     else:
-        print("*".rjust(9),)
+        print("*".rjust(9), end="")
         if ShowSpeedup:
-            print("*".rjust(9),)
+            print("*".rjust(9), end="")
     # check if the worst->best interval for each configuration overlap.
     if minbest:
         if (bestscore1 < bestscore2 and bestscore2 < worstscore1) \
            or (bestscore2 < bestscore1 and bestscore1 < worstscore2):
-            print("(?)",)
+            print("(?)", end="")
     else:
         if (worstscore1 < worstscore2 and worstscore2 < bestscore1) \
            or (worstscore2 < worstscore1 and worstscore1 < bestscore2):
-            print("(?)",)
+            print("(?)", end="")
     print()
 
 
 def print_best_scores(key, scores):
-    print(key,)
+    print(key, end="")
     bestscore = None
     minbest = IsTime
     for score in scores:
@@ -194,22 +196,22 @@ if __name__ == '__main__':
     keys = list(set(scores1.keys() + scores2.keys()))
     keys.sort()
     if VERBOSE:
-        print("comparing ", file1, "vs", file2, "=",)
+        print("comparing ", file1, "vs", file2, "=", end="")
         if IsTime:
             print(file1, "/", file2)
         else:
             print(file2, "/", file1)
 
-    print("#".rjust(3),)
-    print("TEST".ljust(25),)
+    print("#".rjust(3), end="")
+    print("TEST".ljust(25), end="")
     if PrintAllScores:
         for i in range(0, runs):
-            print(("OLD_RUN%d" % i).rjust(9),)
+            print(("OLD_RUN%d" % i).rjust(9), end="")
         for i in range(0, runs):
-            print(("NEW_RUN%d" % i).rjust(9),)
+            print(("NEW_RUN%d" % i).rjust(9), end="")
     else:
-        print("BEST_OLD_MIN(μs)".rjust(17),)
-        print("BEST_NEW_MIN(μs)".rjust(17),)
+        print("BEST_OLD_MIN(μs)".rjust(17), end="")
+        print("BEST_NEW_MIN(μs)".rjust(17), end="")
     print('DELTA'.rjust(9), '%DELTA'.rjust(9), 'SPEEDUP'.rjust(9))
 
     for key in keys:
