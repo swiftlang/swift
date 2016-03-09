@@ -92,8 +92,6 @@ let _ : D = D<Int, Int, Float>(a: 1, b: 2)
 // expected-error @+1 {{generic parameter 'T3' could not be inferred}}
 let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
-
-
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
 // TODO QoI: Cannot infer T1/T2.
@@ -113,6 +111,21 @@ _ = C(a: 42,        // expected-error {{'Int' is not convertible to 'String'}}
 
 _ = G(a: "foo", b: 42)
 _ = G<Int, String>(a: "foo", b: 42)
+
+
+
+// FIXME: Nested generic typealiases aren't working yet.
+struct GenericStruct<T> {
+  typealias TA<U> = MyType<T, U>
+  
+  func testCapture<S>(s : S, t : T) -> TA<S> {  // expected-error {{cannot specialize non-generic type 'MyType<T, U>'}}
+    return TA<S>(a: t, b : s)
+  }
+}
+
+let _ = GenericStruct<Int>.TA<Float>(a: 4.0, b: 1)  // expected-error {{'Int' is not convertible to 'Float'}}
+
+let _ : GenericStruct<Int>.TA<Float>  // expected-error {{cannot specialize non-generic type 'MyType<Int, U>'}}
 
 
 
