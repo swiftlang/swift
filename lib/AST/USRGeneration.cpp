@@ -70,6 +70,10 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
       return true;
 
+  // FIXME: mangling generic parameters of a typealias asserts in the mangler.
+  if (isa<TypeAliasDecl>(VD->getDeclContext()))
+    return true;
+
   OS << getUSRSpacePrefix();
   Mangler Mangler;
   if (auto Ctor = dyn_cast<ConstructorDecl>(VD)) {
