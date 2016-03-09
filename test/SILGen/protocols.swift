@@ -420,12 +420,11 @@ func modifyProperty<T : PropertyWithGetterSetter>(x: inout T) {
 // CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to $*Int
 // CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[SELF]] : $*T
 // CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ADDR]])
-// CHECK:      switch_enum [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout T, @thick T.Type) -> ()>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
-// CHECK:    bb1([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout T, @thick T.Type) -> ()):
+// CHECK:      switch_enum [[CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+// CHECK:    bb1([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
+// CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
 // CHECK:      [[METATYPE:%.*]] = metatype $@thick T.Type
 // CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
-// CHECK:      [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK]]
-// CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
 // CHECK:      apply [[CALLBACK]]<T>
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {

@@ -469,8 +469,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
   // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
   // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
-  // CHECK-NEXT: [[CAST:%.*]] = unchecked_trivial_bit_cast [[CADR]]
-  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CAST]] : {{.*}})
+  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: strong_release
   // CHECK-NEXT: return [[TUPLE]]
 
@@ -480,11 +479,8 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
   // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
   // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
-  // CHECK-NEXT: [[CAST:%.*]] = unchecked_trivial_bit_cast [[CADR]]
-  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CAST]] : {{.*}})
+  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: return [[TUPLE]]
-
-  // Otherwise, we shouldn't need the bit_cast:
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses34PropertyRequirementWitnessFromBaseS_19PropertyRequirementS_FS1_m5depthSi
   // CHECK: [[METH:%.*]] = class_method {{%.*}} : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1

@@ -88,7 +88,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg10expirationSi : $@convention(thin) (@thin MySize.Type) -> Int
 // CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes10expirationSi : $@convention(thin) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem10expirationSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize.Type, @thick MySize.Type.Type) -> ()>)
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem10expirationSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public static var expiration: Int {
     get { return copyright + 70 }
     set { copyright = newValue - 70 }
@@ -98,7 +98,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizeg1dSi : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizes1dSi : $@convention(method) (Int, @inout MySize) -> ()
-// CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1dSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize, @thick MySize.Type) -> ()>)
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1dSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public var d: Int {
     get { return 0 }
     set { }
@@ -108,7 +108,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizeg1wSi : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK-LABEL: sil @_TFV17struct_resilience6MySizes1wSi : $@convention(method) (Int, @inout MySize) -> ()
-// CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1wSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize, @thick MySize.Type) -> ()>)
+// CHECK-LABEL: sil @_TFV17struct_resilience6MySizem1wSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public var w: Int
 
   // Read-only instance stored property
@@ -120,7 +120,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @_TZFV17struct_resilience6MySizeg9copyrightSi : $@convention(thin) (@thin MySize.Type) -> Int
 // CHECK-LABEL: sil @_TZFV17struct_resilience6MySizes9copyrightSi : $@convention(thin) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem9copyrightSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout MySize.Type, @thick MySize.Type.Type) -> ()>)
+// CHECK-LABEL: sil @_TZFV17struct_resilience6MySizem9copyrightSi : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public static var copyright: Int = 0
 }
 

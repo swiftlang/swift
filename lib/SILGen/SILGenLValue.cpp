@@ -943,6 +943,7 @@ namespace {
 
       SILBasicBlock *contBB = gen.createBasicBlock();
       SILBasicBlock *writebackBB = gen.createBasicBlock(gen.B.getInsertionBB());
+
       gen.B.createSwitchEnum(loc, materialized.callback, /*defaultDest*/ nullptr,
                              { { ctx.getOptionalSomeDecl(), writebackBB },
                                { ctx.getOptionalNoneDecl(), contBB } });
@@ -955,22 +956,19 @@ namespace {
           SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
-        SILType callbackSILType = gen.getLoweredType(
-                  materialized.callback->getType().getSwiftRValueType()
-                                                  .getAnyOptionalObjectType());
-
         // The callback is a BB argument from the switch_enum.
         SILValue callback =
-          writebackBB->createBBArg(callbackSILType);
+          writebackBB->createBBArg(rawPointerTy);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
             decl, materialized.genericSig, materialized.origSelfType);
         auto origCallbackType = SILType::getPrimitiveObjectType(origCallbackFnType);
+        callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
+
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, M.getSwiftModule(), substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
-
         auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
 
         // We need to borrow the base here.  We can't just consume it
@@ -1004,9 +1002,6 @@ namespace {
           gen.B.createAddressToPointer(loc,
                                        materialized.temporary.getValue(),
                                        rawPointerTy);
-
-        callback = gen.B.createThinFunctionToPointer(loc, callback, rawPointerTy);
-        callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
 
         // Apply the callback.
         gen.B.createApply(loc, callback, substCallbackType,
