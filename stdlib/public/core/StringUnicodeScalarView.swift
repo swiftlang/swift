@@ -295,7 +295,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   >(
     bounds: Range<Index>, with newElements: C
   ) {
-    let rawSubRange =
+    let rawSubRange: Range<Int> =
       bounds.startIndex._position
       ..< bounds.endIndex._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
@@ -328,7 +328,7 @@ extension String.UnicodeScalarIndex {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16Index.predecessor()]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
         return nil
       }
     }

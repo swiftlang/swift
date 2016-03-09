@@ -390,7 +390,7 @@ extension String.UTF8View.Index {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid in UTF8.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16Index.predecessor()]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.previous(utf16Index)]) {
         return nil
       }
     }
