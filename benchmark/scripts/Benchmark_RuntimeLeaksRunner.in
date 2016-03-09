@@ -56,9 +56,23 @@ IGNORABLE_GLOBAL_OBJC_CLASSES = set([
 
 class LeaksRunnerResult(perf_test_driver.Result):
 
-    def __init__(self, name, status):
+    def __init__(self, name, count=None):
+        # True = 1, False = 0.
+        #
+        # TODO: Why are we using booleans to communicate status here?
+        status = count is None or count > 0
         perf_test_driver.Result.__init__(self, name, status, "", XFAIL_LIST)
+        self.count = count
 
+    def get_count(self):
+        if self.count is not None:
+            return str(self.count)
+        return "N/A"
+
+    def print_data(self, max_test_len):
+        fmt = '{:<%d}{:<10}{:}' % (max_test_len + 5)
+        print(fmt.format(self.get_name(), self.get_result(),
+                         self.get_count()))
 
 class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
@@ -66,6 +80,10 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
         perf_test_driver.BenchmarkDriver.__init__(
             self, binary, xfail_list,
             enable_parallel=True)
+
+    def print_data_header(self, max_test_len):
+        fmt = '{:<%d}{:<10}{:}' % (max_test_len + 5)
+        print(fmt.format('Name', 'Result', 'RC Delta'))
 
     def prepare_input(self, name):
         return {}
@@ -81,7 +99,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             error_out = p.communicate()[1].split("\n")
         except OSError:
             print("Child Process Failed! (%s,%s)" % (data['path'], data['test_name']))
-            return LeaksRunnerResult(test_name, True)
+            return LeaksRunnerResult(test_name)
 
         try:
             # We grab the second line since swift globals get lazily created in the
@@ -95,10 +113,11 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
                 d['swift_count'] -= FUNC_TO_GLOBAL_COUNTS[data['test_name']]['swift_count']
                 d['objc_count'] -= FUNC_TO_GLOBAL_COUNTS[data['test_name']]['objc_count']
 
-            return LeaksRunnerResult(test_name, (d['objc_count'] + d['swift_count']) > 0)
+            total_count = d['objc_count'] + d['swift_count']
+            return LeaksRunnerResult(test_name, total_count)
         except (KeyError, ValueError):
             print("Failed parse output! (%s,%s)" % (data['path'], data['test_name']))
-            return LeaksRunnerResult(test_name, True)
+            return LeaksRunnerResult(test_name)
 
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
