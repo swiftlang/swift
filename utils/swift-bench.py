@@ -160,7 +160,8 @@ main()
 """
 
         bench_re = re.compile(
-            "^\s*func\s\s*bench_([a-zA-Z0-9_]+)\s*\(\s*\)\s*->\s*Int\s*({)?\s*$")
+            "^\s*func\s\s*bench_([a-zA-Z0-9_]+)" +
+            "\s*\(\s*\)\s*->\s*Int\s*({)?\s*$")
         with open(name) as f:
             lines = list(f)
         output = header
@@ -229,11 +230,19 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         if not self.tests[name].processed_source in self.compiled_files:
             try:
                 self.run_command([
-                    self.compiler, self.tests[name].processed_source,
-                    "-o", self.tests[name].binary + '.o', '-c'] + self.opt_flags)
+                    self.compiler,
+                    self.tests[name].processed_source,
+                    "-o",
+                    self.tests[name].binary + '.o',
+                    '-c'
+                ] + self.opt_flags)
                 self.run_command([
-                    self.compiler, '-o', self.tests[name].binary,
-                    self.tests[name].binary + '.o', 'opaque.o'])
+                    self.compiler,
+                    '-o',
+                    self.tests[name].binary,
+                    self.tests[name].binary + '.o',
+                    'opaque.o'
+                ])
                 self.compiled_files[
                     self.tests[name].processed_source] = ('', '')
             except subprocess.CalledProcessError as e:
@@ -276,7 +285,8 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
                 r = self.run_command([
                     self.tests[name].binary, str(scale),
                     self.tests[name].name])
-                (test_name, iters_computed, exec_time) = self.parse_benchmark_output(r)
+                (test_name, iters_computed, exec_time) = \
+                    self.parse_benchmark_output(r)
                 # Convert ns to ms
                 spent = int(exec_time) / 1000000
                 if spent <= self.min_iter_time:
@@ -306,7 +316,8 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         if (num_samples, iter_scale) == (0, 0):
             self.tests[name].status = "CAN'T MEASURE"
             self.tests[name].output = (
-                "Can't find number of iterations for the test to last longer than %d ms." % self.min_iter_time)
+                "Can't find number of iterations for the test to last longer " +
+                "than %d ms." % self.min_iter_time)
             return
         samples = []
         self.log("Running bench: %s, numsamples: %d" % (name, num_samples), 2)
@@ -314,7 +325,8 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
             try:
                 r = self.run_command([self.tests[name].binary, str(iter_scale),
                                       self.tests[name].name])
-                (test_name, iters_computed, exec_time) = self.parse_benchmark_output(r)
+                (test_name, iters_computed, exec_time) = \
+                    self.parse_benchmark_output(r)
                 # TODO: Verify test_name and iters_computed
                 samples.append(int(exec_time) / iter_scale)
                 self.tests[name].output = r

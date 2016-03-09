@@ -18,7 +18,8 @@ import os
 import sys
 
 from cmpcodesize.compare import \
-    compare_function_sizes, compare_sizes_of_file, list_function_sizes, read_sizes
+    compare_function_sizes, compare_sizes_of_file, list_function_sizes,\
+    read_sizes
 
 
 SHORTCUTS = {
@@ -36,14 +37,15 @@ def main():
 Compares code sizes of "new" files, taking "old" files as a reference.
 
 Environment variables:
-    SWIFT_NEW_BUILDDIR   The old build-dir
-E.g. $HOME/swift-work/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
-    SWIFT_OLD_BUILDDIR   The new build-dir
-E.g. $HOME/swift-reference/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+    SWIFT_NEW_BUILDDIR   The new build-dir
+E.g. $HOME/swiftnew/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+    SWIFT_OLD_BUILDDIR   The old build-dir
+E.g. $HOME/swiftold/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
 
 How to specify files:
 1) No files:
-    Compares codesize of the Benchmark_* executables and the swiftCore dylib in the new and old build-dirs.
+    Compares codesize of the Benchmark_* executables and the swiftCore dylib in
+    the new and old build-dirs.
     Example:
         cmpcodesize
 
@@ -181,7 +183,8 @@ How to specify files:
         else:
             compare_function_sizes(old_files, new_files)
     else:
-        print("%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent"))
+        print("%-26s%16s  %8s  %8s  %s" %
+              ("", "Section", "Old", "New", "Percent"))
         if parsed_arguments.sum_sizes:
             compare_sizes_of_file(old_files, new_files,
                                   parsed_arguments.all_sections,

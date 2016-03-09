@@ -27,7 +27,8 @@ def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
             file_list.extend(
                 filter(lambda file: file not in file_list, rel_files))
             dirs[:] = filter(
-                lambda dir: os.path.join(rel_dir, dir) not in skip_subpaths, dirs)
+                lambda dir: os.path.join(rel_dir, dir)
+                not in skip_subpaths, dirs)
     return file_list
 
 
@@ -42,8 +43,9 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
     it's lipo'ed together from all src_root_dirs into a fat binary.
 
     Any path in file_list that's a directory in src_root_dirs results in a
-    corresponding subdirectory in dest_root_dir. If the subdirectory path matches
-    copy_verbatim_subpaths, the whole subdirectory is recursively copied verbatim.
+    corresponding subdirectory in dest_root_dir. If the subdirectory path
+    matches copy_verbatim_subpaths, the whole subdirectory is recursively copied
+    verbatim.
     """
     lipo_cmd = [lipo_executable, "-create"]
 
@@ -92,7 +94,8 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
             else:
                 # Multiple instances are different, and they're not executable.
                 print(
-                    "-- Warning: non-executable source files are different, skipping: %s" % file_paths)
+                    "-- Warning: non-executable source files are different, " +
+                    "skipping: %s" % file_paths)
         else:
             print("-- Warning: Unsupport file type, skipping: %s" % file_paths)
 
@@ -120,10 +123,12 @@ verbatim. This is useful if some subdirectories already contain fat binaries.
                         help="Path to lipo executable, default is \"lipo\"")
     parser.add_argument("--skip-files", metavar="<skip-files>",
                         default=".DS_Store",
-                        help="Files to ignore and skip merge/copy, default is \".DS_Store\"")
+                        help="Files to ignore and skip merge/copy, default " +
+                             "is \".DS_Store\"")
     parser.add_argument("--copy-subdirs", metavar="<subdirs-to-copy-verbatim>",
                         default="",
-                        help="Optional list of subdirectory paths that should be copied verbatim")
+                        help="Optional list of subdirectory paths that " +
+                             "should be copied verbatim")
 
     required_group = parser.add_argument_group("required arguments")
     required_group.add_argument("--destination", metavar="<dest-path>",

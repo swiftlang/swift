@@ -85,7 +85,8 @@ def all_integer_type_names():
 
 
 def all_real_number_type_names():
-    # FIXME , 'Float80' Revert until I figure out a test failure  # Float80 for i386 & x86_64
+    # FIXME , 'Float80' Revert until I figure out a test failure  # Float80
+    # for i386 & x86_64
     return ['Float', 'Double']
 
 

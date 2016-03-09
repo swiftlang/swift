@@ -31,7 +31,8 @@ class SwiftLexer(RegexLexer):
     flags = re.MULTILINE | re.DOTALL
 
     _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)'
-    _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
+    _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)' + \
+                 '([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
     _name = r'[a-zA-Z_][a-zA-Z0-9_?]*'
 
     tokens = {
@@ -49,16 +50,20 @@ class SwiftLexer(RegexLexer):
             (r'\b(var|let)\s', Keyword.Declaration, 'var-decl'),
             (r'\bfor\s', Keyword.Reserved, 'for-loop'),
             (r'\b(func|init|deinit)\s', Keyword.Declaration, 'func-decl'),
-            (r'(\bset\b)(\s?)(\()', bygroups(Keyword.Declaration, Whitespace, Punctuation), 'arg-list'),
+            (r'(\bset\b)(\s?)(\()', bygroups(
+                Keyword.Declaration, Whitespace, Punctuation), 'arg-list'),
             (r'(set|get)(:)', bygroups(Keyword.Reserved, Punctuation)),
             (r'\b(self|Self)\b', Name.Builtin.Pseudo),
             (r'\bid\b', Name.Builtin),
 
             (r'\bimport\s+', Keyword.Namespace, 'import'),
-            (r'\b(class|struct|protocol|extension)\s', Keyword.Declaration, 'class-decl'),
+            (r'\b(class|struct|protocol|extension)\s',
+             Keyword.Declaration, 'class-decl'),
 
-            (r'(\b[A-Z][a-zA-Z0-9_]*\s?)(\()', bygroups(Name.Constant, Punctuation), 'type-cast'),
-            (r'(\b[A-Z][a-zA-Z0-9_]*)(\.)([a-z][a-zA-Z0-9_]*)', bygroups(Name.Constant, Punctuation, Name), 'arg-list'),
+            (r'(\b[A-Z][a-zA-Z0-9_]*\s?)(\()',
+             bygroups(Name.Constant, Punctuation), 'type-cast'),
+            (r'(\b[A-Z][a-zA-Z0-9_]*)(\.)([a-z][a-zA-Z0-9_]*)',
+             bygroups(Name.Constant, Punctuation, Name), 'arg-list'),
             (r'"', String, 'string'),
 
             (r'(\bnew\b\s?)', Keyword.Reserved, 'class-name'),
@@ -81,23 +86,33 @@ class SwiftLexer(RegexLexer):
         ],
 
         'isa': [
-            (_isa, bygroups(Name, Whitespace, Punctuation, Whitespace, Name.Constant)),
+            (_isa, bygroups(
+                Name,
+                Whitespace,
+                Punctuation,
+                Whitespace,
+                Name.Constant)),
         ],
 
         'class-isa': [
-            (_isa, bygroups(Name.Class, Whitespace, Punctuation, Whitespace, Name.Constant)),
+            (_isa, bygroups(Name.Class, Whitespace,
+                            Punctuation, Whitespace, Name.Constant)),
         ],
 
         'var-isa': [
-            (_isa, bygroups(Name.Variable, Whitespace, Punctuation, Whitespace, Name.Constant)),
+            (_isa, bygroups(Name.Variable, Whitespace,
+                            Punctuation, Whitespace, Name.Constant)),
         ],
 
         'var-isa-pop': [
-            (_isa, bygroups(Name.Variable, Whitespace, Punctuation, Whitespace, Name.Constant), '#pop'),
+            (_isa, bygroups(Name.Variable, Whitespace,
+                            Punctuation, Whitespace, Name.Constant), '#pop'),
         ],
 
         'var-isa-comma': [
-            (_isa_comma, bygroups(Name.Variable, Whitespace, Punctuation, Whitespace, Name.Constant, Punctuation)),
+            (_isa_comma, bygroups(Name.Variable, Whitespace,
+                                  Punctuation, Whitespace,
+                                  Name.Constant, Punctuation)),
         ],
 
         'var-name': [
@@ -158,7 +173,11 @@ class SwiftLexer(RegexLexer):
         ],
 
         'var-decl': [
-            (r'(\[)([\w\s,]*)(\])(\s+)', bygroups(Punctuation, Name.Attribute, Punctuation, Whitespace)),
+            (r'(\[)([\w\s,]*)(\])(\s+)', bygroups(
+                Punctuation,
+                Name.Attribute,
+                Punctuation,
+                Whitespace)),
             include('tuple'),
             include('var-isa-comma'),
             include('var-isa-pop'),
@@ -176,7 +195,11 @@ class SwiftLexer(RegexLexer):
         ],
 
         'func-decl': [
-            (r'(\[)([\w\s,]*)(\])(\s+)', bygroups(Punctuation, Name.Attribute, Punctuation, Whitespace)),
+            (r'(\[)([\w\s,]*)(\])(\s+)', bygroups(
+                Punctuation,
+                Name.Attribute,
+                Punctuation,
+                Whitespace)),
             (r'\s?\breturn\b', Keyword.Reserved, 'root2'),
             (r'\s?\w', Name.Function),
             (r'<', Punctuation, 'generic-type'),
@@ -195,7 +218,11 @@ class SwiftLexer(RegexLexer):
 
         'class-decl': [
             (r'\{', Punctuation, '#pop'),
-            (r'(\[)([\w\s,]*)(\])(\s+)', bygroups(Punctuation, Name.Attribute, Punctuation, Whitespace)),
+            (r'(\[)([\w\s,]*)(\])(\s+)', bygroups(
+                Punctuation,
+                Name.Attribute,
+                Punctuation,
+                Whitespace)),
             include('class-isa'),
             (r'[A-Z][a-zA-Z0-9_?]*', Name.Class),
             (r'\s', Whitespace),
@@ -222,7 +249,8 @@ class SwiftLexer(RegexLexer):
 
         'string': [
             (r'"', String, '#pop'),
-            (r'\\([\\abfnrtv"\']|x[a-fA-F0-9]{2,4}|[0-7]{1,3})', String.Escape),
+            (r'\\([\\abfnrtv"\']|x[a-fA-F0-9]{2,4}|[0-7]{1,3})',
+             String.Escape),
             (r'\\\(', String.Interpol, 'in-interpolated'),
             (r'[^\\"]+', String),
             (r'\\', String),
@@ -238,7 +266,8 @@ class SwiftConsoleLexer(RegexLexer):
     flags = re.MULTILINE | re.DOTALL
 
     _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)'
-    _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
+    _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)' + \
+        r'([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
     _name = r'[a-zA-Z_][a-zA-Z0-9_?]*'
 
     tokens = SwiftLexer.tokens.copy()

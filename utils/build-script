@@ -646,7 +646,7 @@ also build for tvOS, but disallow tests that require a tvos device""",
     parser.add_argument(
         "--watchos",
         help="""
-also build for Apple watchOS, but disallow tests that require an watchOS device""",
+also build for watchOS, but disallow tests that require an watchOS device""",
         action="store_true")
 
     parser.add_argument(
@@ -697,9 +697,10 @@ the number of parallel build jobs to use""",
 
     parser.add_argument(
         "--extra-swift-args", help=textwrap.dedent("""
-    Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
-    be called multiple times to add multiple such module_regexp flag pairs. All semicolons
-    in flags must be escaped with a '\'"""),
+    Pass through extra flags to swift in the form of a cmake list
+    'module_regexp;flag'. Can be called multiple times to add multiple such
+    module_regexp flag pairs. All semicolons in flags must be escaped with
+    a '\'"""),
         action="append", dest="extra_swift_args", default=[])
 
     parser.add_argument(
@@ -748,7 +749,8 @@ the number of parallel build jobs to use""",
         args.build_cmark = True
 
     # Build LLDB if any LLDB-related options were specified.
-    if (args.lldb_build_variant is not None or args.lldb_assertions is not None):
+    if args.lldb_build_variant is not None or \
+       args.lldb_assertions is not None:
         args.build_lldb = True
 
     # Set the default build variant.
@@ -1116,7 +1118,11 @@ the number of parallel build jobs to use""",
     build_script_impl_args += args.build_script_impl_args
 
     # Unset environment variables that might affect how tools behave.
-    for v in ['MAKEFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET', 'IPHONEOS_DEPLOYMENT_TARGET']:
+    for v in [
+            'MAKEFLAGS',
+            'SDKROOT',
+            'MACOSX_DEPLOYMENT_TARGET',
+            'IPHONEOS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
 
     if args.show_sdks:

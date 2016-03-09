@@ -135,7 +135,7 @@ def main():
         metavar="PATH")
     parser.add_argument(
         "--verify-build-dir",
-        help="verify the Swift resource directory under the given build directory",
+        help="verify the Swift resource directory under the given build dir.",
         metavar="PATH")
     parser.add_argument(
         "--verify-xcode",
