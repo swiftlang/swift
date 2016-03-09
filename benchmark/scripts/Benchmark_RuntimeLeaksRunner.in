@@ -26,20 +26,6 @@ import perf_test_driver
 XFAIL_LIST = [
 ]
 
-# A list of Functions mapped to the number of globals in that function. These
-# show up as leaks. But we can count them, whitelist them, and then ignore them.
-FUNC_TO_GLOBAL_COUNTS = {
-    'Ackermann': {"swift_count": 1, "objc_count": 0},
-    'AngryPhonebook': {"swift_count": 1, "objc_count": 0},
-    'GlobalClass': {'swift_count': 1, 'objc_count': 0},
-    'Histogram': {'swift_count': 1, 'objc_count': 0},
-    'Phonebook': {'swift_count': 1, 'objc_count': 0},
-    'RC4': {'swift_count': 1, 'objc_count': 0},
-    'RGBHistogram': {'swift_count': 1, 'objc_count': 0},
-    'SortStrings': {'swift_count': 1, 'objc_count': 0},
-    'TwoSum': {'swift_count': 1, 'objc_count': 0},
-}
-
 # Global objective-c classes created by various frameworks. We do not care about these.
 IGNORABLE_GLOBAL_OBJC_CLASSES = set([
     '__NSPlaceholderDate',
@@ -93,18 +79,15 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def prepare_input(self, name):
         return {'num_samples': self.num_samples, 'num_iters': self.num_iters}
 
-    def process_input(self, data):
-        test_name = '({},{})'.format(data['opt'], data['test_name'])
-        print("Running {}...".format(test_name))
-        sys.stdout.flush()
+    def run_test(self, data, num_iters):
         try:
             p = subprocess.Popen([data['path'], "--run-all", "--num-samples={}".format(data['num_samples']),
-                                  "--num-iters={}".format(data['num_iters']), data['test_name']],
+                                  "--num-iters={}".format(num_iters), data['test_name']],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             error_out = p.communicate()[1].split("\n")
         except OSError:
             print("Child Process Failed! (%s,%s)" % (data['path'], data['test_name']))
-            return LeaksRunnerResult(test_name)
+            return None
 
         try:
             # We grab the second line since swift globals get lazily created in the
@@ -113,16 +96,24 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             d['objc_objects'] = [x for x in d['objc_objects'] if x not in IGNORABLE_GLOBAL_OBJC_CLASSES]
             d['objc_count'] = len(d['objc_objects'])
 
-            # Subtract out known global counts.
-            if data['test_name'] in FUNC_TO_GLOBAL_COUNTS:
-                d['swift_count'] -= FUNC_TO_GLOBAL_COUNTS[data['test_name']]['swift_count']
-                d['objc_count'] -= FUNC_TO_GLOBAL_COUNTS[data['test_name']]['objc_count']
-
             total_count = d['objc_count'] + d['swift_count']
-            return LeaksRunnerResult(test_name, total_count)
+            return total_count
         except (KeyError, ValueError):
             print("Failed parse output! (%s,%s)" % (data['path'], data['test_name']))
+            return None
+
+
+    def process_input(self, data):
+        test_name = '({},{})'.format(data['opt'], data['test_name'])
+        print("Running {}...".format(test_name))
+        sys.stdout.flush()
+        total_count1 = self.run_test(data, data['num_iters'])
+        if total_count1 is None:
             return LeaksRunnerResult(test_name)
+        total_count2 = self.run_test(data, data['num_iters']+1)
+        if total_count2 is None:
+            return LeaksRunnerResult(test_name)
+        return LeaksRunnerResult(test_name, total_count2 - total_count1)
 
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
