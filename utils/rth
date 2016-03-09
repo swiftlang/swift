@@ -22,7 +22,7 @@ VERBOSE = True
 
 def verbose_print_command(command):
     if VERBOSE:
-        print " ".join(pipes.quote(c) for c in command)
+        print(" ".join(pipes.quote(c) for c in command))
         sys.stdout.flush()
 
 

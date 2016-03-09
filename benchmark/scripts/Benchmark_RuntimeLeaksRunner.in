@@ -72,7 +72,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
     def process_input(self, data):
         test_name = '({},{})'.format(data['opt'], data['test_name'])
-        print "Running {}...".format(test_name)
+        print("Running {}...".format(test_name))
         sys.stdout.flush()
         try:
             p = subprocess.Popen([data['path'], "--run-all", "--num-samples=2",
@@ -97,7 +97,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
             return LeaksRunnerResult(test_name, (d['objc_count'] + d['swift_count']) > 0)
         except (KeyError, ValueError):
-            print "Failed parse output! (%s,%s)" % (data['path'], data['test_name'])
+            print("Failed parse output! (%s,%s)" % (data['path'], data['test_name']))
             return LeaksRunnerResult(test_name, True)
 
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
