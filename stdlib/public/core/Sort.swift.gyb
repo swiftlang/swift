@@ -152,13 +152,14 @@ func _introSort<
 %   if p:
   var isOrderedBeforeVar = isOrderedBefore
 %   end
-  let len = range.count.toIntMax()
-  if len < 2 {
+  let count =
+    elements.distance(from: range.startIndex, to: range.endIndex).toIntMax()
+  if count < 2 {
     return
   }
   // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
   // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
-  let depthLimit = 2 * _floorLog2(Int64(len))
+  let depthLimit = 2 * _floorLog2(Int64(count))
   _introSortImpl(
     &elements,
     subRange: range,
@@ -220,14 +221,14 @@ func _siftDown<
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
-  let countToIndex = (range.startIndex..<index).count
-  let countFromIndex = (index..<range.endIndex).count
+  let countToIndex = elements.distance(from: range.startIndex, to: index)
+  let countFromIndex = elements.distance(from: index, to: range.endIndex)
   // Check if left child is within bounds. If not, return, because there are
   // no children of the given node in the heap.
   if countToIndex + 1 >= countFromIndex {
     return
   }
-  let left = index.advanced(by: countToIndex + 1)
+  let left = elements.advance(index, by: countToIndex + 1)
   var largest = index
   if ${cmp("elements[largest]", "elements[left]", p)} {
     largest = left
@@ -265,9 +266,11 @@ func _heapify<
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
   let root = range.startIndex
-  var node = root.advanced(by: C.IndexDistance(range.count.toIntMax()/2))
+  var node = elements.advance(
+    root,
+    by: elements.distance(from: range.startIndex, to: range.endIndex) / 2)
   while node != root {
-    node._predecessorInPlace()
+    elements._previousInPlace(&node)
     _siftDown(
       &elements,
       index: node,
