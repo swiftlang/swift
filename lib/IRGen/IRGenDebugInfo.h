@@ -264,13 +264,6 @@ private:
                                          llvm::DIType *PointeeTy,
                                          llvm::DIFile *File, unsigned Line,
                                          unsigned Flags, StringRef MangledName);
-  llvm::DIType *createDoublePointerSizedStruct(
-      llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
-      llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName);
-  llvm::DIType *createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
-                                   llvm::DIFile *File, unsigned Line,
-                                   unsigned SizeInBits, unsigned AlignInBits,
-                                   unsigned Flags, StringRef MangledName);
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
   TypeAliasDecl *getMetadataType();
 };

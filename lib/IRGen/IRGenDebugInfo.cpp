@@ -885,6 +885,74 @@ llvm::DIFile *IRGenDebugInfo::getFile(llvm::DIScope *Scope) {
   return cast<llvm::DIFile>(Scope);
 }
 
+/// Return the storage size of an explosion value.
+static uint64_t getSizeFromExplosionValue(const clang::TargetInfo &TI,
+                                          llvm::Value *V) {
+  llvm::Type *Ty = V->getType();
+  if (unsigned PrimitiveSize = Ty->getPrimitiveSizeInBits())
+    return PrimitiveSize;
+  else if (Ty->isPointerTy())
+    return TI.getPointerWidth(0);
+  else
+    llvm_unreachable("unhandled type of explosion value");
+}
+
+/// A generator that recursively returns the size of each element of a
+/// composite type.
+class ElementSizes {
+  const TrackingDIRefMap &DIRefMap;
+  llvm::SmallPtrSetImpl<const llvm::DIType *> &IndirectEnums;
+  llvm::SmallVector<const llvm::DIType *, 12> Stack;
+public:
+  ElementSizes(const llvm::DIType *DITy, const TrackingDIRefMap &DIRefMap,
+               llvm::SmallPtrSetImpl<const llvm::DIType *> &IndirectEnums)
+    : DIRefMap(DIRefMap), IndirectEnums(IndirectEnums), Stack(1, DITy) {}
+
+  struct SizeAlign {
+    uint64_t SizeInBits, AlignInBits;
+  };
+
+  struct SizeAlign getNext() {
+    if (Stack.empty())
+      return {0, 0};
+
+    auto *Cur = Stack.pop_back_val();
+    if (isa<llvm::DICompositeType>(Cur) &&
+        Cur->getTag() != llvm::dwarf::DW_TAG_subroutine_type) {
+      auto *CTy = cast<llvm::DICompositeType>(Cur);
+      auto Elts = CTy->getElements();
+      unsigned N = Cur->getTag() == llvm::dwarf::DW_TAG_union_type
+        ? std::min(1U, Elts.size()) // For unions, pick any one.
+        : Elts.size();
+
+      if (N) {
+        // Push all elements in reverse order.
+        // FIXME: With a little more state we don't need to actually
+        // store them on the Stack.
+        for (unsigned I = N; I > 0; --I)
+          Stack.push_back(cast<llvm::DIType>(Elts[I - 1]));
+        return getNext();
+      }
+    }
+    switch (Cur->getTag()) {
+    case llvm::dwarf::DW_TAG_member:
+      // FIXME: Correctly handle the explosion value for enum types
+      // with indirect members.
+      if (IndirectEnums.count(Cur))
+        return {0, 0};
+      [[clang::fallthrough]];
+    case llvm::dwarf::DW_TAG_typedef: {
+      // Replace top of stack.
+      auto *DTy = cast<llvm::DIDerivedType>(Cur);
+      Stack.push_back(DTy->getBaseType().resolve(DIRefMap));
+      return getNext();
+    }
+    default:
+      return {Cur->getSizeInBits(), Cur->getAlignInBits()};
+    }
+  }
+};
+
 static Size
 getStorageSize(const llvm::DataLayout &DL, ArrayRef<llvm::Value *> Storage) {
   unsigned size = 0;
@@ -944,16 +1012,13 @@ void IRGenDebugInfo::emitVariableDeclaration(
                                   Optimized, Flags);
 
   // Insert a debug intrinsic into the current block.
+  unsigned OffsetInBits = 0;
   auto *BB = Builder.GetInsertBlock();
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
-
-  // Running variables for the current/previous piece.
-  unsigned SizeInBits = 0;
-  unsigned AlignInBits = SizeOfByte;
-  unsigned OffsetInBits = 0;
-
+  ElementSizes EltSizes(DITy, DIRefMap, IndirectEnumCases);
+  auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
     SmallVector<uint64_t, 3> Operands;
     if (Indirection)
@@ -965,22 +1030,32 @@ void IRGenDebugInfo::emitVariableDeclaration(
       Piece = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
 
     if (IsPiece) {
-      // Advance the offset and align it for the next piece.
-      OffsetInBits += llvm::alignTo(SizeInBits, AlignInBits);
-      SizeInBits = IGM.DataLayout.getTypeSizeInBits(Piece->getType());
-      AlignInBits = IGM.DataLayout.getABITypeAlignment(Piece->getType());
-      if (!AlignInBits)
-        AlignInBits = SizeOfByte;
+      // Try to get the size from the type if possible.
+      auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);
+      assert((Dim.SizeInBits != 0 || StorageSize != 0) &&
+            "zero-sized variable with nonzero storage size");
 
-      // Sanity checks.
-      assert(SizeInBits && "zero-sized piece");
-      assert(SizeInBits < VarSizeInBits && "piece covers entire var");
-      assert(OffsetInBits+SizeInBits <= VarSizeInBits && "pars > totum");
+      // FIXME: Occasionally we miss out that the Storage is actually a
+      // refcount wrapper. Silently skip these for now.
+      if (OffsetInBits+Dim.SizeInBits > VarSizeInBits)
+        break;
+      if (OffsetInBits == 0 && Dim.SizeInBits == VarSizeInBits)
+        break;
+      if (Dim.SizeInBits == 0)
+        break;
 
-      // Add the piece DWARF expression.
+      assert(Dim.SizeInBits < VarSizeInBits
+             && "piece covers entire var");
+      assert(OffsetInBits+Dim.SizeInBits <= VarSizeInBits && "pars > totum");
       Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
       Operands.push_back(OffsetInBits);
-      Operands.push_back(SizeInBits);
+      Operands.push_back(Dim.SizeInBits);
+
+      auto Size = Dim.SizeInBits;
+      Dim = EltSizes.getNext();
+      OffsetInBits +=
+        llvm::alignTo(Size, Dim.AlignInBits ? Dim.AlignInBits
+                      : SizeOfByte);
     }
     emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
                      Loc.Column, Scope, DS);
@@ -1259,46 +1334,14 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
   unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign);
   llvm::Metadata *Elements[] = {
-    DBuilder.createMemberType(Scope, "ptr", File, 0,
+    DBuilder.createMemberType(Scope, "pointer", File, 0,
                               PtrSize, PtrAlign, 0, Flags, PtrTy)
   };
   return DBuilder.createStructType(
       Scope, Name, File, Line, PtrSize, PtrAlign, Flags,
-      /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
-      llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
-}
-
-/// Create a 2*pointer-sized struct with a mangled name and a single
-/// member of PointeeTy.
-llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
-    llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
-    llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName) {
-  unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-  unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-  llvm::Metadata *Elements[] = {
-      DBuilder.createMemberType(
-          Scope, "ptr", File, 0, PtrSize, PtrAlign, 0, Flags,
-          DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign)),
-      DBuilder.createMemberType(
-          Scope, "_", File, 0, PtrSize, PtrAlign, 0, Flags,
-          DBuilder.createPointerType(nullptr, PtrSize, PtrAlign))};
-  return DBuilder.createStructType(
-      Scope, Name, File, Line, 2*PtrSize, PtrAlign, Flags,
-      /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
-      llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
-}
-
-/// Create an opaque struct with a mangled name.
-llvm::DIType *
-IRGenDebugInfo::createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
-                                   llvm::DIFile *File, unsigned Line,
-                                   unsigned SizeInBits, unsigned AlignInBits,
-                                   unsigned Flags, StringRef MangledName) {
-  return DBuilder.createStructType(
-      Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
-      /* DerivedFrom */ nullptr,
-      DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
-      llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+      nullptr, // DerivedFrom
+      DBuilder.getOrCreateArray(Elements), llvm::dwarf::DW_LANG_Swift,
+      nullptr, MangledName);
 }
 
 /// Construct a DIType from a DebugTypeInfo object.
@@ -1454,7 +1497,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         }
       Scope = getOrCreateModule(ModuleName, TheCU, ModuleName, ModulePath);
     }
-    assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
     return createPointerSizedStruct(Scope, Decl->getNameStr(),
                                     getOrCreateFile(L.Filename), L.Line, Flags,
                                     MangledName);
@@ -1466,9 +1508,9 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
     auto L = getDebugLoc(SM, Decl);
     auto File = getOrCreateFile(L.Filename);
-    return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                              File, L.Line, SizeInBits, AlignInBits, Flags,
-                              MangledName);
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::ProtocolComposition: {
@@ -1478,16 +1520,15 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
     // FIXME: emit types
     // auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
-    return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                              File, L.Line, SizeInBits, AlignInBits, Flags,
-                              MangledName);
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::UnboundGeneric: {
     auto *UnboundTy = BaseTy->castTo<UnboundGenericType>();
     auto *Decl = UnboundTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
-    assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
     return createPointerSizedStruct(Scope,
                                     Decl ? Decl->getNameStr() : MangledName,
                                     File, L.Line, Flags, MangledName);
@@ -1497,9 +1538,9 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
     auto *Decl = StructTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
-    return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                              File, L.Line, SizeInBits, AlignInBits, Flags,
-                              MangledName);
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::BoundGenericClass: {
@@ -1508,7 +1549,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto L = getDebugLoc(SM, Decl);
     // TODO: We may want to peek at Decl->isObjC() and set this
     // attribute accordingly.
-    assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
     return createPointerSizedStruct(Scope,
                                     Decl ? Decl->getNameStr() : MangledName,
                                     File, L.Line, Flags, MangledName);
@@ -1600,17 +1640,18 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction: {
-    auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
+    auto FwdDecl = llvm::TempDINode(
+      DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, File, 0,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
-
+          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
+          MangledName));
+     
     auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
     DITypeCache[DbgTy.getType()] = TH;
 
-    CanSILFunctionType FunTy;
+    CanSILFunctionType FunctionTy;
     if (auto *SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
-      FunTy = CanSILFunctionType(SILFnTy);
+      FunctionTy = CanSILFunctionType(SILFnTy);
     // FIXME: Handling of generic parameters in SIL type lowering is in flux.
     // DebugInfo doesn't appear to care about the generic context, so just
     // throw it away before lowering.
@@ -1618,31 +1659,20 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
              isa<PolymorphicFunctionType>(BaseTy)) {
       auto *fTy = cast<AnyFunctionType>(BaseTy);
       auto *nongenericTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
-                                             fTy->getExtInfo());
+                                            fTy->getExtInfo());
 
-      FunTy = IGM.SILMod->Types.getLoweredType(nongenericTy)
-                  .castTo<SILFunctionType>();
+      FunctionTy = IGM.SILMod->Types.getLoweredType(nongenericTy)
+                       .castTo<SILFunctionType>();
     } else
-      FunTy =
+      FunctionTy =
           IGM.SILMod->Types.getLoweredType(BaseTy).castTo<SILFunctionType>();
-    auto Params = createParameterTypes(FunTy, DbgTy.getDeclContext());
+    auto Params = createParameterTypes(FunctionTy, DbgTy.getDeclContext());
 
+    // Functions are actually stored as a Pointer or a FunctionPairTy:
+    // { i8*, %swift.refcounted* }
     auto FnTy = DBuilder.createSubroutineType(Params, Flags);
-    llvm::DIType *DITy;
-    if (FunTy->getRepresentation() == SILFunctionType::Representation::Thick) {
-      if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(0))
-        // This is a FunctionPairTy: { i8*, %swift.refcounted* }.
-        DITy = createDoublePointerSizedStruct(Scope, MangledName, FnTy,
-                                              MainFile, 0, Flags, MangledName);
-      else
-        // This is a generic function as noted above.
-        DITy = createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
-    } else {
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
-      DITy = createPointerSizedStruct(Scope, MangledName, FnTy, MainFile, 0,
-                                      Flags, MangledName);
-    }
+    auto DITy = createPointerSizedStruct(Scope, MangledName, FnTy,
+                                         MainFile, 0, Flags, MangledName);
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     return DITy;
   }
