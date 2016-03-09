@@ -32,8 +32,7 @@ CompilerExecutable = collections.namedtuple('CompilerExecutable', 'cc cxx')
 
 
 def _freebsd_release_date():
-    """
-    Return the release date for FreeBSD operating system on this host.
+    """Return the release date for FreeBSD operating system on this host.
     If the release date cannot be ascertained, return None.
     """
     try:
@@ -46,8 +45,7 @@ def _freebsd_release_date():
 
 
 def _first_clang(suffixes):
-    """
-    Return a CompilerExecutable with the first available versions of clang
+    """Return a CompilerExecutable with the first available versions of clang
     and clang++, searching in the order of the given suffixes.
 
     If no Clang executables are found, return None.
@@ -62,8 +60,7 @@ def _first_clang(suffixes):
 
 
 def host_clang(xcrun_toolchain):
-    """
-    Return a CompilerExecutable for the host platform.
+    """Return a CompilerExecutable for the host platform.
     If no appropriate compilers can be found, return None.
     """
     if platform.system() == 'Darwin':

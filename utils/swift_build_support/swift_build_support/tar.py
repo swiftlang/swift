@@ -13,8 +13,7 @@ import subprocess
 
 
 def tar(source, destination):
-    """
-    Create a gzip archive of the file at 'source' at the given
+    """Create a gzip archive of the file at 'source' at the given
     'destination' path.
     """
     # We do not use `tarfile` here because:

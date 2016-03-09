@@ -19,8 +19,7 @@
 
 
 def migrate_impl_args(argv, migrate_args):
-    """
-    Given a list of arguments of the form:
+    """Given a list of arguments of the form:
 
         --foo --bar=baz -- --flim=flam
 
