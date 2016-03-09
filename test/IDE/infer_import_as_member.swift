@@ -68,5 +68,7 @@ import InferImportAsMember
 // PRINT-NEXT:   init(fuzzyName fuzzyName: ())
 // PRINT-NEXT: }
 
+// PRINT: func __IAMStruct1IgnoreMe(_ s: IAMStruct1) -> Double
+
 // FIXME: get the class working
 

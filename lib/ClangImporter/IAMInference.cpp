@@ -34,6 +34,9 @@
 STATISTIC(FailInferVar, "# of variables unable to infer");
 STATISTIC(FailInferFunction, "# of functions unable to infer");
 
+// Specifically skipped/avoided
+STATISTIC(SkipLeadingUnderscore, "# of globals skipped due to leading underscore");
+
 // Success statistics
 STATISTIC(SuccessImportAsTypeID, "# imported as 'typeID'");
 STATISTIC(SuccessImportAsConstructor, "# imported as 'init'");
@@ -539,6 +542,11 @@ static bool hasWord(StringRef s, StringRef matchWord) {
 }
 
 IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
+  if (clangDecl->getName().startswith("_")) {
+    ++SkipLeadingUnderscore;
+    return {};
+  }
+
   if (auto varDecl = dyn_cast<clang::VarDecl>(clangDecl)) {
     auto fail = [varDecl]() -> IAMResult {
       DEBUG(llvm::dbgs() << "failed to infer variable: ");

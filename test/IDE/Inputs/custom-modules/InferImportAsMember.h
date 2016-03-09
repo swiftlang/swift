@@ -82,6 +82,8 @@ extern struct IAMStruct1 IAMFuzzyStruct1Create();
 extern struct IAMStruct1 IAMFuzzyStruct1CreateWithFuzzyName();
 extern struct IAMStruct1 IAMFuzzyStruct1CreateFuzzyName();
 
+extern double __IAMStruct1IgnoreMe(struct IAMStruct1 s);
+
 // typedef __attribute__((objc_bridge(id))) void *IAMClassRef;
 struct IAMClass {
   float x, y, z;
