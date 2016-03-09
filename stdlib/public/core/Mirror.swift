@@ -209,7 +209,20 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    Subject, C : Collection where C.Iterator.Element == Child
+    Subject,
+    C : Collection
+    where
+    C.Iterator.Element == Child,
+
+    // FIXME(compiler limitation): these constraints should be applied to
+    // associated types of Collection.
+    C.SubSequence : Collection,
+    C.SubSequence.Iterator.Element == Child,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : Collection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices
   >(
     _ subject: Subject,
     children: C,
