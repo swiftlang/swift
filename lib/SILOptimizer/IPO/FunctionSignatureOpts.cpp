@@ -538,6 +538,8 @@ public:
         Allocator(Allocator) {}
 
   bool analyze();
+  bool analyzeParameters();
+  bool analyzeResult();
 
   /// Returns the mangled name of the function that should be generated from
   /// this function analyzer.
@@ -598,10 +600,7 @@ private:
 
 } // end anonymous namespace
 
-/// This function goes through the arguments of F and sees if we have anything
-/// to optimize in which case it returns true. If we have nothing to optimize,
-/// it returns false.
-bool SignatureAnalyzer::analyze() {
+bool SignatureAnalyzer::analyzeParameters() {
   // For now ignore functions with indirect results.
   if (F->getLoweredFunctionType()->hasIndirectResults())
     return false;
@@ -682,6 +681,17 @@ bool SignatureAnalyzer::analyze() {
     // Add the argument to our list.
     ArgDescList.push_back(std::move(A));
   }
+ 
+  return ShouldOptimize;
+}
+
+bool SignatureAnalyzer::analyzeResult() {
+  // For now ignore functions with indirect results.
+  if (F->getLoweredFunctionType()->hasIndirectResults())
+    return false;
+
+  // Did we decide we should optimize any parameter?
+  bool ShouldOptimize = false;
 
   // Analyze return result information.
   auto DirectResults = F->getLoweredFunctionType()->getDirectResults();
@@ -703,8 +713,16 @@ bool SignatureAnalyzer::analyze() {
       ++NumOwnedConvertedToNotOwnedResult;
     }
   }
-
   return ShouldOptimize;
+}
+
+/// This function goes through the arguments of F and sees if we have anything
+/// to optimize in which case it returns true. If we have nothing to optimize,
+/// it returns false.
+bool SignatureAnalyzer::analyze() {
+  bool OptimizedParams = analyzeParameters();
+  bool OptimizedResult = analyzeResult();
+  return OptimizedParams || OptimizedResult;
 }
 
 //===----------------------------------------------------------------------===//
