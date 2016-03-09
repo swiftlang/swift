@@ -81,7 +81,7 @@ GetTemplateArgument (TypeBase* type,
                 BoundGenericType *bound_generic_type = swift_can_type->getAs<BoundGenericType>();
                 if (!bound_generic_type)
                     break;
-                const llvm::ArrayRef<Substitution>& substitutions = bound_generic_type->getSubstitutions(nullptr,nullptr);
+                const ArrayRef<Substitution>& substitutions = bound_generic_type->getSubstitutions(nullptr,nullptr);
                 if (arg_idx >= substitutions.size())
                     break;
                 const Substitution& substitution = substitutions[arg_idx];
@@ -151,7 +151,7 @@ struct EnumElementInfo {
 
 class DeclsLookupSource {
 public:
-  typedef llvm::SmallVectorImpl<ValueDecl *> ValueDecls;
+  typedef SmallVectorImpl<ValueDecl *> ValueDecls;
 
 private:
   class VisibleDeclsConsumer : public VisibleDeclConsumer {
@@ -214,7 +214,7 @@ public:
     Invalid
   };
 
-  typedef llvm::Optional<std::string> PrivateDeclIdentifier;
+  typedef Optional<std::string> PrivateDeclIdentifier;
 
   static DeclsLookupSource
   GetDeclsLookupSource (ASTContext& ast,
@@ -350,7 +350,7 @@ public:
   }
 
   TypeDecl *
-  lookupLocalType (llvm::StringRef key)
+  lookupLocalType (StringRef key)
   {
     switch (_type)
     {
@@ -381,7 +381,7 @@ public:
       case LookupKind::Decl:
         return ConstString(_decl->getName().get());
       case LookupKind::Extension:
-        llvm::SmallString<64> builder;
+        SmallString<64> builder;
         builder.append("ext ");
         builder.append(_extension._decl->getNameStr());
         builder.append(" in ");
@@ -638,7 +638,7 @@ GetIdentifier (SwiftASTContext *ast,
 
 static bool
 FindFirstNamedDeclWithKind (SwiftASTContext *ast,
-                            const llvm::StringRef &name,
+                            const StringRef &name,
                             DeclKind decl_kind,
                             VisitNodeResult &result,
                             DeclsLookupSource::PrivateDeclIdentifier priv_decl_id = DeclsLookupSource::PrivateDeclIdentifier())
@@ -649,14 +649,14 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
     Decl *parent_decl = result._decls.back();
     if (parent_decl)
     {
-      auto nominal_decl = llvm::dyn_cast<NominalTypeDecl>(parent_decl);
+      auto nominal_decl = dyn_cast<NominalTypeDecl>(parent_decl);
 
       if (nominal_decl)
       {
         bool check_type_aliases = false;
 
         DeclsLookupSource lookup(DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
-        llvm::SmallVector<ValueDecl *, 4> decls;
+        SmallVector<ValueDecl *, 4> decls;
         lookup.lookupMember(ast->getIdentifier(name),
                             GetIdentifier(ast,priv_decl_id),
                             decls);
@@ -717,7 +717,7 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
   {
     Module::AccessPathTy access_path;
     Identifier name_ident(ast->getIdentifier(name));
-    llvm::SmallVector<ValueDecl*, 4> decls;
+    SmallVector<ValueDecl*, 4> decls;
     if (priv_decl_id)
       result._module.lookupMember(name_ident, ast->getIdentifier(priv_decl_id.getValue().c_str()), decls);
     else
@@ -779,7 +779,7 @@ FindFirstNamedDeclWithKind (SwiftASTContext *ast,
 
 static size_t
 FindNamedDecls (SwiftASTContext *ast,
-                const llvm::StringRef &name,
+                const StringRef &name,
                 VisitNodeResult &result,
                 DeclsLookupSource::PrivateDeclIdentifier priv_decl_id = DeclsLookupSource::PrivateDeclIdentifier())
 {
@@ -790,12 +790,12 @@ FindNamedDecls (SwiftASTContext *ast,
     result._types.clear();
     if (parent_decl)
     {
-      auto nominal_decl = llvm::dyn_cast<NominalTypeDecl>(parent_decl);
+      auto nominal_decl = dyn_cast<NominalTypeDecl>(parent_decl);
 
       if (nominal_decl)
       {
         DeclsLookupSource lookup(DeclsLookupSource::GetDeclsLookupSource(nominal_decl));
-        llvm::SmallVector<ValueDecl *, 4> decls;
+        SmallVector<ValueDecl *, 4> decls;
         lookup.lookupMember(ast->getIdentifier(name),
                             GetIdentifier(ast,priv_decl_id),
                             decls);
@@ -838,7 +838,7 @@ FindNamedDecls (SwiftASTContext *ast,
   else if (result._module)
   {
     Module::AccessPathTy access_path;
-    llvm::SmallVector<ValueDecl*, 4> decls;
+    SmallVector<ValueDecl*, 4> decls;
     if (priv_decl_id)
       result._module.lookupMember(ast->getIdentifier(name),
                                   ast->getIdentifier(priv_decl_id.getValue().c_str()),
@@ -933,7 +933,7 @@ FixCallingConv (Decl *in_decl, TypeBase *in_type)
   if (!in_decl)
     return in_type;
 
-  AnyFunctionType *func_type = llvm::dyn_cast<AnyFunctionType>(in_type);
+  AnyFunctionType *func_type = dyn_cast<AnyFunctionType>(in_type);
   if (func_type)
   {
     DeclContext *decl_context = in_decl->getDeclContext();
@@ -976,7 +976,7 @@ VisitNodeGenerics (SwiftASTContext *ast,
                    const VisitNodeResult &generic_context, // set by GenericType case
                    Log *log)
 {
-  llvm::SmallVector<Type, 4> nested_types;
+  SmallVector<Type, 4> nested_types;
   VisitNodeResult associated_type_result;
   VisitNodeResult archetype_ref_result;
   VisitNodeResult archetype_type_result;
@@ -1020,7 +1020,7 @@ VisitNodeArchetype(SwiftASTContext *ast,
                    const VisitNodeResult &generic_context, // set by GenericType case
                    Log *log)
 {
-  const llvm::StringRef& archetype_name(cur_node->getText());
+  const StringRef& archetype_name(cur_node->getText());
   VisitNodeResult protocol_list;
   for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end(); pos != end; ++pos)
   {
@@ -1038,7 +1038,7 @@ VisitNodeArchetype(SwiftASTContext *ast,
     }
   }
 
-  llvm::SmallVector<Type, 1> conforms_to;
+  SmallVector<Type, 1> conforms_to;
   if (protocol_list.HasSingleType())
     conforms_to.push_back(protocol_list.GetFirstType());
 
@@ -1065,11 +1065,11 @@ VisitNodeArchetypeRef(SwiftASTContext *ast,
                       const VisitNodeResult &generic_context, // set by GenericType case
                       Log *log)
 {
-  const llvm::StringRef& archetype_name(cur_node->getText());
+  const StringRef& archetype_name(cur_node->getText());
   Type result_type;
   for (const Type &archetype : generic_context._types)
   {
-    const ArchetypeType *cast_archetype = llvm::dyn_cast<ArchetypeType>(archetype.getPointer());
+    const ArchetypeType *cast_archetype = dyn_cast<ArchetypeType>(archetype.getPointer());
 
     if (cast_archetype && !cast_archetype->getName().str().compare(archetype_name))
     {
@@ -1088,7 +1088,7 @@ VisitNodeArchetypeRef(SwiftASTContext *ast,
                                                            nullptr,
                                                            (AssociatedTypeDecl *)nullptr,
                                                            ast->getIdentifier(archetype_name),
-                                                           llvm::ArrayRef<Type>(), Type()));
+                                                           ArrayRef<Type>(), Type()));
     }
     else
     {
@@ -1173,7 +1173,7 @@ VisitNodeBoundGeneric (SwiftASTContext *ast,
 
     if (generic_type_result._types.size() == 1 && !template_types_result._types.empty())
     {
-      NominalTypeDecl *nominal_type_decl = llvm::dyn_cast<NominalTypeDecl>(generic_type_result._decls.front());
+      NominalTypeDecl *nominal_type_decl = dyn_cast<NominalTypeDecl>(generic_type_result._decls.front());
       DeclContext * parent_decl = nominal_type_decl->getParent();
       Type parent_type;
       if (parent_decl->isTypeContext())
@@ -1196,12 +1196,12 @@ VisitNodeBuiltinTypeName (SwiftASTContext *ast,
 {
   std::string builtin_name = cur_node->getText();
 
-  llvm::StringRef builtin_name_ref(builtin_name);
+  StringRef builtin_name_ref(builtin_name);
 
   if (builtin_name_ref.startswith("Builtin."))
   {
-    llvm::StringRef stripped_name_ref = builtin_name_ref.drop_front(strlen("Builtin."));
-    llvm::SmallVector<ValueDecl *, 1> builtin_decls;
+    StringRef stripped_name_ref = builtin_name_ref.drop_front(strlen("Builtin."));
+    SmallVector<ValueDecl *, 1> builtin_decls;
 
     result._module = DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString("Builtin"));
 
@@ -1254,7 +1254,7 @@ VisitNodeConstructor (SwiftASTContext *ast,
   if (kind_type_result.HasSingleType() && type_result.HasSingleType())
   {
     bool found = false;
-    const size_t n = FindNamedDecls(ast, llvm::StringRef("init"), kind_type_result);
+    const size_t n = FindNamedDecls(ast, StringRef("init"), kind_type_result);
     if (n == 1)
     {
       found = true;
@@ -1329,7 +1329,7 @@ VisitNodeDestructor (SwiftASTContext *ast,
   if (kind_type_result.HasSingleType())
   {
     bool found = false;
-    const size_t n = FindNamedDecls(ast, llvm::StringRef("deinit"), kind_type_result);
+    const size_t n = FindNamedDecls(ast, StringRef("deinit"), kind_type_result);
     if (n == 1)
     {
       found = true;
@@ -1411,7 +1411,7 @@ VisitNodeDeclContext (SwiftASTContext *ast,
       AbstractFunctionDecl *func_decl = nullptr;
       for (Decl* decl : found_decls._decls)
       {
-        func_decl = llvm::dyn_cast<AbstractFunctionDecl>(decl);
+        func_decl = dyn_cast<AbstractFunctionDecl>(decl);
         if (!func_decl)
           continue;
         GenericParamList *gen_params = func_decl->getGenericParams();
@@ -1524,7 +1524,7 @@ VisitNodeExtension (SwiftASTContext *ast,
     if (type_result._decls.size() == 1)
     {
       Decl *decl = type_result._decls[0];
-      NominalTypeDecl *nominal_decl = llvm::dyn_cast_or_null<NominalTypeDecl>(decl);
+      NominalTypeDecl *nominal_decl = dyn_cast_or_null<NominalTypeDecl>(decl);
       if (nominal_decl)
       {
         result._module = DeclsLookupSource::GetDeclsLookupSource(module_result._module, nominal_decl);
@@ -1660,7 +1660,7 @@ VisitNodeFunction (SwiftASTContext *ast,
   //                        if (identifier_result.HasSingleType())
   //                        {
   //                            // This contains the class or struct
-  //                            llvm::StringRef init_name("init");
+  //                            StringRef init_name("init");
   //
   //                            if (FindFirstNamedDeclWithKind(ast, init_name, DeclKind::Constructor, identifier_result))
   //                            {
@@ -1886,7 +1886,7 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
 
     for (size_t i = 0; i < num_decls; i++)
     {
-      subscript_decl = llvm::dyn_cast_or_null<SubscriptDecl>(decl_ctx_result._decls[i]);
+      subscript_decl = dyn_cast_or_null<SubscriptDecl>(decl_ctx_result._decls[i]);
       if (subscript_decl)
       {
         switch (node_kind)
@@ -1953,7 +1953,7 @@ VisitNodeSetterGetter (SwiftASTContext *ast,
 
     if (decl_ctx_result._decls.size() == 1)
     {
-      var_decl = llvm::dyn_cast_or_null<VarDecl>(decl_ctx_result._decls[0]);
+      var_decl = dyn_cast_or_null<VarDecl>(decl_ctx_result._decls[0]);
     }
     else if (decl_ctx_result._decls.size() > 0)
     {
@@ -2052,7 +2052,7 @@ VisitNodeLocalDeclName (SwiftASTContext *ast,
 
     result._decls.push_back(decl);
     auto type = decl->getType();
-    if (MetatypeType *metatype = llvm::dyn_cast_or_null<MetatypeType>(type.getPointer()))
+    if (MetatypeType *metatype = dyn_cast_or_null<MetatypeType>(type.getPointer()))
       type = metatype->getInstanceType();
     result._types.push_back(type);
   }
@@ -2125,7 +2125,7 @@ VisitNodeMetatype (SwiftASTContext *ast,
   auto iter = cur_node->begin();
   auto end = cur_node->end();
 
-  llvm::Optional<MetatypeRepresentation> metatype_repr;
+  Optional<MetatypeRepresentation> metatype_repr;
   VisitNodeResult type_result;
 
   for (; iter != end; ++iter)
@@ -2318,10 +2318,10 @@ VisitNodeQualifiedArchetype (SwiftASTContext *ast,
                     if (decl_ptr->getDeclContext()->isTypeContext())
                     {
                         // if I can get the function type from it
-                        if (auto func_type = llvm::dyn_cast_or_null<AnyFunctionType>(type_ptr))
+                        if (auto func_type = dyn_cast_or_null<AnyFunctionType>(type_ptr))
                         {
                             // and it has a return type which is itself a function
-                            auto return_func_type = llvm::dyn_cast_or_null<AnyFunctionType>(func_type->getResult().getPointer());
+                            auto return_func_type = dyn_cast_or_null<AnyFunctionType>(func_type->getResult().getPointer());
                             if (return_func_type)
                                 type_ptr = return_func_type; // then use IT as our source of archetypes
                         }
