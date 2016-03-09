@@ -3955,6 +3955,7 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
                             Impl.OmitNeedlessWords,
+                            Impl.InferImportAsMember,
                             Impl.InferDefaultArguments);
 }
 
