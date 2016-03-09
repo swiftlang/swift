@@ -50,6 +50,7 @@ STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 //===----------------------------------------------------------------------===//
 
 typedef SmallVector<FullApplySite, 8> ApplyList;
+using ReleaseSet = llvm::DenseSet<SILInstruction *>;
 
 /// Returns true if I is a release instruction.
 static bool isRelease(SILInstruction *I) {
@@ -75,6 +76,31 @@ static bool hasIdenticalReleases(ReleaseList LHS, ReleaseList RHS) {
   return true;
 }
 
+static ReleaseSet
+collectEpilogueReleases(ConsumedArgToEpilogueReleaseMatcher &Return,
+                        ConsumedArgToEpilogueReleaseMatcher &Throw,
+                        SILArgument *Arg) {
+  ReleaseSet EpilogueReleases;
+  // Handle return block.
+  auto ReturnReleases = Return.getReleasesForArgument(Arg);
+  if (ReturnReleases.empty())
+    return EpilogueReleases;
+  for (auto &X : Return.getReleasesForArgument(Arg)) 
+    EpilogueReleases.insert(X);
+
+  // Handle throw block.
+  if (!Throw.hasBlock())
+    return EpilogueReleases;
+  auto ThrowReleases = Throw.getReleasesForArgument(Arg);
+  if (ThrowReleases.empty()) {
+    EpilogueReleases.clear();
+    return EpilogueReleases;
+  }
+  for (auto &X : ThrowReleases) 
+    EpilogueReleases.insert(X);
+
+  return EpilogueReleases;
+}
 
 /// Returns .Some(I) if I is a release that is the only non-debug instruction
 /// with side-effects in the use-def graph originating from Arg. Returns
@@ -119,6 +145,9 @@ getNonTrivialNonDebugReleaseUse(SILArgument *Arg) {
   return Result;
 }
 
+
+
+
 //===----------------------------------------------------------------------===//
 //                             Argument Analysis
 //===----------------------------------------------------------------------===//
@@ -139,7 +168,10 @@ struct ArgumentDescriptor {
   const ValueDecl *Decl;
 
   /// Was this parameter originally dead?
-  bool IsDead;
+  bool IsEntirelyDead;
+
+  /// Should the argument be exploded ?
+  bool Explode;
 
   /// Is this parameter an indirect result?
   bool IsIndirectResult;
@@ -165,12 +197,15 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
+  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A,
+                     ReleaseSet Releases)
       : Arg(A), Index(A->getIndex()),
-        Decl(A->getDecl()), IsDead(false),
+        Decl(A->getDecl()), IsEntirelyDead(false), Explode(false),
         IsIndirectResult(A->isIndirectResult()),
         CalleeRelease(), CalleeReleaseInThrowBlock(),
-        ProjTree(A->getModule(), BPA, A->getType()) {
+        ProjTree(A->getModule(), BPA, A->getType(), 
+        ProjectionTreeNode::LivenessKind::IgnoreEpilogueReleases, 
+        Releases) {
     ProjTree.computeUsesAndLiveness(A);
   }
 
@@ -266,7 +301,7 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
     SmallVectorImpl<SILParameterInfo> &Out) const {
   DEBUG(llvm::dbgs() << "        Computing Interface Params\n");
   // If we have a dead argument, bail.
-  if (IsDead) {
+  if (IsEntirelyDead) {
     DEBUG(llvm::dbgs() << "            Dead!\n");
     return;
   }
@@ -287,7 +322,7 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
   }
 
   // If we cannot explode this value, handle callee release and return.
-  if (!shouldExplode()) {
+  if (!Explode) {
     DEBUG(llvm::dbgs() << "            ProjTree cannot explode arg.\n");
     // If we found releases in the callee in the last BB on an @owned
     // parameter, change the parameter to @guaranteed and continue...
@@ -311,10 +346,12 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
   DEBUG(llvm::dbgs() << "            ProjTree can explode arg.\n");
   // Ok, we need to use the projection tree. Iterate over the leafs of the
   // tree...
-  llvm::SmallVector<SILType, 8> LeafTypes;
-  ProjTree.getLeafTypes(LeafTypes);
+  llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
+  ProjTree.getLeafNodes(LeafNodes);
   DEBUG(llvm::dbgs() << "            Leafs:\n");
-  for (SILType Ty : LeafTypes) {
+  for (auto Node : LeafNodes) {
+    // Node type.
+    SILType Ty = Node->getType();
     DEBUG(llvm::dbgs() << "                " << Ty << "\n");
     // If Ty is trivial, just pass it directly.
     if (Ty.isTrivial(Arg->getModule())) {
@@ -356,11 +393,11 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
 void ArgumentDescriptor::addCallerArgs(
     SILBuilder &B, FullApplySite FAS,
     llvm::SmallVectorImpl<SILValue> &NewArgs) const {
-  if (IsDead)
+  if (IsEntirelyDead)
     return;
 
   SILValue Arg = FAS.getArgument(Index);
-  if (!shouldExplode()) {
+  if (!Explode) {
     NewArgs.push_back(Arg);
     return;
   }
@@ -371,10 +408,10 @@ void ArgumentDescriptor::addCallerArgs(
 void ArgumentDescriptor::addThunkArgs(
     SILBuilder &Builder, SILBasicBlock *BB,
     llvm::SmallVectorImpl<SILValue> &NewArgs) const {
-  if (IsDead)
+  if (IsEntirelyDead)
     return;
 
-  if (!shouldExplode()) {
+  if (!Explode) {
     NewArgs.push_back(BB->getBBArg(Index));
     return;
   }
@@ -388,7 +425,7 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
                                                    unsigned ArgOffset) {
   // If this argument is completely dead, delete this argument and return
   // ArgOffset.
-  if (IsDead) {
+  if (IsEntirelyDead) {
     // If we have a callee release and we are dead, set the callee release's
     // operand to undef. We do not need it to have the argument anymore, but we
     // do need the instruction to be non-null.
@@ -410,7 +447,7 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
 
   // If this argument is not dead and we did not perform SROA, increment the
   // offset and return.
-  if (!shouldExplode()) {
+  if (!Explode) {
     return ArgOffset + 1;
   }
 
@@ -424,11 +461,11 @@ unsigned ArgumentDescriptor::updateOptimizedBBArgs(SILBuilder &Builder,
   // We do this in the same order as leaf types since ProjTree expects that the
   // order of leaf values matches the order of leaf types.
   {
-    llvm::SmallVector<SILType, 8> LeafTypes;
-    ProjTree.getLeafTypes(LeafTypes);
-    for (auto Ty : LeafTypes) {
+    llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
+    ProjTree.getLeafNodes(LeafNodes);
+    for (auto Node : LeafNodes) {
       LeafValues.push_back(BB->insertBBArg(
-          ArgOffset++, Ty, BB->getBBArg(OldArgOffset)->getDecl()));
+          ArgOffset++, Node->getType(), BB->getBBArg(OldArgOffset)->getDecl()));
     }
   }
 
@@ -577,13 +614,21 @@ bool SignatureAnalyzer::analyze() {
   ConsumedArgToEpilogueReleaseMatcher ArgToThrowReleaseMap(
       RCIA, F, ConsumedArgToEpilogueReleaseMatcher::ExitKind::Throw);
 
+
   // Did we decide we should optimize any parameter?
   bool ShouldOptimize = false;
 
   // Analyze the argument information.
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgumentDescriptor A(Allocator, Args[i]);
+    // Find all the epilogue releases for this argument.
+    auto EpilogueReleases = collectEpilogueReleases(ArgToReturnReleaseMap,
+                                                    ArgToThrowReleaseMap,
+                                                    Args[i]);
+    ArgumentDescriptor A(Allocator, Args[i], EpilogueReleases);
     bool HaveOptimizedArg = false;
+
+    // Whether we will explode the argument or not.
+    A.Explode = A.shouldExplode();
 
     bool isABIRequired = isArgumentABIRequired(Args[i]);
     auto OnlyRelease = getNonTrivialNonDebugReleaseUse(Args[i]);
@@ -591,7 +636,7 @@ bool SignatureAnalyzer::analyze() {
     // If this argument is not ABI required and has no uses except for debug
     // instructions, remove it.
     if (!isABIRequired && OnlyRelease && OnlyRelease.getValue().empty()) {
-      A.IsDead = true;
+      A.IsEntirelyDead = true;
       HaveOptimizedArg = true;
       ++NumDeadArgsEliminated;
     }
@@ -610,7 +655,7 @@ bool SignatureAnalyzer::analyze() {
           // TODO: accept a second release in the throw block to let the
           // argument be dead.
           if (OnlyRelease && hasIdenticalReleases(OnlyRelease.getValue(), Releases)) {
-            A.IsDead = true;
+            A.IsEntirelyDead = true;
           }
 
           A.CalleeRelease = Releases;
@@ -621,7 +666,7 @@ bool SignatureAnalyzer::analyze() {
       }
     }
 
-    if (A.shouldExplode()) {
+    if (A.Explode) {
       HaveOptimizedArg = true;
       ++NumSROAArguments;
     }
@@ -674,7 +719,7 @@ std::string SignatureAnalyzer::getOptimizedName() const {
   // Handle arguments' changes.
   for (unsigned i : indices(ArgDescList)) {
     const ArgumentDescriptor &Arg = ArgDescList[i];
-    if (Arg.IsDead) {
+    if (Arg.IsEntirelyDead) {
       FSSM.setArgumentDead(i);
     }
 
@@ -686,7 +731,7 @@ std::string SignatureAnalyzer::getOptimizedName() const {
 
     // If this argument is not dead and we can explode it, add 's' to the
     // mangling.
-    if (Arg.shouldExplode() && !Arg.IsDead) {
+    if (Arg.Explode && !Arg.IsEntirelyDead) {
       FSSM.setArgumentSROA(i);
     }
   }
@@ -978,6 +1023,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // optimization is done later by modifying the function signature elements
   // themselves.
   SILFunction *NewF = Optimizer.createEmptyFunctionWithOptimizedSig(NewFName);
+
   // Then we transfer the body of F to NewF. At this point, the arguments of the
   // first BB will not match.
   NewF->spliceBody(F);

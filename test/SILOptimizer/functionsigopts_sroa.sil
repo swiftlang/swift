@@ -317,6 +317,7 @@ bb0(%0 : $S5, %1 : $S5):
   %5 = struct_extract %1 : $S5, #S5.f2
   %6 = struct_extract %5 : $S1, #S1.f1
   %7 = struct_extract %5 : $S1, #S1.f2
+  release_value %1 : $S5
   release_value %0 : $S5
   release_value %1 : $S5
   %8 = tuple(%6 : $Builtin.Int16, %7 : $Builtin.Int32, %6 : $Builtin.Int16, %7 : $Builtin.Int32)
