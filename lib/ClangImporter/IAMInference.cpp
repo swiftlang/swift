@@ -98,8 +98,9 @@ static bool isCFTypeName(StringRef name) {
 
 IAMOptions IAMOptions::getDefault() { return {}; }
 
-// As append, but skip a repeated word at the boundary. Case sensitive.
-// Example: appendUniq("FooBar", "BarBaz") ==> "FooBarBaz"
+// As append, but skip a repeated word at the boundary. First-letter-case
+// insensitive.
+// Example: appendUniq("FooBar", "barBaz") ==> "FooBarBaz"
 void appendUniq(NameBuffer &src, StringRef toAppend) {
   if (src.empty()) {
     src = toAppend;
@@ -109,7 +110,8 @@ void appendUniq(NameBuffer &src, StringRef toAppend) {
   auto appendWords = camel_case::getWords(toAppend);
   StringRef lastWord = *camel_case::getWords(src).rbegin();
   auto wI = appendWords.begin();
-  while (wI != appendWords.end() && *wI == lastWord)
+  while (wI != appendWords.end() &&
+         camel_case::sameWordIgnoreFirstCase(*wI, lastWord))
     ++wI;
   src.append(wI.getRestOfStr());
 }
@@ -158,14 +160,17 @@ static void formHumbleCamelName(StringRef left, StringRef right,
   camel_case::appendSentenceCase(out, wI.getRestOfStr());
 }
 
-static unsigned dropWord(StringRef str, StringRef word, NameBuffer &out) {
+// Drops the specified word, and returns the number of times it was dropped.
+// When forming the resultant string, will call appendUniq to skip repeated
+// words at the boundary.
+static unsigned dropWordUniq(StringRef str, StringRef word, NameBuffer &out) {
   unsigned numDropped = 0;
   auto words = camel_case::getWords(str);
   for (auto wI = words.begin(), wE = words.end(); wI != wE; ++wI)
     if (*wI == word)
       ++numDropped;
     else
-      out.append(*wI);
+      appendUniq(out, *wI);
 
   return numDropped;
 }
@@ -201,7 +206,7 @@ private:
     if (name != initSpecifier) {
       assert(name.size() > initSpecifier.size() &&
              "should have more words in it");
-      auto didDrop = dropWord(name, initSpecifier, buf);
+      auto didDrop = dropWordUniq(name, initSpecifier, buf);
       (void)didDrop;
       assert(didDrop != 0 && "specifier not present?");
     }

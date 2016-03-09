@@ -61,11 +61,12 @@ import InferImportAsMember
 // PRINT-LABEL:  /// Static computed properties
 // PRINT-NEXT:   static var staticProperty: Double
 // PRINT-NEXT:   static var staticOnlyProperty: Double { get }
-
+//
 // PRINT-LABEL:  /// Fuzzy
-// FIXME: fuzzies
-
-// PRINT: }
+// PRINT-NEXT:   init(fuzzy fuzzy: ())
+// PRINT-NEXT:   init(fuzzyWithFuzzyName fuzzyWithFuzzyName: ())
+// PRINT-NEXT:   init(fuzzyName fuzzyName: ())
+// PRINT-NEXT: }
 
 // FIXME: get the class working
 
