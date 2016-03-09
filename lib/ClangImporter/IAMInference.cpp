@@ -35,8 +35,8 @@ STATISTIC(FailInferVar, "# of variables unable to infer");
 STATISTIC(FailInferFunction, "# of functions unable to infer");
 
 // Success statistics
-STATISTIC(SuccessImportAsTypeID, "# imported as typeID");
-STATISTIC(SuccessImportAsConstructor, "# imported as init()");
+STATISTIC(SuccessImportAsTypeID, "# imported as 'typeID'");
+STATISTIC(SuccessImportAsConstructor, "# imported as 'init'");
 STATISTIC(SuccessImportAsInstanceComputedProperty,
           "# imported as instance computed property");
 STATISTIC(SuccessImportAsStaticProperty,
@@ -97,6 +97,23 @@ static bool isCFTypeName(StringRef name) {
 // }
 
 IAMOptions IAMOptions::getDefault() { return {}; }
+
+// Drop consecutive unique words, ignoring case
+static unsigned uniq(StringRef str, NameBuffer &out) {
+  unsigned numDropped = 0;
+  auto words = camel_case::getWords(str);
+  StringRef priorWord = "";
+  for (auto wI = words.begin(), wE = words.end(); wI != wE; ++wI) {
+    if (camel_case::sameWordIgnoreFirstCase(*wI, priorWord)) {
+      ++numDropped;
+      continue;
+    }
+    priorWord = *wI;
+    out.append(*wI);
+  }
+
+  return numDropped;
+}
 
 static unsigned dropWord(StringRef str, StringRef word, NameBuffer &out) {
   unsigned numDropped = 0;
@@ -280,20 +297,39 @@ private:
   }
 
   DeclName formDeclName(StringRef baseName) {
-    return {getHumbleIdentifier(baseName)};
+    NameBuffer baseNameBuf;
+
+    // FIXME: instead, have fuzzy append be append_uniq
+    uniq(baseName, baseNameBuf);
+
+    return {getHumbleIdentifier(baseNameBuf)};
   }
 
   DeclName formDeclName(StringRef baseName,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         StringRef firstPrefix = "") {
     SmallVector<Identifier, 8> argLabels;
+
+    if (params.empty() && firstPrefix != "") {
+      // We need to form an argument label, despite there being no argument
+      NameBuffer paramName;
+      camel_case::toLowercaseWord(firstPrefix, paramName);
+
+      // FIXME: enable this when we have ImportDecl support.
+      // argLabels.push_back(context.getIdentifier(paramName));
+    }
+
     for (unsigned i = 0; i < params.size(); ++i) {
       NameBuffer paramName;
       if (i == 0 && firstPrefix != "") {
-        camel_case::toLowercaseWord(firstPrefix, paramName);
+        NameBuffer prefixBuf;
+        camel_case::toLowercaseWord(firstPrefix, prefixBuf);
         NameBuffer paramBuf;
         camel_case::toSentencecase(params[i]->getName(), paramBuf);
-        paramName.append(paramBuf);
+
+        // FIXME: appendUniq would be more clear than a free-form uniq
+        prefixBuf.append(paramBuf);
+        uniq(prefixBuf, paramName);
       } else {
         paramName.append(params[i]->getName());
       }
@@ -301,7 +337,12 @@ private:
       argLabels.push_back(context.getIdentifier(paramName));
     }
 
-    return {context, getHumbleIdentifier(baseName), argLabels};
+
+    // FIXME: instead, have fuzzy append be append_uniq
+    NameBuffer baseNameBuf;
+    uniq(baseName, baseNameBuf);
+
+    return {context, getHumbleIdentifier(baseNameBuf), argLabels};
   }
 
   bool match(StringRef str, StringRef toMatch, NameBuffer &outStr) {

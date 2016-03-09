@@ -10,6 +10,7 @@ extern double IAMStruct1GlobalVar;
 /// Init
 extern struct IAMStruct1 IAMStruct1CreateCopy(struct IAMStruct1 in);
 extern struct IAMStruct1 IAMStruct1CreateSimple(double value);
+extern struct IAMStruct1 IAMStruct1CreateRedundant(double redundant);
 
 /// Methods
 extern struct IAMStruct1 IAMStruct1Invert(struct IAMStruct1 s);

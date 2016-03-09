@@ -21,6 +21,7 @@ import InferImportAsMember
 // PRINT-LABEL:  /// Init
 // PRINT-NEXT:   init(copyIn in: IAMStruct1)
 // PRINT-NEXT:   init(simpleValue value: Double)
+// PRINT-NEXT:   init(redundant redundant: Double)
 //
 // PRINT-LABEL:  /// Methods
 // PRINT-NEXT:   func invert() -> IAMStruct1
