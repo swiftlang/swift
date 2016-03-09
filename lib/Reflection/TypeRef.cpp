@@ -17,6 +17,7 @@
 
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 using namespace reflection;
@@ -72,6 +73,8 @@ public:
     printHeader("nominal");
     auto demangled = Demangle::demangleTypeAsString(N->getMangledName());
     printField("", demangled);
+    if (auto parent = N->getParent())
+      printRec(parent.get());
     OS << ')';
   }
 
@@ -80,7 +83,9 @@ public:
     auto demangled = Demangle::demangleTypeAsString(BG->getMangledName());
     printField("", demangled);
     for (auto param : BG->getGenericParams())
-      printRec(param.second.get());
+      printRec(param.get());
+    if (auto parent = BG->getParent())
+      printRec(parent.get());
     OS << ')';
   }
 
@@ -127,8 +132,8 @@ public:
 
   void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
     printHeader("generic-type-parameter");
-    printField("index", GTP->getIndex());
     printField("depth", GTP->getDepth());
+    printField("index", GTP->getIndex());
     OS << ')';
   }
 
@@ -172,7 +177,7 @@ struct TypeRefIsConcrete
   bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
     TypeRefVector GenericParams;
     for (auto Param : BG->getGenericParams())
-      if (!visit(Param.second.get()))
+      if (!visit(Param.get()))
         return false;
     return true;
   }
@@ -274,18 +279,7 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
         if (auto ParamTypeRef = fromDemangleNode(genericArg))
           Args.push_back(ParamTypeRef);
 
-      GenericArgumentMap ArgMap;
-      unsigned Index = 0;
-      for (auto Arg : Args) {
-        if (auto GTP = dyn_cast<GenericTypeParameterTypeRef>(Arg.get())) {
-          ArgMap.insert({{GTP->getIndex(), GTP->getDepth()}, Arg});
-        } else {
-          ArgMap.insert({{Index, 0}, Arg});
-        }
-        ++Index;
-      }
-
-      return BoundGenericTypeRef::create(mangledName, ArgMap);
+      return BoundGenericTypeRef::create(mangledName, Args);
     }
     case NodeKind::Class:
     case NodeKind::Enum:
@@ -327,7 +321,7 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();
-      return GenericTypeParameterTypeRef::create(index, depth);
+      return GenericTypeParameterTypeRef::create(depth, index);
     }
     case NodeKind::FunctionType: {
       TypeRefVector arguments;
@@ -366,4 +360,62 @@ TypeRefPointer TypeRef::fromDemangleNode(Demangle::NodePointer Node) {
 
 bool TypeRef::isConcrete() const {
   return TypeRefIsConcrete().visit(this);
+}
+
+static unsigned _getDepth(TypeRef *TR) {
+  switch (TR->getKind()) {
+  case TypeRefKind::Nominal: {
+    auto Nom = cast<NominalTypeRef>(TR);
+    return Nom->getDepth();
+    break;
+  }
+  case TypeRefKind::BoundGeneric: {
+    auto BG = cast<BoundGenericTypeRef>(TR);
+    return BG->getDepth();
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected type ref kind asked for parent type");
+  }
+}
+
+unsigned NominalTypeRef::getDepth() const {
+  if (auto P = Parent.get())
+    return 1 + _getDepth(P);
+
+  return 0;
+}
+
+unsigned BoundGenericTypeRef::getDepth() const {
+  if (auto P = Parent.get())
+    return 1 + _getDepth(P);
+
+  return 0;
+}
+
+GenericArgumentMap TypeRef::getSubstMap() const {
+  GenericArgumentMap Substitutions;
+  switch (getKind()) {
+    case TypeRefKind::Nominal: {
+      auto Nom = cast<NominalTypeRef>(this);
+      if (auto Parent = Nom->getParent())
+        return Parent->getSubstMap();
+      return GenericArgumentMap();
+    }
+    case TypeRefKind::BoundGeneric: {
+      auto BG = cast<BoundGenericTypeRef>(this);
+      auto Depth = BG->getDepth();
+      unsigned Index = 0;
+      for (auto Param : BG->getGenericParams())
+        Substitutions.insert({{Depth, Index++}, Param});
+      if (auto Parent = BG->getParent()) {
+        auto ParentSubs = Parent->getSubstMap();
+        Substitutions.insert(ParentSubs.begin(), ParentSubs.end());
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return Substitutions;
 }

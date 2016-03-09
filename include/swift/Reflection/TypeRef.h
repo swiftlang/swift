@@ -19,10 +19,10 @@
 #define SWIFT_REFLECTION_TYPEREF_H
 
 #include "swift/Basic/Demangle.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
 
 #include <iostream>
-#include <map>
 
 class NodePointer;
 
@@ -48,9 +48,8 @@ using TypeRefPointer = std::shared_ptr<TypeRef>;
 using ConstTypeRefPointer = std::shared_ptr<const TypeRef>;
 using TypeRefVector = std::vector<TypeRefPointer>;
 using ConstTypeRefVector = const std::vector<TypeRefPointer>;
-
-using GenericArgumentMap = std::map<std::pair<unsigned, unsigned>,
-                                    TypeRefPointer>;
+using DepthAndIndex = std::pair<unsigned, unsigned>;
+using GenericArgumentMap = llvm::DenseMap<DepthAndIndex, TypeRefPointer>;
 
 class TypeRef : public std::enable_shared_from_this<TypeRef> {
   TypeRefKind Kind;
@@ -69,8 +68,11 @@ public:
 
   template <typename Runtime>
   TypeRefPointer
-  substituteGenerics(ReflectionContext<Runtime> &RC,
-                     typename Runtime::StoredPointer MetadataAddress);
+  subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs,
+        typename Runtime::StoredPointer MetadatAddress);
+
+  GenericArgumentMap getSubstMap() const;
+
   static TypeRefPointer fromDemangleNode(Demangle::NodePointer Node);
 };
 
@@ -96,18 +98,34 @@ public:
 
 class NominalTypeRef final : public TypeRef {
   std::string MangledName;
+  TypeRefPointer Parent;
 
 public:
-  NominalTypeRef(std::string MangledName)
-    : TypeRef(TypeRefKind::Nominal), MangledName(MangledName) {}
+  NominalTypeRef(std::string MangledName, TypeRefPointer Parent = nullptr)
+    : TypeRef(TypeRefKind::Nominal), MangledName(MangledName), Parent(Parent) {}
 
-  static std::shared_ptr<NominalTypeRef> create(std::string MangledName) {
-    return std::make_shared<NominalTypeRef>(MangledName);
+  static std::shared_ptr<NominalTypeRef>
+  create(std::string MangledName, TypeRefPointer Parent = nullptr) {
+    return std::make_shared<NominalTypeRef>(MangledName, Parent);
   }
 
   std::string getMangledName() const {
     return MangledName;
   }
+
+  ConstTypeRefPointer getParent() const {
+    return Parent;
+  }
+
+  TypeRefPointer getParent() {
+    return Parent;
+  }
+
+  void setParent(TypeRefPointer P) {
+    Parent = P;
+  }
+
+  unsigned getDepth() const;
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Nominal;
@@ -116,26 +134,44 @@ public:
 
 class BoundGenericTypeRef final : public TypeRef {
   std::string MangledName;
-  GenericArgumentMap GenericParams;
+  TypeRefVector GenericParams;
+  TypeRefPointer Parent;
 
 public:
-  BoundGenericTypeRef(std::string MangledName, GenericArgumentMap GenericParams)
+  BoundGenericTypeRef(std::string MangledName, TypeRefVector GenericParams,
+                      TypeRefPointer Parent = nullptr)
     : TypeRef(TypeRefKind::BoundGeneric),
       MangledName(MangledName),
-      GenericParams(GenericParams) {}
+      GenericParams(GenericParams),
+      Parent(Parent) {}
 
   static std::shared_ptr<BoundGenericTypeRef>
-  create(std::string MangledName, GenericArgumentMap GenericParams) {
-    return std::make_shared<BoundGenericTypeRef>(MangledName, GenericParams);
+  create(std::string MangledName, TypeRefVector GenericParams,
+         TypeRefPointer Parent = nullptr) {
+    return std::make_shared<BoundGenericTypeRef>(MangledName, GenericParams,
+                                                 Parent);
   }
 
   std::string getMangledName() const {
     return MangledName;
   }
 
-  const GenericArgumentMap &getGenericParams() const {
+  const TypeRefVector &getGenericParams() const {
     return GenericParams;
   }
+  ConstTypeRefPointer getParent() const {
+    return Parent;
+  }
+
+  TypeRefPointer getParent() {
+    return Parent;
+  }
+
+  void setParent(TypeRefPointer P) {
+    Parent = P;
+  }
+
+  unsigned getDepth() const;
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::BoundGeneric;
@@ -300,24 +336,24 @@ public:
 };
 
 class GenericTypeParameterTypeRef final : public TypeRef {
-  const uint32_t Index;
   const uint32_t Depth;
+  const uint32_t Index;
 
 public:
-  GenericTypeParameterTypeRef(uint32_t Index, uint32_t Depth)
-    : TypeRef(TypeRefKind::GenericTypeParameter), Index(Index), Depth(Depth) {}
+  GenericTypeParameterTypeRef(uint32_t Depth, uint32_t Index)
+    : TypeRef(TypeRefKind::GenericTypeParameter), Depth(Depth), Index(Index) {}
 
   static std::shared_ptr<GenericTypeParameterTypeRef>
-  create(uint32_t Index, uint32_t Depth) {
-    return std::make_shared<GenericTypeParameterTypeRef>(Index, Depth);
-  }
-
-  uint32_t getIndex() const {
-    return Index;
+  create(uint32_t Depth, uint32_t Index) {
+    return std::make_shared<GenericTypeParameterTypeRef>(Depth, Index);
   }
 
   uint32_t getDepth() const {
     return Depth;
+  }
+
+  uint32_t getIndex() const {
+    return Index;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -421,8 +457,10 @@ class TypeRefSubstitution
 public:
   using TypeRefVisitor<TypeRefSubstitution<Runtime>, TypeRefPointer>::visit;
   TypeRefSubstitution(ReflectionContext<Runtime> &RC,
+                      GenericArgumentMap Substitutions,
                       StoredPointer MetadataAddress)
-  : RC(RC), Substitutions(RC.getGenericArguments(MetadataAddress)),
+  : RC(RC),
+    Substitutions(Substitutions),
     MetadataAddress(MetadataAddress) {}
 
   TypeRefPointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
@@ -434,10 +472,10 @@ public:
   }
 
   TypeRefPointer visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    GenericArgumentMap GenericParams;
+    TypeRefVector GenericParams;
     for (auto Param : BG->getGenericParams())
-      if (auto Substituted = visit(Param.second.get()))
-        GenericParams.insert({Param.first, Substituted});
+      if (auto Substituted = visit(Param.get()))
+        GenericParams.push_back(Substituted);
       else return nullptr;
     return std::make_shared<BoundGenericTypeRef>(BG->getMangledName(),
                                                  GenericParams);
@@ -496,10 +534,7 @@ public:
 
   TypeRefPointer
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
-    auto Sub = Substitutions.find({GTP->getIndex(), GTP->getDepth()});
-    if (Sub == Substitutions.end())
-      return nullptr;
-    return Sub->second;
+    return Substitutions[{GTP->getDepth(), GTP->getIndex()}];
   }
 
   TypeRefPointer
@@ -548,9 +583,10 @@ public:
 };
 
 template <typename Runtime>
-TypeRefPointer TypeRef::substituteGenerics(ReflectionContext<Runtime> &RC,
-                                           typename Runtime::StoredPointer MetadataAddress) {
-  return TypeRefSubstitution<Runtime>(RC, MetadataAddress).visit(this);
+TypeRefPointer
+TypeRef::subst(ReflectionContext<Runtime> &RC, GenericArgumentMap Subs,
+               typename Runtime::StoredPointer MetadataAddress) {
+  return TypeRefSubstitution<Runtime>(RC, Subs, MetadataAddress).visit(this);
 }
 
 } // end namespace reflection

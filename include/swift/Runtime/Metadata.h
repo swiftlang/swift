@@ -1949,6 +1949,11 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   StoredPointer offsetToDescriptorOffset() const {
     return offsetof(TargetValueMetadata<Runtime>, Description);
   }
+
+  StoredPointer offsetToParentOffset() const {
+    return offsetof(TargetValueMetadata<Runtime>, Parent);
+  }
+  
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 

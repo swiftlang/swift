@@ -344,13 +344,41 @@ public:
     return SharedProtocolDescriptorRef<Runtime>(Casted, free);
   }
 
-  std::map<std::pair<unsigned, unsigned>, TypeRefPointer>
-  getGenericArguments(StoredPointer MetadataAddress){
+  StoredPointer getParentAddress(StoredPointer MetadataAddress) {
+    auto Meta = readMetadata(MetadataAddress);
+    StoredPointer ParentAddress = 0;
+    if (auto ValueMeta = dyn_cast<TargetValueMetadata<Runtime>>(Meta.get())) {
+      auto AddressOfParentAddress
+        = resolveRelativeOffset<StoredPointer>(MetadataAddress +
+                                             ValueMeta->offsetToParentOffset());
+      if (!Reader.readInteger(AddressOfParentAddress, &ParentAddress))
+        return 0;
+    } else if (auto Class = dyn_cast<TargetClassMetadata<Runtime>>(Meta.get())){
+      StoredPointer DescriptorAddress;
+      SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
+      std::tie(Descriptor, DescriptorAddress)
+        = readNominalTypeDescriptor(MetadataAddress);
+      TypeRefVector Substitutions;
+      auto OffsetToParent
+        = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset - 1);
+      if (!Reader.readInteger(MetadataAddress + OffsetToParent, &ParentAddress))
+        return 0;
+    }
+    return ParentAddress;
+  }
+
+  unsigned getNominalTypeDepth(StoredPointer MetadataAddress) {
+    if (auto ParentAddress = getParentAddress(MetadataAddress))
+      return 1 + getNominalTypeDepth(ParentAddress);
+    return 0;
+  }
+
+  TypeRefVector getGenericSubst(StoredPointer MetadataAddress){
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
       = readNominalTypeDescriptor(MetadataAddress);
-    std::map<std::pair<unsigned, unsigned>, TypeRefPointer> GenericArgTypeRefs;
+    TypeRefVector Substitutions;
     auto NumGenericParams = Descriptor->GenericParams.NumPrimaryParams;
     auto OffsetToGenericArgs
       = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset);
@@ -364,12 +392,11 @@ public:
                                 &GenericArgAddress))
           return {};
       if (auto GenericArg = getTypeRef(GenericArgAddress))
-        // FIXME: Get depth of generic argument when supported
-        GenericArgTypeRefs.insert({{i, 0}, GenericArg});
+        Substitutions.push_back(GenericArg);
       else
         return {};
     }
-    return GenericArgTypeRefs;
+    return Substitutions;
   }
 
   TypeRefPointer
@@ -394,12 +421,21 @@ public:
     if (!DemangleNode)
       return nullptr;
 
+    TypeRefPointer Parent;
+    if (auto ParentAddress = getParentAddress(MetadataAddress))
+      Parent = getTypeRef(ParentAddress);
+
     TypeRefPointer Nominal;
     if (Descriptor->GenericParams.NumPrimaryParams) {
-      auto Args = getGenericArguments(MetadataAddress);
-      Nominal = BoundGenericTypeRef::create(MangledName, Args);
+      auto Args = getGenericSubst(MetadataAddress);
+      auto BG = BoundGenericTypeRef::create(MangledName, Args);
+      BG->setParent(Parent);
+      Nominal = BG;
     } else {
-      Nominal = TypeRef::fromDemangleNode(DemangleNode);
+      auto TR = TypeRef::fromDemangleNode(DemangleNode);
+      auto N = cast<NominalTypeRef>(TR.get());
+      N->setParent(Parent);
+      Nominal = TR;
     }
     TypeRefCache.insert({MetadataAddress, Nominal});
     return Nominal;
@@ -535,6 +571,9 @@ public:
     if (MangledName.empty())
       return {};
 
+    auto TR = getTypeRef(MetadataAddress);
+    auto Subs = TR->getSubstMap();
+
     for (auto Info : ReflectionInfos) {
       for (auto &FieldDescriptor : Info.fieldmd) {
         auto CandidateMangledName = FieldDescriptor.MangledTypeName.get();
@@ -546,9 +585,7 @@ public:
           auto Unsubstituted = TypeRef::fromDemangleNode(Demangled);
           if (!Unsubstituted)
             return {};
-          auto Subs = getGenericArguments(MetadataAddress);
-          auto Substituted = Unsubstituted->substituteGenerics(*this,
-                                                               MetadataAddress);
+          auto Substituted = Unsubstituted->subst(*this, Subs, MetadataAddress);
           Fields.push_back({Field.getFieldName(), Substituted});
         }
       }
