@@ -20,6 +20,7 @@
 #include "swift/Strings.h"
 
 #include <cstdio>
+#include <cstdarg>
 #include <mutex> // std::once
 
 using namespace swift;
