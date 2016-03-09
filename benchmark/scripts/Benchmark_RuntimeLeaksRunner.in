@@ -78,8 +78,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             p = subprocess.Popen([data['path'], "--run-all", "--num-samples=2",
                                   "--num-iters={}".format(2), data['test_name']],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            p.wait()
-            error_out = p.stderr.readlines()
+            error_out = p.communicate()[1].split("\n")
         except OSError:
             print("Child Process Failed! (%s,%s)" % (data['path'], data['test_name']))
             return LeaksRunnerResult(test_name, True)
