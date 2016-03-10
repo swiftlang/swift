@@ -332,4 +332,19 @@ OptionalTests.test("unsafelyUnwrapped") {
   empty.unsafelyUnwrapped
 }
 
+OptionalTests.test("ifPresent") {
+  var result: String? = nil
+  var input: String? = nil
+  func f(value: String) {
+    result = value
+  }
+
+  input.ifPresent(f)
+  expectTrue(result == nil)
+
+  input = "passed"
+  input.ifPresent(f)
+  expectOptionalEqual("passed", result)
+}
+
 runAllTests()
